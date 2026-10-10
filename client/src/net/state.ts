@@ -1,4 +1,4 @@
-import type { ClockState, Dispatch, ServerMessage, SideView } from '@kriegsspiel/protocol';
+import type { ClockState, Dispatch, ServerMessage, Side, SideView } from '@kriegsspiel/protocol';
 
 /** An order this client sent that the server has not rejected. The server reports no delivery estimate yet. */
 export interface PendingOrder {
@@ -11,6 +11,12 @@ export interface PendingOrder {
 export interface Notice {
   code: string;
   message: string;
+}
+
+export interface GameOver {
+  winner: Side | null;
+  reason: Extract<ServerMessage, { kind: 'gameOver' }>['reason'];
+  atGame: number;
 }
 
 export type LinkStatus = 'connecting' | 'open' | 'closed' | 'offline';
@@ -33,6 +39,8 @@ export interface ClientState {
   clock?: ClockAnchor;
   staffAtWork: boolean;
   pending: PendingOrder[];
+  /** Set once the server says the game has ended. */
+  gameOver?: GameOver;
   /** Newest last; the HUD shows the latest few. */
   notices: Notice[];
 }
@@ -84,6 +92,8 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       return { ...s, clock: anchorOf(m.clock.gameMsAtAnchor, m.clock, nowWall) };
     case 'staffAtWork':
       return { ...s, staffAtWork: m.working };
+    case 'gameOver':
+      return { ...s, gameOver: { winner: m.winner, reason: m.reason, atGame: m.atGame } };
     case 'error': {
       const id = orderIdOf(m.message);
       const dropped = id === undefined ? s.pending : s.pending.filter((p) => p.orderId !== id);

@@ -2,7 +2,7 @@
 import { PROTOCOL_VERSION, type Dispatch, type ServerMessage } from '@kriegsspiel/protocol';
 import { describe, expect, it } from 'vitest';
 import { fixtureView } from '../table/fixture.js';
-import { Hud, buildOrderText, clockText, orderPrefix } from '../hud/hud.js';
+import { Hud, buildOrderText, clockText, gameOverText, orderPrefix } from '../hud/hud.js';
 import { parseSession, wsUrl } from '../session.js';
 import { GameConnection, type WebSocketLike } from './connection.js';
 import {
@@ -72,6 +72,26 @@ describe('applyServerMessage', () => {
     s = applyServerMessage(s, m, 0);
     expect(s.pending.map((p) => p.orderId)).toEqual(['o2']);
     expect(s.notices[0]?.message).toBe('o1: no such unit');
+  });
+});
+
+describe('game over', () => {
+  const over: ServerMessage = {
+    v,
+    kind: 'gameOver',
+    winner: 'blue',
+    reason: 'objective-held',
+    atGame: 3_600_000,
+  };
+
+  it('stores the result and words it for the viewer’s side', () => {
+    let s = applyServerMessage(initialState, { v, kind: 'viewUpdate', view: fixtureView }, 0);
+    s = applyServerMessage(s, over, 0);
+    expect(s.gameOver).toEqual({ winner: 'blue', reason: 'objective-held', atGame: 3_600_000 });
+    const text = gameOverText(s)!;
+    expect(text).toContain(fixtureView.side === 'blue' ? 'Victory' : 'Defeat');
+    expect(text).toContain('Day 1 01:00');
+    expect(gameOverText(initialState)).toBeUndefined();
   });
 });
 
@@ -262,6 +282,39 @@ describe('Hud', () => {
     expect(sent).toEqual([['blue-2', '2nd Battalion, advance to the bridge']]);
     expect(text.value).toBe('');
     expect(orderPrefix(fixtureView, 'nope')).toBe('');
+  });
+
+  it('shows the result and stops accepting orders once the game is over', () => {
+    const { hud, sent } = mount();
+    const running = applyServerMessage(
+      initialState,
+      { v, kind: 'viewUpdate', view: fixtureView },
+      0,
+    );
+    const q = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
+    hud.render(running, 0);
+    expect(q('#order-text').hasAttribute('disabled')).toBe(false);
+    expect(q('#order-send').hasAttribute('disabled')).toBe(false);
+    expect(q('#order-unit').hasAttribute('disabled')).toBe(false);
+    expect(q('#gameover').hidden).toBe(true);
+
+    const over = applyServerMessage(
+      running,
+      { v, kind: 'gameOver', winner: 'blue', reason: 'objective-held', atGame: 3_600_000 },
+      0,
+    );
+    hud.render(over, 0);
+    expect(q('#order-text').hasAttribute('disabled')).toBe(true);
+    expect(q('#order-send').hasAttribute('disabled')).toBe(true);
+    expect(q('#order-unit').hasAttribute('disabled')).toBe(true);
+    expect(q('#gameover').hidden).toBe(false);
+    expect(q('#gameover').textContent).toBe(gameOverText(over));
+
+    const text = q<HTMLTextAreaElement>('#order-text');
+    text.value = '1st Battalion, advance';
+    q<HTMLButtonElement>('#order-send').click();
+    text.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true }));
+    expect(sent).toEqual([]);
   });
 
   it('replaces the auto-inserted prefix when another unit is selected, but keeps typed text', () => {

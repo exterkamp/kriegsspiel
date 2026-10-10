@@ -23,6 +23,26 @@ export function clockText(state: ClientState, nowWall: number): string {
   return `${formatGameTime(gameNowMs(state.clock, nowWall))} · ${formatRate(rate)} · ${status}`;
 }
 
+const REASON_TEXT = {
+  'objective-taken': 'the objective was taken',
+  'objective-held': 'the objective was held',
+  eliminated: 'the opposing force was eliminated',
+  withdrawn: 'the opposing force withdrew',
+};
+
+/** Text for the end-of-game panel, or undefined while the game runs. Pure, so it can be tested without a DOM. */
+export function gameOverText(state: ClientState): string | undefined {
+  const g = state.gameOver;
+  if (!g) return undefined;
+  const who =
+    g.winner === null
+      ? 'Both sides were put out of the fight'
+      : g.winner === state.view?.side
+        ? 'Victory'
+        : `Defeat: ${g.winner} wins`;
+  return `${who}: ${REASON_TEXT[g.reason]}. Game time elapsed ${formatGameTime(g.atGame)}.`;
+}
+
 /** Name to put in the order box for a unit. The parser addresses units by name prefix. */
 export function orderPrefix(view: SideView | undefined, unitId: string): string {
   const u = view?.ownUnits.find((o) => o.id === unitId);
@@ -69,6 +89,7 @@ export class Hud {
     root.insertAdjacentHTML(
       'beforeend',
       `<section id="clock" aria-label="Clock"><b id="clock-text"></b> <span id="link"></span><span id="staff" hidden> · staff at work</span></section>
+       <section id="gameover" aria-label="Game over" role="status" hidden></section>
        <section id="orders" aria-label="Orders">
          <h2>Orders</h2>
          <select id="order-unit" aria-label="Unit"></select>
@@ -90,6 +111,8 @@ export class Hud {
     this.trayEl = q('#tray-list');
     this.noticeEl = q('#notices');
     this.staffEl = q('#staff');
+    this.overEl = q('#gameover');
+    this.sendBtn = q('#order-send');
     q('#order-send').addEventListener('click', () => this.send());
     this.textEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) this.send();
@@ -102,6 +125,8 @@ export class Hud {
   }
 
   private readonly staffEl: HTMLElement;
+  private readonly overEl: HTMLElement;
+  private readonly sendBtn: HTMLButtonElement;
 
   /** Choose a unit (for example after a click on the table) and start its order. */
   selectUnit(unitId: string): void {
@@ -116,6 +141,7 @@ export class Hud {
   }
 
   private send(): void {
+    if (this.latest?.gameOver) return;
     const text = this.textEl.value.trim();
     if (!text) return;
     const err = this.h.onSendOrder(this.unitSel.value || undefined, text);
@@ -133,6 +159,10 @@ export class Hud {
     this.tick(nowWall);
     this.linkEl.textContent = LINK_LABEL[state.link];
     this.staffEl.hidden = !state.staffAtWork;
+    const over = gameOverText(state);
+    this.overEl.hidden = over === undefined;
+    this.overEl.textContent = over ?? '';
+    this.textEl.disabled = this.sendBtn.disabled = this.unitSel.disabled = over !== undefined;
     const units = state.view?.ownUnits ?? [];
     const uk = units.map((u) => `${u.id}|${u.name}`).join(';');
     if (uk !== this.unitsKey) {

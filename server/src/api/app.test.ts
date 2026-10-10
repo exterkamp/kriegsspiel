@@ -236,6 +236,31 @@ describe('views', () => {
   });
 });
 
+describe('game over', () => {
+  it('sends one notice to each side, stops the clock, and tells a late joiner at once', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    const b = await blue.waitFor('gameOver');
+    const r = await red.waitFor('gameOver');
+    expect(r).toEqual(b);
+    expect(Object.keys(b).sort()).toEqual(['atGame', 'kind', 'reason', 'v', 'winner']);
+    expect(app!.host.get(game.id)!.gameClock.status).toBe('stopped');
+
+    const late = await join(ws, game, 'red');
+    const l = await late.waitFor('gameOver');
+    expect(l).toEqual(b);
+    // Force further pushes after the notice: only the per-connection guard keeps it to one.
+    for (let i = 0; i < 3; i++) app!.hub.notify(game.id);
+    blue.send(JSON.stringify({ v, kind: 'issueOrder', orderId: 'after', text: 'hold' }));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    for (const c of [blue, red, late]) {
+      expect(c.messages.filter((m) => m.kind === 'gameOver')).toHaveLength(1);
+    }
+  });
+});
+
 describe('orders', () => {
   it('delivers the order after the courier ride, then sends the dispatch', async () => {
     const { base, ws } = await start();

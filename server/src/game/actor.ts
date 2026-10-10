@@ -16,7 +16,6 @@
  * restate) and logged.
  */
 import {
-  advanceTo,
   deserialize,
   featureAnchor,
   serialize,
@@ -37,7 +36,7 @@ import {
 } from '../debug/trace.js';
 import type { OrderParser, ParseContext, ParseResult } from '../orders/index.js';
 import type { SideAgent } from '../opponent/index.js';
-import { applyLoggedOrder } from './replay.js';
+import { advanceUntilOver, applyLoggedOrder } from './replay.js';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
 /** Timer functions, injectable so tests can run on a fake clock. */
@@ -274,7 +273,7 @@ export class GameActor {
   private advanceEngine(target: number): void {
     const emitted: EmittedEvent[] = [];
     const step = (to: number) => {
-      const res = advanceTo(this.engine, to, this.registry);
+      const res = advanceUntilOver(this.engine, to, this.registry);
       this.engine = res.state;
       emitted.push(...res.emitted);
       // Something happened, so an agent that found nothing to do may now have something.
@@ -291,6 +290,8 @@ export class GameActor {
       }
       step(target);
     } finally {
+      // A finished game does not run on.
+      if (this.engine.world.outcome && this.clock.status !== 'stopped') this.clock.stop();
       if (emitted.length > 0) {
         if (this.trace.enabled) {
           for (const event of emitted) this.trace.record(this.id, 'engine', event);

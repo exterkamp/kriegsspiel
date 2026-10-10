@@ -79,6 +79,8 @@ async function play(rate: number | 'fast-forward', untilMs: number | 'end'): Pro
     if (fast) await game.submit({ kind: 'advanceTo', gameMs: step.atMs });
     else await time.advance((step.atMs - at) / (rate as number));
     at = step.atMs;
+    // The advance may have ended the game; nobody signs orders in a finished game.
+    if (game.state.world.outcome) break;
     await game.submit({ kind: 'order', side: 'blue', text: step.text });
   }
   if (fast) {
@@ -173,7 +175,12 @@ describe('end-to-end headless game', () => {
 
   it('gives identical final states and event logs at rates 1, 4, 12 and fast-forward', async () => {
     const base = await play(1, HORIZON_MS);
-    expect(base.state.time).toBe(HORIZON_MS);
+    // The scenario is decided before the horizon, and a finished game does not run on: the clock
+    // stops at the outcome, so every rate ends at the outcome's game time.
+    const outcome = base.state.world.outcome;
+    expect(outcome).toBeTruthy();
+    expect(base.state.time).toBe(outcome!.time);
+    expect(base.state.time).toBeLessThan(HORIZON_MS);
     expect(base.events.length).toBeGreaterThan(0);
     const baseLog = await logOf(base.store);
     expect(baseLog.some((e) => e.agent)).toBe(true);
