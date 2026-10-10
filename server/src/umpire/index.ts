@@ -33,6 +33,13 @@ export { ProviderUmpireClient } from './providerUmpireClient.js';
 export type { ProviderUmpireClientOptions } from './providerUmpireClient.js';
 export { BudgetedUmpireClient, RateLimitedUmpireClient } from './decorators.js';
 export type { BudgetOptions, RateLimitOptions } from './decorators.js';
+export { GameUmpireClient, createGameUmpire } from './gameLimits.js';
+export type {
+  GameLimits,
+  GameUmpireMetric,
+  GameUmpireOptions,
+  GameUmpireReport,
+} from './gameLimits.js';
 export { PlaybackUmpireClient } from './playbackUmpireClient.js';
 export { createUmpireClient } from './createUmpireClient.js';
 export type { CreateUmpireClientOptions } from './createUmpireClient.js';
@@ -57,6 +64,7 @@ export {
   NARRATE_SCHEMA,
   NARRATE_SYSTEM,
   NARRATE_WINDOW_BASE_MS,
+  STAFF_OVERLOADED_NOTICE,
   checkNarration,
   checkProse,
   narrateInput,
