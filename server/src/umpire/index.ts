@@ -52,3 +52,16 @@ export {
   judgePlacements,
 } from './judgePlacement.js';
 export type { JudgePlacementOutput } from './judgePlacement.js';
+export {
+  NARRATE_PROMPT_VERSION,
+  NARRATE_SCHEMA,
+  NARRATE_SYSTEM,
+  NARRATE_WINDOW_BASE_MS,
+  checkNarration,
+  checkProse,
+  narrateInput,
+  narrateReports,
+  narrateWindowMs,
+  reportsDueForNarration,
+} from './narrate.js';
+export type { NarrateOptions, NarrateOutput, NarrateResult, NarratedDispatch } from './narrate.js';
