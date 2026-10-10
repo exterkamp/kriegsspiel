@@ -167,6 +167,39 @@ describe('crash recovery', () => {
     });
   }
 
+  it('recovers an order that was mid-parse when other commands snapshotted', async () => {
+    const path = tmpDb();
+    const time = new FakeTime();
+    let release!: () => void;
+    const slow: OrderParser = {
+      parse: async (text) => {
+        await new Promise<void>((r) => (release = r));
+        return { kind: 'intents', text, unitId: 'blue-1', intents: [{ kind: 'move', to: BRIDGE }] };
+      },
+    };
+    const host = new GameHost({
+      store: open(path),
+      parser: slow,
+      registry: registry(),
+      wallNow: time.now,
+      timers: time,
+    });
+    hosts.push(host);
+    const game = await host.create('g1', loadScenario(holdTheBridge), { rate: 12 });
+    const done = game.submit(order);
+    await time.advance(1_000);
+    // Served while the order is parsing: its seq is lower, but it is logged first.
+    await game.submit({ kind: 'setRate', rate: 4 });
+    release();
+    await done;
+    await game.submit({ kind: 'pause' });
+    const before = serialize(game.state);
+
+    const time2 = new FakeTime(time.now() + 1_000);
+    const reopened = await hostFor(open(path), time2).open('g1');
+    expect(serialize(reopened.state)).toBe(before);
+  });
+
   it('replay from the database equals the in-memory run', async () => {
     const path = tmpDb();
     const time = new FakeTime();

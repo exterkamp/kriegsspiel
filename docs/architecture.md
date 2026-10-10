@@ -81,6 +81,7 @@ LLM calls take real seconds, and game time keeps flowing. At high rates, a short
 - Parsing starts at issue time, in the background, while the courier travels.
 - The engine **does not advance past an unresolved dependency**. The effective game time is `min(clockNow, earliestPendingDependency)`. If the LLM is slow, game time briefly stalls, the clock re-anchors when the result arrives, and the client shows a short "staff at work" indicator.
 - Under normal use the parse finishes long before the courier arrives, so the barrier rarely engages. It exists so correctness doesn't depend on timing.
+- Implementation: `GameClock.setBarrier(t)` holds game time at `t`; lifting or raising it re-anchors the clock, so game time resumes where it stopped. The actor keeps the registry of pending dependencies, sets the barrier to the earliest, and emits a `staffAtWork` message when the set changes. Today the only dependency is an order parse, needed at the signing time (the addressee comes from the parse), so a parse stalls game time for its duration; the architecture above (parse overlapping the courier ride) needs addressing split from intents.
 - LLM failures retry, then fall back to a conservative interpretation ("unit holds and awaits clarification") and log it.
 
 ## Pause and voting

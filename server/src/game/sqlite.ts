@@ -19,6 +19,8 @@ import type { GameSnapshot, GameStore, InputLogEntry, InputLogHeader, SideViews 
  * an entry once released: add a new one.
  */
 export const MIGRATIONS: readonly string[] = [
+  // input_log keeps its rowid: the log is read in insertion order, which is not always seq order
+  // (an order takes its seq at signing but is appended when its parse completes).
   `CREATE TABLE games (
      game_id TEXT PRIMARY KEY,
      scenario_id TEXT NOT NULL,
@@ -30,7 +32,7 @@ export const MIGRATIONS: readonly string[] = [
      seq INTEGER NOT NULL,
      entry TEXT NOT NULL,
      PRIMARY KEY (game_id, seq)
-   ) WITHOUT ROWID;
+   );
    CREATE TABLE snapshots (
      game_id TEXT NOT NULL,
      seq INTEGER NOT NULL,
@@ -129,7 +131,7 @@ export class SqliteGameStore implements GameStore {
 
   async inputLog(gameId: string, afterSeq = 0): Promise<readonly InputLogEntry[]> {
     const rows = this.db
-      .prepare('SELECT entry FROM input_log WHERE game_id = ? AND seq > ? ORDER BY seq')
+      .prepare('SELECT entry FROM input_log WHERE game_id = ? AND seq > ? ORDER BY rowid')
       .all(gameId, afterSeq) as { entry: string }[];
     return rows.map((r) => JSON.parse(r.entry) as InputLogEntry);
   }
