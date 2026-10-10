@@ -505,3 +505,32 @@ it.each([false, true])(
     expect(vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks).toHaveLength(1);
   },
 );
+
+it('autosaves the last order keystroke across desk navigation without enabling signing', async () => {
+  window.localStorage.clear();
+  await mountPlottingApp();
+  const navigate = async (label: string) => {
+    Array.from(target.querySelectorAll('nav.desk button'))
+      .find((button) => button.textContent?.includes(label))!
+      .click();
+    await flush();
+  };
+  await navigate('Orders');
+  const draft = target.querySelector<HTMLTextAreaElement>(
+    '[aria-label="Local order draft"] textarea',
+  )!;
+  draft.value = 'Hold the bridge until further orders.';
+  draft.dispatchEvent(new Event('input', { bubbles: true }));
+  await flush();
+  await navigate('Journal');
+  expect(target.querySelector('[aria-label="Local order draft"]')).toBeNull();
+  await navigate('Orders');
+  expect(
+    target.querySelector<HTMLTextAreaElement>('[aria-label="Local order draft"] textarea')!.value,
+  ).toBe('Hold the bridge until further orders.');
+  const sign = Array.from(target.querySelectorAll('button')).find(
+    (button) => button.textContent === 'Sign and send',
+  )!;
+  expect(sign.disabled).toBe(true);
+  window.localStorage.clear();
+});

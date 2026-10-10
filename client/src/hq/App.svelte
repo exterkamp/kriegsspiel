@@ -12,6 +12,7 @@
   import Roster from './views/roster/Roster.svelte';
   import Journal from './views/journal/Journal.svelte';
   import InTray from './views/intray/InTray.svelte';
+  import Orders from './views/orders/Orders.svelte';
   import Clock from './views/clock/Clock.svelte';
   import Marks from './interactions/marks/Marks.svelte';
   import {
@@ -235,6 +236,8 @@
         scope={source.scope}
         onPlotPaper={(id) => plotPaper(context, id)}
       />
+    {:else if context.state.view === 'orders'}
+      <Orders snapshot={context.sourceState.snapshot} scope={source.scope} />
     {:else if context.state.view === 'journal'}
       <Journal snapshot={context.sourceState.snapshot} scope={source.scope} />
     {:else}
