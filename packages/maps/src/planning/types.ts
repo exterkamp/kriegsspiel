@@ -33,6 +33,8 @@ export interface PlanningInput {
   boundarySides?: ('north' | 'east' | 'south' | 'west')[];
   /** Requires an actually linked bridge in the successful regional network. */
   requireBridge?: boolean;
+  /** Derived layout preference, bounded by the recorded site area/extent limits. */
+  preferredSiteExtentM?: { village?: number; farm?: number };
 }
 export interface DeckProfile {
   crossingId: string;

@@ -29,7 +29,7 @@ export function siteExtent(c: Context, kind: 'village' | 'farm'): number {
       'permissible extents',
       'No extent satisfies the recorded site area/extent interval.',
     );
-  const desired = lo,
+  const desired = Math.max(lo, c.preferredSiteExtentM[kind] ?? lo),
     step = c.spacing;
   const rounded = Math.ceil(desired / step) * step;
   return decimal6(rounded <= hi ? rounded : desired);

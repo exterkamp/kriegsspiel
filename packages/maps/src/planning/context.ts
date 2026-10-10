@@ -45,6 +45,7 @@ export class Context {
   readonly columns: number;
   readonly rows: number;
   readonly cells: number;
+  readonly preferredSiteExtentM: { village?: number; farm?: number };
   readonly gradientCells = new Map<number, { dx: number; dy: number; dxy: number; dyx: number }>();
   expansions = 0;
   placementAttempts = 0;
@@ -56,6 +57,20 @@ export class Context {
     this.settings = checkField(input.elevation, input.bounds, input.settings);
     deriveSeed(input.seed, 'planning:v1');
     const s = this.settings;
+    const preferred = input.preferredSiteExtentM === undefined ? {} : input.preferredSiteExtentM;
+    if (typeof preferred !== 'object' || preferred === null || Array.isArray(preferred))
+      throw new RangeError('Invalid preferred site extents');
+    this.preferredSiteExtentM = {};
+    for (const [kind, extent] of Object.entries(preferred)) {
+      if (kind !== 'village' && kind !== 'farm')
+        throw new RangeError('Unknown preferred site kind');
+      const config = kind === 'village' ? s.settlements.villageSite : s.settlements.farmSite;
+      const minimum = Math.max(config.minExtentM, Math.sqrt(config.minAreaM2));
+      const maximum = Math.min(config.maxExtentM, Math.sqrt(config.maxAreaM2));
+      if (!Number.isFinite(extent) || extent! < minimum || extent! > maximum)
+        throw new RangeError(`Preferred ${kind} extent is outside recorded area/extent limits`);
+      this.preferredSiteExtentM[kind] = extent;
+    }
     if (
       input.limits?.maxOutputFeatures !== undefined &&
       (!Number.isSafeInteger(input.limits.maxOutputFeatures) ||

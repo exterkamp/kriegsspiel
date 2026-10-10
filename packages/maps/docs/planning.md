@@ -361,3 +361,15 @@ propagates callback exceptions without changing their identity. Composition can
 bind the fork's local callback budget during an authority call while retaining
 the factory's aggregate global budget; work is never charged only after a query
 has already run. This hook is not serialized as a generation input.
+
+## Derived site sizing preference
+
+Composition may supply `preferredSiteExtentM` for villages or farms. Preferences
+are descriptor-safe, finite, and inside the intersection of the recorded area
+and extent intervals. They are checked before terrain query allocations and
+copied into the planning context. The planner rounds upward on its existing
+lattice when that remains inside the interval; otherwise it uses the permitted
+preference. Omitted preferences retain the accepted minimum-size behavior.
+Whole permissible-area certificates, spacing, topology and independent sizing
+validation still apply. The caller records any content-affecting derived sizing
+policy in its generator version; preferences do not overwrite saved settings.
