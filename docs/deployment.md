@@ -20,6 +20,15 @@ Compose reads the shell environment and a git-ignored `.env` next to `docker-com
 | `BACKUP_KEEP` | `14` | Number of newest backups kept |
 | `BACKUP_HOUR_UTC` | `3` | Hour of the nightly backup |
 
+Login needs two more settings (see D17 in [decisions.md](decisions.md)); add them to the `environment:` of the `kriegsspiel` service or pass them through `.env`:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PUBLIC_URL` | `http://localhost:$PORT` | Origin that login links point at. Set it to the https address players use; an https value also marks the session cookie `Secure` |
+| `TRUST_PROXY` | off | Set to `1` behind a reverse proxy so the login rate limits use the caller's `X-Forwarded-For` address. Without it every request shares the proxy's address and the per-address limits become global (20 login mails an hour for everyone). Leave it off when the port is reachable directly, because the header can then be forged to dodge the limits |
+| `MAIL_WEBHOOK_URL` | unset | The server POSTs `{to, subject, text}` JSON here to send the login link. Unset, the link is written to the server log (development only: anyone who can read the log can sign in) |
+| `MAIL_WEBHOOK_TOKEN` | unset | Optional bearer token sent to the webhook |
+
 Inside the container the server uses `HOST`, `PORT`, `DB_PATH` (`/data/games.db`) and `STATIC_DIR` (the built client); see `server/src/main.ts`. Without `DB_PATH` the server keeps games in memory. `GET /healthz` returns `{"ok":true}` and backs the container health check.
 
 ## Data and logs
@@ -49,4 +58,4 @@ Verified once on 2026-10-10: a game was created, backed up, the database file de
 
 ## Known limits
 
-The server does not yet reload stored games or side tokens when it restarts (tokens are in memory), so a restart or restore keeps the data for replay and inspection but players need a new game. That belongs with accounts in Epic #5.
+Accounts and seats are stored in the same database file, so they survive a restart and are included in backups. The server does not yet reload stored games when it restarts, so a restart or restore keeps the data for replay and inspection but players need a new game.
