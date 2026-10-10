@@ -1,0 +1,12 @@
+{
+  "name": "@kriegsspiel/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host --port \"${PORT:-5173}\"",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}
