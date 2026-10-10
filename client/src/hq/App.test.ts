@@ -340,7 +340,7 @@ it('plots only by explicit paper action and retains frozen provenance through la
     },
   });
   await flush();
-  Array.from(target.querySelectorAll('nav.desk button'))
+  Array.from(target.querySelectorAll<HTMLButtonElement>('nav.desk button'))
     .find((b) => b.textContent?.includes('In-tray'))!
     .dispatchEvent(new MouseEvent('click', { bubbles: true }));
   await flush();
@@ -391,7 +391,7 @@ it('plots only by explicit paper action and retains frozen provenance through la
   expect(vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks[0]).toEqual(plotted);
 });
 
-async function mountPlottingApp() {
+async function mountPlottingApp(beforeMount?: (ports: ReturnType<typeof makePorts>) => void) {
   const { BrowserPersonalMarksRepository } = await import('./data/marks');
   vi.stubGlobal(
     'ResizeObserver',
@@ -406,6 +406,7 @@ async function mountPlottingApp() {
     removeEventListener() {},
   }));
   const ports = makePorts();
+  const marksStorage = { getItem: () => null, setItem: vi.fn() };
   Object.assign(ports.snapshot, {
     papers: [
       {
@@ -423,20 +424,22 @@ async function mountPlottingApp() {
       },
     ],
   });
+  beforeMount?.(ports);
   target = document.body.appendChild(document.createElement('div'));
   component = mount(App, {
     target,
     props: {
       ...ports,
       artwork,
-      marksRepository: new BrowserPersonalMarksRepository(ports.source.scope, artwork, () => ({
-        getItem: () => null,
-        setItem: () => {},
-      })),
+      marksRepository: new BrowserPersonalMarksRepository(
+        ports.source.scope,
+        artwork,
+        () => marksStorage,
+      ),
     },
   });
   await flush();
-  Array.from(target.querySelectorAll('nav.desk button'))
+  Array.from(target.querySelectorAll<HTMLButtonElement>('nav.desk button'))
     .find((b) => b.textContent?.includes('In-tray'))!
     .dispatchEvent(new MouseEvent('click', { bubbles: true }));
   await flush();
@@ -444,7 +447,7 @@ async function mountPlottingApp() {
     .find((b) => b.textContent?.includes('Open root-plot'))!
     .click();
   await flush();
-  return ports;
+  return { ...ports, marksStorage };
 }
 it('creates one report mark when subsequent navigation fails and explains the partial result persistently', async () => {
   const ports = await mountPlottingApp();
@@ -510,7 +513,7 @@ it('autosaves the last order keystroke across desk navigation without enabling s
   window.localStorage.clear();
   await mountPlottingApp();
   const navigate = async (label: string) => {
-    Array.from(target.querySelectorAll('nav.desk button'))
+    Array.from(target.querySelectorAll<HTMLButtonElement>('nav.desk button'))
       .find((button) => button.textContent?.includes(label))!
       .click();
     await flush();
@@ -533,4 +536,160 @@ it('autosaves the last order keystroke across desk navigation without enabling s
   )!;
   expect(sign.disabled).toBe(true);
   window.localStorage.clear();
+});
+
+it('places a captured report at chosen keyboard coordinates after report refresh without saving automatically', async () => {
+  const ports = await mountPlottingApp();
+  Array.from(target.querySelectorAll('button'))
+    .find((button) => button.textContent === 'Choose report coordinates')!
+    .click();
+  await flush();
+  expect(target.querySelector('h2[data-heading]')?.textContent?.trim()).toBe('Map table');
+  const panel = target.querySelector('[aria-label="Report placement"]')!;
+  expect(document.activeElement).toBe(panel.querySelector('input[name="east"]'));
+  const oldPaper = ports.snapshot.papers[0]!;
+  ports.emit({
+    connection: 'ready',
+    stale: false,
+    error: null,
+    snapshot: {
+      ...ports.snapshot,
+      ordinal: 2,
+      atGame: 20,
+      clock: { ...ports.snapshot.clock, authoritativeGameMs: 20 },
+      papers: [{ ...oldPaper, text: 'Fresher report text.', location: { x: 1500, y: 700 } }],
+    },
+  });
+  await flush();
+  for (const [name, value] of Object.entries({
+    east: '400.25',
+    south: '900.5',
+    label: 'Chosen belief',
+  })) {
+    const input = panel.querySelector<HTMLInputElement>(`input[name="${name}"]`)!;
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  panel
+    .querySelector('form')!
+    .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await flush();
+  const marks = vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks;
+  expect(marks).toHaveLength(1);
+  expect(marks[0]!.geometry).toEqual({ kind: 'pin', at: { x: 400.25, y: 900.5 } });
+  expect(marks[0]!.source).toMatchObject({
+    paperId: 'root-plot',
+    reportedLocation: { x: 1200.25, y: 300.5 },
+    excerpt: 'Captured report.',
+  });
+  expect(marks[0]!.placedAtGame).toBe(10);
+  expect(panel.textContent).toContain('Created locally; unsaved.');
+  expect(ports.marksStorage.setItem).not.toHaveBeenCalled();
+});
+
+it('retains a captured drag across InTray teardown and commits only an exposed final CSS drop', async () => {
+  const ports = await mountPlottingApp();
+  const hub = target.querySelector<HTMLElement>('.hq')!;
+  const canvas = target.querySelector('canvas')!;
+  let capture = false;
+  Object.assign(hub, {
+    setPointerCapture: vi.fn(() => {
+      capture = true;
+    }),
+    hasPointerCapture: vi.fn(() => capture),
+    releasePointerCapture: vi.fn(() => {
+      capture = false;
+    }),
+  });
+  vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    top: 0,
+    right: 800,
+    bottom: 400,
+    width: 800,
+    height: 400,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => canvas });
+  vi.mocked(ports.surface.pickAt).mockReturnValue({
+    ok: true,
+    value: { kind: 'map', at: { x: 2000.75, y: 800.25 } },
+  });
+  const pointer = (element: Element, type: string, x: number, y: number) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.assign(event, {
+      pointerId: 12,
+      pointerType: 'touch',
+      isPrimary: true,
+      button: 0,
+      clientX: x,
+      clientY: y,
+    });
+    element.dispatchEvent(event);
+  };
+  const handle = Array.from(target.querySelectorAll('button')).find(
+    (button) => button.textContent === 'Drag report to map',
+  )!;
+  pointer(handle, 'pointerdown', 200, 150);
+  await flush();
+  expect(target.querySelector('[aria-label="In-tray"]')).toBeNull();
+  expect(capture).toBe(true);
+  pointer(hub, 'pointermove', 250, 180);
+  pointer(hub, 'pointerup', 300, 190);
+  await flush();
+  expect(capture).toBe(false);
+  expect(ports.surface.pickAt).toHaveBeenLastCalledWith(300, 190);
+  expect(vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks[0]!.geometry).toEqual({
+    kind: 'pin',
+    at: { x: 2000.75, y: 800.25 },
+  });
+  canvas.dispatchEvent(
+    new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      detail: 1,
+      clientX: 300,
+      clientY: 190,
+    }),
+  );
+  await flush();
+  expect(vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks).toHaveLength(1);
+  delete (document as unknown as { elementFromPoint?: unknown }).elementFromPoint;
+});
+
+it('keeps delayed preference restoration from moving a camera reserved by report placement', async () => {
+  let complete!: () => void;
+  const ports = await mountPlottingApp((p) => {
+    const document = {
+      ...p.getDocument(),
+      camera: {
+        mapId: artwork.id,
+        mapRevision: artwork.revision,
+        target: { x: 100, y: 100 },
+        distanceM: 1000,
+        azimuthRad: 0,
+        tiltRad: 0,
+      },
+    };
+    vi.mocked(p.repository.load).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = () => resolve({ ok: true, value: { document, durability: 'session-memory' } });
+        }),
+    );
+  });
+  Array.from(target.querySelectorAll('button'))
+    .find((button) => button.textContent === 'Choose report coordinates')!
+    .click();
+  await flush();
+  expect(target.querySelector('h2[data-heading]')?.textContent?.trim()).toBe('Map table');
+  const restorations = vi.mocked(ports.surface.restoreCamera).mock.calls.length;
+  complete();
+  await flush();
+  expect(ports.surface.restoreCamera).toHaveBeenCalledTimes(restorations);
+  expect(target.querySelector('[aria-label="Report placement"]')?.textContent).toContain(
+    'Choose a map contact',
+  );
 });

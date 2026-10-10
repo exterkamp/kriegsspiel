@@ -233,6 +233,7 @@ export interface MapSurface {
   apply(presentation: MapPresentation, op: Operation): Promise<Result<void>>;
   resize(widthCssPx: number, heightCssPx: number, devicePixelRatio: number): Result<void>;
   setActive(active: boolean): Result<void>; // Suspend RAF/controls, retain scene/resources.
+  acquireControls(op: Operation): Result<Unsubscribe>; // Suppress camera gestures; RAF remains active.
   getCamera(): Result<CameraBookmark>;
   restoreCamera(camera: CameraBookmark): Result<void>;
   transitionTo(

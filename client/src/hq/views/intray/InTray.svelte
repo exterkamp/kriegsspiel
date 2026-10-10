@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, tick, untrack } from 'svelte';
+  import { onDestroy, tick, untrack, type Snippet } from 'svelte';
   import type { HqSnapshot, Scope, Result, Paper } from '../../contracts';
   import { createInTrayStore, sameScope, type StoragePort, type PaperStatus } from './store';
   import { categories, collectPapers, gameDate } from './papers';
@@ -8,11 +8,13 @@
     scope,
     storageFactory,
     onPlotPaper,
+    placementHandle,
   }: {
     snapshot: HqSnapshot | null;
     scope: Scope;
     storageFactory?: () => StoragePort;
     onPlotPaper?: (paperId: string) => Promise<Result<void>>;
+    placementHandle?: Snippet<[string]>;
   } = $props();
   const fixedScope = untrack(() => Object.freeze({ ...scope }));
   const store = untrack(() => createInTrayStore(fixedScope, storageFactory));
@@ -215,6 +217,7 @@
           disabled={!mutable}
           onclick={() => change('read')}>Restore to active</button
         >{/if}
+      {#if placementHandle && scopeValid}{@render placementHandle(opened.id)}{/if}
       <button disabled={!scopeValid || !opened.location || !onPlotPaper || plotting} onclick={plot}
         >Plot paper</button
       >

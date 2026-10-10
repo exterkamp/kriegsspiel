@@ -27,6 +27,9 @@
     clock,
     tableTools,
     marks = [],
+    interaction,
+    beforeMapAction,
+    interactionActive = false,
   }: {
     surface: MapSurface;
     source: HqDataSource;
@@ -37,9 +40,12 @@
     clock?: Snippet<[ShellViewContext]>;
     tableTools?: Snippet<[ShellViewContext]>;
     marks?: readonly PersonalMark[];
+    interaction?: Snippet<[ShellViewContext, HTMLElement, HTMLCanvasElement]>;
+    beforeMapAction?: () => void;
+    interactionActive?: boolean;
   } = $props();
-  let root: HTMLElement;
-  let canvas: HTMLCanvasElement;
+  let root = $state<HTMLElement>(null!);
+  let canvas = $state<HTMLCanvasElement>(null!);
   let nav = $state<HqNavigation>();
   let shellState = $state<ShellState>({
     scope: { gameId: '', sideId: '', playerId: '' },
@@ -59,6 +65,7 @@
   let alive = false;
   let life: AbortController;
   let applyController: AbortController | null = null;
+  let pendingApplications = $state(0);
   let applyQueue: Promise<unknown> = Promise.resolve();
   let saveQueue: Promise<unknown> = Promise.resolve();
   let newest: HqSnapshot | null = null;
@@ -79,6 +86,11 @@
           navigation: nav,
           surface,
           capabilities: source.capabilities,
+          mapReady: ready && pendingApplications === 0 && data.snapshot !== null,
+          reserveCamera: () => {
+            choices.camera++;
+            pendingCamera = null;
+          },
         }
       : null,
   );
@@ -96,11 +108,14 @@
           (el) => el.dataset.focusKey === key,
         )
       : null;
-    (object ?? root.querySelector<HTMLElement>(`[data-heading="${viewId}"]`))?.focus();
+    (object ?? root.querySelector<HTMLElement>(`[data-heading="${viewId}"]`))?.focus({
+      preventScroll: true,
+    });
   }
   let navigationTicket = 0;
   async function go(viewId: ViewId, key: string | null = null, restoring = false) {
     if (!ready) return;
+    if (!restoring) beforeMapAction?.();
     if (!restoring) choices.view++;
     const ticket = ++navigationTicket;
     busy = true;
@@ -125,6 +140,7 @@
     }
   }
   async function focusSelection() {
+    beforeMapAction?.();
     choices.camera++;
     const selection = shellState.selection;
     const piece = data.snapshot?.pieces.find(
@@ -240,9 +256,10 @@
     const selection = selectionFor(snapshot);
     const health = healthGeneration;
     const capturedMarks = structuredClone(annotations);
+    pendingApplications++;
     const apply = async () => {
-      if (!alive || controller.signal.aborted) return;
       try {
+        if (!alive || controller.signal.aborted) return;
         const result = await surface.apply(
           {
             scope: snapshot.scope,
@@ -276,11 +293,14 @@
         }
       } catch {
         if (alive && !controller.signal.aborted) error = 'The map presentation failed.';
+      } finally {
+        if (alive) pendingApplications--;
       }
     };
     applyQueue = applyQueue.then(apply, apply);
   }
   function snap(view: 'top-down' | 'oblique') {
+    beforeMapAction?.();
     choices.camera++;
     report(invoke(() => surface.snap(view)));
     persist();
@@ -296,7 +316,14 @@
     persist();
   }
   function pick(event: MouseEvent) {
-    if (!ready || busy || shellState.view !== 'table') return;
+    if (
+      event.defaultPrevented ||
+      interactionActive ||
+      !ready ||
+      busy ||
+      shellState.view !== 'table'
+    )
+      return;
     const result = invoke(() => surface.pickAt(event.clientX, event.clientY));
     if (!report(result) || result.value.kind !== 'piece') return;
     const hit = result.value;
@@ -481,21 +508,6 @@
   class:reduced-motion={motion()}
   aria-busy={busy}
 >
-  <div
-    class="map-layer"
-    role="region"
-    aria-label="Fixture map table"
-    class:at-desk={shellState.view !== 'table'}
-    inert={shellState.view !== 'table'}
-  >
-    <canvas
-      bind:this={canvas}
-      onclick={pick}
-      onpointerdown={() => choices.camera++}
-      onwheel={() => choices.camera++}
-      aria-label="Fixture knowledge map; select own pieces using the list below"
-    ></canvas>
-  </div>
   <header>
     <h1>Headquarters</h1>
     {#if clock && context}{@render clock(context)}{/if}
@@ -522,17 +534,36 @@
         ></button
       >{/each}
   </nav>
+  <div
+    class="map-layer"
+    role="region"
+    aria-label="Fixture map table"
+    class:at-desk={shellState.view !== 'table'}
+    inert={shellState.view !== 'table'}
+  >
+    <canvas
+      bind:this={canvas}
+      onclick={pick}
+      onpointerdown={() => choices.camera++}
+      onwheel={() => choices.camera++}
+      aria-label="Fixture knowledge map; select own pieces using the list below"
+    ></canvas>
+  </div>
   <main class:paper={shellState.view !== 'table'}>
     <h2 tabindex="-1" data-heading={shellState.view}>
       {routes.find((route) => route.view === shellState.view)?.label}
     </h2>
     {#if shellState.view === 'table'}
       <div class="map-tools">
-        <button disabled={!ready || busy} onclick={() => snap('top-down')}>Top-down</button>
-        <button disabled={!ready || busy} onclick={() => snap('oblique')}>Oblique</button>
+        <button disabled={!ready || busy || interactionActive} onclick={() => snap('top-down')}
+          >Top-down</button
+        >
+        <button disabled={!ready || busy || interactionActive} onclick={() => snap('oblique')}
+          >Oblique</button
+        >
         <label
           >Own-piece selection <select
-            disabled={!ready || busy}
+            disabled={!ready || busy || interactionActive}
             value={shellState.selection.kind === 'unit' ? shellState.selection.id : ''}
             onchange={(event) => {
               choices.selection++;
@@ -552,7 +583,7 @@
           ></label
         >
         <button
-          disabled={!ready || busy || shellState.selection.kind !== 'unit'}
+          disabled={!ready || busy || interactionActive || shellState.selection.kind !== 'unit'}
           onclick={focusSelection}>Focus selected piece</button
         >
       </div>
@@ -572,6 +603,7 @@
         : `${shellState.selection.kind} ${shellState.selection.id}`}
     </p>
   </main>
+  {#if interaction && context && root && canvas}{@render interaction(context, root, canvas)}{/if}
   <footer>
     <label
       ><input type="checkbox" bind:checked={letterShortcuts} /> Enable letter shortcuts (this session)</label
@@ -601,13 +633,18 @@
     box-sizing: border-box;
   }
   .map-layer {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
+    position: relative;
+    inset: auto;
+    z-index: 0;
+    height: clamp(24rem, 55vh, 44rem);
     opacity: 0.85;
     transition: opacity 180ms ease;
   }
   .map-layer.at-desk {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+    z-index: -1;
     opacity: 0.18;
   }
   canvas {

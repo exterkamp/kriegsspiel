@@ -96,4 +96,30 @@ it('checks every fixture desk route with axe in CI; layout and colour contrast r
     for (let i = 1; i < levels.length; i++)
       expect(levels[i]!, label).toBeLessThanOrEqual(levels[i - 1]! + 1);
   }
+  Array.from(target.querySelectorAll<HTMLButtonElement>('nav.desk button'))
+    .find((button) => button.textContent?.includes('In-tray'))!
+    .click();
+  await flush();
+  Array.from(target.querySelectorAll('button'))
+    .find((button) => button.textContent?.includes('Open accessible-paper'))!
+    .click();
+  await flush();
+  Array.from(target.querySelectorAll('button'))
+    .find((button) => button.textContent === 'Choose report coordinates')!
+    .click();
+  await flush();
+  expect(target.querySelector('h2[data-heading]')?.textContent?.trim()).toBe('Map table');
+  const panel = target.querySelector('[aria-label="Report placement"]')!;
+  expect(panel).not.toBeNull();
+  expect(
+    (await axe.run(document, { rules: { 'color-contrast': { enabled: false } } })).violations,
+  ).toEqual([]);
+  panel
+    .querySelector('form')!
+    .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await flush();
+  expect(panel.textContent).toContain('Created locally; unsaved.');
+  expect(
+    (await axe.run(document, { rules: { 'color-contrast': { enabled: false } } })).violations,
+  ).toEqual([]);
 });

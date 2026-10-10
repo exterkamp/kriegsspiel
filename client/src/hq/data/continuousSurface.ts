@@ -11,6 +11,7 @@ import type {
   PointM,
   Result,
   Scope,
+  Unsubscribe,
 } from '../contracts/index.js';
 import { failure, immutable, sameScope, success } from './common.js';
 import { demoArtwork } from './fixture.js';
@@ -70,8 +71,35 @@ export class ContinuousSurface implements MapSurface {
     target: THREE.Vector3;
   } | null = null;
   private applying = false;
+  private transitioning = false;
   private transitionCancel: (() => void) | null = null;
   private imageCancel: (() => void) | null = null;
+  private controlLocks = new Set<Unsubscribe>();
+  private syncControls() {
+    if (this.table)
+      this.table.controls.enabled =
+        !this.disposed &&
+        this.active &&
+        this.settled === 'table' &&
+        !this.transitioning &&
+        this.controlLocks.size === 0;
+  }
+  acquireControls(op: Operation): Result<Unsubscribe> {
+    if (this.disposed || !this.table || !this.presentation) return this.unavailable();
+    if (op.signal.aborted) return failure('aborted', 'Map interaction was cancelled.');
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      op.signal.removeEventListener('abort', release);
+      this.controlLocks.delete(release);
+      this.syncControls();
+    };
+    this.controlLocks.add(release);
+    op.signal.addEventListener('abort', release, { once: true });
+    this.syncControls();
+    return success(release);
+  }
   readonly scope: Scope;
   constructor(scope: Scope) {
     this.scope = immutable({ ...scope });
@@ -200,7 +228,7 @@ export class ContinuousSurface implements MapSurface {
       this.table.apply(state, image ?? undefined);
       if (this.disposed) return failure('disposed', 'The table is closed.');
       this.presentation = immutable(structuredClone(p));
-      if (this.settled === 'table' && !this.transitionCancel) this.setActive(true);
+      if (this.settled === 'table' && !this.transitioning) this.setActive(true);
       return success(undefined);
     } catch {
       if (this.disposed) return failure('disposed', 'The table is closed.');
@@ -245,7 +273,7 @@ export class ContinuousSurface implements MapSurface {
   setActive(active: boolean): Result<void> {
     if (this.disposed || !this.table || !this.presentation) return this.unavailable();
     this.active = active;
-    this.table.controls.enabled = active && this.settled === 'table' && !this.transitionCancel;
+    this.syncControls();
     if (active) this.table.start();
     else this.table.stop();
     return success(undefined);
@@ -272,8 +300,7 @@ export class ContinuousSurface implements MapSurface {
   }
   restoreCamera(c: CameraBookmark): Result<void> {
     if (this.disposed || !this.table || !this.presentation) return this.unavailable();
-    if (this.transitionCancel)
-      return failure('conflict', 'A table transition is still in progress.');
+    if (this.transitioning) return failure('conflict', 'A table transition is still in progress.');
     if (
       c.mapId !== demoArtwork.id ||
       c.mapRevision !== demoArtwork.revision ||
@@ -312,8 +339,7 @@ export class ContinuousSurface implements MapSurface {
   ): Promise<Result<void>> {
     if (this.disposed || !this.table || !this.presentation) return this.unavailable();
     if (op.signal.aborted) return failure('aborted', 'Navigation cancelled.');
-    if (this.transitionCancel)
-      return failure('conflict', 'A table transition is still in progress.');
+    if (this.transitioning) return failure('conflict', 'A table transition is still in progress.');
     if (view === this.settled) return success(undefined);
     const table = this.table;
     const before = {
@@ -337,34 +363,43 @@ export class ContinuousSurface implements MapSurface {
               .add(new THREE.Vector3(0, -publicMap.width * 0.15, publicMap.width * 0.3)),
             target: before.target.clone(),
           };
+    const restoreBefore = () => {
+      if (this.disposed) return;
+      table.camera.position.copy(before.position);
+      table.controls.target.copy(before.target);
+      this.settled = before.settled;
+      this.tableCamera = before.bookmark;
+      this.active = before.active;
+      try {
+        if (before.active) table.start();
+        else table.stop();
+        table.controls.update();
+      } catch {
+        /* Preserve restored values when rendering fails. */
+      }
+    };
+    this.transitioning = true;
     table.controls.enabled = false;
     try {
       table.start();
     } catch {
-      this.tableCamera = before.bookmark;
-      table.controls.enabled = before.active && before.settled === 'table';
+      restoreBefore();
+      this.transitioning = false;
+      this.syncControls();
       return failure('internal', 'The table transition could not start.');
+    }
+    if (this.disposed || op.signal.aborted) {
+      restoreBefore();
+      this.transitioning = false;
+      this.syncControls();
+      return this.disposed ? this.unavailable() : failure('aborted', 'Navigation cancelled.');
     }
     this.active = true;
     return new Promise((resolve) => {
       let frame = 0;
       let finished = false;
       const start = performance.now();
-      const rollback = () => {
-        table.camera.position.copy(before.position);
-        table.controls.target.copy(before.target);
-        this.settled = before.settled;
-        this.tableCamera = before.bookmark;
-        this.active = before.active;
-        table.controls.enabled = before.active && before.settled === 'table';
-        try {
-          if (before.active) table.start();
-          else table.stop();
-          table.controls.update();
-        } catch {
-          // Keep the restored values even when the rendering port itself fails.
-        }
-      };
+      const rollback = restoreBefore;
       const finish = (aborted: boolean, failed = false) => {
         if (finished) return;
         finished = true;
@@ -372,11 +407,14 @@ export class ContinuousSurface implements MapSurface {
         op.signal.removeEventListener('abort', abort);
         this.transitionCancel = null;
         if (this.disposed) {
+          this.transitioning = false;
           resolve(failure('disposed', 'The table is closed.'));
           return;
         }
         if (aborted || failed) {
           rollback();
+          this.transitioning = false;
+          this.syncControls();
           resolve(
             failure(
               failed ? 'internal' : 'aborted',
@@ -390,11 +428,24 @@ export class ContinuousSurface implements MapSurface {
           table.controls.target.copy(goal.target);
           table.controls.update();
           table.renderer.render(table.scene, table.camera);
+          if (this.disposed || op.signal.aborted) {
+            if (!this.disposed) rollback();
+            this.transitioning = false;
+            this.syncControls();
+            resolve(
+              this.disposed ? this.unavailable() : failure('aborted', 'Navigation cancelled.'),
+            );
+            return;
+          }
           this.settled = view;
-          this.setActive(view === 'table');
-          resolve(success(undefined));
+          this.transitioning = false;
+          const activated = this.setActive(view === 'table');
+          resolve(this.disposed ? this.unavailable() : activated);
         } catch {
+          this.transitioning = true;
           rollback();
+          this.transitioning = false;
+          this.syncControls();
           resolve(failure('internal', 'The table transition failed.'));
         }
       };
@@ -418,18 +469,39 @@ export class ContinuousSurface implements MapSurface {
           finish(false, true);
         }
       };
-      if (reducedMotion) tick(start);
+      if (this.disposed || op.signal.aborted) finish(true);
+      else if (reducedMotion) tick(start);
       else frame = requestAnimationFrame(tick);
     });
   }
   snap(view: 'top-down' | 'oblique'): Result<void> {
-    if (this.disposed || !this.table || !this.active) return this.unavailable();
+    if (
+      this.disposed ||
+      !this.table ||
+      !this.active ||
+      this.settled !== 'table' ||
+      this.transitioning ||
+      this.applying
+    )
+      return this.unavailable();
+    if (this.controlLocks.size)
+      return failure('conflict', 'Finish or cancel report placement before moving the camera.');
     if (view === 'top-down') this.table.snapTopDown();
     else this.table.snapOblique();
     return success(undefined);
   }
   async focusAt(at: PointM, op: Operation): Promise<Result<void>> {
-    if (this.disposed || !this.table || !this.active) return this.unavailable();
+    if (
+      this.disposed ||
+      !this.table ||
+      !this.active ||
+      this.settled !== 'table' ||
+      this.transitioning ||
+      this.applying
+    )
+      return this.unavailable();
+    if (this.controlLocks.size)
+      return failure('conflict', 'Finish or cancel report placement before moving the camera.');
     if (op.signal.aborted) return failure('aborted', 'Focus cancelled.');
     if (!inArtwork(at)) return failure('invalid-data', 'This location is outside the map.');
     const table = this.table;
@@ -440,7 +512,16 @@ export class ContinuousSurface implements MapSurface {
     return success(undefined);
   }
   pickAt(x: number, y: number): Result<Pick> {
-    if (this.disposed || !this.table || !this.canvas || !this.active) return this.unavailable();
+    if (
+      this.disposed ||
+      !this.table ||
+      !this.canvas ||
+      !this.active ||
+      this.settled !== 'table' ||
+      this.transitioning ||
+      this.applying
+    )
+      return this.unavailable();
     const rect = this.canvas.getBoundingClientRect();
     if (
       !Number.isFinite(x) ||
@@ -491,6 +572,8 @@ export class ContinuousSurface implements MapSurface {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    for (const release of this.controlLocks) release();
+    this.syncControls();
     this.transitionCancel?.();
     this.imageCancel?.();
     this.table?.dispose();

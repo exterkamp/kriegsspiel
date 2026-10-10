@@ -15,6 +15,14 @@
   import Orders from './views/orders/Orders.svelte';
   import Clock from './views/clock/Clock.svelte';
   import Marks from './interactions/marks/Marks.svelte';
+  import PlacementBridge from './PlacementBridge.svelte';
+  import {
+    createReportPlacementController,
+    ReportPlotHandle,
+    type PlotState,
+    type PlotPointer,
+  } from './interactions/plotting';
+  import { createPlacementPorts, type PlacementEnvironment } from './placementPorts';
   import {
     BrowserPersonalMarksRepository,
     createPersonalMarksController,
@@ -57,8 +65,63 @@
     else feedback = 'Personal marks belong to another headquarters or map.';
     return stop;
   });
+  let environment: PlacementEnvironment | null = null;
+  const placement = untrack(() =>
+    createReportPlacementController({
+      scope: source.scope,
+      artwork,
+      ports: createPlacementPorts({
+        scope: source.scope,
+        artwork,
+        surface,
+        marks: personalMarks,
+        alive: () => !life.signal.aborted,
+        environment: () => environment,
+      }),
+    }),
+  );
+  let placementState = $state.raw<PlotState>(placement.getState());
+  const placing = $derived(['navigating', 'placing', 'committing'].includes(placementState.phase));
+  onMount(() =>
+    placement.subscribe((state) => {
+      placementState = state;
+    }),
+  );
+  function placementActive() {
+    return ['navigating', 'placing', 'committing'].includes(placement.getState().phase);
+  }
+  function mutateMark(callback: () => Result<void>): Result<void> {
+    return placementActive()
+      ? failure('conflict', 'Finish or cancel report placement before changing local marks.')
+      : callback();
+  }
+  function cancelPlacement() {
+    const id = placement.getState().requestId;
+    if (id !== null) placement.cancel(id);
+  }
+  function updateEnvironment(next: PlacementEnvironment | null) {
+    environment = next;
+    if (!next || (placement.getState().phase === 'placing' && next.context.state.view !== 'table'))
+      cancelPlacement();
+  }
+  function startPlacement(context: ShellViewContext, paperId: string, pointer: PlotPointer | null) {
+    focusOperation?.abort();
+    action++;
+    const snapshot = context.sourceState.snapshot;
+    if (!snapshot) return failure('not-ready', 'No approved paper snapshot is available.');
+    context.reserveCamera?.();
+    return placement.begin(
+      {
+        snapshot: $state.snapshot(snapshot),
+        paperId,
+        gameMs: projectGameTime(context.sourceState, source.kind, monotonicMs),
+      },
+      pointer,
+    );
+  }
   let focusOperation: AbortController | null = null;
   function beginFocus() {
+    cancelPlacement();
     focusOperation?.abort();
     focusOperation = new AbortController();
     if (life.signal.aborted) focusOperation.abort();
@@ -170,12 +233,30 @@
   }
   onDestroy(() => {
     life.abort();
+    placement.dispose();
     focusOperation?.abort();
     personalMarks.dispose();
   });
 </script>
 
-<Shell {source} {surface} {repository} {artwork} marks={markState.marks}>
+<Shell
+  {source}
+  {surface}
+  {repository}
+  {artwork}
+  marks={markState.marks}
+  interactionActive={placing}
+  beforeMapAction={cancelPlacement}
+>
+  {#snippet interaction(context: ShellViewContext, hub: HTMLElement, canvas: HTMLCanvasElement)}
+    <PlacementBridge
+      controller={placement}
+      {context}
+      {hub}
+      {canvas}
+      onEnvironment={updateEnvironment}
+    />
+  {/snippet}
   {#snippet clock(context: ShellViewContext)}
     <Clock
       state={context.sourceState}
@@ -190,7 +271,7 @@
       marks={markState.marks}
       {artwork}
       papers={context.sourceState.snapshot?.papers ?? []}
-      busy={markState.busy}
+      busy={markState.busy || placing}
       writable={markState.writable}
       dirty={markState.dirty}
       status={markState.error?.message ??
@@ -200,24 +281,38 @@
             ? 'Personal marks have unsaved changes.'
             : 'Personal marks are saved in this browser.')}
       onCreate={(input) =>
-        personalMarks.create(
-          input,
-          context.sourceState.snapshot,
-          context.sourceState.snapshot
-            ? projectGameTime(context.sourceState, source.kind, monotonicMs)
-            : null,
+        mutateMark(() =>
+          personalMarks.create(
+            input,
+            context.sourceState.snapshot,
+            context.sourceState.snapshot
+              ? projectGameTime(context.sourceState, source.kind, monotonicMs)
+              : null,
+          ),
         )}
       onEdit={(id, input) =>
-        personalMarks.edit(
-          id,
-          input,
-          context.sourceState.snapshot
-            ? projectGameTime(context.sourceState, source.kind, monotonicMs)
-            : null,
+        mutateMark(() =>
+          personalMarks.edit(
+            id,
+            input,
+            context.sourceState.snapshot
+              ? projectGameTime(context.sourceState, source.kind, monotonicMs)
+              : null,
+          ),
         )}
-      onDelete={(id) => personalMarks.remove(id)}
-      onSave={() => personalMarks.save()}
-      onReload={() => personalMarks.reload()}
+      onDelete={(id) => mutateMark(() => personalMarks.remove(id))}
+      onSave={() =>
+        placementActive()
+          ? Promise.resolve(
+              failure('conflict', 'Finish or cancel report placement before saving marks.'),
+            )
+          : personalMarks.save()}
+      onReload={() =>
+        placementActive()
+          ? Promise.resolve(
+              failure('conflict', 'Finish or cancel report placement before reloading marks.'),
+            )
+          : personalMarks.reload()}
       onFocus={(id) => focusMark(context, id)}
     />
   {/snippet}
@@ -235,7 +330,15 @@
         snapshot={context.sourceState.snapshot}
         scope={source.scope}
         onPlotPaper={(id) => plotPaper(context, id)}
-      />
+      >
+        {#snippet placementHandle(paperId: string)}
+          <ReportPlotHandle
+            {paperId}
+            disabled={markState.busy || !markState.writable}
+            onStart={(id, pointer) => startPlacement(context, id, pointer)}
+          />
+        {/snippet}
+      </InTray>
     {:else if context.state.view === 'orders'}
       <Orders snapshot={context.sourceState.snapshot} scope={source.scope} />
     {:else if context.state.view === 'journal'}

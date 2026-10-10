@@ -235,3 +235,25 @@ Integrated accepted main `2e6d70d97ed5f80efec63dc70aa5841964273ae4` into the alr
 Dependency refresh: #109 is open/unassigned, #132 open/assigned dfezzie with open PR151 at `659893c2e8ae19d11dcb1d2ee96d2e9e6f6ce3ef`, #134 open/unassigned, #37 closed, #21 closed/assigned exterkamp. Accepted replay/conference implementations still do not supply the required HQ services. No map work was taken over.
 
 #52 high architecture proposal settled after about 8m. Independent reviewer found no blockers (2m01s) but withheld freeze pending factual author completion. Its native question dialog temporarily blocked; root asked user as required by Herdr. The dialog subsequently ended without root answering it. Root then supplied the now-settled author status through an ordinary agent prompt for final acceptance. No implementation dispatch before that gate. The proposal is saved for review in `docs/hq-plotting-proposal.md`.
+
+
+### Report placement architecture and runtime gates — 15:58 PDT
+
+Final simplified architecture passed high independent freeze review (42s, SHA-256 prefix `9855ef10f840`). This preserves immediate drag navigation, early-release cancellation and a separate numeric alternative. The reviewer’s earlier native status dialog ended; root supplied factual completion through a normal prompt and did not answer the blocked dialog. High `hq-continuous` owned only `hq/interactions/plotting/**`, now settled after 11m52s with 85 tests (62 controller/23 DOM), strict types, lint/format and zero Svelte diagnostics. Dollar cost remains unknown.
+
+Root owns shared surface and bridges. High surface review held two callback windows (2m18s; corrected non-DOM probe reproduced them), then a residual inactive-desk RAF abort path (55s). Root added a dedicated transition guard, shared camera/bookmark/RAF restoration and regressions. Independent recheck accepted the bounded surface (17s; 15 tests). No whole-story/browser acceptance.
+
+Root composition uses a persistent Shell hub, exposed canvas hit-test, separate canvas flow region, pending-presentation readiness, frozen snapshot capture, numeric/mouse/touch bridge and explicit local Save. Initial App tests exposed a Svelte-proxy clone boundary; `$state.snapshot` fixes it before validated deep capture. Root bridge review (2m43s) found a distinct-pointer reentrant capture leak, delayed preference camera restoration and missing runtime guards on competing mark callbacks. Root repaired token ownership per hub/pointer, reserved camera choices and guarded current controller state; added distinct-pointer and delayed-load regressions plus an actual no-annotation-write assertion. Current 58 root tests pass (12 App, 5 ports, 41 Shell). Root client typecheck, HQ lint/format pass with zero Svelte warnings. Expanded headless axe also passes active and created placement states; jsdom has no actual canvas/text measurement or browser layout evidence.
+
+Final root/plotting runtime review is underway. No server/browser, storage Save by placement, map-checkout action, merge or deployment.
+
+
+### Final fixture runtime delivery — 16:03 PDT
+
+High plotting author repaired readiness loss between move and up in 1m19s: release capture, clear preview, preserve the frozen request for retry, and guard reentrant release against successors/disposal. Five regressions bring the plotting packet to 90 tests. High independent final review accepted the bounded runtime gate after 18s, independently reproducing 163 tests (90 plotting, 58 root/bridge/Shell, 15 surface). No remaining concrete runtime blockers; browser and full #52 acceptance remain open.
+
+Final complete lint, typecheck, tests and build passed against accepted main `2e6d70d97ed5f80efec63dc70aa5841964273ae4`. Svelte reported zero errors/warnings. All 1,333 tests passed: 290 engine, 45 protocol, 367 server, 618 client and 13 root; one optional server test skipped. Evidence: `/private/tmp/hq-delivery-{lint,types,tests,build}.log`. Build retains the large-chunk warning: 827.58 kB / 227.83 kB gzip. Headless axe checks include active/created placement states; browser contrast/layout remain unverified.
+
+Checkpoint `2fab76c` CI failed because root omitted the already-tested App test selector generic fix from staging. The final placement commit includes `client/src/hq/App.test.ts` and will be verified on its exact published head before PR readiness. This was a staging error, not a waived check.
+
+Current HQ pane labels are Coordinator, Plotting, Runtime Review and Accessibility. Exclusive authors are settled. Ready independent fixture/local work is delivered; live projection/commands, shared marks, signing/couriers, conference/replay services, generated-map handoff and browser/device/performance gates remain external or pending. Epic/stories remain open. No dev server, map-checkout modification, issue closure, merge or deployment.

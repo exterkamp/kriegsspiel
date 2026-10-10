@@ -1,6 +1,6 @@
 # #52 bounded report-placement proposal
 
-Proposed for independent review; no implementation dispatched. Read AGENTS.md, decisions (D2/D3/HQ fixture composition), hq implementation plan/contracts, App, Shell/navigation, InTray/papers, personal-marks helpers and ContinuousSurface.
+Frozen for implementation after independent architecture review on 2026-10-10 at 15:43 PDT (42s final recheck). Runtime and browser gates remain pending. Read AGENTS.md, decisions (D2/D3/HQ fixture composition), hq implementation plan/contracts, App, Shell/navigation, InTray/papers, personal-marks helpers and ContinuousSurface.
 
 ## Scope and ownership
 

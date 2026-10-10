@@ -400,3 +400,120 @@ describe('continuous surface lifecycle', () => {
     surface.dispose();
   });
 });
+
+it('composes control leases across updates, transitions, rollback and terminal disposal', async () => {
+  const { surface } = await mounted();
+  await surface.apply(presentation(), op());
+  const scene = harness.scenes[0] as { controls: { enabled: boolean }; running: boolean };
+  const a = new AbortController();
+  const first = surface.acquireControls({ signal: a.signal });
+  const second = surface.acquireControls(op());
+  expect(first.ok && second.ok).toBe(true);
+  expect(scene.controls.enabled).toBe(false);
+  expect(scene.running).toBe(true);
+  await surface.apply(presentation(2), op());
+  surface.setActive(true);
+  expect(scene.controls.enabled).toBe(false);
+  await surface.transitionTo('desk', true, op());
+  expect(surface.pickAt(410, 220).ok).toBe(false);
+  await surface.transitionTo('table', true, op());
+  expect(scene.controls.enabled).toBe(false);
+  a.abort();
+  if (first.ok) first.value();
+  expect(scene.controls.enabled).toBe(false);
+  const transition = new AbortController();
+  const moving = surface.transitionTo('desk', false, { signal: transition.signal });
+  expect(surface.pickAt(410, 220).ok).toBe(false);
+  transition.abort();
+  expect((await moving).ok).toBe(false);
+  expect(scene.controls.enabled).toBe(false);
+  if (second.ok) second.value();
+  expect(scene.controls.enabled).toBe(true);
+  const third = surface.acquireControls(op());
+  surface.dispose();
+  if (third.ok) third.value();
+  expect(scene.controls.enabled).toBe(false);
+  expect(surface.acquireControls(op()).ok).toBe(false);
+});
+
+it('rejects camera gestures while placement owns controls and preaborted leases never lock', async () => {
+  const { surface } = await mounted();
+  await surface.apply(presentation(), op());
+  const aborted = new AbortController();
+  aborted.abort();
+  expect(surface.acquireControls({ signal: aborted.signal }).ok).toBe(false);
+  const lease = surface.acquireControls(op());
+  expect(surface.snap('top-down').ok).toBe(false);
+  expect((await surface.focusAt({ x: 1200, y: 600 }, op())).ok).toBe(false);
+  expect(surface.pickAt(410, 220).ok).toBe(true);
+  if (lease.ok) lease.value();
+  expect(surface.snap('top-down').ok).toBe(true);
+});
+
+it('keeps transition readiness guarded through start and final render callbacks', async () => {
+  const { surface } = await mounted();
+  await surface.apply(presentation(), op());
+  const scene = harness.scenes[0] as {
+    start: () => void;
+    controls: { enabled: boolean };
+    renderer: { render: ReturnType<typeof vi.fn> };
+  };
+  const lease = surface.acquireControls(op());
+  vi.spyOn(scene, 'start').mockImplementationOnce(() => {
+    if (lease.ok) lease.value();
+    expect(scene.controls.enabled).toBe(false);
+    expect(surface.pickAt(410, 220).ok).toBe(false);
+  });
+  scene.renderer.render.mockImplementationOnce(() => {
+    expect(surface.pickAt(410, 220).ok).toBe(false);
+    expect(scene.controls.enabled).toBe(false);
+  });
+  expect((await surface.transitionTo('desk', true, op())).ok).toBe(true);
+  expect(surface.pickAt(410, 220).ok).toBe(false);
+  await surface.transitionTo('table', true, op());
+  expect(scene.controls.enabled).toBe(true);
+});
+it('preserves a held lease through failed final rendering and refuses picks during delegated apply', async () => {
+  const { surface } = await mounted();
+  await surface.apply(presentation(), op());
+  const scene = harness.scenes[0] as {
+    apply: ReturnType<typeof vi.fn>;
+    controls: { enabled: boolean };
+    renderer: { render: ReturnType<typeof vi.fn> };
+  };
+  const lease = surface.acquireControls(op());
+  scene.renderer.render.mockImplementationOnce(() => {
+    throw new Error('renderer');
+  });
+  expect((await surface.transitionTo('desk', true, op())).ok).toBe(false);
+  expect(scene.controls.enabled).toBe(false);
+  scene.apply.mockImplementationOnce(() => {
+    expect(surface.pickAt(410, 220).ok).toBe(false);
+  });
+  expect((await surface.apply(presentation(2), op())).ok).toBe(true);
+  expect(scene.controls.enabled).toBe(false);
+  if (lease.ok) lease.value();
+  expect(scene.controls.enabled).toBe(true);
+});
+
+it('restores an inactive desk RAF and camera when start aborts synchronously', async () => {
+  const { surface } = await mounted();
+  await surface.apply(presentation(), op());
+  await surface.transitionTo('desk', true, op());
+  const before = surface.getCamera();
+  const scene = harness.scenes[0] as {
+    start: () => void;
+    running: boolean;
+    controls: { enabled: boolean };
+  };
+  const abort = new AbortController();
+  vi.spyOn(scene, 'start').mockImplementationOnce(() => {
+    scene.running = true;
+    abort.abort();
+  });
+  const result = await surface.transitionTo('table', true, { signal: abort.signal });
+  expect(result).toMatchObject({ ok: false, error: { code: 'aborted' } });
+  expect(surface.getCamera()).toEqual(before);
+  expect(scene.controls.enabled).toBe(false);
+  expect(scene.running).toBe(false);
+});

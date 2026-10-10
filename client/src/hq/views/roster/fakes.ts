@@ -106,6 +106,7 @@ export function makePorts() {
     scope,
     coordinates: 'metres',
     implementation: 'continuous',
+    acquireControls: vi.fn(() => ({ ok: true as const, value: () => {} })),
     mount: vi.fn(async () => ok(undefined)),
     apply: vi.fn(async () => ok(undefined)),
     resize: vi.fn(() => ok(undefined)),
