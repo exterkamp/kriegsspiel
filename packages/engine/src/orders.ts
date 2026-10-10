@@ -1,6 +1,7 @@
 import type { EngineState, EventRegistry, HandlerResult, Json } from './events.js';
 import { beginMarch, findPath } from './movement.js';
 import { schedule } from './queue.js';
+import { REPORT_EVENT } from './visibility.js';
 import { MS_PER_MINUTE, type GameState, type Point } from './types.js';
 
 /** What an order asks a unit to do, as parsed. The engine turns it into an `Intent` on delivery. */
@@ -111,6 +112,16 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
         : intent.kind === 'withdraw'
           ? beginMarch(world, unit, intent.toward, ev.time, 'withdraw')
           : beginMarch(world, unit, intent.at, ev.time, 'hold');
-    return { ...res, emit: [delivered, ...(res.emit ?? [])] };
+    // The unit's courier rides back: HQ hears of the delivery after the usual report delay.
+    const ack = {
+      time: ev.time,
+      type: REPORT_EVENT,
+      payload: { kind: 'orderDelivered', unitId: unit.id },
+    };
+    return {
+      ...res,
+      schedule: [ack, ...(res.schedule ?? [])],
+      emit: [delivered, ...(res.emit ?? [])],
+    };
   });
 }

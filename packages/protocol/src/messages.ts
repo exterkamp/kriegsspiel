@@ -7,7 +7,20 @@ const Envelope = { v: z.literal(PROTOCOL_VERSION) };
 
 /** Player-to-server. Every command is logged for replay. */
 export const Command = z.discriminatedUnion('kind', [
-  z.object({ ...Envelope, kind: z.literal('issueOrder'), orderId: Id, draft: Id }).strict(),
+  // Signs a shared draft, or (until drafts exist) sends the order wording directly as `text`.
+  // Exactly one of `draft` and `text` is given.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('issueOrder'),
+      orderId: Id,
+      draft: Id.optional(),
+      text: z.string().trim().min(1).max(2000).optional(),
+    })
+    .strict()
+    .refine((c) => (c.draft === undefined) !== (c.text === undefined), {
+      message: 'issueOrder needs exactly one of draft and text',
+    }),
   z.object({ ...Envelope, kind: z.literal('setReady'), ready: z.boolean() }).strict(),
   z
     .object({ ...Envelope, kind: z.literal('proposePause'), reason: z.string().optional() })

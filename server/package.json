@@ -8,11 +8,17 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "eval:orders": "tsc -p tsconfig.build.json && node dist/orders/eval/cli.js"
+    "eval:orders": "tsc -p tsconfig.build.json && node dist/orders/eval/cli.js",
+    "start": "node dist/main.js",
+    "dev": "npm run build -w @kriegsspiel/engine -w @kriegsspiel/protocol && tsc -p tsconfig.build.json && node dist/main.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
+    "@fastify/websocket": "^11.3.4",
     "@kriegsspiel/engine": "*",
-    "ajv": "^8.20.0"
+    "@kriegsspiel/protocol": "*",
+    "ajv": "^8.20.0",
+    "fastify": "^5.12.5",
+    "zod": "^4.6.5"
   }
 }

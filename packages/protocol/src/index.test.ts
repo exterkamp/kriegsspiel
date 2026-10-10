@@ -61,6 +61,7 @@ const view: SideView = {
 describe('Command', () => {
   const good: Command[] = [
     { v, kind: 'issueOrder', orderId: 'o1', draft: 'd1' },
+    { v, kind: 'issueOrder', orderId: 'o2', text: 'Blue-1 march to the bridge' },
     { v, kind: 'setReady', ready: true },
     { v, kind: 'proposePause', reason: 'door' },
     { v, kind: 'vote', proposal: 'p1', yes: false },
@@ -77,6 +78,18 @@ describe('Command', () => {
     ['missing version', JSON.stringify({ kind: 'setReady', ready: true })],
     ['unknown kind', JSON.stringify({ v, kind: 'cheat' })],
     ['bad field type', JSON.stringify({ v, kind: 'vote', proposal: 'p', yes: 'yes' })],
+    [
+      'issueOrder with neither draft nor text',
+      JSON.stringify({ v, kind: 'issueOrder', orderId: 'o' }),
+    ],
+    [
+      'issueOrder with both draft and text',
+      JSON.stringify({ v, kind: 'issueOrder', orderId: 'o', draft: 'd', text: 'go' }),
+    ],
+    [
+      'issueOrder with blank text',
+      JSON.stringify({ v, kind: 'issueOrder', orderId: 'o', text: ' ' }),
+    ],
     ['extra field', JSON.stringify({ v, kind: 'setReady', ready: true, admin: true })],
   ])('rejects %s', (_n, json) => {
     expect(parseCommand(json).ok).toBe(false);

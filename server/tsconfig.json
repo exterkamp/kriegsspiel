@@ -3,7 +3,8 @@
   "compilerOptions": {
     "noEmit": true,
     "paths": {
-      "@kriegsspiel/engine": ["../packages/engine/src/index.ts"]
+      "@kriegsspiel/engine": ["../packages/engine/src/index.ts"],
+      "@kriegsspiel/protocol": ["../packages/protocol/src/index.ts"]
     },
     "types": ["node"]
   },

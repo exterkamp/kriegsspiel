@@ -60,6 +60,11 @@ export interface GameActorOptions {
   timers?: Timers;
   /** Called with events the engine emitted, in firing order. */
   onEmitted?: (events: EmittedEvent[]) => void;
+  /**
+   * Called after every tick and every command has been applied and saved, whether or not the
+   * world changed. Listeners read `state` and `gameClock`; they must not throw.
+   */
+  onUpdate?: () => void;
   /** Called when a background tick fails (a command's failure is returned to its caller). */
   onError?: (error: unknown) => void;
   /** Starting value for the input counter when resuming a game. */
@@ -86,6 +91,7 @@ export class GameActor {
   private readonly store: GameStore;
   private readonly timers: Timers;
   private readonly onEmitted?: (events: EmittedEvent[]) => void;
+  private readonly onUpdate?: () => void;
   private readonly onError?: (error: unknown) => void;
   private seq: number;
 
@@ -104,6 +110,7 @@ export class GameActor {
     this.store = options.store;
     this.timers = options.timers ?? realTimers;
     this.onEmitted = options.onEmitted;
+    this.onUpdate = options.onUpdate;
     this.onError = options.onError;
     this.seq = options.seq ?? 0;
   }
@@ -208,6 +215,15 @@ export class GameActor {
       await this.persist();
     } finally {
       this.reschedule();
+      this.notify();
+    }
+  }
+
+  private notify(): void {
+    try {
+      this.onUpdate?.();
+    } catch (e) {
+      this.onError?.(e);
     }
   }
 
@@ -229,6 +245,7 @@ export class GameActor {
       await this.persist();
     } finally {
       this.reschedule();
+      this.notify();
     }
     return result;
   }
