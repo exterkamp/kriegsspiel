@@ -35,6 +35,8 @@ export interface InputLogEntry {
   command: GameCommand;
   /** For `order` commands: the parser's result, so replay needs no model call. */
   parse?: ParseResult;
+  /** The parser failed on every attempt and the conservative fallback was used instead. */
+  fallback?: { attempts: number; error: string };
   /** The command was refused or failed; the reason. */
   error?: string;
 }
