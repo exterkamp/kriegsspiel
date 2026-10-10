@@ -135,6 +135,14 @@ async function main(app: HTMLElement): Promise<void> {
     },
     onOverlays: (o) => table.setOverlays(o),
   });
+  // The toolbar and the drawing tools belong to the table: in a desk view, hide them and go back to Look.
+  const marksEl = app.querySelector<HTMLElement>('#marks');
+  let deskOpen = false;
+  activeView.subscribe((v) => {
+    deskOpen = isDeskView(v);
+    if (marksEl) marksEl.hidden = deskOpen;
+    if (deskOpen) marksBar.setTool('view');
+  });
   const deleteSelected = (): void => {
     if (!selectedId) return;
     state = withMarkDeleted(state, selectedId);
@@ -175,7 +183,7 @@ async function main(app: HTMLElement): Promise<void> {
   let down: { x: number; y: number } | undefined;
   canvas.addEventListener('pointerdown', (e) => {
     down = { x: e.clientX, y: e.clientY };
-    if (tool === 'view' || e.button !== 0) return;
+    if (deskOpen || tool === 'view' || e.button !== 0) return;
     const c = mapPoint(e);
     if (!c) return;
     const span = pickMinSize(fixtureMap);
@@ -224,6 +232,7 @@ async function main(app: HTMLElement): Promise<void> {
   window.addEventListener('keydown', (e) => {
     if (
       e.key === 'Delete' &&
+      !deskOpen &&
       selectedId &&
       !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)
     )
