@@ -6,7 +6,7 @@
   "data": {
     "unit": "paces_per_move",
     "ruler_bands": [
-      { "paces": 200, "applies_to": "infantry and mixed columns on route marches", "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3946, 1st band" } },
+      { "paces": 200, "applies_to": "infantry and mixed columns on route marches", "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3945, 1st band" } },
       { "paces": 250, "applies_to": "infantry and foot artillery deploying for battle and in the fight", "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3948, 2nd band" } },
       { "paces": 600, "applies_to": "trot of closed cavalry and horse artillery; also a foot battery in few cases (calibre illegible in the OCR)", "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3950, 3rd band" } },
       { "paces": 800, "applies_to": "gallop of closed cavalry and horse artillery; heavy cavalry charge; adjutants and orderlies", "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3952, 4th band" } },
