@@ -1,4 +1,5 @@
-import type { EngineState, EventRegistry, Json, NewEvent } from './events.js';
+import { ATTACK_INTENT_EVENT, COMBAT_CHECK_EVENT, canReach } from './contact.js';
+import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { schedule } from './queue.js';
 import {
   MS_PER_MINUTE,
@@ -7,6 +8,7 @@ import {
   type MapGrid,
   type Point,
   type Terrain,
+  type Intent,
   type Unit,
   type UnitKind,
 } from './types.js';
@@ -178,7 +180,53 @@ function scheduleStep(map: MapGrid, kind: UnitKind, now: number, p: StepPayload)
 
 /** An order for a unit that does not exist is rejected, so one bad id cannot wedge the queue. */
 function rejectUnknown(world: GameState, unitId: string) {
-  return { world, emit: [{ type: 'order.rejected', payload: { unitId, reason: 'unknown unit' } }] };
+  return rejectOrder(world, unitId, 'unknown unit');
+}
+
+export function rejectOrder(world: GameState, unitId: string, reason: string) {
+  return { world, emit: [{ type: 'order.rejected', payload: { unitId, reason } }] };
+}
+
+/**
+ * Plan a march for `unit` to `dest` and return the handler result. With `attackTarget`
+ * the unit's intent becomes `attack` (it walks to where the target stands and the
+ * combat code takes over); otherwise it becomes `move`. An unreachable destination
+ * is reported and leaves any march already under way alone.
+ */
+export function startMarch(
+  world: GameState,
+  unit: Unit,
+  dest: Point,
+  time: number,
+  attackTarget?: string,
+): HandlerResult<GameState> {
+  const to: [number, number] = [dest.x, dest.y];
+  const path = findPath(world.map, unit.position, dest);
+  if (!path) {
+    return {
+      world: updateUnit(world, unit.id, {}, time),
+      emit: [{ type: 'unit.moveBlocked', payload: { unitId: unit.id, to } }],
+    };
+  }
+  const intent: Intent = attackTarget
+    ? { kind: 'attack', target: attackTarget, to: dest, startedAt: time }
+    : { kind: 'move', to: dest, startedAt: time };
+  if (path.tiles.length === 1) {
+    return {
+      world: updateUnit(world, unit.id, { intent: attackTarget ? intent : { kind: 'idle' } }, time),
+      emit: attackTarget ? [] : [{ type: 'unit.arrived', payload: { unitId: unit.id, at: to } }],
+    };
+  }
+  const step: StepPayload = {
+    unitId: unit.id,
+    startedAt: time,
+    to,
+    path: path.tiles.flatMap((t) => [t.x, t.y]),
+  };
+  return {
+    world: updateUnit(world, unit.id, { intent }, time),
+    schedule: [scheduleStep(world.map, unit.kind, time, step)],
+  };
 }
 
 /**
@@ -195,32 +243,8 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     const { unitId, to } = ev.payload as unknown as MovePayload;
     const unit = world.units.find((u) => u.id === unitId);
     if (!unit) return rejectUnknown(world, unitId);
-    const dest = { x: to[0], y: to[1] };
-    const path = findPath(world.map, unit.position, dest);
-    if (!path) {
-      // A rejected order leaves any march already under way alone.
-      return {
-        world: updateUnit(world, unitId, {}, ev.time),
-        emit: [{ type: 'unit.moveBlocked', payload: { unitId, to } }],
-      };
-    }
-    if (path.tiles.length === 1) {
-      return {
-        world: updateUnit(world, unitId, { intent: { kind: 'idle' } }, ev.time),
-        emit: [{ type: 'unit.arrived', payload: { unitId, at: to } }],
-      };
-    }
-    const flat = path.tiles.flatMap((t) => [t.x, t.y]);
-    const step: StepPayload = { unitId, startedAt: ev.time, to, path: flat };
-    return {
-      world: updateUnit(
-        world,
-        unitId,
-        { intent: { kind: 'move', to: dest, startedAt: ev.time } },
-        ev.time,
-      ),
-      schedule: [scheduleStep(world.map, unit.kind, ev.time, step)],
-    };
+    if (unit.status !== 'active') return rejectOrder(world, unitId, 'unit not active');
+    return startMarch(world, unit, { x: to[0], y: to[1] }, ev.time);
   });
 
   registry.register(HALT_INTENT_EVENT, (world, ev) => {
@@ -235,7 +259,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     const i = unit?.intent;
     if (
       !unit ||
-      i?.kind !== 'move' ||
+      (i?.kind !== 'move' && i?.kind !== 'attack') ||
       i.startedAt !== p.startedAt ||
       i.to.x !== p.to[0] ||
       i.to.y !== p.to[1]
@@ -244,15 +268,44 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     }
     const position = { x: p.path[2]!, y: p.path[3]! };
     const rest = p.path.slice(2);
-    if (rest.length === 2) {
+    // Every step may start or end a contact, or put a unit on the objective.
+    const check: NewEvent = { time: ev.time, type: COMBAT_CHECK_EVENT };
+    if (i.kind === 'attack') {
+      const target = world.units.find((u) => u.id === i.target);
+      if (!target || target.status !== 'active') {
+        return {
+          world: updateUnit(world, p.unitId, { position, intent: { kind: 'idle' } }, ev.time),
+          schedule: [check],
+        };
+      }
+      const arrived = rest.length === 2;
+      if (canReach({ ...unit, position }, target)) {
+        return { world: updateUnit(world, p.unitId, { position }, ev.time), schedule: [check] };
+      }
+      if (arrived) {
+        // The target moved on; plan a fresh march toward where it is now.
+        return {
+          world: updateUnit(world, p.unitId, { position }, ev.time),
+          schedule: [
+            check,
+            {
+              time: ev.time,
+              type: ATTACK_INTENT_EVENT,
+              payload: { unitId: p.unitId, target: i.target },
+            },
+          ],
+        };
+      }
+    } else if (rest.length === 2) {
       return {
         world: updateUnit(world, p.unitId, { position, intent: { kind: 'idle' } }, ev.time),
         emit: [{ type: 'unit.arrived', payload: { unitId: p.unitId, at: p.to } }],
+        schedule: [check],
       };
     }
     return {
       world: updateUnit(world, p.unitId, { position }, ev.time),
-      schedule: [scheduleStep(world.map, unit.kind, ev.time, { ...p, path: rest })],
+      schedule: [check, scheduleStep(world.map, unit.kind, ev.time, { ...p, path: rest })],
     };
   });
 }

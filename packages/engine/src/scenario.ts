@@ -125,6 +125,8 @@ function parseUnits(raw: unknown, map: MapGrid, sides: Side[]): Unit[] {
       morale: int(o.morale, `${p}.morale`, 0, 100),
       facing: oneOf<Facing>(o.facing, FACINGS, `${p}.facing`),
       intent: { kind: 'idle' },
+      status: 'active',
+      home: { ...position },
     };
   });
   for (const id of sideIds) {
@@ -165,5 +167,7 @@ export function loadScenario(raw: unknown): GameState {
       attacker,
       holdMs: int(v.holdMinutes, 'victory.holdMinutes', 1) * MS_PER_MINUTE,
     },
+    combatActive: false,
+    outcome: null,
   };
 }

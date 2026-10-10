@@ -11,6 +11,7 @@ import {
   issueMove,
   loadScenario,
   pathDuration,
+  registerCombat,
   registerMovement,
   serialize,
   stepDuration,
@@ -38,6 +39,7 @@ function grid(rows: string[]): MapGrid {
 function registry() {
   const r = new EventRegistry<GameState>();
   registerMovement(r);
+  registerCombat(r);
   return r;
 }
 

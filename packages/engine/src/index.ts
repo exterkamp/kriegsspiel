@@ -22,3 +22,13 @@ export {
   stepDuration,
 } from './movement.js';
 export type { Path } from './movement.js';
+export {
+  BREAK_MORALE,
+  COMBAT_TICK_MS,
+  COVER,
+  FIRE_RATE,
+  issueAttack,
+  registerCombat,
+  startGame,
+} from './combat.js';
+export { RANGE_TILES, canReach } from './contact.js';

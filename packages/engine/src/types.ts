@@ -29,10 +29,15 @@ export type Intent =
   | { kind: 'idle' }
   /** `startedAt` ties scheduled step events to this order, so a newer intent makes them stale. */
   | { kind: 'move'; to: Point; startedAt: GameTime }
-  | { kind: 'hold'; at: Point };
+  | { kind: 'hold'; at: Point }
+  /** Close on `target` (a unit id) and fight it. `to` is where it stood when the march was planned. */
+  | { kind: 'attack'; target: string; to: Point; startedAt: GameTime };
 
 export const UNIT_KINDS = ['infantry', 'cavalry', 'artillery'] as const;
 export type UnitKind = (typeof UNIT_KINDS)[number];
+
+/** `withdrawn`: broke and is falling back (out of the fight for good). `destroyed`: no men left. */
+export type UnitStatus = 'active' | 'withdrawn' | 'destroyed';
 
 export interface Unit {
   id: string;
@@ -40,12 +45,15 @@ export interface Unit {
   kind: UnitKind;
   name: string;
   position: Point;
-  /** Men remaining. */
+  /** Men remaining. Fractional, since casualties are. */
   strength: number;
   /** 0..100. */
   morale: number;
   facing: Facing;
   intent: Intent;
+  status: UnitStatus;
+  /** Where the unit starts, and where it withdraws to if it breaks. */
+  home: Point;
 }
 
 export interface Side {
@@ -55,12 +63,24 @@ export interface Side {
   controller: 'human' | 'scripted';
 }
 
-/** The `defender` wins by holding `objective` for `holdMs`; the `attacker` wins by taking it. */
+/**
+ * The `attacker` wins the moment its units alone hold `objective`. The `defender` wins if
+ * the game clock reaches `holdMs` with the attacker not having taken it.
+ */
 export interface VictoryCondition {
   objective: Point;
   defender: SideId;
   attacker: SideId;
   holdMs: GameTime;
+}
+
+export type VictoryReason = 'objective-taken' | 'objective-held' | 'eliminated' | 'withdrawn';
+
+/** How the game ended. `winner` is null if both sides were put out of the fight together. */
+export interface Outcome {
+  winner: SideId | null;
+  reason: VictoryReason;
+  time: GameTime;
 }
 
 export interface GameState {
@@ -71,6 +91,10 @@ export interface GameState {
   sides: Side[];
   units: Unit[];
   victory: VictoryCondition;
+  /** True while a chain of combat ticks is running (units are in contact). */
+  combatActive: boolean;
+  /** Set once, when the game ends. Nothing happens in combat or victory handlers after that. */
+  outcome: Outcome | null;
 }
 
 export function tileAt(map: MapGrid, p: Point): Terrain | undefined {
