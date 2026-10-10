@@ -7,6 +7,7 @@ import {
   UNIT_TYPES,
   UnitDataError,
   advanceTo,
+  canReach,
   createState,
   holdTheBridge,
   issueAttack,
@@ -20,6 +21,7 @@ import {
   registerCombat,
   registerMovement,
   ScenarioError,
+  sightRangeMm,
   startGame,
   unitTypeOf,
   type GameState,
@@ -62,6 +64,7 @@ describe('unit data loader', () => {
     bad((d) => delete (d.formations as Partial<typeof d.formations>).square, /formations\.square/);
     bad((d) => (d.unitTypes[0]!.formationChangeMs = 1.5), /whole number/);
     bad((d) => (d.unitTypes = d.unitTypes.filter((t) => t.kind !== 'cavalry')), /kind "cavalry"/);
+    bad((d) => delete d.unitTypes[2]!.chargeM, /unitTypes\[2\]\.chargeM is required for cavalry/);
     expect(() => parseUnitData(null)).toThrow(UnitDataError);
   });
 });
@@ -226,11 +229,121 @@ describe('type and formation effects', () => {
       expect(blueLeft({ type: 'skirmishers', formation: 'skirmish' }, {})).toBeGreaterThan(line);
     });
 
-    it('a square shrugs off cavalry but not as much fire', () => {
+    /** Casualties of red's first shot at blue (same seed, so the same die) at `gapM` apart. */
+    const firstShot = (
+      blue: Partial<RawUnit>,
+      red: Partial<RawUnit>,
+      gapM: number,
+      morale?: Record<string, number>,
+    ) => {
+      const w = miniWorld({
+        units: [
+          { id: 'blue-1', x: 1000, y: 1000, facingDeg: 180, ...blue },
+          { id: 'red-1', side: 'red', x: 1000, y: 1000 + gapM, facingDeg: 0, ...red },
+        ],
+      });
+      let s = startGame(createState(5, w, 0));
+      if (morale) {
+        s = {
+          ...s,
+          world: {
+            ...s.world,
+            units: s.world.units.map((u) => (u.id in morale ? { ...u, morale: morale[u.id]! } : u)),
+          },
+        };
+      }
+      const { emitted } = advanceTo(s, 2 * MS_PER_MINUTE, registry());
+      const shot = emitted.find(
+        (e) => e.type === 'combat.fire' && (e.payload as { attacker: string }).attacker === 'red-1',
+      )!;
+      return shot.payload as { casualties: number; melee: boolean; aspect: string };
+    };
+
+    it('melee casualties scale with the target formation: square 0.4, column 1.2 of a line', () => {
+      // Cavalry inside its charge distance, blue facing it, so the aspect is front in all three.
       const cav = { kind: 'cavalry' as const };
-      const line = blueLeft({ formation: 'line' }, cav);
-      const square = blueLeft({ formation: 'square' }, cav);
-      expect(square).toBeGreaterThan(line);
+      const shot = (formation: string) => firstShot({ formation }, cav, 40);
+      const line = shot('line');
+      expect(line.melee).toBe(true);
+      for (const f of ['line', 'square', 'column']) {
+        expect(shot(f).melee).toBe(true);
+        expect(shot(f).aspect).toBe('front');
+      }
+      expect(shot('square').casualties / line.casualties).toBeCloseTo(0.4, 1);
+      expect(shot('column').casualties / line.casualties).toBeCloseTo(1.2, 1);
+    });
+
+    it('fire casualties use fireVulnerability, not the melee one: a square is worse off than a line', () => {
+      const line = firstShot({ formation: 'line' }, {}, 100);
+      const square = firstShot({ formation: 'square' }, {}, 100);
+      expect(line.melee).toBe(false);
+      expect(square.casualties / line.casualties).toBeCloseTo(1.1, 1);
+    });
+
+    it('a unit breaks at its own type breakMorale: skirmishers at 35, line infantry at 25', () => {
+      const broke = (blue: Partial<RawUnit>) => {
+        const w = miniWorld({
+          units: [
+            { id: 'blue-1', x: 1000, y: 1000, facingDeg: 180, ...blue },
+            { id: 'red-1', side: 'red', x: 1000, y: 1100, facingDeg: 0 },
+          ],
+        });
+        let s = startGame(createState(5, w, 0));
+        s = {
+          ...s,
+          world: {
+            ...s.world,
+            units: s.world.units.map((u) => (u.id === 'blue-1' ? { ...u, morale: 34 } : u)),
+          },
+        };
+        const { emitted, state } = advanceTo(s, 2 * MS_PER_MINUTE, registry());
+        return {
+          broken: emitted.some((e) => e.type === 'unit.broken'),
+          morale: unit(state.world, 'blue-1').morale,
+        };
+      };
+      const line = broke({});
+      const skirm = broke({ type: 'skirmishers', formation: 'skirmish' });
+      // Both end the tick between the two thresholds.
+      expect(line.morale).toBeGreaterThanOrEqual(25);
+      expect(skirm.morale).toBeLessThan(35);
+      expect(skirm.broken).toBe(true);
+      expect(line.broken).toBe(false);
+    });
+  });
+
+  describe('reach and sight', () => {
+    const at = (type: string, enemyType = 'line_infantry') => {
+      const w = miniWorld({
+        units: [
+          { id: 'blue-1', type, x: 1000, y: 1000 },
+          { id: 'red-1', side: 'red', type: enemyType, x: 1000, y: 1500 },
+        ],
+      });
+      const [a, b] = [unit(w, 'blue-1'), unit(w, 'red-1')];
+      const toward = (m: number) => ({ ...b, center: pointMm(1000, 1000 + m) });
+      return { w, a, toward };
+    };
+
+    it('shooters reach as far as their type says', () => {
+      const line = at('line_infantry');
+      const skirm = at('skirmishers');
+      const gun = at('artillery');
+      const cav = at('cavalry');
+      expect(canReach(line.a, line.toward(240))).toBe(false);
+      expect(canReach(skirm.a, skirm.toward(240))).toBe(true);
+      expect(canReach(gun.a, gun.toward(350))).toBe(true);
+      expect(canReach(line.a, line.toward(350))).toBe(false);
+      expect(canReach(cav.a, cav.toward(150))).toBe(false);
+      expect(canReach(line.a, line.toward(150))).toBe(true);
+    });
+
+    it('observers see as far as their type says', () => {
+      const w = at('line_infantry').w;
+      const sight = (type: string) => sightRangeMm(w, { kind: 'infantry', type });
+      expect(sight('skirmishers')).toBeGreaterThan(sight('line_infantry'));
+      expect(sight('cavalry')).toBeGreaterThan(sight('skirmishers'));
+      expect(sightRangeMm(w, unit(at('cavalry').w, 'blue-1'))).toBe(sight('cavalry'));
     });
   });
 });

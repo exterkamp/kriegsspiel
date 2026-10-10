@@ -247,6 +247,7 @@ export function parseUnitData(raw: unknown): UnitData {
       fail(`${p}.defaultFormation "${defaultFormation}" is not in its formations`);
     }
     const kind = oneOf(r.kind, UNIT_KINDS, `${p}.kind`);
+    if (kind === 'cavalry' && r.chargeM === undefined) fail(`${p}.chargeM is required for cavalry`);
     const breakMorale = pos(r.breakMorale, `${p}.breakMorale`);
     if (breakMorale > 100) fail(`${p}.breakMorale must be at most 100`);
     const ms = pos(r.formationChangeMs, `${p}.formationChangeMs`);
@@ -292,8 +293,7 @@ export const DEFAULT_TYPE_OF_KIND: Record<UnitKind, string> = Object.fromEntries
 
 /** The type of a unit (or of an arm, meaning its default type). Throws for an unknown id. */
 export function unitTypeOf(u: Pick<Unit, 'type' | 'kind'> | UnitKind): UnitType {
-  const id =
-    typeof u === 'string' ? DEFAULT_TYPE_OF_KIND[u] : (u.type ?? DEFAULT_TYPE_OF_KIND[u.kind]);
+  const id = typeof u === 'string' ? DEFAULT_TYPE_OF_KIND[u] : u.type;
   const t = UNIT_TYPES[id];
   if (!t) throw new UnitDataError(`unknown unit type "${id}"`);
   return t;
