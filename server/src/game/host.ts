@@ -8,7 +8,7 @@ import {
 } from '@kriegsspiel/engine';
 import { GameClock, type WallClock } from '../clock.js';
 import type { OrderParser } from '../orders/index.js';
-import { GameActor, type GameActorOptions, type Timers } from './actor.js';
+import { GameActor, type GameActorOptions, type StaffAtWork, type Timers } from './actor.js';
 import type { TraceSink } from '../debug/trace.js';
 import type { GameStore } from './store.js';
 
@@ -22,6 +22,11 @@ export interface GameHostOptions {
   onError?: (gameId: string, error: unknown) => void;
   /** Events the engine emitted for a game, in firing order. */
   onEmitted?: (gameId: string, events: EmittedEvent[]) => void;
+  /** The umpire started or finished work that game time is waiting on. */
+  onStaffAtWork?: (gameId: string, state: StaffAtWork) => void;
+  parseRetries?: number;
+  parseTimeoutMs?: number;
+  parseRetryDelayMs?: number;
 }
 
 export class GameHost {
@@ -51,6 +56,10 @@ export class GameHost {
       trace: o.trace,
       onError: (e) => o.onError?.(id, e),
       onEmitted: (events) => o.onEmitted?.(id, events),
+      onStaffAtWork: (state) => o.onStaffAtWork?.(id, state),
+      parseRetries: o.parseRetries,
+      parseTimeoutMs: o.parseTimeoutMs,
+      parseRetryDelayMs: o.parseRetryDelayMs,
     };
   }
 
