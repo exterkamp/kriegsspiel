@@ -85,29 +85,80 @@ export function narrateInput(side: SideId, reports: readonly ViewReport[]) {
 
 type Input = ReturnType<typeof narrateInput>;
 
-const NUMBER_WORDS: Record<string, number> = Object.fromEntries(
-  [
-    'two',
-    'three',
-    'four',
-    'five',
-    'six',
-    'seven',
-    'eight',
-    'nine',
-    'ten',
-    'eleven',
-    'twelve',
-    'thirteen',
-    'fourteen',
-    'fifteen',
-    'sixteen',
-    'seventeen',
-    'eighteen',
-    'nineteen',
-    'twenty',
-  ].map((w, i) => [w, i + 2]),
-);
+const NUMBER_WORDS: Record<string, number> = {
+  ...Object.fromEntries(
+    [
+      'two',
+      'three',
+      'four',
+      'five',
+      'six',
+      'seven',
+      'eight',
+      'nine',
+      'ten',
+      'eleven',
+      'twelve',
+      'thirteen',
+      'fourteen',
+      'fifteen',
+      'sixteen',
+      'seventeen',
+      'eighteen',
+      'nineteen',
+      'twenty',
+    ].map((w, i) => [w, i + 2]),
+  ),
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
+};
+/** Number words that multiply what came before (or stand for the quantity alone: "a hundred"). */
+const NUMBER_SCALES: Record<string, number> = {
+  hundred: 100,
+  thousand: 1000,
+  dozen: 12,
+  score: 20,
+};
+
+/**
+ * Runs of spelled-out numbers in `text` with their value: "four hundred" is 400, "twenty-one" is
+ * 21, "a thousand" is 1000. `words` is the run, for the known-word escape in `checkProse`.
+ */
+function spelledNumbers(text: string): { value: number; words: string[] }[] {
+  const runs: { value: number; words: string[] }[] = [];
+  let words: string[] = [];
+  let total = 0;
+  let current = 0;
+  const flush = () => {
+    if (words.length > 0) runs.push({ value: total + current, words });
+    words = [];
+    total = 0;
+    current = 0;
+  };
+  for (const w of text.toLowerCase().match(/[\p{L}]+/gu) ?? []) {
+    const unit = NUMBER_WORDS[w];
+    const scale = NUMBER_SCALES[w];
+    if (unit !== undefined) {
+      current += unit;
+    } else if (scale === 1000) {
+      total += (current || 1) * scale;
+      current = 0;
+    } else if (scale !== undefined) {
+      current = (current || 1) * scale;
+    } else {
+      flush();
+      continue;
+    }
+    words.push(w);
+  }
+  flush();
+  return runs;
+}
 
 /** Words that may be capitalised mid-sentence in period prose without naming anything. */
 const COMMON_CAPITALISED = new Set([
@@ -118,6 +169,111 @@ const COMMON_CAPITALISED = new Set([
   'god',
   'majesty',
   'excellency',
+]);
+
+/**
+ * Ordinary words that may open a sentence (or a quotation or parenthesis) in period prose. Any
+ * other capitalised word there must be one the input has, so an invented place or officer cannot
+ * hide in the most natural spot for it.
+ */
+const SENTENCE_OPENERS = new Set([
+  'a',
+  'about',
+  'after',
+  'all',
+  'although',
+  'an',
+  'and',
+  'any',
+  'are',
+  'as',
+  'at',
+  'before',
+  'both',
+  'but',
+  'by',
+  'could',
+  'do',
+  'each',
+  'enemy',
+  'every',
+  'for',
+  'from',
+  'half',
+  'has',
+  'have',
+  'he',
+  'her',
+  'his',
+  'how',
+  'i',
+  'if',
+  'in',
+  'is',
+  'it',
+  'its',
+  'later',
+  'many',
+  'more',
+  'most',
+  'my',
+  'near',
+  'no',
+  'none',
+  'nor',
+  'not',
+  'now',
+  'of',
+  'on',
+  'one',
+  'only',
+  'or',
+  'other',
+  'our',
+  'out',
+  'perhaps',
+  'scouts',
+  'she',
+  'since',
+  'so',
+  'some',
+  'still',
+  'such',
+  'that',
+  'the',
+  'their',
+  'them',
+  'then',
+  'there',
+  'these',
+  'they',
+  'this',
+  'those',
+  'though',
+  'to',
+  'under',
+  'until',
+  'upon',
+  'us',
+  'was',
+  'we',
+  'were',
+  'what',
+  'when',
+  'where',
+  'whether',
+  'which',
+  'while',
+  'who',
+  'why',
+  'will',
+  'with',
+  'within',
+  'without',
+  'would',
+  'yet',
+  'you',
+  'your',
 ]);
 
 const ID_PATTERN = /\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/gi;
@@ -136,13 +292,21 @@ function wordsIn(text: string): string[] {
  * The problems with `text` against the input it was written from. Empty means it passes:
  * - ids and hyphenated codes (`blue-1`) must be in the input;
  * - every number, in digits or words, must be one the input has;
- * - a capitalised word that does not start a sentence must be a word the input has.
+ * - every capitalised word must be a word the input has, or an ordinary one: a sentence opener
+ *   (`The`, `We`, ...) at the start of a sentence, quotation or parenthesis, or `Sir` and the like.
  */
 export function checkProse(text: string, input: Input): string[] {
-  const corpus = JSON.stringify(input);
-  const knownNumbers = new Set<number>(numbersIn(corpus));
-  const knownWords = new Set(wordsIn(corpus));
-  const knownIds = new Set((corpus.match(ID_PATTERN) ?? []).map((s) => s.toLowerCase()));
+  // Only the fields the model is meant to draw on: ids and JSON keys are not facts to cite.
+  const facts = input.reports.flatMap((r) => [r.from, r.place, r.sizeEstimate ?? '']);
+  const factText = facts.join('\n');
+  const knownNumbers = new Set<number>([
+    ...numbersIn(factText),
+    ...input.reports.flatMap((r) => [r.minutesAgo, r.radiusM]),
+  ]);
+  const knownWords = new Set([...wordsIn(factText), input.side]);
+  const knownIds = new Set(
+    (JSON.stringify(input).match(ID_PATTERN) ?? []).map((s) => s.toLowerCase()),
+  );
   const problems: string[] = [];
 
   for (const id of text.match(ID_PATTERN) ?? []) {
@@ -153,19 +317,21 @@ export function checkProse(text: string, input: Input): string[] {
   for (const n of numbersIn(withoutIds)) {
     if (!knownNumbers.has(n)) problems.push(`unknown number ${n}`);
   }
-  for (const w of wordsIn(withoutIds)) {
-    const n = NUMBER_WORDS[w];
-    if (n !== undefined && !knownNumbers.has(n) && !knownWords.has(w)) {
-      problems.push(`unknown number "${w}"`);
+  // A spelled-out number is fine when it is a known value ("four hundred" for 400) or the input
+  // itself uses the word.
+  for (const run of spelledNumbers(withoutIds)) {
+    if (!knownNumbers.has(run.value) && !run.words.some((w) => knownWords.has(w))) {
+      problems.push(`unknown number "${run.words.join(' ')}"`);
     }
   }
 
-  // Capitalised words after the first of a sentence are proper nouns: units, officers, places.
-  const sentenceStart = /(^|[.!?]["')\]]*\s+|[\n"“(]\s*)$/;
+  // Capitalised words are proper nouns (units, officers, places) unless they open a sentence.
+  const opensSentence = /(^|[.!?]["')\]]*\s+|[\n"“(]\s*)$/;
   for (const m of withoutIds.matchAll(/\p{Lu}[\p{L}'’-]*/gu)) {
     const word = m[0].toLowerCase();
-    if (sentenceStart.test(withoutIds.slice(0, m.index))) continue;
     if (knownWords.has(word) || COMMON_CAPITALISED.has(word)) continue;
+    if (NUMBER_WORDS[word] !== undefined || NUMBER_SCALES[word] !== undefined) continue;
+    if (SENTENCE_OPENERS.has(word) && opensSentence.test(withoutIds.slice(0, m.index))) continue;
     problems.push(`unknown name "${m[0]}"`);
   }
   return [...new Set(problems)];

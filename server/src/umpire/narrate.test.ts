@@ -84,16 +84,52 @@ describe('prose check', () => {
     expect(checkProse('We saw them near the Hohenau ford.', input)).toEqual([
       'unknown name "Hohenau"',
     ]);
-    expect(checkProse('Colonel Berthier reports it.', input)).toEqual(['unknown name "Berthier"']);
+    expect(checkProse('Colonel Berthier reports it.', input)).toContain('unknown name "Berthier"');
     expect(checkProse('I sent Colonel Berthier forward.', input)).toContain(
       'unknown name "Colonel"',
     );
+  });
+
+  it('catches an invented name at the start of a sentence, or after a quote or bracket', () => {
+    expect(checkProse('Hohenau has fallen to the enemy.', input)).toEqual([
+      'unknown name "Hohenau"',
+    ]);
+    expect(checkProse('Sir. Berthier holds the ford.', input)).toEqual(['unknown name "Berthier"']);
+    expect(checkProse('Near the "Hohenau" ford.', input)).toEqual(['unknown name "Hohenau"']);
+    expect(checkProse('All quiet. (Berthier is ill.)', input)).toEqual(['unknown name "Berthier"']);
+  });
+
+  it('lets ordinary words and known names open a sentence', () => {
+    expect(checkProse('The mill is held. We wait. 2nd Hussars hold. Hussars hold.', input)).toEqual(
+      [],
+    );
+    expect(
+      checkProse('The enemy is near. They number about 400.\nOur scouts watch.', input),
+    ).toEqual([]);
   });
 
   it('catches an invented number, in digits or words', () => {
     expect(checkProse('About 900 men at the mill.', input)).toEqual(['unknown number 900']);
     expect(checkProse('I count seven squadrons.', input)).toEqual(['unknown number "seven"']);
     expect(checkProse('Six minutes ago, 400 men.', input)).toEqual([]);
+  });
+
+  it('catches large and compound number words, and accepts a spelled-out known number', () => {
+    expect(checkProse('The Hussars see a thousand men.', input)).toEqual([
+      'unknown number "thousand"',
+    ]);
+    expect(checkProse('Thirty squadrons at the mill.', input)).toEqual(['unknown number "thirty"']);
+    expect(checkProse('Perhaps a hundred men.', input)).toEqual(['unknown number "hundred"']);
+    expect(checkProse('Twenty guns.', input)).toEqual(['unknown number "twenty"']);
+    expect(checkProse('Four hundred men at the mill.', input)).toEqual([]);
+  });
+
+  it('does not take ids or JSON keys as facts', () => {
+    expect(checkProse('About 3 men at the mill.', input)).toEqual(['unknown number 3']);
+    expect(checkProse('We hold the mill. Reports say Contact.', input)).toEqual([
+      'unknown name "Reports"',
+      'unknown name "Contact"',
+    ]);
   });
 
   it('rejects unknown and missing report ids and empty text', () => {
