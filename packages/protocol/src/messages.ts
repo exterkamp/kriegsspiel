@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PROTOCOL_VERSION, ClockState, GameMs } from './common.js';
+import { PROTOCOL_VERSION, ClockState, GameMs, Side } from './common.js';
 import { Dispatch, SideView } from './view.js';
 
 const Id = z.string().min(1);
@@ -47,6 +47,17 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       kind: z.literal('staffAtWork'),
       working: z.boolean(),
       needAtMs: GameMs.optional(),
+    })
+    .strict(),
+  // The game has ended. Public to both sides and sent once per connection, also to a late joiner.
+  // `winner` is null when both sides were put out of the fight together.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('gameOver'),
+      winner: Side.nullable(),
+      reason: z.enum(['objective-taken', 'objective-held', 'eliminated', 'withdrawn']),
+      atGame: GameMs,
     })
     .strict(),
   z

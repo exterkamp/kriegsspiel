@@ -33,6 +33,7 @@ interface Connection {
   lastView: string;
   lastClock: string;
   sentDispatches: Set<string>;
+  gameOverSent: boolean;
 }
 
 const error = (code: string, message: string): ServerMessage => ({
@@ -63,6 +64,7 @@ export class Hub {
       lastView: '',
       lastClock: '',
       sentDispatches: new Set(),
+      gameOverSent: false,
     };
     const set = this.conns.get(gameId) ?? new Set();
     set.add(conn);
@@ -129,6 +131,18 @@ export class Hub {
       if (viewJson !== conn.lastView) {
         conn.lastView = viewJson;
         this.send(conn, { v: PROTOCOL_VERSION, kind: 'viewUpdate', view });
+      }
+      // The outcome is public, so it is the same for both sides; it follows the final view.
+      const outcome = game.state.world.outcome;
+      if (outcome && !conn.gameOverSent) {
+        conn.gameOverSent = true;
+        this.send(conn, {
+          v: PROTOCOL_VERSION,
+          kind: 'gameOver',
+          winner: outcome.winner,
+          reason: outcome.reason,
+          atGame: outcome.time,
+        });
       }
     } catch (e) {
       this.onError(gameId, e);

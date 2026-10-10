@@ -118,10 +118,17 @@ describe('ServerMessage', () => {
     { v, kind: 'clockState', clock },
     { v, kind: 'staffAtWork', working: true, needAtMs: 5000 },
     { v, kind: 'staffAtWork', working: false },
+    { v, kind: 'gameOver', winner: 'blue', reason: 'objective-held', atGame: 9000 },
+    { v, kind: 'gameOver', winner: null, reason: 'eliminated', atGame: 9000 },
     { v, kind: 'error', code: 'bad_command', message: 'nope' },
   ];
   it.each(good)('round-trips $kind', (m) => {
     expect(parseServerMessage(serializeServerMessage(m))).toEqual({ ok: true, value: m });
+  });
+
+  it('rejects extra fields on a game-over notice', () => {
+    const bad = { v, kind: 'gameOver', winner: 'blue', reason: 'eliminated', atGame: 1, units: [] };
+    expect(parseServerMessage(JSON.stringify(bad)).ok).toBe(false);
   });
 
   it('rejects hidden fields smuggled into a view', () => {

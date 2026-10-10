@@ -2,7 +2,7 @@
 import { PROTOCOL_VERSION, type Dispatch, type ServerMessage } from '@kriegsspiel/protocol';
 import { describe, expect, it } from 'vitest';
 import { fixtureView } from '../table/fixture.js';
-import { Hud, buildOrderText, clockText, orderPrefix } from '../hud/hud.js';
+import { Hud, buildOrderText, clockText, gameOverText, orderPrefix } from '../hud/hud.js';
 import { parseSession, wsUrl } from '../session.js';
 import { GameConnection, type WebSocketLike } from './connection.js';
 import {
@@ -72,6 +72,26 @@ describe('applyServerMessage', () => {
     s = applyServerMessage(s, m, 0);
     expect(s.pending.map((p) => p.orderId)).toEqual(['o2']);
     expect(s.notices[0]?.message).toBe('o1: no such unit');
+  });
+});
+
+describe('game over', () => {
+  const over: ServerMessage = {
+    v,
+    kind: 'gameOver',
+    winner: 'blue',
+    reason: 'objective-held',
+    atGame: 3_600_000,
+  };
+
+  it('stores the result and words it for the viewer’s side', () => {
+    let s = applyServerMessage(initialState, { v, kind: 'viewUpdate', view: fixtureView }, 0);
+    s = applyServerMessage(s, over, 0);
+    expect(s.gameOver).toEqual({ winner: 'blue', reason: 'objective-held', atGame: 3_600_000 });
+    const text = gameOverText(s)!;
+    expect(text).toContain(fixtureView.side === 'blue' ? 'Victory' : 'Defeat');
+    expect(text).toContain('Day 1 01:00');
+    expect(gameOverText(initialState)).toBeUndefined();
   });
 });
 

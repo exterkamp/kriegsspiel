@@ -291,6 +291,8 @@ export class GameActor {
       }
       step(target);
     } finally {
+      // A finished game does not run on.
+      if (this.engine.world.outcome && this.clock.status !== 'stopped') this.clock.stop();
       if (emitted.length > 0) {
         if (this.trace.enabled) {
           for (const event of emitted) this.trace.record(this.id, 'engine', event);
