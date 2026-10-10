@@ -8,14 +8,25 @@ export const TERRAIN_COLOURS: Record<Terrain, string> = {
   road: '#b99f73',
 };
 
-const PX = 24;
+const PX_DEFAULT = 24;
+/** Keep canvases within what mobile GPUs accept as a texture. */
+const MAX_TEXTURE_PX = 4096;
+
+/** Pixels per tile: PX, shrunk so the larger side stays within MAX_TEXTURE_PX. */
+export function tilePx(map: MapGrid): number {
+  return Math.max(
+    1,
+    Math.min(PX_DEFAULT, Math.floor(MAX_TEXTURE_PX / Math.max(map.width, map.height))),
+  );
+}
 
 /** Paint the grid with flat colours and simple hatching. Pure drawing: reads only the grid. */
 export function drawMap(ctx: CanvasRenderingContext2D, map: MapGrid): void {
+  const PX = tilePx(map);
   for (let y = 0; y < map.height; y++) {
     for (let x = 0; x < map.width; x++) {
       const t = map.tiles[y * map.width + x] ?? 'open';
-      ctx.fillStyle = TERRAIN_COLOURS[t];
+      ctx.fillStyle = TERRAIN_COLOURS[t] ?? TERRAIN_COLOURS.open;
       ctx.fillRect(x * PX, y * PX, PX, PX);
       ctx.strokeStyle = 'rgba(60,45,20,0.35)';
       ctx.lineWidth = 1;
@@ -44,8 +55,9 @@ export function drawMap(ctx: CanvasRenderingContext2D, map: MapGrid): void {
 
 export function mapCanvas(map: MapGrid): HTMLCanvasElement {
   const c = document.createElement('canvas');
-  c.width = map.width * PX;
-  c.height = map.height * PX;
+  const px = tilePx(map);
+  c.width = map.width * px;
+  c.height = map.height * px;
   const ctx = c.getContext('2d');
   if (ctx) drawMap(ctx, map);
   return c;

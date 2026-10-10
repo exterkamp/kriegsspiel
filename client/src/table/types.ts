@@ -1,5 +1,7 @@
 import type { Coord } from '@kriegsspiel/protocol';
 
+// NOTE: duplicated from packages/engine/src/types.ts until the map moves into @kriegsspiel/protocol.
+// `table.test.ts` pins the terrain list so drift is caught.
 export const TERRAINS = ['open', 'wood', 'river', 'bridge', 'road'] as const;
 export type Terrain = (typeof TERRAINS)[number];
 

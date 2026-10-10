@@ -2,23 +2,16 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mapCanvas } from './mapTexture.js';
 import { mapToWorld, pickFromRay, type PickResult } from './picking.js';
-import type { Facing, GhostPiece, OwnPiece, SceneState } from './types.js';
-
-const FACING_ANGLE: Record<Facing, number> = {
-  N: 0,
-  NE: -Math.PI / 4,
-  E: -Math.PI / 2,
-  SE: (-3 * Math.PI) / 4,
-  S: Math.PI,
-  SW: (3 * Math.PI) / 4,
-  W: Math.PI / 2,
-  NW: Math.PI / 4,
-};
+import { FACING_ANGLE, fitDistance } from './framing.js';
+import type { GhostPiece, OwnPiece, SceneState } from './types.js';
 
 const SIDE_COLOURS: Record<string, number> = { blue: 0x2f55a4, red: 0xa83232 };
 const BLOCK_H = 0.5;
+/** Labels sit beside the block (toward the near edge) so they never hide it or its facing nose. */
+const TAG_OFFSET_Z = 0.8;
 
-function ageTag(text: string, ghost: boolean): THREE.Sprite {
+/** Sprite materials own their texture; the sprite geometry is shared by three, so it is not disposed. */
+function labelSprite(text: string, ghost: boolean): THREE.Sprite {
   const c = document.createElement('canvas');
   c.width = 256;
   c.height = 64;
@@ -58,11 +51,15 @@ export class TableScene {
   private piecesRoot = new THREE.Group();
   private raf = 0;
 
-  constructor(readonly canvas: HTMLCanvasElement) {
+  constructor(
+    readonly canvas: HTMLCanvasElement,
+    opts: { preserveDrawingBuffer?: boolean } = {},
+  ) {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
-      preserveDrawingBuffer: true,
+      // Costly on mobile GPUs; only enable for screenshots/debugging.
+      preserveDrawingBuffer: opts.preserveDrawingBuffer ?? false,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.scene.background = new THREE.Color(0x2a2118);
@@ -135,16 +132,20 @@ export class TableScene {
     const { width, height } = this.state!.map;
     const span = Math.max(width, height);
     this.controls.minDistance = 4;
-    this.controls.maxDistance = span * 1.8;
+    this.controls.maxDistance = Math.max(span * 1.8, this.fitDistance() * 1.2);
     this.controls.target.set(0, 0, 0);
+  }
+
+  /** Distance at which the whole map fits the current fov and aspect. */
+  private fitDistance(): number {
+    const { width, height } = this.state?.map ?? { width: 40, height: 30 };
+    return fitDistance(width, height, this.camera.fov, this.camera.aspect);
   }
 
   /** Camera straight above the map centre, for precise plotting. */
   snapTopDown(): void {
-    const { width, height } = this.state?.map ?? { width: 40, height: 30 };
-    const span = Math.max(width, height);
     this.controls.target.set(0, 0, 0);
-    this.camera.position.set(0, span * 1.1, 0.001);
+    this.camera.position.set(0, this.fitDistance(), 0.001);
     this.controls.update();
   }
 
@@ -153,8 +154,16 @@ export class TableScene {
     const { width, height } = this.state?.map ?? { width: 40, height: 30 };
     const span = Math.max(width, height);
     this.controls.target.set(0, 0, 0);
-    this.camera.position.set(0, span * 0.7, height * 0.75);
+    this.camera.position
+      .set(0, span * 0.7, height * 0.75)
+      .normalize()
+      .multiplyScalar(this.fitDistance() * 0.85);
     this.controls.update();
+  }
+
+  /** Number of pieces currently in the scene (for tests and debugging). */
+  get pieceCount(): number {
+    return this.pieces.size;
   }
 
   private syncPiece(key: string, p: OwnPiece | GhostPiece, seen: Set<string>): void {
@@ -198,8 +207,8 @@ export class TableScene {
     );
     nose.position.set(0, BLOCK_H * 0.5, -0.27);
     g.add(body, nose);
-    const tag = ageTag(p.label, false);
-    tag.position.set(0, BLOCK_H + 0.45, 0);
+    const tag = labelSprite(p.label, false);
+    tag.position.set(0, BLOCK_H + 0.1, TAG_OFFSET_Z);
     g.add(tag);
     return g;
   }
@@ -218,8 +227,8 @@ export class TableScene {
     body.position.y = BLOCK_H / 2;
     body.name = 'pick';
     g.add(body);
-    const tag = ageTag(p.ageTag, true);
-    tag.position.set(0, BLOCK_H + 0.45, 0);
+    const tag = labelSprite(p.ageTag, true);
+    tag.position.set(0, BLOCK_H + 0.1, TAG_OFFSET_Z);
     g.add(tag);
     return g;
   }
@@ -269,6 +278,7 @@ export class TableScene {
   }
 
   start(): void {
+    if (this.raf) return;
     const loop = (): void => {
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
@@ -279,6 +289,18 @@ export class TableScene {
 
   stop(): void {
     cancelAnimationFrame(this.raf);
+    this.raf = 0;
+  }
+
+  /** Stop rendering and release the renderer, controls and every scene resource. */
+  dispose(): void {
+    this.stop();
+    this.controls.dispose();
+    for (const p of this.pieces.values()) disposeTree(p.group);
+    this.pieces.clear();
+    if (this.mapMesh) disposeTree(this.mapMesh);
+    if (this.tableMesh) disposeTree(this.tableMesh);
+    this.renderer.dispose();
   }
 }
 

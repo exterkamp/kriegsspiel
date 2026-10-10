@@ -22,5 +22,6 @@ if (app) {
     const out = app.querySelector('#pick');
     if (out) out.textContent = JSON.stringify(r);
   });
-  (window as unknown as { table: TableScene }).table = table;
+  // Debug handle, dev only.
+  if (import.meta.env.DEV) (window as unknown as { table: TableScene }).table = table;
 }
