@@ -47,7 +47,7 @@ export interface Side {
   controller: 'human' | 'scripted';
 }
 
-/** Blue wins by holding `objective` for `holdMs`; Red wins by taking it. */
+/** The `defender` wins by holding `objective` for `holdMs`; the `attacker` wins by taking it. */
 export interface VictoryCondition {
   objective: Point;
   defender: SideId;
