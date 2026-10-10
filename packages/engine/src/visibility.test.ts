@@ -8,6 +8,7 @@ import {
   createState,
   issueMove,
   loadScenario,
+  registerCombat,
   registerMovement,
   registerVisibility,
   schedule,
@@ -56,6 +57,7 @@ function world(
 function registry() {
   const r = new EventRegistry<GameState>();
   registerMovement(r);
+  registerCombat(r);
   registerVisibility(r);
   return r;
 }
