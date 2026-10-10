@@ -147,13 +147,17 @@ describe('POST /games', () => {
     expect(app!.host.get(json.id)).toBeDefined();
   });
 
-  it.each([{ rate: 0 }, { rate: -1 }, { rate: 'fast' }, { rate: 1e9 }, { scenario: 'x' }])(
-    'rejects %j',
-    async (body) => {
-      const { base } = await start();
-      expect((await createGame(base, body)).status).toBe(400);
-    },
-  );
+  it.each([
+    { rate: 0 },
+    { rate: -1 },
+    { rate: 1e-9 },
+    { rate: 'fast' },
+    { rate: 1e9 },
+    { scenario: 'x' },
+  ])('rejects %j', async (body) => {
+    const { base } = await start();
+    expect((await createGame(base, body)).status).toBe(400);
+  });
 
   it('defaults to real time', async () => {
     const { base } = await start();
@@ -265,6 +269,20 @@ describe('orders', () => {
     await blue.waitFor('viewUpdate', (m) => m.view.atGame > last.atGame + 120_000);
     const ids = blue.messages.flatMap((m) => (m.kind === 'dispatch' ? [m.dispatch.id] : []));
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('does not push the papers already in the initial view again to a later connection', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const first = await join(ws, game, 'blue');
+    first.send(order('blue-1 hold the bridge'));
+    const { dispatch } = await first.waitFor('dispatch');
+    const second = await join(ws, game, 'blue');
+    const view = await second.waitFor('viewUpdate');
+    expect(view.view.dispatches.some((d) => d.id === dispatch.id)).toBe(true);
+    // Let the game move on so a push reaches the second socket as well.
+    await second.waitFor('viewUpdate', (m) => m.view.atGame > view.view.atGame + 60_000);
+    expect(second.messages.some((m) => m.kind === 'dispatch')).toBe(false);
   });
 
   it('answers an order the umpire cannot read with an error, and keeps the connection', async () => {

@@ -31,8 +31,11 @@ import { Hub, type Socket } from './hub.js';
 /** Fastest clock a client may ask for: 1 game day per wall second. */
 export const MAX_RATE = 86_400;
 
+/** Slowest clock a client may ask for: 1 game second per 100 wall seconds. */
+export const MIN_RATE = 0.01;
+
 const CreateGame = z
-  .object({ rate: z.number().finite().positive().max(MAX_RATE).optional() })
+  .object({ rate: z.number().finite().min(MIN_RATE).max(MAX_RATE).optional() })
   .strict();
 
 /** Largest message a client may send. Orders are a few lines of prose. */
