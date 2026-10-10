@@ -314,7 +314,7 @@ export function loadScenario(raw: unknown): GameState {
     sides,
     units,
     intel: Object.fromEntries(
-      sideIds.map((id) => [id, { contacts: [], inSight: [], reports: [] }]),
+      sideIds.map((id) => [id, { contacts: [], inSight: [], reports: [], documents: [] }]),
     ) as unknown as GameState['intel'],
     victory: {
       objective,
@@ -324,6 +324,7 @@ export function loadScenario(raw: unknown): GameState {
     },
     combatActive: false,
     outcome: null,
+    couriers: [],
     rulings: [],
   };
 }

@@ -74,6 +74,15 @@ describe('applyServerMessage', () => {
   });
 });
 
+describe('server restart', () => {
+  it('keeps a notice that the game came back paused', () => {
+    const s = applyServerMessage(initialState, { v, kind: 'serverRestarted', downMs: 600_000 }, 0);
+    expect(s.notices[0]?.code).toBe('server_restart');
+    expect(s.notices[0]?.message).toContain('at least 10 min');
+    expect(s.notices[0]?.message).toContain('paused');
+  });
+});
+
 describe('game over', () => {
   const over: ServerMessage = {
     v,
@@ -120,12 +129,12 @@ describe('clock', () => {
 
 describe('session params', () => {
   it('picks join, create or fixture', () => {
-    expect(parseSession('?game=g&token=t')).toEqual({ mode: 'join', game: 'g', token: 't' });
-    expect(parseSession('?new=1&rate=12')).toEqual({ mode: 'create', side: 'blue', rate: 12 });
+    expect(parseSession('?game=g')).toEqual({ mode: 'join', game: 'g' });
+    expect(parseSession('?game=g&side=red')).toEqual({ mode: 'join', game: 'g', side: 'red' });
+    expect(parseSession('?new=1&rate=12')).toEqual({ mode: 'create', rate: 12 });
+    expect(parseSession('?new=1&side=red')).toEqual({ mode: 'create', side: 'red' });
     expect(parseSession('')).toEqual({ mode: 'fixture' });
-    expect(wsUrl({ protocol: 'https:', host: 'a.b' }, 'g', 't')).toBe(
-      'wss://a.b/games/g/ws?token=t',
-    );
+    expect(wsUrl({ protocol: 'https:', host: 'a.b' }, 'g')).toBe('wss://a.b/games/g/ws');
   });
 });
 

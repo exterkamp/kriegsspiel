@@ -10,6 +10,10 @@ services:
     # Values come from the shell or a git-ignored .env next to this file (see .env.example).
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      MAIL_WEBHOOK_URL: ${MAIL_WEBHOOK_URL:-}
+      MAIL_WEBHOOK_TOKEN: ${MAIL_WEBHOOK_TOKEN:-}
+      TRUST_PROXY: ${TRUST_PROXY:-}
     volumes:
       - data:/data
     logging:
