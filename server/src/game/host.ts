@@ -160,7 +160,9 @@ export class GameHost {
     for (const e of tail) {
       if (e.error) continue;
       if (e.command.kind === 'setRate') rate = e.command.rate;
-      else if (e.command.kind === 'setMode') mode = e.command.mode;
+      for (const t of e.ratio ?? [])
+        if (t.outcome === 'passed') rate = t.rate;
+        else if (e.command.kind === 'setMode') mode = e.command.mode;
     }
     const clock = new GameClock(this.options.wallNow, {
       gameMs: state.time,
