@@ -73,6 +73,7 @@ const VIEW_KEYS = [
   'visibleEnemies',
   'lastKnownContacts',
   'reports',
+  'documents',
 ];
 /** Keys of a master `GameState`: if any is present, the caller handed over more than a view. */
 const MASTER_KEYS = ['units', 'sides', 'intel', 'map', 'victory', 'outcome', 'queue', 'world'];
