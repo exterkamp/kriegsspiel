@@ -10,6 +10,7 @@ import {
   type ServerMessage,
   type SideView,
 } from './index.js';
+import { parseWith } from './messages.js';
 
 const v = PROTOCOL_VERSION;
 const clock = { gameMsAtAnchor: 0, wallMsAtAnchor: 1000, rate: 4, status: 'running' } as const;
@@ -81,6 +82,46 @@ describe('ServerMessage', () => {
     expect(parseServerMessage(JSON.stringify(bad)).ok).toBe(false);
   });
 
+  describe('rejects extra keys at every nesting level of a view', () => {
+    const dispatch = {
+      id: 'd1',
+      from: 'staff',
+      writtenAtGame: 0,
+      receivedAtGame: 1,
+      category: 'staff',
+      text: 'hi',
+    };
+    const full = { ...view, dispatches: [dispatch] };
+    const extra = { hiddenOrders: 'x' };
+    const cases: [string, (x: typeof full) => unknown][] = [
+      ['SideView', (x) => ({ ...x, ...extra })],
+      ['OwnUnit', (x) => ({ ...x, ownUnits: [{ ...x.ownUnits[0], ...extra }] })],
+      [
+        'VisibleEnemyUnit',
+        (x) => ({ ...x, visibleEnemies: [{ ...x.visibleEnemies[0], ...extra }] }),
+      ],
+      [
+        'LastKnownContact',
+        (x) => ({ ...x, lastKnownContacts: [{ ...x.lastKnownContacts[0], ...extra }] }),
+      ],
+      ['Dispatch', (x) => ({ ...x, dispatches: [{ ...x.dispatches[0], ...extra }] })],
+      ['ClockState', (x) => ({ ...x, clock: { ...x.clock, ...extra } })],
+      [
+        'Coord',
+        (x) => ({ ...x, ownUnits: [{ ...x.ownUnits[0], position: { x: 1, y: 2, z: 3 } }] }),
+      ],
+    ];
+    it('accepts the unmodified view', () => {
+      expect(parseServerMessage(JSON.stringify({ v, kind: 'viewUpdate', view: full })).ok).toBe(
+        true,
+      );
+    });
+    it.each(cases)('%s', (_name, mutate) => {
+      const bad = { v, kind: 'viewUpdate', view: mutate(full) };
+      expect(parseServerMessage(JSON.stringify(bad)).ok).toBe(false);
+    });
+  });
+
   it('rejects an invalid clock', () => {
     const bad = { v, kind: 'clockState', clock: { ...clock, rate: 0 } };
     expect(parseServerMessage(JSON.stringify(bad)).ok).toBe(false);
@@ -104,6 +145,15 @@ describe('Intent', () => {
   it('accepts attack on a unit id or a coord', () => {
     expect(Intent.safeParse({ kind: 'attack', target: 'u1' }).success).toBe(true);
     expect(Intent.safeParse({ kind: 'attack', target: { x: 1, y: 1 } }).success).toBe(true);
+  });
+  it('parse helpers return a failure instead of throwing on a pathologically deep intent', () => {
+    const n = 20000;
+    const json =
+      '{"kind":"when","trigger":{"kind":"attacked"},"then":['.repeat(n) +
+      '{"kind":"report"}' +
+      ']}'.repeat(n);
+    expect(() => JSON.parse(json)).not.toThrow();
+    expect(parseWith(Intent, json).ok).toBe(false);
   });
   it('rejects bad intents', () => {
     expect(Intent.safeParse({ kind: 'move' }).success).toBe(false);

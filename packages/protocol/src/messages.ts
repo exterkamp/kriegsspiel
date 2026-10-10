@@ -38,15 +38,21 @@ export type ServerMessage = z.infer<typeof ServerMessage>;
 
 export type ParseResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
-function parseWith<T>(schema: z.ZodType<T>, json: string): ParseResult<T> {
+/** Exported for tests only; not re-exported from the package index. */
+export function parseWith<T>(schema: z.ZodType<T>, json: string): ParseResult<T> {
   let raw: unknown;
   try {
     raw = JSON.parse(json);
   } catch {
     return { ok: false, error: 'invalid JSON' };
   }
-  const r = schema.safeParse(raw);
-  return r.success ? { ok: true, value: r.data } : { ok: false, error: r.error.message };
+  try {
+    const r = schema.safeParse(raw);
+    return r.success ? { ok: true, value: r.data } : { ok: false, error: r.error.message };
+  } catch {
+    // Pathological payloads (e.g. a deeply nested Intent) can overflow the stack inside zod.
+    return { ok: false, error: 'payload could not be validated' };
+  }
 }
 
 export const parseCommand = (json: string): ParseResult<Command> => parseWith(Command, json);
