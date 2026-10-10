@@ -11,34 +11,56 @@ export { serialize, deserialize } from './snapshot.js';
 export * from './types.js';
 export { loadScenario, ScenarioError } from './scenario.js';
 export { holdTheBridge } from './scenarios/holdTheBridge.js';
+export * from './geometry.js';
 export {
-  MS_PER_TILE,
-  enterCost,
+  BLOCKS_SIGHT,
+  KIND_DEFAULTS,
+  OPEN_GROUND,
+  featureAnchor,
+  featuresAlong,
+  featuresIn,
+  profileAlong,
+  segmentCost,
+  segmentPassable,
+  terrainAt,
+} from './terrain.js';
+export type { FeatureSpan, ProfilePiece, TerrainSample } from './terrain.js';
+export {
+  axes,
+  defaultFootprint,
+  footprintCorners,
+  footprintsOverlap,
+  subPositions,
+  toWorld,
+} from './formation.js';
+export {
+  MS_PER_METRE,
   findPath,
   issueHalt,
   issueMove,
+  legDuration,
   pathDuration,
   registerMovement,
-  stepDuration,
 } from './movement.js';
 export type { Path } from './movement.js';
 export {
   BREAK_MORALE,
   COMBAT_TICK_MS,
-  COVER,
+  coverFactor,
   FIRE_RATE,
   issueAttack,
   registerCombat,
   startGame,
 } from './combat.js';
-export { RANGE_TILES, canReach } from './contact.js';
-export { COURIER_MS_PER_TILE, issueOrder, registerOrders } from './orders.js';
+export { OBJECTIVE_RADIUS_M, RANGE_M, canReach, onObjective } from './contact.js';
+export { COURIER_MS_PER_METRE, issueOrder, registerOrders } from './orders.js';
 export type { Order, OrderIntent } from './orders.js';
 export { beginMarch } from './movement.js';
 export {
   COURIER_DELAY_MS,
   SCAN_INTERVAL_MS,
-  SIGHT_RANGE,
+  SIGHT_RANGE_MM,
+  UNCERTAINTY_MM_PER_MINUTE,
   canSee,
   registerVisibility,
   startVisibility,

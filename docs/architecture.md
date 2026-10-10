@@ -104,10 +104,10 @@ running ──request──► pause_proposed ──all humans yes──► paus
 
 ## Components
 
-- **Engine** (`packages/engine`): pure, deterministic, no network or clock access. Map, units, orders-as-intents, movement (A* paths played out as per-tile step events, see D10), courier-delivered orders (D11), line of sight, combat, morale, supply, seeded RNG, and `advanceTo(t)`. Fully unit-tested.
+- **Engine** (`packages/engine`): pure, deterministic, no network or clock access. Continuous-space map (vector terrain features in metres, no grid, see D15), units with free position, facing and footprint, orders-as-intents, movement (routes played out as per-leg step events, see D10), courier-delivered orders (D11), line of sight, combat, morale, supply, seeded RNG, and `advanceTo(t)`. Fully unit-tested.
 - **Umpire service**: wraps the LLM with strict JSON schemas (tool use / structured outputs). Stages: `parseOrders`, `judge`, `narrate`, plus the staff-check, staff-conference and deputy calls. Prompts are versioned files. Results are recorded.
   The parse seam is the async `OrderParser` interface in `server/src/orders/orderParser.ts`: `parse(orderText, context)` resolves to intents, a clarification request or a rejection, and always carries the original wording. The server depends on the interface only; a rule-based `StubOrderParser` stands in until the LLM umpire exists. Parsers are scored against a golden corpus by the harness in `server/src/orders/eval`, see [order-eval.md](order-eval.md).
-  The model seam is `UmpireClient` in `server/src/umpire/` (`call(request)` returns schema-validated output plus a call record). `AnthropicUmpireClient` sends structured-output requests (`output_config.format`, no forced tool choice) through an injectable `UmpireTransport`, retries transport errors, timeouts and schema-invalid output with backoff, and sums tokens and cost across attempts. Models are set per stage by `UMPIRE_MODEL_PARSE|JUDGE|NARRATE`. Each accepted call goes to a `CallRecorder` (model, prompt version, system, input, raw output) for the input log. `PlaybackUmpireClient` serves those records by stage, prompt version and input with no transport, so replays cannot reach the network.
+  The model seam is `UmpireClient` in `server/src/umpire/` (`call(request)` returns schema-validated output plus a call record). It is provider-agnostic (D14, [llm-providers.md](llm-providers.md)): `ProviderUmpireClient` routes each stage to a configured `{provider, model, params}`, sends it through an `LlmProvider` adapter (Anthropic, OpenAI-compatible, Ollama), validates the result against the schema, retries transport errors, timeouts and schema-invalid output with backoff (with a repair message for models without native structured output), and sums tokens and cost across attempts. Rate limit and budget are `UmpireClient` decorators, and `PlaybackUmpireClient` serves recorded calls with no provider, so replays cannot reach the network. Each accepted call goes to a `CallRecorder` (provider, model, prompt version, system, input, raw output) for the input log. Only the adapters know about a vendor SDK or wire format.
 - **Visibility service**: from master state and a side, produces that side's knowledge: seen units, stale contact reports, received messages. The *only* path from master state to a client. See D12.
 - **Clock and scheduler** (server): the `ClockState`, the scheduler, and pause voting.
 - **Notifier**: pushes dispatch arrivals and clock events over WebSocket, plus email or web push for players who are away. Players set thresholds (all dispatches, urgent only, contact only).
@@ -118,10 +118,10 @@ running ──request──► pause_proposed ──all humans yes──► paus
 
 An `EngineSideView` (engine type, `viewFor`; not the protocol `SideView`, see D12) may contain only:
 
-- `side`, `time`, `mapWidth`, `mapHeight`.
-- `ownUnits`: the side's own units in full (id, name, kind, position, strength, morale).
-- `visibleEnemies`: enemy units in sight now, as id, position and a coarse `sizeEstimate` phrase. Nothing else: no strength, morale, facing, intent or name.
-- `lastKnownContacts`: enemy units seen earlier and not in sight now, as id, the position where seen, `seenAt`, `ageMs`, `uncertaintyTiles` and the size phrase from the sighting.
+- `side`, `time`, `mapWidth`, `mapHeight`. All lengths in a view are metres; master state is integer millimetres (D15).
+- `ownUnits`: the side's own units in full (id, name, kind, position, facing, formation, footprint, loose-formation shape, strength, morale).
+- `visibleEnemies`: enemy units in sight now, as id, position, facing, formation, footprint (rounded to the nearest 10 m, since an exact one would give the strength away), any loose shape, and a coarse `sizeEstimate` phrase. Nothing else: no strength, morale, intent or name.
+- `lastKnownContacts`: enemy units seen earlier and not in sight now, as id, the position where seen, `seenAt`, `ageMs`, `uncertaintyRadius` (metres, growing with age) and the size phrase from the sighting.
 - `reports`: contact, unit-lost and order-delivered reports whose courier delay has passed, each with kind, `observedAt`, `deliveredAt`, `ageMs`, reporting unit name, location, size phrase, confidence and template prose.
 
 Adding a field means updating this list and the leak tests in `visibility.test.ts`.

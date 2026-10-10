@@ -9,6 +9,7 @@ Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a serve
 - `docs/hq-interface.md`: the desk and map table, rendering decision
 - `docs/design.md`: pillars, features, trust risks
 - `docs/research.md`: history and sources
+- `docs/llm-providers.md`: configuring, adding and locally running LLM providers
 - `docs/roadmap.md`: milestones
 - `docs/order-eval.md`: golden order corpus and parser evaluation harness
 

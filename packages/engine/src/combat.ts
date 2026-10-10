@@ -4,18 +4,18 @@ import {
   COMBAT_TICK_EVENT,
   VICTORY_DEADLINE_EVENT,
   canReach,
-  distanceSq,
+  distanceMm,
+  onObjective,
 } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { rejectOrder, startMarch } from './movement.js';
 import { schedule } from './queue.js';
+import { terrainAt } from './terrain.js';
 import {
   MS_PER_MINUTE,
-  tileAt,
   type GameState,
   type Outcome,
   type SideId,
-  type Terrain,
   type Unit,
   type UnitKind,
 } from './types.js';
@@ -34,14 +34,10 @@ export const FIRE_RATE: Record<UnitKind, number> = {
   artillery: 0.04,
 };
 
-/** Multiplier on casualties taken, by the terrain the target stands on. */
-export const COVER: Record<Terrain, number> = {
-  open: 1,
-  road: 1,
-  bridge: 1,
-  river: 1,
-  wood: 0.6,
-};
+/** Multiplier on casualties taken by a target on ground with the given `cover` (0..1). */
+export function coverFactor(cover: number): number {
+  return 1 - cover;
+}
 
 /** Morale lost per percent of strength lost in one tick. */
 export const MORALE_PER_LOSS_PERCENT = 2;
@@ -115,10 +111,8 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
       return { winner: world.sides.find((o) => o.id !== s.id)!.id, reason, time };
     }
   }
-  const onObjective = activeUnits(world).filter(
-    (u) => u.position.x === objective.x && u.position.y === objective.y,
-  );
-  if (onObjective.length > 0 && onObjective.every((u) => u.side === attacker)) {
+  const holders = activeUnits(world).filter((u) => onObjective(u, objective));
+  if (holders.length > 0 && holders.every((u) => u.side === attacker)) {
     return { winner: attacker, reason: 'objective-taken', time };
   }
   return null;
@@ -157,8 +151,8 @@ function chooseTarget(shooter: Unit, enemies: Unit[]): Unit | undefined {
   for (const e of reachable) {
     if (
       !best ||
-      distanceSq(shooter.position, e.position) < distanceSq(shooter.position, best.position) ||
-      (distanceSq(shooter.position, e.position) === distanceSq(shooter.position, best.position) &&
+      distanceMm(shooter.center, e.center) < distanceMm(shooter.center, best.center) ||
+      (distanceMm(shooter.center, e.center) === distanceMm(shooter.center, best.center) &&
         e.id < best.id)
     ) {
       best = e;
@@ -171,7 +165,7 @@ function chooseTarget(shooter: Unit, enemies: Unit[]): Unit | undefined {
  * Register the combat and victory handlers.
  *
  * Contact: whenever a step changes the picture, `combat.check` looks for opposing
- * active units within reach of each other (`RANGE_TILES`). The first contact starts a
+ * active units within reach of each other (`RANGE_M`). The first contact starts a
  * chain of `combat.tick` events every 2 game minutes; the chain stops at the first
  * tick that finds no contact. A tick lets every active unit fire once at its
  * target, all hits being worked out from the strengths at the start of the tick
@@ -212,7 +206,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
                   intent: {
                     kind: 'attack' as const,
                     target: targetId,
-                    to: { ...u.position },
+                    to: { ...u.center },
                     startedAt: ev.time,
                   },
                 }
@@ -222,7 +216,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
         schedule: [check],
       };
     }
-    const res = startMarch(world, unit, target.position, ev.time, targetId);
+    const res = startMarch(world, unit, target.center, ev.time, targetId);
     if (res.emit?.some((e) => e.type === 'unit.moveBlocked')) {
       // No way to the target. A unit that was already attacking it gives up, or
       // `combat.check` would ask for the same chase again at this very instant.
@@ -249,7 +243,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     const chase: NewEvent[] = [];
     for (const u of activeUnits(world)) {
       if (u.intent.kind !== 'attack') continue;
-      if (u.intent.to.x !== u.position.x || u.intent.to.y !== u.position.y) continue;
+      if (u.intent.to.x !== u.center.x || u.intent.to.y !== u.center.y) continue;
       const foe = world.units.find((x) => x.id === (u.intent as { target: string }).target);
       if (foe && foe.status === 'active' && !canReach(u, foe)) {
         chase.push({
@@ -295,7 +289,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       );
       if (!target) continue;
       const die = rng.die(6);
-      const cover = COVER[tileAt(world.map, target.position) ?? 'open'];
+      const cover = coverFactor(terrainAt(world.map, target.center)?.attrs.cover ?? 0);
       const moraleFactor = 0.5 + shooter.morale / 200;
       const casualties = round2(
         shooter.strength * FIRE_RATE[shooter.kind] * (die / 3.5) * moraleFactor * cover,
@@ -303,7 +297,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       shots.push({
         shooter,
         target,
-        distance: Math.sqrt(distanceSq(shooter.position, target.position)),
+        distance: distanceMm(shooter.center, target.center),
         cover,
         die,
         casualties,
@@ -345,7 +339,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
         payload: {
           attacker: s.shooter.id,
           target: s.target.id,
-          distance: round2(s.distance),
+          distance: round2(s.distance / 1000),
           cover: s.cover,
           die: s.die,
           casualties: s.casualties,

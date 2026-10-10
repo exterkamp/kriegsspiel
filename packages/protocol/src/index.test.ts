@@ -18,10 +18,42 @@ const view: SideView = {
   side: 'red',
   atGame: 5000,
   ownUnits: [
-    { id: 'u1', name: '1st Bde', position: { x: 1, y: 2 }, strength: 3000, morale: 0.8, supply: 1 },
+    {
+      id: 'u1',
+      name: '1st Bde',
+      position: { x: 1203.457, y: 2204.5 },
+      facing: 0.6457718,
+      formation: 'loose',
+      footprint: { frontage: 250, depth: 40 },
+      shape: [
+        { x: -120.5, y: -3 },
+        { x: 0, y: 11.25 },
+        { x: 118, y: -2.5 },
+      ],
+      strength: 3000,
+      morale: 0.8,
+      supply: 1,
+    },
   ],
-  visibleEnemies: [{ id: 'e1', position: { x: 5, y: 5 }, sizeEstimate: 'a battalion' }],
-  lastKnownContacts: [{ id: 'c1', position: { x: 9, y: 9 }, observedAtGame: 100, ageMs: 4900 }],
+  visibleEnemies: [
+    {
+      id: 'e1',
+      position: { x: 5.5, y: 5.25 },
+      facing: 3.14159,
+      formation: 'line',
+      footprint: { frontage: 80, depth: 10 },
+      sizeEstimate: 'a battalion',
+    },
+  ],
+  lastKnownContacts: [
+    {
+      id: 'c1',
+      position: { x: 9.75, y: 9 },
+      observedAtGame: 100,
+      ageMs: 4900,
+      uncertaintyRadius: 100,
+    },
+  ],
   dispatches: [],
   clock,
 };
@@ -106,6 +138,20 @@ describe('ServerMessage', () => {
         'LastKnownContact',
         (x) => ({ ...x, lastKnownContacts: [{ ...x.lastKnownContacts[0], ...extra }] }),
       ],
+      [
+        'Footprint',
+        (x) => ({
+          ...x,
+          ownUnits: [{ ...x.ownUnits[0], footprint: { ...x.ownUnits[0]!.footprint, ...extra } }],
+        }),
+      ],
+      [
+        'Shape',
+        (x) => ({
+          ...x,
+          ownUnits: [{ ...x.ownUnits[0], shape: [{ x: 1, y: 2, z: 3 }] }],
+        }),
+      ],
       ['Dispatch', (x) => ({ ...x, dispatches: [{ ...x.dispatches[0], ...extra }] })],
       ['ClockState', (x) => ({ ...x, clock: { ...x.clock, ...extra } })],
       [
@@ -121,6 +167,54 @@ describe('ServerMessage', () => {
     it.each(cases)('%s', (_name, mutate) => {
       const bad = { v, kind: 'viewUpdate', view: mutate(full) };
       expect(parseServerMessage(JSON.stringify(bad)).ok).toBe(false);
+    });
+  });
+
+  describe('continuous space', () => {
+    const send = (mutate: (x: typeof view) => unknown) =>
+      parseServerMessage(JSON.stringify({ v, kind: 'viewUpdate', view: mutate(view) })).ok;
+    const unit0 = (x: typeof view) => x.ownUnits[0]!;
+
+    it('carries free positions, facings and footprints exactly', () => {
+      const r = parseServerMessage(serializeServerMessage({ v, kind: 'viewUpdate', view }));
+      expect(r).toEqual({ ok: true, value: { v, kind: 'viewUpdate', view } });
+    });
+
+    it('requires facing, formation, footprint and an uncertainty radius', () => {
+      expect(send((x) => ({ ...x, ownUnits: [{ ...unit0(x), facing: undefined }] }))).toBe(false);
+      expect(send((x) => ({ ...x, ownUnits: [{ ...unit0(x), formation: undefined }] }))).toBe(
+        false,
+      );
+      expect(send((x) => ({ ...x, ownUnits: [{ ...unit0(x), footprint: undefined }] }))).toBe(
+        false,
+      );
+      expect(
+        send((x) => ({
+          ...x,
+          visibleEnemies: [{ ...x.visibleEnemies[0], footprint: undefined }],
+        })),
+      ).toBe(false);
+      expect(
+        send((x) => ({
+          ...x,
+          lastKnownContacts: [{ ...x.lastKnownContacts[0], uncertaintyRadius: undefined }],
+        })),
+      ).toBe(false);
+    });
+
+    it('rejects a negative radius, a non-finite facing, a flat footprint and an unknown formation', () => {
+      const lk = (r: number) => (x: typeof view) => ({
+        ...x,
+        lastKnownContacts: [{ ...x.lastKnownContacts[0], uncertaintyRadius: r }],
+      });
+      expect(send(lk(-1))).toBe(false);
+      expect(send(lk(0))).toBe(true);
+      expect(send((x) => ({ ...x, ownUnits: [{ ...unit0(x), facing: null }] }))).toBe(false);
+      expect(
+        send((x) => ({ ...x, ownUnits: [{ ...unit0(x), footprint: { frontage: 0, depth: 5 } }] })),
+      ).toBe(false);
+      expect(send((x) => ({ ...x, ownUnits: [{ ...unit0(x), formation: 'blob' }] }))).toBe(false);
+      expect(send((x) => ({ ...x, ownUnits: [{ ...unit0(x), shape: [] }] }))).toBe(false);
     });
   });
 

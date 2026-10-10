@@ -17,7 +17,7 @@ Research for issue #83. The maintainer decides. Items marked **(verify)** come f
 - **Order of battle.** Good. Separate Union and Confederate pages exist ([Union](https://en.wikipedia.org/wiki/Battle_of_Ball%27s_Bluff_order_of_battle:_Union), [Confederate](https://en.wikipedia.org/wiki/Battle_of_Ball%27s_Bluff_order_of_battle:_Confederate)). Note that the Official Records and most secondary works list Lander's and Gorman's brigades in the reverse order and place the 15th Massachusetts and 42nd New York under Gorman, while the Union page follows National Archives Record Group 393. This source conflict needs a decision before data entry. The Official Records are public domain.
 - **Pacing.** One day. At 1:1 the fight is a long afternoon and evening, with the real tension in the slow river crossing by a few boats. At 12:1 it is a short live session.
 - **Hooks.** A single bottleneck (the crossing) makes courier delay and reinforcement lag decisive. The Union side starts with poor knowledge of the Confederate strength. The Confederate side must guess where the main effort lies. Both generals can be left to the LLM if roles are empty.
-- **Risks.** A heavily wooded bluff and a river, so the flat-map, terrain-grid plan (D3) must represent a steep bank and wood cover. Little cavalry or artillery to exercise those rules.
+- **Risks.** A heavily wooded bluff and a river, so the flat-map, vector-terrain plan (D3, D15) must represent a steep bank and wood cover. Little cavalry or artillery to exercise those rules.
 
 ## Candidate B: Podol, 26 to 27 June 1866 (Austro-Prussian War)
 
@@ -57,7 +57,7 @@ Research for issue #83. The maintainer decides. Items marked **(verify)** come f
 1. ~~Read the rights statement on the chosen map and record it.~~ Done (#84), see `assets/maps/README.md`.
 2. Resolve the Lander/Gorman order-of-battle conflict against the Official Records.
 3. Pull march rates and tables per [research.md](research.md) section 6.
-4. Hand-annotate the map for the terrain grid (roadmap, milestone with the first historical scenario).
+4. Hand-annotate the map as vector terrain features (roadmap, milestone with the first historical scenario).
 
 ## Sources
 

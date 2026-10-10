@@ -27,4 +27,4 @@ Helpers: `parseCommand` / `parseServerMessage` (JSON string to `{ ok, value | er
 
 ## Shared types
 
-`Coord`, `ClockState`, `Intent` (move, hold, attack, withdraw, report, when, at), `Trigger`, `Dispatch` (structured fields plus prose `text`), `SideView` (own units, visible enemies, last-known contacts with `ageMs`, dispatches, clock).
+`Coord` (metres on a continuous plane, no grid), `Formation`, `Footprint`, `ClockState`, `Intent` (move, hold, attack, withdraw, report, when, at), `Trigger`, `Dispatch` (structured fields plus prose `text`), `SideView` (own units and visible enemies with free positions, facings and footprints, last-known contacts with `ageMs` and an `uncertaintyRadius` that grows with age, dispatches, clock). Positions and lengths are metres; facing is a compass bearing in radians (0 north, clockwise).

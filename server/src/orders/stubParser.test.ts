@@ -1,33 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import type { OrderParser, ParseContext } from './index.js';
+import type { OrderParser, ParseContext, ParseFeature } from './index.js';
 import { StubOrderParser } from './stubParser.js';
 
-function ctx(rows: string[], side = 'blue'): ParseContext {
-  const legend: Record<string, string> = {
-    '.': 'open',
-    W: 'wood',
-    '~': 'river',
-    B: 'bridge',
-    '=': 'road',
-  };
+/** Anchor points are millimetres, as in the engine's state. */
+const at = (x: number, y: number) => ({ x: x * 1000, y: y * 1000 });
+const WOOD = { id: 'wood-a', kind: 'wood', anchor: at(150, 50) };
+const BRIDGE = { id: 'bridge', kind: 'bridge', anchor: at(250, 250) };
+const ROAD = { id: 'road', kind: 'road', anchor: at(250, 350) };
+
+function ctx(features: ParseFeature[], side = 'blue'): ParseContext {
   return {
     side,
-    map: {
-      width: rows[0]!.length,
-      height: rows.length,
-      tiles: rows.flatMap((r) => [...r].map((c) => legend[c]!)),
-    },
+    map: { features },
     units: [
-      { id: 'blue-1', side: 'blue', name: '1st Battalion', position: { x: 1, y: 4 } },
-      { id: 'blue-2', side: 'blue', name: '2nd Battalion', position: { x: 3, y: 4 } },
-      { id: 'blue-3', side: 'blue', name: 'Cavalry Squadron', position: { x: 2, y: 4 } },
-      { id: 'red-1', side: 'red', name: 'Vanguard Battalion', position: { x: 1, y: 0 } },
+      { id: 'blue-1', side: 'blue', name: '1st Battalion', center: at(150, 450) },
+      { id: 'blue-2', side: 'blue', name: '2nd Battalion', center: at(350, 450) },
+      { id: 'blue-3', side: 'blue', name: 'Cavalry Squadron', center: at(250, 450) },
+      { id: 'red-1', side: 'red', name: 'Vanguard Battalion', center: at(150, 50) },
     ],
   };
 }
 
-const ONE_WOOD = ['.WW..', '.WW..', '~~B~~', '..=..', '.....'];
-const TWO_WOODS = ['.WW..', '.....', '~~B~~', '..=..', '..WW.'];
+const ONE_WOOD = [WOOD, BRIDGE, ROAD];
+const TWO_WOODS = [
+  WOOD,
+  { id: 'wood-b', kind: 'wood', name: 'Hollow wood', anchor: at(350, 480) },
+  BRIDGE,
+  ROAD,
+];
 const parser: OrderParser = new StubOrderParser();
 
 describe('StubOrderParser', () => {
@@ -43,8 +43,8 @@ describe('StubOrderParser', () => {
       text,
       unitId: 'blue-1',
       intents: [
-        { kind: 'move', to: { x: 2, y: 2 } },
-        { kind: 'hold', at: { x: 2, y: 2 } },
+        { kind: 'move', to: at(250, 250) },
+        { kind: 'hold', at: at(250, 250) },
       ],
     });
   });
@@ -54,7 +54,7 @@ describe('StubOrderParser', () => {
     expect(r).toMatchObject({
       kind: 'intents',
       unitId: 'blue-3',
-      intents: [{ kind: 'withdraw', toward: { x: 1, y: 0 } }],
+      intents: [{ kind: 'withdraw', toward: at(150, 50) }],
     });
   });
 
@@ -65,7 +65,7 @@ describe('StubOrderParser', () => {
 
   it('hold with no place holds the current position', async () => {
     const r = await parser.parse('2nd battalion hold', ctx(ONE_WOOD));
-    expect(r).toMatchObject({ intents: [{ kind: 'hold', at: { x: 3, y: 4 } }] });
+    expect(r).toMatchObject({ intents: [{ kind: 'hold', at: at(350, 450) }] });
   });
 
   it('matches units case-insensitively, by id, and by short name', async () => {
@@ -90,7 +90,7 @@ describe('StubOrderParser', () => {
   });
 
   it('rejects a place that is not on the map', async () => {
-    const r = await parser.parse('1st Battalion attack the wood', ctx(['.....', '..B..']));
+    const r = await parser.parse('1st Battalion attack the wood', ctx([BRIDGE]));
     expect(r).toMatchObject({ kind: 'rejection' });
   });
 
@@ -115,10 +115,13 @@ describe('StubOrderParser', () => {
     );
   });
 
-  it('asks which wood when the map has two', async () => {
+  it('asks which wood when the map has two, naming a feature by its name', async () => {
     const r = await parser.parse('1st Battalion withdraw to the wood', ctx(TWO_WOODS));
     expect(r).toMatchObject({ kind: 'clarification', options: expect.any(Array) });
-    expect(r.kind === 'clarification' && r.options).toHaveLength(2);
+    expect(r.kind === 'clarification' && r.options).toEqual([
+      'the wood at (150, 50) m',
+      'the Hollow wood at (350, 480) m',
+    ]);
   });
 
   it.each([
@@ -144,7 +147,7 @@ describe('StubOrderParser', () => {
     const c = ctx(ONE_WOOD);
     c.units = [
       ...c.units,
-      { id: 'blue-4', side: 'blue', name: '1st Battalion Reserve', position: { x: 0, y: 4 } },
+      { id: 'blue-4', side: 'blue', name: '1st Battalion Reserve', center: at(50, 450) },
     ];
     expect(await parser.parse('1st Battalion hold', c)).toMatchObject({ unitId: 'blue-1' });
     expect(await parser.parse('1st Battalion Reserve hold', c)).toMatchObject({ unitId: 'blue-4' });
@@ -160,18 +163,18 @@ describe('StubOrderParser', () => {
     const c = ctx(ONE_WOOD);
     c.units = [
       ...c.units,
-      { id: 'blue-5', side: 'blue', name: 'Advance Guard', position: { x: 0, y: 3 } },
-      { id: 'blue-6', side: 'blue', name: 'Hold Fast Regiment', position: { x: 4, y: 3 } },
+      { id: 'blue-5', side: 'blue', name: 'Advance Guard', center: at(50, 350) },
+      { id: 'blue-6', side: 'blue', name: 'Hold Fast Regiment', center: at(450, 350) },
     ];
     expect(await parser.parse('Advance Guard march to the bridge', c)).toMatchObject({
       kind: 'intents',
       unitId: 'blue-5',
-      intents: [{ kind: 'move', to: { x: 2, y: 2 } }],
+      intents: [{ kind: 'move', to: at(250, 250) }],
     });
     expect(await parser.parse('Hold Fast Regiment hold', c)).toMatchObject({
       kind: 'intents',
       unitId: 'blue-6',
-      intents: [{ kind: 'hold', at: { x: 4, y: 3 } }],
+      intents: [{ kind: 'hold', at: at(450, 350) }],
     });
   });
 

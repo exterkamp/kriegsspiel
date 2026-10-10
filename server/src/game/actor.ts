@@ -18,6 +18,7 @@
 import {
   advanceTo,
   deserialize,
+  featureAnchor,
   issueOrder,
   serialize,
   type EmittedEvent,
@@ -28,7 +29,7 @@ import {
   type OrderIntent as EngineIntent,
 } from '@kriegsspiel/engine';
 import { GameClock, type WallClock } from '../clock.js';
-import type { OrderParser, ParseResult } from '../orders/index.js';
+import type { OrderParser, ParseContext, ParseResult } from '../orders/index.js';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
 /** Timer functions, injectable so tests can run on a fake clock. */
@@ -242,7 +243,8 @@ export class GameActor {
     if (!next || this.clock.status !== 'running' || this.clock.mode === 'manual') return;
     const delay = Math.min(
       MAX_SLEEP_MS,
-      Math.max(0, this.clock.wallDueFor(next.time) - this.wallNow()),
+      // Round up: waking a fraction early finds the event not yet due and spins at zero delay.
+      Math.max(0, Math.ceil(this.clock.wallDueFor(next.time) - this.wallNow())),
     );
     this.timer = this.timers.setTimeout(() => {
       this.timerSet = false;
@@ -318,6 +320,23 @@ export class GameActor {
     }
   }
 
+  /** What the parser may read: the issuing side, named places and the side's own units. */
+  private parseContext(side: string): ParseContext {
+    const { map, units } = this.engine.world;
+    return {
+      side,
+      map: {
+        features: map.features.map((f) => ({
+          id: f.id,
+          kind: f.kind,
+          ...(f.name === undefined ? {} : { name: f.name }),
+          anchor: featureAnchor(f.geometry),
+        })),
+      },
+      units: units.map((u) => ({ id: u.id, side: u.side, name: u.name, center: u.center })),
+    };
+  }
+
   /**
    * Sign an order. The parse runs in the background with the signing time recorded as a pending
    * dependency; the returned promise settles when the result has been applied (or refused).
@@ -341,7 +360,7 @@ export class GameActor {
           command,
         };
         // The parse sees the world as it is at signing time, which the barrier keeps current.
-        const context = { ...this.engine.world, side: command.side };
+        const context = this.parseContext(command.side);
         this.dependencies.set(dep.id, dep);
         this.syncBarrier();
         this.reschedule();

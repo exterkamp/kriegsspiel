@@ -25,10 +25,10 @@ export interface Order {
 }
 
 /**
- * Game ms for a courier to ride one cost-1 tile: 4 tiles/min, about 18 km/h
- * with a tile of 100 paces. Roads cost half, so a courier on a road does 8.
+ * Game ms for a courier to ride one metre of cost-1 ground: 400 m a minute, about 24 km/h.
+ * Roads cost half, so a courier on a road does 800 m a minute.
  */
-export const COURIER_MS_PER_TILE = MS_PER_MINUTE / 4;
+export const COURIER_MS_PER_METRE = MS_PER_MINUTE / 400;
 
 export const ORDER_ISSUE_EVENT = 'order.issue';
 export const ORDER_DELIVER_EVENT = 'order.deliver';
@@ -67,7 +67,7 @@ function undeliverable(world: GameState, order: Order): string | undefined {
 
 /**
  * Register the order handlers. An order is issued at HQ, a courier rides to
- * the unit along the cheapest path (roads are fastest), and the unit adopts
+ * the unit along the cheapest route (roads are fastest), and the unit adopts
  * the order's intent when the courier arrives. Until then it keeps its standing
  * intent. An order that cannot be delivered, because the unit is gone or
  * destroyed or the courier has no route, emits `order_failed` and changes nothing.
@@ -80,13 +80,13 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     if (reason) return failed(world, order, reason);
     const unit = world.units.find((u) => u.id === order.to)!;
     const hq = world.sides.find((s) => s.id === order.side)?.hq;
-    const route = hq && findPath(world.map, hq, unit.position);
+    const route = hq && findPath(world.map, hq, unit.center);
     if (!route) return failed(world, order, 'no route for courier');
     return {
       world,
       schedule: [
         {
-          time: ev.time + (route.cost * COURIER_MS_PER_TILE) / 2,
+          time: ev.time + Math.round((route.cost / 1000) * COURIER_MS_PER_METRE),
           type: ORDER_DELIVER_EVENT,
           payload: ev.payload,
         },
