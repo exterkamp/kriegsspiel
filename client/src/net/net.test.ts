@@ -11,7 +11,6 @@ import {
   gameNowMs,
   initialState,
   withPendingOrder,
-  withRead,
 } from './state.js';
 
 const v = PROTOCOL_VERSION;
@@ -216,36 +215,11 @@ describe('Hud', () => {
   function mount() {
     document.body.innerHTML = '<div id="root"></div>';
     const sent: Array<[string | undefined, string]> = [];
-    const opened: Dispatch[] = [];
     const hud = new Hud(document.getElementById('root')!, {
       onSendOrder: (u, t) => (sent.push([u, t]), undefined),
-      onOpenDispatch: (d) => opened.push(d),
     });
-    return { hud, sent, opened };
+    return { hud, sent };
   }
-
-  it('lists dispatches with written and received times and read state, and opens on click', () => {
-    const { hud, opened } = mount();
-    let s = applyServerMessage(
-      initialState,
-      {
-        v,
-        kind: 'viewUpdate',
-        view: { ...fixtureView, dispatches: [disp('d1', { location: { x: 5, y: 6 } })] },
-      },
-      0,
-    );
-    hud.render(s, 0);
-    const li = document.querySelector<HTMLElement>('#tray-list li')!;
-    expect(li.className).toBe('unread');
-    expect(li.textContent).toContain('written Day 1 00:01');
-    expect(li.textContent).toContain('received Day 1 00:02');
-    li.click();
-    expect(opened.map((d) => d.id)).toEqual(['d1']);
-    s = withRead(s, 'd1');
-    hud.render(s, 0);
-    expect(document.querySelector('#tray-list li')!.className).toBe('read');
-  });
 
   it('escapes dispatch text and shows pending orders and the clock', () => {
     const { hud } = mount();
@@ -263,7 +237,6 @@ describe('Hud', () => {
     );
     s = withPendingOrder(s, { orderId: 'o1', text: '1st Battalion, advance', sentAtGame: 60_000 });
     hud.render(s, 0);
-    expect(document.querySelector('#tray-list img')).toBeNull();
     expect(document.querySelector('#pending')!.textContent).toContain('1st Battalion, advance');
     expect(document.querySelector('#clock-text')!.textContent).toBe('Day 1 01:00 · 1:1 · paused');
   });

@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { activeView, gameState } from './store.js';
+  import { activeView, gameState, trayMarks } from './store.js';
+  import { unreadCount } from './tray.js';
+  import InTray from './InTray.svelte';
   import { VIEWS, isDeskView, isTypingTarget, viewForKey, type ViewId } from './views.js';
   import { formatGameTime } from '../net/state.js';
 
@@ -39,7 +41,7 @@
       })),
     ].sort((a, b) => b.at - a.at),
   );
-  const unread = $derived($gameState.dispatches.filter((d) => !$gameState.read.has(d.id)).length);
+  const unread = $derived(unreadCount($gameState.dispatches, $trayMarks));
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -61,7 +63,11 @@
 
 <div class="fade" class:on={isDeskView($activeView)} aria-hidden="true"></div>
 
-{#if $activeView === 'roster'}
+{#if $activeView === 'inTray'}
+  <section id="tray" class="paper wide" tabindex="-1" aria-label="In-tray">
+    <InTray />
+  </section>
+{:else if $activeView === 'roster'}
   <section id="view-roster" class="paper" tabindex="-1" aria-label="Order of battle">
     <h2>Order of battle</h2>
     {#if units.length === 0}
@@ -161,6 +167,9 @@
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
     z-index: 3;
     animation: slide-in 450ms ease-out;
+  }
+  .paper.wide {
+    width: min(760px, calc(100% - 16px));
   }
   .paper:focus-visible {
     outline: 3px solid #ffd76a;

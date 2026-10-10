@@ -1,10 +1,9 @@
-import type { Dispatch, SideView } from '@kriegsspiel/protocol';
+import type { SideView } from '@kriegsspiel/protocol';
 import { formatGameTime, formatRate, gameNowMs, type ClientState } from '../net/state.js';
 
 export interface HudHandlers {
   /** The player pressed Send. Return an error string to keep the text in the box. */
   onSendOrder(unitId: string | undefined, text: string): string | undefined;
-  onOpenDispatch(d: Dispatch): void;
 }
 
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -65,7 +64,7 @@ export function buildOrderText(
   return named ? text : `${prefix}${text}`;
 }
 
-/** Plain HUD: clock, orders desk, in-tray. Static markup is built once; `render` updates the parts that change. */
+/** Plain HUD: clock and orders desk. Static markup is built once; `render` updates the parts that change. */
 export class Hud {
   private readonly clockEl: HTMLElement;
   private readonly linkEl: HTMLElement;
@@ -73,14 +72,11 @@ export class Hud {
   private readonly textEl: HTMLTextAreaElement;
   private readonly errEl: HTMLElement;
   private readonly pendingEl: HTMLElement;
-  private readonly trayEl: HTMLElement;
   private readonly noticeEl: HTMLElement;
   private latest: ClientState | undefined;
   private unitsKey = '';
   /** The prefix `selectUnit` last put in the box, so a later selection can replace it. */
   private autoPrefix = '';
-  private trayKey = '';
-  private readonly byId = new Map<string, Dispatch>();
 
   constructor(
     root: HTMLElement,
@@ -98,8 +94,7 @@ export class Hud {
          <div id="order-err" role="alert"></div>
          <ul id="pending"></ul>
          <ul id="notices"></ul>
-       </section>
-       <section id="tray" aria-label="In-tray" tabindex="-1"><h2>In-tray</h2><ul id="tray-list"></ul></section>`,
+       </section>`,
     );
     const q = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
     this.clockEl = q('#clock-text');
@@ -108,7 +103,6 @@ export class Hud {
     this.textEl = q('#order-text');
     this.errEl = q('#order-err');
     this.pendingEl = q('#pending');
-    this.trayEl = q('#tray-list');
     this.noticeEl = q('#notices');
     this.staffEl = q('#staff');
     this.overEl = q('#gameover');
@@ -116,11 +110,6 @@ export class Hud {
     q('#order-send').addEventListener('click', () => this.send());
     this.textEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) this.send();
-    });
-    this.trayEl.addEventListener('click', (e) => {
-      const li = (e.target as HTMLElement).closest<HTMLElement>('[data-id]');
-      const d = li && this.byId.get(li.dataset.id!);
-      if (d) this.h.onOpenDispatch(d);
     });
   }
 
@@ -183,21 +172,5 @@ export class Hud {
       .slice(-3)
       .map((n) => `<li>${esc(n.message)}</li>`)
       .join('');
-    const tk = JSON.stringify([state.dispatches.map((d) => d.id), [...state.read]]);
-    if (tk !== this.trayKey) {
-      this.trayKey = tk;
-      this.byId.clear();
-      this.trayEl.innerHTML = [...state.dispatches]
-        .sort((a, b) => b.receivedAtGame - a.receivedAtGame)
-        .map((d) => {
-          this.byId.set(d.id, d);
-          const unread = !state.read.has(d.id);
-          return `<li data-id="${esc(d.id)}" class="${unread ? 'unread' : 'read'}" tabindex="0">
-            <b>${unread ? '● ' : ''}${esc(d.from)}</b>
-            <small>written ${esc(formatGameTime(d.writtenAtGame))} · received ${esc(formatGameTime(d.receivedAtGame))}${d.location ? ' · 📍 locate' : ''}</small>
-            <div>${esc(d.text)}</div></li>`;
-        })
-        .join('');
-    }
   }
 }
