@@ -119,9 +119,10 @@ export async function buildApp(options: AppOptions): Promise<App> {
     options.onError?.(gameId, e);
   };
   // The hub and host refer to each other: the host notifies the hub, the hub looks games up.
-  const hub: Hub = new Hub((id) => host.get(id), onError);
+  const store = options.store ?? new MemoryGameStore();
+  const hub: Hub = new Hub((id) => host.get(id), onError, store);
   const host: GameHost = new GameHost({
-    store: options.store ?? new MemoryGameStore(),
+    store,
     parser: options.parser,
     registry: createRegistry(),
     wallNow: options.wallNow ?? Date.now,

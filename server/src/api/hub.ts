@@ -9,10 +9,12 @@ import {
   parseCommand,
   serializeServerMessage,
   PROTOCOL_VERSION,
+  MAX_MARKS,
   type ClockState,
+  type Mark,
   type ServerMessage,
 } from '@kriegsspiel/protocol';
-import type { GameActor } from '../game/index.js';
+import type { GameActor, GameStore } from '../game/index.js';
 import { sideViewOf } from './sideView.js';
 import type { SideId } from '@kriegsspiel/engine';
 
@@ -47,10 +49,48 @@ const error = (code: string, message: string): ServerMessage => ({
 export class Hub {
   private readonly conns = new Map<string, Set<Connection>>();
 
+  /** Each side's marks, loaded from the store on first use and kept here (the hub is their only writer). */
+  private readonly marks = new Map<string, Promise<Mark[]>>();
+  /** Saves run one after another per side, so the last write is the newest list. */
+  private readonly saves = new Map<string, Promise<void>>();
+
   constructor(
     private readonly lookup: (gameId: string) => GameActor | undefined,
     private readonly onError: (gameId: string, e: unknown) => void,
+    private readonly store?: Pick<GameStore, 'saveMarks' | 'loadMarks'>,
   ) {}
+
+  private marksOf(gameId: string, side: SideId): Promise<Mark[]> {
+    const key = `${gameId}\0${side}`;
+    let p = this.marks.get(key);
+    if (!p) {
+      p = this.store ? this.store.loadMarks(gameId, side) : Promise.resolve([]);
+      this.marks.set(key, p);
+      // A failed load must not stick: the next use retries.
+      p.catch(() => this.marks.delete(key));
+    }
+    return p;
+  }
+
+  private saveMarks(gameId: string, side: SideId, marks: Mark[]): void {
+    if (!this.store) return;
+    const key = `${gameId}\0${side}`;
+    const snapshot = [...marks];
+    const run = (this.saves.get(key) ?? Promise.resolve()).then(() =>
+      this.store!.saveMarks(gameId, side, snapshot),
+    );
+    const tail = run.catch((e) => this.onError(gameId, e));
+    this.saves.set(key, tail);
+    void tail.then(() => {
+      if (this.saves.get(key) === tail) this.saves.delete(key);
+    });
+  }
+
+  /** Tell every connection of a side its marks. */
+  private broadcastMarks(gameId: string, side: SideId, marks: readonly Mark[]): void {
+    for (const c of this.conns.get(gameId) ?? [])
+      if (c.side === side) this.send(c, { v: PROTOCOL_VERSION, kind: 'marks', marks: [...marks] });
+  }
 
   /** Number of open connections to a game. */
   count(gameId: string): number {
@@ -94,6 +134,9 @@ export class Hub {
       });
     });
     this.push(gameId, conn);
+    void this.marksOf(gameId, side)
+      .then((marks) => this.send(conn, { v: PROTOCOL_VERSION, kind: 'marks', marks: [...marks] }))
+      .catch((e) => this.onError(gameId, e));
   }
 
   /** The game changed (a tick or a command): bring every connection up to date. */
@@ -187,6 +230,25 @@ export class Hub {
       return;
     }
     const command = parsed.value;
+    if (command.kind === 'putMark' || command.kind === 'deleteMark') {
+      // Marks are the player's own picture: stored as sent, never checked against the game.
+      const list = await this.marksOf(gameId, conn.side);
+      if (command.kind === 'putMark') {
+        const i = list.findIndex((m) => m.id === command.mark.id);
+        if (i < 0 && list.length >= MAX_MARKS) {
+          this.send(conn, error('too_many_marks', `a side may keep at most ${MAX_MARKS} marks`));
+          return;
+        }
+        if (i < 0) list.push(command.mark);
+        else list[i] = command.mark;
+      } else {
+        const i = list.findIndex((m) => m.id === command.markId);
+        if (i >= 0) list.splice(i, 1);
+      }
+      this.saveMarks(gameId, conn.side, list);
+      this.broadcastMarks(gameId, conn.side, list);
+      return;
+    }
     if (command.kind !== 'issueOrder') {
       this.send(conn, error('not_implemented', `${command.kind} is not supported yet`));
       return;
