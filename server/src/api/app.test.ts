@@ -181,6 +181,37 @@ describe('POST /games', () => {
   });
 });
 
+describe('restart notice', () => {
+  it('tells a player who joins a reopened game that it came back paused', async () => {
+    const { base, ws } = await start();
+    const { json: game } = await createGame(base);
+    const fresh = await join(ws, game, 'blue');
+    await fresh.waitFor('viewUpdate');
+    expect(fresh.messages.some((m) => m.kind === 'serverRestarted')).toBe(false);
+
+    await app!.host.close(game.id);
+    await app!.host.open(game.id);
+    const c = await join(ws, game, 'blue');
+    const note = await c.waitFor('serverRestarted');
+    expect(note.downMs).toBeGreaterThanOrEqual(0);
+    const view = await c.waitFor('viewUpdate');
+    expect(view.view.clock.status).toBe('paused');
+  });
+
+  it('does not tell a later joiner once the game has been resumed', async () => {
+    const { base, ws } = await start();
+    const { json: game } = await createGame(base);
+    await app!.host.close(game.id);
+    const reopened = await app!.host.open(game.id);
+    await reopened.submit({ kind: 'resume' });
+    expect(reopened.gameClock.status).toBe('running');
+    const c = await join(ws, game, 'blue');
+    const view = await c.waitFor('viewUpdate');
+    expect(view.view.clock.status).toBe('running');
+    expect(c.messages.some((m) => m.kind === 'serverRestarted')).toBe(false);
+  });
+});
+
 describe('WebSocket auth', () => {
   it('refuses a missing or wrong token and an unknown game', async () => {
     const { base, ws } = await start();

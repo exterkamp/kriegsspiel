@@ -55,6 +55,15 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       needAtMs: GameMs.optional(),
     })
     .strict(),
+  // The server was down and the game came back paused; game time did not move. `downMs` is the
+  // wall time it was away (an estimate). Sent once per connection.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('serverRestarted'),
+      downMs: z.number().finite().nonnegative(),
+    })
+    .strict(),
   // The game has ended. Public to both sides and sent once per connection, also to a late joiner.
   // `winner` is null when both sides were put out of the fight together.
   z

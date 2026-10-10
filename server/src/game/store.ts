@@ -41,7 +41,12 @@ export type GameCommand =
   | { kind: 'proposeRate'; by: string; rate: number }
   | { kind: 'rateVote'; by: string; proposal: string; yes: boolean }
   /** A ratio vote ran out of time. Issued by the actor's own timer. */
-  | { kind: 'rateExpire' };
+  | { kind: 'rateExpire' }
+  /**
+   * The server came back after being down for `downMs` of wall time (an estimate, from the last
+   * heartbeat). Journal only: the game was reopened paused, so no game time passed.
+   */
+  | { kind: 'restart'; downMs: number };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {
@@ -99,6 +104,9 @@ export interface GameStore {
    */
   saveProgress(gameId: string, gameMs: number): Promise<void>;
   loadProgress(gameId: string): Promise<number | undefined>;
+  /** Remember the last wall time the server was seen alive for this game, so a restart can measure downtime. */
+  saveHeartbeat(gameId: string, wallMs: number): Promise<void>;
+  loadHeartbeat(gameId: string): Promise<number | undefined>;
   /** Append clock changes (rate, pause, mode) to the game's clock history. */
   appendClockHistory(gameId: string, changes: readonly ClockChange[]): Promise<void>;
   clockHistory(gameId: string): Promise<readonly ClockChange[]>;
@@ -134,6 +142,16 @@ export class MemoryGameStore implements GameStore {
 
   async loadProgress(gameId: string): Promise<number | undefined> {
     return this.progress.get(gameId);
+  }
+
+  private readonly heartbeats = new Map<string, number>();
+
+  async saveHeartbeat(gameId: string, wallMs: number): Promise<void> {
+    this.heartbeats.set(gameId, Math.max(wallMs, this.heartbeats.get(gameId) ?? wallMs));
+  }
+
+  async loadHeartbeat(gameId: string): Promise<number | undefined> {
+    return this.heartbeats.get(gameId);
   }
 
   async appendClockHistory(gameId: string, changes: readonly ClockChange[]): Promise<void> {

@@ -75,6 +75,15 @@ describe('applyServerMessage', () => {
   });
 });
 
+describe('server restart', () => {
+  it('keeps a notice that the game came back paused', () => {
+    const s = applyServerMessage(initialState, { v, kind: 'serverRestarted', downMs: 600_000 }, 0);
+    expect(s.notices[0]?.code).toBe('server_restart');
+    expect(s.notices[0]?.message).toContain('at least 10 min');
+    expect(s.notices[0]?.message).toContain('paused');
+  });
+});
+
 describe('game over', () => {
   const over: ServerMessage = {
     v,
