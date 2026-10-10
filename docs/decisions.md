@@ -98,7 +98,7 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 
 **Failure handling.** A `Retry-After` longer than four times `maxBackoffMs` fails the call at once instead of sleeping. Output truncated at `max_tokens` is terminal (retrying the same request would truncate again). A failed call throws `UmpireError` carrying the summed `usage` and `costUsd` of its attempts, so spend on failures is visible, but nothing is recorded for it.
 
-**Open.** The price table in `pricing.ts` is hand-maintained. Recording to the persistent input log is behind the `CallRecorder` interface; the log itself is not built yet. Prompt files and the `OrderParser` adapter that uses this client are separate work. A failed live call leaves no recording, so on replay it surfaces as `missing-recording` rather than the original `schema` or `transport` error; callers must treat all `UmpireError` kinds alike when falling back, or failures need recording too (open).
+**Open.** The price table in `pricing.ts` is hand-maintained. The OpenAI-compatible adapter sends `max_tokens`, which OpenAI's newer models reject in favour of `max_completion_tokens` (a per-provider option is future work). Recording to the persistent input log is behind the `CallRecorder` interface; the log itself is not built yet. Prompt files and the `OrderParser` adapter that uses this client are separate work. A failed live call leaves no recording, so on replay it surfaces as `missing-recording` rather than the original `schema` or `transport` error; callers must treat all `UmpireError` kinds alike when falling back, or failures need recording too (open).
 
 ## D14: The umpire runs on any LLM through provider adapters
 

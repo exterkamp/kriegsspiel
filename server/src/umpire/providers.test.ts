@@ -314,6 +314,19 @@ describe.each(wires)('provider contract: $name', (wire) => {
       expect(seen).toHaveLength(1);
     });
 
+    it('budget counts spend from a call that failed every attempt', async () => {
+      // Schema-invalid on all three attempts: the call throws, but the tokens were still spent.
+      replies = Array.from({ length: 3 }, () => ({
+        body: wire.ok('{"verdict":"maybe"}', { in: 60, out: 50 }),
+      }));
+      const { client } = clientFor(wire.make());
+      const budgeted = new BudgetedUmpireClient(client, { maxTotalTokens: 300 });
+      await expect(budgeted.call(request)).rejects.toMatchObject({ kind: 'schema', attempts: 3 });
+      expect(budgeted.spent.totalTokens).toBe(330);
+      await expect(budgeted.call(request)).rejects.toMatchObject({ kind: 'budget' });
+      expect(seen).toHaveLength(3);
+    });
+
     it('budget counts dollars for a priced model', async () => {
       replies = [{ body: wire.ok('{"verdict":"ok"}', { in: 1_000_000, out: 0 }) }];
       const { client } = clientFor(wire.make());
@@ -321,6 +334,31 @@ describe.each(wires)('provider contract: $name', (wire) => {
       await budgeted.call(request); // opus: $4 per million input tokens
       expect(budgeted.spent.costUsd).toBeCloseTo(4);
       await expect(budgeted.call(request)).rejects.toMatchObject({ kind: 'budget' });
+    });
+  });
+});
+
+describe('openai-compatible usage', () => {
+  it('splits cached prompt tokens out of the input count', async () => {
+    replies = [
+      {
+        body: {
+          choices: [{ message: { content: '{}' }, finish_reason: 'stop' }],
+          usage: {
+            prompt_tokens: 100,
+            completion_tokens: 5,
+            prompt_tokens_details: { cached_tokens: 40 },
+          },
+        },
+      },
+    ];
+    const provider = new OpenAiCompatibleProvider({ baseUrl: `${baseUrl}/v1` });
+    const res = await provider.generate(treq, new AbortController().signal);
+    expect(res.usage).toEqual({
+      inputTokens: 60,
+      outputTokens: 5,
+      cacheReadTokens: 40,
+      cacheWriteTokens: 0,
     });
   });
 });
