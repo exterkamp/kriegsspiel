@@ -4,6 +4,8 @@ import { sideViewOf } from '../api/sideView.js';
 import { buildApp, type App } from '../api/app.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { adminFromEnv, isLoopback } from './adminApi.js';
+import { TraceStore, traceUmpire } from '../debug/index.js';
+import { MockUmpireClient } from '../umpire/index.js';
 
 const RATE = 3600;
 const TOKEN = 'admin-secret-token';
@@ -290,5 +292,52 @@ describe('read-only', () => {
         .filter((l) => /admin/.test(l) || /stream|state|entries/.test(l));
       expect(adminSection.join('\n')).not.toMatch(/POST|PUT|PATCH|DELETE/);
     });
+  });
+});
+
+describe('LLM log through the admin API', () => {
+  const KEY = 'sk-ant-api03-FAKEKEYFORTESTING1234567890';
+
+  it('serves mock umpire calls with full prompts and responses, never the API key', async () => {
+    const trace = new TraceStore({ secrets: [KEY] });
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      admin: { enabled: true, trace },
+    });
+    const schema = { type: 'object' };
+    const mock = new MockUmpireClient([
+      { stage: 'judge', output: { verdict: `ok ${KEY}` } },
+      { stage: 'parse', failure: { kind: 'timeout', message: `timed out using ${KEY}` } },
+    ]);
+    const umpire = traceUmpire(mock, { trace, gameId: 'g1', mode: 'playback' });
+    await umpire.call({
+      stage: 'judge',
+      promptVersion: 'j1',
+      system: `You are the umpire. key=${KEY}`,
+      input: { question: 'can they cross?', apiKey: KEY },
+      schema,
+    });
+    await umpire
+      .call({ stage: 'parse', promptVersion: 'p1', system: 's', input: {}, schema })
+      .catch(() => undefined);
+
+    const res = await get('/admin/api/games/g1/entries?kind=llm', '127.0.0.1');
+    expect(res.statusCode).toBe(200);
+    expect(res.body).not.toContain(KEY);
+    expect(res.body).not.toContain('FAKEKEYFORTESTING');
+    const { entries } = res.json() as { entries: { data: Record<string, unknown> }[] };
+    expect(entries).toHaveLength(2);
+    expect(entries[0]!.data).toMatchObject({
+      stage: 'judge',
+      mode: 'playback',
+      model: 'mock',
+      promptVersion: 'j1',
+      system: 'You are the umpire. key=[REDACTED]',
+      schema,
+      response: expect.stringContaining('[REDACTED]'),
+      output: { verdict: 'ok [REDACTED]' },
+      ok: true,
+    });
+    expect(entries[1]!.data).toMatchObject({ stage: 'parse', ok: false, errorKind: 'timeout' });
   });
 });

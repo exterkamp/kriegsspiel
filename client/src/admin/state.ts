@@ -123,7 +123,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 function badge(text: string): HTMLElement {
-  return el('span', 'badge', text);
+  return el('span', 'state-badge', text);
 }
 
 export class StatePanel {

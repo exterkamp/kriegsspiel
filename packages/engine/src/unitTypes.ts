@@ -1,3 +1,4 @@
+import { speedFactor } from './fatigue.js';
 import {
   FORMATIONS,
   MS_PER_MINUTE,
@@ -45,6 +46,8 @@ export interface UnitType {
   chargeM?: number;
   /** How far it sees in clear weather, in metres. */
   sightRangeM: number;
+  /** 0..1: how well drilled the unit is. Well-trained units understand orders (fewer garbled). */
+  training: number;
   /** A unit whose morale falls below this breaks and withdraws. */
   breakMorale: number;
   /** Game ms it stands still to change formation. */
@@ -126,6 +129,7 @@ export const UNIT_DATA: UnitData = {
       fireRate: 0.03,
       rangeM: 200,
       sightRangeM: 600,
+      training: 0.5,
       breakMorale: 25,
       formationChangeMs: 2 * MS_PER_MINUTE,
       defaultFormation: 'line',
@@ -140,6 +144,7 @@ export const UNIT_DATA: UnitData = {
       fireRate: 0.02,
       rangeM: 250,
       sightRangeM: 700,
+      training: 0.6,
       breakMorale: 35,
       formationChangeMs: MS_PER_MINUTE,
       defaultFormation: 'skirmish',
@@ -155,6 +160,7 @@ export const UNIT_DATA: UnitData = {
       rangeM: 100,
       chargeM: 60,
       sightRangeM: 800,
+      training: 0.6,
       breakMorale: 25,
       formationChangeMs: MS_PER_MINUTE,
       defaultFormation: 'line',
@@ -169,6 +175,7 @@ export const UNIT_DATA: UnitData = {
       fireRate: 0.04,
       rangeM: 400,
       sightRangeM: 600,
+      training: 0.7,
       breakMorale: 25,
       formationChangeMs: 3 * MS_PER_MINUTE,
       defaultFormation: 'line',
@@ -250,6 +257,9 @@ export function parseUnitData(raw: unknown): UnitData {
     if (kind === 'cavalry' && r.chargeM === undefined) fail(`${p}.chargeM is required for cavalry`);
     const breakMorale = pos(r.breakMorale, `${p}.breakMorale`);
     if (breakMorale > 100) fail(`${p}.breakMorale must be at most 100`);
+    const training = r.training as number;
+    if (typeof training !== 'number' || !(training >= 0 && training <= 1))
+      fail(`${p}.training must be a number from 0 to 1`);
     const ms = pos(r.formationChangeMs, `${p}.formationChangeMs`);
     if (!Number.isInteger(ms)) fail(`${p}.formationChangeMs must be a whole number of ms`);
     return {
@@ -262,6 +272,7 @@ export function parseUnitData(raw: unknown): UnitData {
       rangeM: pos(r.rangeM, `${p}.rangeM`),
       ...(r.chargeM === undefined ? {} : { chargeM: pos(r.chargeM, `${p}.chargeM`) }),
       sightRangeM: pos(r.sightRangeM, `${p}.sightRangeM`),
+      training,
       breakMorale,
       formationChangeMs: ms,
       defaultFormation,
@@ -299,8 +310,17 @@ export function unitTypeOf(u: Pick<Unit, 'type' | 'kind'> | UnitKind): UnitType 
   return t;
 }
 
-/** Game ms to march one metre of cost-1 ground. A bare arm marches at its type's base speed. */
-export function msPerMetreOf(u: Pick<Unit, 'type' | 'kind' | 'formation'> | UnitKind): number {
+/**
+ * Game ms to march one metre of cost-1 ground. A bare arm marches at its type's base speed;
+ * a unit's pace and fatigue (fatigue.ts) change its own.
+ */
+export function msPerMetreOf(
+  u:
+    | (Pick<Unit, 'type' | 'kind' | 'formation'> & Partial<Pick<Unit, 'pace' | 'fatigue'>>)
+    | UnitKind,
+): number {
   const base = MS_PER_MINUTE / unitTypeOf(u).marchMetresPerMinute;
-  return typeof u === 'string' ? base : base / FORMATION_RULES[u.formation].moveFactor;
+  return typeof u === 'string'
+    ? base
+    : base / (FORMATION_RULES[u.formation].moveFactor * speedFactor(u));
 }

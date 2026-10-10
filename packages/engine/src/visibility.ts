@@ -8,6 +8,7 @@ import { unitTypeOf } from './unitTypes.js';
 import { BLOCKS_SIGHT, profileAlong, terrainAt } from './terrain.js';
 import {
   MS_PER_MINUTE,
+  type CapturedDocument,
   type Contact,
   type Formation,
   type GameState,
@@ -61,6 +62,7 @@ export const COURIER_DELAY_MS = 10 * MS_PER_MINUTE;
 
 export const SCAN_EVENT = 'intel.scan';
 export const REPORT_EVENT = 'intel.report';
+const REPORT_KINDS: Array<Report['kind']> = ['unitLost', 'orderDelivered', 'lowAmmo', 'exhausted'];
 
 function concealedAt(world: GameState, p: Point): boolean {
   return (terrainAt(world.map, p)?.attrs.concealment ?? 0) >= BLOCKS_SIGHT;
@@ -140,6 +142,10 @@ export interface ViewUnit {
   shape?: Point[];
   strength: number;
   morale: number;
+  /** 0 fresh .. 100 spent. */
+  fatigue: number;
+  /** 0..100: share of its ammunition left. */
+  ammo: number;
 }
 
 /** An enemy unit in sight now. What a watcher can make out: where, which way, and about how big a patch of ground (footprint to the nearest 10 m). */
@@ -186,6 +192,25 @@ export interface ViewReport {
   text: string;
 }
 
+/** An enemy dispatch this side took from a courier, once it has reached HQ. */
+export interface ViewDocument {
+  id: string;
+  kind: CapturedDocument['kind'];
+  capturedAt: GameTime;
+  deliveredAt: GameTime;
+  /** Game ms since it was taken. */
+  ageMs: number;
+  /** When the enemy HQ sent it. */
+  issuedAt: GameTime;
+  /** Name of the enemy unit it was addressed to. */
+  addressedTo: string;
+  /** Metres: where the courier was taken. */
+  location: Point;
+  place: string;
+  /** The order exactly as the enemy wrote it. */
+  text: string;
+}
+
 /**
  * Everything one side may know. This is the complete list; nothing else
  * reaches a client (see docs/architecture.md, "SideView contents").
@@ -201,6 +226,8 @@ export interface EngineSideView {
   lastKnownContacts: ViewContact[];
   /** Only reports whose courier delay has passed. */
   reports: ViewReport[];
+  /** Enemy dispatches taken from couriers, once they have reached HQ. */
+  documents: ViewDocument[];
 }
 
 /** Plain template prose for a report. The LLM replaces this later. */
@@ -215,7 +242,17 @@ export function renderReport(r: Report, ageMs: number): string {
       return `${r.from} is lost ${where}, ${when}.`;
     case 'orderDelivered':
       return `${r.from} received its orders ${where}, ${when}.`;
+    case 'lowAmmo':
+      return `${r.from} is running short of ammunition ${where}, ${when}.`;
+    case 'exhausted':
+      return `${r.from} is exhausted ${where}, ${when}.`;
   }
+}
+
+/** Prose for the table: where and when the dispatch was taken, then the enemy's own words. */
+export function renderDocument(d: ViewDocument): string {
+  const mins = Math.round(d.ageMs / MS_PER_MINUTE);
+  return `Enemy dispatch to ${d.addressedTo}, taken from a courier ${d.place}, ${mins} min ago: "${d.text}"`;
 }
 
 /**
@@ -250,6 +287,8 @@ export function viewFor(
         ...(u.shape ? { shape: u.shape.map(viewPoint) } : {}),
         strength: u.strength,
         morale: u.morale,
+        fatigue: u.fatigue,
+        ammo: u.ammo,
       })),
     visibleEnemies: seen.map((u) => ({
       id: u.id,
@@ -298,6 +337,20 @@ export function viewFor(
           text: renderReport(r, ageMs),
         };
       }),
+    documents: intel.documents
+      .filter((d) => d.deliverAt <= state.time)
+      .map((d) => ({
+        id: d.id,
+        kind: d.kind,
+        capturedAt: d.capturedAt,
+        deliveredAt: d.deliverAt,
+        ageMs: state.time - d.capturedAt,
+        issuedAt: d.issuedAt,
+        addressedTo: d.addressedTo,
+        location: viewPoint(d.location),
+        place: d.place,
+        text: d.text,
+      })),
   };
 }
 
@@ -351,6 +404,27 @@ function scan(world: GameState, time: GameTime): GameState {
   return w;
 }
 
+/** File a report from `unit` about itself (lost, orders received, short of ammunition...). */
+export function fileReport(
+  world: GameState,
+  kind: Report['kind'],
+  unit: Unit,
+  time: GameTime,
+): GameState {
+  const report: Report = {
+    id: reportId(world, unit.side),
+    kind,
+    observedAt: time,
+    deliverAt: time + COURIER_DELAY_MS,
+    from: unit.name,
+    location: { ...unit.center },
+    place: describePlace(world.map, unit.center),
+    uncertainty: 0,
+    confidence: 'high',
+  };
+  return withIntel(world, unit.side, { reports: [...world.intel[unit.side].reports, report] });
+}
+
 /**
  * Register the visibility handlers. `intel.scan` rescans who sees whom, files a
  * contact report (delayed by the courier) for each enemy newly in sight, and
@@ -370,27 +444,12 @@ export function registerVisibility(registry: EventRegistry<GameState>): void {
 
   registry.register(REPORT_EVENT, (world, ev) => {
     const p = ev.payload as unknown as { kind: string; unitId: string };
-    if (p?.kind !== 'unitLost' && p?.kind !== 'orderDelivered') {
+    if (!REPORT_KINDS.includes(p?.kind as Report['kind'])) {
       throw new Error(`${REPORT_EVENT}: unknown report kind ${String(p?.kind)}`);
     }
     const unit = world.units.find((u) => u.id === p.unitId);
     if (!unit) throw new Error(`${REPORT_EVENT}: unknown unit ${String(p.unitId)}`);
-    const report: Report = {
-      id: reportId(world, unit.side),
-      kind: p.kind,
-      observedAt: ev.time,
-      deliverAt: ev.time + COURIER_DELAY_MS,
-      from: unit.name,
-      location: { ...unit.center },
-      place: describePlace(world.map, unit.center),
-      uncertainty: 0,
-      confidence: 'high',
-    };
-    return {
-      world: withIntel(world, unit.side, {
-        reports: [...world.intel[unit.side].reports, report],
-      }),
-    };
+    return { world: fileReport(world, p.kind as Report['kind'], unit, ev.time) };
   });
 }
 

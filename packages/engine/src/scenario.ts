@@ -184,6 +184,15 @@ function parseSides(raw: unknown, map: TerrainMap): Side[] {
       name: str(o.name, `sides[${i}].name`),
       controller: oneOf(o.controller, ['human', 'scripted'] as const, `sides[${i}].controller`),
       hq: parseHq(o, i, map),
+      ...(o.depots === undefined
+        ? {}
+        : {
+            depots: arr(o.depots, `sides[${i}].depots`).map((d, k) => {
+              const at = parsePoint(d, `sides[${i}].depots[${k}]`);
+              if (!passableAt(map, at)) fail(`sides[${i}].depots[${k}] must be on passable ground`);
+              return at;
+            }),
+          }),
     };
   });
   if (sides[0]?.id === sides[1]?.id) fail('sides must have distinct ids');
@@ -241,6 +250,9 @@ function parseUnits(raw: unknown, map: TerrainMap, sides: Side[]): Unit[] {
         : { shape: arr(o.shape, `${p}.shape`).map((v, k) => parseVertex(v, `${p}.shape[${k}]`)) }),
       strength,
       morale: int(o.morale, `${p}.morale`, 0, 100),
+      fatigue: 0,
+      ammo: 100,
+      pace: 'march',
       intent: { kind: 'idle' },
       status: 'active',
       home: { ...center },
@@ -302,7 +314,7 @@ export function loadScenario(raw: unknown): GameState {
     sides,
     units,
     intel: Object.fromEntries(
-      sideIds.map((id) => [id, { contacts: [], inSight: [], reports: [] }]),
+      sideIds.map((id) => [id, { contacts: [], inSight: [], reports: [], documents: [] }]),
     ) as unknown as GameState['intel'],
     victory: {
       objective,
@@ -312,6 +324,7 @@ export function loadScenario(raw: unknown): GameState {
     },
     combatActive: false,
     outcome: null,
+    couriers: [],
     rulings: [],
   };
 }

@@ -51,6 +51,25 @@ interface Proposal {
   deadlineMs: number;
 }
 
+/**
+ * How a vote stands: `fail` when it can no longer pass, a passing cause, or undefined while open.
+ * Shared by the pause vote and the ratio vote (`ratioVote.ts`), so both follow one rule.
+ */
+export function tallyVotes(
+  rule: VoteRule,
+  voters: number,
+  yes: number,
+  no: number,
+): 'fail' | 'all-yes' | 'majority-yes' | undefined {
+  if (rule === 'unanimous') {
+    if (no > 0) return 'fail';
+    return yes === voters ? 'all-yes' : undefined;
+  }
+  if (yes * 2 > voters) return yes === voters ? 'all-yes' : 'majority-yes';
+  // Even if everyone left voted yes it could not pass.
+  return (voters - no) * 2 <= voters ? 'fail' : undefined;
+}
+
 export class PauseVoting {
   private current: PausePhase;
   private proposal: Proposal | undefined;
@@ -174,14 +193,9 @@ export class PauseVoting {
     const passed = (cause: PauseCause) =>
       this.move(resuming ? 'running' : 'paused', cause, nowMs, extra);
     const failed = () => this.move(resuming ? 'paused' : 'running', 'no-vote', nowMs, extra);
-    if (this.rule === 'unanimous') {
-      if (no > 0) return failed();
-      if (yes === n) return passed('all-yes');
-    } else {
-      if (yes * 2 > n) return passed(yes === n ? 'all-yes' : 'majority-yes');
-      // Even if everyone left voted yes it could not pass.
-      if ((n - no) * 2 <= n) return failed();
-    }
+    const verdict = tallyVotes(this.rule, n, yes, no);
+    if (verdict === 'fail') return failed();
+    if (verdict === 'all-yes' || verdict === 'majority-yes') return passed(verdict);
     return undefined;
   }
 
