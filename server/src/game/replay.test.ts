@@ -132,6 +132,70 @@ describe('input log replay', () => {
   });
 });
 
+describe('replay edge cases', () => {
+  it('stops at an earlier --until without applying later inputs', async () => {
+    const store = new MemoryGameStore();
+    await play(store, 1);
+    const header = (await store.logHeader('g1'))!;
+    const entries = await store.inputLog('g1');
+    const run = (until?: number) =>
+      replayLog(header, loadScenarioById(header.scenarioId), entries, createRegistry(), until);
+    const early = run(30_000);
+    expect(early.state.time).toBe(30_000);
+    expect(early.state.queue.some((e) => e.kind === 'order.issue')).toBe(false);
+    expect(early.emitted.some((e) => e.kind.startsWith('order'))).toBe(false);
+    expect(run(90_000).state.time).toBe(90_000);
+    expect(run().state.time).toBe(30 * 60_000);
+  });
+
+  it('carries the world through a slow parse that ends the log', async () => {
+    const store = new MemoryGameStore();
+    const time = new FakeTime();
+    let release!: () => void;
+    const parser: OrderParser = {
+      parse: async (text) => {
+        await new Promise<void>((r) => (release = r));
+        return {
+          kind: 'intents',
+          text,
+          unitId: 'blue-1',
+          intents: [{ kind: 'move', to: { x: 20, y: 20 } }],
+        };
+      },
+    };
+    host = new GameHost({
+      store,
+      parser,
+      registry: createRegistry(),
+      wallNow: time.now,
+      timers: time,
+    });
+    const game = await host.create('g1', loadScenario(holdTheBridge));
+    const done = game.submit({ kind: 'order', side: 'blue', text: 'march' });
+    await time.advance(10_000);
+    release();
+    await done;
+    const [entry] = await store.inputLog('g1');
+    expect(entry!.endGameMs!).toBeGreaterThan(entry!.gameMs);
+    expect((await replayOf(store)()).state).toEqual(game.state);
+  });
+
+  it('leaves the state alone for a failed command that carries a parse result', async () => {
+    const store = new MemoryGameStore();
+    await play(store, 1);
+    const header = (await store.logHeader('g1'))!;
+    const entries = await store.inputLog('g1');
+    const order = entries.find((e) => e.command.kind === 'order')!;
+    const run = (list: typeof entries) =>
+      replayLog(header, loadScenarioById(header.scenarioId), list, createRegistry());
+    const failed = { ...order, error: 'store write failed' };
+    const noOrder = { ...order, command: { kind: 'pause' as const }, parse: undefined };
+    expect(run(entries.map((e) => (e === order ? failed : e)))).toEqual(
+      run(entries.map((e) => (e === order ? noOrder : e))),
+    );
+  });
+});
+
 describe('FileGameStore', () => {
   it('persists a JSON-lines log per game that replays to the same state', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kriegsspiel-log-'));

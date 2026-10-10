@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { createRegistry, loadScenarioById } from './registry.js';
 import { replayLog } from './replay.js';
 import { parseInputLog } from './store.js';
@@ -8,7 +9,8 @@ import { parseInputLog } from './store.js';
  *
  * Replays a game's input log (JSON lines) on a manual clock, with no wall-clock waits and no
  * parser calls, and prints the final state. `--json` prints the full engine state, `--events`
- * the emitted events instead of the summary.
+ * the emitted events instead of the summary. A relative `<logfile>` is resolved from the
+ * directory npm was run in, not from `server/`.
  */
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
@@ -23,7 +25,9 @@ async function main(): Promise<number> {
     console.error('--until needs a number of game milliseconds');
     return 2;
   }
-  const { header, entries } = parseInputLog(await readFile(file, 'utf8'));
+  const { header, entries } = parseInputLog(
+    await readFile(resolve(process.env.INIT_CWD ?? process.cwd(), file), 'utf8'),
+  );
   const { state, emitted } = replayLog(
     header,
     loadScenarioById(header.scenarioId),

@@ -66,8 +66,9 @@ export interface ReplayResult {
 
 /**
  * Replay `entries` from the scenario `world` (the one named by `header.scenarioId`). Pass
- * `untilGameMs` to stop at an earlier or later game time; by default it ends where the last
- * logged input left the world.
+ * `untilGameMs` to stop at that game time: inputs logged after it are not applied, and a time
+ * past the last input runs the world on to it. By default it ends where the last logged input
+ * left the world.
  */
 export function replayLog(
   header: InputLogHeader,
@@ -89,6 +90,9 @@ export function replayLog(
   };
 
   for (const entry of entries) {
+    // Stop before the first input after the target, so an earlier `untilGameMs` leaves later
+    // inputs out of the state.
+    if (untilGameMs !== undefined && entry.gameMs > untilGameMs) break;
     advance(entry.gameMs);
     // A refused or failed command left the engine untouched (the order is queued last).
     if (!entry.error) {
@@ -99,7 +103,8 @@ export function replayLog(
         if ('state' in res) state = res.state;
       }
     }
-    advance(entry.endGameMs ?? state.time);
+    const settled = entry.endGameMs ?? state.time;
+    advance(untilGameMs === undefined ? settled : Math.min(settled, untilGameMs));
   }
   if (untilGameMs !== undefined) advance(untilGameMs);
   return { state, emitted };
