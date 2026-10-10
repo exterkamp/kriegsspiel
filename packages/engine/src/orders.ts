@@ -1,5 +1,6 @@
 import type { EngineState, EventRegistry, HandlerResult, Json } from './events.js';
-import { beginMarch, findPath } from './movement.js';
+import { beginMarch } from './movement.js';
+import { findPath } from './navigation.js';
 import { schedule } from './queue.js';
 import { REPORT_EVENT } from './visibility.js';
 import { MS_PER_MINUTE, type GameState, type Point } from './types.js';
