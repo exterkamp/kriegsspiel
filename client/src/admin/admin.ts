@@ -20,8 +20,10 @@ import {
   type LinkStatus,
   type PanelId,
 } from './model.js';
+import { StatePanel, type AdminState } from './state.js';
 
 const POLL_MS = 3000;
+const STATE_DEBOUNCE_MS = 250;
 
 export class AdminPage {
   private status: LinkStatus = 'connecting';
@@ -32,6 +34,9 @@ export class AdminPage {
   private failures = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private streamCount = 0;
+  private statePanel!: StatePanel;
+  private stateReq = 0;
+  private stateTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly token: string | undefined;
 
   private readonly picker: HTMLSelectElement;
@@ -88,6 +93,7 @@ export class AdminPage {
       else sec.innerHTML = `<p class="empty">${id} panel — not implemented yet.</p>`;
       this.panels.set(id, sec);
     }
+    this.statePanel = new StatePanel(this.panels.get('State')!);
     this.llm = new LlmPanel(this.panels.get('LLM')!);
     nav.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
@@ -122,6 +128,7 @@ export class AdminPage {
   stop(): void {
     for (const list of this.lists.values()) list.destroy();
     clearTimeout(this.timer);
+    clearTimeout(this.stateTimer);
     this.closeStream();
   }
 
@@ -144,6 +151,7 @@ export class AdminPage {
 
   private applyFilter(): void {
     this.panels.get(this.panel)!.dataset.filter = this.filter.value;
+    this.statePanel.setFilter(this.filter.value);
     this.llm.setFilter(this.filter.value);
     for (const list of this.lists.values()) list.setText(this.filter.value);
   }
@@ -166,6 +174,7 @@ export class AdminPage {
         this.openStream(this.gameId);
       }
       this.render();
+      void this.refreshState();
       this.timer = setTimeout(() => void this.poll(), POLL_MS);
     } catch {
       this.failures++;
@@ -192,7 +201,11 @@ export class AdminPage {
     this.entries.clear();
     for (const list of this.lists.values()) list.reset();
     this.status = id ? 'connecting' : 'live';
-    if (id) this.openStream(id);
+    this.statePanel.showMessage(id ? 'Loading state…' : 'No game selected.');
+    if (id) {
+      this.openStream(id);
+      void this.refreshState();
+    }
     this.render();
   }
 
@@ -214,6 +227,13 @@ export class AdminPage {
     };
     es.onmessage = (e: MessageEvent<string>) => {
       this.streamCount++;
+      // A trace entry means something changed; refetch the state, at most a few times a second.
+      if (!this.stateTimer) {
+        this.stateTimer = setTimeout(() => {
+          this.stateTimer = undefined;
+          void this.refreshState();
+        }, STATE_DEBOUNCE_MS);
+      }
       try {
         const entry = JSON.parse(e.data) as TraceEntry;
         this.llm.add(entry);
@@ -229,6 +249,27 @@ export class AdminPage {
       if (es.readyState === EventSource.CLOSED) this.closeStream();
       this.render();
     };
+  }
+
+  /** Fetches the master state and both side views of the selected game into the State panel. */
+  private async refreshState(): Promise<void> {
+    const id = this.gameId;
+    if (!id) return;
+    // Poll- and stream-driven refreshes can overlap; only the latest request may write.
+    const req = ++this.stateReq;
+    const current = () => id === this.gameId && req === this.stateReq;
+    try {
+      const res = await this.fetchFn(apiUrl(`games/${encodeURIComponent(id)}/state`, this.token));
+      if (!current()) return;
+      if (res.status === 404)
+        return this.statePanel.showMessage('This game is not open; no live state.');
+      if (!res.ok) throw new Error(String(res.status));
+      const body = (await res.json()) as AdminState;
+      if (current()) this.statePanel.update(body);
+    } catch {
+      // Keep the last good state but dim it, so old data never passes for current; the next refresh retries.
+      if (current()) this.statePanel.markStale();
+    }
   }
 
   private closeStream(): void {
