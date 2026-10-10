@@ -11,8 +11,8 @@
           {
             "kind": "move",
             "to": {
-              "x": 2,
-              "y": 2
+              "x": 250000,
+              "y": 250000
             }
           }
         ]
@@ -28,15 +28,15 @@
           {
             "kind": "move",
             "to": {
-              "x": 2,
-              "y": 3
+              "x": 250000,
+              "y": 350000
             }
           },
           {
             "kind": "hold",
             "at": {
-              "x": 2,
-              "y": 3
+              "x": 250000,
+              "y": 350000
             }
           }
         ]
@@ -52,8 +52,8 @@
           {
             "kind": "withdraw",
             "toward": {
-              "x": 2,
-              "y": 3
+              "x": 250000,
+              "y": 350000
             }
           }
         ]
@@ -69,8 +69,8 @@
           {
             "kind": "attack",
             "target": {
-              "x": 2,
-              "y": 2
+              "x": 250000,
+              "y": 250000
             }
           }
         ]
@@ -86,8 +86,8 @@
           {
             "kind": "hold",
             "at": {
-              "x": 4,
-              "y": 3
+              "x": 450000,
+              "y": 350000
             }
           }
         ]
@@ -111,8 +111,8 @@
           {
             "kind": "move",
             "to": {
-              "x": 2,
-              "y": 2
+              "x": 250000,
+              "y": 250000
             }
           }
         ]
@@ -136,8 +136,8 @@
           {
             "kind": "withdraw",
             "toward": {
-              "x": 2,
-              "y": 3
+              "x": 250000,
+              "y": 350000
             }
           }
         ]
@@ -166,7 +166,7 @@
       "output": {
         "kind": "clarification",
         "question": "Which wood do you mean?",
-        "options": ["the wood at (1, 0)", "the wood at (2, 4)"]
+        "options": ["the wood at (150, 50) m", "the Hollow wood at (350, 450) m"]
       }
     },
     {

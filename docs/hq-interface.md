@@ -30,18 +30,18 @@ Navigation is by clicking desk objects, plus hotkeys. A small clock on the desk 
 Layers are what let one historical map serve both sides and the engine.
 
 1. **Base map**: a scanned or redrawn period map (hachured hills, roads, woods, villages). Both players see the same base. It is slightly *wrong* in places, as period maps were.
-2. **Truth layer** (server only): the engine's terrain grid, elevation, roads, obstacles and cover, derived from the base map and corrected where needed.
+2. **Truth layer** (server only): the engine's vector terrain features (woods, rivers, roads, bridges, buildings, with cover, concealment and height tags), derived from the base map and corrected where needed. It is continuous: there is no grid or tile.
 3. **Player marks layer**: pins and counters the player places, plus marks the staff add automatically when a report arrives. Each mark records its source report and time, and fades or greys with age.
 4. **Report sketches**: scouts' sketches attached to a location, for example "bridge at Hohenau, intact, 2 companies".
 5. **Overlays** (toggle): order arrows, planned routes, estimated march times, and a "last known" fog shading showing how old your knowledge is per area.
 
 ## Using historical maps: the hard part
 
-The engine needs a terrain grid, but players should see the original map. Options:
+The engine needs vector terrain features, but players should see the original map. Options:
 
 | Approach | Pros | Cons |
 |----------|------|------|
-| **A. Hand-annotate** each scenario: trace roads, woods, rivers, slope onto the scan as vector layers, and generate the grid from them. | Accurate, controllable, great quality | Labour per map |
+| **A. Hand-annotate** each scenario: trace roads, woods, rivers, slope onto the scan as vector layers; they are the engine's features directly. | Accurate, controllable, great quality | Labour per map |
 | **B. Semi-automatic**: use a vision model plus colour segmentation to propose features, then a human cleans up in an editor. | Faster once the tool exists | Needs an annotation editor, and maps vary |
 | **C. Real elevation data** (DEM) georeferenced to the historical map. *Dropped: the table is flat, see the rendering decision below.* | Real slopes and viewsheds | Terrain has changed, and georeferencing takes work |
 | **D. Procedural** (generated terrain) restyled to look like a period map | Infinite scenarios | Not "historical" |
@@ -75,13 +75,13 @@ Period style, not a fantasy skin: aged paper, ink, sealing wax, pencil, brass in
 - **Camera.** Orbit and zoom within limits, with a "top-down" snap for precise plotting. Tilts away from the table to the desk.
 - **Desk (HTML/CSS over the canvas).** In-tray, orders desk, order of battle, journal and staff conference are 2D Papers Please-style screens. Papers can be dragged, stamped and filed, and text stays crisp and selectable. A transition (camera dolly plus fade) moves between table and desk. Dragging a report from the desk onto the table to place a marker is a core interaction, so the two layers share a drag-and-drop system.
 - **UI framework for the desk:** Svelte (preferred) or React. Vanilla Three.js for the scene, with no react-three-fiber unless the scene gets complicated.
-- **Picking.** Raycast against the flat map plane to convert pointer position to map coordinates. Pieces are picked by raycasting their meshes. Because the map is flat, coordinates are plain (x, y) with no height, which the engine's grid already uses.
+- **Picking.** Raycast against the flat map plane to convert pointer position to map coordinates. Pieces are picked by raycasting their meshes. Because the map is flat, coordinates are plain (x, y) in metres with no height, which is what the engine's continuous plane uses (D13). Pieces stand at any position and facing and are drawn at their footprint; there are no cells to snap to.
 
 Because the map is flat, **elevation data is no longer needed** (option C above is dropped). Line of sight and cover come from the annotated terrain layer plus per-feature height tags (woods, ridges, buildings) in the engine.
 
 ## Implications for the build
 
-- The engine's terrain grid is the **truth layer** and a debug view only. The player never sees it.
+- The engine's vector terrain is the **truth layer** and a debug view only. The player never sees it.
 - The player-facing client is the Three.js table and the Svelte desk, built fresh.
 - Info panels are diegetic: terrain notes and sketches for places, the journal and roster for units.
 

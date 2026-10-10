@@ -4,7 +4,7 @@
 
 (Historical details to be checked against the rulebooks, see [research.md](research.md).)
 
-1. **Setup.** An umpire picks a scenario. Both sides get a *general situation* (shared) and a *special situation* (their own orders and knowledge). The umpire holds the master map. Each side has its own map in a separate room.
+1. **Setup.** An umpire picks a scenario. Both sides get a *general situation* (shared) and a *special situation* (their own orders and knowledge). The umpire holds the master map. Each side has its own map in a separate room. Space is continuous: units stand at any position and facing and may be drawn up in any shape the umpire judges realistic, with no squares or tiles (D15).
 2. **Teams.** A side is several officers, not one player. A commander-in-chief gives orders to subordinates, usually in writing.
 3. **Turns.** Rigid: fixed time slices tied to march rates. Free: the umpire sets the length of each slice, shorter in contact and longer on quiet marches.
 4. **Orders.** Written. The umpire moves the blocks as competent subordinates would, including delays and misunderstandings.

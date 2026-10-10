@@ -37,34 +37,30 @@ export type GoldenOrder = {
   expect: Expectation;
 };
 
-/** Legend: `.` open, `W` wood, `~` river, `B` bridge, `=` road. Two woods, one bridge, one road. */
-const ROWS = ['.WW..', '.....', '~~B~~', '..=..', '..WW.'];
-const LEGEND: Record<string, string> = {
-  '.': 'open',
-  W: 'wood',
-  '~': 'river',
-  B: 'bridge',
-  '=': 'road',
-};
+/** Anchor points are millimetres, as in the engine's state; `at` takes metres. */
+const at = (x: number, y: number) => ({ x: x * 1000, y: y * 1000 });
 
-/** The fixed world every corpus order is parsed in. Blue is the issuing side. */
+/** The fixed world every corpus order is parsed in. Blue is the issuing side. Two woods, one bridge, one road. */
 export const CORPUS_CONTEXT: ParseContext = {
   side: 'blue',
   map: {
-    width: 5,
-    height: 5,
-    tiles: ROWS.flatMap((r) => [...r].map((c) => LEGEND[c] as string)),
+    features: [
+      { id: 'wood-a', kind: 'wood', anchor: at(150, 50) },
+      { id: 'wood-b', kind: 'wood', name: 'Hollow wood', anchor: at(350, 450) },
+      { id: 'bridge', kind: 'bridge', anchor: at(250, 250) },
+      { id: 'road', kind: 'road', anchor: at(250, 350) },
+    ],
   },
   units: [
-    { id: 'blue-1', side: 'blue', name: '1st Battalion', position: { x: 0, y: 3 } },
-    { id: 'blue-2', side: 'blue', name: '2nd Battalion', position: { x: 4, y: 3 } },
-    { id: 'blue-3', side: 'blue', name: 'Cavalry Squadron', position: { x: 2, y: 4 } },
-    { id: 'red-1', side: 'red', name: 'Vanguard Battalion', position: { x: 3, y: 0 } },
+    { id: 'blue-1', side: 'blue', name: '1st Battalion', center: at(50, 350) },
+    { id: 'blue-2', side: 'blue', name: '2nd Battalion', center: at(450, 350) },
+    { id: 'blue-3', side: 'blue', name: 'Cavalry Squadron', center: at(250, 450) },
+    { id: 'red-1', side: 'red', name: 'Vanguard Battalion', center: at(350, 50) },
   ],
 };
 
-const BRIDGE = { x: 2, y: 2 };
-const ROAD = { x: 2, y: 3 };
+const BRIDGE = at(250, 250);
+const ROAD = at(250, 350);
 
 const intents = (unitId: string, ...list: OrderIntent[]): Expectation => ({
   kinds: ['intents'],
@@ -106,7 +102,7 @@ export const GOLDEN_ORDERS: readonly GoldenOrder[] = [
     id: 'clear-05',
     category: 'clear',
     text: '2nd Battalion hold',
-    expect: intents('blue-2', { kind: 'hold', at: { x: 4, y: 3 } }),
+    expect: intents('blue-2', { kind: 'hold', at: at(450, 350) }),
   },
   {
     id: 'clear-06',

@@ -6,23 +6,95 @@ export const MS_PER_MINUTE = 60 * MS_PER_SECOND;
 
 export type SideId = 'blue' | 'red';
 
-export const TERRAINS = ['open', 'wood', 'river', 'bridge', 'road'] as const;
-export type Terrain = (typeof TERRAINS)[number];
-
+/**
+ * A point on the continuous map plane. In master state every coordinate and length is an
+ * integer count of millimetres (see `mm` / `metres` in geometry.ts), so serialisation and
+ * replay are exact. The map origin is the north-west corner: x grows east, y grows south.
+ */
 export interface Point {
   x: number;
   y: number;
 }
 
-/** Row-major grid: `tiles[y * width + x]`. */
-export interface MapGrid {
-  width: number;
-  height: number;
-  tiles: Terrain[];
+/** Terrain height tag. Only a label for now; slopes and line-of-sight by height come later. */
+export const HEIGHTS = ['low', 'flat', 'rise', 'high'] as const;
+export type Height = (typeof HEIGHTS)[number];
+
+/** What a piece of ground does to units on it. */
+export interface TerrainAttrs {
+  /** Multiplier on march time; 1 is open ground. Ignored when not passable. */
+  moveCost: number;
+  /** 0..1: protection from fire. */
+  cover: number;
+  /** 0..1: how well it hides troops. 1 blocks sight through it. */
+  concealment: number;
+  height: Height;
+  passable: boolean;
 }
 
-export const FACINGS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const;
-export type Facing = (typeof FACINGS)[number];
+export const FEATURE_KINDS = [
+  'field',
+  'wood',
+  'marsh',
+  'water',
+  'road',
+  'river',
+  'stream',
+  'bridge',
+  'ford',
+  'building',
+] as const;
+export type FeatureKind = (typeof FEATURE_KINDS)[number];
+
+/** A closed area (woods, marsh, water, fields). */
+export interface PolygonGeometry {
+  shape: 'polygon';
+  points: Point[];
+}
+
+/** A line with a width (roads, rivers, streams). `width` is the full width in mm. */
+export interface PolylineGeometry {
+  shape: 'polyline';
+  points: Point[];
+  width: number;
+}
+
+/** A place with a radius (bridges, fords, buildings). `radius` is in mm. */
+export interface PointGeometry {
+  shape: 'point';
+  at: Point;
+  radius: number;
+}
+
+export type FeatureGeometry = PolygonGeometry | PolylineGeometry | PointGeometry;
+
+/** A vector terrain feature. Where features overlap, the highest `layer` decides the ground. */
+export interface TerrainFeature {
+  id: string;
+  kind: FeatureKind;
+  name?: string;
+  layer: number;
+  geometry: FeatureGeometry;
+  attrs: TerrainAttrs;
+}
+
+/** The ground: a rectangle `width` x `height` mm from the origin, and the features on it. */
+export interface TerrainMap {
+  width: number;
+  height: number;
+  features: TerrainFeature[];
+}
+
+export const FORMATIONS = ['line', 'column', 'square', 'skirmish', 'loose'] as const;
+export type Formation = (typeof FORMATIONS)[number];
+
+/** The ground a unit covers, as an oriented rectangle around its centre, in mm. */
+export interface Footprint {
+  /** Width across the facing. */
+  frontage: number;
+  /** Length along the facing. */
+  depth: number;
+}
 
 /** What a unit is currently trying to do. Produced from orders; the engine applies it. */
 export type Intent =
@@ -46,12 +118,21 @@ export interface Unit {
   side: SideId;
   kind: UnitKind;
   name: string;
-  position: Point;
+  /** Centre of the unit's footprint. */
+  center: Point;
+  /** Compass bearing in radians the unit faces: 0 is north (-y), growing clockwise (east is pi/2). */
+  facing: number;
+  formation: Formation;
+  footprint: Footprint;
+  /**
+   * Sub-positions of a loose formation (a skirmish line along a treeline, an arc), as offsets
+   * in mm from `center` in the unit's own frame: x to its right, y to its front.
+   */
+  shape?: Point[];
   /** Men remaining. Fractional, since casualties are. */
   strength: number;
   /** 0..100. */
   morale: number;
-  facing: Facing;
   intent: Intent;
   status: UnitStatus;
   /** Where the unit starts, and where it withdraws to if it breaks. */
@@ -127,7 +208,7 @@ export interface GameState {
   scenarioId: string;
   time: GameTime;
   seed: number;
-  map: MapGrid;
+  map: TerrainMap;
   sides: Side[];
   units: Unit[];
   victory: VictoryCondition;
@@ -136,10 +217,4 @@ export interface GameState {
   /** Set once, when the game ends. Nothing happens in combat or victory handlers after that. */
   outcome: Outcome | null;
   intel: Record<SideId, SideIntel>;
-}
-
-export function tileAt(map: MapGrid, p: Point): Terrain | undefined {
-  if (!Number.isInteger(p.x) || !Number.isInteger(p.y)) return undefined;
-  if (p.x < 0 || p.y < 0 || p.x >= map.width || p.y >= map.height) return undefined;
-  return map.tiles[p.y * map.width + p.x];
 }
