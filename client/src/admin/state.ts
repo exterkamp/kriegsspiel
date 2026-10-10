@@ -28,7 +28,12 @@ export interface SideViewLike {
   [k: string]: unknown;
 }
 
-/** Master unit field -> the field of the wire view that carries it. Anything absent here has no wire form. */
+/**
+ * Master unit field -> the field of the wire view that carries it. Anything absent here has no wire form.
+ * Hand-kept: it must follow how `toSideView` in `server/src/api/sideView.ts` renames fields. A new wire
+ * field reads as master only until it is added here. It tests presence, not value, so a field the view
+ * carries with a fuzzed value still counts as seen.
+ */
 const WIRE_FIELD: Record<string, string> = {
   id: 'id',
   name: 'name',
@@ -136,11 +141,18 @@ export class StatePanel {
     }
   }
 
+  /** Dims the panel: a refresh failed, so what is shown is the last good state, not the current one. */
+  markStale(): void {
+    this.root.dataset.stale = 'true';
+  }
+
   showMessage(text: string): void {
+    delete this.root.dataset.stale;
     this.root.replaceChildren(el('p', 'empty', text));
   }
 
   update(s: AdminState): void {
+    delete this.root.dataset.stale;
     const { engine, sideViews } = s;
     const world = engine.world;
     const out: HTMLElement[] = [];
@@ -210,7 +222,7 @@ export class StatePanel {
     }
     out.push(rest);
 
-    // Keep open <details> and scroll position across live refreshes.
+    // Keep open <details> across live refreshes. Inner scroll positions and text selection are not kept.
     const open = new Set(
       [...this.root.querySelectorAll<HTMLDetailsElement>('details[open]')].map(
         (d) => d.dataset.key,

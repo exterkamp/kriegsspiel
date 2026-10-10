@@ -31,6 +31,7 @@ export class AdminPage {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private streamCount = 0;
   private statePanel!: StatePanel;
+  private stateReq = 0;
   private stateTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly token: string | undefined;
 
@@ -221,16 +222,20 @@ export class AdminPage {
   private async refreshState(): Promise<void> {
     const id = this.gameId;
     if (!id) return;
+    // Poll- and stream-driven refreshes can overlap; only the latest request may write.
+    const req = ++this.stateReq;
+    const current = () => id === this.gameId && req === this.stateReq;
     try {
       const res = await this.fetchFn(apiUrl(`games/${encodeURIComponent(id)}/state`, this.token));
-      if (id !== this.gameId) return;
+      if (!current()) return;
       if (res.status === 404)
         return this.statePanel.showMessage('This game is not open; no live state.');
       if (!res.ok) throw new Error(String(res.status));
       const body = (await res.json()) as AdminState;
-      if (id === this.gameId) this.statePanel.update(body);
+      if (current()) this.statePanel.update(body);
     } catch {
-      // The link indicator already reports connectivity; the next refresh retries.
+      // Keep the last good state but dim it, so old data never passes for current; the next refresh retries.
+      if (current()) this.statePanel.markStale();
     }
   }
 
