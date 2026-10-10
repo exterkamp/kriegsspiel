@@ -1,11 +1,18 @@
 import {
+  ASPECT_FACTOR,
   ATTACK_INTENT_EVENT,
   COMBAT_CHECK_EVENT,
   COMBAT_TICK_EVENT,
+  MELEE_FACTOR,
   VICTORY_DEADLINE_EVENT,
+  aspectOf,
+  bearingTo,
   canReach,
   distanceMm,
+  inMelee,
   onObjective,
+  rangeFactor,
+  type Aspect,
 } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { rejectOrder, startMarch } from './movement.js';
@@ -25,7 +32,8 @@ export const COMBAT_TICK_MS = 2 * MS_PER_MINUTE;
 
 /**
  * Placeholder numbers; the rules tables arrive with Epic #2. A unit's casualties
- * per tick are `strength * FIRE_RATE * (die / 3.5) * moraleFactor * cover`, so a
+ * per tick are `strength * FIRE_RATE * (die / 3.5) * moraleFactor * cover`, times a
+ * range factor (or the melee factor) and a flank or rear factor, so a
  * 600-man battalion on a fair roll costs a target about 18 men every 2 minutes.
  */
 export const FIRE_RATE: Record<UnitKind, number> = {
@@ -135,6 +143,8 @@ interface Shot {
   target: Unit;
   distance: number;
   cover: number;
+  aspect: Aspect;
+  melee: boolean;
   die: number;
   casualties: number;
 }
@@ -291,14 +301,26 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       const die = rng.die(6);
       const cover = coverFactor(terrainAt(world.map, target.center)?.attrs.cover ?? 0);
       const moraleFactor = 0.5 + shooter.morale / 200;
+      const aspect = aspectOf(shooter, target);
+      const melee = inMelee(shooter, target);
+      // Melee is a blow at arm's length: no range falloff, but a heavier one than fire.
+      const reach = melee ? MELEE_FACTOR : rangeFactor(shooter, target);
       const casualties = round2(
-        shooter.strength * FIRE_RATE[shooter.kind] * (die / 3.5) * moraleFactor * cover,
+        shooter.strength *
+          FIRE_RATE[shooter.kind] *
+          (die / 3.5) *
+          moraleFactor *
+          cover *
+          reach *
+          ASPECT_FACTOR[aspect],
       );
       shots.push({
         shooter,
         target,
         distance: distanceMm(shooter.center, target.center),
         cover,
+        aspect,
+        melee,
         die,
         casualties,
       });
@@ -341,6 +363,8 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
           target: s.target.id,
           distance: round2(s.distance / 1000),
           cover: s.cover,
+          aspect: s.aspect,
+          melee: s.melee,
           die: s.die,
           casualties: s.casualties,
           targetStrength: after.strength,
@@ -349,6 +373,14 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       });
     }
     w = { ...w, units: w.units.map((u) => fate.get(u.id) ?? u) };
+    // A unit that fired turns to face its target, so it shows its front to whom it fights.
+    const faced = new Map(
+      shots.map((s) => [s.shooter.id, bearingTo(s.shooter.center, s.target.center)]),
+    );
+    w = {
+      ...w,
+      units: w.units.map((u) => (faced.has(u.id) ? { ...u, facing: faced.get(u.id)! } : u)),
+    };
 
     for (const u of w.units) {
       if (!fate.has(u.id)) continue;

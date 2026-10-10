@@ -149,11 +149,12 @@ export interface Side {
 }
 
 /**
- * The `attacker` wins the moment its units alone hold `objective`. The `defender` wins if
+ * The `attacker` wins the moment its units alone hold `objective`, an area (a closed polygon
+ * of at least three points); a unit holds it when its centre is inside. The `defender` wins if
  * the game clock reaches `holdMs` with the attacker not having taken it.
  */
 export interface VictoryCondition {
-  objective: Point;
+  objective: Point[];
   defender: SideId;
   attacker: SideId;
   holdMs: GameTime;

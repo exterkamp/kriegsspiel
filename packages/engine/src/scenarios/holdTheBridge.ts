@@ -129,5 +129,15 @@ export const holdTheBridge = {
       morale: 85,
     },
   ],
-  victory: { objective: { x: 2050, y: 1500 }, defender: 'blue', attacker: 'red', holdMinutes: 180 },
+  victory: {
+    objective: [
+      [2020, 1470],
+      [2080, 1470],
+      [2080, 1530],
+      [2020, 1530],
+    ],
+    defender: 'blue',
+    attacker: 'red',
+    holdMinutes: 180,
+  },
 };
