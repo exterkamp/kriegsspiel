@@ -1,6 +1,6 @@
 # The HQ interface
 
-Implementation ports and capability gates are recorded in [HQ contracts](hq-contracts.md), with packet evidence in [HQ execution log](hq-execution-log.md). The current HQ composition is an explicitly identified fixture demonstration; its continuous-metre table consumes accepted #118. Browser rendering/performance and live-server acceptance remain pending.
+Implementation ports and capability gates are recorded in [HQ contracts](hq-contracts.md), with packet evidence in [HQ execution log](hq-execution-log.md). The current HQ composition is an explicitly identified fixture demonstration; its continuous-metre table consumes accepted #118. Browser rendering/performance and live-server acceptance remain pending. Opening the client without session parameters shows the HQ fixture. Existing `/?new=1&side=blue&rate=12` and `/?game=<id>&token=<t>` URLs retain the accepted live client and transport; live HQ composition awaits its contract gate.
 
 The game is played from a general's headquarters. There is no HUD and no minimap. The screen is a **desk in a tent or requisitioned farmhouse**, and everything you know arrives as paper.
 

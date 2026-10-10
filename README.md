@@ -20,7 +20,9 @@ A deterministic engine owns the world: terrain, movement, line of sight, combat,
 
 ## Current state
 
-Early scaffold. The monorepo is set up (engine, protocol, server and client packages with tests, lint and CI); there is no game logic yet. The planned client is a Three.js map table (flat historical map, 3D pieces) plus a Papers Please-style Svelte desk, backed by a TypeScript server with a continuous-time engine and an LLM umpire. An earlier Phaser prototype was abandoned.
+The engine, filtered game API and live client are implemented. The default client page now opens a fixture-driven Three.js map table and Svelte HQ desk with scoped browser notes, personal marks and paper dispositions. It is an interface demonstration; live HQ integration and browser acceptance remain pending. [HQ contracts](docs/hq-contracts.md) and the [execution log](docs/hq-execution-log.md) record the gates.
+
+The accepted live client remains available at `/?new=1&side=blue&rate=12` to create a game, or `/?game=<id>&token=<t>` to join. Vite proxies `/games` HTTP and WebSocket requests to `API_URL` (default `http://localhost:3000`).
 
 ## Development
 
