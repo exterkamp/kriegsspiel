@@ -1,0 +1,45 @@
+# Decision log
+
+Short records of decisions made, why, and what is still open. Newest at the bottom. Detail lives in the linked docs.
+
+## D1: LLM umpire on a server, hybrid adjudication
+**Decision.** A deterministic engine owns state, movement, line of sight, combat and dice. The LLM parses free-text orders, makes bounded judgment calls, and narrates per-side reports. It never edits state directly, and dice are rolled by a seeded server RNG.
+**Why.** A pure LLM umpire is inconsistent and unauditable (the free-Kriegsspiel failure mode). Related LLM wargaming work also converges on this pattern.
+**See.** [design.md](design.md), [research.md](research.md)
+
+## D2: The player's interface is a general's HQ
+**Decision.** Players see no HUD or minimap. Everything arrives as paper: dispatches, reports, rosters, a journal. Their map shows only what they or their staff marked.
+**Why.** It makes fog of war, stale information and delegation the game, and it matches the original Kriegsspiel.
+**See.** [hq-interface.md](hq-interface.md)
+
+## D3: Hybrid rendering: Three.js table + Svelte desk
+**Decision.** A Three.js scene with a **flat** historical map on a table and 3D wooden-block pieces, plus a Papers Please-style 2D desk built in HTML/Svelte. Phaser is dropped.
+**Why.** The game is mostly documents plus one map. A DOM UI is much better for text and drag-and-drop, and a 3D table gives the physical Kriegsspiel feel. A flat map avoids needing elevation data.
+**Alternatives considered.** Phaser, PixiJS, Babylon.js, Godot web export, full 3D room, fully 2D desk.
+**Consequence.** The existing Phaser prototype is replaced. Its order, turn, pathfinding and generator logic moves into the engine package.
+**See.** [hq-interface.md](hq-interface.md), [architecture.md](architecture.md)
+
+## D4: Continuous game clock with an adjustable ratio, not turns
+**Decision.** Game time is tied to wall-clock time at a per-game ratio (1:1, 4:1, 12:1, custom). Couriers and battles take real hours at 1:1. The engine is a continuous-time event simulator that never reads the wall clock. Manual-step and fast-forward modes are required, for testing and for optional turn-based play.
+**Why.** It makes order lag and delegation real, and one engine supports every pace. An earlier turn-based design with deadlines was superseded.
+**Consequence.** An **LLM barrier** stops game time from advancing past an unresolved LLM result. Inputs are logged for deterministic replay.
+**Open.** The default ratio is chosen after the first scenario's pacing is measured.
+**See.** [architecture.md](architecture.md), [gameplay.md](gameplay.md)
+
+## D5: Pause by unanimous vote
+**Decision.** All human players across all sides can vote to pause. One "no" or a timeout cancels it (hosts may allow a majority). A paused game allows reading and drafting, but signed orders dispatch on resume. After server downtime the game restarts paused.
+**Suggested, not confirmed.** Emergency hold: a short, limited, single-player clock stop that lapses unless ratified.
+**See.** [architecture.md](architecture.md), [gameplay.md](gameplay.md)
+
+## D6: Collaborative play with roles and shared drafts
+**Decision.** Each side is a group of roles (commander, chief of staff, intelligence, quartermaster, subordinate commanders). Orders are shared drafts that anyone can propose to and the commander signs and stamps. An LLM staff check shows how a subordinate would read a draft. Empty roles are filled by the LLM.
+**Open.** Default hierarchy is assumed to be shared HQ, with chain-of-command as an option. Command level is assumed to be brigades and battalions.
+**See.** [gameplay.md](gameplay.md)
+
+## Open questions
+- Default clock ratio (decide after the first scenario).
+- Command level and default hierarchy (assumptions above).
+- Emergency hold: keep or drop.
+- First historical scenario and map source (licences to verify).
+- How much auto-plotting of reports onto the map players get.
+- Rules tables (march rates, frontage, fire, casualties): to be taken from the primary sources.
