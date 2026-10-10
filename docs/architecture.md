@@ -100,6 +100,7 @@ running ──request──► pause_proposed ──all humans yes──► paus
 - **While paused**, players can read reports, write drafts and sign orders. Newly signed orders are stamped with the paused game time and the courier leaves when the clock resumes, so nothing new is learned and a pause cannot be used to gain information.
 - **Emergency hold** (suggested): any single player can call a short hold of a few wall-clock minutes, a limited number of times per game, which ends on its own unless ratified by a vote. This avoids a stuck game when a real emergency comes up and others are away.
 - **Server downtime**: if the server was down, the game resumes **paused** and asks the players to confirm. We never silently skip game time.
+- A **ratio change** is voted on the same way (`proposeRate`, `rateVote`): the same voters and rules, one open proposal, and on a pass the clock re-anchors at the current game time before the new rate applies.
 - All pauses and votes are recorded in the journal, and the post-game critique can mention them.
 
 ## Components

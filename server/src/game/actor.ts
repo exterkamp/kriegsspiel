@@ -37,6 +37,7 @@ import {
 import type { OrderParser, ParseContext, ParseResult } from '../orders/index.js';
 import type { SideAgent } from '../opponent/index.js';
 import { PauseVoting, type PauseConfig, type PauseTransition } from '../pause.js';
+import { RatioVoting, type RatioTransition } from '../ratioVote.js';
 import { advanceUntilOver, applyLoggedOrder } from './replay.js';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
@@ -167,6 +168,8 @@ export class GameActor {
 
   /** The pause state machine; absent when the game has no voters configured. */
   private readonly pauseVoting: PauseVoting | undefined;
+  /** The ratio vote; present when the game has voters. */
+  private readonly ratioVoting: RatioVoting | undefined;
   private pauseTimer: unknown;
   private pauseTimerSet = false;
 
@@ -205,6 +208,7 @@ export class GameActor {
         phase: this.clock.status === 'running' ? 'running' : 'paused',
         nowMs: this.wallNow(),
       });
+      this.ratioVoting = new RatioVoting(options.pause);
     }
     this.snapshotSeq = -1;
     this.snapshotEvery = Math.max(1, Math.floor(options.snapshotEvery ?? 1));
@@ -228,6 +232,11 @@ export class GameActor {
   /** The pause vote: its phase and the open proposal, for the views. Undefined without voters. */
   get pauseState(): { phase: PauseVoting['phase']; proposal: PauseVoting['open'] } | undefined {
     return this.pauseVoting && { phase: this.pauseVoting.phase, proposal: this.pauseVoting.open };
+  }
+
+  /** The open ratio vote, for the views. Undefined without voters. */
+  get ratioState(): { proposal: RatioVoting['open'] } | undefined {
+    return this.ratioVoting && { proposal: this.ratioVoting.open };
   }
 
   /** Persist the starting snapshot and start the scheduler. */
@@ -441,14 +450,18 @@ export class GameActor {
   /** Wake at the next vote or pause deadline (wall time), which no game event accounts for. */
   private reschedulePause(): void {
     this.clearPauseTimer();
-    const deadline = this.pauseVoting?.deadlineMs;
-    if (this.closed || deadline === undefined) return;
+    const deadlines = [this.pauseVoting?.deadlineMs, this.ratioVoting?.deadlineMs].filter(
+      (d) => d !== undefined,
+    );
+    if (this.closed || deadlines.length === 0) return;
+    const deadline = Math.min(...deadlines);
     const delay = Math.min(MAX_SLEEP_MS, Math.max(0, deadline - this.wallNow()));
     this.pauseTimer = this.timers.setTimeout(() => {
       this.pauseTimerSet = false;
       // Checked when the job runs, so a vote that settled meanwhile logs nothing.
       this.enqueue(async () => {
         if (this.pauseVoting?.isDue(this.wallNow())) await this.apply({ kind: 'pauseExpire' });
+        if (this.ratioVoting?.isDue(this.wallNow())) await this.apply({ kind: 'rateExpire' });
       }).catch((e) => {
         if (this.trace.enabled) this.trace.record(this.id, 'error', { source: 'pause', error: e });
         this.onError?.(e);
@@ -560,6 +573,20 @@ export class GameActor {
     }
   }
 
+  /** Apply what the ratio vote decided: a passed ratio re-anchors the clock, so time never jumps. */
+  private applyRatio(entry: InputLogEntry, steps: RatioTransition[]): void {
+    for (const t of steps) {
+      (entry.ratio ??= []).push(t);
+      if (t.outcome === 'passed') this.clock.setRate(t.rate);
+    }
+  }
+
+  private requireRatioVoting(): RatioVoting {
+    if (!this.ratioVoting) throw new Error('voting is not set up for this game');
+    if (this.clock.status === 'stopped') throw new Error('clock is stopped');
+    return this.ratioVoting;
+  }
+
   private requirePauseVoting(): PauseVoting {
     if (!this.pauseVoting) throw new Error('pause voting is not set up for this game');
     if (this.clock.status === 'stopped') throw new Error('clock is stopped');
@@ -584,6 +611,28 @@ export class GameActor {
       }
       case 'pauseExpire': {
         this.applyPause(entry, [this.pauseVoting?.expire(this.wallNow())]);
+        return { ok: true };
+      }
+      case 'proposeRate': {
+        const rv = this.requireRatioVoting();
+        const step = rv.propose(
+          `r${entry.seq}`,
+          command.by,
+          command.rate,
+          this.clock.rate,
+          this.wallNow(),
+        );
+        this.applyRatio(entry, [step]);
+        return { ok: true };
+      }
+      case 'rateVote': {
+        const rv = this.requireRatioVoting();
+        this.applyRatio(entry, rv.vote(command.by, command.proposal, command.yes, this.wallNow()));
+        return { ok: true };
+      }
+      case 'rateExpire': {
+        const step = this.ratioVoting?.expire(this.wallNow());
+        this.applyRatio(entry, step ? [step] : []);
         return { ok: true };
       }
       case 'setRate':
