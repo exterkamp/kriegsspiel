@@ -10,6 +10,7 @@ Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a serve
 - `docs/design.md`: pillars, features, trust risks
 - `docs/research.md`: history and sources
 - `docs/roadmap.md`: milestones
+- `docs/map-implementation-plan.md`: M3c implementation sequence, Herdr agent ownership, validation and recovery
 - `docs/order-eval.md`: golden order corpus and parser evaluation harness
 
 ## Rules of the design

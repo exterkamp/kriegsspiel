@@ -12,7 +12,7 @@
     "client"
   ],
   "scripts": {
-    "test": "npm run test --workspaces --if-present && node --test \"test/*.test.js\"",
+    "test": "npm run test --workspaces --if-present && node --test \"test/*.test.js\" \"scripts/maps-assessment/*.test.mjs\"",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
