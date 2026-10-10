@@ -170,6 +170,22 @@ describe('behaviour', () => {
     expect(seeds.size).toBeGreaterThan(1);
   });
 
+  it('reports itself unsettled when a unit sat a decision out on a roll', () => {
+    const outcomes = Array.from({ length: 300 }, (_, seed) => {
+      const agent = new ScriptedOpponent({ ...CONFIG, seed });
+      const orders = agent.think(view());
+      return { orders: orders.length, settled: agent.settled() };
+    });
+    // One unit with no standing order: it either gets an order or hesitates, never both.
+    expect(outcomes.some((o) => o.orders === 0 && !o.settled)).toBe(true);
+    expect(outcomes.every((o) => (o.orders === 0) === !o.settled)).toBe(true);
+    // Once it has been told to advance, a quiet decision is a settled one.
+    const agent = new ScriptedOpponent({ ...CONFIG, seed: 1 });
+    for (let t = 0; t < 4; t++) agent.think(view({ time: t * THINK_INTERVAL_MS }));
+    expect(agent.think(view({ time: 5 * THINK_INTERVAL_MS }))).toEqual([]);
+    expect(agent.settled()).toBe(true);
+  });
+
   it('builds an agent for each scripted side only', () => {
     const agents = scriptedAgents(loadScenario(holdTheBridge));
     expect(agents.map((a) => a.side)).toEqual(['red']);
@@ -367,6 +383,96 @@ describe('headless game', () => {
     await actor.submit({ kind: 'order', side: 'blue', text: 'blue-1 move to the ridge' });
     await time.advance(0);
     expect(thoughts).toBeGreaterThan(quiet);
+    expect(time.pendingTimers).toBe(0);
+    await actor.close();
+  });
+
+  it('keeps asking an agent that held back on a roll, even with nothing queued', async () => {
+    const time = new FakeTime();
+    const world = loadScenario(holdTheBridge);
+    const store = new MemoryGameStore();
+    let thoughts = 0;
+    // Holds back at the first decision (like a hesitation roll), then has an order to give.
+    const agent: SideAgent = {
+      side: 'red',
+      intervalMs: THINK_INTERVAL_MS,
+      settled: () => thoughts !== 1,
+      think: () =>
+        ++thoughts !== 2
+          ? []
+          : [
+              {
+                text: 'red-1 advance',
+                unitId: 'red-1',
+                intent: { kind: 'move', to: { x: 2050, y: 1500 } },
+              },
+            ],
+    };
+    const actor = new GameActor({
+      id: 'g1',
+      state: createState(world.seed, world, 0),
+      registry: registry(),
+      clock: new GameClock(time.now, { rate: 1 }),
+      wallNow: time.now,
+      parser: noParser,
+      store,
+      timers: time,
+      agents: [agent],
+    });
+    await actor.start();
+    await actor.submit({ kind: 'setMode', mode: 'fast-forward' });
+    await time.advance(0);
+    // The first decision held back; it was asked again with nothing queued and gave its order.
+    expect(thoughts).toBeGreaterThan(1);
+    expect((await store.inputLog('g1')).filter((e) => e.agent)).toHaveLength(1);
+    await actor.close();
+  });
+
+  it('looks again after the last event empties the queue', async () => {
+    const time = new FakeTime();
+    const world = loadScenario(holdTheBridge);
+    const thinkTimes: number[] = [];
+    let lastEvent = 0;
+    const agent: SideAgent = {
+      side: 'red',
+      intervalMs: THINK_INTERVAL_MS,
+      think: (v) => {
+        thinkTimes.push(v.time);
+        return [];
+      },
+    };
+    const parser: OrderParser = {
+      async parse(text) {
+        return {
+          kind: 'intents',
+          text,
+          unitId: 'blue-1',
+          intents: [{ kind: 'move', to: { x: 20, y: 20 } }],
+        };
+      },
+    };
+    const actor = new GameActor({
+      id: 'g1',
+      state: createState(world.seed, world, 0),
+      registry: registry(),
+      clock: new GameClock(time.now, { rate: 1 }),
+      wallNow: time.now,
+      parser,
+      store: new MemoryGameStore(),
+      timers: time,
+      agents: [agent],
+      onEmitted: (events) => {
+        for (const e of events) lastEvent = Math.max(lastEvent, e.time);
+      },
+    });
+    await actor.start();
+    await actor.submit({ kind: 'setMode', mode: 'fast-forward' });
+    await time.advance(0);
+    await actor.submit({ kind: 'order', side: 'blue', text: 'blue-1 move to the ridge' });
+    await time.advance(0);
+    expect(lastEvent).toBeGreaterThan(0);
+    // Red saw the world as the final event left it, then went quiet.
+    expect(Math.max(...thinkTimes)).toBeGreaterThan(lastEvent);
     expect(time.pendingTimers).toBe(0);
     await actor.close();
   });

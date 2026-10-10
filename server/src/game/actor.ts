@@ -279,7 +279,8 @@ export class GameActor {
         if (!due || due.nextAt > target || this.engine.world.outcome) break;
         step(due.nextAt);
         due.nextAt += due.agent.intervalMs;
-        if (!this.engine.world.outcome) due.idle = !this.think(due.agent);
+        if (!this.engine.world.outcome)
+          due.idle = !this.think(due.agent) && (due.agent.settled?.() ?? true);
       }
       step(target);
     } finally {

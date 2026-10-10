@@ -29,6 +29,12 @@ export interface SideAgent {
   /** Game ms between decisions. */
   readonly intervalMs: number;
   think(view: EngineSideView): AgentOrder[];
+  /**
+   * Whether the last `think` that issued no order did so because nothing needs doing, rather than
+   * because it chose to wait. The actor stops asking an agent that is settled once the world is
+   * quiet; one that is not settled is asked again at its next interval. Default: settled.
+   */
+  settled?(): boolean;
 }
 
 /** Game ms between decisions: five game minutes. */
@@ -107,6 +113,8 @@ export class ScriptedOpponent implements SideAgent {
   private readonly standing = new Map<string, Standing>();
   /** The most men each unit has been seen with: the yardstick for "weakened". */
   private readonly peak = new Map<string, number>();
+  /** Whether a unit sat out the last decision on a roll, which a later roll may reverse. */
+  private hesitated = false;
 
   constructor(private readonly config: ScriptedOpponentConfig) {
     this.side = config.side;
@@ -122,6 +130,7 @@ export class ScriptedOpponent implements SideAgent {
       ...view.lastKnownContacts.filter((c) => c.ageMs <= CONTACT_FRESH_MS),
     ];
     const orders: AgentOrder[] = [];
+    this.hesitated = false;
     for (const unit of view.ownUnits) {
       if (unit.strength <= 0) continue;
       const peak = Math.max(this.peak.get(unit.id) ?? 0, unit.strength);
@@ -146,11 +155,16 @@ export class ScriptedOpponent implements SideAgent {
           },
         };
       }
+      if (!next) this.hesitated = true;
       if (!next || !this.changes(standing, next)) continue;
       this.standing.set(unit.id, next);
       orders.push(this.order(unit.id, unit.name, next));
     }
     return orders;
+  }
+
+  settled(): boolean {
+    return !this.hesitated;
   }
 
   /** Whether `next` differs enough from what the unit was last told to be worth an order. */
