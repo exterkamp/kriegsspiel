@@ -13,6 +13,7 @@ services:
       PUBLIC_URL: ${PUBLIC_URL:-}
       MAIL_WEBHOOK_URL: ${MAIL_WEBHOOK_URL:-}
       MAIL_WEBHOOK_TOKEN: ${MAIL_WEBHOOK_TOKEN:-}
+      TRUST_PROXY: ${TRUST_PROXY:-}
     volumes:
       - data:/data
     logging:
