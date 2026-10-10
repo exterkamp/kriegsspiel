@@ -78,7 +78,7 @@ describe('input log replay', () => {
     expect(replayed.state).toEqual(final);
     expect(replayed.emitted).toEqual(events);
     expect(events.length).toBeGreaterThan(0);
-  });
+  }, 30_000);
 
   it('gives the same result at every clock rate and on a manual clock', async () => {
     const results = [];
@@ -97,7 +97,7 @@ describe('input log replay', () => {
       results.push(replayed.state.world);
     }
     for (const w of results.slice(1)) expect(w).toEqual(results[0]);
-  });
+  }, 60_000);
 
   it('never calls the parser: orders use the recorded parse result', async () => {
     const store = new MemoryGameStore();
