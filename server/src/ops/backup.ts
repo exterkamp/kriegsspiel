@@ -15,6 +15,8 @@ import { DatabaseSync } from 'node:sqlite';
 const PREFIX = 'kriegsspiel-';
 
 export function backupDb(dbPath: string, dir: string, keep = 14, now = new Date()): string {
+  if (!Number.isInteger(keep) || keep < 1)
+    throw new Error(`keep must be a positive integer, got ${keep}`);
   if (!existsSync(dbPath)) throw new Error(`no database at ${dbPath}`);
   mkdirSync(dir, { recursive: true });
   const stamp = now

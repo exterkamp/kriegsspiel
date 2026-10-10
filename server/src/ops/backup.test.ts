@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -35,6 +35,29 @@ describe('backup and restore', () => {
       'kriegsspiel-20260103T000000Z.db',
       'kriegsspiel-20260104T000000Z.db',
     ]);
+  });
+
+  it('rejects a keep that is not a positive integer', () => {
+    const dbPath = join(dir, 'games.db');
+    new SqliteGameStore(dbPath).close();
+    for (const keep of [0, -1, NaN, 1.5])
+      expect(() => backupDb(dbPath, join(dir, 'b'), keep)).toThrow(/keep/);
+  });
+
+  it('removes stale WAL and SHM files when restoring', async () => {
+    const dbPath = join(dir, 'games.db');
+    const live = new SqliteGameStore(dbPath);
+    await live.saveLogHeader({ gameId: 'g1', scenarioId: 's', seed: 7 });
+    const backup = backupDb(dbPath, join(dir, 'b'));
+    live.close();
+    writeFileSync(dbPath + '-wal', 'junk');
+    writeFileSync(dbPath + '-shm', 'junk');
+    restoreDb(backup, dbPath);
+    expect(existsSync(dbPath + '-wal')).toBe(false);
+    expect(existsSync(dbPath + '-shm')).toBe(false);
+    const restored = new SqliteGameStore(dbPath);
+    expect(await restored.logHeader('g1')).toEqual({ gameId: 'g1', scenarioId: 's', seed: 7 });
+    restored.close();
   });
 
   it('refuses to restore from a missing backup', () => {

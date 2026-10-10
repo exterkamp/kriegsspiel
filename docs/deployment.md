@@ -28,7 +28,7 @@ The volume `data` holds one SQLite file in WAL mode. The input log, snapshots an
 
 ## Backups
 
-The `backup` service runs `server/dist/ops/backup.js` at start and then once a night. It uses `VACUUM INTO`, which writes a consistent copy while the game is running, as `$BACKUP_DIR/kriegsspiel-<UTC stamp>.db`, and deletes all but the newest `BACKUP_KEEP`. Copy `BACKUP_DIR` off the host to survive losing the machine. Take one by hand with:
+The `backup` service runs `server/dist/ops/backup.js` at start and then once a night. It uses `VACUUM INTO`, which writes a consistent copy while the game is running, as `$BACKUP_DIR/kriegsspiel-<UTC stamp>.db`, and deletes all but the newest `BACKUP_KEEP`. The service runs as root so it can write to a host `BACKUP_DIR`; after each run it hands any `-wal`/`-shm` files it may have created back to the `node` user. `BACKUP_KEEP` must be a positive integer (a bad value makes the backup fail loudly). Copy `BACKUP_DIR` off the host to survive losing the machine. Take one by hand with:
 
 ```bash
 docker compose exec backup node /app/server/dist/ops/backup.js backup /data/games.db /backups

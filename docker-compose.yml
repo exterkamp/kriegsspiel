@@ -30,6 +30,9 @@ services:
       - ${BACKUP_DIR:-./backups}:/backups
     user: root
     entrypoint: ['sh', '/app/server/backup-loop.sh']
+    # Listens on nothing, so the image's HTTP HEALTHCHECK would report unhealthy forever.
+    healthcheck:
+      disable: true
 
 volumes:
   data:
