@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as joinPath } from 'node:path';
 import {
   COURIER_DELAY_MS,
   COURIER_MS_PER_METRE,
@@ -15,6 +18,7 @@ import {
   startingState,
 } from '../game/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
+import { scriptedOpponentsFromEnv } from '../config.js';
 import { buildApp, type App } from './app.js';
 
 /** One game hour per wall second, so a courier ride and its report take well under a second. */
@@ -424,3 +428,95 @@ async function until(cond: () => boolean, ms = 5000): Promise<void> {
     await new Promise((r) => setTimeout(r, 10));
   }
 }
+
+describe('scripted opponent', () => {
+  /** Starts the app with the settings `main.ts` derives from the given environment. */
+  async function startLikeMain(env: Record<string, string | undefined>) {
+    store = new MemoryGameStore();
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      store,
+      scriptedOpponents: scriptedOpponentsFromEnv(env),
+    });
+    const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+    return base;
+  }
+
+  const redUnits = (id: string) =>
+    app!.host.get(id)!.state.world.units.filter((u) => u.side === 'red');
+
+  it('moves Red by default with no client input', async () => {
+    const base = await startLikeMain({});
+    const game = (await createGame(base, { rate: 86_400 })).json;
+    const start = redUnits(game.id).map((u) => u.center);
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      const log = await store.inputLog(game.id);
+      const moved = redUnits(game.id).some(
+        (u, i) => u.center.x !== start[i]!.x || u.center.y !== start[i]!.y,
+      );
+      if (log.some((e) => e.agent) && moved) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect((await store.inputLog(game.id)).some((e) => e.agent)).toBe(true);
+    expect(
+      redUnits(game.id).some((u, i) => u.center.x !== start[i]!.x || u.center.y !== start[i]!.y),
+    ).toBe(true);
+  });
+
+  it('leaves Red idle when SCRIPTED_OPPONENTS=0', async () => {
+    // Calibrate the wait: time how long the default setting takes to produce an agent order, so
+    // the idle check below can't pass vacuously by looking for less time than that.
+    const defaultBase = await startLikeMain({});
+    const calibration = (await createGame(defaultBase, { rate: 86_400 })).json;
+    const t0 = Date.now();
+    while (!(await store.inputLog(calibration.id)).some((e) => e.agent)) {
+      if (Date.now() - t0 > 5000) throw new Error('default setting never produced an agent order');
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    const agentLatency = Date.now() - t0;
+    await app!.server.close();
+
+    const base = await startLikeMain({ SCRIPTED_OPPONENTS: '0' });
+    const game = (await createGame(base, { rate: 86_400 })).json;
+    await new Promise((r) => setTimeout(r, Math.max(500, agentLatency * 3)));
+    expect((await store.inputLog(game.id)).some((e) => e.agent)).toBe(false);
+  });
+
+  it.each([
+    [{}, true],
+    [{ SCRIPTED_OPPONENTS: '' }, true],
+    [{ SCRIPTED_OPPONENTS: '1' }, true],
+    [{ SCRIPTED_OPPONENTS: 'true' }, true],
+    [{ SCRIPTED_OPPONENTS: '0' }, false],
+    [{ SCRIPTED_OPPONENTS: ' 0 ' }, false],
+    [{ SCRIPTED_OPPONENTS: 'false' }, false],
+    [{ SCRIPTED_OPPONENTS: 'FALSE' }, false],
+    [{ SCRIPTED_OPPONENTS: 'off' }, false],
+    [{ SCRIPTED_OPPONENTS: 'OFF' }, false],
+  ])('scriptedOpponentsFromEnv(%j) is %s', (env, expected) => {
+    expect(scriptedOpponentsFromEnv(env)).toBe(expected);
+  });
+});
+
+describe('deployment endpoints', () => {
+  it('answers /healthz and serves the built client from staticDir', async () => {
+    const dir = mkdtempSync(joinPath(tmpdir(), 'ks-static-'));
+    writeFileSync(joinPath(dir, 'index.html'), '<title>ks</title>');
+    const { server } = await buildApp({ parser: new StubOrderParser(), staticDir: dir });
+    try {
+      const health = await server.inject('/healthz');
+      expect(health.statusCode).toBe(200);
+      expect(health.json()).toEqual({ ok: true });
+      const page = await server.inject('/');
+      expect(page.statusCode).toBe(200);
+      expect(page.body).toContain('<title>ks</title>');
+      expect((await server.inject({ method: 'POST', url: '/games', payload: {} })).statusCode).toBe(
+        201,
+      );
+    } finally {
+      await server.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

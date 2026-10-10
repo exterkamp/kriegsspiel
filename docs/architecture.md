@@ -143,6 +143,8 @@ The simulation is a function of: scenario, seed, and the **ordered log of inputs
 
 A scripted side is a `SideAgent` run by the `GameActor`. Every `intervalMs` of game time the actor advances the engine to that instant, builds `viewFor(world, side)` and calls `think(view)`; the orders it returns are issued at once through `applyLoggedOrder`, then travel by courier like any other. The agent never sees `GameState`: its input type is `EngineSideView` and `assertFogOnly` checks it at runtime. Each order is logged with `agent: true` and its parse result, so replay needs no agent and no model call. See decision "Scripted Red opponent".
 
+The server turns the opponent on by default: `main.ts` passes `scriptedOpponents: scriptedOpponentsFromEnv(process.env)` to `buildApp`, which hands it to `GameHost`. Set `SCRIPTED_OPPONENTS=0` (or `false`/`off`) to disable it, for tests or human-vs-human games. `GameHost` itself defaults to off.
+
 ## Debug trace
 
 `server/src/debug/` holds the debug trace store behind the admin view (Epic #119). It is read-only diagnostics: the engine never reads it and no game client ever receives it.
@@ -213,4 +215,5 @@ type Ruling = {                          // an umpire judgment call, always reco
 - **Umpire**: golden tests of order parsing on a corpus of sample orders (including nonsense and injection attempts). A mock umpire with fixtures for all non-LLM tests.
 - **Leak tests**: scripted games checking nothing from the other side's private state appears in a side's payload or narration.
 - **Replay**: a recorded game replays to an identical state with no model calls.
+- **End to end**: `server/src/game/endToEnd.test.ts` plays Hold the Bridge headless (scripted Blue orders against the scripted Red, on a fake wall clock) at rates 1, 4, 12 and in fast-forward, checks the final states and event logs are identical (a failure prints the first divergence) and that replay from the log matches.
 - **Crash recovery**: kill the server mid-game, restart, and check the game comes back paused with state intact.

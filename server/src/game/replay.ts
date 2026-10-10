@@ -58,6 +58,24 @@ export function applyLoggedOrder(
   return { state: issueOrder(state, order, state.time), orderId: order.id };
 }
 
+/**
+ * `advanceTo`, except that a finished game does not run on: nothing happens once the world has an
+ * outcome, and an advance that crosses the outcome stops at its game time. The live actor and
+ * replay both advance through this, so the final time does not depend on how the advance was
+ * chunked (rate, fast-forward, a late tick).
+ */
+export function advanceUntilOver(
+  state: EngineState<GameState>,
+  t: number,
+  registry: EventRegistry<GameState>,
+): { state: EngineState<GameState>; emitted: EmittedEvent[] } {
+  if (state.world.outcome) return { state, emitted: [] };
+  const res = advanceTo(state, t, registry);
+  const outcome = res.state.world.outcome;
+  // Advancing is pure, so re-running to the outcome time gives the state as it stood then.
+  return outcome && outcome.time < t ? advanceTo(state, outcome.time, registry) : res;
+}
+
 export interface ReplayResult {
   state: EngineState<GameState>;
   /** Every event the engine emitted, in firing order. */
@@ -101,7 +119,7 @@ export function replayFrom(
   const emitted: EmittedEvent[] = [];
   const advance = (t: number) => {
     if (t < state.time) return;
-    const res = advanceTo(state, t, registry);
+    const res = advanceUntilOver(state, t, registry);
     state = res.state;
     emitted.push(...res.emitted);
   };
@@ -123,7 +141,10 @@ export function replayFrom(
     // A refused or failed command left the engine untouched (the order is queued last).
     if (!entry.error) {
       const { command } = entry;
-      if (command.kind === 'advanceTo') advance(command.gameMs);
+      // An advance is logged at the game time it started from, and agents think (and log orders)
+      // part way through it. So do not run to its target now: later entries catch the world up as
+      // they come, and the settle at the end covers the rest.
+      if (command.kind === 'advanceTo') settled = Math.max(settled, command.gameMs);
       else if (command.kind === 'order' && entry.parse) {
         const res = applyLoggedOrder(state, gameId, entry.seq, command.side, entry.parse);
         if ('state' in res) state = res.state;

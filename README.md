@@ -42,6 +42,10 @@ npm run format    # Prettier write
 
 CI (`.github/workflows/ci.yml`) runs lint, typecheck, tests and build on pull requests.
 
+### Server settings
+
+The server reads `PORT` (default 3000), `HOST` (default 127.0.0.1) and `SCRIPTED_OPPONENTS`. Sides the scenario marks `scripted` (Red in "hold the bridge") are played by the built-in opponent unless `SCRIPTED_OPPONENTS` is `0`, `false` or `off`.
+
 ### Dev servers
 
 Start dev servers with `devrun`, not a bare `npm run dev`:
