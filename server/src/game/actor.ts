@@ -97,6 +97,8 @@ export interface GameActorOptions {
   parseRetryDelayMs?: number;
   /** Starting value for the input counter when resuming a game. */
   seq?: number;
+  /** Take a snapshot after this many logged inputs (default 1: after every input). */
+  snapshotEvery?: number;
   /** Server-side agents that play scripted sides (see `opponent/`). */
   agents?: SideAgent[];
 }
@@ -141,6 +143,11 @@ export class GameActor {
   private readonly agents: AgentSlot[];
   /** Agent orders issued since the last flush, to be appended to the input log in order. */
   private agentLog: InputLogEntry[] = [];
+  private readonly snapshotEvery: number;
+  /** Seq covered by the newest stored snapshot. */
+  private snapshotSeq: number;
+  /** How many clock history entries the store already has. */
+  private historySaved = 0;
   /** Pending LLM dependencies: the game time each is needed and how to answer its caller. */
   private readonly dependencies = new Map<number, Dependency>();
   private nextDependency = 1;
@@ -173,6 +180,8 @@ export class GameActor {
       agent,
       nextAt: t === 0 ? 0 : (Math.floor(t / agent.intervalMs) + 1) * agent.intervalMs,
     }));
+    this.snapshotSeq = -1;
+    this.snapshotEvery = Math.max(1, Math.floor(options.snapshotEvery ?? 1));
   }
 
   /** Whether the game is waiting on the umpire. */
@@ -194,6 +203,7 @@ export class GameActor {
   async start(): Promise<void> {
     await this.enqueue(async () => {
       await this.persist();
+      await this.persistProgress();
       this.reschedule();
     });
   }
@@ -316,12 +326,35 @@ export class GameActor {
     }
   }
 
+  /** Store a snapshot, with the per-side views as of it. Recovery starts from the newest one. */
   private async persist(): Promise<void> {
     await this.flushAgentLog();
+    const seq = this.seq;
     await this.store.saveSnapshot(this.id, {
+      seq,
       engine: serialize(this.engine),
       clock: { ...this.clock.snapshot(), mode: this.clock.mode },
     });
+    this.snapshotSeq = seq;
+    const { world, time } = this.engine;
+    const views: Record<string, unknown> = {};
+    for (const side of world.sides) views[side.id] = viewFor(world, side.id, time);
+    await this.store.saveViews(this.id, { seq, gameMs: time, views });
+  }
+
+  /**
+   * Cheap bookkeeping after anything that moved game time or the clock: how far time has run
+   * (so recovery can catch up to it) and any new clock history.
+   */
+  private async persistProgress(): Promise<void> {
+    // Agents think on ticks with no command to carry their orders into the log.
+    await this.flushAgentLog();
+    await this.store.saveProgress(this.id, this.engine.time);
+    const history = this.clock.history();
+    if (history.length > this.historySaved) {
+      await this.store.appendClockHistory(this.id, history.slice(this.historySaved));
+      this.historySaved = history.length;
+    }
   }
 
   /**
@@ -377,7 +410,7 @@ export class GameActor {
       this.sync();
     }
     try {
-      await this.persist();
+      await this.persistProgress();
     } finally {
       this.reschedule();
     }
@@ -418,7 +451,12 @@ export class GameActor {
       await this.flushAgentLog();
       await this.store.appendInput(this.id, entry);
       this.sync();
-      await this.persist();
+      await this.persistProgress();
+      // Not while an order is mid-parse: its seq is taken at signing but it is logged when the
+      // parse completes, so a snapshot now would claim a seq whose entry is not in it or the log.
+      if (this.dependencies.size === 0 && this.seq - this.snapshotSeq >= this.snapshotEvery) {
+        await this.persist();
+      }
     } finally {
       this.reschedule();
     }

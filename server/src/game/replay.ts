@@ -80,7 +80,27 @@ export function replayLog(
   if (world.scenarioId !== header.scenarioId) {
     throw new Error(`log is for scenario ${header.scenarioId}, got ${world.scenarioId}`);
   }
-  let state = createState(header.seed, structuredClone(world), 0);
+  return replayFrom(
+    createState(header.seed, structuredClone(world), 0),
+    header.gameId,
+    entries,
+    registry,
+    untilGameMs,
+  );
+}
+
+/**
+ * Replay `entries` on top of `start` (a fresh scenario state, or a stored snapshot whose later
+ * log entries are being re-applied). The same rules as `replayLog`.
+ */
+export function replayFrom(
+  start: EngineState<GameState>,
+  gameId: string,
+  entries: readonly InputLogEntry[],
+  registry: EventRegistry<GameState>,
+  untilGameMs?: number,
+): ReplayResult {
+  let state = start;
   const emitted: EmittedEvent[] = [];
   const advance = (t: number) => {
     if (t < state.time) return;
@@ -108,7 +128,7 @@ export function replayLog(
       const { command } = entry;
       if (command.kind === 'advanceTo') advance(command.gameMs);
       else if (command.kind === 'order' && entry.parse) {
-        const res = applyLoggedOrder(state, header.gameId, entry.seq, command.side, entry.parse);
+        const res = applyLoggedOrder(state, gameId, entry.seq, command.side, entry.parse);
         if ('state' in res) state = res.state;
       }
     }
