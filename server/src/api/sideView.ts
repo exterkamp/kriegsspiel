@@ -3,11 +3,13 @@
  * filter (`viewFor`) and nothing else from the world, so a client can never be sent hidden state.
  */
 import {
+  renderDocument,
   viewFor,
   type EngineSideView,
   type EngineState,
   type GameState,
   type SideId,
+  type ViewDocument,
   type ViewReport,
 } from '@kriegsspiel/engine';
 import type { ClockState, Dispatch, SideView } from '@kriegsspiel/protocol';
@@ -16,6 +18,8 @@ const CATEGORY: Record<ViewReport['kind'], Dispatch['category']> = {
   contact: 'scouts',
   unitLost: 'subordinates',
   orderDelivered: 'subordinates',
+  lowAmmo: 'staff',
+  exhausted: 'subordinates',
 };
 
 export function toDispatch(r: ViewReport): Dispatch {
@@ -29,6 +33,19 @@ export function toDispatch(r: ViewReport): Dispatch {
     ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
     confidence: r.confidence,
     text: r.text,
+  };
+}
+
+/** A captured enemy dispatch reaches the desk as an intelligence paper, in the enemy's own words. */
+export function documentToDispatch(d: ViewDocument): Dispatch {
+  return {
+    id: d.id,
+    from: 'Captured dispatch',
+    writtenAtGame: d.issuedAt,
+    receivedAtGame: d.deliveredAt,
+    category: 'intelligence',
+    location: d.location,
+    text: renderDocument(d),
   };
 }
 
@@ -47,8 +64,8 @@ export function toSideView(view: EngineSideView, clock: ClockState): SideView {
       strength: u.strength,
       // The engine scores morale 0..100; the wire uses 0..1.
       morale: Math.min(1, Math.max(0, u.morale / 100)),
-      // There is no supply model yet, so every unit is fully supplied.
-      supply: 1,
+      // The wire's supply is the share of ammunition left (engine 0..100).
+      supply: Math.min(1, Math.max(0, u.ammo / 100)),
     })),
     visibleEnemies: view.visibleEnemies.map((e) => ({
       id: e.id,
@@ -67,7 +84,7 @@ export function toSideView(view: EngineSideView, clock: ClockState): SideView {
       uncertaintyRadius: c.uncertaintyRadius,
       sizeEstimate: c.sizeEstimate,
     })),
-    dispatches: view.reports.map(toDispatch),
+    dispatches: [...view.reports.map(toDispatch), ...view.documents.map(documentToDispatch)],
     clock,
   };
 }

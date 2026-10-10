@@ -79,7 +79,7 @@ Real life happens. The game can be **paused by a vote of all human players** acr
 
 ### Changing the ratio
 
-The ratio can be changed mid-game by vote, for example to slow down a decisive battle or speed up a long march. The clock re-anchors so game time never jumps.
+The ratio can be changed mid-game by vote, for example to slow down a decisive battle or speed up a long march. The clock re-anchors so game time never jumps. Any voter proposes a ratio and the others vote under the same rules as a pause (unanimous by default, or a majority; a vote that times out is cancelled). One ratio vote is open at a time, and it works while the game is paused.
 
 ## Multiplayer collaborative mode
 

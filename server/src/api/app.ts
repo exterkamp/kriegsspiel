@@ -110,7 +110,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   if (trace) await adminApi(server, { host, trace, token: options.admin?.token });
 
   if (options.staticDir) {
-    await server.register(fastifyStatic, { root: resolve(options.staticDir) });
+    await server.register(fastifyStatic, { root: resolve(options.staticDir), redirect: true });
   }
 
   server.post('/games', async (req, reply) => {

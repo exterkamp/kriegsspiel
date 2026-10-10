@@ -1,3 +1,5 @@
+import type { Pace } from './fatigue.js';
+import type { Order, OrderIntent } from './orders.js';
 import type { PlacementProposal, PlacementVerdict } from './placement.js';
 
 /** Game time in integer milliseconds since the scenario start. Never derived from the wall clock. */
@@ -123,6 +125,8 @@ export interface Leg {
   to: Point;
   startedAt: GameTime;
   arriveAt: GameTime;
+  /** The game ms per metre of cost-1 ground the leg was timed with (pace and fatigue at its start). */
+  msPerMetre?: number;
 }
 
 export const UNIT_KINDS = ['infantry', 'cavalry', 'artillery'] as const;
@@ -130,6 +134,29 @@ export type UnitKind = (typeof UNIT_KINDS)[number];
 
 /** `withdrawn`: broke and is falling back (out of the fight for good). `destroyed`: no men left. */
 export type UnitStatus = 'active' | 'withdrawn' | 'destroyed';
+
+/**
+ * What sets off a standing order. Each is judged from the unit's own knowledge: an enemy it
+ * can see itself, its own strength, the orders it has been handed, the clock.
+ */
+export type Trigger =
+  /** An enemy unit the unit itself can see has its centre inside `area` (a closed polygon). */
+  | { kind: 'enemySighted'; area: Point[] }
+  /** The unit's own strength (men) has dropped below `strength`. */
+  | { kind: 'strengthBelow'; strength: number }
+  /** An order from `from` (an `Order.from`, 'hq' unless stated) reaches the unit. */
+  | { kind: 'orderReceived'; from: string }
+  /** Game time has reached `gameTime`. */
+  | { kind: 'timeReached'; gameTime: GameTime };
+
+/** A conditional or timed instruction the unit carries until its trigger fires (once). */
+export interface StandingOrder {
+  /** `<orderId>#<n>`; unique among a unit's standing orders. */
+  id: string;
+  orderId: string;
+  trigger: Trigger;
+  then: OrderIntent[];
+}
 
 export interface Unit {
   id: string;
@@ -153,7 +180,15 @@ export interface Unit {
   strength: number;
   /** 0..100. */
   morale: number;
+  /** 0 fresh .. 100 spent. Slows the march and, when high, wears morale down. */
+  fatigue: number;
+  /** 0..100: the share of its ammunition left. At 0 its fire is nearly useless. */
+  ammo: number;
+  /** How hard the current march is pushed. Only matters while marching. */
+  pace: Pace;
   intent: Intent;
+  /** Conditional and timed orders waiting on their trigger. Absent when there are none. */
+  standing?: StandingOrder[];
   /** Set while the unit is marching along a leg, so a new order can stop it mid-leg. */
   leg?: Leg;
   status: UnitStatus;
@@ -168,6 +203,8 @@ export interface Side {
   controller: 'human' | 'scripted';
   /** Where this side's orders start from. Couriers ride from here. */
   hq: Point;
+  /** Where wagons load ammunition. Defaults to the HQ when a scenario names none. */
+  depots?: Point[];
 }
 
 /**
@@ -194,7 +231,7 @@ export interface Outcome {
 /** A report waiting for, or already past, its courier delay. Belongs to one side's intel. */
 export interface Report {
   id: string;
-  kind: 'contact' | 'unitLost' | 'orderDelivered';
+  kind: 'contact' | 'unitLost' | 'orderDelivered' | 'lowAmmo' | 'exhausted';
   /** Game time of the thing reported. */
   observedAt: GameTime;
   /** Game time the report reaches HQ (observedAt plus courier delay). */
@@ -214,6 +251,42 @@ export interface Report {
   subject?: string;
 }
 
+/**
+ * A courier on the map, riding an order from HQ to its unit along `legs`. It exists from the
+ * moment the order leaves HQ until it delivers, is lost, or is taken. Master state only.
+ */
+export interface Courier {
+  id: string;
+  side: SideId;
+  /** The dispatch as signed. Its `text` is what a captor reads. */
+  order: Order;
+  /** Where the ride began (HQ). */
+  origin: Point;
+  /** The ride, one leg per route segment, with the times it is on each. Empty if HQ is the destination. */
+  legs: Leg[];
+  /** The intents the unit will adopt, when the courier garbles the order. Absent if the order arrives as signed. */
+  garbled?: OrderIntent[];
+}
+
+/** An enemy dispatch a side has taken from a courier. Belongs to the capturing side's intel. */
+export interface CapturedDocument {
+  id: string;
+  kind: 'capturedDispatch';
+  capturedAt: GameTime;
+  /** Game time it reaches the capturing side's HQ (capturedAt plus courier delay). */
+  deliverAt: GameTime;
+  /** Game time the dispatch left the enemy HQ. */
+  issuedAt: GameTime;
+  fromSide: SideId;
+  /** Name of the enemy unit it was addressed to. */
+  addressedTo: string;
+  /** Where the courier was taken. */
+  location: Point;
+  place: string;
+  /** The order's original wording. */
+  text: string;
+}
+
 /** Last sighting of an enemy unit, as the side saw it then. */
 export interface Contact {
   id: string;
@@ -231,6 +304,8 @@ export interface SideIntel {
   /** Enemy ids visible at the last scan, so a report fires only on first sight. */
   inSight: string[];
   reports: Report[];
+  /** Enemy dispatches taken from couriers. */
+  documents: CapturedDocument[];
 }
 
 export interface GameState {
@@ -246,6 +321,8 @@ export interface GameState {
   /** Set once, when the game ends. Nothing happens in combat or victory handlers after that. */
   outcome: Outcome | null;
   intel: Record<SideId, SideIntel>;
+  /** Couriers riding now, both sides. Master state only: never sent to a client. */
+  couriers: Courier[];
   /** Weather hook: multiplies every unit's sight range (1 when absent, 0.5 in fog). */
   sightFactor?: number;
   /** Every umpire placement ruling so far, in order. Master state only: never sent to a client. */

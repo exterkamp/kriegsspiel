@@ -21,6 +21,10 @@ import { newMarkId } from './table/marks.js';
 import { pickMinSize } from './table/picking.js';
 import type { Dispatch, Mark } from '@kriegsspiel/protocol';
 import { parseSession, wsUrl } from './session.js';
+import { mount } from 'svelte';
+import Desk from './desk/Desk.svelte';
+import { activeView, gameState } from './desk/store.js';
+import { isDeskView } from './desk/views.js';
 
 async function createGame(side: string, rate?: number): Promise<{ game: string; token: string }> {
   const res = await fetch('/games', {
@@ -46,6 +50,15 @@ async function main(app: HTMLElement): Promise<void> {
   window.addEventListener('resize', () => table.resize());
   app.querySelector('#top')?.addEventListener('click', () => table.snapTopDown());
   app.querySelector('#obl')?.addEventListener('click', () => table.snapOblique());
+  // The desk shell sits over the canvas. The table keeps rendering whichever view is open.
+  mount(Desk, { target: app });
+  activeView.subscribe((v) => {
+    app.dataset.view = v;
+    table.setDesk(
+      isDeskView(v),
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 600,
+    );
+  });
   if (import.meta.env.DEV) (window as unknown as { table: TableScene }).table = table;
 
   let params = parseSession(window.location.search);
@@ -72,6 +85,7 @@ async function main(app: HTMLElement): Promise<void> {
       if (!conn.sendOrder(orderId, full)) return 'Not connected. Try again when the link is back.';
       const now = state.clock ? gameNowMs(state.clock, Date.now()) : 0;
       state = withPendingOrder(state, { orderId, text: full, sentAtGame: now });
+      gameState.set(state);
       hud.render(state, Date.now());
       return undefined;
     },
@@ -79,6 +93,7 @@ async function main(app: HTMLElement): Promise<void> {
       state = withRead(state, d.id);
       if (d.location) lastReport = d;
       redrawMarks();
+      gameState.set(state);
       hud.render(state, Date.now());
       if (d.location) table.panTo(d.location);
     },
@@ -143,6 +158,7 @@ async function main(app: HTMLElement): Promise<void> {
   setInterval(redrawMarks, 2000);
 
   const rerender = () => {
+    gameState.set(state);
     hud.render(state, Date.now());
     if (state.view) table.apply(buildSceneState(state.view, fixtureMap));
     redrawMarks();
@@ -227,6 +243,7 @@ async function main(app: HTMLElement): Promise<void> {
   } else {
     // No server: the fixture board with an empty desk.
     state = { ...withLink(state, 'offline'), view: fixtureView };
+    gameState.set(state);
     hud.render(state, Date.now());
   }
 }

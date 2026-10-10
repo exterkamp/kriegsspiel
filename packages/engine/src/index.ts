@@ -103,8 +103,30 @@ export {
   rangeFactor,
 } from './contact.js';
 export type { Aspect } from './contact.js';
-export { COURIER_MS_PER_METRE, issueOrder, registerOrders } from './orders.js';
+export {
+  COURIER_LOST_EVENT,
+  COURIER_MS_PER_METRE,
+  COURIER_STEP_EVENT,
+  issueOrder,
+  registerOrders,
+} from './orders.js';
+export {
+  GARBLE_MAX_M,
+  GARBLE_MIN_M,
+  INTERCEPT_BY_KIND,
+  INTERCEPT_CHECK_MS,
+  courierPosition,
+  interceptChance,
+  rideRisk,
+} from './courier.js';
 export type { Order, OrderIntent } from './orders.js';
+export {
+  STANDING_EVENT,
+  applyIntents,
+  evaluateStanding,
+  fireOnReceipt,
+  triggerHolds,
+} from './standing.js';
 export { describePlace } from './place.js';
 export { beginMarch } from './movement.js';
 export {
@@ -117,6 +139,27 @@ export {
   registerVisibility,
   startVisibility,
   viewFor,
+  renderDocument,
   renderReport,
 } from './visibility.js';
-export type { EngineSideView, ViewUnit, ViewEnemy, ViewContact, ViewReport } from './visibility.js';
+export type {
+  EngineSideView,
+  ViewContact,
+  ViewDocument,
+  ViewEnemy,
+  ViewReport,
+  ViewUnit,
+} from './visibility.js';
+export * from './fatigue.js';
+export {
+  AMMO_PER_FIRE_TICK,
+  LOW_AMMO,
+  OUT_OF_AMMO_FACTOR,
+  RESUPPLY_PER_TICK,
+  SUPPLY_TICK_EVENT,
+  SUPPLY_TICK_MS,
+  WAGON_REACH_COST_M,
+  depotsOf,
+  registerSupply,
+  wagonsReach,
+} from './supply.js';
