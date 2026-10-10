@@ -65,6 +65,10 @@ export class UmpireError extends Error {
     message: string,
     readonly kind: 'transport' | 'timeout' | 'schema' | 'refusal' | 'missing-recording',
     readonly attempts: number,
+    /** Tokens spent on the attempts of a failed call. Absent when nothing was spent. */
+    readonly usage?: TokenUsage,
+    /** Cost of those attempts. `null` when the model has no known price. */
+    readonly costUsd?: number | null,
   ) {
     super(message);
     this.name = 'UmpireError';

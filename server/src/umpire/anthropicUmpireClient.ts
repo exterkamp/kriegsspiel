@@ -1,4 +1,5 @@
 import { Ajv } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import type { UmpireConfig } from './config.js';
 import { DEFAULT_UMPIRE_CONFIG } from './config.js';
 import { addUsage, costUsd, ZERO_USAGE } from './pricing.js';
@@ -38,6 +39,7 @@ export class AnthropicUmpireClient implements UmpireClient {
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly random: () => number;
   private readonly ajv = new Ajv({ strict: false, allErrors: false });
+  private readonly validators = new WeakMap<object, ValidateFunction>();
 
   constructor(opts: AnthropicUmpireClientOptions) {
     this.transport = opts.transport;
@@ -48,15 +50,22 @@ export class AnthropicUmpireClient implements UmpireClient {
   }
 
   async call<T>(request: UmpireRequest): Promise<UmpireResponse<T>> {
-    const validate = this.ajv.compile(request.schema);
+    let validate = this.validators.get(request.schema);
+    if (!validate) {
+      validate = this.ajv.compile(request.schema);
+      this.validators.set(request.schema, validate);
+    }
     const model = this.config.models[request.stage];
     const user = JSON.stringify(request.input);
     let usage = ZERO_USAGE;
     let cost: number | null = 0;
     let lastError: UmpireError | undefined;
+    const withSpend = (e: UmpireError) =>
+      new UmpireError(e.message, e.kind, e.attempts, usage, cost);
 
     for (let attempt = 1; attempt <= this.config.maxAttempts; attempt++) {
       let delayHint = 0;
+      let terminal = false;
       try {
         const res = await this.sendWithTimeout(model, request, user);
         usage = addUsage(usage, res.usage);
@@ -66,14 +75,16 @@ export class AnthropicUmpireClient implements UmpireClient {
         if (res.refusal) {
           throw new UmpireError('model refused the request', 'refusal', attempt);
         }
+        if (res.truncated) {
+          // Same input and limit would truncate again, so retrying only pays for it twice.
+          terminal = true;
+          throw this.schemaError('output truncated at max_tokens', attempt);
+        }
         let parsed: unknown;
         try {
           parsed = JSON.parse(res.text);
         } catch {
-          throw this.schemaError(
-            res.truncated ? 'output truncated at max_tokens' : 'output is not JSON',
-            attempt,
-          );
+          throw this.schemaError('output is not JSON', attempt);
         }
         if (!validate(parsed)) {
           throw this.schemaError(this.ajv.errorsText(validate.errors), attempt);
@@ -92,10 +103,22 @@ export class AnthropicUmpireClient implements UmpireClient {
         this.recorder?.record(record);
         return { output: parsed as T, record };
       } catch (err) {
-        if (err instanceof UmpireError && err.kind === 'refusal') throw err;
+        if (err instanceof UmpireError && (err.kind === 'refusal' || terminal)) {
+          throw withSpend(err);
+        }
         if (err instanceof TransportError) {
-          if (!err.retryable) throw new UmpireError(err.message, 'transport', attempt);
+          if (!err.retryable) throw withSpend(new UmpireError(err.message, 'transport', attempt));
           delayHint = err.retryAfterMs ?? 0;
+          if (delayHint > this.config.maxBackoffMs * 4) {
+            // The server wants a wait longer than the barrier can tolerate: fail now.
+            throw withSpend(
+              new UmpireError(
+                `${err.message} (retry-after ${delayHint}ms too long)`,
+                'transport',
+                attempt,
+              ),
+            );
+          }
           lastError = new UmpireError(err.message, 'transport', attempt);
         } else if (err instanceof UmpireError) {
           lastError = err;
@@ -111,6 +134,8 @@ export class AnthropicUmpireClient implements UmpireClient {
       lastError?.message ?? 'no attempts made',
       lastError?.kind ?? 'transport',
       this.config.maxAttempts,
+      usage,
+      cost,
     );
   }
 

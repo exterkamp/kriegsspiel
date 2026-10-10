@@ -1,4 +1,5 @@
 import { Ajv } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { UmpireError } from './umpireClient.js';
 import type {
   UmpireCallRecord,
@@ -27,6 +28,7 @@ const keyOf = (r: { stage: string; promptVersion: string; input: unknown }) =>
 export class PlaybackUmpireClient implements UmpireClient {
   private readonly queues = new Map<string, UmpireCallRecord[]>();
   private readonly ajv = new Ajv({ strict: false });
+  private readonly validators = new WeakMap<object, ValidateFunction>();
 
   constructor(records: readonly UmpireCallRecord[]) {
     for (const r of records) {
@@ -46,8 +48,17 @@ export class PlaybackUmpireClient implements UmpireClient {
         0,
       );
     }
-    const output: unknown = JSON.parse(record.rawOutput);
-    const validate = this.ajv.compile(request.schema);
+    let output: unknown;
+    try {
+      output = JSON.parse(record.rawOutput);
+    } catch {
+      throw new UmpireError('recorded output is not JSON', 'schema', 0);
+    }
+    let validate = this.validators.get(request.schema);
+    if (!validate) {
+      validate = this.ajv.compile(request.schema);
+      this.validators.set(request.schema, validate);
+    }
     if (!validate(output)) {
       throw new UmpireError(
         `recorded output no longer matches schema: ${this.ajv.errorsText(validate.errors)}`,

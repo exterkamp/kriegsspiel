@@ -127,6 +127,45 @@ describe('AnthropicUmpireClient', () => {
     await expect(client(t).c.call(request)).rejects.toMatchObject({ kind: 'timeout', attempts: 3 });
   });
 
+  it('fires the abort signal when an attempt times out', async () => {
+    let seen: AbortSignal | undefined;
+    const send = vi.fn(async (_r: unknown, signal: AbortSignal) => {
+      seen = signal;
+      return new Promise<TransportResponse>(() => {});
+    });
+    await expect(client({ send }).c.call(request)).rejects.toMatchObject({ kind: 'timeout' });
+    expect(seen?.aborted).toBe(true);
+  });
+
+  it('gives up at once when Retry-After is longer than the barrier can wait', async () => {
+    const t = scripted(new TransportError('429', true, 3_600_000), good());
+    const { c, sleeps } = client(t);
+    await expect(c.call(request)).rejects.toMatchObject({ kind: 'transport', attempts: 1 });
+    expect(sleeps).toEqual([]);
+    expect(t.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry output truncated at max_tokens, and reports the spend', async () => {
+    const t = scripted({ ...good('{"verdict":'), truncated: true }, good());
+    const err = await client(t)
+      .c.call(request)
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(UmpireError);
+    expect(err).toMatchObject({ kind: 'schema', attempts: 1, usage });
+    expect((err as UmpireError).costUsd).toBeCloseTo((1000 * 4 + 100 * 20) / 1e6);
+    expect(t.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('attaches the summed spend of every attempt to a call that exhausts its retries', async () => {
+    const t = scripted(good('nope'), good('nope'), good('nope'));
+    const err = await client(t)
+      .c.call(request)
+      .catch((e: unknown) => e);
+    expect(err).toMatchObject({ kind: 'schema', attempts: 3 });
+    expect((err as UmpireError).usage?.inputTokens).toBe(3000);
+    expect((err as UmpireError).costUsd).toBeCloseTo(3 * ((1000 * 4 + 100 * 20) / 1e6));
+  });
+
   it('retries schema-invalid output and sums cost across attempts', async () => {
     const t = scripted(good('{"verdict":"maybe"}'), good('not json'), good());
     const { c, recorded } = client(t);
@@ -224,12 +263,31 @@ describe('AnthropicTransport', () => {
       retryable: true,
       retryAfterMs: 3000,
     });
+    await expect(
+      respond(429, { 'retry-after-ms': '250' }).send(treq, signal),
+    ).rejects.toMatchObject({
+      retryAfterMs: 250,
+    });
     await expect(respond(503).send(treq, signal)).rejects.toMatchObject({ retryable: true });
     await expect(respond(400).send(treq, signal)).rejects.toMatchObject({ retryable: false });
   });
 });
 
 describe('PlaybackUmpireClient', () => {
+  it('reports a corrupt recording as a schema UmpireError', async () => {
+    const rec = {
+      ...({} as UmpireCallRecord),
+      stage: 'judge',
+      promptVersion: 'judge-v1',
+      system: request.system,
+      input: request.input,
+      rawOutput: '{oops',
+    } as UmpireCallRecord;
+    await expect(new PlaybackUmpireClient([rec]).call(request)).rejects.toMatchObject({
+      kind: 'schema',
+    });
+  });
+
   it('replays a recorded game without touching the network', async () => {
     // Record through the real SDK transport, backed by a fake fetch.
     const fetchLive = vi.fn(async () =>

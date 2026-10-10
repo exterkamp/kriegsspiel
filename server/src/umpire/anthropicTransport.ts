@@ -53,12 +53,15 @@ function toTransportError(err: unknown): Error {
   if (err instanceof Anthropic.APIError) {
     const status = err.status ?? 0;
     const retryable = status === 408 || status === 409 || status === 429 || status >= 500;
-    const retryAfter = Number(err.headers?.get('retry-after'));
-    return new TransportError(
-      `${status}: ${err.message}`,
-      retryable,
-      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : undefined,
-    );
+    const ms = Number(err.headers?.get('retry-after-ms'));
+    const secs = Number(err.headers?.get('retry-after'));
+    const retryAfterMs =
+      Number.isFinite(ms) && ms > 0
+        ? ms
+        : Number.isFinite(secs) && secs > 0
+          ? secs * 1000
+          : undefined;
+    return new TransportError(`${status}: ${err.message}`, retryable, retryAfterMs);
   }
   return err instanceof Error ? err : new Error(String(err));
 }

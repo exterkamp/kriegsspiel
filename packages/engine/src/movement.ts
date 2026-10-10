@@ -1,9 +1,10 @@
-import type { EngineState, EventRegistry, Json, NewEvent } from './events.js';
+import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { schedule } from './queue.js';
 import {
   MS_PER_MINUTE,
   tileAt,
   type GameState,
+  type Intent,
   type MapGrid,
   type Point,
   type Terrain,
@@ -181,6 +182,56 @@ function rejectUnknown(world: GameState, unitId: string) {
   return { world, emit: [{ type: 'order.rejected', payload: { unitId, reason: 'unknown unit' } }] };
 }
 
+/** The destination a march intent is heading for, or undefined if the intent is not a march. */
+function marchTarget(i: Intent): Point | undefined {
+  return i.kind === 'move' ? i.to : i.kind === 'withdraw' ? i.toward : undefined;
+}
+
+/**
+ * Start `unit` marching to `dest` at `time`, as a plain move, a withdrawal, or a
+ * move that ends in a hold. Shared by move orders and delivered courier orders.
+ * An unreachable destination is reported and leaves any march under way alone.
+ */
+export function beginMarch(
+  world: GameState,
+  unit: Unit,
+  dest: Point,
+  time: number,
+  how: 'move' | 'withdraw' | 'hold' = 'move',
+): HandlerResult<GameState> {
+  const to: [number, number] = [dest.x, dest.y];
+  const path = findPath(world.map, unit.position, dest);
+  if (!path) {
+    return {
+      world: updateUnit(world, unit.id, {}, time),
+      emit: [{ type: 'unit.moveBlocked', payload: { unitId: unit.id, to } }],
+    };
+  }
+  if (path.tiles.length === 1) {
+    const intent: Intent = how === 'hold' ? { kind: 'hold', at: dest } : { kind: 'idle' };
+    return {
+      world: updateUnit(world, unit.id, { intent }, time),
+      emit: [{ type: 'unit.arrived', payload: { unitId: unit.id, at: to } }],
+    };
+  }
+  const intent: Intent =
+    how === 'withdraw'
+      ? { kind: 'withdraw', toward: dest, startedAt: time }
+      : how === 'hold'
+        ? { kind: 'move', to: dest, startedAt: time, thenHold: true }
+        : { kind: 'move', to: dest, startedAt: time };
+  const step: StepPayload = {
+    unitId: unit.id,
+    startedAt: time,
+    to,
+    path: path.tiles.flatMap((t) => [t.x, t.y]),
+  };
+  return {
+    world: updateUnit(world, unit.id, { intent }, time),
+    schedule: [scheduleStep(world.map, unit.kind, time, step)],
+  };
+}
+
 /**
  * Register the movement handlers. Movement is event-driven: a move order
  * plans a path from where the unit stands now and schedules one step event per
@@ -195,32 +246,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     const { unitId, to } = ev.payload as unknown as MovePayload;
     const unit = world.units.find((u) => u.id === unitId);
     if (!unit) return rejectUnknown(world, unitId);
-    const dest = { x: to[0], y: to[1] };
-    const path = findPath(world.map, unit.position, dest);
-    if (!path) {
-      // A rejected order leaves any march already under way alone.
-      return {
-        world: updateUnit(world, unitId, {}, ev.time),
-        emit: [{ type: 'unit.moveBlocked', payload: { unitId, to } }],
-      };
-    }
-    if (path.tiles.length === 1) {
-      return {
-        world: updateUnit(world, unitId, { intent: { kind: 'idle' } }, ev.time),
-        emit: [{ type: 'unit.arrived', payload: { unitId, at: to } }],
-      };
-    }
-    const flat = path.tiles.flatMap((t) => [t.x, t.y]);
-    const step: StepPayload = { unitId, startedAt: ev.time, to, path: flat };
-    return {
-      world: updateUnit(
-        world,
-        unitId,
-        { intent: { kind: 'move', to: dest, startedAt: ev.time } },
-        ev.time,
-      ),
-      schedule: [scheduleStep(world.map, unit.kind, ev.time, step)],
-    };
+    return beginMarch(world, unit, { x: to[0], y: to[1] }, ev.time);
   });
 
   registry.register(HALT_INTENT_EVENT, (world, ev) => {
@@ -233,20 +259,25 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     const p = ev.payload as unknown as StepPayload;
     const unit = world.units.find((u) => u.id === p.unitId);
     const i = unit?.intent;
+    const target = i && marchTarget(i);
     if (
       !unit ||
-      i?.kind !== 'move' ||
+      !i ||
+      !target ||
+      (i.kind !== 'move' && i.kind !== 'withdraw') ||
       i.startedAt !== p.startedAt ||
-      i.to.x !== p.to[0] ||
-      i.to.y !== p.to[1]
+      target.x !== p.to[0] ||
+      target.y !== p.to[1]
     ) {
       return { world }; // superseded by a newer intent
     }
     const position = { x: p.path[2]!, y: p.path[3]! };
     const rest = p.path.slice(2);
     if (rest.length === 2) {
+      const intent: Intent =
+        i.kind === 'move' && i.thenHold ? { kind: 'hold', at: position } : { kind: 'idle' };
       return {
-        world: updateUnit(world, p.unitId, { position, intent: { kind: 'idle' } }, ev.time),
+        world: updateUnit(world, p.unitId, { position, intent }, ev.time),
         emit: [{ type: 'unit.arrived', payload: { unitId: p.unitId, at: p.to } }],
       };
     }
