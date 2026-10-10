@@ -15,17 +15,15 @@
 import {
   advanceTo,
   deserialize,
-  issueOrder,
   serialize,
   type EmittedEvent,
   type EngineState,
   type EventRegistry,
   type GameState,
-  type Order,
-  type OrderIntent as EngineIntent,
 } from '@kriegsspiel/engine';
 import { GameClock, type WallClock } from '../clock.js';
 import type { OrderParser, ParseResult } from '../orders/index.js';
+import { applyLoggedOrder } from './replay.js';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
 /** Timer functions, injectable so tests can run on a fake clock. */
@@ -63,16 +61,6 @@ export interface GameActorOptions {
   onError?: (error: unknown) => void;
   /** Starting value for the input counter when resuming a game. */
   seq?: number;
-}
-
-/** Maps a parsed intent to one the engine knows, or the reason it cannot. */
-function toEngineIntents(intents: ParseResult & { kind: 'intents' }): EngineIntent[] | string {
-  const out: EngineIntent[] = [];
-  for (const i of intents.intents) {
-    if (i.kind === 'attack') return 'attack orders are not modelled yet';
-    out.push(i);
-  }
-  return out;
 }
 
 export class GameActor {
@@ -216,6 +204,8 @@ export class GameActor {
       this.sync();
       entry.gameMs = this.engine.time;
       result = await this.run(command, entry);
+      this.sync();
+      entry.endGameMs = this.engine.time;
     } catch (e) {
       entry.error = e instanceof Error ? e.message : String(e);
       result = { ok: false, kind: 'rejection', reason: entry.error };
@@ -259,7 +249,6 @@ export class GameActor {
   ): Promise<CommandResult> {
     // The order is signed now. A paused game stamps it with the paused time and its courier
     // leaves when the clock resumes (it is queued at that time, and the engine only moves on).
-    const issuedAt = this.engine.time;
     let parsed: ParseResult;
     try {
       parsed = await this.parser.parse(command.text, { ...this.engine.world, side: command.side });
@@ -269,29 +258,20 @@ export class GameActor {
       return { ok: false, kind: 'rejection', reason };
     }
     entry.parse = parsed;
-    if (parsed.kind === 'clarification') {
-      return {
-        ok: false,
-        kind: 'clarification',
-        question: parsed.question,
-        options: parsed.options,
-      };
+    const applied = applyLoggedOrder(this.engine, this.id, entry.seq, command.side, parsed);
+    if ('reason' in applied) {
+      if (parsed.kind === 'clarification') {
+        return {
+          ok: false,
+          kind: 'clarification',
+          question: parsed.question,
+          options: parsed.options,
+        };
+      }
+      return { ok: false, kind: 'rejection', reason: applied.reason };
     }
-    if (parsed.kind === 'rejection') return { ok: false, kind: 'rejection', reason: parsed.reason };
-    const intents = toEngineIntents(parsed);
-    if (typeof intents === 'string') return { ok: false, kind: 'rejection', reason: intents };
-
-    const order: Order = {
-      id: `${this.id}-o${entry.seq}`,
-      side: command.side as Order['side'],
-      to: parsed.unitId,
-      issuedAt,
-      text: parsed.text,
-      intents,
-    };
-    // The engine was not advanced during the parse, so `issuedAt` is still its time.
-    this.engine = issueOrder(this.engine, order, issuedAt);
-    return { ok: true, orderId: order.id };
+    this.engine = applied.state;
+    return { ok: true, orderId: applied.orderId };
   }
 }
 
