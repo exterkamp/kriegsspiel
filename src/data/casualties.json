@@ -57,11 +57,11 @@
     },
     "victor_losses": { "per_half_battalion": 10, "per_skirmish_block": 5, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 4.2.2 Recording Losses" } },
     "unit_removal": [
-      { "id": "half_battalion_removed_points", "points": 90, "source": { "source": "rulespal-reisswitz", "locator": "Part Two 2. The Troop Symbols (removed at half strength, 450 men / 5 men per point)" } }
+      { "id": "half_battalion_block_total_points", "points": 90, "source": { "source": "rulespal-reisswitz", "locator": "Part Two 2. The Troop Symbols and Points and Losses (a half battalion of 450 men in three ranks = 90 points at 5 men per point; 90 points of losses remove the block)" } }
     ]
   },
   "gaps": [
-    "Die 4 (3:1) close combat row is not legible in the edition page text. Not recorded. See follow-up issue.",
+    "Die 4 (3:1) close combat row not recorded: in the edition page text the Die 4 and Die 5 rows come out of order, and a run of cells (Black R 18/6 | Blank | Blank | White T 30/12 | White R 18/6 | White D 25/10) appears after section 4.2.1, near the Die 5 row. Their row assignment is ambiguous, so check the page image. See follow-up issue.",
     "The 1828 supplement replaces the odds with a 6-die scheme (Appendix Two, 4.1.2 New Dice Odds). Not encoded yet."
   ]
 }

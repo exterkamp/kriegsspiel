@@ -40,24 +40,35 @@ for (const f of tableFiles) {
   });
 }
 
-test('every number in data has a citation on itself or an enclosing object', () => {
-  const walk = (node, cited, path, f) => {
-    if (Array.isArray(node)) return node.forEach((n, i) => walk(n, cited, `${path}[${i}]`, f));
-    if (node && typeof node === 'object') {
-      const own = Object.values(node).some((v) => v && typeof v === 'object' && 'locator' in v);
-      const c = cited || own;
-      for (const [k, v] of Object.entries(node)) {
-        if (k.endsWith('source') && v && typeof v === 'object') continue;
-        walk(v, c, `${path}.${k}`, f);
-      }
-    } else if (typeof node === 'number') {
-      assert.ok(cited, `${f}: uncited number at ${path}`);
+// Returns the paths of numbers that have no {source, locator} on their own object or an
+// enclosing object inside `data`. The table-level source does not count: it is required by
+// the schema, so counting it would make the check pass for everything.
+function uncitedNumbers(node, cited = false, path = 'data', out = []) {
+  if (Array.isArray(node)) {
+    node.forEach((n, i) => uncitedNumbers(n, cited, `${path}[${i}]`, out));
+  } else if (node && typeof node === 'object') {
+    const own = Object.values(node).some((v) => v && typeof v === 'object' && 'locator' in v);
+    for (const [k, v] of Object.entries(node)) {
+      if (k.endsWith('source') && v && typeof v === 'object') continue;
+      uncitedNumbers(v, cited || own, `${path}.${k}`, out);
     }
-  };
-  for (const f of tableFiles) {
-    const t = load(f);
-    walk(t.data, Boolean(t.source), 'data', f);
+  } else if (typeof node === 'number' && !cited) {
+    out.push(path);
   }
+  return out;
+}
+
+test('uncitedNumbers flags numbers without a citation (checks the check)', () => {
+  const src = { source: 'x', locator: 'y' };
+  assert.deepEqual(uncitedNumbers({ stray: 999 }), ['data.stray']);
+  assert.deepEqual(uncitedNumbers({ rows: [{ a: 1, source: src }, { b: 2 }] }), ['data.rows[1].b']);
+  assert.deepEqual(uncitedNumbers({ a: 1, nested: { b: 2 }, source: src }), []);
+  assert.deepEqual(uncitedNumbers({ group: { source: src, v: [1, 2] }, other: 3 }), ['data.other']);
+});
+
+test('every number in data has a citation on itself or an enclosing object', () => {
+  const bad = tableFiles.flatMap((f) => uncitedNumbers(load(f).data).map((p) => `${f}: ${p}`));
+  assert.deepEqual(bad, []);
 });
 
 test('dice and fire rows are well formed', () => {
@@ -71,9 +82,9 @@ test('dice and fire rows are well formed', () => {
     }
 });
 
-test('spot values match the sources', () => {
+test('pinned values unchanged (regression pins; checked against the sources by hand)', () => {
   // 1824 scan, march ruler bands; 1 Decimalzoll = 400 Schritt
   assert.deepEqual(load('march.json').data.ruler_bands.map((b) => b.paces), [200, 250, 600, 800, 900]);
-  assert.equal(load('scale.json').data.paces_per_decimal_zoll, 400);
+  assert.equal(load('scale.json').data.scale.paces_per_decimal_zoll, 400);
   assert.deepEqual(load('fire.json').data.infantry_half_battalion.rows[2].by_die_face, [20, 20, 10, 25, 50, 6]);
 });

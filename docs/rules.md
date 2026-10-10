@@ -21,6 +21,8 @@ Every table file has a table-level `source` (`{source, locator}`), and individua
 
 ## Verifying three values
 
+Line numbers (`djvu.txt line N`) are counted in the raw `Reisswitz1824_djvu.txt` file as downloaded from archive.org, with its HTML wrapper included. If you strip the wrapper you will land on the wrong line.
+
 1. Ruler band 800 paces (gallop): `march.json` cites `djvu.txt` line 3952, "800 Schritt: Galopp der geschlossenen Cavallerie…".
 2. Scale 400 paces per decimal Zoll: `scale.json`, `djvu.txt` line 3798.
 3. Infantry fire at 100-200 paces, `[20,20,10,25,50,6]`: `fire.json`, edition section 3.1.1 Infantry Fire Table.
@@ -28,6 +30,9 @@ Every table file has a table-level `source` (`{source, locator}`), and individua
 The 1824 scan confirms the march ruler and the scale. The fire and close-combat tables are cited to the English edition only, because the OCR of the scan's tables is not readable. A reviewer should check those against the edition, and ideally against page images of the scan.
 
 ## Simplifications and known problems
+
+- The edition is inconsistent about the half-battalion block: one passage says 75 deep and 125 long (we use `frontage` 125, `depth` 75), another says width 75 and length 125. The engine depends on this, so decide it before using the footprint.
+- The 1:8000 map ratio is confirmed only by the edition. The scan OCR has the 400 Schritt part but not the ratio.
 
 - We record only what was legible. Nothing was filled in from memory.
 - `casualties.json`, white T face of Die 1: the edition prints 30/18 in its table and 30/12 in its dice picture. We use 30/12 to match the other T faces. Unresolved.
