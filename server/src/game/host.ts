@@ -52,6 +52,11 @@ export class GameHost {
     return this.games.get(id);
   }
 
+  /** Ids of the games that are open now. */
+  ids(): string[] {
+    return [...this.games.keys()];
+  }
+
   get size(): number {
     return this.games.size;
   }
