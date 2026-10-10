@@ -54,7 +54,7 @@ Each milestone should end in something playable.
 
 ## M5: Remote async play and collaboration
 - [ ] Accounts, lobbies, clock ratio chosen in the lobby (1:1, 4:1, 12:1, custom), mid-game ratio change by vote
-- [ ] Pause voting (unanimous by default), emergency hold, resume rules, safe restart after downtime
+- [ ] Pause voting (server state machine done in #63; WebSocket wiring and client pending), emergency hold, resume rules, safe restart after downtime
 - [ ] Notifications (WebSocket, web push, email) with per-player thresholds
 - [ ] Deputy mode: LLM staff officer acting within standing orders
 - [ ] Roles per side, with LLM filling empty staff roles

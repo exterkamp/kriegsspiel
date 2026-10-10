@@ -9,6 +9,7 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
+import type { PauseTransition } from '../pause.js';
 
 /** Everything needed to resume a game: serialised engine state and the clock's anchor. */
 export interface GameSnapshot {
@@ -27,7 +28,13 @@ export type GameCommand =
   | { kind: 'resume' }
   | { kind: 'setMode'; mode: ClockMode }
   /** Manual and fast-forward modes: move game time to this point. */
-  | { kind: 'advanceTo'; gameMs: number };
+  | { kind: 'advanceTo'; gameMs: number }
+  /** Pause voting (docs/architecture.md). `by` is a voter's player id. */
+  | { kind: 'proposePause'; by: string; reason?: string }
+  | { kind: 'proposeResume'; by: string }
+  | { kind: 'vote'; by: string; proposal: string; yes: boolean }
+  /** A vote or the maximum pause length ran out. Issued by the actor's own timer. */
+  | { kind: 'pauseExpire' };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {
@@ -53,6 +60,8 @@ export interface InputLogEntry {
   fallback?: { attempts: number; error: string };
   /** Issued by a scripted side's agent, not a player. Replay applies it at `gameMs` before any command at the same instant. */
   agent?: boolean;
+  /** Pause-voting steps this command caused, for the journal. */
+  pause?: PauseTransition[];
   /** The command was refused or failed; the reason. */
   error?: string;
 }
