@@ -1,11 +1,13 @@
 /**
  * Entry point. Environment:
- *   PORT        listen port (default 3000)
- *   HOST        listen address (default 127.0.0.1; the container sets 0.0.0.0)
- *   DB_PATH     SQLite file for durable games; unset keeps games in memory
- *   STATIC_DIR  built client to serve at `/`; unset serves the API only
+ *   PORT                listen port (default 3000)
+ *   HOST                listen address (default 127.0.0.1; the container sets 0.0.0.0)
+ *   DB_PATH             SQLite file for durable games; unset keeps games in memory
+ *   STATIC_DIR          built client to serve at `/`; unset serves the API only
+ *   SCRIPTED_OPPONENTS  scripted sides are played by the built-in opponent unless `0`, `false` or `off`
  */
 import { buildApp } from './api/app.js';
+import { scriptedOpponentsFromEnv } from './config.js';
 import { SqliteGameStore } from './game/index.js';
 import { StubOrderParser } from './orders/stubParser.js';
 
@@ -18,6 +20,7 @@ const { server } = await buildApp({
   store,
   staticDir: process.env.STATIC_DIR,
   logger: true,
+  scriptedOpponents: scriptedOpponentsFromEnv(process.env),
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
