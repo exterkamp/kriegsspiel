@@ -20,6 +20,7 @@ import {
   deserialize,
   featureAnchor,
   serialize,
+  viewFor,
   type EmittedEvent,
   type EngineState,
   type EventRegistry,
@@ -82,6 +83,11 @@ export interface GameActorOptions {
   timers?: Timers;
   /** Called with events the engine emitted, in firing order. */
   onEmitted?: (events: EmittedEvent[]) => void;
+  /**
+   * Called after every tick and every command has been applied and saved, whether or not the
+   * world changed. Listeners read `state` and `gameClock`; they must not throw.
+   */
+  onUpdate?: () => void;
   /** Called when a background tick fails (a command's failure is returned to its caller). */
   onError?: (error: unknown) => void;
   /** Called when the set of pending LLM dependencies changes. */
@@ -94,6 +100,8 @@ export interface GameActorOptions {
   parseRetryDelayMs?: number;
   /** Starting value for the input counter when resuming a game. */
   seq?: number;
+  /** Take a snapshot after this many logged inputs (default 1: after every input). */
+  snapshotEvery?: number;
 }
 
 interface Dependency {
@@ -121,12 +129,18 @@ export class GameActor {
   private readonly timers: Timers;
   private readonly parseTimers = new Set<unknown>();
   private readonly onEmitted?: (events: EmittedEvent[]) => void;
+  private readonly onUpdate?: () => void;
   private readonly onError?: (error: unknown) => void;
   private readonly onStaffAtWork?: (state: StaffAtWork) => void;
   private readonly parseRetries: number;
   private readonly parseTimeoutMs: number;
   private readonly parseRetryDelayMs: number;
   private seq: number;
+  private readonly snapshotEvery: number;
+  /** Seq covered by the newest stored snapshot. */
+  private snapshotSeq: number;
+  /** How many clock history entries the store already has. */
+  private historySaved = 0;
   /** Pending LLM dependencies: the game time each is needed and how to answer its caller. */
   private readonly dependencies = new Map<number, Dependency>();
   private nextDependency = 1;
@@ -147,12 +161,15 @@ export class GameActor {
     this.trace = options.trace ?? NOOP_TRACE;
     this.timers = options.timers ?? realTimers;
     this.onEmitted = options.onEmitted;
+    this.onUpdate = options.onUpdate;
     this.onError = options.onError;
     this.onStaffAtWork = options.onStaffAtWork;
     this.parseRetries = options.parseRetries ?? DEFAULT_PARSE_RETRIES;
     this.parseTimeoutMs = options.parseTimeoutMs ?? DEFAULT_PARSE_TIMEOUT_MS;
     this.parseRetryDelayMs = options.parseRetryDelayMs ?? DEFAULT_PARSE_RETRY_DELAY_MS;
     this.seq = options.seq ?? 0;
+    this.snapshotSeq = -1;
+    this.snapshotEvery = Math.max(1, Math.floor(options.snapshotEvery ?? 1));
   }
 
   /** Whether the game is waiting on the umpire. */
@@ -174,6 +191,7 @@ export class GameActor {
   async start(): Promise<void> {
     await this.enqueue(async () => {
       await this.persist();
+      await this.persistProgress();
       this.reschedule();
     });
   }
@@ -234,11 +252,32 @@ export class GameActor {
     }
   }
 
+  /** Store a snapshot, with the per-side views as of it. Recovery starts from the newest one. */
   private async persist(): Promise<void> {
+    const seq = this.seq;
     await this.store.saveSnapshot(this.id, {
+      seq,
       engine: serialize(this.engine),
       clock: { ...this.clock.snapshot(), mode: this.clock.mode },
     });
+    this.snapshotSeq = seq;
+    const { world, time } = this.engine;
+    const views: Record<string, unknown> = {};
+    for (const side of world.sides) views[side.id] = viewFor(world, side.id, time);
+    await this.store.saveViews(this.id, { seq, gameMs: time, views });
+  }
+
+  /**
+   * Cheap bookkeeping after anything that moved game time or the clock: how far time has run
+   * (so recovery can catch up to it) and any new clock history.
+   */
+  private async persistProgress(): Promise<void> {
+    await this.store.saveProgress(this.id, this.engine.time);
+    const history = this.clock.history();
+    if (history.length > this.historySaved) {
+      await this.store.appendClockHistory(this.id, history.slice(this.historySaved));
+      this.historySaved = history.length;
+    }
   }
 
   /**
@@ -282,9 +321,18 @@ export class GameActor {
       this.sync();
     }
     try {
-      await this.persist();
+      await this.persistProgress();
     } finally {
       this.reschedule();
+      this.notify();
+    }
+  }
+
+  private notify(): void {
+    try {
+      this.onUpdate?.();
+    } catch (e) {
+      this.onError?.(e);
     }
   }
 
@@ -322,9 +370,15 @@ export class GameActor {
     try {
       await this.store.appendInput(this.id, entry);
       this.sync();
-      await this.persist();
+      await this.persistProgress();
+      // Not while an order is mid-parse: its seq is taken at signing but it is logged when the
+      // parse completes, so a snapshot now would claim a seq whose entry is not in it or the log.
+      if (this.dependencies.size === 0 && this.seq - this.snapshotSeq >= this.snapshotEvery) {
+        await this.persist();
+      }
     } finally {
       this.reschedule();
+      this.notify();
     }
   }
 

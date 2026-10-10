@@ -1,64 +1,94 @@
-import type { MapGrid, Terrain } from './types.js';
+import type { BaseFeature, BaseMap, FeatureKind } from './types.js';
 
-export const TERRAIN_COLOURS: Record<Terrain, string> = {
-  open: '#d8cfa6',
+export const FEATURE_COLOURS: Record<FeatureKind | 'ground', string> = {
+  ground: '#d8cfa6',
+  field: '#cfc58f',
   wood: '#5f7a4a',
+  marsh: '#8a9a6a',
+  water: '#6f9bb5',
   river: '#6f9bb5',
-  bridge: '#8a6a43',
+  stream: '#7fa8c0',
   road: '#b99f73',
+  bridge: '#8a6a43',
+  ford: '#a9bfa0',
+  building: '#7a5a48',
 };
 
-const PX_DEFAULT = 24;
-/** Keep canvases within what mobile GPUs accept as a texture. */
-const MAX_TEXTURE_PX = 4096;
+/**
+ * Painting order. Mirrors the engine's layer table (`KIND_DEFAULTS` in
+ * packages/engine/src/terrain.ts): a river cuts a road, and a bridge or ford carries it across.
+ */
+const LAYER: Record<FeatureKind, number> = {
+  field: 0,
+  marsh: 1,
+  wood: 1,
+  road: 2,
+  building: 2,
+  water: 3,
+  stream: 3,
+  river: 3,
+  ford: 4,
+  bridge: 4,
+};
 
-/** Pixels per tile: PX, shrunk so the larger side stays within MAX_TEXTURE_PX. */
-export function tilePx(map: MapGrid): number {
-  return Math.max(
-    1,
-    Math.min(PX_DEFAULT, Math.floor(MAX_TEXTURE_PX / Math.max(map.width, map.height))),
-  );
+/** Largest canvas side. Keeps the texture within what mobile GPUs accept. */
+export const MAX_TEXTURE_PX = 2048;
+
+/** Pixels per metre: the larger side of the map fills MAX_TEXTURE_PX. */
+export function pxPerMetre(map: BaseMap): number {
+  return MAX_TEXTURE_PX / Math.max(map.width, map.height, 1);
 }
 
-/** Paint the grid with flat colours and simple hatching. Pure drawing: reads only the grid. */
-export function drawMap(ctx: CanvasRenderingContext2D, map: MapGrid): void {
-  const PX = tilePx(map);
-  for (let y = 0; y < map.height; y++) {
-    for (let x = 0; x < map.width; x++) {
-      const t = map.tiles[y * map.width + x] ?? 'open';
-      ctx.fillStyle = TERRAIN_COLOURS[t] ?? TERRAIN_COLOURS.open;
-      ctx.fillRect(x * PX, y * PX, PX, PX);
-      ctx.strokeStyle = 'rgba(60,45,20,0.35)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      if (t === 'wood') {
-        ctx.arc(x * PX + PX / 2, y * PX + PX / 2, PX / 3, 0, Math.PI * 2);
-      } else if (t === 'river') {
-        ctx.moveTo(x * PX + 3, y * PX + PX / 2);
-        ctx.quadraticCurveTo(x * PX + PX / 2, y * PX + PX / 4, x * PX + PX - 3, y * PX + PX / 2);
-      } else if (t === 'bridge') {
-        ctx.moveTo(x * PX, y * PX + 4);
-        ctx.lineTo(x * PX + PX, y * PX + 4);
-        ctx.moveTo(x * PX, y * PX + PX - 4);
-        ctx.lineTo(x * PX + PX, y * PX + PX - 4);
-      } else if (t === 'road') {
-        ctx.moveTo(x * PX + PX / 2, y * PX);
-        ctx.lineTo(x * PX + PX / 2, y * PX + PX);
-      } else {
-        ctx.strokeStyle = 'rgba(60,45,20,0.12)';
-        ctx.strokeRect(x * PX + 0.5, y * PX + 0.5, PX - 1, PX - 1);
-      }
+/** Features in painting order (stable within a layer). */
+export function paintOrder(features: readonly BaseFeature[]): BaseFeature[] {
+  return features
+    .map((f, i) => ({ f, i }))
+    .sort((a, b) => LAYER[a.f.kind] - LAYER[b.f.kind] || a.i - b.i)
+    .map(({ f }) => f);
+}
+
+/** Paint the base map in metres, scaled by `s` px per metre. Pure drawing: reads only the map. */
+export function drawMap(ctx: CanvasRenderingContext2D, map: BaseMap, s = pxPerMetre(map)): void {
+  ctx.fillStyle = FEATURE_COLOURS.ground;
+  ctx.fillRect(0, 0, map.width * s, map.height * s);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'butt';
+  for (const f of paintOrder(map.features)) {
+    const g = f.geometry;
+    ctx.fillStyle = FEATURE_COLOURS[f.kind];
+    ctx.strokeStyle = FEATURE_COLOURS[f.kind];
+    ctx.beginPath();
+    if (g.shape === 'polygon') {
+      g.points.forEach((p, i) =>
+        i === 0 ? ctx.moveTo(p.x * s, p.y * s) : ctx.lineTo(p.x * s, p.y * s),
+      );
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(60,45,20,0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    } else if (g.shape === 'polyline') {
+      g.points.forEach((p, i) =>
+        i === 0 ? ctx.moveTo(p.x * s, p.y * s) : ctx.lineTo(p.x * s, p.y * s),
+      );
+      ctx.lineWidth = Math.max(g.width * s, 2);
+      ctx.stroke();
+    } else {
+      ctx.arc(g.at.x * s, g.at.y * s, Math.max(g.radius * s, 2), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(60,45,20,0.6)';
+      ctx.lineWidth = 1.5;
       ctx.stroke();
     }
   }
 }
 
-export function mapCanvas(map: MapGrid): HTMLCanvasElement {
+export function mapCanvas(map: BaseMap): HTMLCanvasElement {
+  const s = pxPerMetre(map);
   const c = document.createElement('canvas');
-  const px = tilePx(map);
-  c.width = map.width * px;
-  c.height = map.height * px;
+  c.width = Math.max(1, Math.round(map.width * s));
+  c.height = Math.max(1, Math.round(map.height * s));
   const ctx = c.getContext('2d');
-  if (ctx) drawMap(ctx, map);
+  if (ctx) drawMap(ctx, map, s);
   return c;
 }

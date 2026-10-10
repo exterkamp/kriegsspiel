@@ -1,6 +1,6 @@
 import { buildSceneState } from './table/sceneState.js';
 import { TableScene } from './table/TableScene.js';
-import { fixtureFacings, fixtureMap, fixtureView } from './table/fixture.js';
+import { fixtureMap, fixtureView } from './table/fixture.js';
 
 const app = document.getElementById('app');
 if (app) {
@@ -9,7 +9,7 @@ if (app) {
     <div id="hud"><button id="top">Top-down</button><button id="obl">Oblique</button><span id="pick">Click the map</span></div>`;
   const canvas = app.querySelector<HTMLCanvasElement>('#table')!;
   const table = new TableScene(canvas);
-  table.apply(buildSceneState(fixtureView, fixtureMap, fixtureFacings));
+  table.apply(buildSceneState(fixtureView, fixtureMap));
   table.start();
   window.addEventListener('resize', () => table.resize());
   app.querySelector('#top')?.addEventListener('click', () => table.snapTopDown());

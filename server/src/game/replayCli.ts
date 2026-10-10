@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { createRegistry, loadScenarioById } from './registry.js';
+import { createRegistry, loadScenarioById, startingState } from './registry.js';
 import { replayLog } from './replay.js';
 import { parseInputLog } from './store.js';
 
@@ -34,6 +34,7 @@ async function main(): Promise<number> {
     entries,
     createRegistry(),
     until,
+    startingState,
   );
   if (args.includes('--json')) console.log(JSON.stringify(state, null, 2));
   else if (args.includes('--events')) console.log(JSON.stringify(emitted, null, 2));

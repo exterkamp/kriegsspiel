@@ -3,15 +3,17 @@
  *
  * The actor is the only writer for its game. A store keeps the latest snapshot (engine state
  * plus clock) and an append-only input log: every player command and every parser result, so a
- * game can be replayed with no model calls. SQLite replaces `MemoryGameStore` in Epic #2.
+ * game can be replayed with no model calls. `SqliteGameStore` (sqlite.ts) is the durable implementation.
  */
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { ClockMode, ClockState } from '../clock.js';
+import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
 
 /** Everything needed to resume a game: serialised engine state and the clock's anchor. */
 export interface GameSnapshot {
+  /** Seq of the last input log entry this snapshot includes. Recovery replays the entries after it. */
+  seq: number;
   /** `serialize(engineState)` from the engine. */
   engine: string;
   clock: ClockState & { mode: ClockMode };
@@ -53,6 +55,14 @@ export interface InputLogEntry {
   error?: string;
 }
 
+/** What one side was shown at a point in the game: `viewFor` output, keyed by side id. */
+export interface SideViews {
+  /** Seq of the last input the views include. */
+  seq: number;
+  gameMs: number;
+  views: Record<string, unknown>;
+}
+
 export interface GameStore {
   /** Create or replace the snapshot. */
   saveSnapshot(gameId: string, snapshot: GameSnapshot): Promise<void>;
@@ -61,7 +71,20 @@ export interface GameStore {
   saveLogHeader(header: InputLogHeader): Promise<void>;
   logHeader(gameId: string): Promise<InputLogHeader | undefined>;
   appendInput(gameId: string, entry: InputLogEntry): Promise<void>;
-  inputLog(gameId: string): Promise<readonly InputLogEntry[]>;
+  /** The log in `seq` order. With `afterSeq`, only the entries after it. */
+  inputLog(gameId: string, afterSeq?: number): Promise<readonly InputLogEntry[]>;
+  /**
+   * Remember how far game time has run, which the scheduler moves without any input. Recovery
+   * advances the replayed state to it, so a restart loses no game time. Never goes backwards.
+   */
+  saveProgress(gameId: string, gameMs: number): Promise<void>;
+  loadProgress(gameId: string): Promise<number | undefined>;
+  /** Append clock changes (rate, pause, mode) to the game's clock history. */
+  appendClockHistory(gameId: string, changes: readonly ClockChange[]): Promise<void>;
+  clockHistory(gameId: string): Promise<readonly ClockChange[]>;
+  /** Keep the latest per-side views, as of a snapshot. */
+  saveViews(gameId: string, views: SideViews): Promise<void>;
+  loadViews(gameId: string): Promise<SideViews | undefined>;
   listGames(): Promise<string[]>;
 }
 
@@ -69,6 +92,36 @@ export class MemoryGameStore implements GameStore {
   private readonly snapshots = new Map<string, GameSnapshot>();
   private readonly logs = new Map<string, InputLogEntry[]>();
   private readonly headers = new Map<string, InputLogHeader>();
+  private readonly progress = new Map<string, number>();
+  private readonly clockLogs = new Map<string, ClockChange[]>();
+  private readonly views = new Map<string, SideViews>();
+
+  async saveProgress(gameId: string, gameMs: number): Promise<void> {
+    this.progress.set(gameId, Math.max(gameMs, this.progress.get(gameId) ?? gameMs));
+  }
+
+  async loadProgress(gameId: string): Promise<number | undefined> {
+    return this.progress.get(gameId);
+  }
+
+  async appendClockHistory(gameId: string, changes: readonly ClockChange[]): Promise<void> {
+    const log = this.clockLogs.get(gameId) ?? [];
+    log.push(...structuredClone(changes));
+    this.clockLogs.set(gameId, log);
+  }
+
+  async clockHistory(gameId: string): Promise<readonly ClockChange[]> {
+    return structuredClone(this.clockLogs.get(gameId) ?? []);
+  }
+
+  async saveViews(gameId: string, views: SideViews): Promise<void> {
+    this.views.set(gameId, structuredClone(views));
+  }
+
+  async loadViews(gameId: string): Promise<SideViews | undefined> {
+    const v = this.views.get(gameId);
+    return v && structuredClone(v);
+  }
 
   async saveLogHeader(header: InputLogHeader): Promise<void> {
     this.headers.set(header.gameId, { ...header });
@@ -94,8 +147,8 @@ export class MemoryGameStore implements GameStore {
     this.logs.set(gameId, log);
   }
 
-  async inputLog(gameId: string): Promise<readonly InputLogEntry[]> {
-    return structuredClone(this.logs.get(gameId) ?? []);
+  async inputLog(gameId: string, afterSeq = 0): Promise<readonly InputLogEntry[]> {
+    return structuredClone((this.logs.get(gameId) ?? []).filter((e) => e.seq > afterSeq));
   }
 
   async listGames(): Promise<string[]> {
@@ -104,7 +157,7 @@ export class MemoryGameStore implements GameStore {
 }
 
 /**
- * Snapshots in memory (until SQLite, Epic #2), input log on disk: one JSON-lines file per game,
+ * Snapshots in memory (use `SqliteGameStore` for durable ones), input log on disk: one JSON-lines file per game,
  * `<dir>/<gameId>.jsonl`. The first line is the `InputLogHeader`, every later line is an
  * `InputLogEntry`. Lines are only ever appended, so a crash loses at most a trailing partial line.
  */
@@ -135,8 +188,8 @@ export class FileGameStore extends MemoryGameStore {
     await appendFile(this.logPath(gameId), `${JSON.stringify(entry)}\n`);
   }
 
-  override async inputLog(gameId: string): Promise<readonly InputLogEntry[]> {
-    return (await this.readLog(gameId))?.entries ?? [];
+  override async inputLog(gameId: string, afterSeq = 0): Promise<readonly InputLogEntry[]> {
+    return ((await this.readLog(gameId))?.entries ?? []).filter((e) => e.seq > afterSeq);
   }
 
   private async readLog(gameId: string) {

@@ -7,6 +7,9 @@ import {
   registerOrders,
   registerPlacement,
   registerVisibility,
+  startGame,
+  startVisibility,
+  type EngineState,
   type GameState,
 } from '@kriegsspiel/engine';
 
@@ -19,6 +22,15 @@ export function createRegistry(): EventRegistry<GameState> {
   registerPlacement(r);
   registerVisibility(r);
   return r;
+}
+
+/**
+ * The state a new game starts in: the scenario's state with the first scheduled events queued
+ * (the visibility scans and the combat chain). `GameHost` applies it to a new game and replay
+ * applies it before the first input, so a log replays to the world it was played in.
+ */
+export function startingState(state: EngineState<GameState>): EngineState<GameState> {
+  return startGame(startVisibility(state));
 }
 
 const SCENARIOS: Record<string, () => GameState> = {

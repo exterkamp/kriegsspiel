@@ -68,7 +68,8 @@ export interface ReplayResult {
  * Replay `entries` from the scenario `world` (the one named by `header.scenarioId`). Pass
  * `untilGameMs` to stop at that game time: inputs logged after it are not applied, and a time
  * past the last input runs the world on to it. By default it ends where the last logged input
- * left the world.
+ * left the world. `init` is applied to the fresh state first, the same hook `GameHost` was given
+ * when it created the game (the server passes `startingState`).
  */
 export function replayLog(
   header: InputLogHeader,
@@ -76,11 +77,27 @@ export function replayLog(
   entries: readonly InputLogEntry[],
   registry: EventRegistry<GameState>,
   untilGameMs?: number,
+  init?: (state: EngineState<GameState>) => EngineState<GameState>,
 ): ReplayResult {
   if (world.scenarioId !== header.scenarioId) {
     throw new Error(`log is for scenario ${header.scenarioId}, got ${world.scenarioId}`);
   }
-  let state = createState(header.seed, structuredClone(world), 0);
+  const state0 = createState(header.seed, structuredClone(world), 0);
+  return replayFrom(init?.(state0) ?? state0, header.gameId, entries, registry, untilGameMs);
+}
+
+/**
+ * Replay `entries` on top of `start` (a fresh scenario state, or a stored snapshot whose later
+ * log entries are being re-applied). The same rules as `replayLog`.
+ */
+export function replayFrom(
+  start: EngineState<GameState>,
+  gameId: string,
+  entries: readonly InputLogEntry[],
+  registry: EventRegistry<GameState>,
+  untilGameMs?: number,
+): ReplayResult {
+  let state = start;
   const emitted: EmittedEvent[] = [];
   const advance = (t: number) => {
     if (t < state.time) return;
@@ -99,7 +116,7 @@ export function replayLog(
       const { command } = entry;
       if (command.kind === 'advanceTo') advance(command.gameMs);
       else if (command.kind === 'order' && entry.parse) {
-        const res = applyLoggedOrder(state, header.gameId, entry.seq, command.side, entry.parse);
+        const res = applyLoggedOrder(state, gameId, entry.seq, command.side, entry.parse);
         if ('state' in res) state = res.state;
       }
     }
