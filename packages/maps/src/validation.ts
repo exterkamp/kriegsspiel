@@ -28,7 +28,8 @@ import {
 } from './geometry.js';
 import { preflightAsset } from './resources.js';
 import { createElevationQueries, validateElevationShape } from './queries.js';
-import { WaterPolygonIndex, boxesMeet, segmentBox, type Box } from './validation-water.js';
+import { WaterPolygonIndex, boxesMeet, segmentBox } from './validation-water.js';
+import { roadIntersectionCandidates } from './validation-roads.js';
 
 export function validateSettings(s: MapSettings): void {
   const columns = s.widthM / s.sampleSpacingM + 1,
@@ -236,18 +237,6 @@ export function validateAssetTopology(asset: MapAsset, maxChecks: number): void 
       body.polygons.map((poly) => new WaterPolygonIndex(poly, budget, '$.layers.water')),
     );
   }
-  const roadBounds = new Map<string, Box>();
-  for (const road of layers.roads) {
-    budget.consume('$.layers.roads', road.path.length);
-    const box: Box = [Infinity, Infinity, -Infinity, -Infinity];
-    for (const p of road.path) {
-      box[0] = Math.min(box[0], p[0]);
-      box[1] = Math.min(box[1], p[1]);
-      box[2] = Math.max(box[2], p[0]);
-      box[3] = Math.max(box[3], p[1]);
-    }
-    roadBounds.set(road.id, [box[0] - 1e-9, box[1] - 1e-9, box[2] + 1e-9, box[3] + 1e-9]);
-  }
   const roadCrossings = new Map<string, Set<string>>(),
     crossingRoads = new Map<string, Set<string>>(),
     roadRoutes = new Map<string, Set<string>>();
@@ -333,39 +322,32 @@ export function validateAssetTopology(asset: MapAsset, maxChecks: number): void 
   }
   // Graph crossings must be explicit common endpoint nodes; overlapping edges
   // cannot be hidden behind a shared node elsewhere.
-  for (let i = 0; i < layers.roads.length; i++)
-    for (let j = 0; j < i; j++) {
-      const a = layers.roads[i]!,
-        b = layers.roads[j]!;
-      budget.consume('$.layers.roads');
-      if (!boxesMeet(roadBounds.get(a.id)!, roadBounds.get(b.id)!)) continue;
-      const common = [a.fromNodeId, a.toNodeId]
-        .filter((id) => id === b.fromNodeId || id === b.toNodeId)
-        .map((id) => nodes.get(id)!.position);
-      for (let ai = 1; ai < a.path.length; ai++)
-        for (let bi = 1; bi < b.path.length; bi++) {
-          budget.consume('$.layers.roads');
-          const p = a.path[ai - 1]!,
-            q = a.path[ai]!,
-            r = b.path[bi - 1]!,
-            s = b.path[bi]!;
-          if (!boxesMeet(segmentBox(p, q), segmentBox(r, s))) continue;
-          if (!segmentsIntersect(p, q, r, s)) continue;
-          const allowed = common.some(
-            (n) =>
-              (distance(n, p) <= join || distance(n, q) <= join) &&
-              (distance(n, r) <= join || distance(n, s) <= join),
-          );
-          const overlap =
-            pointSegmentDistance(interpolate(p, q, 0.5), r, s) < 1e-9 ||
-            pointSegmentDistance(interpolate(r, s, 0.5), p, q) < 1e-9;
-          if (!allowed || overlap)
-            fail(
-              `$.layers.roads[${i}].path`,
-              `Intersection with ${b.id} lacks a shared endpoint node, or overlaps an edge`,
-            );
-        }
-    }
+  roadIntersectionCandidates(layers.roads, budget, (i, ai, j, bi) => {
+    const a = layers.roads[i]!,
+      b = layers.roads[j]!;
+    const p = a.path[ai - 1]!,
+      q = a.path[ai]!,
+      r = b.path[bi - 1]!,
+      s = b.path[bi]!;
+    if (!segmentsIntersect(p, q, r, s)) return;
+    budget.consume('$.layers.roads', 2);
+    const common = [a.fromNodeId, a.toNodeId]
+      .filter((id) => id === b.fromNodeId || id === b.toNodeId)
+      .map((id) => nodes.get(id)!.position);
+    const allowed = common.some(
+      (n) =>
+        (distance(n, p) <= join || distance(n, q) <= join) &&
+        (distance(n, r) <= join || distance(n, s) <= join),
+    );
+    const overlap =
+      pointSegmentDistance(interpolate(p, q, 0.5), r, s) < 1e-9 ||
+      pointSegmentDistance(interpolate(r, s, 0.5), p, q) < 1e-9;
+    if (!allowed || overlap)
+      fail(
+        `$.layers.roads[${i}].path`,
+        `Intersection with ${b.id} lacks a shared endpoint node, or overlaps an edge`,
+      );
+  });
   for (const [i, crossing] of layers.crossings.entries()) {
     const p = `$.layers.crossings[${i}]`,
       body = water.get(crossing.waterId);

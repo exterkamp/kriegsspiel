@@ -134,7 +134,9 @@ Strict import builds one private polygon-edge row index per parsed water polygon
 Conservative EPS-expanded bounds skip geometry that cannot affect the accepted
 horizontal-ray, boundary, capsule or crossing-cut predicates. Dry holes, tangent
 corridors and the larger crossing-abutment radius retain their existing exact
-checks. Road pair bounds similarly exclude disjoint paths before intersection
-work. Ring staging, row insertions, scans and detached cut-pair copies reserve
+checks. Metered100m segment indexes exclude disjoint road pairs and long-path
+self-intersection pairs before exact predicate work. Small paths retain their
+original checks; adjacency, closed-ring endpoint exceptions and EPS-expanded
+bounds preserve the same geometry authority. Ring staging, row insertions, scans and detached cut-pair copies reserve
 work first; distant misses still consume the caller's topology budget. This
 changes validation cost, not geometry semantics or the configured caps.

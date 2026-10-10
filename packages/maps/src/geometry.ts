@@ -1,5 +1,6 @@
 import type { Point, Polygon } from './contract.js';
 import { fail, TopologyBudget } from './errors.js';
+import { pathIntersectionCandidates } from './path-index.js';
 
 export const TOPOLOGY_EPSILON = 1e-9;
 export const distance = (a: Point, b: Point): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -124,6 +125,7 @@ export function validatePath(
   budget: TopologyBudget,
   closedAllowed = false,
 ): void {
+  if (points.length > 16) budget.consume(path, points.length);
   const closed = distance(points[0]!, points.at(-1)!) <= TOPOLOGY_EPSILON;
   if (closed && !closedAllowed) fail(path, 'Path must have distinct endpoints');
   for (let i = 1; i < points.length; i++) {
@@ -136,13 +138,19 @@ export function validatePath(
       if ((b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1]) < 0)
         fail(`${path}[${i}]`, 'Path backtracks');
     }
-    for (let j = i + 2; j < points.length; j++) {
+    for (let j = i + 2; points.length <= 16 && j < points.length; j++) {
       if (closed && i === 1 && j === points.length - 1) continue;
       budget.consume(path);
       if (segmentsIntersect(points[i - 1]!, points[i]!, points[j - 1]!, points[j]!))
         fail(path, `Segments ${i - 1} and ${j - 1} intersect`);
     }
   }
+  if (points.length > 16)
+    pathIntersectionCandidates(points, budget, path, TOPOLOGY_EPSILON, (i, j) => {
+      if (closed && i === 1 && j === points.length - 1) return;
+      if (segmentsIntersect(points[i - 1]!, points[i]!, points[j - 1]!, points[j]!))
+        fail(path, `Segments ${i - 1} and ${j - 1} intersect`);
+    });
 }
 function ringsTouch(a: Point[], b: Point[], budget: TopologyBudget, path: string): boolean {
   for (let i = 1; i < a.length; i++)
