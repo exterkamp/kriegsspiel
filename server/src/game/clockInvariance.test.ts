@@ -29,7 +29,7 @@ const SCRIPT: { atMs: number; text: string }[] = [
   { atMs: 0, text: 'blue-1 march to the bridge' },
   { atMs: 0, text: 'blue-2 march to the bridge' },
   { atMs: 2 * MIN, text: 'blue-3 hold the bridge' },
-  { atMs: 20 * MIN, text: 'blue-1 hold the bridge' },
+  { atMs: 5 * MIN, text: 'blue-1 hold the bridge' },
 ];
 
 const parser: OrderParser = {
@@ -45,7 +45,10 @@ const parser: OrderParser = {
   },
 };
 
-/** A hand-written perturbation: cycle through these segments while waiting for each order. */
+/**
+ * A hand-written perturbation: cycle through these segments while waiting for each order. Each
+ * schedule needs at least one rate step, or `reach` never advances game time.
+ */
 type Step = { rate: number; wallMs: number } | { pause: number };
 interface Corpus {
   seeds: number[];
