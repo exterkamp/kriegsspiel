@@ -36,6 +36,14 @@ describe('PauseVoting', () => {
     expect(m.deadlineMs).toBeUndefined();
   });
 
+  it('a late vote finds the proposal timed out instead of passing it', () => {
+    const m = make();
+    m.propose('p1', 'a', 0);
+    m.vote('b', 'p1', true, 10);
+    expect(m.vote('c', 'p1', true, 1000)).toMatchObject([{ to: 'running', cause: 'timeout' }]);
+    expect(m.phase).toBe('running');
+  });
+
   it('with the majority rule, more than half decide', () => {
     const m = make({ rule: 'majority' });
     m.propose('p1', 'a', 0);

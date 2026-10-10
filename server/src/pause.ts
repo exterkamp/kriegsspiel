@@ -152,6 +152,11 @@ export class PauseVoting {
     const p = this.proposal;
     if (!p || p.id !== proposal) throw new Error(`no open proposal ${proposal}`);
     if (p.votes.has(player)) throw new Error(`${player} has already voted on ${proposal}`);
+    // The expiry timer may not have run yet: a late vote finds the proposal already timed out.
+    if (nowMs >= p.deadlineMs) {
+      const expired = this.expire(nowMs);
+      if (expired) return [expired];
+    }
     p.votes.set(player, yes);
     const settled = this.decide(nowMs, player);
     return settled ? [settled] : [];

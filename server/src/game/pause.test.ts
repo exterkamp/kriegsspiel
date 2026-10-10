@@ -47,7 +47,9 @@ afterEach(async () => {
   host = undefined;
 });
 
-async function newGame(opts: { rate?: number; maxPauseMs?: number; rule?: 'majority' } = {}) {
+async function newGame(
+  opts: { rate?: number; maxPauseMs?: number; rule?: 'majority'; voters?: string[] } = {},
+) {
   const time = new FakeTime();
   const store = new MemoryGameStore();
   const parser = new GateParser();
@@ -58,7 +60,7 @@ async function newGame(opts: { rate?: number; maxPauseMs?: number; rule?: 'major
     wallNow: time.now,
     timers: time,
     pause: () => ({
-      voters: VOTERS,
+      voters: opts.voters ?? VOTERS,
       voteTimeoutMs: 30_000,
       maxPauseMs: opts.maxPauseMs,
       rule: opts.rule,
@@ -126,9 +128,37 @@ describe('pause voting in a game', () => {
   });
 
   it('majority mode: a majority is enough', async () => {
-    const { game } = await newGame({ rule: 'majority' });
-    // Two voters: a majority is both of them, so one yes alone does not pause.
+    const { game } = await newGame({ rule: 'majority', voters: ['alice', 'bob', 'carol'] });
+    // Three voters: the proposer's yes is one of three, so not yet a majority.
     await game.submit({ kind: 'proposePause', by: 'alice' });
+    expect(game.pauseState!.phase).toBe('pause_proposed');
+    // A second yes is a majority; carol has not voted.
+    await game.submit({
+      kind: 'vote',
+      by: 'bob',
+      proposal: game.pauseState!.proposal!.id,
+      yes: true,
+    });
+    expect(game.pauseState!.phase).toBe('paused');
+    expect(game.gameClock.status).toBe('paused');
+  });
+
+  it('a plain host pause or resume settles any open proposal', async () => {
+    const { game } = await newGame();
+    await game.submit({ kind: 'proposePause', by: 'alice' });
+    await game.submit({ kind: 'pause' });
+    expect(game.pauseState!.phase).toBe('paused');
+    expect(game.pauseState!.proposal).toBeUndefined();
+    expect(game.gameClock.status).toBe('paused');
+
+    await game.submit({ kind: 'proposeResume', by: 'alice' });
+    expect(game.pauseState!.phase).toBe('resume_proposed');
+    await game.submit({ kind: 'resume' });
+    expect(game.pauseState!.phase).toBe('running');
+    expect(game.pauseState!.proposal).toBeUndefined();
+    expect(game.gameClock.status).toBe('running');
+    // A fresh pause proposal is accepted again.
+    await game.submit({ kind: 'proposePause', by: 'bob' });
     expect(game.pauseState!.phase).toBe('pause_proposed');
   });
 
