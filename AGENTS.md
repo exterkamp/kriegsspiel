@@ -13,6 +13,7 @@ Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a serve
 - `docs/roadmap.md`: milestones
 - `docs/order-eval.md`: golden order corpus and parser evaluation harness
 - `docs/umpire-fixtures.md`: mock umpire and how to add fixtures
+- `docs/deployment.md`: container, compose, backups and restore
 
 ## Rules of the design
 - The engine is pure and deterministic. It never reads the wall clock. It only advances to a given game time.
