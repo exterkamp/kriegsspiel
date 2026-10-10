@@ -29,7 +29,7 @@ export const OPEN_GROUND: TerrainAttrs = {
   passable: true,
 };
 
-/** A feature this concealing blocks sight through it. */
+/** A feature this concealing (a wood, a building) blocks sight through it. */
 export const BLOCKS_SIGHT = 1;
 
 /**
@@ -64,7 +64,7 @@ export const KIND_DEFAULTS: Record<FeatureKind, { layer: number; attrs: TerrainA
   ford: { layer: 4, attrs: { ...OPEN_GROUND, moveCost: 2, height: 'low' } },
   building: {
     layer: 2,
-    attrs: { moveCost: 2, cover: 0.8, concealment: 0.6, height: 'flat', passable: true },
+    attrs: { moveCost: 2, cover: 0.8, concealment: 1, height: 'flat', passable: true },
   },
 };
 

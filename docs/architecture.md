@@ -122,8 +122,8 @@ An `EngineSideView` (engine type, `viewFor`; not the protocol `SideView`, see D1
 - `side`, `time`, `mapWidth`, `mapHeight`. All lengths in a view are metres; master state is integer millimetres (D15).
 - `ownUnits`: the side's own units in full (id, name, kind, position, facing, formation, footprint, loose-formation shape, strength, morale).
 - `visibleEnemies`: enemy units in sight now, as id, position, facing, formation, footprint (rounded to the nearest 10 m, since an exact one would give the strength away), any loose shape, and a coarse `sizeEstimate` phrase. Nothing else: no strength, morale, intent or name.
-- `lastKnownContacts`: enemy units seen earlier and not in sight now, as id, the position where seen, `seenAt`, `ageMs`, `uncertaintyRadius` (metres, growing with age) and the size phrase from the sighting.
-- `reports`: contact, unit-lost and order-delivered reports whose courier delay has passed, each with kind, `observedAt`, `deliveredAt`, `ageMs`, reporting unit name, location, size phrase, confidence and template prose.
+- `lastKnownContacts`: enemy units seen earlier and not in sight now, as id, the position where seen, `facing` (coarse), `seenAt`, `ageMs`, `uncertaintyRadius` (metres, growing with age) and the size phrase from the sighting.
+- `reports`: contact, unit-lost and order-delivered reports whose courier delay has passed, each with kind, `observedAt`, `deliveredAt`, `ageMs`, reporting unit name, location, a plain-language `place` and `uncertaintyRadius`, size phrase, confidence and template prose.
 
 Adding a field means updating this list and the leak tests in `visibility.test.ts`.
 

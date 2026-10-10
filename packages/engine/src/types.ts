@@ -18,7 +18,10 @@ export interface Point {
   y: number;
 }
 
-/** Terrain height tag. Only a label for now; slopes and line-of-sight by height come later. */
+/**
+ * Terrain height tag. For sight, ground standing higher than both the observer and the target
+ * blocks the line between them (a ridge); `low` ground (water, marsh) never does.
+ */
 export const HEIGHTS = ['low', 'flat', 'rise', 'high'] as const;
 export type Height = (typeof HEIGHTS)[number];
 
@@ -200,6 +203,10 @@ export interface Report {
   /** Coarse size of the enemy force; only for contacts. */
   sizeEstimate?: string;
   confidence: 'low' | 'medium' | 'high';
+  /** Plain-language place of `location`, from the named features near it. */
+  place: string;
+  /** Radius in mm around `location` the report is good to. */
+  uncertainty: number;
   /** Enemy unit id; only for contacts. */
   subject?: string;
 }
@@ -209,6 +216,8 @@ export interface Contact {
   id: string;
   position: Point;
   seenAt: GameTime;
+  /** The facing as judged at the sighting, rounded to the nearest eighth of a turn. */
+  facing: number;
   sizeEstimate: string;
 }
 
@@ -234,6 +243,8 @@ export interface GameState {
   /** Set once, when the game ends. Nothing happens in combat or victory handlers after that. */
   outcome: Outcome | null;
   intel: Record<SideId, SideIntel>;
+  /** Weather hook: multiplies every unit's sight range (1 when absent, 0.5 in fog). */
+  sightFactor?: number;
   /** Every umpire placement ruling so far, in order. Master state only: never sent to a client. */
   rulings: Ruling[];
 }

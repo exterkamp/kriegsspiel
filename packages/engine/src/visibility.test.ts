@@ -5,6 +5,7 @@ import {
   MS_PER_MINUTE,
   advanceTo,
   canSee,
+  describePlace,
   createState,
   issueMove,
   registerCombat,
@@ -485,6 +486,7 @@ describe('uncertainty', () => {
       id: 'r',
       position: { x: 2_050_000, y: 1_550_000 },
       seenAt: 0,
+      facing: 0,
       sizeEstimate: 'about a battalion',
     });
     const young = viewFor(w, 'blue', 7 * MS_PER_MINUTE);
@@ -493,5 +495,251 @@ describe('uncertainty', () => {
     expect(v.lastKnownContacts[0]!.ageMs).toBe(180 * MS_PER_MINUTE);
     expect(v.lastKnownContacts[0]!.uncertaintyRadius).toBe(3000);
     expect(v.lastKnownContacts[0]!.position).toEqual({ x: 2050, y: 1550 });
+  });
+});
+
+const ridge = (id: string, x0: number, y0: number, x1: number, y1: number, height = 'rise') => ({
+  id,
+  kind: 'field',
+  height,
+  polygon: [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ],
+});
+
+describe('canSee over ridges and buildings', () => {
+  const pair = (
+    features:
+      ReturnType<typeof ridge>[] | Array<Record<string, unknown> & { id: string; kind: string }>,
+    bx = 400,
+    rx = 900,
+  ) =>
+    miniWorld({
+      features,
+      units: [
+        { id: 'b', x: bx, y: 550 },
+        { id: 'r', side: 'red', x: rx, y: 550 },
+      ],
+    });
+  const sees = (w: GameState) => canSee(w, unit(w, 'b'), unit(w, 'r'));
+
+  it('is blocked by a ridge between two units on flat ground, from either end', () => {
+    const w = pair([ridge('ridge', 600, 300, 700, 800)]);
+    expect(sees(w)).toBe(false);
+    expect(canSee(w, unit(w, 'r'), unit(w, 'b'))).toBe(false);
+  });
+
+  it('sees over a lower rise, and over a ridge from a unit standing on higher ground', () => {
+    expect(sees(pair([ridge('rise', 600, 300, 700, 800, 'rise')]))).toBe(false);
+    // The observer stands on a high hill: the rise between is below its eye.
+    const hill = pair([
+      ridge('hill', 300, 300, 500, 800, 'high'),
+      ridge('rise', 600, 300, 700, 800),
+    ]);
+    expect(sees(hill)).toBe(true);
+    // A high ridge still blocks a unit that stands on a mere rise.
+    const blocked = pair([
+      ridge('rise', 300, 300, 500, 800, 'rise'),
+      ridge('hill', 600, 300, 700, 800, 'high'),
+    ]);
+    expect(sees(blocked)).toBe(false);
+  });
+
+  it('sees across open ground when both units stand in low ground', () => {
+    const box = (id: string, kind: string, x0: number, x1: number) => ({
+      id,
+      kind,
+      polygon: [
+        [x0, 500],
+        [x1, 500],
+        [x1, 600],
+        [x0, 600],
+      ],
+    });
+    const w = pair([box('m1', 'marsh', 350, 450), box('m2', 'marsh', 850, 950)]);
+    expect(sees(w)).toBe(true);
+    expect(canSee(w, unit(w, 'r'), unit(w, 'b'))).toBe(true);
+    // A ford on one side, open ground on the other.
+    const f = pair([box('f', 'ford', 350, 450)]);
+    expect(sees(f)).toBe(true);
+    // A rise between low-ground units still blocks.
+    const r = pair([
+      box('m1', 'marsh', 350, 450),
+      box('m2', 'marsh', 850, 950),
+      ridge('rise', 600, 300, 700, 800),
+    ]);
+    expect(sees(r)).toBe(false);
+  });
+
+  it('is not blocked by low ground such as a marsh or a river', () => {
+    const w = pair([
+      {
+        id: 'river',
+        kind: 'river',
+        polyline: [
+          [650, 0],
+          [650, 2000],
+        ],
+        width: 100,
+      },
+      {
+        id: 'marsh',
+        kind: 'marsh',
+        polygon: [
+          [500, 400],
+          [800, 400],
+          [800, 700],
+          [500, 700],
+        ],
+      },
+    ]);
+    expect(sees(w)).toBe(true);
+  });
+
+  it('is blocked by a building in between and sees a unit beside it', () => {
+    const house = { id: 'mill', kind: 'building', at: { x: 650, y: 550 }, radius: 30 };
+    expect(sees(pair([house]))).toBe(false);
+    const w = miniWorld({
+      features: [house],
+      units: [
+        { id: 'b', x: 400, y: 700 },
+        { id: 'r', side: 'red', x: 900, y: 700 },
+      ],
+    });
+    expect(sees(w)).toBe(true);
+  });
+
+  it('hides a unit inside a building beyond 200 m', () => {
+    const house = { id: 'mill', kind: 'building', at: { x: 900, y: 550 }, radius: 30 };
+    expect(sees(pair([house]))).toBe(false);
+    expect(sees(pair([house], 750, 900))).toBe(true);
+  });
+
+  it('is not blocked by a ridge the line only touches at a corner', () => {
+    // A diamond whose western corner is exactly on the line y=550 at x=650.
+    const diamond = {
+      id: 'rise',
+      kind: 'field',
+      height: 'rise',
+      polygon: [
+        [650, 550],
+        [750, 650],
+        [650, 750],
+        [550, 650],
+      ],
+    };
+    const w = pair([diamond]);
+    expect(sees(w)).toBe(true);
+  });
+
+  it('shortens sight range by the weather factor', () => {
+    const w = pair([], 400, 900);
+    expect(sees(w)).toBe(true);
+    expect(sees({ ...w, sightFactor: 0.5 })).toBe(false);
+  });
+});
+
+describe('contacts keep a coarse facing', () => {
+  it('records the facing rounded to an eighth of a turn, and not the exact bearing', () => {
+    const w = world([
+      ['b', 'blue', 5, 5],
+      ['r', 'red', 8, 5],
+    ]);
+    unit(w, 'r').facing = 1.0; // 57.3 degrees: nearest eighth is 45 degrees
+    const s = advanceTo(startVisibility(createState(1, w, 0)), 0, registry()).state;
+    expect(s.world.intel.blue.contacts[0]!.facing).toBeCloseTo(Math.PI / 4, 9);
+    unit(s.world, 'r').facing = 6.2; // just under a full turn: wraps to north
+    const wrapped = advanceTo(s, MS_PER_MINUTE, registry()).state;
+    expect(wrapped.world.intel.blue.contacts[0]!.facing).toBe(0);
+  });
+
+  it('shows the facing on a last-known contact, with nothing else about the enemy', () => {
+    const w = world([['b', 'blue', 5, 5]]);
+    w.intel.blue.contacts.push({
+      id: 'r',
+      position: { x: 2_050_000, y: 1_550_000 },
+      seenAt: 0,
+      facing: Math.PI / 2,
+      sizeEstimate: 'about a battalion',
+    });
+    const c = viewFor(w, 'blue', 3 * MS_PER_MINUTE).lastKnownContacts[0]!;
+    expect(c.facing).toBe(Math.PI / 2);
+    expect(Object.keys(c).sort()).toEqual([
+      'ageMs',
+      'facing',
+      'id',
+      'position',
+      'seenAt',
+      'sizeEstimate',
+      'uncertaintyRadius',
+    ]);
+  });
+});
+
+describe('places in reports', () => {
+  const mill = {
+    id: 'mill',
+    kind: 'building',
+    name: 'the mill',
+    at: { x: 1500, y: 1000 },
+    radius: 20,
+  };
+  const road = {
+    id: 'rd',
+    kind: 'road',
+    name: 'The road',
+    polyline: [
+      [1400, 0],
+      [1400, 2000],
+    ],
+    width: 10,
+  };
+  const map = () => miniWorld({ features: [mill, road], units: [{ id: 'b', x: 100, y: 100 }] }).map;
+
+  it('describes a point by the nearest landmark and the side of the road', () => {
+    expect(describePlace(map(), { x: 1_560_000, y: 1_050_000 })).toBe(
+      'near the mill, east of the road',
+    );
+    expect(describePlace(map(), { x: 1_300_000, y: 1_000_000 })).toBe(
+      'near the mill, west of the road',
+    );
+  });
+
+  it('says on the road, and falls back to a bearing from the nearest named feature', () => {
+    expect(describePlace(map(), { x: 1_400_000, y: 300_000 })).toBe('on the road');
+    expect(describePlace(map(), { x: 2_900_000, y: 1_900_000 })).toBe('1500 m east of the road');
+    expect(
+      describePlace(miniWorld({ units: [{ id: 'b', x: 100, y: 100 }] }).map, { x: 5, y: 5 }),
+    ).toBe('in open country');
+  });
+
+  it('puts a place and an uncertainty radius on a contact report, with no coordinates', () => {
+    const w = miniWorld({
+      features: [mill, road],
+      units: [
+        { id: 'b', x: 1000, y: 1000 },
+        { id: 'r', side: 'red', x: 1500, y: 1050 },
+      ],
+    });
+    let s = startVisibility(createState(1, w, 0));
+    s = advanceTo(s, COURIER_DELAY_MS, registry()).state;
+    const [r] = viewFor(s.world, 'blue', s.time).reports;
+    expect(r).toMatchObject({ place: 'near the mill, east of the road', uncertaintyRadius: 60 });
+    expect(r!.text).toBe(
+      'Unit b sighted about a battalion near the mill, east of the road, 10 min ago (medium confidence).',
+    );
+    expect(r!.text).not.toMatch(/\d+, \d+/);
+  });
+
+  it('has no grid or cell concept in the view', () => {
+    const w = world([
+      ['b', 'blue', 5, 5],
+      ['r', 'red', 8, 5],
+    ]);
+    const json = JSON.stringify(viewFor(w, 'blue'));
+    expect(json).not.toMatch(/"(cell|tile|grid|col|row)s?"/i);
   });
 });

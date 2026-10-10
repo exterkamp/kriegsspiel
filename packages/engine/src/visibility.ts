@@ -2,6 +2,7 @@ import type { EventRegistry, NewEvent } from './events.js';
 import { schedule } from './queue.js';
 import type { EngineState } from './events.js';
 import { distance, metres } from './geometry.js';
+import { describePlace } from './place.js';
 import { BLOCKS_SIGHT, profileAlong, terrainAt } from './terrain.js';
 import {
   MS_PER_MINUTE,
@@ -9,6 +10,7 @@ import {
   type Formation,
   type GameState,
   type GameTime,
+  type Height,
   type Point,
   type Report,
   type SideId,
@@ -46,6 +48,9 @@ const COVERED_RANGE_MM = 200_000;
 /** How far, in mm, a contact's possible position spreads per minute of age (100 m). */
 export const UNCERTAINTY_MM_PER_MINUTE = 100_000;
 
+/** A sighting report is good to a tenth of the range, but never tighter than 20 m. */
+const MIN_REPORT_UNCERTAINTY_MM = 20_000;
+
 /** How often (game time) the engine rescans who sees whom. */
 export const SCAN_INTERVAL_MS = MS_PER_MINUTE;
 
@@ -59,21 +64,44 @@ function concealedAt(world: GameState, p: Point): boolean {
   return (terrainAt(world.map, p)?.attrs.concealment ?? 0) >= BLOCKS_SIGHT;
 }
 
+const HEIGHT_RANK: Record<Height, number> = { low: -1, flat: 0, rise: 1, high: 2 };
+
+function rankAt(world: GameState, p: Point): number {
+  return HEIGHT_RANK[terrainAt(world.map, p)?.attrs.height ?? 'flat'];
+}
+
+/** Sight range in mm for a unit kind, after the weather hook. */
+export function sightRangeMm(world: GameState, kind: UnitKind): number {
+  return SIGHT_RANGE_MM[kind] * (world.sightFactor ?? 1);
+}
+
+/** Round a bearing to the nearest eighth of a turn, in [0, 2 pi): all a watcher can judge. */
+const coarseFacing = (f: number): number => {
+  const step = Math.PI / 4;
+  const n = ((Math.round(f / step) % 8) + 8) % 8;
+  return n * step;
+};
+
 /**
- * Whether `observer` can see `target`: within sight range, no sight-blocking ground (a
- * wood) on the straight line between them, and a unit in or looking from a wood only
- * within 200 m. Facing does not matter yet.
+ * Whether `observer` can see `target`: within sight range (unit kind and weather), and on
+ * the straight line between them no sight-blocking ground (a wood, a building) and no ground
+ * higher than both of them (a ridge). A unit in or looking from a wood or building sees and
+ * is seen only within 200 m. Facing does not matter yet.
  */
 export function canSee(world: GameState, observer: Unit, target: Unit): boolean {
   const a = observer.center;
   const b = target.center;
   const dist = distance(a, b);
-  if (dist > SIGHT_RANGE_MM[observer.kind]) return false;
+  if (dist > sightRangeMm(world, observer.kind)) return false;
   if (concealedAt(world, a) || concealedAt(world, b)) return dist <= COVERED_RANGE_MM;
   // Walk the line from a canonical endpoint so sight is symmetric.
   const [p, q] = a.y < b.y || (a.y === b.y && a.x <= b.x) ? [a, b] : [b, a];
+  // Only rise/high ground can block, so low-lying observers still see across flat ground.
+  const eye = Math.max(0, rankAt(world, a), rankAt(world, b));
   return !profileAlong(world.map, p, q).some(
-    (piece) => piece.attrs.concealment >= BLOCKS_SIGHT && piece.length > 0,
+    (piece) =>
+      piece.length > 0 &&
+      (piece.attrs.concealment >= BLOCKS_SIGHT || HEIGHT_RANK[piece.attrs.height] > eye),
   );
 }
 
@@ -125,6 +153,8 @@ export interface ViewContact {
   id: string;
   /** Where it was when seen, not where it is. Metres. */
   position: Point;
+  /** Which way it faced when seen, to the nearest eighth of a turn. A guess once it has moved. */
+  facing: number;
   seenAt: GameTime;
   ageMs: number;
   /** Radius in metres it may have moved since (grows with age). */
@@ -142,6 +172,10 @@ export interface ViewReport {
   from: string;
   /** Metres. */
   location: Point;
+  /** Plain-language place, such as "near the mill, east of the road". */
+  place: string;
+  /** Metres: the report puts the thing within this radius of `location`. */
+  uncertaintyRadius: number;
   sizeEstimate?: string;
   confidence: Report['confidence'];
   text: string;
@@ -167,15 +201,15 @@ export interface EngineSideView {
 /** Plain template prose for a report. The LLM replaces this later. */
 export function renderReport(r: Report, ageMs: number): string {
   const mins = Math.round(ageMs / MS_PER_MINUTE);
-  const where = `(${Math.round(metres(r.location.x))}, ${Math.round(metres(r.location.y))} m)`;
+  const where = r.place;
   const when = `${mins} min ago`;
   switch (r.kind) {
     case 'contact':
-      return `${r.from} sighted ${r.sizeEstimate ?? 'enemy troops'} at ${where}, ${when} (${r.confidence} confidence).`;
+      return `${r.from} sighted ${r.sizeEstimate ?? 'enemy troops'} ${where}, ${when} (${r.confidence} confidence).`;
     case 'unitLost':
-      return `${r.from} is lost near ${where}, ${when}.`;
+      return `${r.from} is lost ${where}, ${when}.`;
     case 'orderDelivered':
-      return `${r.from} received its orders at ${where}, ${when}.`;
+      return `${r.from} received its orders ${where}, ${when}.`;
   }
 }
 
@@ -228,6 +262,7 @@ export function viewFor(
         return {
           id: c.id,
           position: viewPoint(c.position),
+          facing: c.facing,
           seenAt: c.seenAt,
           ageMs,
           uncertaintyRadius: metres(
@@ -251,6 +286,8 @@ export function viewFor(
           ageMs,
           from: r.from,
           location: viewPoint(r.location),
+          place: r.place,
+          uncertaintyRadius: metres(r.uncertainty),
           ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
           confidence: r.confidence,
           text: renderReport(r, ageMs),
@@ -279,6 +316,7 @@ function scan(world: GameState, time: GameTime): GameState {
       contacts.set(u.id, {
         id: u.id,
         position: { ...u.center },
+        facing: coarseFacing(u.facing),
         seenAt: time,
         sizeEstimate: sizeEstimate(u.strength),
       });
@@ -292,8 +330,10 @@ function scan(world: GameState, time: GameTime): GameState {
         deliverAt: time + COURIER_DELAY_MS,
         from: observer.name,
         location: { ...u.center },
+        place: describePlace(w.map, u.center),
+        uncertainty: Math.max(MIN_REPORT_UNCERTAINTY_MM, Math.ceil(dist / 10 / 10_000) * 10_000),
         sizeEstimate: sizeEstimate(u.strength),
-        confidence: dist <= SIGHT_RANGE_MM[observer.kind] / 2 ? 'high' : 'medium',
+        confidence: dist <= sightRangeMm(w, observer.kind) / 2 ? 'high' : 'medium',
         subject: u.id,
       });
     }
@@ -332,6 +372,8 @@ export function registerVisibility(registry: EventRegistry<GameState>): void {
       deliverAt: ev.time + COURIER_DELAY_MS,
       from: unit.name,
       location: { ...unit.center },
+      place: describePlace(world.map, unit.center),
+      uncertainty: 0,
       confidence: 'high',
     };
     return {
