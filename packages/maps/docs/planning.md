@@ -332,3 +332,25 @@ thirteenth. The asymmetric 30° outward-tangent regression passes; inward and
 backtracking connectors reject. These are source-only probes, separate from the
 focused package suite. No root checks or browser/settlement acceptance were run
 by this implementer; the coordinator owns final checkpoint acceptance.
+
+## Reusable composition certificates
+
+`createPlanningCertificates(input)` constructs one private terrain/water index and
+returns bounded `footprint`, `roadSegment`, `directionalGrade` and `bridge`
+methods, plus metered `heightAt`/`gradientAt` queries and cumulative `work`.
+Methods delegate the same accepted numerical validators; they add no second
+surface or geometry policy. Query samples, water, settings, bounds and grid
+metadata are detached from caller changes. Every check, including failed checks,
+shares one aggregate validation budget. Composition must retain this instance
+through its local-layout attempts rather than reset it for each building or retry.
+The returned callable object is an implementation context, never canonical asset
+data. Invalid schemas/callback arguments throw; expected resource exhaustion uses
+the existing typed planning diagnostics.
+
+The coordinator’s default10km flat-ground probe took820ms for ten standalone
+footprint calls, versus148ms including initialization with one reusable context.
+Separate fresh processes observed178MiB and111MiB peak RSS respectively. These
+are small context-reuse observations, not full composition/performance acceptance.
+Four focused regressions cover numerical parity, detached mutation, exact shared
+exhaustion across repeated failures and zero getter invocation. Integration and
+independent review are recorded in the execution log.

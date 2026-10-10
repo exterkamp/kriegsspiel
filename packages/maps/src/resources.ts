@@ -46,6 +46,7 @@ export function preflightAsset(
   input: unknown,
   limits: ImportLimits,
   chargeNode?: () => void,
+  chargeDescriptor?: () => void,
 ): ResourceUsage {
   const usage = { bytes: 0, samples: 0, sampleValues: 0, features: 0, vertices: 0, nodes: 0 };
   const active = new WeakSet<object>();
@@ -117,11 +118,13 @@ export function preflightAsset(
           Number(key) >= value.length
         )
           fail(path, 'Arrays cannot carry named, hidden or symbol properties');
+        chargeDescriptor?.();
         const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
         if (!descriptor.enumerable || !('value' in descriptor))
           fail(`${path}[${key}]`, 'Hidden/accessor arrays are not JSON data');
       }
       for (let i = 0; i < value.length; i++) {
+        chargeDescriptor?.();
         const descriptor = Object.getOwnPropertyDescriptor(value, String(i));
         if (!descriptor || !('value' in descriptor))
           fail(`${path}[${i}]`, 'Sparse/accessor arrays are not JSON data');
@@ -137,6 +140,7 @@ export function preflightAsset(
         fail(path, 'Expected plain JSON object');
       for (const key of Reflect.ownKeys(value)) {
         if (typeof key !== 'string') fail(path, 'Symbol properties are not JSON data');
+        chargeDescriptor?.();
         const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
         if (!descriptor.enumerable || !('value' in descriptor))
           fail(`${path}.${key}`, 'Hidden/accessor properties are not JSON data');
@@ -144,6 +148,7 @@ export function preflightAsset(
       const keys = Object.keys(value);
       addBytes(keys.length + 2, path);
       for (const key of keys) {
+        chargeDescriptor?.();
         const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
         if (!('value' in descriptor))
           fail(`${path}.${key}`, 'Accessor properties are not JSON data');

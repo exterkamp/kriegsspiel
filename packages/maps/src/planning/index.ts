@@ -32,3 +32,4 @@ export { certifyFootprint, certifyRoadSegment, directionalGrade } from './certif
 export { certifyBridge } from './bridges.js';
 export { validatePlanning, validateRoadPath } from './validation.js';
 export { reconcileLocalJoins } from './reconcile.js';
+export { createPlanningCertificates, type PlanningCertificates } from './session.js';
