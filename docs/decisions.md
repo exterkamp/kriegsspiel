@@ -119,3 +119,9 @@ Retry, backoff, the per-attempt timeout and schema validation stay in `ProviderU
 **Why.** Local judging and mixed setups (small local parser, cloud narrator) should be a config change, with no change to stage code.
 **Open.** Prices exist only for Claude models, so local calls have `costUsd: null` and count against the token budget only. The budget is per process and in memory (it resets on restart) and can overshoot by the calls in flight. There is no streaming. Tool-use is a flag only; nothing uses it yet. The Gemma 4 tag is whatever the local server serves; the live test needs a pulled model.
 **See.** [llm-providers.md](llm-providers.md), [architecture.md](architecture.md)
+
+## Debug trace store (story 8.1, #120)
+
+**Decision.** Tracing is an injected `TraceSink`; a no-op sink is the default so the disabled admin view has zero overhead. Correlation ids travel by `AsyncLocalStorage` rather than being threaded through every signature. Redaction happens inside the store, so no producer can forget it. Details in `docs/architecture.md` (Debug trace).
+
+**Open.** HTTP and WebSocket transports do not exist yet; they should wrap each request in `traceRequest`. The composition root still has to construct the `TraceStore` from config (size, file path, the API key as a registered secret) and wrap the live umpire client with `traceUmpire`.

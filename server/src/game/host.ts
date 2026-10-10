@@ -10,6 +10,7 @@ import {
 import { GameClock, type WallClock } from '../clock.js';
 import type { OrderParser } from '../orders/index.js';
 import { GameActor, type GameActorOptions, type Timers } from './actor.js';
+import type { TraceSink } from '../debug/trace.js';
 import type { GameStore } from './store.js';
 
 export interface GameHostOptions {
@@ -22,6 +23,7 @@ export interface GameHostOptions {
   onUpdate?: (gameId: string) => void;
   /** Applied to a new game's state before it starts, e.g. to queue its first scheduled events. */
   init?: (state: EngineState<GameState>) => EngineState<GameState>;
+  trace?: TraceSink;
   onError?: (gameId: string, error: unknown) => void;
   /** Events the engine emitted for a game, in firing order. */
   onEmitted?: (gameId: string, events: EmittedEvent[]) => void;
@@ -52,6 +54,7 @@ export class GameHost {
       store: o.store,
       timers: o.timers,
       onUpdate: () => o.onUpdate?.(id),
+      trace: o.trace,
       onError: (e) => o.onError?.(id, e),
       onEmitted: (events) => o.onEmitted?.(id, events),
     };

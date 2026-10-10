@@ -1,5 +1,6 @@
 import { Ajv } from 'ajv';
 import type { ValidateFunction } from 'ajv';
+import { stable } from './stable.js';
 import { UmpireError } from './umpireClient.js';
 import type {
   UmpireCallRecord,
@@ -7,14 +8,6 @@ import type {
   UmpireRequest,
   UmpireResponse,
 } from './umpireClient.js';
-
-function stable(value: unknown): string {
-  return JSON.stringify(value, (_k, v: unknown) =>
-    v && typeof v === 'object' && !Array.isArray(v)
-      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1)))
-      : v,
-  );
-}
 
 const keyOf = (r: { stage: string; promptVersion: string; input: unknown }) =>
   `${r.stage}\u0000${r.promptVersion}\u0000${stable(r.input)}`;
