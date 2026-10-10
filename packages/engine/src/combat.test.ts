@@ -18,6 +18,7 @@ import {
   type EngineState,
   type GameState,
 } from './index.js';
+import { evaluateVictory } from './combat.js';
 
 type RawUnit = {
   id: string;
@@ -241,6 +242,23 @@ describe('attack orders', () => {
     expect(unit(state, 'red-1').position.y).toBeLessThan(4);
   });
 
+  it('follows a target that walks away after contact was made', () => {
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 0, y: 4 },
+      { id: 'red-1', side: 'red', x: 6, y: 4 },
+    ]);
+    s = issueAttack(s, 'red-1', 'blue-1');
+    const stopped = run(s, 12);
+    expect(unit(stopped.state, 'red-1').position).toEqual({ x: 2, y: 4 });
+    expect(ofType(stopped.emitted, 'contact.begin')).toHaveLength(1);
+    // Blue now marches off; red must give chase and catch it up again.
+    const moved = run(issueMove(stopped.state, 'blue-1', { x: 0, y: 0 }), 5);
+    expect(unit(moved.state, 'red-1').position.y).toBeLessThan(4);
+    expect(unit(moved.state, 'red-1').intent.kind).toBe('attack');
+    expect(ofType(moved.emitted, 'contact.end').length).toBeGreaterThan(0);
+    expect(ofType(moved.emitted, 'contact.begin').length).toBeGreaterThan(0);
+  });
+
   it('rejects bad orders without side effects', () => {
     let s = field(duel);
     s = issueAttack(s, 'ghost', 'red-1');
@@ -250,6 +268,29 @@ describe('attack orders', () => {
     expect(
       ofType(emitted, 'order.rejected').map((e) => (e.payload as { reason: string }).reason),
     ).toEqual(['unknown unit', 'unknown target', 'target is friendly']);
+  });
+});
+
+describe('fire', () => {
+  it('a shaken shooter does less damage than a steady one on the same die', () => {
+    const firstShot = (morale: number) => {
+      const { emitted } = run(
+        field([
+          { id: 'blue-1', side: 'blue', x: 1, y: 4 },
+          { id: 'red-1', side: 'red', x: 2, y: 4, morale },
+        ]),
+        3,
+      );
+      return ofType(emitted, 'combat.fire').find(
+        (e) => (e.payload as { attacker: string }).attacker === 'red-1',
+      )!.payload as { die: number; casualties: number };
+    };
+    const steady = firstShot(100);
+    const shaken = firstShot(30);
+    expect(shaken.die).toBe(steady.die);
+    expect(shaken.casualties).toBeLessThan(steady.casualties);
+    // 0.5 + morale / 200: 0.65 against 1.0.
+    expect(shaken.casualties / steady.casualties).toBeCloseTo(0.65, 1);
   });
 });
 
@@ -373,6 +414,42 @@ describe('victory conditions', () => {
       10,
     );
     expect(ofType(emitted, 'game.end')[0]!.payload).toEqual({ winner: 'red', reason: 'withdrawn' });
+  });
+
+  it('a side already past its hold time fires the deadline at once instead of throwing', () => {
+    const g = loadScenario(holdTheBridge);
+    const late = createState(g.seed, g, g.victory.holdMs + MS_PER_MINUTE);
+    const { emitted } = run(startGame(late), 1);
+    expect(ofType(emitted, 'game.end')[0]!.payload).toEqual({
+      winner: g.victory.defender,
+      reason: 'objective-held',
+    });
+  });
+
+  it('when both sides are out together, nobody wins and the reason is the weaker one', () => {
+    const base = field([
+      { id: 'blue-1', side: 'blue', x: 0, y: 0 },
+      { id: 'red-1', side: 'red', x: 9, y: 4 },
+    ]).world;
+    const set = (blue: 'destroyed' | 'withdrawn', red: 'destroyed' | 'withdrawn'): GameState => ({
+      ...base,
+      units: base.units.map((u) => ({ ...u, status: u.side === 'blue' ? blue : red })),
+    });
+    expect(evaluateVictory(set('destroyed', 'destroyed'), 5)).toEqual({
+      winner: null,
+      reason: 'eliminated',
+      time: 5,
+    });
+    expect(evaluateVictory(set('destroyed', 'withdrawn'), 5)).toEqual({
+      winner: null,
+      reason: 'withdrawn',
+      time: 5,
+    });
+    expect(evaluateVictory(set('withdrawn', 'withdrawn'), 5)).toMatchObject({
+      winner: null,
+      reason: 'withdrawn',
+    });
+    expect(evaluateVictory(base, 5)).toBeNull();
   });
 
   it('ends the game once: later events do nothing', () => {

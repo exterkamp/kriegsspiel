@@ -64,12 +64,13 @@ export function issueAttack(
 
 /**
  * Arm the victory clock and look for contact at the current time. Call once on a
- * freshly created state, before the first `advanceTo`.
+ * freshly created state, before the first `advanceTo`. If the clock is already past
+ * the hold time (a restored state, a very short hold) the deadline fires at once.
  */
 export function startGame(state: EngineState<GameState>): EngineState<GameState> {
   return schedule(state, [
     { time: state.time, type: COMBAT_CHECK_EVENT },
-    { time: state.world.victory.holdMs, type: VICTORY_DEADLINE_EVENT },
+    { time: Math.max(state.time, state.world.victory.holdMs), type: VICTORY_DEADLINE_EVENT },
   ]);
 }
 
@@ -96,8 +97,8 @@ function sideOut(world: GameState, side: SideId): 'eliminated' | 'withdrawn' | n
   return mine.every((u) => u.status === 'destroyed') ? 'eliminated' : 'withdrawn';
 }
 
-/** The result of the game as of `time`, or null if it goes on. */
-function evaluateVictory(world: GameState, time: number): Outcome | null {
+/** The result of the game as of `time`, or null if it goes on. Exported for tests only. */
+export function evaluateVictory(world: GameState, time: number): Outcome | null {
   const { attacker, objective } = world.victory;
   const out = new Map<SideId, 'eliminated' | 'withdrawn'>();
   for (const s of world.sides) {
@@ -186,6 +187,14 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     const unit = world.units.find((u) => u.id === unitId);
     if (!unit) return rejectOrder(world, unitId, 'unknown unit');
     if (unit.status !== 'active') return rejectOrder(world, unitId, 'unit not active');
+    // Several checks at one instant may each ask for a re-plan; the first one is enough.
+    if (
+      unit.intent.kind === 'attack' &&
+      unit.intent.target === targetId &&
+      unit.intent.startedAt === ev.time
+    ) {
+      return { world };
+    }
     const target = world.units.find((u) => u.id === targetId);
     if (!target) return rejectOrder(world, unitId, 'unknown target');
     if (target.side === unit.side) return rejectOrder(world, unitId, 'target is friendly');
@@ -203,7 +212,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
                   intent: {
                     kind: 'attack' as const,
                     target: targetId,
-                    to: { ...target.position },
+                    to: { ...u.position },
                     startedAt: ev.time,
                   },
                 }
@@ -221,12 +230,27 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     if (world.outcome) return { world };
     const outcome = evaluateVictory(world, ev.time);
     if (outcome) return finish(world, outcome);
-    if (world.combatActive) return { world };
+    // An attacker that stopped in reach (its `to` is where it stands) and whose target
+    // has since moved out of reach gives chase again.
+    const chase: NewEvent[] = [];
+    for (const u of activeUnits(world)) {
+      if (u.intent.kind !== 'attack') continue;
+      if (u.intent.to.x !== u.position.x || u.intent.to.y !== u.position.y) continue;
+      const foe = world.units.find((x) => x.id === (u.intent as { target: string }).target);
+      if (foe && foe.status === 'active' && !canReach(u, foe)) {
+        chase.push({
+          time: ev.time,
+          type: ATTACK_INTENT_EVENT,
+          payload: { unitId: u.id, target: foe.id },
+        });
+      }
+    }
+    if (world.combatActive) return { world, schedule: chase };
     const pairs = contactPairs(world);
-    if (pairs.length === 0) return { world };
+    if (pairs.length === 0) return { world, schedule: chase };
     return {
       world: { ...world, time: ev.time, combatActive: true },
-      schedule: [{ time: ev.time + COMBAT_TICK_MS, type: COMBAT_TICK_EVENT }],
+      schedule: [{ time: ev.time + COMBAT_TICK_MS, type: COMBAT_TICK_EVENT }, ...chase],
       emit: [
         {
           type: 'contact.begin',

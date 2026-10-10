@@ -316,7 +316,12 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
       }
       const arrived = rest.length === 2;
       if (canReach({ ...unit, position }, foe)) {
-        return { world: updateUnit(world, p.unitId, { position }, ev.time), schedule: [check] };
+        // In reach: stop here. `to` becomes the stopping tile, so the unit counts as
+        // stopped and \`combat.check\` re-plans it if the foe later walks out of reach.
+        return {
+          world: updateUnit(world, p.unitId, { position, intent: { ...i, to: position } }, ev.time),
+          schedule: [check],
+        };
       }
       if (arrived) {
         // The foe moved on; plan a fresh march toward where it is now.
