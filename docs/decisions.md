@@ -58,6 +58,12 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Open.** A new order replans from the last completed tile, so progress on the tile being entered is lost (re-issuing an order more often than a tile takes would pin a unit in place); carrying over an unchanged first step is future work. A* uses a linear open-list scan, which is fine for small maps; switch to a binary heap if maps or order bursts grow. Units may share tiles for now (no collision or stacking rules yet). Diagonal moves, slopes and pace (march/quick/forced) are not modelled. Rates are a first pass, not the 1824 movement table.
 **See.** [architecture.md](architecture.md)
 
+## D11: Visibility is a pure filter over per-side intel
+**Decision.** `viewFor(world, side, now)` in `packages/engine/src/visibility.ts` is the only function that turns master state into a `SideView`. A unit sees an enemy within its sight range (infantry and artillery 6 tiles, cavalry 8) when no wood tile lies on the Bresenham line between them; a unit in or looking from a wood sees or is seen only within 2 tiles. A repeating `intel.scan` event (every game minute) records sightings in `GameState.intel[side]` (last-known contacts and reports), and files a contact report the first time an enemy comes into sight. `intel.report` events file unit-lost and order-delivered reports. Every report is delivered `COURIER_DELAY_MS` (10 game minutes) after it happened, and the view shows it with its age. Enemy size is a coarse phrase, never a number. Last-known contacts show the position where the enemy was seen, its age, and an uncertainty radius in tiles that grows one tile per minute of age.
+**Why.** Keeping memory in state makes stale contacts replayable, and one filter function makes the leak tests meaningful.
+**Open.** The engine `SideView` is not yet mapped to the protocol `SideView` (no clock, dispatches or supply). The courier delay is a flat constant, not distance to HQ. Sight ignores facing, weather and night. Contacts are not dropped after a long time.
+**See.** [architecture.md](architecture.md)
+
 ## Open questions
 - Default clock ratio (decide after the first scenario).
 - Command level and default hierarchy (assumptions above).

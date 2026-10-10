@@ -104,7 +104,19 @@ running ──request──► pause_proposed ──all humans yes──► paus
 
 - **Engine** (`packages/engine`): pure, deterministic, no network or clock access. Map, units, orders-as-intents, movement (A* paths played out as per-tile step events, see D10), line of sight, combat, morale, supply, seeded RNG, and `advanceTo(t)`. Fully unit-tested.
 - **Umpire service**: wraps the LLM with strict JSON schemas (tool use / structured outputs). Stages: `parseOrders`, `judge`, `narrate`, plus the staff-check, staff-conference and deputy calls. Prompts are versioned files. Results are recorded.
-- **Visibility service**: from master state and a side, produces that side's knowledge: seen units, stale contact reports, received messages. The *only* path from master state to a client.
+- **Visibility service**: from master state and a side, produces that side's knowledge: seen units, stale contact reports, received messages. The *only* path from master state to a client. See D11.
+
+### SideView contents
+
+A `SideView` (engine type, `viewFor`) may contain only:
+
+- `side`, `time`, `mapWidth`, `mapHeight`.
+- `ownUnits`: the side's own units in full (id, name, kind, position, strength, morale).
+- `visibleEnemies`: enemy units in sight now, as id, position and a coarse `sizeEstimate` phrase. Nothing else: no strength, morale, facing, intent or name.
+- `lastKnownContacts`: enemy units seen earlier and not in sight now, as id, the position where seen, `seenAt`, `ageMs`, `uncertaintyTiles` and the size phrase from the sighting.
+- `reports`: contact, unit-lost and order-delivered reports whose courier delay has passed, each with kind, `observedAt`, `deliveredAt`, `ageMs`, reporting unit name, location, size phrase, confidence and template prose.
+
+Adding a field means updating this list and the leak tests in `visibility.test.ts`.
 - **Clock and scheduler** (server): the `ClockState`, the scheduler, and pause voting.
 - **Notifier**: pushes dispatch arrivals and clock events over WebSocket, plus email or web push for players who are away. Players set thresholds (all dispatches, urgent only, contact only).
 - **Persistence**: an append-only event log of *inputs* (commands, clock changes, votes, LLM outputs, seeds), plus periodic snapshots for quick recovery. Stores the model, prompt version and raw output of each LLM call.

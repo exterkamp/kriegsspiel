@@ -22,3 +22,14 @@ export {
   stepDuration,
 } from './movement.js';
 export type { Path } from './movement.js';
+export {
+  COURIER_DELAY_MS,
+  SCAN_INTERVAL_MS,
+  SIGHT_RANGE,
+  canSee,
+  registerVisibility,
+  startVisibility,
+  viewFor,
+  renderReport,
+} from './visibility.js';
+export type { SideView, ViewUnit, ViewEnemy, ViewContact, ViewReport } from './visibility.js';
