@@ -50,7 +50,9 @@ export const fixtureCapabilities = immutable(
   Object.fromEntries(
     features.map((feature) => [
       feature,
-      ['read-snapshot', 'public-artwork', 'clock-mode', 'barrier-state'].includes(feature)
+      ['read-snapshot', 'public-artwork', 'clock-mode', 'barrier-state', 'personal-marks'].includes(
+        feature,
+      )
         ? { state: 'fixture', evidence: 'Explicit local demonstration; no live server' }
         : { state: 'unavailable', reason: 'Awaiting an accepted service or persistence contract' },
     ]),

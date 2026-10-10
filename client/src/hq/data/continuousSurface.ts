@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { TableScene } from '../../table/TableScene.js';
-import type { BaseMap, SceneState } from '../../table/types.js';
+import type { BaseMap, SceneMark, SceneState } from '../../table/types.js';
 import type {
   CameraBookmark,
   MapPresentation,
   MapSurface,
+  PersonalMark,
   Operation,
   Pick,
   PointM,
@@ -23,6 +24,36 @@ const publicMap: BaseMap = {
 const finitePoint = (p: PointM) => Number.isFinite(p.x) && Number.isFinite(p.y);
 export const inArtwork = (p: PointM): boolean =>
   finitePoint(p) && p.x >= 0 && p.y >= 0 && p.x <= demoArtwork.widthM && p.y <= demoArtwork.heightM;
+
+/** Strip private provenance/scope after presentation validation; renderer receives geometry only. */
+function renderMark(mark: PersonalMark): SceneMark {
+  const common = { id: mark.id, label: mark.label };
+  const geometry = mark.geometry;
+  switch (geometry.kind) {
+    case 'pin':
+      return { ...common, geometry: { kind: 'pin', at: { ...geometry.at } } };
+    case 'polyline':
+      return {
+        ...common,
+        geometry: { kind: 'polyline', points: geometry.points.map((point) => ({ ...point })) },
+      };
+    case 'arrow':
+      return {
+        ...common,
+        geometry: { kind: 'arrow', points: geometry.points.map((point) => ({ ...point })) },
+      };
+    case 'ring':
+      return {
+        ...common,
+        geometry: { kind: 'ring', centre: { ...geometry.centre }, radiusM: geometry.radiusM },
+      };
+    case 'symbol':
+      return {
+        ...common,
+        geometry: { kind: 'symbol', at: { ...geometry.at }, symbol: geometry.symbol },
+      };
+  }
+}
 
 /** Public-art fixture surface using the accepted continuous metre renderer. */
 export class ContinuousSurface implements MapSurface {
@@ -106,6 +137,7 @@ export class ContinuousSurface implements MapSurface {
     const state: SceneState = {
       side: this.scope.sideId,
       map: publicMap,
+      marks: p.marks.map(renderMark),
       own: p.pieces
         .filter((piece) => piece.relationship === 'own')
         .map((piece) => ({
@@ -166,6 +198,7 @@ export class ContinuousSurface implements MapSurface {
       const image = old ? null : await this.loadImage(op.signal);
       if (this.disposed || op.signal.aborted) return failure('aborted', 'Table update cancelled.');
       this.table.apply(state, image ?? undefined);
+      if (this.disposed) return failure('disposed', 'The table is closed.');
       this.presentation = immutable(structuredClone(p));
       if (this.settled === 'table' && !this.transitionCancel) this.setActive(true);
       return success(undefined);

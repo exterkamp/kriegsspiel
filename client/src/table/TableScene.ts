@@ -6,6 +6,7 @@ import { mapToWorld, pickFromRay, pickMinSize, rayToMap, type PickResult } from 
 import { facingToRotationY, fitDistance } from './framing.js';
 import { createDressing, positionDressing } from './dressing.js';
 import { ghostOpacity, tagLines } from './tagText.js';
+import { createMarkGroup, markSignature, validateSceneMarks } from './marks.js';
 import type { BaseMap, GhostPiece, OwnPiece, SceneState } from './types.js';
 
 const SIDE_COLOURS: Record<string, number> = { blue: 0x2f55a4, red: 0xa83232 };
@@ -40,6 +41,11 @@ interface PieceObject {
   tagSignature: string;
 }
 
+interface MarkObject {
+  group: THREE.Group;
+  signature: string;
+}
+
 /** Owns a continuous metre scene. Replacements are prepared before the commit. */
 export class TableScene {
   readonly scene = new THREE.Scene();
@@ -52,11 +58,24 @@ export class TableScene {
   private tableMesh: THREE.Mesh | undefined;
   private pieces = new Map<string, PieceObject>();
   private piecesRoot = new THREE.Group();
+  private marks = new Map<string, MarkObject>();
+  private marksRoot = new THREE.Group();
   private dressing: THREE.Group | undefined;
   private artworkImage: HTMLImageElement | undefined;
   private raf = 0;
   private renderGeneration = 0;
   private disposed = false;
+  // Record before dispatching Three's synchronous disposal event. Terminal
+  // cleanup can re-enter while a replaced resource is still being released.
+  private releasedResources = new WeakSet<{ dispose(): void }>();
+  private releaseResource = (resource?: { dispose(): void } | null): void => {
+    if (!resource || this.releasedResources.has(resource)) return;
+    this.releasedResources.add(resource);
+    resource.dispose();
+  };
+  private releaseTree(object: THREE.Object3D): void {
+    disposeTree(object, this.releaseResource);
+  }
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -81,13 +100,14 @@ export class TableScene {
       this.scene.add(new THREE.AmbientLight(0xfff2d8, 0.7));
       const lamp = new THREE.DirectionalLight(0xffe2b0, 1.1);
       lamp.position.set(-12, 25, 10);
-      this.scene.add(lamp, this.piecesRoot);
+      this.marksRoot.name = 'marks-root';
+      this.scene.add(lamp, this.piecesRoot, this.marksRoot);
       this.dressing = createDressing();
       this.scene.add(this.dressing);
       this.resize();
     } catch (error) {
       controls?.dispose();
-      disposeTree(this.scene);
+      this.releaseTree(this.scene);
       this.scene.clear();
       this.renderer.dispose();
       throw error;
@@ -98,6 +118,7 @@ export class TableScene {
   apply(state: SceneState, loadedImage?: HTMLImageElement): void {
     if (this.disposed) return;
     this.validateState(state);
+    const marks = validateSceneMarks(state.marks === undefined ? [] : state.marks, state.map);
     if (loadedImage) this.validateArtwork(loadedImage, state.map);
     const mapKey = JSON.stringify(state.map);
     const dimensionsChanged =
@@ -108,10 +129,24 @@ export class TableScene {
     // Public art supersedes fallback features. Equal extents/art do not reallocate the map.
     const rebuildMap = dimensionsChanged || (!image && mapKey !== this.mapKey);
     const nextPieces = new Map<string, PieceObject>();
+    const nextMarks = new Map<string, MarkObject>();
     const created: THREE.Object3D[] = [];
     const tags = new Map<string, THREE.CanvasTexture>();
     let mapGroup: THREE.Group | undefined;
     let replacementTexture: THREE.Texture | undefined;
+    const discard = () => {
+      if (mapGroup) this.releaseTree(mapGroup);
+      this.releaseResource(replacementTexture);
+      created.forEach((object) => this.releaseTree(object));
+      tags.forEach(this.releaseResource);
+    };
+    const terminated = () => {
+      if (!this.disposed) return false;
+      // Some staged objects/textures may already have joined the live scene.
+      // The release ledger makes overlap with terminal cleanup harmless.
+      discard();
+      return true;
+    };
     try {
       if (rebuildMap) mapGroup = this.makeMap(state.map, image);
       else if (image && image !== this.artworkImage) replacementTexture = this.artTexture(image);
@@ -135,36 +170,50 @@ export class TableScene {
             tags.set(key, labelTexture(tagLines(p), p.kind === 'ghost'));
         }
       }
+      for (const mark of marks) {
+        const signature = markSignature(mark, state.map);
+        const old = this.marks.get(mark.id);
+        if (old?.signature === signature) nextMarks.set(mark.id, old);
+        else {
+          const group = createMarkGroup(mark, state.map);
+          created.push(group);
+          nextMarks.set(mark.id, { group, signature });
+        }
+      }
     } catch (error) {
-      if (mapGroup) disposeTree(mapGroup);
-      replacementTexture?.dispose();
-      created.forEach(disposeTree);
-      tags.forEach((texture) => texture.dispose());
+      discard();
       throw error;
     }
+    if (terminated()) return;
 
     // All candidate geometry, paper and artwork is now allocated and validated.
     if (mapGroup) {
       for (const old of [this.mapMesh, this.tableMesh]) {
         if (old) {
           this.scene.remove(old);
-          disposeTree(old);
+          this.releaseTree(old);
+          if (terminated()) return;
         }
       }
       this.mapMesh = mapGroup.getObjectByName('map-artwork') as THREE.Mesh;
       this.tableMesh = mapGroup.getObjectByName('table-board') as THREE.Mesh;
-      this.scene.add(this.mapMesh, this.tableMesh);
+      this.scene.add(this.mapMesh);
+      if (terminated()) return;
+      this.scene.add(this.tableMesh);
+      if (terminated()) return;
     } else if (replacementTexture) {
       const material = this.mapMesh!.material as THREE.MeshStandardMaterial;
       const previous = material.map;
       material.map = replacementTexture;
       material.needsUpdate = true;
-      previous?.dispose();
+      this.releaseResource(previous);
+      if (terminated()) return;
     }
     for (const [key, old] of this.pieces) {
       if (nextPieces.get(key)?.group !== old.group) {
         this.piecesRoot.remove(old.group);
-        disposeTree(old.group);
+        this.releaseTree(old.group);
+        if (terminated()) return;
       }
     }
     const clippingPlanes = this.mapClipping(state.map);
@@ -172,6 +221,7 @@ export class TableScene {
       const key = `${p.kind}:${p.id}`;
       const obj = nextPieces.get(key)!;
       if (obj.group.parent !== this.piecesRoot) this.piecesRoot.add(obj.group);
+      if (terminated()) return;
       const tag = obj.group.getObjectByName('paper-tag') as THREE.Sprite;
       const texture = tags.get(key);
       if (texture) {
@@ -179,7 +229,8 @@ export class TableScene {
         tag.material.map = texture;
         tag.material.needsUpdate = true;
         tag.userData.lines = tagLines(p);
-        previous?.dispose();
+        this.releaseResource(previous);
+        if (terminated()) return;
       }
       obj.group.position.copy(mapToWorld(state.map, p.position));
       obj.group.getObjectByName('body')!.rotation.y = facingToRotationY(p.facing);
@@ -199,6 +250,18 @@ export class TableScene {
       tag.material.opacity = p.kind === 'ghost' ? 0.65 + ghostOpacity(p.ageMs) * 0.5 : 1;
     }
     this.pieces = nextPieces;
+    for (const [id, old] of this.marks) {
+      if (nextMarks.get(id)?.group !== old.group) {
+        this.marksRoot.remove(old.group);
+        this.releaseTree(old.group);
+        if (terminated()) return;
+      }
+    }
+    for (const mark of nextMarks.values()) {
+      if (mark.group.parent !== this.marksRoot) this.marksRoot.add(mark.group);
+      if (terminated()) return;
+    }
+    this.marks = nextMarks;
     this.state = state;
     this.mapKey = mapKey;
     this.artworkImage = image;
@@ -285,7 +348,7 @@ export class TableScene {
     material.map = texture;
     material.needsUpdate = true;
     this.artworkImage = image;
-    previous?.dispose();
+    this.releaseResource(previous);
   }
 
   private makeMap(map: BaseMap, image?: HTMLImageElement): THREE.Group {
@@ -320,7 +383,7 @@ export class TableScene {
       group.add(board);
       return group;
     } catch (error) {
-      disposeTree(group);
+      this.releaseTree(group);
       throw error;
     }
   }
@@ -433,7 +496,7 @@ export class TableScene {
       group.add(tag);
       return group;
     } catch (error) {
-      disposeTree(group);
+      this.releaseTree(group);
       throw error;
     }
   }
@@ -607,11 +670,14 @@ export class TableScene {
     this.disposed = true;
     this.stop();
     this.controls.dispose();
-    disposeTree(this.scene);
+    this.releaseTree(this.scene);
     this.pieces.clear();
+    this.marks.clear();
     this.scene.clear();
     this.piecesRoot.clear();
+    this.marksRoot.clear();
     this.state = undefined;
+    this.mapKey = '';
     this.mapMesh = this.tableMesh = undefined;
     this.dressing = undefined;
     this.artworkImage = undefined;
@@ -619,7 +685,10 @@ export class TableScene {
   }
 }
 
-function disposeTree(object: THREE.Object3D): void {
+function disposeTree(
+  object: THREE.Object3D,
+  release: (resource: { dispose(): void }) => void,
+): void {
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
   const textures = new Set<THREE.Texture>();
@@ -633,7 +702,7 @@ function disposeTree(object: THREE.Object3D): void {
       materials.add(item);
     }
   });
-  textures.forEach((texture) => texture.dispose());
-  materials.forEach((material) => material.dispose());
-  geometries.forEach((geometry) => geometry.dispose());
+  textures.forEach(release);
+  materials.forEach(release);
+  geometries.forEach(release);
 }

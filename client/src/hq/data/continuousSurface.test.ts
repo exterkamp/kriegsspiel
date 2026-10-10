@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MapPresentation } from '../contracts/index.js';
+import type { MapPresentation, PersonalMark } from '../contracts/index.js';
 import { demoArtwork, demoScope, normalizeFixture } from './fixture.js';
 import { fixtureView } from '../../table/fixture.js';
 import { ContinuousSurface, inArtwork } from './continuousSurface.js';
@@ -270,6 +270,55 @@ describe('continuous surface lifecycle', () => {
     expect(!result.ok && result.error.code).toBe('disposed');
     expect(latestImage?.onload).toBeNull();
     expect((harness.scenes[0] as { apply: ReturnType<typeof vi.fn> }).apply).not.toHaveBeenCalled();
+  });
+  it('does not publish success or restore presentation when disposal occurs during the scene commit', async () => {
+    const { surface } = await mounted();
+    const apply = (harness.scenes[0] as { apply: ReturnType<typeof vi.fn> }).apply;
+    apply.mockImplementationOnce(() => surface.dispose());
+    const result = await surface.apply(presentation(), op());
+    expect(!result.ok && result.error.code).toBe('disposed');
+    expect(surface.getCamera().ok).toBe(false);
+    expect((await surface.apply(presentation(2), op())).ok).toBe(false);
+  });
+  it('validates personal marks and forwards only render geometry without scope or paper provenance', async () => {
+    const { surface } = await mounted();
+    const mark: PersonalMark = {
+      id: 'mark-1',
+      scope: demoScope,
+      map: { id: demoArtwork.id, revision: demoArtwork.revision },
+      label: '<script>plain label</script>',
+      geometry: {
+        kind: 'arrow',
+        points: [
+          { x: 325.75, y: 815.125 },
+          { x: 1500.25, y: 1225.75 },
+        ],
+      },
+      source: { kind: 'manual' },
+      placedAtGame: null,
+      editedAtGame: null,
+    };
+    const p = { ...presentation(), marks: [mark] };
+    expect((await surface.apply(p, op())).ok).toBe(true);
+    const apply = (harness.scenes[0] as { apply: ReturnType<typeof vi.fn> }).apply;
+    const state = apply.mock.calls[0]![0];
+    expect(state.marks).toEqual([{ id: mark.id, label: mark.label, geometry: mark.geometry }]);
+    expect(Object.keys(state.marks[0]).sort()).toEqual(['geometry', 'id', 'label']);
+    const invalid = [
+      { ...mark, scope: { ...demoScope, playerId: 'other' } },
+      { ...mark, map: { ...mark.map, revision: 'other' } },
+      { ...mark, geometry: { kind: 'pin', at: { x: demoArtwork.widthM + 0.01, y: 100 } } },
+      { ...mark, privateReliability: 'secret' },
+    ];
+    for (const bad of invalid)
+      expect(
+        (await surface.apply({ ...p, revision: 'changed', marks: [bad] as PersonalMark[] }, op()))
+          .ok,
+      ).toBe(false);
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect((await surface.apply({ ...presentation(2), marks: [mark] }, op())).ok).toBe(true);
+    expect(apply.mock.calls.at(-1)![0].marks[0].geometry).toEqual(mark.geometry);
+    surface.dispose();
   });
   it('rejects hidden/malformed/stale presentations before changing the scene', async () => {
     const { surface } = await mounted();

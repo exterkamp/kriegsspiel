@@ -92,9 +92,29 @@ export interface GhostPiece extends Placed {
   observedAtGame?: number;
 }
 
+/** Render-only annotation geometry in metres; no knowledge or authorization metadata. */
+export type SceneMarkGeometry =
+  | { readonly kind: 'pin'; readonly at: Readonly<Coord> }
+  | { readonly kind: 'polyline'; readonly points: readonly Readonly<Coord>[] }
+  | { readonly kind: 'arrow'; readonly points: readonly Readonly<Coord>[] }
+  | { readonly kind: 'ring'; readonly centre: Readonly<Coord>; readonly radiusM: number }
+  | {
+      readonly kind: 'symbol';
+      readonly at: Readonly<Coord>;
+      readonly symbol: 'cross' | 'dot' | 'flag';
+    };
+
+export interface SceneMark {
+  readonly id: string;
+  readonly label: string;
+  readonly geometry: SceneMarkGeometry;
+}
+
 export interface SceneState {
   side: string;
   map: BaseMap;
   own: OwnPiece[];
   ghosts: GhostPiece[];
+  /** Omission preserves the standalone client and renders no annotations. */
+  marks?: readonly SceneMark[];
 }

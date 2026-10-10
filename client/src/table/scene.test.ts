@@ -21,9 +21,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { buildSceneState } from './sceneState.js';
 import { TableScene } from './TableScene.js';
-import { FEATURE_KINDS } from './types.js';
+import { FEATURE_KINDS, type SceneMark } from './types.js';
 import { mapToWorld } from './picking.js';
 import { performanceSceneState } from './performanceFixture.js';
+import * as markBuilders from './marks.js';
 
 const state = buildSceneState(fixtureView, fixtureMap);
 const tables: TableScene[] = [];
@@ -265,6 +266,537 @@ const artwork = (width = 1200, height = 900, src = '/hq-preview.svg'): HTMLImage
 };
 const mapMaterial = (table: TableScene): THREE.MeshStandardMaterial =>
   (table.scene.getObjectByName('map-artwork') as THREE.Mesh).material as THREE.MeshStandardMaterial;
+
+const localMarks: readonly SceneMark[] = [
+  { id: 'pin', label: 'Local pin', geometry: { kind: 'pin', at: { x: 350.125, y: 250.875 } } },
+  {
+    id: 'path',
+    label: '',
+    geometry: {
+      kind: 'polyline',
+      points: [
+        { x: 0, y: 0 },
+        { x: 3100, y: 1200 },
+      ],
+    },
+  },
+  {
+    id: 'arrow',
+    label: 'Belief',
+    geometry: {
+      kind: 'arrow',
+      points: [
+        { x: 2000, y: 1500 },
+        { x: 4000, y: 3000 },
+      ],
+    },
+  },
+  { id: 'ring', label: '', geometry: { kind: 'ring', centre: { x: 0, y: 0 }, radiusM: 200 } },
+  {
+    id: 'symbol',
+    label: '',
+    geometry: { kind: 'symbol', at: { x: 4000, y: 3000 }, symbol: 'dot' },
+  },
+];
+const markRoot = (table: TableScene) => table.scene.getObjectByName('marks-root')!;
+const markOf = (table: TableScene, id: string) =>
+  markRoot(table).children.find((object) => object.userData.markId === id)!;
+const ownedResources = (root: THREE.Object3D) => {
+  const resources = new Set<{ dispose(): void }>();
+  root.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if (mesh.geometry && !(object instanceof THREE.Sprite)) resources.add(mesh.geometry);
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      if (!material) continue;
+      resources.add(material);
+      const texture = (material as THREE.MeshBasicMaterial).map;
+      if (texture) resources.add(texture);
+    }
+  });
+  return resources;
+};
+
+function expectTerminal(table: TableScene, piecesRoot: THREE.Object3D, marksRoot: THREE.Object3D) {
+  const internals = table as unknown as {
+    marks: Map<string, unknown>;
+    pieces: Map<string, unknown>;
+    state: unknown;
+    mapMesh: unknown;
+    tableMesh: unknown;
+    artworkImage: unknown;
+    mapKey: string;
+  };
+  expect(table.scene.children).toHaveLength(0);
+  expect(piecesRoot.children).toHaveLength(0);
+  expect(marksRoot.children).toHaveLength(0);
+  expect(internals.marks.size).toBe(0);
+  expect(internals.pieces.size).toBe(0);
+  expect(internals.state).toBeUndefined();
+  expect(internals.mapMesh).toBeUndefined();
+  expect(internals.tableMesh).toBeUndefined();
+  expect(internals.artworkImage).toBeUndefined();
+  expect(internals.mapKey).toBe('');
+  expect(table.pickNdc(new THREE.Vector2(0, 0))).toEqual({ type: 'none' });
+}
+
+describe('terminal disposal during scene commit', () => {
+  const disposals = () => {
+    const geometry = vi.spyOn(THREE.BufferGeometry.prototype, 'dispose');
+    const material = vi.spyOn(THREE.Material.prototype, 'dispose');
+    const texture = vi.spyOn(THREE.Texture.prototype, 'dispose');
+    return () => [...geometry.mock.contexts, ...material.mock.contexts, ...texture.mock.contexts];
+  };
+  for (const operation of ['replacement', 'deletion'] as const) {
+    it.each(['texture', 'material', 'geometry'] as const)(
+      `stops ${operation} when an old mark %s disposal listener closes the table`,
+      (resourceKind) => {
+        const t = make();
+        t.apply({ ...state, marks: localMarks }, artwork());
+        t.snapOblique();
+        const pieceRoot = piecesOf(t);
+        const annotationRoot = markRoot(t);
+        const oldResources = ownedResources(t.scene);
+        const oldMark = markOf(t, 'pin');
+        const ink = oldMark.getObjectByName('mark-ink') as THREE.LineSegments<
+          THREE.BufferGeometry,
+          THREE.LineBasicMaterial
+        >;
+        const label = oldMark.getObjectByName('mark-label') as THREE.Mesh<
+          THREE.BufferGeometry,
+          THREE.MeshBasicMaterial
+        >;
+        const resource =
+          resourceKind === 'texture'
+            ? label.material.map!
+            : resourceKind === 'material'
+              ? ink.material
+              : ink.geometry;
+        const camera = t.camera.position.clone();
+        const projection = t.camera.projectionMatrix.clone();
+        const target = t.controls.target.clone();
+        const disposed = vi.fn(() => t.dispose());
+        resource.addEventListener('dispose', disposed);
+        const released = disposals();
+        const rendererDisposed = vi.spyOn(t.renderer, 'dispose');
+        const controlsDisposed = vi.spyOn(t.controls, 'dispose');
+        const build = markBuilders.createMarkGroup;
+        const staged: THREE.Group[] = [];
+        vi.spyOn(markBuilders, 'createMarkGroup').mockImplementation((mark, map) => {
+          const group = build(mark, map);
+          staged.push(group);
+          return group;
+        });
+        const newPin = { ...localMarks[0]!, label: 'New pin' };
+        const marks = [
+          ...(operation === 'replacement' ? [newPin] : []),
+          ...localMarks.slice(1),
+          { ...newPin, id: 'added' },
+        ];
+        // Stage art, piece geometry, tags and marks together. By the old mark
+        // event, some candidates have joined the scene and some remain detached.
+        t.apply(
+          {
+            ...state,
+            own: state.own.map((piece, i) => ({
+              ...piece,
+              snapshotAtGame: 1000,
+              footprint: i === 0 ? { frontage: 100, depth: 20 } : piece.footprint,
+            })),
+            marks,
+          },
+          artwork(),
+        );
+        expect(staged).toHaveLength(operation === 'replacement' ? 2 : 1);
+        const stagedResources = new Set(staged.flatMap((group) => [...ownedResources(group)]));
+        for (const resource of [...oldResources, ...stagedResources])
+          expect(released().filter((item) => item === resource)).toHaveLength(1);
+        expect(new Set(released()).size).toBe(released().length);
+        staged.forEach((group) => expect(group.parent).toBeNull());
+        expectTerminal(t, pieceRoot, annotationRoot);
+        expect(t.camera.position).toEqual(camera);
+        expect(t.camera.projectionMatrix).toEqual(projection);
+        expect(t.controls.target).toEqual(target);
+        const count = released().length;
+        t.dispose();
+        t.apply({ ...state, marks: localMarks }, artwork());
+        t.resize(400, 300, 2);
+        t.snapTopDown();
+        expect(released()).toHaveLength(count);
+        expect(disposed).toHaveBeenCalledTimes(1);
+        expect(rendererDisposed).toHaveBeenCalledTimes(1);
+        expect(controlsDisposed).toHaveBeenCalledTimes(1);
+        expectTerminal(t, pieceRoot, annotationRoot);
+      },
+    );
+  }
+
+  it.each([
+    'map artwork',
+    'table board',
+    'art replacement',
+    'piece replacement',
+    'piece deletion',
+    'tag replacement',
+  ])('stops commit and releases staged marks when %s disposal closes the table', (boundary) => {
+    const t = make();
+    t.apply({ ...state, marks: localMarks }, artwork());
+    t.snapOblique();
+    const pieceRoot = piecesOf(t);
+    const annotationRoot = markRoot(t);
+    const oldResources = ownedResources(t.scene);
+    const piece = pieceRoot.children[0]!;
+    const tag = piece.getObjectByName('paper-tag') as THREE.Sprite;
+    const map = t.scene.getObjectByName('map-artwork') as THREE.Mesh;
+    const board = t.scene.getObjectByName('table-board') as THREE.Mesh;
+    const resource =
+      boundary === 'map artwork' || boundary === 'art replacement'
+        ? mapMaterial(t).map!
+        : boundary === 'table board'
+          ? board.geometry
+          : boundary === 'tag replacement'
+            ? tag.material.map!
+            : (piece.getObjectByName('block') as THREE.Mesh).geometry;
+    const camera = t.camera.position.clone();
+    const projection = t.camera.projectionMatrix.clone();
+    const target = t.controls.target.clone();
+    resource.addEventListener('dispose', () => t.dispose());
+    const released = disposals();
+    const build = markBuilders.createMarkGroup;
+    let staged: THREE.Group | undefined;
+    vi.spyOn(markBuilders, 'createMarkGroup').mockImplementation((mark, map) => {
+      staged = build(mark, map);
+      return staged;
+    });
+    const rebuildMap = boundary === 'map artwork' || boundary === 'table board';
+    t.apply(
+      {
+        ...state,
+        map: rebuildMap ? { width: 8000, height: 6000, features: [] } : state.map,
+        own:
+          boundary === 'piece deletion'
+            ? state.own.slice(1)
+            : state.own.map((piece, i) => ({
+                ...piece,
+                snapshotAtGame: 1000,
+                footprint:
+                  boundary === 'piece replacement' && i === 0
+                    ? { frontage: 100, depth: 20 }
+                    : piece.footprint,
+              })),
+        marks: [{ ...localMarks[0]!, label: 'Staged mark' }],
+      },
+      boundary === 'art replacement' ? artwork() : undefined,
+    );
+    expect(staged).toBeDefined();
+    for (const resource of [...oldResources, ...ownedResources(staged!)])
+      expect(released().filter((item) => item === resource)).toHaveLength(1);
+    expect(new Set(released()).size).toBe(released().length);
+    expectTerminal(t, pieceRoot, annotationRoot);
+    expect(t.camera.position).toEqual(camera);
+    expect(t.camera.projectionMatrix).toEqual(projection);
+    expect(t.controls.target).toEqual(target);
+    expect(map.parent).toBeNull();
+    const count = released().length;
+    t.dispose();
+    expect(released()).toHaveLength(count);
+  });
+
+  it('keeps standalone artwork replacement terminal when its old texture listener disposes', () => {
+    const t = make();
+    t.apply({ ...state, marks: localMarks }, artwork());
+    const pieceRoot = piecesOf(t);
+    const annotationRoot = markRoot(t);
+    const oldResources = ownedResources(t.scene);
+    const released = disposals();
+    mapMaterial(t).map!.addEventListener('dispose', () => t.dispose());
+    t.setArtwork(artwork());
+    for (const resource of oldResources)
+      expect(released().filter((item) => item === resource)).toHaveLength(1);
+    expect(new Set(released()).size).toBe(released().length);
+    expectTerminal(t, pieceRoot, annotationRoot);
+  });
+});
+
+describe('render-only mark reconciliation', () => {
+  it('preserves standalone omission, renders all shapes separately, and treats omission as empty', () => {
+    const t = make();
+    t.apply(state);
+    expect(markRoot(t).children).toHaveLength(0);
+    t.apply({ ...state, marks: localMarks });
+    expect(markRoot(t).children).toHaveLength(5);
+    expect(markRoot(t)).not.toBe(piecesOf(t));
+    markRoot(t).traverse((object) => {
+      expect(object.userData.id).toBeUndefined();
+      expect(object.name).not.toBe('pick');
+    });
+    expect(t.pieceCount).toBe(state.own.length + state.ghosts.length);
+    t.apply(state);
+    expect(markRoot(t).children).toHaveLength(0);
+  });
+
+  it('reuses unchanged annotation objects and resources through source updates', () => {
+    const t = make();
+    t.apply({ ...state, marks: localMarks }, artwork());
+    t.snapOblique();
+    const initial = [...markRoot(t).children];
+    const resources = ownedResources(markRoot(t));
+    const disposed = [...resources].map((resource) => vi.spyOn(resource, 'dispose'));
+    for (let i = 0; i < 5; i++)
+      t.apply({
+        ...state,
+        own: state.own.map((piece) => ({
+          ...piece,
+          position: { x: piece.position.x + i, y: piece.position.y },
+          snapshotAtGame: i * 1000,
+        })),
+        ghosts: state.ghosts.map((piece) => ({ ...piece, ageMs: i * 1000 })),
+        marks: structuredClone(localMarks),
+      });
+    expect(markRoot(t).children).toEqual(initial);
+    initial.forEach((object, i) => expect(markRoot(t).children[i]).toBe(object));
+    expect(ownedResources(markRoot(t))).toEqual(resources);
+    disposed.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+  });
+
+  it('mark-only changes retain camera, target, public artwork, native map and piece resources', () => {
+    const t = make();
+    const image = artwork();
+    t.apply({ ...state, marks: localMarks }, image);
+    t.snapOblique();
+    const camera = t.camera.position.clone();
+    const target = t.controls.target.clone();
+    const map = t.scene.getObjectByName('map-artwork');
+    const texture = mapMaterial(t).map;
+    const pieces = [...piecesOf(t).children];
+    const resources = ownedResources(piecesOf(t));
+    const disposal = [...resources, texture!].map((resource) => vi.spyOn(resource, 'dispose'));
+    t.apply({
+      ...state,
+      marks: [
+        {
+          ...localMarks[0]!,
+          label: 'Changed label',
+          geometry: { kind: 'pin', at: { x: 3100.125, y: 1200.875 } },
+        },
+      ],
+    });
+    expect(t.camera.position).toEqual(camera);
+    expect(t.controls.target).toEqual(target);
+    expect(t.scene.getObjectByName('map-artwork')).toBe(map);
+    expect(mapMaterial(t).map).toBe(texture);
+    expect(mapMaterial(t).map!.image).toBe(image);
+    pieces.forEach((object, i) => expect(piecesOf(t).children[i]).toBe(object));
+    expect(ownedResources(piecesOf(t))).toEqual(resources);
+    disposal.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+  });
+
+  it('prevalidates invalid marks before allocating or changing art, pieces, marks or camera', () => {
+    const t = make();
+    t.apply({ ...state, marks: localMarks }, artwork());
+    t.snapOblique();
+    const objects = new Set<THREE.Object3D>();
+    t.scene.traverse((object) => objects.add(object));
+    const camera = t.camera.position.clone();
+    const target = t.controls.target.clone();
+    const texture = mapMaterial(t).map;
+    const positions = piecesOf(t).children.map((object) => object.position.clone());
+    const allocation = vi.spyOn(HTMLCanvasElement.prototype, 'getContext');
+    allocation.mockClear();
+    for (const invalid of [
+      null,
+      [localMarks[0], localMarks[0]],
+      [{ ...localMarks[0], source: { kind: 'manual' } }],
+      [{ ...localMarks[0], geometry: { kind: 'pin', at: { x: -1e-6, y: 0 } } }],
+    ]) {
+      expect(() =>
+        t.apply(
+          {
+            ...state,
+            own: state.own.map((piece) => ({
+              ...piece,
+              position: { x: piece.position.x + 20, y: piece.position.y },
+            })),
+            marks: invalid as readonly SceneMark[],
+          },
+          artwork(),
+        ),
+      ).toThrow(RangeError);
+    }
+    expect(allocation).not.toHaveBeenCalled();
+    const after = new Set<THREE.Object3D>();
+    t.scene.traverse((object) => after.add(object));
+    expect(after).toEqual(objects);
+    expect(mapMaterial(t).map).toBe(texture);
+    expect(t.camera.position).toEqual(camera);
+    expect(t.controls.target).toEqual(target);
+    expect(piecesOf(t).children.map((object) => object.position)).toEqual(positions);
+  });
+
+  it('disposes deleted, replaced and final mark resources exactly once without shared sprite disposal', () => {
+    const t = make();
+    t.apply({ ...state, marks: localMarks });
+    const pin = markOf(t, 'pin');
+    const deleted = markOf(t, 'arrow');
+    const retained = markOf(t, 'ring');
+    const previous = [...ownedResources(pin), ...ownedResources(deleted)].map((resource) =>
+      vi.spyOn(resource, 'dispose'),
+    );
+    const sprite = piecesOf(t).children[0]!.getObjectByName('paper-tag') as THREE.Sprite;
+    const sharedGeometry = vi.spyOn(sprite.geometry, 'dispose');
+    t.apply({ ...state, marks: [{ ...localMarks[0]!, label: 'Replacement' }, localMarks[3]!] });
+    previous.forEach((spy) => expect(spy).toHaveBeenCalledTimes(1));
+    expect(pin.parent).toBeNull();
+    expect(deleted.parent).toBeNull();
+    expect(markOf(t, 'ring')).toBe(retained);
+    const final = [...ownedResources(markRoot(t))].map((resource) => vi.spyOn(resource, 'dispose'));
+    t.dispose();
+    t.dispose();
+    previous.forEach((spy) => expect(spy).toHaveBeenCalledTimes(1));
+    final.forEach((spy) => expect(spy).toHaveBeenCalledTimes(1));
+    expect(sharedGeometry).not.toHaveBeenCalled();
+  });
+
+  it('rebuilds annotations when the map extent changes, preserving stored metre geometry', () => {
+    const t = make();
+    t.apply({ ...state, marks: localMarks });
+    const previous = markOf(t, 'path');
+    const disposal = [...ownedResources(previous)].map((resource) => vi.spyOn(resource, 'dispose'));
+    t.apply({ ...state, map: { width: 8000, height: 6000, features: [] }, marks: localMarks });
+    const current = markOf(t, 'path');
+    expect(current).not.toBe(previous);
+    disposal.forEach((spy) => expect(spy).toHaveBeenCalledTimes(1));
+    const positions = (
+      current.getObjectByName('mark-ink') as THREE.LineSegments
+    ).geometry.getAttribute('position');
+    expect(positions.getX(0) + 4000).toBe(0);
+    expect(positions.getZ(0) + 3000).toBe(0);
+    expect(positions.getX(1) + 4000).toBe(3100);
+    expect(positions.getZ(1) + 3000).toBe(1200);
+  });
+
+  it('cleans all staged allocations on mark failure and retains the complete previous frame', () => {
+    const t = make();
+    t.apply({ ...state, marks: localMarks }, artwork());
+    t.snapOblique();
+    const previousResources = ownedResources(t.scene);
+    const previousObjects = new Set<THREE.Object3D>();
+    t.scene.traverse((object) => previousObjects.add(object));
+    const camera = t.camera.position.clone();
+    const target = t.controls.target.clone();
+    const oldPositions = piecesOf(t).children.map((object) => object.position.clone());
+    const geometryDisposal = vi.spyOn(THREE.BufferGeometry.prototype, 'dispose');
+    const materialDisposal = vi.spyOn(THREE.Material.prototype, 'dispose');
+    const textureDisposal = vi.spyOn(THREE.Texture.prototype, 'dispose');
+    const context = document.createElement('canvas').getContext('2d')!;
+    vi.spyOn(context, 'fillText').mockImplementation((label) => {
+      if (label === 'fail') throw new Error('Mark canvas failed');
+    });
+    expect(() =>
+      t.apply(
+        {
+          ...state,
+          own: state.own.map((piece, i) => ({
+            ...piece,
+            position: { x: piece.position.x + 10, y: piece.position.y },
+            footprint: i === 0 ? { frontage: 100, depth: 20 } : piece.footprint,
+            snapshotAtGame: 1000,
+          })),
+          marks: [
+            ...localMarks,
+            { ...localMarks[0]!, id: 'good', label: 'good' },
+            { ...localMarks[0]!, id: 'bad', label: 'fail' },
+          ],
+        },
+        artwork(),
+      ),
+    ).toThrow('Mark canvas failed');
+    const allocatedResources = [
+      ...geometryDisposal.mock.contexts,
+      ...materialDisposal.mock.contexts,
+      ...textureDisposal.mock.contexts,
+    ] as { dispose(): void }[];
+    expect(allocatedResources.length).toBeGreaterThan(10);
+    expect(new Set(allocatedResources).size).toBe(allocatedResources.length);
+    allocatedResources.forEach((resource) => expect(previousResources.has(resource)).toBe(false));
+    const currentObjects = new Set<THREE.Object3D>();
+    t.scene.traverse((object) => currentObjects.add(object));
+    expect(currentObjects).toEqual(previousObjects);
+    expect(piecesOf(t).children.map((object) => object.position)).toEqual(oldPositions);
+    expect(t.camera.position).toEqual(camera);
+    expect(t.controls.target).toEqual(target);
+    t.dispose();
+    for (const resource of allocatedResources) {
+      const instances = [
+        ...geometryDisposal.mock.contexts,
+        ...materialDisposal.mock.contexts,
+        ...textureDisposal.mock.contexts,
+      ];
+      expect(instances.filter((item) => item === resource)).toHaveLength(1);
+    }
+  });
+
+  it('unit and map picking pass through marks, including colliding mark/piece ids', () => {
+    const t = make();
+    const piece = state.own[0]!;
+    const pin: SceneMark = {
+      id: piece.id,
+      label: 'Local only',
+      geometry: { kind: 'pin', at: piece.position },
+    };
+    t.apply({
+      ...state,
+      marks: [
+        pin,
+        {
+          ...pin,
+          id: 'centre',
+          geometry: { kind: 'symbol', at: { x: 2000, y: 1500 }, symbol: 'dot' },
+        },
+      ],
+    });
+    t.snapTopDown();
+    expect(t.pickNdc(new THREE.Vector2(0, 0))).toMatchObject({
+      type: 'point',
+      coord: { x: expect.closeTo(2000, 5), y: expect.closeTo(1500, 5) },
+    });
+    const world = mapToWorld(fixtureMap, piece.position);
+    t.camera.position.set(world.x, 3000, world.z + 0.001);
+    t.controls.target.copy(world);
+    t.controls.update();
+    expect(t.pickNdc(new THREE.Vector2(0, 0))).toMatchObject({
+      type: 'piece',
+      id: piece.id,
+      pieceKind: 'own',
+    });
+    const rect = { left: 10, top: 20, right: 810, bottom: 620, width: 800, height: 600 };
+    vi.spyOn(t.canvas, 'getBoundingClientRect').mockReturnValue(rect as DOMRect);
+    expect(t.pickAt(410, 320)).toMatchObject({ type: 'piece', id: piece.id });
+  });
+
+  it('does not commit or revive RAF if disposal occurs during mark allocation', () => {
+    const callbacks: FrameRequestCallback[] = [];
+    const raf = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    });
+    const t = make();
+    t.apply(state);
+    t.start();
+    const context = document.createElement('canvas').getContext('2d')!;
+    vi.spyOn(context, 'fillText').mockImplementation((label) => {
+      if (label === 'dispose') t.dispose();
+    });
+    t.apply({ ...state, marks: [{ ...localMarks[0]!, label: 'dispose' }] });
+    expect(t.scene.children).toHaveLength(0);
+    expect(t.pieceCount).toBe(0);
+    callbacks[0]!(100);
+    t.start();
+    t.apply({ ...state, marks: localMarks });
+    expect(raf).toHaveBeenCalledTimes(1);
+    expect(t.scene.children).toHaveLength(0);
+  });
+});
 
 describe('loaded public fixture artwork', () => {
   it('preserves scene/camera and disposes each replaced texture exactly once', () => {
