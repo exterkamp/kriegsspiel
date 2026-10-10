@@ -121,6 +121,7 @@ export class GameActor {
   private readonly parser: OrderParser;
   private readonly store: GameStore;
   private readonly timers: Timers;
+  private readonly parseTimers = new Set<unknown>();
   private readonly onEmitted?: (events: EmittedEvent[]) => void;
   private readonly onError?: (error: unknown) => void;
   private readonly onStaffAtWork?: (state: StaffAtWork) => void;
@@ -189,6 +190,7 @@ export class GameActor {
     if (!this.closed) {
       this.closed = true;
       this.clearTimer();
+      for (const handle of [...this.parseTimers]) this.clearParseTimer(handle);
       // Abandon work still with the umpire: its callers are told, and a late result is ignored.
       for (const dep of [...this.dependencies.values()]) {
         dep.abandoned = true;
@@ -344,15 +346,26 @@ export class GameActor {
   private submitOrder(command: Extract<GameCommand, { kind: 'order' }>): Promise<CommandResult> {
     return new Promise<CommandResult>((resolve, reject) => {
       this.enqueue(async () => {
-        this.sync();
-        // The order is signed now. A paused game stamps it with the paused time and its courier
-        // leaves when the clock resumes (it is queued at that time, and the engine only moves on).
+        // The order is signed now. Hold game time at this instant in one step, so a wall clock
+        // that moves meanwhile cannot leave the barrier behind the clock. A paused game stamps
+        // the order with the paused time and its courier leaves when the clock resumes (it is
+        // queued at that time, and the engine only moves on).
+        const before = this.clock.barrier;
         const dep: Dependency = {
           id: this.nextDependency++,
-          neededAt: this.engine.time,
+          neededAt: this.clock.holdAtNow(),
           settle: resolve,
           abandoned: false,
         };
+        this.dependencies.set(dep.id, dep);
+        try {
+          this.sync();
+        } catch (e) {
+          // Leave nothing held for a parse that will never start.
+          this.dependencies.delete(dep.id);
+          this.syncBarrier();
+          throw e;
+        }
         const entry: InputLogEntry = {
           seq: ++this.seq,
           wallMs: this.wallNow(),
@@ -361,10 +374,10 @@ export class GameActor {
         };
         // The parse sees the world as it is at signing time, which the barrier keeps current.
         const context = this.parseContext(command.side);
-        this.dependencies.set(dep.id, dep);
         this.syncBarrier();
+        this.announceStaff(before);
         this.reschedule();
-        void this.parseWithRetries(command.text, context).then((outcome) =>
+        void this.parseWithRetries(dep, command.text, context).then((outcome) =>
           this.enqueueCompletion(() => this.completeOrder(dep, command, entry, outcome)).catch(
             (e) => {
               this.dependencies.delete(dep.id);
@@ -378,6 +391,7 @@ export class GameActor {
 
   /** Parse with a timeout per attempt, retrying failures, then falling back. Never throws. */
   private async parseWithRetries(
+    dep: Dependency,
     text: string,
     context: Parameters<OrderParser['parse']>[1],
   ): Promise<ParseOutcome> {
@@ -385,6 +399,8 @@ export class GameActor {
     let error = '';
     for (let attempt = 1; attempt <= attempts; attempt++) {
       if (attempt > 1) await this.sleep(this.parseRetryDelayMs);
+      // A closed game's abandoned parse stops here: no more paid calls and no new timers.
+      if (dep.abandoned) break;
       try {
         return { parsed: await this.withTimeout(this.parser.parse(text, context)) };
       } catch (e) {
@@ -403,23 +419,38 @@ export class GameActor {
     };
   }
 
+  /** A timer for the background parse, tracked so `close` can clear it. */
+  private parseTimer(fn: () => void, ms: number): unknown {
+    const handle = this.timers.setTimeout(() => {
+      this.parseTimers.delete(handle);
+      fn();
+    }, ms);
+    this.parseTimers.add(handle);
+    return handle;
+  }
+
+  private clearParseTimer(handle: unknown): void {
+    this.parseTimers.delete(handle);
+    this.timers.clearTimeout(handle);
+  }
+
   private sleep(ms: number): Promise<void> {
-    return new Promise((r) => this.timers.setTimeout(r, ms));
+    return new Promise((r) => this.parseTimer(r, ms));
   }
 
   private withTimeout<T>(work: Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      const handle = this.timers.setTimeout(
+      const handle = this.parseTimer(
         () => reject(new Error(`parse timed out after ${this.parseTimeoutMs} ms`)),
         this.parseTimeoutMs,
       );
       work.then(
         (v) => {
-          this.timers.clearTimeout(handle);
+          this.clearParseTimer(handle);
           resolve(v);
         },
         (e) => {
-          this.timers.clearTimeout(handle);
+          this.clearParseTimer(handle);
           reject(e);
         },
       );
@@ -435,12 +466,18 @@ export class GameActor {
 
   /** Hold the clock at the earliest pending dependency, or release it. */
   private syncBarrier(): void {
+    const before = this.clock.barrier;
     let earliest: number | undefined;
     for (const d of this.dependencies.values()) {
       if (earliest === undefined || d.neededAt < earliest) earliest = d.neededAt;
     }
-    const before = this.clock.barrier;
     this.clock.setBarrier(earliest);
+    this.announceStaff(before);
+  }
+
+  /** Tell the listener when the barrier moved from `before`. */
+  private announceStaff(before: number | undefined): void {
+    const earliest = this.clock.barrier;
     if (before !== earliest) {
       this.onStaffAtWork?.(
         earliest === undefined ? { working: false } : { working: true, needAtMs: earliest },

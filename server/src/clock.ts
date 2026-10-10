@@ -186,6 +186,20 @@ export class GameClock {
     this.barrierMs = gameMs;
   }
 
+  /**
+   * Hold game time at its current reading and return that time. One step, so a caller that wants
+   * "stall here" never passes a reading the wall clock has since moved past (see `setBarrier`).
+   * The barrier can only move earlier this way: the reading is already capped by any barrier.
+   */
+  holdAtNow(): number {
+    const t = this.now();
+    if (t !== this.barrierMs) {
+      this.reanchor('barrier', {}, t);
+      this.barrierMs = t;
+    }
+    return t;
+  }
+
   setRate(rate: number): void {
     assertRate(rate);
     this.reanchor('rate', { rate });

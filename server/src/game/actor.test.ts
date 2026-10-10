@@ -316,6 +316,69 @@ describe('order parsing', () => {
     expect(blue1(game).intent).toMatchObject({ kind: 'move', startedAt: DELIVERY_MS });
   });
 
+  it.each([1, 4, 12])(
+    'accepts an order while the wall clock moves on every read (rate %i)',
+    async (rate) => {
+      const time = new FakeTime();
+      let ticks = 0;
+      const store = new MemoryGameStore();
+      const h = new GameHost({
+        store,
+        parser: new FixedParser(),
+        registry: registry(),
+        // Like Date.now(): every read is a little later than the last.
+        wallNow: () => time.now() + ticks++,
+        timers: time,
+      });
+      host = h;
+      const game = await h.create('g1', loadScenario(holdTheBridge), { rate });
+      await time.advance(2_000);
+      expect(await game.submit(order)).toEqual({ ok: true, orderId: 'g1-o1' });
+      const signedAt = (await store.inputLog('g1')).find((e) => e.command.kind === 'order')!.gameMs;
+      // The clock was held at the signing time; the courier left then, whatever the parse took.
+      expect(game.gameClock.barrier).toBeUndefined();
+      // The skewed wall source shifts the scheduler's due times by the ticks so far.
+      await time.advance(DELIVERY_MS / rate + ticks + 100);
+      expect(blue1(game).intent).toMatchObject({ kind: 'move', startedAt: signedAt + DELIVERY_MS });
+    },
+  );
+
+  it('leaves no timers and makes no more calls once a game with a hanging parse is shut down', async () => {
+    const { time, game, parser } = await newGame(1);
+    let calls = 0;
+    parser.parse = () => {
+      calls++;
+      return new Promise<ParseResult>(() => undefined);
+    };
+    const pending = game.submit(order);
+    await time.advance(1_000);
+    void pending.catch(() => undefined);
+    await host?.shutdown();
+    host = undefined;
+    const callsAtShutdown = calls;
+    expect(time.pendingTimers).toBe(0);
+    await time.advance(10 * 60_000);
+    expect(calls).toBe(callsAtShutdown);
+  });
+
+  it('logs an order at its completion, so the input log is not in signing order', async () => {
+    const { time, game, parser, store } = await newGame(1);
+    let release: () => void = () => undefined;
+    parser.gate = new Promise((r) => (release = r));
+    const pending = game.submit(order);
+    await time.advance(1_000);
+    await game.submit({ kind: 'setRate', rate: 2 });
+    release();
+    await pending;
+    const log = await store.inputLog('g1');
+    // The order was signed first (seq 1) but is appended after the command served meanwhile.
+    // Replay must therefore go by seq/gameMs, not by log position (docs/decisions.md D14).
+    expect(log.map((e) => [e.seq, e.command.kind])).toEqual([
+      [2, 'setRate'],
+      [1, 'order'],
+    ]);
+  });
+
   it('falls back to a clarification and logs it when every attempt fails or hangs', async () => {
     const { time, game, parser, store } = await newGame(1);
     let calls = 0;
