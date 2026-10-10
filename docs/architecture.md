@@ -139,6 +139,10 @@ Adding a field means updating this list and the leak tests in `visibility.test.t
 
 The simulation is a function of: scenario, seed, and the **ordered log of inputs with their game timestamps** (commands, LLM outputs, pause and rate changes). Replaying that log through the engine on a manual clock gives identical state, regardless of the wall-clock rate used during the original game. LLM outputs are recorded and played back, so replays never call the model. Implemented in `server/src/game/replay.ts` (see D14a); run it with `npm run replay -w server -- <logfile>`.
 
+## Scripted opponent
+
+A scripted side is a `SideAgent` run by the `GameActor`. Every `intervalMs` of game time the actor advances the engine to that instant, builds `viewFor(world, side)` and calls `think(view)`; the orders it returns are issued at once through `applyLoggedOrder`, then travel by courier like any other. The agent never sees `GameState`: its input type is `EngineSideView` and `assertFogOnly` checks it at runtime. Each order is logged with `agent: true` and its parse result, so replay needs no agent and no model call. See decision "Scripted Red opponent".
+
 ## Debug trace
 
 `server/src/debug/` holds the debug trace store behind the admin view (Epic #119). It is read-only diagnostics: the engine never reads it and no game client ever receives it.
