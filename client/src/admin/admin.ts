@@ -136,7 +136,7 @@ export class AdminPage {
   private async poll(): Promise<void> {
     try {
       const res = await this.fetchFn(apiUrl('games', this.token));
-      if (res.status === 404) return this.fail('disabled');
+      if (res.status === 404) return this.fail('disabled', true);
       if (res.status === 401) return this.fail('unauthorized');
       if (!res.ok) throw new Error(String(res.status));
       const body = (await res.json()) as { games: GameSummary[] };
@@ -161,22 +161,25 @@ export class AdminPage {
     }
   }
 
-  private fail(status: 'disabled' | 'unauthorized'): void {
+  private fail(status: 'disabled' | 'unauthorized', retry = false): void {
     this.status = status;
     this.closeStream();
     this.render();
+    // 404 may be a proxy blip or a restart with the API enabled; 401 needs a reload with a new token.
+    if (retry) this.timer = setTimeout(() => void this.poll(), backoffMs(Infinity));
   }
 
   private select(id: string | undefined): void {
     this.gameId = id;
     this.closeStream();
     this.streamCount = 0;
+    this.status = id ? 'connecting' : 'live';
     if (id) this.openStream(id);
     this.render();
   }
 
   private openStream(id: string): void {
-    // EventSource reconnects by itself (also after a server restart); we only mirror its state.
+    // EventSource reconnects by itself after network errors; we mirror its state and reopen it if it gives up.
     const es = new EventSource(apiUrl(`games/${encodeURIComponent(id)}/stream`, this.token));
     this.stream = es;
     es.onopen = () => {
@@ -189,6 +192,8 @@ export class AdminPage {
     };
     es.onerror = () => {
       this.status = 'reconnecting';
+      // A non-200 answer closes the EventSource for good; drop it so the next poll reopens it.
+      if (es.readyState === EventSource.CLOSED) this.closeStream();
       this.render();
     };
   }

@@ -10,6 +10,8 @@ const games = [
 
 class FakeES {
   static last: FakeES | undefined;
+  static CLOSED = 2;
+  readyState = 1;
   onopen?: () => void;
   onerror?: () => void;
   onmessage?: () => void;
@@ -24,9 +26,10 @@ class FakeES {
 
 const ok = (body: unknown) =>
   Promise.resolve({ ok: true, status: 200, json: async () => body }) as never;
-const flush = () => new Promise((r) => setTimeout(r, 0));
+const flush = () => vi.advanceTimersByTimeAsync(0);
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   document.body.innerHTML = '';
 });
@@ -55,6 +58,7 @@ describe('model', () => {
 describe('AdminPage', () => {
   function mount(fetchFn: typeof fetch) {
     vi.stubGlobal('EventSource', FakeES);
+    vi.useFakeTimers();
     document.body.innerHTML = '<div id="app"></div>';
     return new AdminPage(document.getElementById('app')!, '', fetchFn);
   }
@@ -115,8 +119,84 @@ describe('AdminPage', () => {
     await flush();
     expect(page.linkStatus).toBe('reconnecting');
     up = true;
-    await new Promise((r) => setTimeout(r, 1100));
+    await vi.advanceTimersByTimeAsync(1100);
     expect(FakeES.last!.url).toBe('/admin/api/games/aaaaaaaa-1/stream');
+    page.stop();
+  });
+
+  it('reopens a live stream after the server goes down and comes back', async () => {
+    let up = true;
+    const page = mount(
+      vi.fn(() => (up ? ok({ games }) : Promise.reject(new Error('down')))) as never,
+    );
+    page.start();
+    await flush();
+    const first = FakeES.last!;
+    first.onopen!();
+    expect(page.linkStatus).toBe('live');
+    up = false;
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(first.closed).toBe(true);
+    expect(page.linkStatus).toBe('reconnecting');
+    up = true;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(FakeES.last).not.toBe(first);
+    FakeES.last!.onopen!();
+    expect(page.linkStatus).toBe('live');
+    page.stop();
+  });
+
+  it('recovers from a 404 once the API is enabled', async () => {
+    let status = 404;
+    const page = mount(
+      vi.fn(() =>
+        status === 404 ? Promise.resolve({ ok: false, status }) : ok({ games }),
+      ) as never,
+    );
+    page.start();
+    await flush();
+    expect(page.linkStatus).toBe('disabled');
+    status = 200;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(page.linkStatus).toBe('connecting');
+    page.stop();
+  });
+
+  it('stays on unauthorized after a 401', async () => {
+    const fetchFn = vi.fn(() => Promise.resolve({ ok: false, status: 401 }) as never);
+    const page = mount(fetchFn);
+    page.start();
+    await flush();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(page.linkStatus).toBe('unauthorized');
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    page.stop();
+  });
+
+  it('reopens a stream the browser gave up on', async () => {
+    const page = mount(vi.fn(() => ok({ games })));
+    page.start();
+    await flush();
+    const first = FakeES.last!;
+    first.readyState = FakeES.CLOSED;
+    first.onerror!();
+    expect(first.closed).toBe(true);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(FakeES.last).not.toBe(first);
+    page.stop();
+  });
+
+  it('shows connecting when switching to another game', async () => {
+    const page = mount(vi.fn(() => ok({ games })));
+    page.start();
+    await flush();
+    FakeES.last!.onopen!();
+    expect(page.linkStatus).toBe('live');
+    const picker = document.querySelector<HTMLSelectElement>('#game')!;
+    picker.value = 'bbbbbbbb-2';
+    picker.dispatchEvent(new Event('change'));
+    expect(page.linkStatus).toBe('connecting');
+    expect(FakeES.last!.url).toBe('/admin/api/games/bbbbbbbb-2/stream');
     page.stop();
   });
 });
