@@ -96,7 +96,8 @@ export function canSee(world: GameState, observer: Unit, target: Unit): boolean 
   if (concealedAt(world, a) || concealedAt(world, b)) return dist <= COVERED_RANGE_MM;
   // Walk the line from a canonical endpoint so sight is symmetric.
   const [p, q] = a.y < b.y || (a.y === b.y && a.x <= b.x) ? [a, b] : [b, a];
-  const eye = Math.max(rankAt(world, a), rankAt(world, b));
+  // Only rise/high ground can block, so low-lying observers still see across flat ground.
+  const eye = Math.max(0, rankAt(world, a), rankAt(world, b));
   return !profileAlong(world.map, p, q).some(
     (piece) =>
       piece.length > 0 &&

@@ -526,7 +526,7 @@ describe('canSee over ridges and buildings', () => {
     });
   const sees = (w: GameState) => canSee(w, unit(w, 'b'), unit(w, 'r'));
 
-  it('is blocked by a ridge between two units on low ground, from either end', () => {
+  it('is blocked by a ridge between two units on flat ground, from either end', () => {
     const w = pair([ridge('ridge', 600, 300, 700, 800)]);
     expect(sees(w)).toBe(false);
     expect(canSee(w, unit(w, 'r'), unit(w, 'b'))).toBe(false);
@@ -546,6 +546,32 @@ describe('canSee over ridges and buildings', () => {
       ridge('hill', 600, 300, 700, 800, 'high'),
     ]);
     expect(sees(blocked)).toBe(false);
+  });
+
+  it('sees across open ground when both units stand in low ground', () => {
+    const box = (id: string, kind: string, x0: number, x1: number) => ({
+      id,
+      kind,
+      polygon: [
+        [x0, 500],
+        [x1, 500],
+        [x1, 600],
+        [x0, 600],
+      ],
+    });
+    const w = pair([box('m1', 'marsh', 350, 450), box('m2', 'marsh', 850, 950)]);
+    expect(sees(w)).toBe(true);
+    expect(canSee(w, unit(w, 'r'), unit(w, 'b'))).toBe(true);
+    // A ford on one side, open ground on the other.
+    const f = pair([box('f', 'ford', 350, 450)]);
+    expect(sees(f)).toBe(true);
+    // A rise between low-ground units still blocks.
+    const r = pair([
+      box('m1', 'marsh', 350, 450),
+      box('m2', 'marsh', 850, 950),
+      ridge('rise', 600, 300, 700, 800),
+    ]);
+    expect(sees(r)).toBe(false);
   });
 
   it('is not blocked by low ground such as a marsh or a river', () => {

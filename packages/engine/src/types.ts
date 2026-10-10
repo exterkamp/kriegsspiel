@@ -1,3 +1,5 @@
+import type { PlacementProposal, PlacementVerdict } from './placement.js';
+
 /** Game time in integer milliseconds since the scenario start. Never derived from the wall clock. */
 export type GameTime = number;
 
@@ -108,7 +110,20 @@ export type Intent =
   | { kind: 'withdraw'; toward: Point; startedAt: GameTime }
   | { kind: 'hold'; at: Point }
   /** Close on `target` (a unit id) and fight it. `to` is where it stood when the march was planned. */
-  | { kind: 'attack'; target: string; to: Point; startedAt: GameTime };
+  | { kind: 'attack'; target: string; to: Point; startedAt: GameTime }
+  /** Changing formation: the unit stands still until `formation.done` fires. */
+  | { kind: 'reform'; formation: Formation; startedAt: GameTime };
+
+/**
+ * The stretch of a march a unit is on: it left `from` at `startedAt` and reaches `to` at
+ * `arriveAt`. `center` only moves at the end of a leg; the leg says where the unit is in between.
+ */
+export interface Leg {
+  from: Point;
+  to: Point;
+  startedAt: GameTime;
+  arriveAt: GameTime;
+}
 
 export const UNIT_KINDS = ['infantry', 'cavalry', 'artillery'] as const;
 export type UnitKind = (typeof UNIT_KINDS)[number];
@@ -137,6 +152,8 @@ export interface Unit {
   /** 0..100. */
   morale: number;
   intent: Intent;
+  /** Set while the unit is marching along a leg, so a new order can stop it mid-leg. */
+  leg?: Leg;
   status: UnitStatus;
   /** Where the unit starts, and where it withdraws to if it breaks. */
   home: Point;
@@ -228,4 +245,22 @@ export interface GameState {
   intel: Record<SideId, SideIntel>;
   /** Weather hook: multiplies every unit's sight range (1 when absent, 0.5 in fog). */
   sightFactor?: number;
+  /** Every umpire placement ruling so far, in order. Master state only: never sent to a client. */
+  rulings: Ruling[];
+}
+
+/**
+ * An umpire judgment call about where a unit stands, kept whole so a game can be replayed and
+ * audited with no model call: what the umpire proposed, what the engine made of it, and why.
+ */
+export interface Ruling {
+  id: string;
+  /** Game time the engine ruled on the proposal. */
+  time: GameTime;
+  proposal: PlacementProposal;
+  verdict: PlacementVerdict;
+  /** The umpire's reasoning. */
+  rationale: string;
+  /** What the table is told happened ("the column strung out along the road"). */
+  narrative: string;
 }
