@@ -175,6 +175,7 @@ export class TableScene {
 
   /** Camera straight above the map centre, for precise plotting. */
   snapTopDown(): void {
+    if (this.atDesk) return;
     this.controls.target.set(0, 0, 0);
     this.camera.position.set(0, this.fitDistance(), 0.001);
     this.controls.update();
@@ -206,6 +207,7 @@ export class TableScene {
 
   /** Angled view from the near edge of the table. */
   snapOblique(): void {
+    if (this.atDesk) return;
     const { height } = this.state?.map ?? { height: 3000 };
     this.controls.target.set(0, 0, 0);
     this.camera.position
@@ -243,9 +245,10 @@ export class TableScene {
     const from = this.currentPose();
     let to: CameraPose;
     if (on) {
-      this.tablePose = from;
+      // A dolly still running means the camera is mid-flight back to the table: keep the pose it is heading to.
+      if (!this.dolly || !this.tablePose) this.tablePose = from;
       const { height } = this.state?.map ?? { height: 3000 };
-      to = deskPose(from, height, this.span);
+      to = deskPose(this.tablePose, height, this.span);
     } else {
       to = this.tablePose ?? from;
     }

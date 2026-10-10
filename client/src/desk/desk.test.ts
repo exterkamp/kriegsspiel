@@ -53,8 +53,10 @@ describe('camera transition maths', () => {
     expect(lerpPose(a, b, 0.5).position).toEqual({ x: 2, y: 6, z: 4 });
   });
   it('puts the desk pose low, in front of the table edge', () => {
-    const d = deskPose(a, 3000, 4000);
-    expect(d.position.y).toBeLessThan(a.position.y + 1e6);
+    const overhead = { position: { x: 0, y: 5000, z: 0 }, target: { x: 0, y: 0, z: 0 } };
+    const d = deskPose(overhead, 3000, 4000);
+    expect(d.position.y).toBeLessThan(overhead.position.y);
+    expect(d.position.y).toBeLessThan(4000);
     expect(d.target.z).toBeGreaterThan(1500);
     expect(d.position.z).toBeGreaterThan(d.target.z);
   });
@@ -81,6 +83,27 @@ describe('TableScene desk dolly', () => {
     t.stepDolly(3000);
     expect(t.controls.enabled).toBe(true);
     expect(t.camera.position.distanceTo(before)).toBeLessThan(1e-6);
+  });
+  it('returns to the original table pose after reversing mid-dolly', () => {
+    const t = make();
+    const before = t.camera.position.clone();
+    t.setDesk(true, 1000, 0);
+    t.stepDolly(1000);
+    t.setDesk(false, 1000, 2000);
+    t.stepDolly(2300);
+    t.setDesk(true, 1000, 2300);
+    t.stepDolly(3300);
+    t.setDesk(false, 1000, 4000);
+    t.stepDolly(5000);
+    expect(t.camera.position.distanceTo(before)).toBeLessThan(1e-6);
+  });
+  it('ignores the top-down and oblique snaps while at the desk', () => {
+    const t = make();
+    t.setDesk(true, 0, 0);
+    const at = t.camera.position.clone();
+    t.snapTopDown();
+    t.snapOblique();
+    expect(t.camera.position.distanceTo(at)).toBe(0);
   });
   it('jumps when the duration is 0', () => {
     const t = make();
