@@ -168,6 +168,9 @@ export function loadScenario(raw: unknown): GameState {
     map,
     sides,
     units,
+    intel: Object.fromEntries(
+      sideIds.map((id) => [id, { contacts: [], inSight: [], reports: [] }]),
+    ) as unknown as GameState['intel'],
     victory: {
       objective,
       defender,

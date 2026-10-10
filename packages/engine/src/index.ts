@@ -25,3 +25,14 @@ export type { Path } from './movement.js';
 export { COURIER_MS_PER_TILE, issueOrder, registerOrders } from './orders.js';
 export type { Order, OrderIntent } from './orders.js';
 export { beginMarch } from './movement.js';
+export {
+  COURIER_DELAY_MS,
+  SCAN_INTERVAL_MS,
+  SIGHT_RANGE,
+  canSee,
+  registerVisibility,
+  startVisibility,
+  viewFor,
+  renderReport,
+} from './visibility.js';
+export type { EngineSideView, ViewUnit, ViewEnemy, ViewContact, ViewReport } from './visibility.js';

@@ -12,7 +12,7 @@ Each milestone should end in something playable.
 - [ ] Map, units, orders and movement in `engine`, written fresh against the event-queue design
 - [ ] Seeded RNG, event log, replay
 - [ ] Unit types: line infantry, skirmishers, cavalry, artillery; formations (column/line)
-- [ ] Line of sight and per-side visibility function
+- [x] Line of sight and per-side visibility function
 - [ ] Combat v1 with simple fire + melee tables, fractional casualties, morale
 - [ ] CLI to run a scripted two-side scenario and print the event log
 - [ ] Event queue and `advanceTo(t)`; the engine never touches the wall clock

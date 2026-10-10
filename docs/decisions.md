@@ -65,6 +65,12 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Open.** `order_delivered` is emitted even if the unit then cannot march (`unit.moveBlocked`, destination unreachable from where it stands); the two events are not linked yet. The courier route is fixed when the order is issued from the unit's position then, not chased as the unit moves, and couriers cannot be intercepted. Only the first parsed intent is adopted; conditional and timed intents, and `attack` (from 1.7), are not yet modelled. Strength 0 stands in for "destroyed" until combat decides how units are removed.
 **See.** [architecture.md](architecture.md), [gameplay.md](gameplay.md)
 
+## D12: Visibility is a pure filter over per-side intel
+**Decision.** `viewFor(world, side, now)` in `packages/engine/src/visibility.ts` is the only function that turns master state into an `EngineSideView`. A unit sees an enemy within its sight range (infantry and artillery 6 tiles, cavalry 8) when no wood tile lies on the Bresenham line between them; a unit in or looking from a wood sees or is seen only within 2 tiles. A repeating `intel.scan` event (every game minute) records sightings in `GameState.intel[side]` (last-known contacts and reports), and files a contact report the first time an enemy comes into sight. `intel.report` events file unit-lost and order-delivered reports. Every report is delivered `COURIER_DELAY_MS` (10 game minutes) after it happened, and the view shows it with its age. Enemy size is a coarse phrase, never a number. Last-known contacts show the position where the enemy was seen, its age, and an uncertainty radius in tiles that grows one tile per minute of age, capped at the map's longer side.
+**Why.** Keeping memory in state makes stale contacts replayable, and one filter function makes the leak tests meaningful.
+**Open.** The `EngineSideView` is not yet mapped to the protocol `SideView` (no clock, dispatches or supply); tracked in #109. The courier delay is a flat constant, not distance to HQ. Sight ignores facing, weather and night. Contacts are never pruned, not even for destroyed enemies; tracked in #110.
+**See.** [architecture.md](architecture.md)
+
 ## Open questions
 - Default clock ratio (decide after the first scenario).
 - Command level and default hierarchy (assumptions above).
