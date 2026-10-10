@@ -133,6 +133,9 @@ Retain the plan defaults; these fixtures provide no evidence that whole-map perf
 | Sites | 4 villages + 6 farm sites; bounded counts, minimum suitable area/spacing resolved in #137; report infeasible requests |
 | Resource targets | ≤10 s default / ≤30 s maximum generation, peak ≤512 MiB; measure documented hardware in #142 |
 | Preview target | p95 frame ≤33 ms, 1440×900; later browser measurement, not a claim from Node fixtures |
+
+The supported Node CLI/resource measurement profile uses `--max-old-space-size=256`; `npm run maps:cli` and corpus child processes apply it explicitly. This sets a256MiB V8 old-space limit, not total heap or process RSS (Node22.22.2 reports304MiB total heap limit). Reports retain actual flags, V8 heap limit and separate generation-through/post-check whole-process peak RSS. The512MiB target is measured, not guaranteed by that flag. The initial unconstrained-heap default diagnostic reached578MiB and failed; the bounded-profile diagnostic preserved identical asset/geometry identities. Final accepted-source evidence belongs in the resource report. Browser worker/page memory remains a separate, unmeasured quantity.
+
 | Overrides | Rename, move settlement anchors, exclude placement regions. Names leave geometry unchanged; moves/exclusions regenerate dependent local layouts and roads with stable place IDs. |
 
 No terrain brush, arbitrary road drawing, building editor, hydrology editor or multiplayer authoring. Relief/land-cover density are generation settings and regenerate. Reject missing override IDs and unsupported recorded versions. Farm population/footprint defaults, exact site spacing and algorithm operation limits are unresolved configurable contracts for #134/#137/#138, not decisions established by these village fixtures. Do not promise arbitrary cross-runtime float identity.

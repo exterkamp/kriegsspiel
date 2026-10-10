@@ -31,3 +31,4 @@ export {
 } from './terrain/index.js';
 export * from './geography/index.js';
 export * from './planning/index.js';
+export * from './composition/index.js';

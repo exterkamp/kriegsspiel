@@ -166,3 +166,13 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Owner boundary.** The owner explicitly selected “Keep distribution gated; prepare review PR.” This authorizes source review and local verification, without changing Kriegsspiel's license or publishing a combined browser build/package. The source-bearing fallback implements the existing plan, rather than resolving that owner licensing decision.
 
 **See.** [Snapshot instructions](../vendor/settlemaker/README.md), [map architecture](map-architecture.md), [execution log](map-execution-log.md).
+
+## D21: Complete maps persist certified access and validate saved geometry independently
+
+**Decision.** The `complete-frontage-access-v1` composition pipeline runs terrain, geography, contours, regional planning, constrained physical settlements and bounded join reconciliation before canonical whole-map certification. A versioned50m farm preference stays inside recorded site intervals. Four-person dwellings persist their real0.8m access corridors as tracks connected to split local street nodes. Compatible degree-two street chains retain every bend. Occupied footprints are convex actual-building envelopes clipped to permissible land, with disconnected results explicitly infeasible.
+
+**Validation and replay.** The saved validator calls no generator and heals no geometry. It checks exact supported source/stage identities, kind-bound stable place slots, actual capacity and footprints, water/grade/contour suitability, regional route connectivity, local access and entrance joins, bridges and ordered overrides. Metered conservative spatial indexes prune only impossible intersection candidates; existing exact predicates and deterministic caps remain authoritative. Lower caller work limits change success/failure rather than successful canonical geometry. Node-only CLI and canonical JSON/SVG exports share complete certification.
+
+**Boundary.** This is a public cartographic asset and scenario adapter seam, separate from engine state, movement, combat, visibility and objectives. Source review/local verification remain authorized; combined distribution stays gated under D20. Complete milestone acceptance still requires the authoring, replay and resource evidence in the execution log.
+
+**See.** [Composition policies](../packages/maps/docs/composition.md), [authoring guide](map-authoring-guide.md), [gameplay handoff](map-gameplay-handoff.md), [execution log](map-execution-log.md).

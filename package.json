@@ -19,7 +19,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run verify:map-source && npm run build --workspaces --if-present",
     "verify:map-source": "node scripts/verify-map-source.mjs",
-    "setup:map-source": "node scripts/setup-map-source.mjs"
+    "setup:map-source": "node scripts/setup-map-source.mjs",
+    "maps:cli": "node --max-old-space-size=256 packages/maps/dist/composition/headless-cli.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
