@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
 import type { PauseTransition } from '../pause.js';
+import type { RatioTransition } from '../ratioVote.js';
 
 /** Everything needed to resume a game: serialised engine state and the clock's anchor. */
 export interface GameSnapshot {
@@ -34,7 +35,12 @@ export type GameCommand =
   | { kind: 'proposeResume'; by: string }
   | { kind: 'vote'; by: string; proposal: string; yes: boolean }
   /** A vote or the maximum pause length ran out. Issued by the actor's own timer. */
-  | { kind: 'pauseExpire' };
+  | { kind: 'pauseExpire' }
+  /** Ratio voting (docs/gameplay.md, Changing the ratio): same voters and rules as the pause vote. */
+  | { kind: 'proposeRate'; by: string; rate: number }
+  | { kind: 'rateVote'; by: string; proposal: string; yes: boolean }
+  /** A ratio vote ran out of time. Issued by the actor's own timer. */
+  | { kind: 'rateExpire' };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {
@@ -62,6 +68,8 @@ export interface InputLogEntry {
   agent?: boolean;
   /** Pause-voting steps this command caused, for the journal. */
   pause?: PauseTransition[];
+  /** Ratio-vote steps this command caused. A `passed` step carries the new ratio. */
+  ratio?: RatioTransition[];
   /** The command was refused or failed; the reason. */
   error?: string;
 }

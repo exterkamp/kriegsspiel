@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
 import {
@@ -514,6 +514,27 @@ describe('deployment endpoints', () => {
       expect((await server.inject({ method: 'POST', url: '/games', payload: {} })).statusCode).toBe(
         201,
       );
+    } finally {
+      await server.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('redirects a directory without trailing slash, keeping the query', async () => {
+    const dir = mkdtempSync(joinPath(tmpdir(), 'ks-static-'));
+    mkdirSync(joinPath(dir, 'admin'));
+    writeFileSync(joinPath(dir, 'admin', 'index.html'), '<title>admin</title>');
+    const { server } = await buildApp({ parser: new StubOrderParser(), staticDir: dir });
+    try {
+      const bare = await server.inject('/admin');
+      expect(bare.statusCode).toBe(301);
+      expect(bare.headers.location).toBe('/admin/');
+      const withToken = await server.inject('/admin?token=x');
+      expect(withToken.statusCode).toBe(301);
+      expect(withToken.headers.location).toBe('/admin/?token=x');
+      const page = await server.inject('/admin/');
+      expect(page.statusCode).toBe(200);
+      expect(page.body).toContain('<title>admin</title>');
     } finally {
       await server.close();
       rmSync(dir, { recursive: true, force: true });

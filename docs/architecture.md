@@ -100,6 +100,7 @@ running ──request──► pause_proposed ──all humans yes──► paus
 - **While paused**, players can read reports, write drafts and sign orders. Newly signed orders are stamped with the paused game time and the courier leaves when the clock resumes, so nothing new is learned and a pause cannot be used to gain information.
 - **Emergency hold** (suggested): any single player can call a short hold of a few wall-clock minutes, a limited number of times per game, which ends on its own unless ratified by a vote. This avoids a stuck game when a real emergency comes up and others are away.
 - **Server downtime**: if the server was down, the game resumes **paused** and asks the players to confirm. We never silently skip game time.
+- A **ratio change** is voted on the same way (`proposeRate`, `rateVote`): the same voters and rules, one open proposal, and on a pass the clock re-anchors at the current game time before the new rate applies.
 - All pauses and votes are recorded in the journal, and the post-game critique can mention them.
 
 ## Components
@@ -162,6 +163,14 @@ The server turns the opponent on by default: `main.ts` passes `scriptedOpponents
 - **Routes**, all `GET` under `/admin/api`: `games`; `games/:id/state` (unfiltered engine state and clock); `games/:id/entries` (`kind`, `correlationId`, `after` cursor, `limit`; `next` is the cursor for the following page); `games/:id/stream` (server-sent events of new entries, `after` replays the backlog first).
 - **Gating.** The routes exist only when `ADMIN_ENABLED` is `1`, `true` or `on`; otherwise `buildApp` never registers them, so every `/admin` path is a plain 404, and the trace is the no-op sink. When enabled, a request must come from a loopback address or carry `ADMIN_TOKEN` (`Authorization: Bearer`, or `?token=` for `EventSource`). With no token set, only loopback gets in. The check uses the socket address, and a request that carries `X-Forwarded-For` or `Forwarded` is never treated as loopback, so callers behind a same-host reverse proxy, or across a container bridge, need the token.
 - **Read-only and separate.** Only `GET` routes are registered, none calls an actor command, and the module shares no code with `api/hub.ts` or `api/sideView.ts`. Master state leaves the process only through these routes.
+
+## Admin page
+
+`client/admin/index.html` with `client/src/admin/` is a standalone page at `/admin/`, built by the same Vite config as the game client (a second entry) and sharing no code with it. It is a shell (story 8.3): a game picker fed by `GET /admin/api/games`, a live indicator, and empty State, Events, Requests, LLM and Replay panels under one filter bar, which later stories fill.
+
+- **Live indicator.** `live` while the selected game's SSE stream is open (or the game list polls fine when there are no games); `reconnecting…` when the stream errors or the list request fails (retry backoff 1s to 10s, and the stream is reopened on recovery); `admin disabled` on a 404; `unauthorized` on a 401. Pass `?token=` on the page URL to send `ADMIN_TOKEN`.
+- **Serving.** In dev, Vite proxies `/admin/api` to the server and redirects `/admin` to `/admin/`. In the container the static handler serves `dist/admin/`. The page is static and holds no game data; with the admin view off, only the API paths 404 and the page shows `admin disabled`.
+- **Keys.** `1`-`5` switch panels, `←`/`→` move along the tabs, `/` focuses the filter.
 
 ## Tech choices (suggested, open to change)
 

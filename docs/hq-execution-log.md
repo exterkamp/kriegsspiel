@@ -2,7 +2,7 @@
 
 ## Resumed execution — 2026-10-10
 
-Current state: Wave A fixture architecture accepted; Wave B #48 implementation active after permission mode changed to Approve for me. Escalated GitHub and Herdr commands now pass automatic approval review. The earlier blocked kickoff below is historical.
+Current state: ready fixture/local packets are independently reviewed and published in PR #193; final CI and conflict reconciliation are in progress. Epic #4 is assigned to dfezzie and remains open. Browser/live/service/map gates remain pending. The entries below preserve historical execution states; latest acceptance evidence is at the end.
 
 - Refreshed `origin/main` and fast-forwarded HQ to `cb635a21bb8170df9d83d426848cefe6f52f8f89`. Roadmap edit was temporarily stashed by path, reapplied without conflict, and the preservation stash dropped only by successful `stash pop`.
 - Accepted prerequisites on main: replay PR #143, merge `f3c1fe5c2be581ab1b823a3aa7186e1de306cd79`; LLM barrier PR #152 included in current base. Replay still lacks the arbitrary-time, authorized post-game service required by #58.
@@ -257,3 +257,10 @@ Final complete lint, typecheck, tests and build passed against accepted main `2e
 Checkpoint `2fab76c` CI failed because root omitted the already-tested App test selector generic fix from staging. The final placement commit includes `client/src/hq/App.test.ts` and will be verified on its exact published head before PR readiness. This was a staging error, not a waived check.
 
 Current HQ pane labels are Coordinator, Plotting, Runtime Review and Accessibility. Exclusive authors are settled. Ready independent fixture/local work is delivered; live projection/commands, shared marks, signing/couriers, conference/replay services, generated-map handoff and browser/device/performance gates remain external or pending. Epic/stories remain open. No dev server, map-checkout modification, issue closure, merge or deployment.
+
+
+### Accepted-main conflict reconciliation — 16:07 PDT
+
+GitHub reported PR #193 conflicting, so no final-head CI was scheduled. Refreshed main to `a862433` (accepted PR #189 admin shell and #190 mid-game ratio voting), merging only into HQ. The sole conflict was `client/vite.config.ts`; root retained both admin/HQ entry configurations, admin redirect, REST/WS proxies, Svelte plugin and browser conditions. Independent high reviewer compared both parents and accepted the bounded configuration after 20s. No files edited by reviewer or servers started.
+
+Full post-resolution lint, types, tests and build exited zero: 1,363 passed (290 engine, 45 protocol, 384 server, 631 client, 13 root), one optional server skip, zero Svelte errors/warnings. Logs: `/private/tmp/hq-merge-{lint,types,tests,build}.log`. Build emits the separate admin entry and warns about the 827.08 kB / 227.67 kB gzip HQ/main chunk. This local baseline merge is authorized prerequisite reconciliation; no GitHub PR was merged. Final CI and PR readiness are verified through GitHub after publication.
