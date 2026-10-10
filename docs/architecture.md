@@ -109,7 +109,7 @@ running ──request──► pause_proposed ──all humans yes──► paus
 
 ### SideView contents
 
-A `SideView` (engine type, `viewFor`) may contain only:
+An `EngineSideView` (engine type, `viewFor`; not the protocol `SideView`, see D11) may contain only:
 
 - `side`, `time`, `mapWidth`, `mapHeight`.
 - `ownUnits`: the side's own units in full (id, name, kind, position, strength, morale).

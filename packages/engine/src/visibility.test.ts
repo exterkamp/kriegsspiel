@@ -104,6 +104,45 @@ describe('canSee', () => {
   });
 });
 
+describe('canSee symmetry', () => {
+  it('gives the same answer from either end across a wood corner', () => {
+    for (let wx = 3; wx <= 7; wx++) {
+      for (let wy = 3; wy <= 7; wy++) {
+        const w = world(
+          [
+            ['a', 'blue', 2, 2],
+            ['b', 'red', 6, 5],
+          ],
+          [[wx, wy]],
+        );
+        expect(canSee(w, unit(w, 'a'), unit(w, 'b'))).toBe(canSee(w, unit(w, 'b'), unit(w, 'a')));
+      }
+    }
+  });
+
+  it('is symmetric on a diagonal-ish line over many layouts', () => {
+    for (let wx = 0; wx < 12; wx++) {
+      for (let wy = 0; wy < 12; wy++) {
+        const w = world(
+          [
+            ['a', 'blue', 4, 7],
+            ['b', 'red', 7, 4],
+          ],
+          [[wx, wy]],
+        );
+        if (
+          [
+            [4, 7],
+            [7, 4],
+          ].some(([x, y]) => x === wx && y === wy)
+        )
+          continue;
+        expect(canSee(w, unit(w, 'a'), unit(w, 'b'))).toBe(canSee(w, unit(w, 'b'), unit(w, 'a')));
+      }
+    }
+  });
+});
+
 describe('viewFor', () => {
   it('shows own units fully and visible enemies coarsely', () => {
     const w = world([
@@ -160,19 +199,28 @@ describe('viewFor', () => {
       ),
     );
     s = advanceTo(s, 0, reg).state;
-    expect(viewFor(s.world, 'blue', s.time).visibleEnemies).toHaveLength(1);
+    const first = viewFor(s.world, 'blue', s.time);
+    expect(first.visibleEnemies).toHaveLength(1);
+    // Never both visible and last-known.
+    expect(first.lastKnownContacts).toEqual([]);
 
     s = issueMove(s, 'r', { x: 25, y: 5 });
-    s = advanceTo(s, 40 * MS_PER_MINUTE, reg).state;
-    expect(unit(s.world, 'r').position.x).toBeGreaterThan(12);
+    s = advanceTo(s, 20 * MS_PER_MINUTE, reg).state;
+    expect(unit(s.world, 'r').position.x).toBeGreaterThan(11);
 
     const v = viewFor(s.world, 'blue', s.time);
     expect(v.visibleEnemies).toEqual([]);
     expect(v.lastKnownContacts).toHaveLength(1);
     const c = v.lastKnownContacts[0]!;
     expect(c.id).toBe('r');
-    expect(c.ageMs).toBeGreaterThan(0);
-    expect(c.uncertaintyTiles).toBeGreaterThan(0);
+    // Last scan that saw it, and the exact age and radius since.
+    const lastSeen = c.seenAt;
+    expect(lastSeen).toBeGreaterThan(0);
+    expect(lastSeen).toBeLessThan(20 * MS_PER_MINUTE);
+    expect(lastSeen % MS_PER_MINUTE).toBe(0);
+    const n = (s.time - lastSeen) / MS_PER_MINUTE;
+    expect(c.ageMs).toBe(n * MS_PER_MINUTE);
+    expect(c.uncertaintyTiles).toBe(n);
     // Old position (where it was last seen), never the current one.
     expect(c.position).not.toEqual(unit(s.world, 'r').position);
     expect(c.position.x).toBeLessThanOrEqual(11);
@@ -211,7 +259,27 @@ describe('reports', () => {
     expect(JSON.stringify(r)).not.toContain('437');
   });
 
-  it('reports a contact once, and tells the other side nothing of it', () => {
+  it('reports a contact once while in sight, and tells the other side nothing of it', () => {
+    const reg = registry();
+    let s = startVisibility(
+      createState(
+        1,
+        world([
+          ['b', 'blue', 5, 5],
+          ['r', 'red', 8, 5],
+        ]),
+        0,
+      ),
+    );
+    s = advanceTo(s, 60 * MS_PER_MINUTE, reg).state;
+    const blue = viewFor(s.world, 'blue', s.time).reports;
+    expect(blue.filter((r) => r.kind === 'contact')).toHaveLength(1);
+    expect(
+      viewFor(s.world, 'red', s.time).reports.filter((r) => r.kind === 'contact'),
+    ).toHaveLength(1);
+  });
+
+  it('reports nothing for an enemy that is never in sight', () => {
     const reg = registry();
     let s = startVisibility(
       createState(
@@ -226,6 +294,28 @@ describe('reports', () => {
     s = advanceTo(s, 60 * MS_PER_MINUTE, reg).state;
     expect(viewFor(s.world, 'blue', s.time).reports).toEqual([]);
     expect(viewFor(s.world, 'red', s.time).reports).toEqual([]);
+  });
+
+  it('files a second contact report when the enemy leaves sight and comes back', () => {
+    const reg = registry();
+    let s = startVisibility(
+      createState(
+        1,
+        world([
+          ['b', 'blue', 5, 5],
+          ['r', 'red', 8, 5],
+        ]),
+        0,
+      ),
+    );
+    s = advanceTo(s, 0, reg).state;
+    s = issueMove(s, 'r', { x: 25, y: 5 });
+    s = advanceTo(s, 40 * MS_PER_MINUTE, reg).state;
+    s = issueMove(s, 'r', { x: 8, y: 5 });
+    s = advanceTo(s, 120 * MS_PER_MINUTE, reg).state;
+    expect(viewFor(s.world, 'blue', s.time).visibleEnemies).toHaveLength(1);
+    const contacts = viewFor(s.world, 'blue', s.time).reports.filter((r) => r.kind === 'contact');
+    expect(contacts).toHaveLength(2);
   });
 
   it('files unit-lost and order-delivered reports for the unit side only', () => {
@@ -245,5 +335,48 @@ describe('reports', () => {
     s = advanceTo(s, COURIER_DELAY_MS, reg).state;
     expect(viewFor(s.world, 'blue', s.time).reports.map((r) => r.kind)).toEqual(['unitLost']);
     expect(viewFor(s.world, 'red', s.time).reports.map((r) => r.kind)).toEqual(['orderDelivered']);
+  });
+});
+
+describe('intel.report validation', () => {
+  it('throws on an unknown report kind or unit', () => {
+    const reg = registry();
+    const mk = (payload: Record<string, string>) =>
+      schedule(
+        createState(
+          1,
+          world([
+            ['b', 'blue', 5, 5],
+            ['r', 'red', 20, 15],
+          ]),
+          0,
+        ),
+        [{ time: 0, type: 'intel.report', payload }],
+      );
+    expect(() => advanceTo(mk({ kind: 'bogus', unitId: 'b' }), 1, reg)).toThrow(
+      /unknown report kind/,
+    );
+    expect(() => advanceTo(mk({ kind: 'unitLost', unitId: 'nope' }), 1, reg)).toThrow(
+      /unknown unit/,
+    );
+    expect(() => advanceTo(mk({ kind: 'unitLost' }), 1, reg)).toThrow(/unknown unit/);
+  });
+});
+
+describe('uncertainty', () => {
+  it('is capped at the longer side of the map', () => {
+    const w = world([
+      ['b', 'blue', 5, 5],
+      ['r', 'red', 20, 15],
+    ]);
+    w.intel.blue.contacts.push({
+      id: 'r',
+      position: { x: 20, y: 15 },
+      seenAt: 0,
+      sizeEstimate: 'about a battalion',
+    });
+    const v = viewFor(w, 'blue', 180 * MS_PER_MINUTE);
+    expect(v.lastKnownContacts[0]!.ageMs).toBe(180 * MS_PER_MINUTE);
+    expect(v.lastKnownContacts[0]!.uncertaintyTiles).toBe(30);
   });
 });

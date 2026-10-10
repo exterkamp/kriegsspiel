@@ -66,7 +66,9 @@ export function canSee(world: GameState, observer: Unit, target: Unit): boolean 
   if (dist > WOOD_RANGE && (tileAt(world.map, a) === 'wood' || tileAt(world.map, b) === 'wood')) {
     return false;
   }
-  return between(a, b).every((p) => tileAt(world.map, p) !== 'wood');
+  // Walk the line from a canonical endpoint so sight is symmetric.
+  const [p, q] = a.y < b.y || (a.y === b.y && a.x <= b.x) ? [a, b] : [b, a];
+  return between(p, q).every((t) => tileAt(world.map, t) !== 'wood');
 }
 
 function visibleTo(world: GameState, side: SideId): Unit[] {
@@ -130,7 +132,7 @@ export interface ViewReport {
  * Everything one side may know. This is the complete list; nothing else
  * reaches a client (see docs/architecture.md, "SideView contents").
  */
-export interface SideView {
+export interface EngineSideView {
   side: SideId;
   time: GameTime;
   mapWidth: number;
@@ -162,7 +164,11 @@ export function renderReport(r: Report, ageMs: number): string {
  * `now` is the engine clock (`EngineState.time`); `world.time` only moves when an
  * event fires, so pass `now` whenever the clock may have advanced past the last event.
  */
-export function viewFor(world: GameState, side: SideId, now: GameTime = world.time): SideView {
+export function viewFor(
+  world: GameState,
+  side: SideId,
+  now: GameTime = world.time,
+): EngineSideView {
   const state = { ...world, time: now };
   const intel = state.intel[side];
   const seen = visibleTo(state, side);
@@ -196,7 +202,10 @@ export function viewFor(world: GameState, side: SideId, now: GameTime = world.ti
           position: { ...c.position },
           seenAt: c.seenAt,
           ageMs,
-          uncertaintyTiles: Math.ceil(ageMs / MS_PER_MINUTE),
+          uncertaintyTiles: Math.min(
+            Math.ceil(ageMs / MS_PER_MINUTE),
+            Math.max(state.map.width, state.map.height),
+          ),
           sizeEstimate: c.sizeEstimate,
         };
       }),
@@ -283,9 +292,12 @@ export function registerVisibility(registry: EventRegistry<GameState>): void {
   }));
 
   registry.register(REPORT_EVENT, (world, ev) => {
-    const p = ev.payload as unknown as { kind: 'unitLost' | 'orderDelivered'; unitId: string };
+    const p = ev.payload as unknown as { kind: string; unitId: string };
+    if (p?.kind !== 'unitLost' && p?.kind !== 'orderDelivered') {
+      throw new Error(`${REPORT_EVENT}: unknown report kind ${String(p?.kind)}`);
+    }
     const unit = world.units.find((u) => u.id === p.unitId);
-    if (!unit) return { world };
+    if (!unit) throw new Error(`${REPORT_EVENT}: unknown unit ${String(p.unitId)}`);
     const report: Report = {
       id: reportId(world, unit.side),
       kind: p.kind,

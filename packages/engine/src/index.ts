@@ -32,4 +32,4 @@ export {
   viewFor,
   renderReport,
 } from './visibility.js';
-export type { SideView, ViewUnit, ViewEnemy, ViewContact, ViewReport } from './visibility.js';
+export type { EngineSideView, ViewUnit, ViewEnemy, ViewContact, ViewReport } from './visibility.js';
