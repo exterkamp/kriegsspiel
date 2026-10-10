@@ -111,7 +111,7 @@ running ──request──► pause_proposed ──all humans yes──► paus
   The model seam is `UmpireClient` in `server/src/umpire/` (`call(request)` returns schema-validated output plus a call record). It is provider-agnostic (D14, [llm-providers.md](llm-providers.md)): `ProviderUmpireClient` routes each stage to a configured `{provider, model, params}`, sends it through an `LlmProvider` adapter (Anthropic, OpenAI-compatible, Ollama), validates the result against the schema, retries transport errors, timeouts and schema-invalid output with backoff (with a repair message for models without native structured output), and sums tokens and cost across attempts. Rate limit and budget are `UmpireClient` decorators, and `PlaybackUmpireClient` serves recorded calls with no provider, so replays cannot reach the network. Each accepted call goes to a `CallRecorder` (provider, model, prompt version, system, input, raw output) for the input log. Only the adapters know about a vendor SDK or wire format. `MockUmpireClient` serves hand-written JSON fixtures (with configurable latency and failure injection) for all non-LLM tests, see [umpire-fixtures.md](umpire-fixtures.md).
 - **Visibility service**: from master state and a side, produces that side's knowledge: seen units, stale contact reports, received messages. The *only* path from master state to a client. See D12.
 - **Clock and scheduler** (server): the `ClockState`, the scheduler, and pause voting.
-- **API** (server, `server/src/api`): Fastify. `POST /games` creates a game; `GET /games/:id/ws?token=` is one side's WebSocket, speaking the `packages/protocol` messages. Inbound frames are validated with the protocol schemas, and the hub sends only `SideView` data built by the visibility filter. See D16.
+- **API** (server, `server/src/api`): Fastify. `POST /games` creates a game; `GET /games/:id/ws` is the WebSocket of the side the signed-in user holds a seat on (D17), speaking the `packages/protocol` messages. Inbound frames are validated with the protocol schemas, and the hub sends only `SideView` data built by the visibility filter. See D16.
 - **Notifier**: pushes dispatch arrivals and clock events over WebSocket, plus email or web push for players who are away. Players set thresholds (all dispatches, urgent only, contact only).
 - **Persistence**: an append-only event log of *inputs* (commands, clock changes, votes, LLM outputs, seeds), plus periodic snapshots for quick recovery. Implemented as `SqliteGameStore` (D14b): recovery is the latest snapshot plus replay of the later inputs, and the game resumes paused. Stores the model, prompt version and raw output of each LLM call.
 - **Client**: a Three.js map table (flat map, 3D pieces) and a Svelte desk, showing a desk clock with the rate and any pause. It renders only what the server sends. See [hq-interface.md](hq-interface.md).
@@ -185,7 +185,7 @@ The server turns the opponent on by default: `main.ts` passes `scriptedOpponents
 | Realtime | WebSocket for clock, dispatch and vote events | Needed now that play is continuous |
 | Notifications | Web push and email | Players are away most of the time |
 | LLM | Anthropic API, structured outputs | Cost split by stage |
-| Auth | Magic link or simple accounts, later | Not needed for hot-seat prototype |
+| Auth | Magic-link email login, cookie sessions, per-game seats (D17) | No passwords to store or reset |
 | Hosting | Single container, docker compose | Matches the other self-hosted services |
 
 ## Key data shapes (sketch)

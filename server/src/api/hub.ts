@@ -29,6 +29,7 @@ const OPEN = 1;
 
 interface Connection {
   side: SideId;
+  userId: string | undefined;
   socket: Socket;
   lastView: string;
   lastClock: string;
@@ -56,10 +57,18 @@ export class Hub {
     return this.conns.get(gameId)?.size ?? 0;
   }
 
+  /** Closes every socket a user has open, e.g. after they delete their account or log out everywhere. */
+  disconnectUser(userId: string, reason = 'signed out'): void {
+    for (const set of this.conns.values()) {
+      for (const c of [...set]) if (c.userId === userId) c.socket.close(1008, reason);
+    }
+  }
+
   /** Serve one player's socket: send the initial view, then handle its commands. */
-  attach(gameId: string, side: SideId, socket: Socket): void {
+  attach(gameId: string, side: SideId, socket: Socket, userId?: string): void {
     const conn: Connection = {
       side,
+      userId,
       socket,
       lastView: '',
       lastClock: '',

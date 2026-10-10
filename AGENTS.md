@@ -25,8 +25,8 @@ Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a serve
 
 ## Current state
 - Only the monorepo scaffold exists (`packages/engine`, `packages/protocol`, `server`, `client`; `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`). An earlier Phaser prototype was abandoned and removed. Do not revive it. Build the engine and client fresh from the docs.
-- Server API: `npm run dev -w server` builds and starts it on `$PORT` (default 3000), so under `devrun` use `devrun up --name api --port-env PORT -- npm run dev -w server`. `POST /games` makes a game; `/games/:id/ws?token=` is a side's WebSocket (D16).
-- Client HUD (`client/src/hud`, `client/src/net`): open `/?new=1&side=blue&rate=12` to create a game and join as a side, or `/?game=<id>&token=<t>` to join one; with neither the page shows the offline fixture. Vite proxies `/games` (REST and WebSocket) to `$API_URL` (default `http://localhost:3000`). The server does not yet send pending orders or a delivery estimate, so the HUD lists orders it sent itself.
+- Server API: `npm run dev -w server` builds and starts it on `$PORT` (default 3000), so under `devrun` use `devrun up --name api --port-env PORT -- npm run dev -w server`. `POST /games` makes a game; `/games/:id/ws` is a side's WebSocket, authenticated by the session cookie and the user's seat (D16, D17). Sign in with `POST /auth/login`; with no `MAIL_WEBHOOK_URL` the login link is in the server log.
+- Client HUD (`client/src/hud`, `client/src/net`): sign in with the emailed link, then open `/?new=1&side=blue&rate=12` to create a game and take a side, or `/?game=<id>` to join one; with neither the page shows the offline fixture. Vite proxies `/games` (REST and WebSocket) and `/auth` to `$API_URL` (default `http://localhost:3000`). The server does not yet send pending orders or a delivery estimate, so the HUD lists orders it sent itself.
 - Node version is in `.nvmrc`. Start dev servers with `devrun` (see `~/CLAUDE.md`), not bare `npm run dev`.
 
 ## Keep docs current
