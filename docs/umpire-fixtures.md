@@ -29,4 +29,4 @@ Add a `*.json` file to `server/src/umpire/fixtures/` (or append to one). Each fi
 | `failure`       | Optional `{kind, message?, times?}`. Throws `UmpireError` of `kind` for the first `times` matching calls (every call if `times` is omitted), then returns `output`. |
 | `name`          | Optional label used in error messages.                                                       |
 
-The first fixture that matches a call wins, so put specific fixtures (with `input`) before general ones. Fixtures are reusable. A call that matches nothing throws `UmpireError` with kind `missing-recording`.
+The first fixture that matches a call wins, so put specific fixtures (with `input`) before general ones. This also holds across the files of a fixtures directory, which load in file-name order: a catch-all (no `promptVersion` or `input`) in an earlier file shadows later, more specific ones, so pin shared fixtures to a `promptVersion`. Fixtures are checked when the client is built, whether they come from a file or are passed inline. Fixtures are reusable. A call that matches nothing throws `UmpireError` with kind `missing-recording`.

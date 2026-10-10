@@ -3,6 +3,7 @@
     {
       "name": "judge: any attack succeeds",
       "stage": "judge",
+      "promptVersion": "judge-v1",
       "output": { "verdict": "ok" }
     }
   ]

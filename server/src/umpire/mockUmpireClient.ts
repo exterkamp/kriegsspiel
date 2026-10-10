@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Ajv } from 'ajv';
 import type { ValidateFunction } from 'ajv';
+import { stable } from './stable.js';
 import { UmpireError } from './umpireClient.js';
 import type {
   CallRecorder,
@@ -41,16 +42,19 @@ export interface MockUmpireClientOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
-function stable(value: unknown): string {
-  return JSON.stringify(value, (_k, v: unknown) =>
-    v && typeof v === 'object' && !Array.isArray(v)
-      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1)))
-      : v,
-  );
-}
-
 const FAILURE_KINDS = ['transport', 'timeout', 'schema', 'refusal', 'missing-recording'];
 const STAGES = ['parse', 'judge', 'narrate'];
+
+/** Throws a clear error for a fixture that could never be served. */
+function validateFixture(f: UmpireFixture, where: string): void {
+  if (!f || !STAGES.includes(f.stage)) throw new Error(`${where}: bad or missing stage`);
+  if (f.failure && !FAILURE_KINDS.includes(f.failure.kind)) {
+    throw new Error(`${where}: bad failure kind`);
+  }
+  if (!('output' in f) && (!f.failure || f.failure.times !== undefined)) {
+    throw new Error(`${where}: needs output or failure`);
+  }
+}
 
 /** Reads one fixture file (`{"fixtures": [...]}` or a bare array) and checks its shape. */
 export function loadFixtureFile(path: string): UmpireFixture[] {
@@ -58,14 +62,7 @@ export function loadFixtureFile(path: string): UmpireFixture[] {
   const list = Array.isArray(parsed) ? parsed : (parsed as { fixtures?: unknown })?.fixtures;
   if (!Array.isArray(list)) throw new Error(`${path}: expected {"fixtures": [...]}`);
   return list.map((f: UmpireFixture, i) => {
-    const where = `${path} fixture ${i}`;
-    if (!f || !STAGES.includes(f.stage)) throw new Error(`${where}: bad or missing stage`);
-    if (f.failure && !FAILURE_KINDS.includes(f.failure.kind)) {
-      throw new Error(`${where}: bad failure kind`);
-    }
-    if (!('output' in f) && (!f.failure || f.failure.times !== undefined)) {
-      throw new Error(`${where}: needs output or failure`);
-    }
+    validateFixture(f, `${path} fixture ${i}`);
     return f;
   });
 }
@@ -97,6 +94,7 @@ export class MockUmpireClient implements UmpireClient {
   private readonly validators = new WeakMap<object, ValidateFunction>();
 
   constructor(fixtures: readonly UmpireFixture[], opts: MockUmpireClientOptions = {}) {
+    fixtures.forEach((f, i) => validateFixture(f, `fixture ${i}`));
     this.fixtures = [...fixtures];
     this.recorder = opts.recorder;
     this.sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
