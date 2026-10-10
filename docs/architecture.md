@@ -124,6 +124,7 @@ An `EngineSideView` (engine type, `viewFor`; not the protocol `SideView`, see D1
 - `visibleEnemies`: enemy units in sight now, as id, position, facing, formation, footprint (rounded to the nearest 10 m, since an exact one would give the strength away), any loose shape, and a coarse `sizeEstimate` phrase. Nothing else: no strength, morale, intent or name.
 - `lastKnownContacts`: enemy units seen earlier and not in sight now, as id, the position where seen, `facing` (coarse), `seenAt`, `ageMs`, `uncertaintyRadius` (metres, growing with age) and the size phrase from the sighting.
 - `reports`: contact, unit-lost and order-delivered reports whose courier delay has passed, each with kind, `observedAt`, `deliveredAt`, `ageMs`, reporting unit name, location, a plain-language `place` and `uncertaintyRadius`, size phrase, confidence and template prose.
+- `documents`: enemy dispatches this side took from couriers whose capture has reached HQ, each with `capturedAt`, `deliveredAt`, `ageMs`, `issuedAt`, the enemy unit it was `addressedTo`, location, `place` and the order's original `text`. Nothing about the sender's route, courier or the garbled version.
 
 Adding a field means updating this list and the leak tests in `visibility.test.ts`.
 

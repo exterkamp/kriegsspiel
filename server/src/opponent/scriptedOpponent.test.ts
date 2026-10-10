@@ -56,6 +56,7 @@ function view(over: Partial<EngineSideView> = {}): EngineSideView {
     visibleEnemies: [],
     lastKnownContacts: [],
     reports: [],
+    documents: [],
     ...over,
   };
 }
