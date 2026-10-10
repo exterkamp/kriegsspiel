@@ -36,6 +36,11 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Open.** Default hierarchy is assumed to be shared HQ, with chain-of-command as an option. Command level is assumed to be brigades and battalions.
 **See.** [gameplay.md](gameplay.md)
 
+## D7: Wire format is zod schemas in `packages/protocol`
+**Decision.** Every command and server message carries a version field `v` and is validated with strict zod schemas (unknown fields rejected). Types are inferred from the schemas. The package exports no master-state types.
+**Why.** One source of truth for server and client, and strict parsing keeps hidden state from leaking onto the wire.
+**See.** [architecture.md](architecture.md), `packages/protocol/README.md`
+
 ## Open questions
 - Default clock ratio (decide after the first scenario).
 - Command level and default hierarchy (assumptions above).
