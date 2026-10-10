@@ -3,8 +3,8 @@ import type { ValidateFunction } from 'ajv';
 import type { UmpireConfig } from './config.js';
 import { DEFAULT_UMPIRE_CONFIG } from './config.js';
 import { addUsage, costUsd, ZERO_USAGE } from './pricing.js';
-import { TransportError } from './transport.js';
-import type { UmpireTransport } from './transport.js';
+import { TransportError } from './provider.js';
+import type { ChatMessage, LlmProvider, ProviderRequest } from './provider.js';
 import { UmpireError } from './umpireClient.js';
 import type {
   CallRecorder,
@@ -14,8 +14,9 @@ import type {
   UmpireResponse,
 } from './umpireClient.js';
 
-export interface AnthropicUmpireClientOptions {
-  transport: UmpireTransport;
+export interface ProviderUmpireClientOptions {
+  /** Providers by the ids the config's stages refer to. */
+  providers: Record<string, LlmProvider>;
   config?: UmpireConfig;
   /** Every successful call is recorded here (model, prompt version, input, raw output). */
   recorder?: CallRecorder;
@@ -28,12 +29,17 @@ export interface AnthropicUmpireClientOptions {
 const DEFAULT_MAX_TOKENS = 4096;
 
 /**
- * Calls the model with a strict JSON schema, retrying transport failures, timeouts and
- * schema-invalid output with exponential backoff. Cost and tokens are accumulated across all
- * attempts so failed tries are still accounted for.
+ * Routes each stage to its configured provider and model, asks for JSON matching the schema,
+ * and retries transport failures, timeouts and schema-invalid output with exponential backoff.
+ * Cost and tokens are accumulated across all attempts so failed tries are still accounted for.
+ *
+ * A provider with native structured output is trusted to follow the schema (a retry just
+ * resends). Otherwise the schema goes in the prompt, and a bad reply is answered with a repair
+ * message that quotes the error. Either way the output is validated here before it is returned,
+ * and the retries are bounded by `maxAttempts`.
  */
-export class AnthropicUmpireClient implements UmpireClient {
-  private readonly transport: UmpireTransport;
+export class ProviderUmpireClient implements UmpireClient {
+  private readonly providers: Record<string, LlmProvider>;
   private readonly config: UmpireConfig;
   private readonly recorder?: CallRecorder;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -41,9 +47,14 @@ export class AnthropicUmpireClient implements UmpireClient {
   private readonly ajv = new Ajv({ strict: false, allErrors: false });
   private readonly validators = new WeakMap<object, ValidateFunction>();
 
-  constructor(opts: AnthropicUmpireClientOptions) {
-    this.transport = opts.transport;
+  constructor(opts: ProviderUmpireClientOptions) {
+    this.providers = opts.providers;
     this.config = opts.config ?? DEFAULT_UMPIRE_CONFIG;
+    for (const [stage, route] of Object.entries(this.config.stages)) {
+      if (!this.providers[route.provider]) {
+        throw new Error(`stage "${stage}" uses provider "${route.provider}", which was not built`);
+      }
+    }
     this.recorder = opts.recorder;
     this.sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
     this.random = opts.random ?? Math.random;
@@ -55,8 +66,25 @@ export class AnthropicUmpireClient implements UmpireClient {
       validate = this.ajv.compile(request.schema);
       this.validators.set(request.schema, validate);
     }
-    const model = this.config.models[request.stage];
-    const user = JSON.stringify(request.input);
+    const route = this.config.stages[request.stage];
+    const provider = this.providers[route.provider]!;
+    const model = route.model;
+    const structured = provider.capabilities.structuredOutput;
+    const system =
+      structured === 'native'
+        ? request.system
+        : `${request.system}\n\nReply with a single JSON object and nothing else (no prose, no code fences) that validates against this JSON Schema:\n${JSON.stringify(request.schema)}`;
+    const messages: ChatMessage[] = [{ role: 'user', content: JSON.stringify(request.input) }];
+    const base: ProviderRequest = {
+      model,
+      system,
+      messages,
+      schema: request.schema,
+      structured,
+      maxTokens: request.maxTokens ?? route.params?.maxTokens ?? DEFAULT_MAX_TOKENS,
+    };
+    const temperature = request.temperature ?? route.params?.temperature;
+    if (temperature !== undefined) base.temperature = temperature;
     let usage = ZERO_USAGE;
     let cost: number | null = 0;
     let lastError: UmpireError | undefined;
@@ -66,8 +94,9 @@ export class AnthropicUmpireClient implements UmpireClient {
     for (let attempt = 1; attempt <= this.config.maxAttempts; attempt++) {
       let delayHint = 0;
       let terminal = false;
+      let repair: { reply: string; problem: string } | undefined;
       try {
-        const res = await this.sendWithTimeout(model, request, user);
+        const res = await this.sendWithTimeout(provider, { ...base, messages: [...messages] });
         usage = addUsage(usage, res.usage);
         const c = costUsd(model, res.usage);
         cost = cost === null || c === null ? null : cost + c;
@@ -80,22 +109,27 @@ export class AnthropicUmpireClient implements UmpireClient {
           terminal = true;
           throw this.schemaError('output truncated at max_tokens', attempt);
         }
+        const text = structured === 'native' ? res.text : stripFence(res.text);
         let parsed: unknown;
         try {
-          parsed = JSON.parse(res.text);
+          parsed = JSON.parse(text);
         } catch {
+          repair = { reply: res.text, problem: 'it is not valid JSON' };
           throw this.schemaError('output is not JSON', attempt);
         }
         if (!validate(parsed)) {
-          throw this.schemaError(this.ajv.errorsText(validate.errors), attempt);
+          const detail = this.ajv.errorsText(validate.errors);
+          repair = { reply: res.text, problem: `it fails the schema: ${detail}` };
+          throw this.schemaError(detail, attempt);
         }
         const record: UmpireCallRecord = {
           stage: request.stage,
+          provider: route.provider,
           model,
           promptVersion: request.promptVersion,
           system: request.system,
           input: request.input,
-          rawOutput: res.text,
+          rawOutput: text,
           usage,
           costUsd: cost,
           attempts: attempt,
@@ -126,6 +160,15 @@ export class AnthropicUmpireClient implements UmpireClient {
           throw err;
         }
       }
+      if (repair && structured !== 'native') {
+        messages.push(
+          { role: 'assistant', content: repair.reply },
+          {
+            role: 'user',
+            content: `Your reply was rejected because ${repair.problem}. Reply again with only the corrected JSON object.`,
+          },
+        );
+      }
       if (attempt < this.config.maxAttempts) {
         await this.sleep(Math.max(delayHint, this.backoffMs(attempt)));
       }
@@ -149,7 +192,7 @@ export class AnthropicUmpireClient implements UmpireClient {
     return Math.round(exp * (0.5 + this.random() / 2));
   }
 
-  private async sendWithTimeout(model: string, request: UmpireRequest, user: string) {
+  private async sendWithTimeout(provider: LlmProvider, request: ProviderRequest) {
     const ctrl = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
@@ -160,21 +203,15 @@ export class AnthropicUmpireClient implements UmpireClient {
     });
     try {
       // Race so a transport that ignores the abort signal still times out.
-      return await Promise.race([
-        this.transport.send(
-          {
-            model,
-            system: request.system,
-            user,
-            schema: request.schema,
-            maxTokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
-          },
-          ctrl.signal,
-        ),
-        timeout,
-      ]);
+      return await Promise.race([provider.generate(request, ctrl.signal), timeout]);
     } finally {
       clearTimeout(timer);
     }
   }
+}
+
+/** Local models often wrap JSON in a markdown fence even when told not to. */
+function stripFence(text: string): string {
+  const m = /^\s*```(?:json)?\s*\n([\s\S]*?)\n?```\s*$/.exec(text);
+  return m ? m[1]! : text;
 }

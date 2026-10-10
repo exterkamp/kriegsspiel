@@ -1,8 +1,8 @@
 /**
  * The seam every LLM call goes through. See docs/architecture.md (Umpire service).
  *
- * The server depends on this file only. Implementations (the Anthropic wrapper, the playback
- * client, test mocks) live next to it and are injected. A client never mutates game state: it
+ * The server depends on this file only. Implementations (the provider-backed client, the playback
+ * client, decorators, test mocks) live next to it and are injected. A client never mutates game state: it
  * returns validated structured output, and the engine decides what to do with it.
  */
 
@@ -20,7 +20,10 @@ export interface UmpireRequest {
   input: unknown;
   /** The output must validate against this schema. */
   schema: JsonSchema;
+  /** Overrides the stage's configured `maxTokens`. */
   maxTokens?: number;
+  /** Overrides the stage's configured temperature. */
+  temperature?: number;
 }
 
 export interface TokenUsage {
@@ -33,11 +36,13 @@ export interface TokenUsage {
 /** One model call as written to the input log. Enough to replay it with no network. */
 export interface UmpireCallRecord {
   stage: UmpireStage;
+  /** Id of the configured provider that served the call. Absent in older recordings. */
+  provider?: string;
   model: string;
   promptVersion: string;
   system: string;
   input: unknown;
-  /** The model's raw text, exactly as received. */
+  /** The model's JSON text as received (a wrapping code fence, if any, is stripped). */
   rawOutput: string;
   usage: TokenUsage;
   /** Summed over all attempts, including failed ones. `null` when the model has no known price. */
@@ -63,7 +68,7 @@ export interface CallRecorder {
 export class UmpireError extends Error {
   constructor(
     message: string,
-    readonly kind: 'transport' | 'timeout' | 'schema' | 'refusal' | 'missing-recording',
+    readonly kind: 'transport' | 'timeout' | 'schema' | 'refusal' | 'missing-recording' | 'budget',
     readonly attempts: number,
     /** Tokens spent on the attempts of a failed call. Absent when nothing was spent. */
     readonly usage?: TokenUsage,
