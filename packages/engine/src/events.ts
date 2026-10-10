@@ -52,6 +52,11 @@ export interface HandlerResult<W> {
   emit?: Array<{ type: string; payload?: Json }>;
 }
 
+/**
+ * Handlers must be pure: never mutate `world` (or the event) in place, return a
+ * new world instead. In-place mutation would change the caller's input state and
+ * break replay and chunking guarantees.
+ */
 export type Handler<W> = (
   world: W,
   event: QueuedEvent,

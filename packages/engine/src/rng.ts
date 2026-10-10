@@ -36,6 +36,9 @@ export class Rng {
 
   /** Uniform integer in [min, max] inclusive. */
   int(min: number, max: number): number {
+    if (!Number.isInteger(min) || !Number.isInteger(max) || min > max) {
+      throw new Error(`int(${min}, ${max}): bounds must be integers with min <= max`);
+    }
     return min + Math.floor(this.next() * (max - min + 1));
   }
 

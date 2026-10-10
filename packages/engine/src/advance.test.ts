@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EventRegistry,
+  compareEvents,
   Rng,
   advanceTo,
   createState,
@@ -111,11 +112,34 @@ describe('event ordering', () => {
     );
   });
 
+  it('rejects a handler scheduling before its own firing time', () => {
+    const reg = new EventRegistry<World>().register('bad', (w, ev) => ({
+      world: w,
+      schedule: [{ type: 'bad', time: ev.time - 1 }],
+    }));
+    expect(() => advanceTo(start(1, [{ type: 'bad', time: 5 }]), 10, reg)).toThrow(
+      /before current/,
+    );
+  });
+
+  it('breaks time ties by seq in compareEvents', () => {
+    const ev = (seq: number) => ({ time: 5, seq, type: 'x', payload: null });
+    expect([ev(2), ev(0), ev(1)].sort(compareEvents).map((e) => e.seq)).toEqual([0, 1, 2]);
+  });
+
   it('does not mutate the input state', () => {
     const s = start(7, [{ type: 'roll', time: 1 }]);
     const before = serialize(s);
     advanceTo(s, 100, makeRegistry());
     expect(serialize(s)).toBe(before);
+  });
+});
+
+describe('Rng.int', () => {
+  it('rejects inverted or non-integer bounds', () => {
+    const r = new Rng(1);
+    expect(() => r.int(5, 1)).toThrow();
+    expect(() => r.int(0.5, 3)).toThrow();
   });
 });
 
