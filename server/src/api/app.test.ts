@@ -437,9 +437,36 @@ describe('scripted opponent', () => {
   });
 
   it('leaves Red idle when SCRIPTED_OPPONENTS=0', async () => {
+    // Calibrate the wait: time how long the default setting takes to produce an agent order, so
+    // the idle check below can't pass vacuously by looking for less time than that.
+    const defaultBase = await startLikeMain({});
+    const calibration = (await createGame(defaultBase, { rate: 86_400 })).json;
+    const t0 = Date.now();
+    while (!(await store.inputLog(calibration.id)).some((e) => e.agent)) {
+      if (Date.now() - t0 > 5000) throw new Error('default setting never produced an agent order');
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    const agentLatency = Date.now() - t0;
+    await app!.server.close();
+
     const base = await startLikeMain({ SCRIPTED_OPPONENTS: '0' });
     const game = (await createGame(base, { rate: 86_400 })).json;
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, Math.max(500, agentLatency * 3)));
     expect((await store.inputLog(game.id)).some((e) => e.agent)).toBe(false);
+  });
+
+  it.each([
+    [{}, true],
+    [{ SCRIPTED_OPPONENTS: '' }, true],
+    [{ SCRIPTED_OPPONENTS: '1' }, true],
+    [{ SCRIPTED_OPPONENTS: 'true' }, true],
+    [{ SCRIPTED_OPPONENTS: '0' }, false],
+    [{ SCRIPTED_OPPONENTS: ' 0 ' }, false],
+    [{ SCRIPTED_OPPONENTS: 'false' }, false],
+    [{ SCRIPTED_OPPONENTS: 'FALSE' }, false],
+    [{ SCRIPTED_OPPONENTS: 'off' }, false],
+    [{ SCRIPTED_OPPONENTS: 'OFF' }, false],
+  ])('scriptedOpponentsFromEnv(%j) is %s', (env, expected) => {
+    expect(scriptedOpponentsFromEnv(env)).toBe(expected);
   });
 });
