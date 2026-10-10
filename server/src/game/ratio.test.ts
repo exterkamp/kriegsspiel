@@ -43,7 +43,7 @@ afterEach(async () => {
   host = undefined;
 });
 
-async function newGame(opts: { rate?: number; rule?: 'majority' } = {}) {
+async function newGame(opts: { rate?: number; rule?: 'majority'; snapshotEvery?: number } = {}) {
   const time = new FakeTime();
   const store = new MemoryGameStore();
   host = new GameHost({
@@ -52,6 +52,7 @@ async function newGame(opts: { rate?: number; rule?: 'majority' } = {}) {
     registry: registry(),
     wallNow: time.now,
     timers: time,
+    snapshotEvery: opts.snapshotEvery,
     pause: () => ({ voters: ['alice', 'bob'], voteTimeoutMs: 30_000, rule: opts.rule }),
   });
   const game = await host.create('g1', loadScenario(holdTheBridge), { rate: opts.rate ?? 1 });
@@ -185,13 +186,22 @@ describe('ratio change by vote', () => {
     });
   }
 
-  it('a reopened game keeps the voted rate', async () => {
-    const { time, game, store } = await newGame();
+  it('a reopened game keeps the voted rate (vote in the log tail)', async () => {
+    const { time, game, store } = await newGame({ snapshotEvery: 100 });
     await time.advance(1_000);
     await changeRate(game, 12);
     await host!.close('g1');
+    const snap = await store.loadSnapshot('g1');
+    expect(snap!.clock.rate).toBe(1);
     const reopened = await host!.open('g1');
     expect(reopened.gameClock.rate).toBe(12);
-    expect(store).toBeDefined();
+  });
+
+  it('a reopened game keeps the mode set in the log tail', async () => {
+    const { game } = await newGame({ snapshotEvery: 100 });
+    await game.submit({ kind: 'setMode', mode: 'manual' });
+    await host!.close('g1');
+    const reopened = await host!.open('g1');
+    expect(reopened.gameClock.mode).toBe('manual');
   });
 });
