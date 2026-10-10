@@ -138,7 +138,7 @@ The supported Node CLI/resource measurement profile uses `--max-old-space-size=2
 
 | Overrides | Rename, move settlement anchors, exclude placement regions. Names leave geometry unchanged; moves/exclusions regenerate dependent local layouts and roads with stable place IDs. |
 
-No terrain brush, arbitrary road drawing, building editor, hydrology editor or multiplayer authoring. Relief/land-cover density are generation settings and regenerate. Reject missing override IDs and unsupported recorded versions. Farm population/footprint defaults, exact site spacing and algorithm operation limits are unresolved configurable contracts for #134/#137/#138, not decisions established by these village fixtures. Do not promise arbitrary cross-runtime float identity.
+No terrain brush, arbitrary road drawing, building editor, hydrology editor or multiplayer authoring. Relief/land-cover density are generation settings and regenerate. Reject missing override IDs and unsupported recorded versions. The later contract/planning/composition gates establish configurable population, footprint, spacing and work limits; these early village fixtures alone do not establish them. Do not promise arbitrary cross-runtime float identity.
 
 ## Fork build, packaging and distribution gate
 
@@ -180,3 +180,11 @@ Coordinator: review this note and fixture, reconcile the planner selection/assum
 The regional planner consumes accepted authoritative ground, water and crossing proposals without running the local settlement planner. `sites-lattice-decks-v1` ranks complete permissible site footprints, routes bounded terrain-cost lattice edges and certifies the normalized emitted network. `linear-ground-endpoints-v1` records continuous bridge deck heights separately from channel ground. Stable site slots and explicit boundary entrance endpoints/bearings/route references form the fork handoff; permissible regions are not occupied layouts or population success.
 
 [The planning package policy](../packages/maps/docs/planning.md) defines complete footprint/corridor checks, graph validation, stage budgets and actual-join reconciliation. Composition must accumulate reconciliation work across attempts and validate local streets, capacity, occupied footprints and all joins independently. Planning success alone does not certify a composed/exportable asset. Source review retains the owner’s distribution gate.
+
+## Accepted standalone runtime and milestone evidence
+
+The verified runtime pair is Node22.22.2 (Darwin/arm64) and Chrome154.0.8037.95 on the documented M3/macOS machine. Current source produces identical canonical full assets across Node and real browser workers for flat17, hills31, river97 and a saved rename/move/exclusion recipe. This is the tested supported pair, not an arbitrary cross-runtime floating-point promise.
+
+Complete composition uses `complete-frontage-access-v1` and independent saved certification `complete-map-v1`; D21/D22 establish the final composition/worker/export boundaries. Actual connected settlements, certified footprints and access, reciprocal bridges, saved replay and rejected candidate handling are covered by the [verification report](map-verification-report.md), with raw21-seed records, default/maximum resource measurements and overview/detail screenshots.
+
+Supported CLI/measurement children explicitly use256MiB V8 old space (actual total V8 heap limit304MiB), while generation RSS is measured independently. Default10km17 and maximum15km flat17 meet the10s/30s/512MiB targets on that machine. The unrestricted default's578MiB failure remains recorded. Three representative1440×900 preview runs meet p95≤33ms; initial generation/export/load costs and raw long frames remain visible. Browser memory, GPU completion, native input latency and worst-case performance over every permitted recipe are not established. Combined-work distribution remains gated.
