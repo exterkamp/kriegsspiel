@@ -2,6 +2,7 @@ import {
   FACINGS,
   MS_PER_MINUTE,
   TERRAINS,
+  UNIT_KINDS,
   tileAt,
   type Facing,
   type GameState,
@@ -117,6 +118,7 @@ function parseUnits(raw: unknown, map: MapGrid, sides: Side[]): Unit[] {
     return {
       id,
       side: oneOf(o.side, sideIds, `${p}.side`),
+      kind: oneOf(o.kind, UNIT_KINDS, `${p}.kind`),
       name: str(o.name, `${p}.name`),
       position,
       strength: int(o.strength, `${p}.strength`, 1),

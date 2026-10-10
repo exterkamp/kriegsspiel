@@ -25,11 +25,19 @@ export const FACINGS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const;
 export type Facing = (typeof FACINGS)[number];
 
 /** What a unit is currently trying to do. Produced from orders; the engine applies it. */
-export type Intent = { kind: 'idle' } | { kind: 'move'; to: Point } | { kind: 'hold'; at: Point };
+export type Intent =
+  | { kind: 'idle' }
+  /** `startedAt` ties scheduled step events to this order, so a newer intent makes them stale. */
+  | { kind: 'move'; to: Point; startedAt: GameTime }
+  | { kind: 'hold'; at: Point };
+
+export const UNIT_KINDS = ['infantry', 'cavalry', 'artillery'] as const;
+export type UnitKind = (typeof UNIT_KINDS)[number];
 
 export interface Unit {
   id: string;
   side: SideId;
+  kind: UnitKind;
   name: string;
   position: Point;
   /** Men remaining. */
