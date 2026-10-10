@@ -3,10 +3,14 @@
  *
  *   POST /games                    create "Hold the Bridge": body `{ "rate"?: number }`
  *   GET  /games/:id/ws?token=...   WebSocket for one side (`@kriegsspiel/protocol` messages)
+ *   GET  /healthz                  liveness, `{ ok: true }`
+ *   GET  /*                        the built client, when `staticDir` is set
  *
  * Dev auth is a per-side token in the URL; real accounts arrive with Epic #5.
  */
 import { randomBytes, randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
+import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import { holdTheBridge, loadScenario, type SideId } from '@kriegsspiel/engine';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -43,6 +47,8 @@ export interface AppOptions {
   timers?: Timers;
   /** Log lines from Fastify; off by default so tests stay quiet. */
   logger?: boolean;
+  /** Directory of the built client to serve at `/`. Unset: API only (dev uses the Vite server). */
+  staticDir?: string;
   onError?: (gameId: string, error: unknown) => void;
 }
 
@@ -83,6 +89,13 @@ export async function buildApp(options: AppOptions): Promise<App> {
   const tokens = new Map<string, Map<string, SideId>>();
 
   await server.register(websocket, { options: { maxPayload: MAX_PAYLOAD_BYTES } });
+
+  // Liveness for the container health check. Does not touch a game or the store.
+  server.get('/healthz', async () => ({ ok: true }));
+
+  if (options.staticDir) {
+    await server.register(fastifyStatic, { root: resolve(options.staticDir) });
+  }
 
   server.post('/games', async (req, reply) => {
     const body = CreateGame.safeParse(req.body ?? {});

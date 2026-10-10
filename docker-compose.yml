@@ -1,0 +1,38 @@
+# docker compose up -d   ->  http://localhost:${KRIEGSSPIEL_PORT:-3000}
+# See docs/deployment.md for configuration, backups and restore.
+services:
+  kriegsspiel:
+    build: .
+    image: kriegsspiel
+    restart: unless-stopped
+    ports:
+      - '${KRIEGSSPIEL_PORT:-3000}:3000'
+    # Values come from the shell or a git-ignored .env next to this file (see .env.example).
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - data:/data
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: '5' }
+
+  # Nightly consistent copy of the database (VACUUM INTO), keeping the newest BACKUP_KEEP.
+  backup:
+    build: .
+    image: kriegsspiel
+    restart: unless-stopped
+    depends_on: [kriegsspiel]
+    environment:
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-3}
+    volumes:
+      - data:/data
+      - ${BACKUP_DIR:-./backups}:/backups
+    user: root
+    entrypoint: ['sh', '/app/server/backup-loop.sh']
+    # Listens on nothing, so the image's HTTP HEALTHCHECK would report unhealthy forever.
+    healthcheck:
+      disable: true
+
+volumes:
+  data:
