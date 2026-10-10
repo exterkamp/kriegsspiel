@@ -176,23 +176,31 @@ function scheduleStep(map: MapGrid, kind: UnitKind, now: number, p: StepPayload)
   };
 }
 
+/** An order for a unit that does not exist is rejected, so one bad id cannot wedge the queue. */
+function rejectUnknown(world: GameState, unitId: string) {
+  return { world, emit: [{ type: 'order.rejected', payload: { unitId, reason: 'unknown unit' } }] };
+}
+
 /**
  * Register the movement handlers. Movement is event-driven: a move order
  * plans a path from where the unit stands now and schedules one step event per
  * tile, each firing when the unit finishes entering that tile. A newer intent
  * makes the old order's pending steps stale, and they do nothing when they fire.
- * An interrupted unit stays on the last tile it completed.
+ * An interrupted unit stays on the last tile it completed. An order that
+ * cannot be carried out (unknown unit, unreachable destination) is reported
+ * and changes nothing else.
  */
 export function registerMovement(registry: EventRegistry<GameState>): void {
   registry.register(MOVE_INTENT_EVENT, (world, ev) => {
     const { unitId, to } = ev.payload as unknown as MovePayload;
     const unit = world.units.find((u) => u.id === unitId);
-    if (!unit) throw new Error(`move order for unknown unit: ${unitId}`);
+    if (!unit) return rejectUnknown(world, unitId);
     const dest = { x: to[0], y: to[1] };
     const path = findPath(world.map, unit.position, dest);
     if (!path) {
+      // A rejected order leaves any march already under way alone.
       return {
-        world: updateUnit(world, unitId, { intent: { kind: 'idle' } }, ev.time),
+        world: updateUnit(world, unitId, {}, ev.time),
         emit: [{ type: 'unit.moveBlocked', payload: { unitId, to } }],
       };
     }
@@ -217,9 +225,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
 
   registry.register(HALT_INTENT_EVENT, (world, ev) => {
     const { unitId } = ev.payload as unknown as { unitId: string };
-    if (!world.units.some((u) => u.id === unitId)) {
-      throw new Error(`halt order for unknown unit: ${unitId}`);
-    }
+    if (!world.units.some((u) => u.id === unitId)) return rejectUnknown(world, unitId);
     return { world: updateUnit(world, unitId, { intent: { kind: 'idle' } }, ev.time) };
   });
 

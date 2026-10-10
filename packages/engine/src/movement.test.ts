@@ -63,7 +63,7 @@ describe('findPath', () => {
   });
 
   it('never crosses the river except at the bridge', () => {
-    const map = grid(['..B..', '~~B~~', '..B..'].map((r) => r.replace(/B/g, 'B')));
+    const map = grid(['..B..', '~~B~~', '..B..']);
     const p = findPath(map, { x: 0, y: 0 }, { x: 0, y: 2 })!;
     expect(p.tiles.every((t) => tileAt(map, t) !== 'river')).toBe(true);
     expect(p.tiles.some((t) => tileAt(map, t) === 'bridge')).toBe(true);
@@ -100,9 +100,10 @@ describe('movement events', () => {
     const s0 = game();
     const g = s0.world;
     const to = { x: 20, y: 24 };
-    const path = findPath(g.map, { x: 18, y: 24 }, to)!;
-    const expected = pathDuration(g.map, path.tiles, 'infantry');
-    expect(expected).toBeGreaterThan(0);
+    const expected = 1.5 * MS_PER_MINUTE; // one open tile (1 min) then one road tile (0.5)
+    expect(pathDuration(g.map, findPath(g.map, { x: 18, y: 24 }, to)!.tiles, 'infantry')).toBe(
+      expected,
+    );
     const s1 = issueMove(s0, 'blue-1', to);
 
     const early = advanceTo(s1, expected - 1, registry());
@@ -171,6 +172,48 @@ describe('movement events', () => {
     const r = advanceTo(issueMove(game(), 'blue-1', { x: 5, y: 14 }), 0, registry());
     expect(r.emitted.map((e) => e.type)).toEqual(['unit.moveBlocked']);
     expect(unit(r.state, 'blue-1').position).toEqual({ x: 18, y: 24 });
+  });
+
+  it('a rejected order does not stop a march already under way', () => {
+    const s = advanceTo(
+      issueMove(game(), 'blue-1', { x: 18, y: 20 }),
+      1.5 * MS_PER_MINUTE,
+      registry(),
+    );
+    const r = advanceTo(
+      issueMove(s.state, 'blue-1', { x: 5, y: 14 }),
+      10 * MS_PER_MINUTE,
+      registry(),
+    );
+    expect(r.emitted.map((e) => e.type)).toEqual(['unit.moveBlocked', 'unit.arrived']);
+    expect(unit(r.state, 'blue-1').position).toEqual({ x: 18, y: 20 });
+  });
+
+  it('re-issuing a move to the same destination kills the old step chain', () => {
+    const to = { x: 18, y: 20 };
+    const first = advanceTo(issueMove(game(), 'blue-1', to), 1.5 * MS_PER_MINUTE, registry());
+    const again = advanceTo(issueMove(first.state, 'blue-1', to), first.state.time, registry());
+    // The old step event is still queued but stale, plus the new order's first step.
+    expect(again.state.queue).toHaveLength(2);
+    const done = advanceTo(again.state, 60 * MS_PER_MINUTE, registry());
+    // Replanned from (18,23) at 1.5 min: three open tiles, so 4.5 min. The stale
+    // old chain would have arrived at 4 min.
+    expect(done.emitted.map((e) => [e.time, e.type])).toEqual([
+      [4.5 * MS_PER_MINUTE, 'unit.arrived'],
+    ]);
+    expect(unit(done.state, 'blue-1').position).toEqual(to);
+    expect(done.state.queue).toEqual([]);
+  });
+
+  it('orders for an unknown unit are rejected without wedging the queue', () => {
+    const s = issueHalt(issueMove(game(), 'nobody', { x: 1, y: 1 }), 'ghost');
+    const r = advanceTo(issueMove(s, 'blue-1', { x: 18, y: 23 }), 5 * MS_PER_MINUTE, registry());
+    expect(r.emitted.map((e) => e.type)).toEqual([
+      'order.rejected',
+      'order.rejected',
+      'unit.arrived',
+    ]);
+    expect(r.state.queue).toEqual([]);
   });
 
   it('red can cross the bridge and reach the objective', () => {
