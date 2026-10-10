@@ -11,7 +11,7 @@ import {
   withRead,
   type ClientState,
 } from './net/state.js';
-import { Hud } from './hud/hud.js';
+import { Hud, buildOrderText } from './hud/hud.js';
 import { parseSession, wsUrl } from './session.js';
 
 async function createGame(side: string, rate?: number): Promise<{ game: string; token: string }> {
@@ -60,10 +60,7 @@ async function main(app: HTMLElement): Promise<void> {
     onSendOrder(unitId, text) {
       if (!conn) return 'Not connected to a game (open with ?new=1 or ?game=…&token=…).';
       const orderId = `o-${Date.now().toString(36)}-${++orderSeq}`;
-      // The parser finds the unit from the wording, so a chosen unit is put in front of bare text.
-      const named = unitId ? state.view?.ownUnits.find((u) => u.id === unitId)?.name : undefined;
-      const full =
-        named && !text.toLowerCase().startsWith(named.toLowerCase()) ? `${named}, ${text}` : text;
+      const full = buildOrderText(state.view, unitId, text);
       if (!conn.sendOrder(orderId, full)) return 'Not connected. Try again when the link is back.';
       const now = state.clock ? gameNowMs(state.clock, Date.now()) : 0;
       state = withPendingOrder(state, { orderId, text: full, sentAtGame: now });

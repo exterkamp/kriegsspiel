@@ -29,6 +29,22 @@ export function orderPrefix(view: SideView | undefined, unitId: string): string 
   return u ? `${u.name}, ` : '';
 }
 
+/**
+ * Final text of an order. The parser finds the unit from the wording, so the chosen unit's name is put in
+ * front of bare text, but never when the text already starts with the name of any of our own units.
+ */
+export function buildOrderText(
+  view: SideView | undefined,
+  unitId: string | undefined,
+  text: string,
+): string {
+  const prefix = unitId ? orderPrefix(view, unitId) : '';
+  if (!prefix) return text;
+  const lower = text.toLowerCase();
+  const named = view?.ownUnits.some((u) => lower.startsWith(u.name.toLowerCase()));
+  return named ? text : `${prefix}${text}`;
+}
+
 /** Plain HUD: clock, orders desk, in-tray. Static markup is built once; `render` updates the parts that change. */
 export class Hud {
   private readonly clockEl: HTMLElement;
@@ -41,6 +57,8 @@ export class Hud {
   private readonly noticeEl: HTMLElement;
   private latest: ClientState | undefined;
   private unitsKey = '';
+  /** The prefix `selectUnit` last put in the box, so a later selection can replace it. */
+  private autoPrefix = '';
   private trayKey = '';
   private readonly byId = new Map<string, Dispatch>();
 
@@ -88,8 +106,11 @@ export class Hud {
   /** Choose a unit (for example after a click on the table) and start its order. */
   selectUnit(unitId: string): void {
     this.unitSel.value = unitId;
-    if (this.textEl.value.trim() === '' && this.latest?.view) {
-      this.textEl.value = orderPrefix(this.latest.view, unitId);
+    const current = this.textEl.value;
+    const untouched = current.trim() === '' || current === this.autoPrefix;
+    if (untouched && this.latest?.view) {
+      this.autoPrefix = orderPrefix(this.latest.view, unitId);
+      this.textEl.value = this.autoPrefix;
     }
     this.textEl.focus();
   }

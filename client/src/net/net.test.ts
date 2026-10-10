@@ -2,7 +2,7 @@
 import { PROTOCOL_VERSION, type Dispatch, type ServerMessage } from '@kriegsspiel/protocol';
 import { describe, expect, it } from 'vitest';
 import { fixtureView } from '../table/fixture.js';
-import { Hud, clockText, orderPrefix } from '../hud/hud.js';
+import { Hud, buildOrderText, clockText, orderPrefix } from '../hud/hud.js';
 import { parseSession, wsUrl } from '../session.js';
 import { GameConnection, type WebSocketLike } from './connection.js';
 import {
@@ -262,5 +262,31 @@ describe('Hud', () => {
     expect(sent).toEqual([['blue-2', '2nd Battalion, advance to the bridge']]);
     expect(text.value).toBe('');
     expect(orderPrefix(fixtureView, 'nope')).toBe('');
+  });
+
+  it('replaces the auto-inserted prefix when another unit is selected, but keeps typed text', () => {
+    const { hud } = mount();
+    hud.render(
+      applyServerMessage(initialState, { v, kind: 'viewUpdate', view: fixtureView }, 0),
+      0,
+    );
+    const text = document.querySelector<HTMLTextAreaElement>('#order-text')!;
+    hud.selectUnit('blue-1');
+    hud.selectUnit('blue-2');
+    expect(text.value).toBe('2nd Battalion, ');
+    text.value += 'advance';
+    hud.selectUnit('blue-1');
+    expect(text.value).toBe('2nd Battalion, advance');
+  });
+
+  it('buildOrderText prefixes bare text once and never doubles a unit name', () => {
+    expect(buildOrderText(fixtureView, 'blue-2', 'advance')).toBe('2nd Battalion, advance');
+    expect(buildOrderText(fixtureView, 'blue-2', '2nd Battalion, advance')).toBe(
+      '2nd Battalion, advance',
+    );
+    expect(buildOrderText(fixtureView, 'blue-2', '1st Battalion, advance')).toBe(
+      '1st Battalion, advance',
+    );
+    expect(buildOrderText(fixtureView, undefined, 'advance')).toBe('advance');
   });
 });
