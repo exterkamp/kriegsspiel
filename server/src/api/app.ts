@@ -8,7 +8,7 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import websocket from '@fastify/websocket';
-import { holdTheBridge, loadScenario, type GameState, type SideId } from '@kriegsspiel/engine';
+import { holdTheBridge, loadScenario, type SideId } from '@kriegsspiel/engine';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { WallClock } from '../clock.js';
