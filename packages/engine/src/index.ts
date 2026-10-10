@@ -34,15 +34,21 @@ export {
   toWorld,
 } from './formation.js';
 export {
+  FORMATION_CHANGE_MS,
   MS_PER_METRE,
-  findPath,
+  issueFormation,
   issueHalt,
   issueMove,
   legDuration,
   pathDuration,
+  positionAlong,
+  positionAt,
   registerMovement,
 } from './movement.js';
-export type { Path } from './movement.js';
+export { findPath, legCost } from './navigation.js';
+export type { Path, RouteOptions } from './navigation.js';
+export { OVERLAP_TOLERANCE_MM, validatePlacement } from './placement.js';
+export type { Placement, PlacementProposal, PlacementVerdict } from './placement.js';
 export {
   BREAK_MORALE,
   COMBAT_TICK_MS,
