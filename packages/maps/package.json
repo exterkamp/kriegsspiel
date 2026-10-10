@@ -17,6 +17,7 @@
     "test": "npm run build && vitest run"
   },
   "dependencies": {
+    "@kriegsspiel/settlemaker": "file:../../vendor/settlemaker-runtime.tgz",
     "zod": "^4.6.5"
   }
 }

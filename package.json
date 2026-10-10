@@ -13,11 +13,13 @@
     "client"
   ],
   "scripts": {
-    "test": "npm run test --workspaces --if-present && node --test \"test/*.test.js\" \"scripts/maps-assessment/*.test.mjs\"",
+    "test": "npm run verify:map-source && npm run test --workspaces --if-present && node --test \"test/*.test.js\" \"scripts/maps-assessment/*.test.mjs\"",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run verify:map-source && npm run build --workspaces --if-present",
+    "verify:map-source": "node scripts/verify-map-source.mjs",
+    "setup:map-source": "node scripts/setup-map-source.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

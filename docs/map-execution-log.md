@@ -24,6 +24,8 @@ Owner resumed implementation on 2026-10-10; delivery is review PRs, without merg
 | #135 | map-implementer / w1:p6 | maps terrain | 28a611c | Accepted | 27bbce4;35 focused tests, numerical review | #136 |
 | #136 | map-implementer + map-client | maps geography/cover | 27bbce4 | Accepted | 78b918a;57 focused tests, independent review | #137 |
 | #137 | map-implementer / w1:p6 | maps planning | 78b918a + 6e22367 | Accepted |31 focused tests; independent review;543 root tests and lint/typecheck/build | #138 |
+| #138 | map-implementer / w1:p6 | accepted fork constraint source | 697b67b | Accepted | e08ec2e; independent review; clean141 files/1523 tests, build and compatibility replay | #139 |
+| #139 | map-implementer / w1:p6 | maps composition except source.ts, tests/docs/CLI | accepted B/D/E/F | Active | source/caller-budget seam frozen | #140/#141 after API freeze |
 
 Coordinator exclusively owns root workspace/lockfiles, decisions, integration commits and GitHub tracking. No more than two writers and one reviewer.
 
@@ -186,3 +188,22 @@ Use seeds `1, 2, 3, 7, 17, 31, 97, 55337` for each of flat countryside, wooded h
 
 - Client writer resumed bounded H preparation in preview.ts and its focused tests only: stable-ID detail selection across multiple sites, with missing-ID recovery and input immutability. Main/worker wiring stays gated on G. Reviewer remains on F; coordinator reviews this isolated preparation after handoff.
 - Coordinator source review PASS for `fitSite(siteId)`: stable selection uses the frozen parsed asset, missing IDs preserve the existing view, and normal fit remains unchanged.10 affected viewport/renderer/preview tests, scoped lint/format and writer client typecheck pass. Preparation only; actual multi-site UI/browser acceptance remains H.
+
+## Reviewed fork checkpoint — F acceptance pending clean suite
+
+- Writer stopped after18 constrained regressions,38 existing focused checks, build/format and fresh-process analytical replay. Independent reviewer final source PASS, including canonical deck width, independent capacity/seed/access evidence, emitted scene parity, entrance holes and uniform glyph scaling. No final F claim yet.
+- Fork checkpoint `7eed51a782c756382febe6cae14dbc443ecc6829`, tree `c7fa5e9aeef476db7609547ced46ec7b14e694a9`. Only approved source/docs/tests/NOTICE/build-helper/package paths and public-index footer staged. Protected render patch and all four terrain hashes match baseline; remaining fork dirt is exactly original index/render/terrain prototype.
+- Complete `git archive --format=tar` SHA-256 `1cad7725a519ba4ae1e7d88b148fdbe0fdcde93693781c5b6fbea055533315c1`; lock SHA unchanged `b4b573af49d188d144273d19662485290924d5558a7653c805dbe9d0bed34e01`. Fresh source `.local/map-fork-validation/7eed51a782c756382febe6cae14dbc443ecc6829/source` excludes all prototype input. `npm ci` started with isolated cache; complete suite/build/browser-banner/artifact acceptance pending.
+
+## Accepted gate F — #138
+
+- Accepted fork revision `e08ec2e09f9a15f9110a3048123a31a58d08c341`, tree `dd79e4a4e7644e81e1417fb7d945ee85be58b919`. Clean source full suite:141/141 files,1523/1523 tests, exit0,452.09s. The earlier parallel run had two existing60s road-edge timeouts; limiting Vitest to two workers preserves every case/assertion/deadline. Worst-pair focused rerun9/9 in159.59s, no RPC errors. Independent source/config review PASS.
+- Fresh locked `npm ci`, TypeScript/browser builds and all16 assessment geometry/diagnostic comparisons passed. Final archive reused the same installed dependency tree through a symlink after verifying the unchanged lock; no second install is claimed. Archive SHA-256 `eb6a44f6b8bfa0e49cb2f27abb419a1a8766734cf95ab930f342d39c212ba5ca`; lock SHA-256 `b4b573af49d188d144273d19662485290924d5558a7653c805dbe9d0bed34e01`. Logs under `.local/map-fork-validation/e08ec2e09f9a15f9110a3048123a31a58d08c341`.
+- Generic constrained physical village/farm/isolated generation, independent complete local validator, bounded full footprint/corridor authority, exact entrances, bridges, truthful capacity/population and scene/export parity.18 constrained regressions and38 existing focused tests. Three fresh processes reproduce the analytical geometry with Date.now/Math.random disabled. Protected prototype index/render/terrain changes remain unstaged outside accepted source.
+- Fork review PR: https://github.com/dfezzie/settlemaker/pull/1 (draft). No merge or distribution.
+
+## Accepted G source and budget seams; active composition
+
+- Attributed snapshot contains163 verified payload files, including the isolated compiler lock; source is byte-identical to the accepted fork archive. Local generated npm tarball SHA-256 `df41ca6e340f068f68600be702a74d3db74e165a4f61727916279ccfd3785f84`, SHA-512 integrity recorded in the snapshot, root lock and `CONSUMED_FORK`. Two separate setup runs reproduced exact bytes. Runtime dependency is installed from that file artifact, not a workspace symlink. D20 records source-review-only bootstrap; publication stays gated.
+- Shared planning certificate callback reserves caller budget before operations, preserves exact ordinary/typed caller exceptions for footprint/height/gradient and factory initialization, and retains cumulative global work. Independent reviewer PASS;51 affected tests pass. No complete composition acceptance is implied.
+- G writer map-implementer / w1:p6 retains observed gpt-6.1-sol/xhigh. Owns composition except coordinator-owned source.ts, focused tests/docs and headless export seam. Complete generation and independent saved validation must establish real terrain/local/global connectivity and provenance. Client integration waits for a frozen G API; reviewer prepares independent oracles.

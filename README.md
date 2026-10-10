@@ -32,7 +32,8 @@ Node version is in `.nvmrc` (`nvm use`). This is an npm workspaces monorepo:
 - `client`: Vite + TypeScript client
 
 ```bash
-npm install
+npm run setup:map-source # verify pinned engine source and build its local tarball
+npm ci
 npm test          # Vitest in every package
 npm run lint      # ESLint + Prettier check
 npm run typecheck # tsc --noEmit in every package

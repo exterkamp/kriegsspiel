@@ -1,0 +1,82 @@
+{
+  "name": "settlemaker",
+  "version": "3.0.1",
+  "type": "module",
+  "description": "Procedural village and city map engine with SVG, local GeoJSON, biome artwork and portable skins for Node.js and browsers",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "clean": "node scripts/clean-dist.mjs",
+    "prepack": "npm run clean && npm run build && npm run build:lib",
+    "build": "tsc",
+    "build:art": "node scripts/build-runtime-art.mjs",
+    "review:art": "npm run build && node scripts/review-artwork.mjs",
+    "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
+    "build:lib": "node scripts/build-lib.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "review:roads": "node scripts/run-road-review.mjs",
+    "measure:city-glyphs": "esbuild scripts/measure-city-glyphs.ts --bundle --platform=node --format=cjs --packages=external --outfile=output/measure-city-glyphs.cjs && node output/measure-city-glyphs.cjs",
+    "review:cities": "esbuild scripts/review-cities.ts --bundle --platform=node --format=cjs --packages=external --outfile=output/city-review-runner.cjs && node output/city-review-runner.cjs",
+    "docs:images": "npm run build && node scripts/generate-examples.mjs",
+    "docs:check": "npm run build && npm run build:lib && node scripts/check-docs.mjs",
+    "review:settlements": "npm run build && node scripts/review-settlements.mjs",
+    "generate": "npm run build && node scripts/settlemaker.mjs"
+  },
+  "license": "GPL-3.0-only",
+  "author": "barrulus",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/barrulus/settlemaker.git"
+  },
+  "homepage": "https://settlemaker.com",
+  "devDependencies": {
+    "@types/pg": "^8.11.0",
+    "esbuild": "^0.25.0",
+    "p-limit": "^6.0.0",
+    "pg": "^8.13.0",
+    "sharp": "^0.33.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "files": [
+    "dist",
+    "src",
+    "tsconfig.json",
+    "scripts/clean-dist.mjs",
+    "scripts/build-runtime-art.mjs",
+    "scripts/art",
+    "NOTICE",
+    "docs/skins.schema.json",
+    "docs/examples/moon-glass.skin.json",
+    "docs/examples/copperline.skin.json",
+    "docs/examples/copperline-village.svg",
+    "docs/examples/copperline-city.svg",
+    "symbols/copperline",
+    "symbols/LICENSE",
+    "symbols/CREDITS",
+    "symbols/village",
+    "symbols/city",
+    "symbols/landscape",
+    "symbols/greens",
+    "symbols/infrastructure",
+    "symbols/markers",
+    "docs/*.md",
+    "docs/releases/3.0.0.md",
+    "docs/releases/3.0.1.md",
+    "docs/examples/gallery",
+    "scripts/generate-examples.mjs",
+    "scripts/check-docs.mjs",
+    "scripts/generate-copperline.mjs",
+    "scripts/render-copperline.mjs",
+    "scripts/settlemaker.mjs",
+    "scripts/build-lib.mjs"
+  ],
+  "dependencies": {
+    "@types/geojson": "^7946.0.14",
+    "polygon-clipping": "^0.15.7"
+  },
+  "bin": {
+    "settlemaker": "scripts/settlemaker.mjs"
+  }
+}

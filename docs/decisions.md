@@ -156,3 +156,13 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Boundary.** This standalone cartographic network introduces no gameplay movement rule or visibility path. Full local settlement composition and Node/browser replay remain later gates. Combined-build distribution remains gated for source review.
 
 **See.** [Regional planning policies](../packages/maps/docs/planning.md), [map architecture](map-architecture.md), [execution log](map-execution-log.md).
+
+## D20: Review builds consume an attributed, integrity-pinned local source artifact
+
+**Decision.** Until the owner resolves combined-work distribution, Kriegsspiel commits the accepted SettleMaker source snapshot and original notices, with an exact source manifest and standalone dependency lock. `npm run setup:map-source` verifies that payload, installs its locked compiler dependencies without lifecycle scripts, compiles it, and creates an ignored local npm tarball. The root dependency consumes that tarball through a file dependency with recorded SHA-256 and SHA-512 integrity; CI runs the same setup before `npm ci`. No ignored development checkout or experimental terrain/render patch participates.
+
+**Identity.** The consumed fork revision is `e08ec2e09f9a15f9110a3048123a31a58d08c341`, tree `dd79e4a4e7644e81e1417fb7d945ee85be58b919`. Provenance distinguishes the exact corresponding-source archive from the exact consumed npm tarball. Bootstrap rejects mismatches before installation into the root graph. Snapshot attribution and GPL-3.0-only terms remain intact.
+
+**Owner boundary.** The owner explicitly selected “Keep distribution gated; prepare review PR.” This authorizes source review and local verification, without changing Kriegsspiel's license or publishing a combined browser build/package. The source-bearing fallback implements the existing plan, rather than resolving that owner licensing decision.
+
+**See.** [Snapshot instructions](../vendor/settlemaker/README.md), [map architecture](map-architecture.md), [execution log](map-execution-log.md).
