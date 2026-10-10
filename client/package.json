@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@kriegsspiel/maps": "*",
     "@kriegsspiel/protocol": "*",
     "three": "^0.170.0"
   },

@@ -4,7 +4,10 @@
     "noEmit": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
-    "paths": { "@kriegsspiel/protocol": ["../packages/protocol/src/index.ts"] }
+    "paths": {
+      "@kriegsspiel/maps": ["../packages/maps/src/index.ts"],
+      "@kriegsspiel/protocol": ["../packages/protocol/src/index.ts"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }

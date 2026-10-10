@@ -123,3 +123,11 @@ Use seeds `1, 2, 3, 7, 17, 31, 97, 55337` for each of flat countryside, wooded h
 - 57 geography tests; coordinator repository lint/typecheck/test/build all pass: 442 Vitest plus18 Node tests (460 total), including154 maps tests and15 preparatory preview tests. Logs `.local/map-gate-d-{lint,types,tests,build}.log`. Existing Canvas test notices and player-bundle size advisory remain non-failing.
 - Default10km seed17 geography succeeds under unchanged caps in763ms; benchmark process peak285.30MiB. Diagnostic24-seed corpus retains explicit river1 topology infeasibility; representative flat17/hills31/river97 succeed. Full composition/maximum complex water/browser performance remain J.
 - Next: story-sized geography commit then #137 sites and grade-constrained regional network. No source/fork distribution or gameplay integration authorized.
+
+## Active gate E — #137 and worker preparation
+
+- Geography checkpoint `78b918a`. Primary map-implementer / w1:p6 (gpt-6.1-sol/high) owns maps `src/planning/**`, `tests/planning*.test.ts`, `docs/planning.md` and focused compiled artifacts. Sites, real connected regional graph, directional-grade/corridor validation, explicit linked bridges, authoritative entrances and bounded reconciliation. Representative river97 must use a crossing, not merely export unused candidates.
+- map-client / w1:p8 (configured default gpt-6.1-sol/medium) owns only new `client/src/map-authoring/generation/**`. Preparatory typed controller/runner with injected generator and complete validator, cancellation/stale/error/watchdog tests; no fake generator or acceptance claim. Actual worker/controls integration waits for G/H.
+- Reviewer / w1:p7 read-only: preview preparation source review first, then E independent numerical/topological oracles/source review. Two disjoint writers plus one reviewer; common files/commits/GitHub remain coordinator-owned.
+
+- Independent reviewer PASS for fixture preview preparation: detached/frozen loading, hole/coordinate/width rendering, retained valid candidate and lifecycle source checks; coordinator15 tests pass and gate D root build includes both player/authoring entries. Integrate this preparation separately; no closure for #140 until real assets/screenshots/browser performance. New generation subdirectory remains worker-owned and unreviewed.

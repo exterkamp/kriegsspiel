@@ -1,0 +1,24 @@
+# Preparatory #140 preview shell
+
+Standalone entry: `client/map-authoring.html`, served at `/map-authoring.html` by the client Vite setup. It loads only `createReferenceAsset()` from the frozen public maps API accepted at `28a611c`. This is a hand-authored 150 m fixture, not generated geography or gameplay state. Its contour layer is empty. Hillshade comes from the authoritative bilinear elevation derivatives; no contours or source geography are generated here.
+
+`MapPreview(canvas, onState)` is the reusable browser asset-loading module. `loadAsset(unknown, 'reference-fixture' | 'asset')` parses a detached, deeply frozen snapshot and returns `AssetLoadResult`. Import failures publish structured issues and retain the previous valid map. Unexpected programming/rendering errors propagate. Contract validity is not composition certification. Future controls/worker packets can supply public assets through this seam; there are no workers, generation controls, save/load UI or source generators in this packet.
+
+API: `fit(optionalBounds)`, `zoom(factor, optionalCssPixelAnchor)`, `setLayer(layer, enabled)`, `setHighContrast(enabled)`, `center()` and `dispose()`. `PreviewState` exposes the frozen asset, source status, failed-candidate issues and a detached viewport. `MapRenderer` is the Canvas2D presentation module; `viewport.ts` shares CSS pixel/metre transforms across vectors, interactions, culling and scale. DPR affects only the backing canvas. Polygons retain all rings/holes and use even-odd fill. Roads draw `surfaceWidthM`; reserved corridor semantics remain in the contract. Features outside the viewport are culled by cached bounds. All canonical geometry remains present at every zoom; label density and collision suppression provide presentation detail levels. No simplification, rounding or geometry union occurs.
+
+The shell supports fit map, first-site detail, pointer pan, wheel/button zoom, keyboard arrows, +/− and F, nine independent layer toggles, high contrast, provenance and diagnostics. The narrow layout puts the map above controls. Canvas and hillshade are capped at DPR 2 and 512 pixels on the longest hillshade edge respectively; these are presentation bounds, not measured performance claims.
+
+Preparatory review fixes: persisted `pagehide` keeps the preview alive; persisted `pageshow` replaces any suspended frame, preserves the viewport centre/scale and redraws. A resolution media-query watcher re-arms after every DPR change, with resize and restored-page refreshes as additional redraw triggers. Final departure/disposal removes the display watchers. Both bridge and ford decks use the distinct yellow crossing fill in high contrast. Culling includes half the screen-space outline/contour stroke plus one CSS pixel for antialiasing; round joins bound outline extent. Road bounds already include half the metre-based surface width and now receive antialias padding. Canonical geometry and contract-only status are unchanged.
+
+Coordinator integration: owns client dependency/source aliases/tsconfig (already present), lockfiles and production Vite multi-entry configuration. Include `map-authoring.html` alongside the existing entry for a future production build; do not replace the player entry. No dev server or package build was run here because devrun remains unresolved.
+
+Exact focused checks, run after coordinator alert, both passed:
+
+```sh
+npm exec --workspace client -- tsc --noEmit
+npm exec --workspace client -- vitest run src/map-authoring/viewport.test.ts src/map-authoring/geometry.test.ts src/map-authoring/display-lifecycle.test.ts src/map-authoring/renderer.test.ts
+```
+
+Four test files / 15 tests passed. Tests cover translated/asymmetric viewport fitting, anchored/clamped zoom, resize/pan, metric scale, invalid viewport inputs, detached/frozen loading, exact rings/holes/winding, all fixture layer tracing and descriptor-safe invalid-candidate rejection. New mocked display/Canvas2D tests cover repeated cached-page restores, final departure, DPR changes without resize, watcher cleanup, bridge/ford contrast with exact deck geometry, and stroke-aware edge culling at two zooms. These mocks verify logic and drawing commands, not real browser rasterization or back/forward-cache eligibility. Formatting was scoped to owned files. No browser or representative asset review was performed.
+
+#140 remains open. #139 real assets must replace/supplement the fixture for representative flat, wooded-hill and multi-village river-valley visual review. Browser overview/detail screenshots at 1440×900 and narrow sizes, geometry/export alignment, visible rejection behavior and p95 frame measurements remain integration/acceptance work. This preparatory shell supplies no representative visual gate or resource benchmark evidence. Existing player/table code and the initial terrain prototype are untouched.
