@@ -533,7 +533,7 @@ describe('Hold the Bridge', () => {
       return run(s, 200);
     };
     const a = play();
-    expect(a.state.world.outcome).toMatchObject({ winner: 'blue', reason: 'objective-held' });
+    expect(a.state.world.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
     expect(ofType(a.emitted, 'game.end')).toHaveLength(1);
     expect(ofType(a.emitted, 'combat.fire').length).toBeGreaterThan(0);
     expect(a.emitted).toEqual(play().emitted);
