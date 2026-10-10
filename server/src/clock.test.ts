@@ -263,3 +263,51 @@ describe('GameClock fast-forward', () => {
     expect(clock.now()).toBe(4500 + 4000);
   });
 });
+
+describe('GameClock barrier', () => {
+  it.each([1, 4, 12])('stalls at the barrier and resumes without jumping at rate %d', (rate) => {
+    const wall = fakeWall();
+    const clock = new GameClock(wall, { rate });
+    wall.advance(1000);
+    const at = clock.now();
+    clock.setBarrier(at);
+    wall.advance(60_000);
+    expect(clock.now()).toBe(at);
+    expect(clock.wallDueFor(at + 1)).toBe(Infinity);
+    expect(clock.wallDueFor(at)).toBeLessThanOrEqual(wall());
+
+    clock.setBarrier(undefined);
+    expect(clock.now()).toBe(at);
+    wall.advance(1000);
+    expect(clock.now()).toBe(at + 1000 * rate);
+  });
+
+  it('lets time run up to a later barrier', () => {
+    const wall = fakeWall();
+    const clock = new GameClock(wall, { rate: 1 });
+    clock.setBarrier(5000);
+    wall.advance(3000);
+    expect(clock.now()).toBe(3000);
+    wall.advance(10_000);
+    expect(clock.now()).toBe(5000);
+  });
+
+  it('holds a manual advance at the barrier and rejects a barrier in the past', () => {
+    const wall = fakeWall();
+    const clock = new GameClock(wall, { mode: 'manual' });
+    clock.advanceTo(100);
+    clock.setBarrier(500);
+    clock.advanceTo(9000);
+    expect(clock.now()).toBe(500);
+    expect(() => clock.setBarrier(10)).toThrow(RangeError);
+  });
+
+  it('keeps the barrier through rate changes', () => {
+    const wall = fakeWall();
+    const clock = new GameClock(wall, { rate: 1 });
+    clock.setBarrier(0);
+    clock.setRate(12);
+    wall.advance(1000);
+    expect(clock.now()).toBe(0);
+  });
+});

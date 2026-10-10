@@ -296,5 +296,6 @@ export function loadScenario(raw: unknown): GameState {
     },
     combatActive: false,
     outcome: null,
+    rulings: [],
   };
 }

@@ -42,6 +42,7 @@ Each milestone should end in something playable.
 - [ ] Decide on an annotation editor for future maps
 
 ## M4: Judgment and personality
+- [x] `judge` placement: arbitrary unit configurations validated by the engine (#117)
 - [ ] `judge` stage with capped modifiers for unruled situations; case-law file
 - [ ] Subordinate commander traits
 - [ ] Rigid ↔ free dial; umpire personas

@@ -7,6 +7,9 @@ export default defineConfig({
       '@kriegsspiel/engine': fileURLToPath(
         new URL('../packages/engine/src/index.ts', import.meta.url),
       ),
+      '@kriegsspiel/protocol': fileURLToPath(
+        new URL('../packages/protocol/src/index.ts', import.meta.url),
+      ),
     },
   },
 });

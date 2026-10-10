@@ -29,7 +29,7 @@ export type ClockState = {
 export type ClockChange = {
   wallMs: number;
   gameMs: number;
-  kind: 'rate' | 'pause' | 'resume' | 'stop' | 'mode' | 'advance';
+  kind: 'rate' | 'pause' | 'resume' | 'stop' | 'mode' | 'advance' | 'barrier';
   rate: number;
   status: ClockStatus;
   mode: ClockMode;
@@ -54,6 +54,8 @@ export class GameClock {
   private readonly changes: ClockChange[] = [];
   /** Highest game time reported so far, so a wall source stepping back never rewinds `now()`. */
   private highWater: number;
+  /** Game time the clock may not pass: the earliest unresolved LLM dependency (the LLM barrier). */
+  private barrierMs: number | undefined;
 
   constructor(
     private readonly wallNow: WallClock,
@@ -105,18 +107,25 @@ export class GameClock {
     return Math.max(0, wallMs - this.state.wallMsAtAnchor);
   }
 
-  /** Current game time in ms. */
+  /** The barrier, if one is set. Game time never passes it. */
+  get barrier(): number | undefined {
+    return this.barrierMs;
+  }
+
+  /** Current game time in ms: the clock's own reading, held at the barrier if there is one. */
   now(): number {
-    if (!this.following) return this.state.gameMsAtAnchor;
+    const cap = this.barrierMs ?? Infinity;
+    if (!this.following) return Math.min(this.state.gameMsAtAnchor, cap);
     const t = this.state.gameMsAtAnchor + this.wallElapsed(this.wallNow()) * this.state.rate;
-    this.highWater = Math.max(this.highWater, t);
+    this.highWater = Math.max(this.highWater, Math.min(t, cap));
     return this.highWater;
   }
 
   /** Game time at an arbitrary wall time, assuming the clock keeps its current settings. */
   gameMsAtWall(wallMs: number): number {
-    if (!this.following) return this.state.gameMsAtAnchor;
-    return this.state.gameMsAtAnchor + this.wallElapsed(wallMs) * this.state.rate;
+    const cap = this.barrierMs ?? Infinity;
+    if (!this.following) return Math.min(this.state.gameMsAtAnchor, cap);
+    return Math.min(this.state.gameMsAtAnchor + this.wallElapsed(wallMs) * this.state.rate, cap);
   }
 
   /**
@@ -124,8 +133,10 @@ export class GameClock {
    * May be in the past if already due. Infinity if it will never be reached without
    * outside action (paused, stopped, manual), unless the game time is already reached.
    * Fast-forward never waits, so it returns the current wall time.
+   * Infinity for any time past the barrier, which only a result arriving can lift.
    */
   wallDueFor(gameMs: number): number {
+    if (this.barrierMs !== undefined && gameMs > this.barrierMs) return Infinity;
     if (this.clockMode === 'fast-forward' && this.state.status === 'running') return this.wallNow();
     if (this.following) {
       return this.state.wallMsAtAnchor + (gameMs - this.state.gameMsAtAnchor) / this.state.rate;
@@ -159,6 +170,34 @@ export class GameClock {
       status: this.state.status,
       mode: this.clockMode,
     });
+  }
+
+  /**
+   * Hold game time at `gameMs` (the LLM barrier), or lift the hold with `undefined`. Re-anchors at
+   * the current game time first, so game time stalls at the barrier and, when it is lifted or
+   * raised, carries on from where it stopped instead of jumping to catch up with the wall.
+   */
+  setBarrier(gameMs: number | undefined): void {
+    if (gameMs === this.barrierMs) return;
+    if (gameMs !== undefined && !(gameMs >= this.now())) {
+      throw new RangeError(`barrier ${gameMs} is before the current game time ${this.now()}`);
+    }
+    this.reanchor('barrier');
+    this.barrierMs = gameMs;
+  }
+
+  /**
+   * Hold game time at its current reading and return that time. One step, so a caller that wants
+   * "stall here" never passes a reading the wall clock has since moved past (see `setBarrier`).
+   * The barrier can only move earlier this way: the reading is already capped by any barrier.
+   */
+  holdAtNow(): number {
+    const t = this.now();
+    if (t !== this.barrierMs) {
+      this.reanchor('barrier', {}, t);
+      this.barrierMs = t;
+    }
+    return t;
   }
 
   setRate(rate: number): void {
@@ -199,7 +238,8 @@ export class GameClock {
         `cannot move game time backwards (${gameMs} < ${this.state.gameMsAtAnchor})`,
       );
     }
-    this.reanchor('advance', {}, gameMs);
+    // A manual advance stalls at the barrier like everything else.
+    this.reanchor('advance', {}, Math.min(gameMs, this.barrierMs ?? Infinity));
   }
 
   /** Manual and fast-forward modes: advance game time by `dtMs`. */

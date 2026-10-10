@@ -10,7 +10,7 @@ Helpers: `parseCommand` / `parseServerMessage` (JSON string to `{ ok, value | er
 
 | kind           | fields                      | notes                           |
 | -------------- | --------------------------- | ------------------------------- |
-| `issueOrder`   | `orderId`, `draft`          | signs a draft                   |
+| `issueOrder`   | `orderId`, `draft` or `text` | signs a draft, or sends the order wording directly (until drafts exist); exactly one of the two |
 | `setReady`     | `ready`                     | resume-from-pause readiness     |
 | `proposePause` | `reason?`                   | starts a pause vote             |
 | `vote`         | `proposal`, `yes`           | vote on a proposal              |
