@@ -67,6 +67,7 @@ Clock modes (all required, since tests need them):
 - **Scheduler**: sleeps until the next event is due in wall time: `wallDue = wallAnchor + (eventGame - gameAnchor) / rate`. It wakes early whenever the queue, the rate or the pause state changes. When running, it advances the engine through each due event in order.
 - **Lazy simulation**: when a player command arrives, the server first advances the world to "now", then applies the command. Quiet stretches cost nothing.
 - **Combat ticks**: while units are in contact, the engine schedules short ticks (for example every 1-5 game minutes) so a fight resolves in finer steps. Outside contact it jumps between events.
+- **Event ordering (implemented in `packages/engine`)**: events fire in ascending `(time, seq)`. `seq` is a per-game counter assigned at scheduling, so same-instant events fire in the order they were scheduled. `advanceTo(state, t)` fires every event with `time <= t` (including ones handlers schedule for `<= t` during the call), then sets the clock to `t`. Scheduling before the current time is an error. Chunking `advanceTo` never changes the result. State (clock, RNG, queue, `nextSeq`, world) is plain JSON for snapshots. Handlers are registered by event type in an `EventRegistry`; all dice come from the seeded RNG passed to the handler.
 - **Single writer per game**: each game runs as one serial actor, with a command queue. Commands are applied in arrival order. No locks and no races, and the log is a total order. Many games can share a process.
 
 ## The LLM barrier
@@ -136,6 +137,8 @@ The simulation is a function of: scenario, seed, and the **ordered log of inputs
 | Hosting | Single container, docker compose | Matches the other self-hosted services |
 
 ## Key data shapes (sketch)
+
+The implemented wire schemas live in `packages/protocol` (see its README). Each message also carries a version field `v`, omitted from the sketch below.
 
 ```ts
 type Command =                          // everything a player can send; all are logged

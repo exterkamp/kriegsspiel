@@ -36,7 +36,12 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Open.** Default hierarchy is assumed to be shared HQ, with chain-of-command as an option. Command level is assumed to be brigades and battalions.
 **See.** [gameplay.md](gameplay.md)
 
-## D7: Engine world model and scenario data
+## D7: Wire format is zod schemas in `packages/protocol`
+**Decision.** Every command and server message carries a version field `v` and is validated with strict zod schemas (unknown fields rejected). Types are inferred from the schemas. The package exports no master-state types.
+**Why.** One source of truth for server and client, and strict parsing keeps hidden state from leaking onto the wire.
+**See.** [architecture.md](architecture.md), `packages/protocol/README.md`
+
+## D8: Engine world model and scenario data
 **Decision.** Game time is an integer count of game milliseconds. The map is a row-major tile grid (open, wood, river, bridge, road). Scenarios are plain JSON-compatible data, and `loadScenario` validates them and builds the initial `GameState` at t=0. "Hold the Bridge" is 40x30 tiles, with 3 units per side. Blue wins by holding the bridge for 180 game minutes, and Red wins by taking it. A test greps the engine sources for wall-clock and ambient-random calls.
 **Why.** Integer time keeps replay exact, and validated plain data keeps state JSON round-trippable.
 **See.** [architecture.md](architecture.md)
