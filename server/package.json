@@ -10,7 +10,8 @@
     "test": "vitest run",
     "eval:orders": "tsc -p tsconfig.build.json && node dist/orders/eval/cli.js",
     "start": "node dist/main.js",
-    "dev": "npm run build -w @kriegsspiel/engine -w @kriegsspiel/protocol && tsc -p tsconfig.build.json && node dist/main.js"
+    "dev": "npm run build -w @kriegsspiel/engine -w @kriegsspiel/protocol && tsc -p tsconfig.build.json && node dist/main.js",
+    "replay": "tsc -p tsconfig.build.json && node dist/game/replayCli.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

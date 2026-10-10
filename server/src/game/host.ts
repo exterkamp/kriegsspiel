@@ -85,6 +85,11 @@ export class GameHost {
     }
     const state0 = createState(world.seed, world, 0);
     const state = this.options.init?.(state0) ?? state0;
+    await this.options.store.saveLogHeader({
+      gameId: id,
+      scenarioId: world.scenarioId,
+      seed: world.seed,
+    });
     const actor = new GameActor({
       ...this.actorOptions(id),
       state,
