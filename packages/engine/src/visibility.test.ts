@@ -734,6 +734,46 @@ describe('places in reports', () => {
     expect(r!.text).not.toMatch(/\d+, \d+/);
   });
 
+  it('shows a captured dispatch to the captor only, with just the documented fields', () => {
+    const w = world([
+      ['b', 'blue', 5, 5],
+      ['r', 'red', 8, 5],
+    ]);
+    w.couriers = [];
+    w.intel.red.documents = [
+      {
+        id: 'red-d1',
+        kind: 'capturedDispatch',
+        capturedAt: 1000,
+        deliverAt: 2000,
+        issuedAt: 500,
+        fromSide: 'blue',
+        addressedTo: 'Unit b',
+        location: { x: 850_000, y: 550_000 },
+        place: 'open ground',
+        text: 'Hold the ridge.',
+      },
+    ];
+    const doc = viewFor(w, 'red', 2000).documents[0]!;
+    expect(Object.keys(doc).sort()).toEqual([
+      'addressedTo',
+      'ageMs',
+      'capturedAt',
+      'deliveredAt',
+      'id',
+      'issuedAt',
+      'kind',
+      'location',
+      'place',
+      'text',
+    ]);
+    const json = JSON.stringify(viewFor(w, 'red', 2000));
+    for (const hidden of ['courier', 'garbled', 'fromSide', '"route"', '"legs"']) {
+      expect(json).not.toContain(hidden);
+    }
+    expect(viewFor(w, 'blue', 2000).documents).toEqual([]);
+  });
+
   it('has no grid or cell concept in the view', () => {
     const w = world([
       ['b', 'blue', 5, 5],
