@@ -298,3 +298,210 @@ it('reports a late mark-focus failure in persistent session feedback after the m
     'The map could not focus this mark.',
   );
 });
+
+it('plots only by explicit paper action and retains frozen provenance through later source refresh', async () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+  const ports = makePorts();
+  const paper = {
+    id: 'plot-paper',
+    from: 'Plotting scout',
+    category: 'scouts' as const,
+    writtenAtGame: 0,
+    receivedAtGame: 0,
+    observedAtGame: null,
+    location: { x: 1200.25, y: 300.5 },
+    unitId: null,
+    sizeEstimate: null,
+    confidence: null,
+    text: 'Older report, explicitly plotted.',
+  };
+  Object.assign(ports.snapshot, { papers: [paper] });
+  const { BrowserPersonalMarksRepository } = await import('./data/marks');
+  component = mount(App, {
+    target: (target = document.body.appendChild(document.createElement('div'))),
+    props: {
+      ...ports,
+      artwork,
+      marksRepository: new BrowserPersonalMarksRepository(ports.source.scope, artwork, () => ({
+        getItem: () => null,
+        setItem: () => {},
+      })),
+    },
+  });
+  await flush();
+  Array.from(target.querySelectorAll('nav.desk button'))
+    .find((b) => b.textContent?.includes('In-tray'))!
+    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await flush();
+  Array.from(target.querySelectorAll('button'))
+    .find((b) => b.textContent?.includes('Open plot-paper'))!
+    .click();
+  await flush();
+  expect(vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks).toHaveLength(0);
+  Array.from(target.querySelectorAll('button'))
+    .find((b) => b.textContent?.trim() === 'Plot paper')!
+    .click();
+  await flush();
+  expect(target.querySelector('h2')?.textContent).toBe('Map table');
+  const plotted = vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks[0]!;
+  expect(plotted.geometry).toEqual({ kind: 'pin', at: paper.location });
+  expect(plotted.source).toMatchObject({
+    kind: 'paper',
+    paperId: paper.id,
+    writtenAtGame: 0,
+    receivedAtGame: 0,
+    observedAtGame: null,
+    reportedLocation: paper.location,
+    excerpt: paper.text,
+  });
+  ports.emit({
+    connection: 'ready',
+    stale: false,
+    snapshot: {
+      ...ports.snapshot,
+      ordinal: 2,
+      atGame: 20,
+      clock: { ...ports.snapshot.clock, authoritativeGameMs: 20 },
+      papers: [
+        paper,
+        {
+          ...paper,
+          id: 'newer-paper',
+          writtenAtGame: 10,
+          receivedAtGame: 20,
+          text: 'Fresher prose.',
+          location: { x: 1500, y: 700 },
+        },
+      ],
+    },
+    error: null,
+  });
+  await flush();
+  expect(vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks[0]).toEqual(plotted);
+});
+
+async function mountPlottingApp() {
+  const { BrowserPersonalMarksRepository } = await import('./data/marks');
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+  const ports = makePorts();
+  Object.assign(ports.snapshot, {
+    papers: [
+      {
+        id: 'root-plot',
+        from: 'Root scout',
+        category: 'scouts',
+        writtenAtGame: 0,
+        receivedAtGame: 0,
+        observedAtGame: null,
+        location: { x: 1200.25, y: 300.5 },
+        unitId: null,
+        sizeEstimate: null,
+        confidence: null,
+        text: 'Captured report.',
+      },
+    ],
+  });
+  target = document.body.appendChild(document.createElement('div'));
+  component = mount(App, {
+    target,
+    props: {
+      ...ports,
+      artwork,
+      marksRepository: new BrowserPersonalMarksRepository(ports.source.scope, artwork, () => ({
+        getItem: () => null,
+        setItem: () => {},
+      })),
+    },
+  });
+  await flush();
+  Array.from(target.querySelectorAll('nav.desk button'))
+    .find((b) => b.textContent?.includes('In-tray'))!
+    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await flush();
+  Array.from(target.querySelectorAll('button'))
+    .find((b) => b.textContent?.includes('Open root-plot'))!
+    .click();
+  await flush();
+  return ports;
+}
+it('creates one report mark when subsequent navigation fails and explains the partial result persistently', async () => {
+  const ports = await mountPlottingApp();
+  vi.mocked(ports.surface.transitionTo).mockResolvedValueOnce({
+    ok: false,
+    error: { code: 'internal', message: 'Map navigation failed.', retry: 'never' },
+  });
+  Array.from(target.querySelectorAll('button'))
+    .find((b) => b.textContent?.trim() === 'Plot paper')!
+    .click();
+  await flush();
+  expect(target.querySelector('h2')?.textContent).toBe('In-tray');
+  expect(vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks).toHaveLength(1);
+  expect(target.querySelector('.session-feedback')?.textContent).toContain(
+    'Report mark created locally.',
+  );
+  expect(target.querySelector('.session-feedback')?.textContent).toContain(
+    'Map navigation failed.',
+  );
+});
+it.each([false, true])(
+  'preserves session plot feedback after panel teardown and ignores superseded focus (new action=%s)',
+  async (supersede) => {
+    const ports = await mountPlottingApp();
+    let finish!: (result: import('./contracts').Result<void>) => void;
+    vi.mocked(ports.surface.focusAt).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    Array.from(target.querySelectorAll('button'))
+      .find((b) => b.textContent?.trim() === 'Plot paper')!
+      .click();
+    await flush();
+    expect(target.querySelector('[aria-label="In-tray"]')).toBeNull();
+    if (supersede) {
+      target
+        .querySelector<HTMLButtonElement>('[aria-label="Focus mark Root scout: report"]')!
+        .click();
+      await flush();
+      expect(target.querySelector('.session-feedback')?.textContent).toContain(
+        'Personal mark located',
+      );
+    }
+    finish({
+      ok: false,
+      error: { code: 'internal', message: 'Old plot focus failed.', retry: 'never' },
+    });
+    await flush();
+    expect(target.querySelector('.session-feedback')?.textContent).toContain(
+      supersede ? 'Personal mark located' : 'Old plot focus failed.',
+    );
+    if (supersede)
+      expect(target.querySelector('.session-feedback')?.textContent).not.toContain(
+        'Old plot focus failed.',
+      );
+    expect(vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks).toHaveLength(1);
+  },
+);

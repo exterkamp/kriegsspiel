@@ -11,6 +11,7 @@
   import Shell from './shell/Shell.svelte';
   import Roster from './views/roster/Roster.svelte';
   import Journal from './views/journal/Journal.svelte';
+  import InTray from './views/intray/InTray.svelte';
   import Clock from './views/clock/Clock.svelte';
   import Marks from './interactions/marks/Marks.svelte';
   import {
@@ -18,7 +19,7 @@
     createPersonalMarksController,
     type PersonalMarksState,
   } from './data/marks';
-  import { failure, sameScope } from './data/common';
+  import { failure, sameScope, success } from './data/common';
   import { createFormationFocus } from './sessionActions';
   import type { ShellViewContext } from './shell/types';
   import { projectGameTime } from './data/fixture';
@@ -109,6 +110,63 @@
       feedback = result.ok ? 'Personal mark located on the map.' : result.error.message;
     return result;
   }
+  async function plotPaper(context: ShellViewContext, paperId: string): Promise<Result<void>> {
+    const ticket = ++action;
+    const operation = beginFocus();
+    const snapshot = context.sourceState.snapshot;
+    const paper = snapshot?.papers.find((item) => item.id === paperId);
+    if (
+      life.signal.aborted ||
+      !snapshot ||
+      !paper?.location ||
+      !sameScope(snapshot.scope, source.scope) ||
+      !sameScope(snapshot.scope, context.surface.scope) ||
+      !sameScope(snapshot.scope, context.navigation.scope)
+    ) {
+      const result = failure('invalid-data', 'No approved report location is available.');
+      if (!life.signal.aborted && ticket === action && !result.ok) feedback = result.error.message;
+      return result;
+    }
+    const created = personalMarks.create(
+      {
+        label: `${paper.from}: report`.slice(0, 256),
+        geometry: { kind: 'pin', at: { ...paper.location } },
+        source: { kind: 'paper', paperId },
+      },
+      snapshot,
+      projectGameTime(context.sourceState, source.kind, monotonicMs),
+    );
+    if (!created.ok) {
+      if (!life.signal.aborted && ticket === action) feedback = created.error.message;
+      return created;
+    }
+    // Creation succeeded in local RAM. Navigation/focus failure must not invite duplicate creation.
+    let located: Result<void>;
+    try {
+      const selected = context.navigation.select({
+        kind: 'paper',
+        id: paperId,
+        scope: snapshot.scope,
+      });
+      if (!selected.ok) throw new Error('Report selection failed');
+      const navigated = await context.navigation.navigate('table', null, {
+        signal: operation.signal,
+      });
+      located =
+        navigated.ok && !operation.signal.aborted
+          ? await context.surface.focusAt(paper.location, { signal: operation.signal })
+          : navigated.ok
+            ? failure('aborted', 'Map navigation was cancelled.')
+            : navigated;
+    } catch {
+      located = failure('internal', 'The report mark could not be located on the map.');
+    }
+    if (!life.signal.aborted && ticket === action)
+      feedback = located.ok
+        ? 'Report plotted locally. Save local marks to retain it.'
+        : `Report mark created locally. ${located.error.message} Save local marks to retain it.`;
+    return success(undefined);
+  }
   onDestroy(() => {
     life.abort();
     focusOperation?.abort();
@@ -170,6 +228,12 @@
         surface={context.surface}
         gameMs={projectGameTime(context.sourceState, source.kind, monotonicMs)}
         onFocusUnit={(id) => focus(context, id)}
+      />
+    {:else if context.state.view === 'in-tray'}
+      <InTray
+        snapshot={context.sourceState.snapshot}
+        scope={source.scope}
+        onPlotPaper={(id) => plotPaper(context, id)}
       />
     {:else if context.state.view === 'journal'}
       <Journal snapshot={context.sourceState.snapshot} scope={source.scope} />
