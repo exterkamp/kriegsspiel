@@ -30,6 +30,86 @@
         flex-wrap: wrap;
         max-width: calc(100% - 16px);
       }
+      #clock,
+      #orders,
+      #tray {
+        position: fixed;
+        background: rgba(42, 33, 24, 0.88);
+        color: #efe6c8;
+        font-size: 13px;
+        padding: 8px;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      #clock {
+        top: 8px;
+        right: 8px;
+      }
+      #orders {
+        left: 8px;
+        bottom: 8px;
+        width: min(340px, calc(100% - 16px));
+        max-height: 45%;
+        overflow: auto;
+      }
+      #tray {
+        right: 8px;
+        top: 44px;
+        bottom: 8px;
+        width: min(320px, 45%);
+        overflow: auto;
+      }
+      #orders h2,
+      #tray h2 {
+        margin: 0 0 4px;
+        font-size: 14px;
+      }
+      #orders select,
+      #orders textarea {
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 4px;
+      }
+      #orders ul,
+      #tray ul {
+        list-style: none;
+        margin: 4px 0 0;
+        padding: 0;
+      }
+      #tray li {
+        border-top: 1px solid #5a4a36;
+        padding: 4px 0;
+        cursor: pointer;
+      }
+      #tray li.unread {
+        font-weight: bold;
+      }
+      #tray small {
+        display: block;
+        opacity: 0.75;
+        font-weight: normal;
+      }
+      #order-err {
+        color: #ff9a8a;
+      }
+      @media (max-width: 600px) {
+        #clock {
+          top: 44px;
+          left: 8px;
+          right: auto;
+        }
+        #tray {
+          top: auto;
+          bottom: 8px;
+          right: 8px;
+          width: calc(100% - 16px);
+          max-height: 22%;
+        }
+        #orders {
+          bottom: calc(22% + 16px);
+          max-height: 30%;
+        }
+      }
     </style>
   </head>
   <body>
