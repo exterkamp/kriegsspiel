@@ -20,6 +20,10 @@ Owner resumed implementation on 2026-10-10; delivery is review PRs, without merg
 | --- | --- | --- | --- | --- | --- | --- |
 | #133 | map-implementer / w1:p6 | docs/map-architecture.md; scripts/maps-assessment/ | initial bases above | Accepted | Five analytical tests; 16 flat/constrained comparisons; fresh-process replay; clean install/build; independent review passed | #134 |
 | #133 review | map-reviewer / w1:p7 | read-only | initial bases above | Accepted | Independent source and final artifact review: no material findings | Review #134 contract |
+| #134 | map-implementer / w1:p6 | packages/maps contract | 6d181b5 | Accepted | 28a611c;62 tests and independent review | #135 |
+| #135 | map-implementer / w1:p6 | maps terrain | 28a611c | Accepted | 27bbce4;35 focused tests, numerical review | #136 |
+| #136 | map-implementer + map-client | maps geography/cover | 27bbce4 | Accepted | 78b918a;57 focused tests, independent review | #137 |
+| #137 | map-implementer / w1:p6 | maps planning | 78b918a + 6e22367 | Accepted |31 focused tests; independent review;543 root tests and lint/typecheck/build | #138 |
 
 Coordinator exclusively owns root workspace/lockfiles, decisions, integration commits and GitHub tracking. No more than two writers and one reviewer.
 
@@ -145,3 +149,18 @@ Use seeds `1, 2, 3, 7, 17, 31, 97, 55337` for each of flat countryside, wooded h
 
 - Accepted additive geography seam: caller-owned crossing budget also meters descriptor preflight per node and reserves schema traversal before parsing; invalid candidate checks cannot repeat uncharged work. Independent reviewer PASS, exact-cap repeat rejection and getter-safety probes. Coordinator59 affected contract/import/crossing tests and scoped lint/format pass. E independent review identified malformed deck tuple/path acceptance and omitted actual site-area constraints; fixes delegated before E acceptance.
 - Local fixture preview started through devrun as `map-review`, URL `http://127.0.0.1:41660/map-authoring.html`, explicit coordinator pane context. Chrome automation reaches its native blocked page (`ERR_BLOCKED_BY_CLIENT`); owner asked to allow this local page. No browser security settings changed; headless work continues.
+
+- Browser fixture smoke now succeeds through `devrun up --name map-review -- npm run dev --workspace @kriegsspiel/client`. The original direct Vite invocation had the wrong root and yielded404; owner screenshot exposed that configuration error. Corrected server retains41660; Chrome loads the fixture with overview, site detail, fit and high contrast verified visually. No extension/security changes needed; browser access question resolved. This is fixture-only preparation, not H acceptance/performance.
+
+- Client preparatory packet resumes under E/F allowance: map-client / w1:p8 gpt-6.1-sol/medium owns only `client/src/map-authoring/controls/**`, reusable DOM settings/ordered-override/status/load/export panel around accepted injected controller41522f6. No generator, validator, worker entry, main/renderer integration, distribution or story acceptance. Primary retains planning/compiled artifacts; reviewer stays independent. Two disjoint writers plus one reviewer.
+
+- Herdr panes named at owner request: `w1:p5` Epic #132 · Coordinator; `w1:p6` Maps · Core implementation; `w1:p7` Maps · Independent review; `w1:p8` Maps · Client authoring. Agent names remain unchanged.
+- E final review holds for failed-retry reconciliation accounting: rejected joins consume work but original result exposed cumulative work only on success. Primary adds deterministic cumulative work/pass metadata on both result branches and a two-failed-pass cap regression. Earlier geometry, override/provenance, allocation, exit and getter findings are closed with positive controls. No E acceptance until checks and this last recheck pass.
+
+## Accepted gate E — #137
+
+- `sites-lattice-decks-v1`, whole permissible-footprint suitability, deterministic slots/overrides, terrain-cost bounded regional routing, explicit normalized graph joins, exact boundary approaches, linked continuous linear decks and independent network/override/provenance validation. Local-join reconciliation returns cumulative work/pass metadata on both success and infeasibility; rejected retries cannot reset aggregate work. D19 and architecture/public exports integrated.
+- Writer live gpt-6.1-sol/xhigh; independent final source review PASS, all reproduced numerical, semantic, import and cap defects corrected.31 focused tests across five files; actual5km flat17/hills31/river97 each connect four villages/six farms. River97 uses two linked bridges; opposite-bank fixture verifies a used crossing.24 diagnostic seeds retain explicit recipes/outcomes.
+- Coordinator repository lint/typecheck/test/build all pass:525 Vitest plus18 Node tests (543 total), including186 maps and84 client tests (the latter includes unfinished controls preparation). Logs `.local/map-gate-e-{lint,types,tests,build}.log`. Existing Canvas notices/player bundle advisory remain non-failing. Controls directory is not staged or accepted.
+- Planning-only default10km17 is2573ms; maximum15km flat17 is4607ms. Sequential-process peak386MiB includes prior terrain/geography/cases; not isolated complete generation evidence. FinalJ retains full composition/browser/default/maximum verification.
+- Next: story-sized planning checkpoint then F/#138 generic terrain-aware SettleMaker local layouts. No E claim about settlement capacity/buildings/internal streets or whole composition. GPL distribution remains gated; source-review PR only.

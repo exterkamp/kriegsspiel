@@ -30,3 +30,4 @@ export {
   type ContourHeightEvidence,
 } from './terrain/index.js';
 export * from './geography/index.js';
+export * from './planning/index.js';

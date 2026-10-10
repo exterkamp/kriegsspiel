@@ -146,3 +146,13 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Boundary.** These are coarse cartographic generation policies, not discharge, erosion or surveyed bathymetry. Required-river infeasibility, unsupported geometry and exhausted work remain explicit. Whole-map connectivity, settlements and browser replay are later gates. The owner keeps combined-build distribution gated for source review.
 
 **See.** [Geography policies](../packages/maps/docs/geography.md), [cover policies](../packages/maps/docs/geography-cover.md), [execution log](map-execution-log.md).
+
+## D19: Regional planning certifies emitted roads and settlement approaches
+
+**Decision.** Deterministic site slots rank whole permissible footprints by certified bilinear gradient and seeded ties. A bounded cardinal lattice routes regional roads by length and directional grade, preserving exact boundary entrances and explicit graph intersections. Complete reserved corridors and normalized emitted geometry are revalidated. Bridges use a linear deck between authoritative dry endpoint heights, with dry approaches and reciprocal road links; channel-bed elevation does not substitute for deck grade.
+
+**Validation and reconciliation.** Independent graph validation checks required approaches, boundary exits, crossing joins, site geometry and recorded overrides. Local layouts supply actual world-space entrance endpoints, bearings and reserved widths; bounded reconciliation validates changed regional approaches and accumulates work across passes. Site capacity, occupied footprints and internal street connectivity remain fork/composition responsibilities. Conservative certificates and exhausted deterministic budgets return explicit infeasibility.
+
+**Boundary.** This standalone cartographic network introduces no gameplay movement rule or visibility path. Full local settlement composition and Node/browser replay remain later gates. Combined-build distribution remains gated for source review.
+
+**See.** [Regional planning policies](../packages/maps/docs/planning.md), [map architecture](map-architecture.md), [execution log](map-execution-log.md).
