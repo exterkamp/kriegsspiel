@@ -107,6 +107,11 @@ interface AgentSlot {
   agent: SideAgent;
   /** Game time of its next decision. */
   nextAt: number;
+  /**
+   * Its last decision changed nothing and nothing has happened in the world since. With an empty
+   * event queue the world cannot change by itself, so thinking again would only spin the clock.
+   */
+  idle: boolean;
 }
 
 interface Dependency {
@@ -179,6 +184,7 @@ export class GameActor {
     this.agents = (options.agents ?? []).map((agent) => ({
       agent,
       nextAt: t === 0 ? 0 : (Math.floor(t / agent.intervalMs) + 1) * agent.intervalMs,
+      idle: false,
     }));
     this.snapshotSeq = -1;
     this.snapshotEvery = Math.max(1, Math.floor(options.snapshotEvery ?? 1));
@@ -264,6 +270,8 @@ export class GameActor {
       const res = advanceTo(this.engine, to, this.registry);
       this.engine = res.state;
       emitted.push(...res.emitted);
+      // Something happened, so an agent that found nothing to do may now have something.
+      if (res.emitted.length > 0) for (const a of this.agents) a.idle = false;
     };
     try {
       for (;;) {
@@ -271,7 +279,7 @@ export class GameActor {
         if (!due || due.nextAt > target || this.engine.world.outcome) break;
         step(due.nextAt);
         due.nextAt += due.agent.intervalMs;
-        if (!this.engine.world.outcome) this.think(due.agent);
+        if (!this.engine.world.outcome) due.idle = !this.think(due.agent);
       }
       step(target);
     } finally {
@@ -284,16 +292,19 @@ export class GameActor {
     }
   }
 
+  /** The agent due to think soonest, leaving out idle ones when no event is queued to wake them. */
   private nextAgent(): AgentSlot | undefined {
+    const waiting = this.engine.queue.length > 0;
     return this.agents.reduce<AgentSlot | undefined>(
-      (best, a) => (!best || a.nextAt < best.nextAt ? a : best),
+      (best, a) => ((a.idle && !waiting) || (best && best.nextAt <= a.nextAt) ? best : a),
       undefined,
     );
   }
 
   /** Run one decision: the same order path as a human's, logged so replay needs no agent. */
-  private think(agent: SideAgent): void {
+  private think(agent: SideAgent): boolean {
     const view = viewFor(this.engine.world, agent.side as SideId, this.engine.time);
+    let changed = false;
     for (const o of agent.think(view)) {
       const parsed: ParseResult = {
         kind: 'intents',
@@ -312,10 +323,14 @@ export class GameActor {
       };
       const applied = applyLoggedOrder(this.engine, this.id, entry.seq, agent.side, parsed);
       if ('reason' in applied) entry.error = applied.reason;
-      else this.engine = applied.state;
+      else {
+        this.engine = applied.state;
+        changed = true;
+      }
       if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
       this.agentLog.push(entry);
     }
+    return changed;
   }
 
   /** Append the agent orders issued so far, before anything logged after them. */

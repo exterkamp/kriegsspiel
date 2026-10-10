@@ -1,5 +1,6 @@
 import {
   EventRegistry,
+  createState,
   holdTheBridge,
   loadScenario,
   registerCombat,
@@ -12,11 +13,14 @@ import {
   type GameState,
 } from '@kriegsspiel/engine';
 import { afterEach, describe, expect, it } from 'vitest';
-import { GameHost, MemoryGameStore, replayLog } from '../game/index.js';
+import { GameActor, GameHost, MemoryGameStore, replayLog } from '../game/index.js';
+import { GameClock } from '../clock.js';
 import { FakeTime } from '../game/testing.js';
 import type { OrderParser } from '../orders/index.js';
+import type { SideAgent } from './index.js';
 import {
   AIM_SPREAD_M,
+  THINK_INTERVAL_MS,
   ScriptedOpponent,
   assertFogOnly,
   scriptedAgents,
@@ -282,5 +286,168 @@ describe('headless game', () => {
     expect(base.length).toBeGreaterThan(0);
     expect(await orderTimes(4)).toEqual(base);
     expect(await orderTimes(12)).toEqual(base);
+  });
+  it('goes quiet in fast-forward when the agent has nothing to do and nothing is queued', async () => {
+    const time = new FakeTime();
+    const store = new MemoryGameStore();
+    let thoughts = 0;
+    const idleAgent: SideAgent = {
+      side: 'red',
+      intervalMs: THINK_INTERVAL_MS,
+      think: () => {
+        thoughts++;
+        return [];
+      },
+    };
+    const world = loadScenario(holdTheBridge);
+    const actor = new GameActor({
+      id: 'g1',
+      state: createState(world.seed, world, 0),
+      registry: registry(),
+      clock: new GameClock(time.now, { rate: 1 }),
+      wallNow: time.now,
+      parser: noParser,
+      store,
+      timers: time,
+      agents: [idleAgent],
+    });
+    await actor.start();
+    await actor.submit({ kind: 'setMode', mode: 'fast-forward' });
+    await time.advance(0);
+    // It thought, found nothing to do, and the game is not over: no timer keeps the clock running.
+    expect(thoughts).toBeGreaterThan(0);
+    expect(time.pendingTimers).toBe(0);
+    const stoppedAt = actor.state.time;
+    const seen = thoughts;
+    await time.advance(60 * 60_000);
+    expect(actor.state.time).toBe(stoppedAt);
+    expect(thoughts).toBe(seen);
+    await actor.close();
+  });
+
+  it('thinks again once the world changes after it went idle', async () => {
+    const time = new FakeTime();
+    const world = loadScenario(holdTheBridge);
+    let thoughts = 0;
+    const agent: SideAgent = {
+      side: 'red',
+      intervalMs: THINK_INTERVAL_MS,
+      think: () => {
+        thoughts++;
+        return [];
+      },
+    };
+    const parser: OrderParser = {
+      async parse(text) {
+        return {
+          kind: 'intents',
+          text,
+          unitId: 'blue-1',
+          intents: [{ kind: 'move', to: { x: 20, y: 20 } }],
+        };
+      },
+    };
+    const actor = new GameActor({
+      id: 'g1',
+      state: createState(world.seed, world, 0),
+      registry: registry(),
+      clock: new GameClock(time.now, { rate: 1 }),
+      wallNow: time.now,
+      parser,
+      store: new MemoryGameStore(),
+      timers: time,
+      agents: [agent],
+    });
+    await actor.start();
+    await actor.submit({ kind: 'setMode', mode: 'fast-forward' });
+    await time.advance(0);
+    expect(time.pendingTimers).toBe(0);
+    const quiet = thoughts;
+    // Blue's courier and march are events; Red looks again after they happen, then goes quiet.
+    await actor.submit({ kind: 'order', side: 'blue', text: 'blue-1 move to the ridge' });
+    await time.advance(0);
+    expect(thoughts).toBeGreaterThan(quiet);
+    expect(time.pendingTimers).toBe(0);
+    await actor.close();
+  });
+
+  describe('with a human on the other side', () => {
+    const blueParser: OrderParser = {
+      async parse(text) {
+        return {
+          kind: 'intents',
+          text,
+          unitId: 'blue-1',
+          intents: [{ kind: 'move', to: { x: 20, y: 20 } }],
+        };
+      },
+    };
+
+    /** Rate 1, so a wall minute is a game minute; Blue orders land at chosen game minutes. */
+    async function play(store: MemoryGameStore, stopAndReopenAt?: number) {
+      const time = new FakeTime();
+      const make = () =>
+        new GameHost({
+          store,
+          parser: blueParser,
+          registry: registry(),
+          wallNow: time.now,
+          timers: time,
+          scriptedOpponents: true,
+        });
+      let h = make();
+      host = h;
+      let game = await h.create('g1', loadScenario(holdTheBridge), { rate: 1 });
+      let elapsed = 0;
+      const to = async (minute: number) => {
+        await time.advance((minute - elapsed) * 60_000);
+        elapsed = minute;
+      };
+      // Exactly 5 game minutes: the instant Red thinks, so a command and a decision share it.
+      await to(5);
+      await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 move to the ridge' });
+      await to(12);
+      if (stopAndReopenAt !== undefined) {
+        await to(stopAndReopenAt);
+        await game.submit({ kind: 'pause' });
+        await h.shutdown();
+        h = make();
+        host = h;
+        game = await h.open('g1');
+        await game.submit({ kind: 'resume' });
+      }
+      await to(25);
+      await game.submit({ kind: 'pause' });
+      return { game, time };
+    }
+
+    it('replays a command and a decision that share an instant, whatever order they were logged in', async () => {
+      const store = new MemoryGameStore();
+      const { game } = await play(store);
+      const log = await store.inputLog('g1');
+      const human = log.find((e) => !e.agent && e.command.kind === 'order');
+      expect(human).toBeDefined();
+      const agent = log.find((e) => e.agent && e.gameMs === human!.gameMs);
+      expect(agent).toBeDefined();
+      const header = (await store.logHeader('g1'))!;
+      const until = game.state.time;
+      const replay = (entries: typeof log) =>
+        replayLog(header, loadScenario(holdTheBridge), entries, registry(), until).state;
+      expect(replay(log)).toEqual(game.state);
+      // Same entries with the human command logged ahead of the decision that preceded it.
+      const swapped = log.filter((e) => e !== agent);
+      swapped.splice(swapped.indexOf(human!) + 1, 0, agent!);
+      expect(replay(swapped)).toEqual(game.state);
+    });
+
+    it('stopping and reopening mid-game gives the world an uninterrupted game reaches', async () => {
+      const straight = await play(new MemoryGameStore());
+      const world = straight.game.state.world;
+      await host?.shutdown();
+      host = undefined;
+      const resumed = await play(new MemoryGameStore(), 18);
+      expect(resumed.game.state.time).toBe(straight.game.state.time);
+      expect(resumed.game.state.world).toEqual(world);
+    });
   });
 });
