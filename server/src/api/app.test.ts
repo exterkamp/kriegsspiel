@@ -15,6 +15,7 @@ import {
   startingState,
 } from '../game/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
+import { scriptedOpponentsFromEnv } from '../config.js';
 import { buildApp, type App } from './app.js';
 
 /** One game hour per wall second, so a courier ride and its report take well under a second. */
@@ -399,3 +400,46 @@ async function until(cond: () => boolean, ms = 5000): Promise<void> {
     await new Promise((r) => setTimeout(r, 10));
   }
 }
+
+describe('scripted opponent', () => {
+  /** Starts the app with the settings `main.ts` derives from the given environment. */
+  async function startLikeMain(env: Record<string, string | undefined>) {
+    store = new MemoryGameStore();
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      store,
+      scriptedOpponents: scriptedOpponentsFromEnv(env),
+    });
+    const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+    return base;
+  }
+
+  const redUnits = (id: string) =>
+    app!.host.get(id)!.state.world.units.filter((u) => u.side === 'red');
+
+  it('moves Red by default with no client input', async () => {
+    const base = await startLikeMain({});
+    const game = (await createGame(base, { rate: 86_400 })).json;
+    const start = redUnits(game.id).map((u) => u.center);
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      const log = await store.inputLog(game.id);
+      const moved = redUnits(game.id).some(
+        (u, i) => u.center.x !== start[i]!.x || u.center.y !== start[i]!.y,
+      );
+      if (log.some((e) => e.agent) && moved) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect((await store.inputLog(game.id)).some((e) => e.agent)).toBe(true);
+    expect(
+      redUnits(game.id).some((u, i) => u.center.x !== start[i]!.x || u.center.y !== start[i]!.y),
+    ).toBe(true);
+  });
+
+  it('leaves Red idle when SCRIPTED_OPPONENTS=0', async () => {
+    const base = await startLikeMain({ SCRIPTED_OPPONENTS: '0' });
+    const game = (await createGame(base, { rate: 86_400 })).json;
+    await new Promise((r) => setTimeout(r, 500));
+    expect((await store.inputLog(game.id)).some((e) => e.agent)).toBe(false);
+  });
+});

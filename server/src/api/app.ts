@@ -43,6 +43,8 @@ export interface AppOptions {
   timers?: Timers;
   /** Log lines from Fastify; off by default so tests stay quiet. */
   logger?: boolean;
+  /** Play sides the scenario marks `scripted` with the built-in opponent. Off unless set; `main.ts` sets it from the environment. */
+  scriptedOpponents?: boolean;
   onError?: (gameId: string, error: unknown) => void;
 }
 
@@ -76,6 +78,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     wallNow: options.wallNow ?? Date.now,
     timers: options.timers,
     init: startingState,
+    scriptedOpponents: options.scriptedOpponents,
     onUpdate: (id) => hub.notify(id),
     onError,
   });

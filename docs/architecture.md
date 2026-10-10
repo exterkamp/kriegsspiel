@@ -143,6 +143,8 @@ The simulation is a function of: scenario, seed, and the **ordered log of inputs
 
 A scripted side is a `SideAgent` run by the `GameActor`. Every `intervalMs` of game time the actor advances the engine to that instant, builds `viewFor(world, side)` and calls `think(view)`; the orders it returns are issued at once through `applyLoggedOrder`, then travel by courier like any other. The agent never sees `GameState`: its input type is `EngineSideView` and `assertFogOnly` checks it at runtime. Each order is logged with `agent: true` and its parse result, so replay needs no agent and no model call. See decision "Scripted Red opponent".
 
+The server turns the opponent on by default: `main.ts` passes `scriptedOpponents: scriptedOpponentsFromEnv(process.env)` to `buildApp`, which hands it to `GameHost`. Set `SCRIPTED_OPPONENTS=0` (or `false`/`off`) to disable it, for tests or human-vs-human games. `GameHost` itself defaults to off.
+
 ## Debug trace
 
 `server/src/debug/` holds the debug trace store behind the admin view (Epic #119). It is read-only diagnostics: the engine never reads it and no game client ever receives it.
