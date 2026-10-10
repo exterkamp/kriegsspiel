@@ -1,43 +1,92 @@
-import type { Coord } from '@kriegsspiel/protocol';
+import type { Coord, Footprint, Formation } from '@kriegsspiel/protocol';
 
-// NOTE: duplicated from packages/engine/src/types.ts until the map moves into @kriegsspiel/protocol.
-// `table.test.ts` pins the terrain list so drift is caught.
-export const TERRAINS = ['open', 'wood', 'river', 'bridge', 'road'] as const;
-export type Terrain = (typeof TERRAINS)[number];
+// NOTE: mirrors the vector feature kinds in packages/engine/src/types.ts until the base map
+// moves into @kriegsspiel/protocol. `table.test.ts` pins the list so drift is caught.
+export const FEATURE_KINDS = [
+  'field',
+  'wood',
+  'marsh',
+  'water',
+  'road',
+  'river',
+  'stream',
+  'bridge',
+  'ford',
+  'building',
+] as const;
+export type FeatureKind = (typeof FEATURE_KINDS)[number];
 
-export const FACINGS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const;
-export type Facing = (typeof FACINGS)[number];
-
-/** The base map the player sees: row-major `tiles[y * width + x]`. Same shape as the engine grid. */
-export interface MapGrid {
+/** A closed area (woods, marsh, water, fields), in metres. */
+export interface PolygonShape {
+  shape: 'polygon';
+  points: Coord[];
+}
+/** A line with a full `width` in metres (roads, rivers, streams). */
+export interface PolylineShape {
+  shape: 'polyline';
+  points: Coord[];
   width: number;
-  height: number;
-  tiles: Terrain[];
+}
+/** A place with a `radius` in metres (bridges, fords, buildings). */
+export interface PointShape {
+  shape: 'point';
+  at: Coord;
+  radius: number;
 }
 
-export interface OwnPiece {
+/** A feature of the base map the player sees. Later features draw over earlier ones. */
+export interface BaseFeature {
+  id: string;
+  kind: FeatureKind;
+  geometry: PolygonShape | PolylineShape | PointShape;
+}
+
+/**
+ * The base map the player sees: a plane `width` x `height` metres from the north-west
+ * corner (x east, y south), with vector features painted on it. There is no grid.
+ */
+export interface BaseMap {
+  width: number;
+  height: number;
+  features: BaseFeature[];
+}
+
+/** An oriented footprint at a centre, in metres. `facing` is a compass bearing in radians. */
+interface Placed {
+  /** Centre of the footprint, in metres. */
+  position: Coord;
+  facing: number;
+}
+
+export interface OwnPiece extends Placed {
   kind: 'own';
   id: string;
   label: string;
   side: string;
-  /** Map coordinates (tile units; a unit on tile (x, y) has position {x, y}). */
-  position: Coord;
-  facing: Facing;
+  formation: Formation;
+  footprint: Footprint;
+  /** Loose sub-positions, as offsets in metres in the unit's own frame (x right, y front). */
+  shape?: Coord[];
 }
 
-export interface GhostPiece {
+export interface GhostPiece extends Placed {
   kind: 'ghost';
   id: string;
-  position: Coord;
   ageMs: number;
   /** Paper tag text, for example "2h 10m old". */
   ageTag: string;
+  /** The enemy may now be anywhere within this many metres of `position`; 0 for a live sighting. */
+  uncertaintyRadius: number;
   sizeEstimate?: string;
+  /** Only for a live sighting, where the watcher can judge the ground it covers. */
+  formation?: Formation;
+  footprint?: Footprint;
+  shape?: Coord[];
 }
 
 export interface SceneState {
   side: string;
-  map: MapGrid;
+  map: BaseMap;
   own: OwnPiece[];
   ghosts: GhostPiece[];
 }
