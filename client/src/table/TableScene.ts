@@ -1,7 +1,14 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mapCanvas } from './mapTexture.js';
-import { mapToWorld, pickFromRay, pickMinSize, worldToMap, type PickResult } from './picking.js';
+import {
+  mapToWorld,
+  pickFromRay,
+  pickMinSize,
+  rayToMap,
+  worldToMap,
+  type PickResult,
+} from './picking.js';
 import { facingToRotationY, fitDistance } from './framing.js';
 import type { GhostPiece, OwnPiece, SceneState } from './types.js';
 
@@ -44,6 +51,7 @@ export class TableScene {
   readonly controls: OrbitControls;
   private state: SceneState | undefined;
   private mapKey = '';
+  private mapRef: SceneState['map'] | undefined;
   private mapMesh: THREE.Mesh | undefined;
   private tableMesh: THREE.Mesh | undefined;
   private pieces = new Map<string, PieceObject>();
@@ -79,7 +87,10 @@ export class TableScene {
   /** Reconcile the scene with `state`. Safe to call repeatedly with equal states. */
   apply(state: SceneState): void {
     this.state = state;
-    const key = JSON.stringify(state.map);
+    // Same reference means same map; only a new reference pays for the deep compare.
+    const mapChanged = state.map !== this.mapRef;
+    this.mapRef = state.map;
+    const key = mapChanged ? JSON.stringify(state.map) : this.mapKey;
     if (key !== this.mapKey) {
       this.mapKey = key;
       this.buildMap();
@@ -338,7 +349,10 @@ export class TableScene {
       while (o && o.userData.id === undefined) o = o.parent;
       if (o) {
         const { pieceKind, id } = o.userData as { pieceKind: 'own' | 'ghost'; id: string };
-        return { type: 'piece', pieceKind, id, coord: worldToMap(this.state.map, hit.point) };
+        // Which piece comes from the pick mesh; where is the ray's point on the map plane,
+        // not the point on the mesh's top or side, which is shifted toward the camera.
+        const coord = rayToMap(this.state.map, rc.ray) ?? worldToMap(this.state.map, hit.point);
+        return { type: 'piece', pieceKind, id, coord };
       }
     }
     return pickFromRay(this.state, rc.ray);

@@ -118,6 +118,41 @@ describe('picking in continuous space', () => {
     expect(pickFromRay(state, rayDownAt(gap.x, gap.y)).type).toBe('point');
   });
 
+  it('bounds a sub-position pick by the minimum pick size', () => {
+    const u = state.own.find((p) => p.id === 'blue-4')!;
+    const minSize = pickMinSize(fixtureMap);
+    const facing = u.facing;
+    const at = (s: { x: number; y: number }) => ({
+      x: u.position.x + s.x * Math.cos(facing) + s.y * Math.sin(facing),
+      y: u.position.y + s.x * Math.sin(facing) - s.y * Math.cos(facing),
+    });
+    // Sub-position (0, 20); the footprint reaches only y = 30 (depth 60). Just inside and
+    // just outside minSize/2 of the sub-position, ahead of the footprint's front edge.
+    const inside = at({ x: 0, y: 20 + minSize / 2 - 1 });
+    const outside = at({ x: 0, y: 20 + minSize / 2 + 2 });
+    expect(pickFromRay(state, rayDownAt(inside.x, inside.y))).toMatchObject({ id: 'blue-4' });
+    expect(pickFromRay(state, rayDownAt(outside.x, outside.y)).type).toBe('point');
+  });
+
+  it('uses the footprint depth, not a fixed size, for the far edge of a deep unit', () => {
+    // A 85 x 120 m column facing north at (1850, 2450); minSize is 50 m so half is 25 m.
+    const deep: SceneState = {
+      ...state,
+      own: [
+        {
+          ...state.own[0]!,
+          facing: 0,
+          footprint: { frontage: 85, depth: 120 },
+          formation: 'column',
+        },
+      ],
+      ghosts: [],
+    };
+    expect(pickFromRay(deep, rayDownAt(1850, 2450 - 55)).type).toBe('piece');
+    expect(pickFromRay(deep, rayDownAt(1850, 2450 + 55)).type).toBe('piece');
+    expect(pickFromRay(deep, rayDownAt(1850, 2450 - 65)).type).toBe('point');
+  });
+
   it('reports a ghost contact near its position', () => {
     expect(pickFromRay(state, rayDownAt(2160, 345))).toMatchObject({
       type: 'piece',

@@ -14,22 +14,25 @@ export const FEATURE_COLOURS: Record<FeatureKind | 'ground', string> = {
   building: '#7a5a48',
 };
 
-/** Painting order: areas, then water lines, then roads, then crossings and buildings. */
+/**
+ * Painting order. Mirrors the engine's layer table (`KIND_DEFAULTS` in
+ * packages/engine/src/terrain.ts): a river cuts a road, and a bridge or ford carries it across.
+ */
 const LAYER: Record<FeatureKind, number> = {
   field: 0,
   marsh: 1,
   wood: 1,
-  water: 2,
+  road: 2,
+  building: 2,
+  water: 3,
   stream: 3,
   river: 3,
-  road: 4,
-  ford: 5,
-  bridge: 6,
-  building: 7,
+  ford: 4,
+  bridge: 4,
 };
 
 /** Largest canvas side. Keeps the texture within what mobile GPUs accept. */
-const MAX_TEXTURE_PX = 2048;
+export const MAX_TEXTURE_PX = 2048;
 
 /** Pixels per metre: the larger side of the map fills MAX_TEXTURE_PX. */
 export function pxPerMetre(map: BaseMap): number {

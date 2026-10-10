@@ -1,7 +1,7 @@
 import type { Coord, Footprint, Formation } from '@kriegsspiel/protocol';
 
 // NOTE: mirrors the vector feature kinds in packages/engine/src/types.ts until the base map
-// moves into @kriegsspiel/protocol. `table.test.ts` pins the list so drift is caught.
+// moves into @kriegsspiel/protocol. `scene.test.ts` compares the list with the engine's source so drift is caught.
 export const FEATURE_KINDS = [
   'field',
   'wood',
