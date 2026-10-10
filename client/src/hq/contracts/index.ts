@@ -1,6 +1,6 @@
 /** HQ first-gate proposal, hq-contracts/1. UI ports only; no new wire schemas.
- * Base cb635a21bb8170df9d83d426848cefe6f52f8f89. Runtime validation required.
- * Later orders, annotations, conference and reveal services are unavailable.
+ * Continuous baseline af0dc698392f350b73cdfc3684e6adc3a1282ca0. Runtime validation required.
+ * Live orders, shared annotations, conference and reveal services are unavailable.
  */
 export type GameMs = number; // Safe nonnegative integer game milliseconds.
 export type Revision = string; // Opaque equality token, never lexically ordered.
@@ -227,7 +227,7 @@ export type Pick =
 export interface MapSurface {
   readonly scope: Scope;
   readonly coordinates: 'metres';
-  readonly implementation: 'continuous' | 'legacy-tile-preview';
+  readonly implementation: 'continuous';
   mount(canvas: HTMLCanvasElement, op: Operation): Promise<Result<void>>;
   apply(presentation: MapPresentation, op: Operation): Promise<Result<void>>;
   resize(widthCssPx: number, heightCssPx: number, devicePixelRatio: number): Result<void>;
@@ -247,13 +247,6 @@ export interface MapSurface {
     readonly clientYCssPx: number;
   } | null>;
   dispose(): void;
-}
-export interface LegacyTileAdapterPolicy {
-  readonly kind: 'legacy-tile-preview';
-  readonly metresPerTile: 100;
-  readonly renderPlacement: 'tile-centre';
-  readonly facing: 'nearest-eight-way';
-  readonly continuousAcceptance: false;
 }
 /** First local version only persists shell preferences. Drafts/marks/history need later schemas. */
 export interface LocalDocument {
@@ -293,4 +286,61 @@ export interface ReplaySource {
   };
   open(op: Operation): Promise<Result<never>>; // Returns unsupported; never returns truth.
   dispose(): void;
+}
+
+/** Separately reviewed browser-only personal-mark contract; no server authority. */
+export type MarkGeometry =
+  | { readonly kind: 'pin'; readonly at: PointM }
+  | { readonly kind: 'polyline' | 'arrow'; readonly points: readonly PointM[] }
+  | { readonly kind: 'ring'; readonly centre: PointM; readonly radiusM: number }
+  | { readonly kind: 'symbol'; readonly at: PointM; readonly symbol: 'cross' | 'dot' | 'flag' };
+export type MarkSource =
+  | { readonly kind: 'manual' }
+  | {
+      readonly kind: 'paper';
+      readonly paperId: string;
+      readonly writtenAtGame: GameMs;
+      readonly receivedAtGame: GameMs;
+      readonly observedAtGame: GameMs | null;
+      readonly reportedLocation: PointM | null;
+      readonly excerpt: string;
+    };
+export interface PersonalMark {
+  readonly id: string;
+  readonly scope: Scope;
+  readonly map: { readonly id: string; readonly revision: Revision };
+  readonly label: string;
+  readonly geometry: MarkGeometry;
+  readonly source: MarkSource;
+  /** Fixture display times, not server-accepted command timestamps. */
+  readonly placedAtGame: GameMs | null;
+  readonly editedAtGame: GameMs | null;
+}
+export interface PersonalMarksDocument {
+  readonly schemaVersion: 1;
+  readonly scope: Scope;
+  readonly map: { readonly id: string; readonly revision: Revision };
+  readonly revision: Revision;
+  readonly marks: readonly PersonalMark[];
+}
+export interface PersonalMarksRepository {
+  readonly scope: Scope;
+  readonly artwork: PublicArtwork;
+  load(op: Operation): Promise<Result<PersonalMarksDocument>>;
+  save(
+    marks: readonly PersonalMark[],
+    expectedRevision: Revision,
+    op: Operation,
+  ): Promise<Result<PersonalMarksDocument>>;
+  dispose(): void;
+}
+export interface MarkCreateInput {
+  readonly label: string;
+  readonly geometry: MarkGeometry;
+  readonly source:
+    { readonly kind: 'manual' } | { readonly kind: 'paper'; readonly paperId: string };
+}
+export interface MarkEditInput {
+  readonly label: string;
+  readonly geometry: MarkGeometry;
 }

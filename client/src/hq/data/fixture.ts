@@ -19,10 +19,10 @@ export const demoScope: Scope = { gameId: 'hq-demo', sideId: 'blue', playerId: '
 export const demoArtwork: PublicArtwork = {
   kind: 'public-artwork',
   id: 'hq-schematic',
-  revision: '1',
+  revision: '2',
   widthM: 4000,
-  heightM: 1600,
-  image: { url: '/hq-preview.svg', pixelWidth: 1200, pixelHeight: 480 },
+  heightM: 3000,
+  image: { url: '/hq-preview.svg', pixelWidth: 1200, pixelHeight: 900 },
   registration: 'full-image-nw-origin',
   credit: 'Original Kriegsspiel HQ fixture artwork',
   licence: 'Project-owned fixture; external reuse terms unspecified',
@@ -310,7 +310,7 @@ export class FixtureSource implements HqDataSource {
         raw.ownUnits = raw.ownUnits.map((u) => ({
           ...u,
           id: u.id.replace('blue-', 'red-'),
-          position: { x: 4000 - u.position.x, y: 1600 - u.position.y },
+          position: { x: demoArtwork.widthM - u.position.x, y: demoArtwork.heightM - u.position.y },
         }));
       const snapshot = normalizeFixture(raw, this.scope, this.now(), ++this.ordinal);
       if (this.getState().connection === 'disposed')

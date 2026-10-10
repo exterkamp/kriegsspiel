@@ -1,6 +1,6 @@
 # The HQ interface
 
-Implementation ports and capability gates are recorded in [HQ contracts](hq-contracts.md), with packet evidence in [HQ execution log](hq-execution-log.md). The current HQ composition is an explicitly identified fixture demonstration; its temporary table adapter does not certify continuous rendering or live-server behavior.
+Implementation ports and capability gates are recorded in [HQ contracts](hq-contracts.md), with packet evidence in [HQ execution log](hq-execution-log.md). The current HQ composition is an explicitly identified fixture demonstration; its continuous-metre table consumes accepted #118. Browser rendering/performance and live-server acceptance remain pending.
 
 The game is played from a general's headquarters. There is no HUD and no minimap. The screen is a **desk in a tent or requisitioned farmhouse**, and everything you know arrives as paper.
 
@@ -77,7 +77,7 @@ Period style, not a fantasy skin: aged paper, ink, sealing wax, pencil, brass in
 - **Camera.** Orbit and zoom within limits, with a "top-down" snap for precise plotting. Tilts away from the table to the desk.
 - **Desk (HTML/CSS over the canvas).** In-tray, orders desk, order of battle, journal and staff conference are 2D Papers Please-style screens. Papers can be dragged, stamped and filed, and text stays crisp and selectable. A transition (camera dolly plus fade) moves between table and desk. Dragging a report from the desk onto the table to place a marker is a core interaction, so the two layers share a drag-and-drop system.
 - **UI framework for the desk:** Svelte (preferred) or React. Vanilla Three.js for the scene, with no react-three-fiber unless the scene gets complicated.
-- **Picking.** Raycast against the flat map plane to convert pointer position to map coordinates. Pieces are picked by raycasting their meshes. Because the map is flat, coordinates are plain (x, y) in metres with no height, which is what the engine's continuous plane uses (D13). Pieces stand at any position and facing and are drawn at their footprint; there are no cells to snap to.
+- **Picking.** Raycast against the flat map plane to convert pointer position to map coordinates. Pieces are picked by raycasting their meshes. Because the map is flat, coordinates are plain (x, y) in metres with no height, which is what the engine's continuous plane uses (D15). Pieces stand at any position and facing and are drawn at their footprint; there are no cells to snap to.
 
 Because the map is flat, **elevation data is no longer needed** (option C above is dropped). Line of sight and cover come from the annotated terrain layer plus per-feature height tags (woods, ridges, buildings) in the engine.
 

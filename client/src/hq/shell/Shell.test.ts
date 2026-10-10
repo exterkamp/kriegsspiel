@@ -89,7 +89,7 @@ describe('fixture desk DOM', () => {
     }
     expect(ports.surface.mount).toHaveBeenCalledTimes(1);
     expect(target.textContent).toContain('Fixture / demo');
-    expect(target.textContent).toContain('Degraded legacy preview');
+    expect(target.textContent).not.toContain('Degraded legacy preview');
   });
   it('suppresses typing and modal shortcuts, and routes ordinary keys', async () => {
     await render();

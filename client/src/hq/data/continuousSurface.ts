@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { fixtureMap } from '../../table/fixture.js';
 import { TableScene } from '../../table/TableScene.js';
-import { FACINGS, type SceneState } from '../../table/types.js';
+import type { BaseMap, SceneState } from '../../table/types.js';
 import type {
   CameraBookmark,
   MapPresentation,
@@ -16,23 +15,29 @@ import { failure, immutable, sameScope, success } from './common.js';
 import { demoArtwork } from './fixture.js';
 import { parsePresentation } from './presentation.js';
 
-const SCALE = 100;
+const publicMap: BaseMap = {
+  width: demoArtwork.widthM,
+  height: demoArtwork.heightM,
+  features: [],
+};
 const finitePoint = (p: PointM) => Number.isFinite(p.x) && Number.isFinite(p.y);
 export const inArtwork = (p: PointM): boolean =>
   finitePoint(p) && p.x >= 0 && p.y >= 0 && p.x <= demoArtwork.widthM && p.y <= demoArtwork.heightM;
-export const toMetres = (p: PointM): PointM => ({ x: p.x * SCALE, y: p.y * SCALE });
 
-/** Explicit degraded preview only. This port does not implement #118's continuous table. */
-export class LegacySurface implements MapSurface {
+/** Public-art fixture surface using the accepted continuous metre renderer. */
+export class ContinuousSurface implements MapSurface {
   readonly coordinates = 'metres';
-  readonly implementation = 'legacy-tile-preview';
+  readonly implementation = 'continuous';
   private table: TableScene | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private presentation: MapPresentation | null = null;
   private disposed = false;
   private active = false;
   private settled: 'desk' | 'table' = 'table';
-  private tableCamera: { position: THREE.Vector3; target: THREE.Vector3 } | null = null;
+  private tableCamera: {
+    position: THREE.Vector3;
+    target: THREE.Vector3;
+  } | null = null;
   private applying = false;
   private transitionCancel: (() => void) | null = null;
   private imageCancel: (() => void) | null = null;
@@ -56,10 +61,7 @@ export class LegacySurface implements MapSurface {
     } catch {
       this.table?.dispose();
       this.table = null;
-      return failure(
-        'unsupported',
-        'This browser could not open the 3D table. Desk papers remain readable.',
-      );
+      return failure('unsupported', 'This browser could not open the 3D headquarters table.');
     }
   }
   async apply(p: MapPresentation, op: Operation): Promise<Result<void>> {
@@ -103,7 +105,7 @@ export class LegacySurface implements MapSurface {
     if (old && JSON.stringify(p) === JSON.stringify(old)) return success(undefined);
     const state: SceneState = {
       side: this.scope.sideId,
-      map: fixtureMap,
+      map: publicMap,
       own: p.pieces
         .filter((piece) => piece.relationship === 'own')
         .map((piece) => ({
@@ -112,24 +114,49 @@ export class LegacySurface implements MapSurface {
           side: this.scope.sideId,
           label: piece.label,
           snapshotAtGame: p.snapshot.atGame,
-          position: { x: piece.position.x / SCALE, y: piece.position.y / SCALE },
-          facing:
-            FACINGS[
-              ((Math.round((piece.appearance?.facingRad ?? 0) / (Math.PI / 4)) % 8) + 8) % 8
-            ]!,
+          position: { x: piece.position.x, y: piece.position.y },
+          facing: piece.appearance!.facingRad,
+          formation: piece.appearance!.formation,
+          footprint: {
+            frontage: piece.appearance!.frontageM,
+            depth: piece.appearance!.depthM,
+          },
+          ...(piece.appearance!.shape === null
+            ? {}
+            : {
+                shape: piece.appearance!.shape.map((point) => ({ ...point })),
+              }),
         })),
       ghosts: p.pieces
         .filter((piece) => piece.relationship === 'enemy')
         .map((piece) => ({
           kind: 'ghost',
           id: piece.unitId,
-          position: { x: piece.position.x / SCALE, y: piece.position.y / SCALE },
+          position: { x: piece.position.x, y: piece.position.y },
           ageMs: piece.ageMs ?? 0,
           ageTag:
             piece.observedAtGame === null
               ? 'Snapshot'
               : `${Math.floor((piece.ageMs ?? 0) / 60000)}m old`,
           sizeEstimate: piece.label,
+          facing: piece.appearance?.facingRad ?? 0,
+          uncertaintyRadius: piece.uncertaintyRadiusM ?? 0,
+          ...(piece.appearance === null
+            ? {}
+            : {
+                formation: piece.appearance.formation,
+                footprint: {
+                  frontage: piece.appearance.frontageM,
+                  depth: piece.appearance.depthM,
+                },
+                ...(piece.appearance.shape === null
+                  ? {}
+                  : {
+                      shape: piece.appearance.shape.map((point) => ({
+                        ...point,
+                      })),
+                    }),
+              }),
           snapshotAtGame: p.snapshot.atGame,
           ...(piece.observedAtGame === null ? {} : { observedAtGame: piece.observedAtGame }),
         })),
@@ -138,8 +165,7 @@ export class LegacySurface implements MapSurface {
     try {
       const image = old ? null : await this.loadImage(op.signal);
       if (this.disposed || op.signal.aborted) return failure('aborted', 'Table update cancelled.');
-      this.table.apply(state);
-      if (image) this.table.setArtwork(image);
+      this.table.apply(state, image ?? undefined);
       this.presentation = immutable(structuredClone(p));
       if (this.settled === 'table' && !this.transitionCancel) this.setActive(true);
       return success(undefined);
@@ -169,7 +195,7 @@ export class LegacySurface implements MapSurface {
         }
       };
       this.imageCancel = abort;
-      image.onload = () => finish(image.naturalWidth === 1200 && image.naturalHeight === 480);
+      image.onload = () => finish(image.naturalWidth === 1200 && image.naturalHeight === 900);
       image.onerror = () => finish(false);
       signal.addEventListener('abort', abort, { once: true });
       if (signal.aborted) finish(false);
@@ -180,10 +206,7 @@ export class LegacySurface implements MapSurface {
     if (this.disposed || !this.table) return this.unavailable();
     if (![width, height, dpr].every((n) => Number.isFinite(n) && n > 0))
       return failure('invalid-data', 'Invalid table viewport.');
-    this.table.renderer.setPixelRatio(Math.min(dpr, 2));
-    this.table.renderer.setSize(width, height, false);
-    this.table.camera.aspect = width / height;
-    this.table.camera.updateProjectionMatrix();
+    this.table.resize(width, height, dpr);
     return success(undefined);
   }
   setActive(active: boolean): Result<void> {
@@ -199,17 +222,17 @@ export class LegacySurface implements MapSurface {
     const camera = this.settled === 'desk' ? this.tableCamera : null;
     const target = camera?.target ?? this.table.controls.target;
     const delta = (camera?.position ?? this.table.camera.position).clone().sub(target);
-    const at = toMetres({
-      x: target.x + fixtureMap.width / 2,
-      y: target.z + fixtureMap.height / 2,
-    });
+    const at = {
+      x: target.x + publicMap.width / 2,
+      y: target.z + publicMap.height / 2,
+    };
     if (!inArtwork(at))
       return failure('invalid-data', 'The camera is outside the demonstration map.');
     return success({
       mapId: demoArtwork.id,
       mapRevision: demoArtwork.revision,
       target: at,
-      distanceM: delta.length() * SCALE,
+      distanceM: delta.length(),
       azimuthRad: Math.atan2(delta.x, delta.z),
       tiltRad: Math.acos(Math.max(-1, Math.min(1, delta.y / delta.length()))),
     });
@@ -223,20 +246,22 @@ export class LegacySurface implements MapSurface {
       c.mapRevision !== demoArtwork.revision ||
       !inArtwork(c.target) ||
       !Number.isFinite(c.distanceM) ||
-      c.distanceM <= 0 ||
+      c.distanceM < this.table.controls.minDistance ||
+      c.distanceM > this.table.controls.maxDistance ||
       !Number.isFinite(c.azimuthRad) ||
       !Number.isFinite(c.tiltRad) ||
       c.tiltRad < 0 ||
-      c.tiltRad > Math.PI / 2
+      c.tiltRad > this.table.controls.maxPolarAngle ||
+      c.tiltRad < this.table.controls.minPolarAngle
     )
       return failure('invalid-data', 'The camera bookmark does not match this map.');
     const target = new THREE.Vector3(
-      c.target.x / SCALE - fixtureMap.width / 2,
+      c.target.x - publicMap.width / 2,
       0,
-      c.target.y / SCALE - fixtureMap.height / 2,
+      c.target.y - publicMap.height / 2,
     );
     const offset = new THREE.Vector3().setFromSpherical(
-      new THREE.Spherical(c.distanceM / SCALE, c.tiltRad, c.azimuthRad),
+      new THREE.Spherical(c.distanceM, c.tiltRad, c.azimuthRad),
     );
     if (this.settled === 'desk') {
       this.tableCamera = { target, position: target.clone().add(offset) };
@@ -266,22 +291,48 @@ export class LegacySurface implements MapSurface {
       bookmark: this.tableCamera,
     };
     if (view === 'desk')
-      this.tableCamera = { position: before.position.clone(), target: before.target.clone() };
+      this.tableCamera = {
+        position: before.position.clone(),
+        target: before.target.clone(),
+      };
     const goal =
       view === 'table' && this.tableCamera
         ? this.tableCamera
         : {
-            position: before.position.clone().add(new THREE.Vector3(0, -6, 12)),
+            position: before.position
+              .clone()
+              .add(new THREE.Vector3(0, -publicMap.width * 0.15, publicMap.width * 0.3)),
             target: before.target.clone(),
           };
     table.controls.enabled = false;
-    table.start();
+    try {
+      table.start();
+    } catch {
+      this.tableCamera = before.bookmark;
+      table.controls.enabled = before.active && before.settled === 'table';
+      return failure('internal', 'The table transition could not start.');
+    }
     this.active = true;
     return new Promise((resolve) => {
       let frame = 0;
       let finished = false;
       const start = performance.now();
-      const finish = (aborted: boolean) => {
+      const rollback = () => {
+        table.camera.position.copy(before.position);
+        table.controls.target.copy(before.target);
+        this.settled = before.settled;
+        this.tableCamera = before.bookmark;
+        this.active = before.active;
+        table.controls.enabled = before.active && before.settled === 'table';
+        try {
+          if (before.active) table.start();
+          else table.stop();
+          table.controls.update();
+        } catch {
+          // Keep the restored values even when the rendering port itself fails.
+        }
+      };
+      const finish = (aborted: boolean, failed = false) => {
         if (finished) return;
         finished = true;
         cancelAnimationFrame(frame);
@@ -291,15 +342,17 @@ export class LegacySurface implements MapSurface {
           resolve(failure('disposed', 'The table is closed.'));
           return;
         }
-        if (aborted) {
-          table.camera.position.copy(before.position);
-          table.controls.target.copy(before.target);
-          this.settled = before.settled;
-          this.tableCamera = before.bookmark;
-          this.setActive(before.active);
-          table.controls.update();
-          resolve(failure('aborted', 'Navigation cancelled.'));
-        } else {
+        if (aborted || failed) {
+          rollback();
+          resolve(
+            failure(
+              failed ? 'internal' : 'aborted',
+              failed ? 'The table transition failed.' : 'Navigation cancelled.',
+            ),
+          );
+          return;
+        }
+        try {
           table.camera.position.copy(goal.position);
           table.controls.target.copy(goal.target);
           table.controls.update();
@@ -307,6 +360,9 @@ export class LegacySurface implements MapSurface {
           this.settled = view;
           this.setActive(view === 'table');
           resolve(success(undefined));
+        } catch {
+          rollback();
+          resolve(failure('internal', 'The table transition failed.'));
         }
       };
       const abort = () => finish(true);
@@ -317,13 +373,17 @@ export class LegacySurface implements MapSurface {
           finish(true);
           return;
         }
-        const t = reducedMotion ? 1 : Math.min(1, (now - start) / 240);
-        const ease = t * t * (3 - 2 * t);
-        table.camera.position.lerpVectors(before.position, goal.position, ease);
-        table.controls.target.lerpVectors(before.target, goal.target, ease);
-        table.controls.update();
-        if (t === 1) finish(false);
-        else frame = requestAnimationFrame(tick);
+        try {
+          const t = reducedMotion ? 1 : Math.min(1, (now - start) / 240);
+          const ease = t * t * (3 - 2 * t);
+          table.camera.position.lerpVectors(before.position, goal.position, ease);
+          table.controls.target.lerpVectors(before.target, goal.target, ease);
+          table.controls.update();
+          if (t === 1) finish(false);
+          else frame = requestAnimationFrame(tick);
+        } catch {
+          finish(false, true);
+        }
       };
       if (reducedMotion) tick(start);
       else frame = requestAnimationFrame(tick);
@@ -341,11 +401,7 @@ export class LegacySurface implements MapSurface {
     if (!inArtwork(at)) return failure('invalid-data', 'This location is outside the map.');
     const table = this.table;
     const old = table.controls.target.clone();
-    table.controls.target.set(
-      at.x / SCALE - fixtureMap.width / 2,
-      0,
-      at.y / SCALE - fixtureMap.height / 2,
-    );
+    table.controls.target.set(at.x - publicMap.width / 2, 0, at.y - publicMap.height / 2);
     table.camera.position.add(table.controls.target.clone().sub(old));
     table.controls.update();
     return success(undefined);
@@ -370,36 +426,28 @@ export class LegacySurface implements MapSurface {
         (p) =>
           p.unitId === picked.id && (p.relationship === 'own') === (picked.pieceKind === 'own'),
       );
-      if (piece)
-        return success({ kind: 'piece', key: piece.key, unitId: piece.unitId, at: piece.position });
+      if (piece && inArtwork(picked.coord))
+        return success({
+          kind: 'piece',
+          key: piece.key,
+          unitId: piece.unitId,
+          at: { ...picked.coord },
+        });
     }
-    const raycaster = new THREE.Raycaster();
-    this.table.camera.updateMatrixWorld();
-    raycaster.setFromCamera(
-      new THREE.Vector2(
-        ((x - rect.left) / rect.width) * 2 - 1,
-        (-(y - rect.top) / rect.height) * 2 + 1,
-      ),
-      this.table.camera,
+    return success(
+      picked.type === 'point' && inArtwork(picked.coord)
+        ? { kind: 'map', at: { ...picked.coord } }
+        : { kind: 'none' },
     );
-    const hit = raycaster.ray.intersectPlane(
-      new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
-      new THREE.Vector3(),
-    );
-    if (!hit) return success({ kind: 'none' });
-    const at = toMetres({ x: hit.x + fixtureMap.width / 2, y: hit.z + fixtureMap.height / 2 });
-    return success(inArtwork(at) ? { kind: 'map', at } : { kind: 'none' });
   }
   project(at: PointM): Result<{ clientXCssPx: number; clientYCssPx: number } | null> {
     if (this.disposed || !this.table || !this.canvas || !this.presentation)
       return this.unavailable();
     if (!inArtwork(at)) return failure('invalid-data', 'This location is outside the map.');
     this.table.camera.updateMatrixWorld();
-    const v = new THREE.Vector3(
-      at.x / SCALE - fixtureMap.width / 2,
-      0,
-      at.y / SCALE - fixtureMap.height / 2,
-    ).project(this.table.camera);
+    const v = new THREE.Vector3(at.x - publicMap.width / 2, 0, at.y - publicMap.height / 2).project(
+      this.table.camera,
+    );
     if (Math.abs(v.x) > 1 || Math.abs(v.y) > 1 || Math.abs(v.z) > 1) return success(null);
     const r = this.canvas.getBoundingClientRect();
     return success({

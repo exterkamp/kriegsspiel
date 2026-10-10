@@ -22,10 +22,10 @@ export const scope: Scope = { gameId: 'fixture', sideId: 'blue', playerId: 'one'
 export const artwork: PublicArtwork = {
   kind: 'public-artwork',
   id: 'public-map',
-  revision: 'art-1',
+  revision: '2',
   widthM: 4000,
-  heightM: 1600,
-  image: { url: '/fixture-map.svg', pixelWidth: 4000, pixelHeight: 1600 },
+  heightM: 3000,
+  image: { url: '/fixture-map.svg', pixelWidth: 1200, pixelHeight: 900 },
   registration: 'full-image-nw-origin',
   credit: 'Test artwork',
   licence: 'CC0',
@@ -157,7 +157,7 @@ export function makePorts(session: Scope = scope) {
   const surface: MapSurface = {
     scope: session,
     coordinates: 'metres',
-    implementation: 'legacy-tile-preview',
+    implementation: 'continuous',
     mount: vi.fn(async () => ok(undefined)),
     apply: vi.fn(async () => ok(undefined)),
     resize: vi.fn(() => ok(undefined)),

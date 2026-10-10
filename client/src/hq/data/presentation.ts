@@ -41,7 +41,7 @@ const artwork = z
       .object({
         url: z.literal('/hq-preview.svg'),
         pixelWidth: z.literal(1200),
-        pixelHeight: z.literal(480),
+        pixelHeight: z.literal(900),
       })
       .strict(),
     registration: z.literal('full-image-nw-origin'),

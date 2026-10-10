@@ -488,10 +488,7 @@
         ? 'Fixture / demo — no live game services'
         : 'Read-only source — no command services'}
     </p>
-    {#if surface.implementation === 'legacy-tile-preview'}<p class="notice">
-        Degraded legacy preview: tile-centre placement, eight-way facing; continuous geometry and
-        footprints unavailable.
-      </p>{/if}
+
     <p>
       Source: {data.connection}{data.stale ? ' · stale snapshot' : ''}{data.snapshot
         ? ` · snapshot at ${data.snapshot.atGame} game ms`
@@ -678,8 +675,7 @@
     display: inline-block;
     margin-right: 1rem;
   }
-  .error,
-  .notice {
+  .error {
     font-weight: bold;
   }
   .error {

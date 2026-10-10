@@ -3,16 +3,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MapPresentation } from '../contracts/index.js';
 import { demoArtwork, demoScope, normalizeFixture } from './fixture.js';
 import { fixtureView } from '../../table/fixture.js';
-import { LegacySurface, inArtwork, toMetres } from './legacySurface.js';
+import { ContinuousSurface, inArtwork } from './continuousSurface.js';
 
 const harness = vi.hoisted(() => ({ scenes: [] as unknown[] }));
 vi.mock('../../table/TableScene.js', async () => {
   const THREE = await import('three');
+  const { rayToMap } = await import('../../table/picking.js');
   class TableScene {
     readonly scene = new THREE.Scene();
-    readonly camera = new THREE.PerspectiveCamera(45, 1, 1, 300);
-    readonly renderer = { setPixelRatio: vi.fn(), setSize: vi.fn(), render: vi.fn() };
+    readonly camera = new THREE.PerspectiveCamera(45, 1, 20, 40000);
+    readonly renderer = {
+      setPixelRatio: vi.fn(),
+      setSize: vi.fn(),
+      render: vi.fn(),
+    };
     readonly controls = {
+      minDistance: 80,
+      maxDistance: 10000,
+      minPolarAngle: 0,
+      maxPolarAngle: Math.PI * 0.42,
       target: new THREE.Vector3(),
       enabled: false,
       update: () => this.camera.lookAt(this.controls.target),
@@ -21,8 +30,8 @@ vi.mock('../../table/TableScene.js', async () => {
     readonly apply = vi.fn();
     readonly setArtwork = vi.fn();
     running = false;
-    constructor() {
-      this.camera.position.set(0, 30, 0.001);
+    constructor(readonly canvas: HTMLCanvasElement) {
+      this.camera.position.set(0, 6000, 0.001);
       this.controls.update();
       harness.scenes.push(this);
     }
@@ -33,15 +42,32 @@ vi.mock('../../table/TableScene.js', async () => {
       this.running = false;
     }
     snapTopDown() {
-      this.camera.position.set(0, 30, 0.001);
+      this.camera.position.set(0, 6000, 0.001);
       this.controls.update();
     }
     snapOblique() {
-      this.camera.position.set(0, 25, 20);
+      this.camera.position.set(0, 5000, 4000);
       this.controls.update();
     }
-    pickAt() {
-      return { type: 'none' };
+    resize(width = 800, height = 600, dpr = 1) {
+      this.renderer.setPixelRatio(Math.min(dpr, 2));
+      this.renderer.setSize(width, height, false);
+      this.camera.aspect = width / height;
+      this.camera.updateProjectionMatrix();
+    }
+    pickAt(x: number, y: number) {
+      const rect = this.canvas.getBoundingClientRect();
+      this.camera.updateMatrixWorld();
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(
+        new THREE.Vector2(
+          ((x - rect.left) / rect.width) * 2 - 1,
+          (-(y - rect.top) / rect.height) * 2 + 1,
+        ),
+        this.camera,
+      );
+      const coord = rayToMap({ width: 4000, height: 3000, features: [] }, ray.ray);
+      return coord ? { type: 'point', coord } : { type: 'none' };
     }
   }
   return { TableScene };
@@ -68,7 +94,7 @@ function presentation(ordinal = 1): MapPresentation {
   };
 }
 async function mounted() {
-  const surface = new LegacySurface(demoScope);
+  const surface = new ContinuousSurface(demoScope);
   const canvas = document.createElement('canvas');
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
     x: 10,
@@ -100,7 +126,7 @@ beforeEach(() => {
     'Image',
     class {
       naturalWidth = 1200;
-      naturalHeight = 480;
+      naturalHeight = 900;
       onload: (() => void) | null = null;
       onerror: (() => void) | null = null;
       constructor() {
@@ -119,12 +145,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('legacy preview lifecycle', () => {
+describe('continuous surface lifecycle', () => {
   it('keeps controls disabled when an update arrives during dolly and rejects time regression', async () => {
     const { surface } = await mounted();
     await surface.apply(presentation(), op());
     const controller = new AbortController();
-    const pending = surface.transitionTo('desk', false, { signal: controller.signal });
+    const pending = surface.transitionTo('desk', false, {
+      signal: controller.signal,
+    });
     expect((await surface.apply(presentation(2), op())).ok).toBe(true);
     const table = harness.scenes[0] as { controls: { enabled: boolean } };
     expect(table.controls.enabled).toBe(false);
@@ -132,7 +160,10 @@ describe('legacy preview lifecycle', () => {
     const result = await surface.apply(
       {
         ...regressed,
-        snapshot: { ...regressed.snapshot, atGame: regressed.snapshot.atGame - 1 },
+        snapshot: {
+          ...regressed.snapshot,
+          atGame: regressed.snapshot.atGame - 1,
+        },
         pieces: [],
       },
       op(),
@@ -151,9 +182,20 @@ describe('legacy preview lifecycle', () => {
     expect((await surface.transitionTo('desk', true, op())).ok).toBe(true);
     expect(surface.getCamera()).toEqual(before);
     if (!before.ok) throw new Error('Missing bookmark');
-    const changed = { ...before.value, target: { x: 1800, y: 700 }, distanceM: 2400 };
+    const changed = {
+      ...before.value,
+      target: { x: 1800, y: 700 },
+      distanceM: 2400,
+    };
     expect(surface.restoreCamera(changed).ok).toBe(true);
-    expect(surface.getCamera()).toEqual({ ok: true, value: changed });
+    const atDesk = surface.getCamera();
+    expect(atDesk.ok).toBe(true);
+    if (atDesk.ok) {
+      expect(atDesk.value.target).toEqual(changed.target);
+      expect(atDesk.value.mapRevision).toBe(changed.mapRevision);
+      expect(atDesk.value.distanceM).toBeCloseTo(changed.distanceM, 8);
+      expect(atDesk.value.tiltRad).toBeCloseTo(changed.tiltRad, 6);
+    }
     expect((await surface.transitionTo('table', true, op())).ok).toBe(true);
     const restored = surface.getCamera();
     expect(restored.ok).toBe(true);
@@ -174,7 +216,9 @@ describe('legacy preview lifecycle', () => {
     await surface.apply(presentation(), op());
     const before = surface.getCamera();
     const controller = new AbortController();
-    const transition = surface.transitionTo('desk', false, { signal: controller.signal });
+    const transition = surface.transitionTo('desk', false, {
+      signal: controller.signal,
+    });
     expect(frames.size).toBe(1);
     controller.abort();
     expect((await transition).ok).toBe(false);
@@ -186,6 +230,35 @@ describe('legacy preview lifecycle', () => {
     expect(!result.ok && result.error.code).toBe('disposed');
     expect(frames.size).toBe(0);
   });
+  it.each([false, true])(
+    'settles and restores the camera after a render failure (reduced=%s)',
+    async (reduced) => {
+      const { surface } = await mounted();
+      await surface.apply(presentation(), op());
+      const before = surface.getCamera();
+      const scene = harness.scenes[0] as {
+        renderer: { render: ReturnType<typeof vi.fn> };
+        controls: { enabled: boolean };
+      };
+      scene.renderer.render.mockImplementationOnce(() => {
+        throw new Error('renderer lost');
+      });
+      const pending = surface.transitionTo('desk', reduced, op());
+      if (!reduced) {
+        for (const [id, callback] of frames) {
+          frames.delete(id);
+          callback(performance.now() + 300);
+        }
+      }
+      const result = await pending;
+      expect(!result.ok && result.error.code).toBe('internal');
+      expect(surface.getCamera()).toEqual(before);
+      expect(scene.controls.enabled).toBe(true);
+      expect(frames.size).toBe(0);
+      expect((await surface.transitionTo('desk', true, op())).ok).toBe(true);
+      surface.dispose();
+    },
+  );
   it('cancels artwork loading on disposal without committing or retaining callbacks', async () => {
     autoLoad = false;
     const { surface } = await mounted();
@@ -207,14 +280,22 @@ describe('legacy preview lifecycle', () => {
       { ...p, pieces: [...p.pieces, p.pieces[0]!] },
       {
         ...p,
-        pieces: [{ ...p.pieces[0]!, appearance: { ...p.pieces[0]!.appearance!, facingRad: NaN } }],
+        pieces: [
+          {
+            ...p.pieces[0]!,
+            appearance: { ...p.pieces[0]!.appearance!, facingRad: NaN },
+          },
+        ],
       },
       {
         ...p,
         pieces: [
           {
             ...p.pieces[0]!,
-            appearance: { ...p.pieces[0]!.appearance!, shape: [{ x: 1e9, y: 0 }] },
+            appearance: {
+              ...p.pieces[0]!.appearance!,
+              shape: [{ x: 1e9, y: 0 }],
+            },
           },
         ],
       },
@@ -260,9 +341,12 @@ describe('legacy preview lifecycle', () => {
     if (!picked.ok || picked.value.kind !== 'map') throw new Error('Expected map pick');
     expect(picked.value.at.x).toBeCloseTo(at.x, 6);
     expect(picked.value.at.y).toBeCloseTo(at.y, 6);
-    expect(inArtwork(toMetres({ x: 40, y: 16 }))).toBe(true);
-    expect(inArtwork({ x: 4000.001, y: 1600 })).toBe(false);
-    expect(surface.pickAt(9, 20)).toEqual({ ok: true, value: { kind: 'none' } });
+    expect(inArtwork({ x: 4000, y: 3000 })).toBe(true);
+    expect(inArtwork({ x: 4000.001, y: 3000 })).toBe(false);
+    expect(surface.pickAt(9, 20)).toEqual({
+      ok: true,
+      value: { kind: 'none' },
+    });
     surface.dispose();
   });
 });
