@@ -1,4 +1,4 @@
-export { REDACTED, Redactor } from './redact.js';
+export { MAX_STRING_LENGTH, REDACTED, Redactor } from './redact.js';
 export {
   DEFAULT_MAX_TRACE_ENTRIES,
   NOOP_TRACE,

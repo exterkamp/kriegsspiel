@@ -17,7 +17,14 @@ import { GameHost, MemoryGameStore } from '../game/index.js';
 import { FakeTime } from '../game/testing.js';
 import type { OrderParser, ParseResult } from '../orders/index.js';
 import type { UmpireClient, UmpireRequest, UmpireResponse } from '../umpire/index.js';
-import { NOOP_TRACE, Redactor, TraceStore, traceRequest, traceUmpire } from './index.js';
+import {
+  MAX_STRING_LENGTH,
+  Redactor,
+  TraceStore,
+  traceRequest,
+  traceUmpire,
+  type TraceSink,
+} from './index.js';
 
 // Blue HQ to blue-1 courier travel time.
 const DELIVERY_MS = (9 * COURIER_MS_PER_TILE) / 2;
@@ -184,24 +191,96 @@ describe('debug trace store', () => {
   });
 
   it('stores nothing when disabled', async () => {
-    const s = setup(NOOP_TRACE);
+    const calls: unknown[][] = [];
+    const spy: TraceSink = {
+      enabled: false,
+      record: (...args) => {
+        calls.push(args);
+      },
+    };
+    // A real store that is built but never handed to the host.
+    const unused = new TraceStore();
+    const s = setup(spy);
     host = s.host;
     const game = await host.create('g1', loadScenario(holdTheBridge));
     const ran = await traceRequest(
-      NOOP_TRACE,
+      spy,
       'g1',
       { transport: 'http', method: 'POST', path: '/x' },
       async () => game.submit(order),
     );
     expect(ran).toMatchObject({ ok: true });
+    await game.submit({ kind: 'pause' });
+    await game.submit({ kind: 'resume' });
     await s.time.advance(60_000);
-    expect(NOOP_TRACE.enabled).toBe(false);
+    expect(calls).toEqual([]);
+    expect(unused.entries('g1')).toEqual([]);
     // The umpire is not even wrapped.
-    expect(traceUmpire(fakeUmpire, { trace: NOOP_TRACE, gameId: 'g1', mode: 'live' })).toBe(
-      fakeUmpire,
+    expect(traceUmpire(fakeUmpire, { trace: spy, gameId: 'g1', mode: 'live' })).toBe(fakeUmpire);
+  });
+
+  it('redacts bare token and cookie keys', () => {
+    const r = new Redactor();
+    expect(
+      r.value({
+        cookie: 'sid=abc',
+        token: 'xyz',
+        'set-cookie': 'a=b',
+        'x-auth-token': 't',
+        inputTokens: 10,
+        outputTokens: 5,
+      }),
+    ).toEqual({
+      cookie: '[REDACTED]',
+      token: '[REDACTED]',
+      'set-cookie': '[REDACTED]',
+      'x-auth-token': '[REDACTED]',
+      inputTokens: 10,
+      outputTokens: 5,
+    });
+  });
+
+  it('keeps prose that merely starts with Basic or Bearer', () => {
+    const r = new Redactor();
+    expect(r.string('Basic movement orders')).toBe('Basic movement orders');
+    expect(r.string('Authorization: Basic dXNlcjpwYXNzd29yZA==')).toContain('[REDACTED]');
+    expect(r.string('Bearer abcdefgh12345')).toBe('[REDACTED]');
+  });
+
+  it('serialises Date, Map and Set, and truncates huge strings', () => {
+    const r = new Redactor();
+    expect(r.value({ d: new Date(0), m: new Map([['a', 1]]), s: new Set([1]) })).toEqual({
+      d: '1970-01-01T00:00:00.000Z',
+      m: [['a', 1]],
+      s: [1],
+    });
+    const big = r.string('x'.repeat(MAX_STRING_LENGTH + 50));
+    expect(big.length).toBeLessThan(MAX_STRING_LENGTH + 60);
+    expect(big).toContain('[truncated 50 chars]');
+  });
+
+  it('never throws on a throwing getter or Proxy, and record survives it', () => {
+    const errors: unknown[] = [];
+    const trace = new TraceStore({ onFileError: (e) => errors.push(e) });
+    const bad = {
+      ok: 1,
+      get x(): number {
+        throw new Error('boom');
+      },
+    };
+    expect(new Redactor().value(bad)).toEqual({ ok: 1, x: '[unserializable]' });
+    const proxy = new Proxy(
+      {},
+      {
+        ownKeys() {
+          throw new Error('trap');
+        },
+      },
     );
-    // And a store that was never given the sink has nothing.
-    expect(new TraceStore().entries('g1')).toEqual([]);
+    expect(() => trace.record('g1', 'engine', { bad, proxy })).not.toThrow();
+    expect(trace.entries('g1')).toHaveLength(1);
+    expect(new Redactor().value(proxy)).toBe('[unserializable]');
+    expect(errors).toEqual([]);
   });
 
   it('bounds the ring buffer per game', () => {

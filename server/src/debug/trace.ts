@@ -61,7 +61,7 @@ export interface TraceStoreOptions {
   /** Exact secret values (such as the API key) to scrub on top of the built-in patterns. */
   secrets?: readonly (string | undefined)[];
   now?: () => number;
-  /** Called when the file sink fails; the trace must never take a game down. */
+  /** Called when the file sink fails or a record cannot be built; the trace must never take a game down. Defaults to `console.error`, once per store. */
   onFileError?: (error: unknown) => void;
 }
 
@@ -74,19 +74,37 @@ export class TraceStore implements TraceSink {
   private readonly redactor: Redactor;
   private readonly now: () => number;
   private readonly file?: WriteStream;
+  private readonly onError: (error: unknown) => void;
   private seq = 0;
 
   constructor(options: TraceStoreOptions = {}) {
     this.max = Math.max(1, options.maxEntriesPerGame ?? DEFAULT_MAX_TRACE_ENTRIES);
     this.redactor = new Redactor(options.secrets);
     this.now = options.now ?? Date.now;
+    let warned = false;
+    this.onError =
+      options.onFileError ??
+      ((e) => {
+        if (warned) return;
+        warned = true;
+        console.error('debug trace failed (further failures are not logged):', e);
+      });
     if (options.filePath) {
       this.file = createWriteStream(options.filePath, { flags: 'a' });
-      this.file.on('error', (e) => options.onFileError?.(e));
+      this.file.on('error', (e) => this.onError(e));
     }
   }
 
+  /** Never throws: a trace failure must not fail the game command that triggered it. */
   record(gameId: string, kind: TraceKind, data: unknown, correlationId?: string): void {
+    try {
+      this.append(gameId, kind, data, correlationId);
+    } catch (e) {
+      this.onError(e);
+    }
+  }
+
+  private append(gameId: string, kind: TraceKind, data: unknown, correlationId?: string): void {
     const entry: TraceEntry = {
       seq: ++this.seq,
       ts: this.now(),
