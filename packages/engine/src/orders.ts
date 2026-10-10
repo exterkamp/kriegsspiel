@@ -1,4 +1,5 @@
 import type { EngineState, EventRegistry, HandlerResult, Json } from './events.js';
+import type { Pace } from './fatigue.js';
 import { beginMarch } from './movement.js';
 import { findPath } from './navigation.js';
 import { schedule } from './queue.js';
@@ -7,7 +8,9 @@ import { MS_PER_MINUTE, type GameState, type Point } from './types.js';
 
 /** What an order asks a unit to do, as parsed. The engine turns it into an `Intent` on delivery. */
 export type OrderIntent =
-  { kind: 'move'; to: Point } | { kind: 'hold'; at: Point } | { kind: 'withdraw'; toward: Point };
+  | { kind: 'move'; to: Point; pace?: Pace }
+  | { kind: 'hold'; at: Point }
+  | { kind: 'withdraw'; toward: Point };
 
 /** A signed order. Plain JSON so it can ride in event payloads and replay logs. */
 export interface Order {
@@ -109,7 +112,7 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     };
     const res =
       intent.kind === 'move'
-        ? beginMarch(world, unit, intent.to, ev.time, 'move')
+        ? beginMarch(world, unit, intent.to, ev.time, 'move', undefined, intent.pace)
         : intent.kind === 'withdraw'
           ? beginMarch(world, unit, intent.toward, ev.time, 'withdraw')
           : beginMarch(world, unit, intent.at, ev.time, 'hold');

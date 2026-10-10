@@ -1,3 +1,4 @@
+import type { Pace } from './fatigue.js';
 import type { PlacementProposal, PlacementVerdict } from './placement.js';
 
 /** Game time in integer milliseconds since the scenario start. Never derived from the wall clock. */
@@ -153,6 +154,12 @@ export interface Unit {
   strength: number;
   /** 0..100. */
   morale: number;
+  /** 0 fresh .. 100 spent. Slows the march and, when high, wears morale down. */
+  fatigue: number;
+  /** 0..100: the share of its ammunition left. At 0 its fire is nearly useless. */
+  ammo: number;
+  /** How hard the current march is pushed. Only matters while marching. */
+  pace: Pace;
   intent: Intent;
   /** Set while the unit is marching along a leg, so a new order can stop it mid-leg. */
   leg?: Leg;
@@ -168,6 +175,8 @@ export interface Side {
   controller: 'human' | 'scripted';
   /** Where this side's orders start from. Couriers ride from here. */
   hq: Point;
+  /** Where wagons load ammunition. Defaults to the HQ when a scenario names none. */
+  depots?: Point[];
 }
 
 /**
@@ -194,7 +203,7 @@ export interface Outcome {
 /** A report waiting for, or already past, its courier delay. Belongs to one side's intel. */
 export interface Report {
   id: string;
-  kind: 'contact' | 'unitLost' | 'orderDelivered';
+  kind: 'contact' | 'unitLost' | 'orderDelivered' | 'lowAmmo' | 'exhausted';
   /** Game time of the thing reported. */
   observedAt: GameTime;
   /** Game time the report reaches HQ (observedAt plus courier delay). */

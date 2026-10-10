@@ -16,7 +16,16 @@ import {
 } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { rejectOrder, startMarch } from './movement.js';
+import { FATIGUE_PER_FIGHT_TICK } from './fatigue.js';
 import { schedule } from './queue.js';
+import {
+  AMMO_PER_FIRE_TICK,
+  OUT_OF_AMMO_FACTOR,
+  SUPPLY_TICK_EVENT,
+  SUPPLY_TICK_MS,
+  registerSupply,
+  noteWear,
+} from './supply.js';
 import { terrainAt } from './terrain.js';
 import { FORMATION_RULES, unitTypeOf } from './unitTypes.js';
 import {
@@ -77,6 +86,7 @@ export function startGame(state: EngineState<GameState>): EngineState<GameState>
   return schedule(state, [
     { time: state.time, type: COMBAT_CHECK_EVENT },
     { time: Math.max(state.time, state.world.victory.holdMs), type: VICTORY_DEADLINE_EVENT },
+    { time: state.time + SUPPLY_TICK_MS, type: SUPPLY_TICK_EVENT },
   ]);
 }
 
@@ -185,6 +195,7 @@ function chooseTarget(shooter: Unit, enemies: Unit[]): Unit | undefined {
  * and checks for victory. Dice come only from the seeded game RNG, rolled in unit order.
  */
 export function registerCombat(registry: EventRegistry<GameState>): void {
+  registerSupply(registry);
   registry.register(ATTACK_INTENT_EVENT, (world, ev) => {
     const { unitId, target: targetId } = ev.payload as unknown as {
       unitId: string;
@@ -318,6 +329,8 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
           moraleFactor *
           cover *
           reach *
+          // A shooter with no cartridges left is nearly harmless; steel in melee is not fired.
+          (!melee && shooter.ammo <= 0 ? OUT_OF_AMMO_FACTOR : 1) *
           ASPECT_FACTOR[aspect],
       );
       shots.push({
@@ -379,6 +392,26 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       });
     }
     w = { ...w, units: w.units.map((u) => fate.get(u.id) ?? u) };
+    // Fighting tires everyone in an exchange, and firing spends the shooters' ammunition.
+    const engaged = new Set(shots.flatMap((s) => [s.shooter.id, s.target.id]));
+    const fired = new Set(
+      shots.filter((s) => !s.melee && s.shooter.ammo > 0).map((s) => s.shooter.id),
+    );
+    const worn: Array<[Unit, Unit]> = [];
+    w = {
+      ...w,
+      units: w.units.map((u) => {
+        if (!engaged.has(u.id)) return u;
+        const w2: Unit = {
+          ...u,
+          fatigue: Math.min(100, round2(u.fatigue + FATIGUE_PER_FIGHT_TICK)),
+          ammo: fired.has(u.id) ? Math.max(0, u.ammo - AMMO_PER_FIRE_TICK[u.kind]) : u.ammo,
+        };
+        worn.push([u, w2]);
+        return w2;
+      }),
+    };
+    for (const [before, after] of worn) w = noteWear(w, before, after, ev.time);
     // A unit that fired turns to face its target, so it shows its front to whom it fights.
     const faced = new Map(
       shots.map((s) => [s.shooter.id, bearingTo(s.shooter.center, s.target.center)]),

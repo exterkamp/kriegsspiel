@@ -1,7 +1,10 @@
 import { ATTACK_INTENT_EVENT, COMBAT_CHECK_EVENT, canReach } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { distance } from './geometry.js';
+import { FATIGUE_PER_MARCH_MINUTE, type Pace } from './fatigue.js';
 import { schedule } from './queue.js';
+import { noteWear } from './supply.js';
+import { MS_PER_MINUTE } from './types.js';
 import { defaultFootprint } from './formation.js';
 import { findPath, legCost } from './navigation.js';
 import { profileAlong } from './terrain.js';
@@ -119,15 +122,16 @@ export const FORMATION_DONE_EVENT = 'formation.done';
 export const HALT_INTENT_EVENT = 'intent.halt';
 export const MOVE_STEP_EVENT = 'move.step';
 
-/** Queue an order for `unitId` to move to `to`, firing at `time` (default: now). */
+/** Queue an order for `unitId` to move to `to` at `pace`, firing at `time` (default: now). */
 export function issueMove(
   state: EngineState<GameState>,
   unitId: string,
   to: Point,
   time = state.time,
+  pace: Pace = 'march',
 ): EngineState<GameState> {
   return schedule(state, [
-    { time, type: MOVE_INTENT_EVENT, payload: { unitId, to: [to.x, to.y] } },
+    { time, type: MOVE_INTENT_EVENT, payload: { unitId, to: [to.x, to.y], pace } },
   ]);
 }
 
@@ -153,6 +157,7 @@ export function issueFormation(
 interface MovePayload {
   unitId: string;
   to: [number, number];
+  pace?: Pace;
 }
 
 interface StepPayload {
@@ -225,7 +230,9 @@ export function beginMarch(
   time: number,
   how: 'move' | 'withdraw' | 'hold' | 'attack' = 'move',
   attackTarget?: string,
+  pace: Pace = 'march',
 ): HandlerResult<GameState> {
+  unit = { ...unit, pace }; // a new march sets its own pace; the leg below is timed with it
   const to: [number, number] = [dest.x, dest.y];
   // A unit on the march is stopped where it has got to, not at the last waypoint it passed.
   const here = positionAt(world.map, unit, time);
@@ -247,12 +254,12 @@ export function beginMarch(
     if (how === 'attack' && attackTarget) {
       const intent: Intent = { kind: 'attack', target: attackTarget, to: dest, startedAt: time };
       return {
-        world: updateUnit(world, unit.id, { intent, center: here, leg: undefined }, time),
+        world: updateUnit(world, unit.id, { intent, center: here, leg: undefined, pace }, time),
       };
     }
     const intent: Intent = how === 'hold' ? { kind: 'hold', at: dest } : { kind: 'idle' };
     return {
-      world: updateUnit(world, unit.id, { intent, center: here, leg: undefined }, time),
+      world: updateUnit(world, unit.id, { intent, center: here, leg: undefined, pace }, time),
       emit: [{ type: 'unit.arrived', payload: { unitId: unit.id, at: to } }],
     };
   }
@@ -272,7 +279,7 @@ export function beginMarch(
   };
   const { event, leg } = nextLeg(world.map, unit, time, step);
   return {
-    world: updateUnit(world, unit.id, { intent, center: here, leg }, time),
+    world: updateUnit(world, unit.id, { intent, center: here, leg, pace }, time),
     schedule: [event],
   };
 }
@@ -301,11 +308,11 @@ export function startMarch(
  */
 export function registerMovement(registry: EventRegistry<GameState>): void {
   registry.register(MOVE_INTENT_EVENT, (world, ev) => {
-    const { unitId, to } = ev.payload as unknown as MovePayload;
+    const { unitId, to, pace } = ev.payload as unknown as MovePayload;
     const unit = world.units.find((u) => u.id === unitId);
     if (!unit) return rejectUnknown(world, unitId);
     if (unit.status !== 'active') return rejectOrder(world, unitId, 'unit not active');
-    return beginMarch(world, unit, { x: to[0], y: to[1] }, ev.time);
+    return beginMarch(world, unit, { x: to[0], y: to[1] }, ev.time, 'move', undefined, pace);
   });
 
   registry.register(HALT_INTENT_EVENT, (world, ev) => {
@@ -390,6 +397,19 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     }
     const center = { x: p.path[2]!, y: p.path[3]! };
     const rest = p.path.slice(2);
+    // The men are tired by the ground they have just covered, more so at a forced pace.
+    const marched = unit.leg ? ev.time - unit.leg.startedAt : 0;
+    const tired: Unit = {
+      ...unit,
+      fatigue: Math.min(
+        100,
+        Math.round(
+          (unit.fatigue + (FATIGUE_PER_MARCH_MINUTE[unit.pace] * marched) / MS_PER_MINUTE) * 100,
+        ) / 100,
+      ),
+    };
+    world = { ...world, units: world.units.map((u) => (u.id === unit.id ? tired : u)) };
+    world = noteWear(world, unit, tired, ev.time);
     // Every step may start or end a contact, or put a unit on the objective.
     const check: NewEvent = { time: ev.time, type: COMBAT_CHECK_EVENT };
     if (i.kind === 'attack') {
@@ -442,7 +462,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
         schedule: [check],
       };
     }
-    const { event, leg } = nextLeg(world.map, unit, ev.time, { ...p, path: rest });
+    const { event, leg } = nextLeg(world.map, tired, ev.time, { ...p, path: rest });
     return {
       world: updateUnit(world, p.unitId, { center, leg }, ev.time),
       schedule: [check, event],
