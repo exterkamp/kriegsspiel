@@ -195,6 +195,8 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     if (!c) return { world };
     const at = courierPosition(c, ev.time);
     // One roll per enemy unit in reach, in unit order; the first to succeed takes the courier.
+    // Rolls stop at the first success, so draws per step depend on who captured: still fixed by
+    // the seed, but keep every roll inside this handler or the clock-invariance rule breaks.
     const captor = world.units.find((u) => {
       if (u.side === c.side) return false;
       const chance = interceptChance(world, u, at);

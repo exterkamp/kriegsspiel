@@ -6,6 +6,7 @@ import {
   advanceTo,
   createState,
   holdTheBridge,
+  interceptChance,
   issueOrder,
   loadScenario,
   pointMm,
@@ -19,7 +20,9 @@ import {
   type EngineState,
   type GameState,
   type Order,
+  type Point,
 } from './index.js';
+import { miniWorld, wood } from './scenario.testkit.js';
 
 function registry() {
   const r = new EventRegistry<GameState>();
@@ -194,5 +197,61 @@ describe('rideRisk', () => {
     const r = rideRisk({ ...world, sightFactor: 0.25 }, to, 1000 * km, 1000 * km);
     expect(r.loss).toBeLessThan(1);
     expect(r.garble).toBeLessThan(1);
+  });
+});
+
+describe('interceptChance', () => {
+  // Enemy at (1000, 1000) m; wood covers 1500-1700 m east of it, open ground elsewhere.
+  const raw = (kind: 'infantry' | 'cavalry' | 'artillery', over: { strength?: number } = {}) =>
+    miniWorld({
+      features: [wood('w', 1500, 900, 1700, 1100)],
+      units: [
+        { id: 'b', side: 'blue', x: 200, y: 200 },
+        { id: 'e', side: 'red', x: 1000, y: 1000, kind, ...over },
+      ],
+    });
+  const m = (x: number): Point => ({ x: x * 1000, y: 1_000_000 });
+  const chance = (w: GameState, x: number) =>
+    interceptChance(
+      w,
+      w.units.find((u) => u.id === 'e')!,
+      m(x),
+    );
+
+  it('is nothing for artillery, even at point-blank', () => {
+    const w = raw('artillery');
+    expect(chance(w, 1000)).toBe(0);
+    expect(chance(w, 1050)).toBe(0);
+  });
+
+  it('reaches 300 m for infantry and no further', () => {
+    const w = raw('infantry');
+    expect(chance(w, 1300)).toBeCloseTo(0.1);
+    expect(chance(w, 1301)).toBe(0);
+  });
+
+  it('reaches 800 m for cavalry and no further', () => {
+    const w = raw('cavalry');
+    expect(chance(w, 1800)).toBeGreaterThan(0);
+    expect(chance(w, 1801)).toBe(0);
+    expect(chance(w, 1100)).toBeCloseTo(0.3);
+  });
+
+  it('halves in sight-blocking ground', () => {
+    const w = raw('cavalry');
+    expect(chance(w, 1600)).toBeCloseTo(0.15);
+    expect(chance(w, 1400)).toBeCloseTo(0.3);
+  });
+
+  it('is nothing for a dead or non-active enemy', () => {
+    const w = raw('cavalry');
+    const e = w.units.find((u) => u.id === 'e')!;
+    expect(interceptChance(w, { ...e, strength: 0 }, m(1100))).toBe(0);
+    expect(interceptChance(w, { ...e, status: 'withdrawn' }, m(1100))).toBe(0);
+  });
+
+  it('is scaled by the sight factor', () => {
+    const w = { ...raw('cavalry'), sightFactor: 0.5 };
+    expect(chance(w, 1100)).toBeCloseTo(0.15);
   });
 });
