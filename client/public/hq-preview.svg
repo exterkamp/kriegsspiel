@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="480" viewBox="0 0 1200 480">
+<rect width="1200" height="480" fill="#d8cba9"/><g stroke="#b6a57f" stroke-width="1" opacity=".3"><path d="M0 40H1200M0 100H1200M0 180H1200M0 290H1200M0 400H1200"/></g>
+<path d="M0 226Q180 196 360 234T730 222T1200 235L1200 278Q920 248 730 266T360 276T0 270Z" fill="#96a9ae" stroke="#536971" stroke-width="2"/>
+<g fill="#8e9670" stroke="#596343" stroke-width="2"><path d="M155 65L305 50L368 103L342 144L188 158L142 117Z"/><path d="M822 328L995 300L1040 382L956 425L792 390Z"/></g>
+<path d="M610 0L610 204M610 286L610 480" fill="none" stroke="#7b6850" stroke-width="8"/><path d="M607 0L607 204M607 286L607 480" fill="none" stroke="#e6ddbd" stroke-width="3"/>
+<path d="M595 212H625V286H595Z" fill="#9b8060" stroke="#594937" stroke-width="3"/>
+<g fill="#605341" font-family="serif" text-anchor="middle"><text x="240" y="190" font-size="17">North wood</text><text x="917" y="452" font-size="17">South coppice</text><text x="725" y="246" font-size="17" font-style="italic">River</text><text x="595" y="34" font-size="13" text-anchor="end">N ↑</text><text x="190" y="350" font-size="22">HQ demonstration map</text><text x="190" y="377" font-size="13">Public schematic · 4000 × 1600 metres</text></g>
+<rect x="6" y="6" width="1188" height="468" fill="none" stroke="#67573e" stroke-width="2"/>
+</svg>
