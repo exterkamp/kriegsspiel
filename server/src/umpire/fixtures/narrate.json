@@ -1,0 +1,11 @@
+{
+  "fixtures": [
+    {
+      "name": "narrate: quiet morning",
+      "stage": "narrate",
+      "promptVersion": "narrate-v1",
+      "output": { "text": "A quiet morning on the ridge." },
+      "latencyMs": 5
+    }
+  ]
+}

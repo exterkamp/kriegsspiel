@@ -42,3 +42,5 @@ export {
   OpenAiCompatibleProvider,
   defaultProviderRegistry,
 } from './providers/index.js';
+export { MockUmpireClient, loadFixtures, loadFixtureFile } from './mockUmpireClient.js';
+export type { FixtureFailure, MockUmpireClientOptions, UmpireFixture } from './mockUmpireClient.js';
