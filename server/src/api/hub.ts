@@ -121,6 +121,14 @@ export class Hub {
         conn.lastClock = clockJson;
       }
       const first = conn.lastView === '';
+      // Only while the game is still waiting on the confirm: later joiners must not be told it is paused.
+      if (first && game.restart && clock.status === 'paused' && !game.state.world.outcome) {
+        this.send(conn, {
+          v: PROTOCOL_VERSION,
+          kind: 'serverRestarted',
+          downMs: game.restart.downMs,
+        });
+      }
       for (const dispatch of view.dispatches) {
         if (conn.sentDispatches.has(dispatch.id)) continue;
         conn.sentDispatches.add(dispatch.id);
