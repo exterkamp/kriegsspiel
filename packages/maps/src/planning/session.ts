@@ -29,7 +29,12 @@ function configurationValue(object: unknown, key: string, path: string): unknown
 export interface PlanningCertificates {
   readonly work: number;
   footprint(polygon: Polygon): GenerationResult<Suitability>;
-  roadSegment(a: Point, b: Point, widthM?: number): GenerationResult<CorridorCertificate>;
+  roadSegment(
+    a: Point,
+    b: Point,
+    widthM?: number,
+    exit?: 'north' | 'east' | 'south' | 'west',
+  ): GenerationResult<CorridorCertificate>;
   directionalGrade(a: Point, b: Point): GenerationResult<number>;
   bridge(candidate: CrossingCandidate, profile?: DeckProfile): GenerationResult<DeckProfile>;
   heightAt(x: number, y: number): number;
@@ -76,10 +81,15 @@ export function createPlanningCertificates(
         return shared.used;
       },
       footprint: (p: Polygon) => bounded(() => footprint(c, p)),
-      roadSegment: (a: Point, b: Point, width = c.settings.roads.maxReservedWidthM) =>
+      roadSegment: (
+        a: Point,
+        b: Point,
+        width = c.settings.roads.maxReservedWidthM,
+        exit?: 'north' | 'east' | 'south' | 'west',
+      ) =>
         bounded(() => {
           points(a, b);
-          return corridor(c, a, b, width);
+          return corridor(c, a, b, width, exit);
         }),
       directionalGrade: (a: Point, b: Point) =>
         bounded(() => {

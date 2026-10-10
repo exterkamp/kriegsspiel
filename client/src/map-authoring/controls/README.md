@@ -14,6 +14,7 @@ The returned panel exposes:
 - `generate()`: validate the entire displayed recipe before calling the injected controller; returns its ID or null with a recoverable panel error. It can replace an active request. Invalid settings never reach the worker factory.
 - `cancel()`: cancel controller work and pending saved-file acceptance, preserving its last validated preview.
 - `loadText(text)` / `loadFile(file)`: direct saved-asset loading and complete validation through the controller, never regeneration. Text loading returns the controller operation ID immediately. File loading returns an ID after reading, or null for read failure/supersession; observe controller state for complete validation.
+- `canExport()`: live non-serializing availability query, using the same current recipe/file-read gate as JSON export. Added for worker-certified SVG integration.
 - `exportJson()`: returns `{ filename, mimeType: 'application/json', text }` only for the live validated asset matching the displayed seed/settings/ordered overrides. Text uses the frozen `canonicalizeAsset` API; serialization failure returns null and explains the error.
 - `dispose()`: abort native file reading, invalidate late read acceptance, unsubscribe and remove the panel. It does **not** dispose the injected controller; its owner manages that lifetime separately. Repeated disposal is safe; further panel operations throw.
 

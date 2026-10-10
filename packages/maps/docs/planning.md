@@ -373,3 +373,8 @@ preference. Omitted preferences retain the accepted minimum-size behavior.
 Whole permissible-area certificates, spacing, topology and independent sizing
 validation still apply. The caller records any content-affecting derived sizing
 policy in its generator version; preferences do not overwrite saved settings.
+
+The reusable `roadSegment` accepts the existing optional boundary-exit side.
+It forwards the same certificate policy, with the interior endpoint first and
+the boundary endpoint second, retaining shared cumulative work. This exposes
+the accepted clipped-boundary rule without rebuilding the surface context.

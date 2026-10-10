@@ -51,6 +51,8 @@ export interface AuthoringPanel {
   loadText(text: string): number;
   loadFile(file: File): Promise<number | null>;
   exportJson(): JsonExport | null;
+  /** Live export availability without serialization; includes pending/failed file reads. */
+  canExport(): boolean;
   dispose(): void;
 }
 interface Field {
@@ -728,6 +730,10 @@ export function createAuthoringPanel(
     loadText,
     loadFile,
     exportJson,
+    canExport() {
+      live();
+      return !!exportable();
+    },
     dispose() {
       if (disposed) return;
       disposed = true;

@@ -46,6 +46,19 @@ function value<T>(result: GenerationResult<T>): T {
   if (!result.ok) throw Error(JSON.stringify(result));
   return result.value;
 }
+it('shares existing boundary-exit corridor policy and cumulative work', () => {
+  const a = input();
+  const certificates = value(createPlanningCertificates(a));
+  const before = certificates.work;
+  expect(value(certificates.roadSegment([25, 50], [0, 50], 12)).traversable).toBe(false);
+  const refused = certificates.work;
+  expect(refused).toBeGreaterThan(before);
+  const accepted = certificates.roadSegment([25, 50], [0, 50], 12, 'west');
+  expect(accepted).toEqual(certifyRoadSegment(a, [25, 50], [0, 50], 12, 'west'));
+  expect(value(accepted).traversable).toBe(true);
+  expect(certificates.work).toBeGreaterThan(refused);
+  expect(value(certificates.roadSegment([25, 50], [0, 50], 12, 'east')).traversable).toBe(false);
+});
 it('charges an injected caller budget before queries and preserves its exception', () => {
   let active = false;
   const denied = new Error('caller budget exhausted');
