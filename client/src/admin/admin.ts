@@ -2,6 +2,7 @@
  * Admin page shell: game picker, live indicator and empty tabbed panels with a shared filter bar.
  * Read-only: it only issues GETs to `/admin/api` and shares nothing with the game client.
  */
+import { LlmPanel } from './llm.js';
 import { EntryStore, type TraceEntry } from './entries.js';
 import { ListPanel } from './listPanel.js';
 import { EVENTS_PANEL, REQUESTS_PANEL } from './panels.js';
@@ -39,6 +40,7 @@ export class AdminPage {
   private readonly tabs = new Map<PanelId, HTMLButtonElement>();
   private readonly panels = new Map<PanelId, HTMLElement>();
   private readonly note: HTMLElement;
+  private readonly llm: LlmPanel;
   private readonly entries = new EntryStore();
   private readonly lists = new Map<PanelId, ListPanel>();
 
@@ -86,6 +88,7 @@ export class AdminPage {
       else sec.innerHTML = `<p class="empty">${id} panel — not implemented yet.</p>`;
       this.panels.set(id, sec);
     }
+    this.llm = new LlmPanel(this.panels.get('LLM')!);
     nav.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         this.show(stepPanel(this.panel, e.key === 'ArrowRight' ? 1 : -1), true);
@@ -141,6 +144,7 @@ export class AdminPage {
 
   private applyFilter(): void {
     this.panels.get(this.panel)!.dataset.filter = this.filter.value;
+    this.llm.setFilter(this.filter.value);
     for (const list of this.lists.values()) list.setText(this.filter.value);
   }
 
@@ -184,6 +188,7 @@ export class AdminPage {
     this.gameId = id;
     this.closeStream();
     this.streamCount = 0;
+    this.llm.reset();
     this.entries.clear();
     for (const list of this.lists.values()) list.reset();
     this.status = id ? 'connecting' : 'live';
@@ -210,8 +215,9 @@ export class AdminPage {
     es.onmessage = (e: MessageEvent<string>) => {
       this.streamCount++;
       try {
-        if (this.entries.add(JSON.parse(e.data) as TraceEntry))
-          for (const list of this.lists.values()) list.refresh();
+        const entry = JSON.parse(e.data) as TraceEntry;
+        this.llm.add(entry);
+        if (this.entries.add(entry)) for (const list of this.lists.values()) list.refresh();
       } catch {
         // A malformed frame is skipped; the stream carries on.
       }
