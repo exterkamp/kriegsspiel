@@ -15,6 +15,7 @@ A deterministic engine owns the world: terrain, movement, line of sight, combat,
 - [docs/design.md](docs/design.md): pillars, feature ideas, hybrid adjudication model, trust risks
 - [docs/gameplay.md](docs/gameplay.md): how Kriegsspiel is played, the continuous game clock, pacing, pausing, and collaborative roles
 - [docs/hq-interface.md](docs/hq-interface.md): the general's-HQ desk: historical map table, in-tray of dispatches, orders desk, staff
+- [docs/hq-getting-started.md](docs/hq-getting-started.md): current HQ features, user instructions and hands-on validation checklist
 - [docs/architecture.md](docs/architecture.md): server/engine/umpire design, tech choices, testing
 - [docs/roadmap.md](docs/roadmap.md): milestones and next steps
 
