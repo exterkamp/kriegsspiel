@@ -1,12 +1,12 @@
 import { mount, unmount } from 'svelte';
-import Shell from './hq/shell/Shell.svelte';
+import App from './hq/App.svelte';
 import { demoArtwork, demoScope, FixtureSource } from './hq/data/fixture.js';
 import { BrowserRepository } from './hq/data/repository.js';
 import { LegacySurface } from './hq/data/legacySurface.js';
 
 const app = document.getElementById('app');
 if (app) {
-  const component = mount(Shell, {
+  const component = mount(App, {
     target: app,
     props: {
       source: new FixtureSource(demoScope),
