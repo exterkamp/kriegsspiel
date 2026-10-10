@@ -13,13 +13,11 @@ import { fail, MapValidationError, TopologyBudget } from './errors.js';
 import {
   bearingDegrees,
   capsuleContainedInPolygon,
-  capsuleIntersectsPolygon,
   distance,
   interpolate,
   pointSegmentDistance,
   polygonArea,
   polygonContainsPolygon,
-  polygonEdges,
   polygonLocation,
   polygonsOverlap,
   projection,
@@ -30,6 +28,7 @@ import {
 } from './geometry.js';
 import { preflightAsset } from './resources.js';
 import { createElevationQueries, validateElevationShape } from './queries.js';
+import { WaterPolygonIndex, boxesMeet, segmentBox, type Box } from './validation-water.js';
 
 export function validateSettings(s: MapSettings): void {
   const columns = s.widthM / s.sampleSpacingM + 1,
@@ -229,6 +228,26 @@ export function validateAssetTopology(asset: MapAsset, maxChecks: number): void 
   const water = new Map(layers.water.map((w) => [w.id, w]));
   const crossings = new Map(layers.crossings.map((c) => [c.id, c]));
   const sites = new Map(layers.sites.map((s) => [s.id, s]));
+  const indexedWater = new Map<string, WaterPolygonIndex[]>();
+  for (const body of layers.water) {
+    budget.consume('$.layers.water', body.polygons.length);
+    indexedWater.set(
+      body.id,
+      body.polygons.map((poly) => new WaterPolygonIndex(poly, budget, '$.layers.water')),
+    );
+  }
+  const roadBounds = new Map<string, Box>();
+  for (const road of layers.roads) {
+    budget.consume('$.layers.roads', road.path.length);
+    const box: Box = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const p of road.path) {
+      box[0] = Math.min(box[0], p[0]);
+      box[1] = Math.min(box[1], p[1]);
+      box[2] = Math.max(box[2], p[0]);
+      box[3] = Math.max(box[3], p[1]);
+    }
+    roadBounds.set(road.id, [box[0] - 1e-9, box[1] - 1e-9, box[2] + 1e-9, box[3] + 1e-9]);
+  }
   const roadCrossings = new Map<string, Set<string>>(),
     crossingRoads = new Map<string, Set<string>>(),
     roadRoutes = new Map<string, Set<string>>();
@@ -318,6 +337,8 @@ export function validateAssetTopology(asset: MapAsset, maxChecks: number): void 
     for (let j = 0; j < i; j++) {
       const a = layers.roads[i]!,
         b = layers.roads[j]!;
+      budget.consume('$.layers.roads');
+      if (!boxesMeet(roadBounds.get(a.id)!, roadBounds.get(b.id)!)) continue;
       const common = [a.fromNodeId, a.toNodeId]
         .filter((id) => id === b.fromNodeId || id === b.toNodeId)
         .map((id) => nodes.get(id)!.position);
@@ -328,6 +349,7 @@ export function validateAssetTopology(asset: MapAsset, maxChecks: number): void 
             q = a.path[ai]!,
             r = b.path[bi - 1]!,
             s = b.path[bi]!;
+          if (!boxesMeet(segmentBox(p, q), segmentBox(r, s))) continue;
           if (!segmentsIntersect(p, q, r, s)) continue;
           const allowed = common.some(
             (n) =>
@@ -388,28 +410,26 @@ export function validateAssetTopology(asset: MapAsset, maxChecks: number): void 
       );
     if (!capsuleContainedInPolygon(a, b, crossing.widthM / 2, crossing.deck, budget, p))
       fail(`${p}.deck`, 'Deck must contain full round-capped reserved crossing corridor');
-    const edges = body.polygons.flatMap(polygonEdges),
+    const cached = indexedWater.get(body.id)!;
+    const edges = cached.flatMap((poly) => poly.cutEdges(a, b, p)),
       cuts = segmentCuts(a, b, edges, budget, p);
     if (
       !cuts
         .slice(1)
         .some((t, j) =>
-          body.polygons.some(
-            (poly) =>
-              polygonLocation(interpolate(a, b, (cuts[j]! + t) / 2), poly, budget, p) === 'inside',
+          cached.some(
+            (poly) => poly.location(interpolate(a, b, (cuts[j]! + t) / 2), p) === 'inside',
           ),
         )
     )
       fail(`${p}.endpoints`, 'Span does not traverse its declared water body');
     for (const endpoint of [a, b])
-      for (const poly of body.polygons)
+      for (const poly of cached)
         if (
-          capsuleIntersectsPolygon(
+          poly.intersectsCapsule(
             endpoint,
             endpoint,
             crossing.widthM / 2 + settings.roads.minimumAbutmentM,
-            poly,
-            budget,
             p,
           )
         )
@@ -418,13 +438,22 @@ export function validateAssetTopology(asset: MapAsset, maxChecks: number): void 
   for (const [ri, road] of layers.roads.entries())
     for (const body of layers.water) {
       const p = `$.layers.roads[${ri}].crossingIds`;
+      budget.consume(p, road.crossingIds.length + 1);
       const relevant = road.crossingIds
         .map((id) => crossings.get(id)!)
         .filter((c) => c.waterId === body.id);
-      const edges = body.polygons.flatMap(polygonEdges);
+      const cached = indexedWater.get(body.id)!;
       for (let i = 1; i < road.path.length; i++) {
         const a = road.path[i - 1]!,
           b = road.path[i]!;
+        const box = segmentBox(a, b, road.widthM / 2 + 1e-9);
+        const nearby = cached.filter((poly) => {
+          budget.consume(p);
+          return boxesMeet(box, poly.bounds);
+        });
+        if (!nearby.length) continue;
+        const edges = nearby.flatMap((poly) => poly.cutEdges(a, b, p));
+        budget.consume(p, relevant.length + edges.length);
         const spanEdges = relevant.map((c) => c.endpoints as [Point, Point]);
         const cuts = segmentCuts(a, b, [...edges, ...spanEdges], budget, p);
         for (let j = 1; j < cuts.length; j++) {
@@ -433,9 +462,7 @@ export function validateAssetTopology(asset: MapAsset, maxChecks: number): void 
             to = interpolate(a, b, cuts[j]!),
             mid = interpolate(from, to, 0.5);
           if (
-            body.polygons.some((poly) =>
-              capsuleIntersectsPolygon(from, to, road.widthM / 2, poly, budget, p),
-            ) &&
+            nearby.some((poly) => poly.intersectsCapsule(from, to, road.widthM / 2, p)) &&
             !relevant.some(
               (c) =>
                 pointSegmentDistance(mid, c.endpoints[0], c.endpoints[1]) <= join &&

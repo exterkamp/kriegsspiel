@@ -127,3 +127,14 @@ Results on 2026-10-10: `npm test --workspace @kriegsspiel/maps` exited 0 (build 
 Focused suite: 62 tests across 5 files, including malformed rings/bowties/holes, overlap retention, whole polygon containment, bridge kinds/orphans/reciprocal links/displacement/partial coverage/width/dry abutments, authoritative entrance data, resource caps/getter attacks, planning/population budgets, separate drainage graph/accounting/cycles, continuous river profile checks, tiny and translated geometry, decimal seams, boundary exits, ordered overrides and canonical precision. The fresh-process test launches two new Node processes under different TZ/LANG settings, reverses unordered features and compares canonical strings, all three SHA-256 identities and stage seeds. Positive plane and mixed-term numerical oracles pass. Build precedes this test so it executes current compiled code.
 
 Browser bundle/runtime replay, real seeded generators, independent composition certification, root integration checks and performance/memory targets are not evidenced by these contract fixtures. They remain coordinator/component and later story gates. Focused passing tests do not self-accept those stories.
+
+### Metered water topology cache
+
+Strict import builds one private polygon-edge row index per parsed water polygon.
+Conservative EPS-expanded bounds skip geometry that cannot affect the accepted
+horizontal-ray, boundary, capsule or crossing-cut predicates. Dry holes, tangent
+corridors and the larger crossing-abutment radius retain their existing exact
+checks. Road pair bounds similarly exclude disjoint paths before intersection
+work. Ring staging, row insertions, scans and detached cut-pair copies reserve
+work first; distant misses still consume the caller's topology budget. This
+changes validation cost, not geometry semantics or the configured caps.
