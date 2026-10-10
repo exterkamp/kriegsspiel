@@ -1,35 +1,20 @@
 import { convexOverlap } from './geometry.js';
 import type { Footprint, Formation, Point, Unit, UnitKind } from './types.js';
+import { FORMATION_RULES, unitTypeOf, type UnitType } from './unitTypes.js';
 
 /**
- * Ground per man in square metres, by arm and formation, and the frontage-to-depth ratio of
- * the formation. A first pass, not the 1824 frontage tables (cavalry and artillery
- * frontages are still missing from docs/rules.md).
+ * The footprint a formation gives `strength` men of a unit type (or of an arm's default
+ * type), in integer mm. The numbers come from the unit data (`unitTypes.ts`).
  */
-const AREA_PER_MAN_M2: Record<UnitKind, number> = { infantry: 1.2, cavalry: 4, artillery: 10 };
-const FORMATION_AREA: Record<Formation, number> = {
-  line: 1,
-  column: 1,
-  square: 1.3,
-  skirmish: 20,
-  loose: 20,
-};
-const FORMATION_ASPECT: Record<Formation, number> = {
-  line: 12,
-  column: 0.15,
-  square: 1,
-  skirmish: 25,
-  loose: 4,
-};
-
-/** The footprint a formation gives `strength` men of `kind`, in integer mm. */
 export function defaultFootprint(
-  kind: UnitKind,
+  type: UnitType | UnitKind,
   formation: Formation,
   strength: number,
 ): Footprint {
-  const area = AREA_PER_MAN_M2[kind] * FORMATION_AREA[formation] * Math.max(1, strength);
-  const frontage = Math.sqrt(area * FORMATION_ASPECT[formation]);
+  const t = typeof type === 'string' ? unitTypeOf(type) : type;
+  const rules = FORMATION_RULES[formation];
+  const area = t.areaPerMan * rules.areaFactor * Math.max(1, strength);
+  const frontage = Math.sqrt(area * rules.aspect);
   return { frontage: Math.round(frontage * 1000), depth: Math.round((area / frontage) * 1000) };
 }
 

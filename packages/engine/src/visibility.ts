@@ -4,6 +4,7 @@ import type { EngineState } from './events.js';
 import { distance, metres } from './geometry.js';
 import { describePlace } from './place.js';
 import { evaluateStanding } from './standing.js';
+import { unitTypeOf } from './unitTypes.js';
 import { BLOCKS_SIGHT, profileAlong, terrainAt } from './terrain.js';
 import {
   MS_PER_MINUTE,
@@ -36,11 +37,11 @@ const viewEnemyFootprint = (u: Unit) => ({
   depth: coarse(u.footprint.depth),
 });
 
-/** Sight range in mm: infantry and artillery 600 m, cavalry 800 m. */
+/** Sight range in mm of each arm's default type; a unit's own comes from its type. */
 export const SIGHT_RANGE_MM: Record<UnitKind, number> = {
-  infantry: 600_000,
-  cavalry: 800_000,
-  artillery: 600_000,
+  infantry: unitTypeOf('infantry').sightRangeM * 1000,
+  cavalry: unitTypeOf('cavalry').sightRangeM * 1000,
+  artillery: unitTypeOf('artillery').sightRangeM * 1000,
 };
 
 /** A unit standing in or looking out of a wood sees and is seen only this close (200 m). */
@@ -71,9 +72,12 @@ function rankAt(world: GameState, p: Point): number {
   return HEIGHT_RANK[terrainAt(world.map, p)?.attrs.height ?? 'flat'];
 }
 
-/** Sight range in mm for a unit kind, after the weather hook. */
-export function sightRangeMm(world: GameState, kind: UnitKind): number {
-  return SIGHT_RANGE_MM[kind] * (world.sightFactor ?? 1);
+/** Sight range in mm for a unit (or an arm's default type), after the weather hook. */
+export function sightRangeMm(
+  world: GameState,
+  who: Pick<Unit, 'type' | 'kind'> | UnitKind,
+): number {
+  return unitTypeOf(who).sightRangeM * 1000 * (world.sightFactor ?? 1);
 }
 
 /** Round a bearing to the nearest eighth of a turn, in [0, 2 pi): all a watcher can judge. */
@@ -93,7 +97,7 @@ export function canSee(world: GameState, observer: Unit, target: Unit): boolean 
   const a = observer.center;
   const b = target.center;
   const dist = distance(a, b);
-  if (dist > sightRangeMm(world, observer.kind)) return false;
+  if (dist > sightRangeMm(world, observer)) return false;
   if (concealedAt(world, a) || concealedAt(world, b)) return dist <= COVERED_RANGE_MM;
   // Walk the line from a canonical endpoint so sight is symmetric.
   const [p, q] = a.y < b.y || (a.y === b.y && a.x <= b.x) ? [a, b] : [b, a];
@@ -334,7 +338,7 @@ function scan(world: GameState, time: GameTime): GameState {
         place: describePlace(w.map, u.center),
         uncertainty: Math.max(MIN_REPORT_UNCERTAINTY_MM, Math.ceil(dist / 10 / 10_000) * 10_000),
         sizeEstimate: sizeEstimate(u.strength),
-        confidence: dist <= sightRangeMm(w, observer.kind) / 2 ? 'high' : 'medium',
+        confidence: dist <= sightRangeMm(w, observer) / 2 ? 'high' : 'medium',
         subject: u.id,
       });
     }

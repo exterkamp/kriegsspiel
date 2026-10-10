@@ -26,6 +26,24 @@ export {
 } from './terrain.js';
 export type { FeatureSpan, ProfilePiece, TerrainSample } from './terrain.js';
 export {
+  DEFAULT_TYPE_OF_KIND,
+  FORMATION_RULES,
+  UNIT_DATA,
+  UNIT_TYPES,
+  UnitDataError,
+  catalogueOf,
+  msPerMetreOf,
+  parseUnitData,
+  unitTypeOf,
+} from './unitTypes.js';
+export type {
+  FormationRules,
+  FormationTable,
+  UnitData,
+  UnitType,
+  UnitTypeCatalogue,
+} from './unitTypes.js';
+export {
   axes,
   defaultFootprint,
   footprintCorners,

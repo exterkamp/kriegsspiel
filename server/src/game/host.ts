@@ -10,6 +10,7 @@ import {
 } from '@kriegsspiel/engine';
 import { GameClock, type WallClock } from '../clock.js';
 import { scriptedAgents } from '../opponent/index.js';
+import type { PauseConfig } from '../pause.js';
 import type { OrderParser } from '../orders/index.js';
 import { GameActor, type GameActorOptions, type StaffAtWork, type Timers } from './actor.js';
 import type { TraceSink } from '../debug/trace.js';
@@ -39,6 +40,8 @@ export interface GameHostOptions {
   parseRetryDelayMs?: number;
   /** Play every side the scenario marks `scripted` with the built-in opponent. Default off. */
   scriptedOpponents?: boolean;
+  /** Pause voting for a game: who votes and the host's rules. Unset: players cannot vote to pause. */
+  pause?: (id: string, world: GameState) => PauseConfig | undefined;
 }
 
 export class GameHost {
@@ -50,6 +53,11 @@ export class GameHost {
 
   get(id: string): GameActor | undefined {
     return this.games.get(id);
+  }
+
+  /** Ids of the games that are open now. */
+  ids(): string[] {
+    return [...this.games.keys()];
   }
 
   get size(): number {
@@ -115,6 +123,7 @@ export class GameHost {
       ...this.actorOptions(id),
       state,
       agents: this.agentsFor(world),
+      pause: this.options.pause?.(id, world),
       clock: new GameClock(this.options.wallNow, { rate: clock.rate }),
     });
     this.games.set(id, actor);
@@ -164,6 +173,7 @@ export class GameHost {
       state,
       clock,
       agents: this.agentsFor(state.world),
+      pause: this.options.pause?.(id, state.world),
       // The log is in insertion order, which is not always seq order (see D14b).
       seq: tail.reduce((max, e) => Math.max(max, e.seq), snap.seq),
     });

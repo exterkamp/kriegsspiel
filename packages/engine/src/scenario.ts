@@ -6,6 +6,7 @@ import {
 } from './formation.js';
 import { mm, pointMm, polygonCentroid } from './geometry.js';
 import { KIND_DEFAULTS, terrainAt } from './terrain.js';
+import { UNIT_TYPES, unitTypeOf } from './unitTypes.js';
 import {
   FEATURE_KINDS,
   FORMATIONS,
@@ -201,11 +202,25 @@ function parseUnits(raw: unknown, map: TerrainMap, sides: Side[]): Unit[] {
     if (ids.has(id)) fail(`duplicate unit id "${id}"`);
     ids.add(id);
     const center = parsePoint(o.at, `${p}.at`);
-    const kind = oneOf(o.kind, UNIT_KINDS, `${p}.kind`);
+    if (o.type === undefined && o.kind === undefined) fail(`${p} needs a type (or a kind)`);
+    const type =
+      o.type === undefined
+        ? unitTypeOf(oneOf(o.kind, UNIT_KINDS, `${p}.kind`))
+        : (UNIT_TYPES[str(o.type, `${p}.type`)] ??
+          fail(`${p}.type "${String(o.type)}" is not a known unit type`));
+    if (o.kind !== undefined && o.kind !== type.kind) {
+      fail(`${p}.kind "${String(o.kind)}" does not match unit type "${type.id}" (${type.kind})`);
+    }
+    const kind = type.kind;
     const strength = int(o.strength, `${p}.strength`, 1);
     const formation =
-      o.formation === undefined ? 'line' : oneOf(o.formation, FORMATIONS, `${p}.formation`);
-    const def = defaultFootprint(kind, formation, strength);
+      o.formation === undefined
+        ? type.defaultFormation
+        : oneOf(o.formation, FORMATIONS, `${p}.formation`);
+    if (!type.formations.includes(formation)) {
+      fail(`${p}.formation "${formation}" is not available to ${type.name}`);
+    }
+    const def = defaultFootprint(type, formation, strength);
     const footprint: Footprint = {
       frontage:
         o.frontage === undefined ? def.frontage : mm(num(o.frontage, `${p}.frontage`, 0.001)),
@@ -215,6 +230,7 @@ function parseUnits(raw: unknown, map: TerrainMap, sides: Side[]): Unit[] {
       id,
       side: oneOf(o.side, sideIds, `${p}.side`),
       kind,
+      type: type.id,
       name: str(o.name, `${p}.name`),
       center,
       facing: (num(o.facingDeg, `${p}.facingDeg`) * Math.PI) / 180,

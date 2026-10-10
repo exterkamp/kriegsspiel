@@ -11,6 +11,9 @@ export interface RawUnit {
   x: number;
   y: number;
   kind?: 'infantry' | 'cavalry' | 'artillery';
+  /** A unit type id; when set it replaces `kind`. */
+  type?: string;
+  formation?: string;
   strength?: number;
   facingDeg?: number;
 }
@@ -84,7 +87,8 @@ export function miniWorld(opts: {
     ].map((u) => ({
       id: u.id,
       side: u.side ?? 'blue',
-      kind: u.kind ?? 'infantry',
+      ...(u.type ? { type: u.type } : { kind: u.kind ?? 'infantry' }),
+      ...(u.formation ? { formation: u.formation } : {}),
       name: `Unit ${u.id}`,
       at: { x: u.x, y: u.y },
       facingDeg: u.facingDeg ?? 0,

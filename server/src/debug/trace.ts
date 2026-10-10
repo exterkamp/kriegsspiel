@@ -76,6 +76,7 @@ export class TraceStore implements TraceSink {
   private readonly file?: WriteStream;
   private readonly onError: (error: unknown) => void;
   private seq = 0;
+  private readonly listeners = new Set<(entry: TraceEntry) => void>();
 
   constructor(options: TraceStoreOptions = {}) {
     this.max = Math.max(1, options.maxEntriesPerGame ?? DEFAULT_MAX_TRACE_ENTRIES);
@@ -118,6 +119,42 @@ export class TraceStore implements TraceSink {
     ring.push(entry);
     if (ring.length > this.max) ring.splice(0, ring.length - this.max);
     this.file?.write(JSON.stringify(entry) + '\n');
+    for (const listener of [...this.listeners]) {
+      try {
+        listener(entry);
+      } catch (e) {
+        this.onError(e);
+      }
+    }
+  }
+
+  /** Call `listener` with each entry (already redacted) as it is recorded. Returns the unsubscribe function. */
+  subscribe(listener: (entry: TraceEntry) => void): () => void {
+    this.listeners.add(listener);
+    return () => void this.listeners.delete(listener);
+  }
+
+  /** Ids of games that have buffered entries. */
+  gameIds(): string[] {
+    return [...this.rings.keys()];
+  }
+
+  /**
+   * One page of a game's entries, oldest first. `afterSeq` is exclusive, so a caller pages by
+   * passing the last `seq` it saw.
+   */
+  page(
+    gameId: string,
+    filter: { kind?: TraceKind; correlationId?: string; afterSeq?: number; limit?: number } = {},
+  ): TraceEntry[] {
+    const after = filter.afterSeq ?? 0;
+    const out: TraceEntry[] = [];
+    for (const e of this.entries(gameId, filter)) {
+      if (e.seq <= after) continue;
+      out.push(e);
+      if (filter.limit !== undefined && out.length >= filter.limit) break;
+    }
+    return out;
   }
 
   /** Entries for a game, oldest first, optionally filtered. */

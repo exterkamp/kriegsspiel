@@ -159,6 +159,8 @@ export interface Unit {
   id: string;
   side: SideId;
   kind: UnitKind;
+  /** Id of the unit type (see unitTypes.ts) that gives this unit its stats. */
+  type: string;
   name: string;
   /** Centre of the unit's footprint. */
   center: Point;
