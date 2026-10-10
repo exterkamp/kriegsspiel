@@ -7,6 +7,7 @@ import {
   createState,
   findPath,
   holdTheBridge,
+  issueFormation,
   issueHalt,
   issueMove,
   legDuration,
@@ -14,6 +15,7 @@ import {
   mm,
   pathDuration,
   pointMm,
+  positionAlong,
   profileAlong,
   registerCombat,
   registerMovement,
@@ -215,18 +217,23 @@ describe('movement events', () => {
     expect(r.emitted).toEqual([]);
   });
 
-  it('a new intent interrupts a march; stale steps do nothing', () => {
+  it('a new intent stops a march where the unit has got to; stale steps do nothing', () => {
     const s0 = game();
     const to = P(1850, 1000);
     const path = findPath(s0.world.map, unit(s0, 'blue-1').center, to)!;
     const first = legDuration(s0.world.map, path.waypoints[0]!, path.waypoints[1]!, 'infantry')!;
     const mid = advanceTo(issueMove(s0, 'blue-1', to), first + 1000, registry());
-    const stopped = unit(mid.state, 'blue-1').center;
-    expect(stopped).toEqual(path.waypoints[1]);
+    expect(unit(mid.state, 'blue-1').center).toEqual(path.waypoints[1]);
     expect(mid.state.queue).toHaveLength(1);
 
+    // One second into the next step the unit is 1/60 of a minute's march past the waypoint.
+    const leg = unit(mid.state, 'blue-1').leg!;
+    const where = positionAlong(mid.state.world.map, leg.from, leg.to, 'infantry', 1000);
+    expect(where).not.toEqual(path.waypoints[1]);
+
     const halted = advanceTo(issueHalt(mid.state, 'blue-1'), 600 * MINUTE, registry());
-    expect(unit(halted.state, 'blue-1').center).toEqual(stopped);
+    expect(unit(halted.state, 'blue-1').center).toEqual(where);
+    expect(unit(halted.state, 'blue-1').leg).toBeUndefined();
     expect(halted.emitted).toEqual([]);
     expect(halted.state.queue).toEqual([]);
 
@@ -237,6 +244,14 @@ describe('movement events', () => {
     );
     expect(unit(redirected.state, 'blue-1').center).toEqual(P(1650, 2450));
     expect(redirected.emitted.map((e) => e.type)).toEqual(['unit.arrived']);
+  });
+
+  it('halts at the exact point reached, part way through a leg', () => {
+    const s = advanceTo(issueMove(game(), 'blue-1', P(1850, 2000)), 150_000, registry());
+    // 2.5 minutes at 100 m a minute from (1850, 2450): 250 m on, between two 90 m steps.
+    expect(unit(s.state, 'blue-1').center).toEqual(P(1850, 2270)); // last 90 m step reached
+    const halted = advanceTo(issueHalt(s.state, 'blue-1', 150_000), 150_000, registry());
+    expect(unit(halted.state, 'blue-1').center).toEqual(P(1850, 2200));
   });
 
   it('reports an unreachable destination and stays put', () => {
@@ -260,9 +275,9 @@ describe('movement events', () => {
     // The old step event is still queued but stale, plus the new order's step.
     expect(again.state.queue).toHaveLength(2);
     const done = advanceTo(again.state, 600 * MINUTE, registry());
-    // Replanned at 2 min from the last 90 m step it reached (180 m along), so the 270 m left
-    // arrive at 4.7 min; the stale chain would have arrived at 4.5.
-    expect(done.emitted.map((e) => [e.time, e.type])).toEqual([[4.7 * MINUTE, 'unit.arrived']]);
+    // Replanned at 2 min from the exact point reached (200 m along), so the 250 m left arrive
+    // at 4.5 min: the same as the old chain, and no progress is lost to the re-issue.
+    expect(done.emitted.map((e) => [e.time, e.type])).toEqual([[4.5 * MINUTE, 'unit.arrived']]);
     expect(unit(done.state, 'blue-1').center).toEqual(to);
     expect(done.state.queue).toEqual([]);
   });
@@ -314,5 +329,85 @@ describe('movement events', () => {
     expect(serialize(advanceTo(resumed, 600 * MINUTE, registry()).state)).toBe(
       serialize(advanceTo(mid, 600 * MINUTE, registry()).state),
     );
+  });
+});
+
+describe('formation changes', () => {
+  const crossing = () =>
+    miniWorld({
+      features: [river('rv', 40, [0, 1000], [3000, 1000]), bridge('narrow', 1450, 1000, 25)],
+      units: [{ id: 'u', x: 1450, y: 600 }],
+    });
+  const regs = registry;
+
+  it('takes game time, stands the unit still, then changes footprint', () => {
+    const s0 = issueFormation(game(), 'blue-1', 'column');
+    const line = unit(s0, 'blue-1').footprint;
+    const start = advanceTo(s0, 0, regs());
+    expect(unit(start.state, 'blue-1').intent).toMatchObject({
+      kind: 'reform',
+      formation: 'column',
+    });
+    const early = advanceTo(start.state, 2 * MINUTE - 1, regs());
+    expect(unit(early.state, 'blue-1').formation).toBe('line');
+    expect(early.emitted).toEqual([]);
+    const done = advanceTo(early.state, 2 * MINUTE, regs());
+    const u = unit(done.state, 'blue-1');
+    expect(u.formation).toBe('column');
+    expect(u.intent).toEqual({ kind: 'idle' });
+    expect(u.footprint.frontage).toBeLessThan(line.frontage);
+    expect(done.emitted.map((e) => e.type)).toEqual(['unit.reformed']);
+  });
+
+  it('is cancelled by a newer order, and stops a march where it is', () => {
+    let s = advanceTo(issueMove(game(), 'blue-1', P(1850, 2000)), 60_000, regs()).state;
+    s = advanceTo(issueFormation(s, 'blue-1', 'column', 60_000), 60_000, regs()).state;
+    expect(unit(s, 'blue-1').center).toEqual(P(1850, 2350)); // 100 m into the march, part way along its 90 m steps
+    s = advanceTo(issueHalt(s, 'blue-1', 90_000), 10 * MINUTE, regs()).state;
+    expect(unit(s, 'blue-1').formation).toBe('line');
+  });
+
+  it('rejects a change to the formation the unit is already in', () => {
+    const r = advanceTo(issueFormation(game(), 'blue-1', 'line'), 0, regs());
+    expect(r.emitted).toEqual([
+      {
+        time: 0,
+        type: 'order.rejected',
+        payload: { unitId: 'blue-1', reason: 'already in that formation' },
+      },
+    ]);
+  });
+
+  it('a line cannot take a narrow bridge, a column can once it has re-formed', () => {
+    const s0 = createState(1, crossing(), 0);
+    const to = P(1450, 1400);
+    const refused = advanceTo(issueMove(s0, 'u', to), 0, registry());
+    expect(refused.emitted).toEqual([
+      {
+        time: 0,
+        type: 'unit.moveBlocked',
+        payload: { unitId: 'u', to: [1_450_000, 1_400_000], tooWide: true },
+      },
+    ]);
+
+    let s = advanceTo(issueFormation(s0, 'u', 'column'), 0, registry()).state;
+    s = advanceTo(issueMove(s, 'u', to, 2 * MINUTE), 100 * MINUTE, registry()).state;
+    expect(unit(s, 'u').center).toEqual(to);
+  });
+
+  it('survives chunked advances', () => {
+    const s = issueMove(
+      issueFormation(game(), 'blue-1', 'column'),
+      'blue-1',
+      P(2050, 2000),
+      3 * MINUTE,
+    );
+    const whole = advanceTo(s, 40 * MINUTE, registry());
+    let chunked = s;
+    for (let t = 9000; ; t += 9000) {
+      chunked = advanceTo(chunked, Math.min(t, 40 * MINUTE), registry()).state;
+      if (t >= 40 * MINUTE) break;
+    }
+    expect(serialize(chunked)).toBe(serialize(whole.state));
   });
 });
