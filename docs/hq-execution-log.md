@@ -98,3 +98,53 @@ No agent/pane IDs, packet elapsed times, retries, review findings or accepted co
 Resume by restoring permitted network/session access, then preserve any newly appeared edits, fetch and reconcile main without touching the map checkout, inspect active owners/PRs/agents, install dependencies and establish passing baseline checks. Dispatch architecture/contracts and independent review with explicit exclusive paths and accepted prerequisite SHAs. Accept that gate before coordinator installs Svelte and starts #48/#49. Serialize shared-file edits, installs, full checks and browser verification. Continue ready fixture work without claiming live-server acceptance.
 
 Delivery remains one accumulating Epic 4 review-ready PR with a story/evidence matrix. Include `Closes #...` only after full story criteria pass. Do not merge, deploy, mark issues Done, or close Epic #4 on fixture evidence.
+
+## Resumed execution — 2026-10-10
+
+The earlier failures were sandbox restrictions, not broken machine authentication. After the user enabled automatic approval review, approved GitHub/network and Herdr calls succeeded. Epic #4 was assigned to `dfezzie`, as requested. No merge or deployment is authorized.
+
+### Refreshed baseline and dependencies
+
+- HQ fast-forwarded to `cb635a21bb8170df9d83d426848cefe6f52f8f89` on `feat/hq-interface`. Planning changes were backed up in `/private/tmp/hq-baseline-20261010/`, temporarily stashed by path and restored cleanly. The separate procedural-map checkout was preserved.
+- `npm ci` succeeded. Baseline lint, typecheck and build passed. Approved full tests passed: 179 engine, 38 protocol, 215 server (one optional live test skipped), 19 client and 13 root tests. The first server test attempt failed on sandbox loopback permissions; the approved retry passed. Logs are in the baseline backup directory.
+- #20: `exterkamp`, open PR #158 at `7e34f8f0b1c77ef9033786a7887c5424af17d0bd`; not accepted. It supplies transport/projection groundwork but not all signing, readiness, voting or draft contracts. #23/#109 remain unassigned; no cross-epic takeover.
+- #118 continuous table: `exterkamp`, open. #129 vector migration: unassigned. HQ retains an explicitly degraded tile adapter, with no geometry acceptance claim.
+- #21 is closed; PR #143 merged at `f3c1fe5c2be581ab1b823a3aa7186e1de306cd79`. Authorized arbitrary-time replay service is still absent. #37 is closed but conference service is absent.
+- #132 is owned by `dfezzie` in the separate map run; #134 is unassigned. Map PR #151 remains external work. No map files, agents or panes were controlled.
+
+### Actual orchestration and contract gate
+
+Herdr 0.9.3 compatibility and `HERDR_ENV=1` were verified. Explicit pane IDs were used because inherited caller context was stale. HQ coordinator is `w3:p1`; architecture/table writer `w3:p2`, independent reviewer `w3:p3`, shell/roster writer `w3:p4`. Initially one writer ran while map writers were active; subsequent disjoint packets used at most two writers plus reviewer. Native model arguments and visible agent footers verified `gpt-6.1-sol`: high reasoning for contracts, table lifecycle and independent review; medium for ordinary shell and view packets.
+
+Contract gate accepted in commit `f3d4878` after independent review and six semantic repairs. Public artwork, filtered fixture data, provenance, scoped versioned preferences, lifecycle/cancellation and unavailable capabilities are explicit. No server capabilities were inferred from stubs. Production types are `client/src/hq/contracts/index.ts`, with reconciliation in `docs/hq-contracts.md`.
+
+| Packet | Exclusive ownership / actual selection | Evidence and current gate |
+| --- | --- | --- |
+| Architecture | `hq-architecture`, w3:p2; temporary contract draft, coordinator integration; 6.1-sol high | Accepted after independent repairs; author 8m49s. Review phases 1m51s, 48s, 1m17s, 30s. |
+| #48 shell | `hq-shell`, w3:p4; `hq/shell/**`; 6.1-sol medium | 21 DOM tests initially passed; compact revision fix passed. Independent review reproduced abort-after-focus, stale source, delayed restoration and mutable selection issues; writer repairing with regressions. Initial 6m12s plus 26s revision repair. |
+| #49 table polish | `hq-architecture`, w3:p2; designated `table/**` files; 6.1-sol high | Paper tags, supplied game ages, dressing, terminal disposal, public-art texture replacement and 60-piece sampling fixture implemented. Independent review pending. No measured FPS or visual acceptance. |
+| #54 roster | `hq-shell`, w3:p4; `hq/views/roster/**`; 6.1-sol medium | 22 focused tests, Svelte and TypeScript checks passed; 4m10s. Session-owned focus callback resolves view-unmount lifetime. Independent review and root composition pending. |
+| #55 journal | `hq-journal`, reused idle w3:p2 after high-effort writer exited; `hq/views/journal/**`; 6.1-sol medium | In progress. Separate scoped notes schema; papers only, missing order/pause history explicit. |
+| Shared integration | Coordinator; manifests, configuration, `hq/data/**`, composition, docs and GitHub | Runtime validators, fixture source, scoped preferences, original artwork and legacy metre adapter. 65 client tests passed before roster additions; ongoing independent review repairs precede acceptance. |
+
+Architecture/table process exposed aggregate tokens on exit: 178,553 total (134,147 input, 44,406 output, 2,895,872 cached input; reasoning 9,896). These are process totals, not isolated packet measurements. Monetary cost and other agent tokens remain unknown, not zero. No spending ceiling or new paid service was introduced.
+
+### Launcher and remaining gates
+
+`devrun` is absent here and `~/CLAUDE.md` is absent. The user supplied `https://github.com/exterkamp/devrun`; its current README documents Linux support, and this Mac lacks Go. The user is arranging the launcher separately and explicitly requested avoiding it for now. No HQ dev server was started. Browser inspection, screenshots, axe, real WebGL picking and measured 60-piece performance remain pending. Automated tests establish code behavior only.
+
+Ready fixture views continue after code review. #50 requires accepted continuous geometry and annotation contracts; #51/#53 require live transport/order services; report plotting, conference, terrain-study and replay integrations retain their prerequisite gates. Full live-game, provenance and accessibility/visual acceptance remain open. The final PR must distinguish implemented fixture groundwork from complete story acceptance.
+
+### Pre-rebase checkpoint — 14:00 PDT
+
+Independent review accepted bounded #49 and #54 code after 8m15s; #55 and the three coordinator runtime repairs after subsequent review; #56/App integration after 1m19s; final shell gate after 1m34s. Shell repairs covered navigation rollback, immutable scoped state, late initialization, obsolete snapshots and immediate clock-health freeze. Coordinator repairs covered action invalidation, retained desk bookmarks and transformed shape bounds. Review used memory-only mounted probes and code inspection. It did not certify visuals, real WebGL picking or FPS.
+
+Client verification passed 201 tests, Svelte/TypeScript diagnostics (zero errors/warnings), full lint/format and client production build. Build warns about a 731.71 kB chunk; no browser load/performance claim. Journal: 19 tests, 6m23s; clock: 50 cases, 3m30s; shell focused final gate: 52 tests, repairs 6m05s, 1m38s and 50s plus 11s lint repair. Journal/clock process aggregate tokens on exit: 114,700 total (92,730 input, 21,970 output, 1,036,160 cached input; reasoning 3,014). Dollar cost remains unknown.
+
+Accepted checkpoint commits (these pre-rebase hashes are historical): `0510149` table, `2524ead` desk/data/tooling, `230b05b` roster, `bfad085` journal, `4040a07` clock, `bf4671c` composition.
+
+The dependency refresh changed readiness: PR #162 / #118 merged at `84d0003a3c6307abc5be98fedb422f98bd32be3f`; PR #158 / #20 merged at `89f3e5846077d0bd6e3e952425606b1575f0a470`. Fetched main is now `af0dc698392f350b73cdfc3684e6adc3a1282ca0`. #23 is assigned to `exterkamp`, with open PR #166 at `2a5801c3c9f65dc2d4eaf7f043238d9cf71d3e05`; do not take over its work. Earlier open/owner statements in this log are historical.
+
+Coordinator will rebase the accepted checkpoint onto that exact main. A new architecture reconciliation gate removes the tile adapter, preserves incoming metre/radian/footprint/subposition/uncertainty behavior, and updates the public asset to 4000×3000 metres with a new revision. `hq-continuous`, w3:p2 (label “HQ · Continuous Table”), is verified 6.1-sol high and first performed read-only architecture inspection (1m58s). It owns designated table files only after dispatch; coordinator owns data/asset/contracts/composition/rebase. Independent review precedes consumer handoff. Local personal marks (#50) becomes the next architecture packet after this continuous integration gate; server/shared authority stays unavailable.
+
+Pane labels requested by the user are “HQ · Coordinator”, “HQ · Continuous Table”, “HQ · Review” and “HQ · Shell & Roster”. No map pane labels changed. No server, merge or deployment started.
