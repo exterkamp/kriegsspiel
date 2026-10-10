@@ -154,6 +154,14 @@ The server turns the opponent on by default: `main.ts` passes `scriptedOpponents
 - Everything passes through `Redactor` before storage: secret-named keys, key-shaped strings (`sk-ant-...`, bearer tokens) and any exact secret values registered at startup. Token counts are not treated as secrets.
 - When the admin view is off the server passes `NOOP_TRACE` (or nothing). Producers check `trace.enabled` before building a payload, and `traceUmpire` returns the umpire client unwrapped, so a disabled trace costs nothing and stores nothing.
 
+## Admin API
+
+`server/src/admin/` serves the trace and master state to the debug page (Epic #119). It is development tooling, not part of the game.
+
+- **Routes**, all `GET` under `/admin/api`: `games`; `games/:id/state` (unfiltered engine state and clock); `games/:id/entries` (`kind`, `correlationId`, `after` cursor, `limit`; `next` is the cursor for the following page); `games/:id/stream` (server-sent events of new entries, `after` replays the backlog first).
+- **Gating.** The routes exist only when `ADMIN_ENABLED` is `1`, `true` or `on`; otherwise `buildApp` never registers them, so every `/admin` path is a plain 404, and the trace is the no-op sink. When enabled, a request must come from a loopback address or carry `ADMIN_TOKEN` (`Authorization: Bearer`, or `?token=` for `EventSource`). With no token set, only loopback gets in. The check uses the socket address, not `X-Forwarded-For`, so behind a reverse proxy or a container bridge callers are not loopback and need the token.
+- **Read-only and separate.** Only `GET` routes are registered, none calls an actor command, and the module shares no code with `api/hub.ts` or `api/sideView.ts`. Master state leaves the process only through these routes.
+
 ## Tech choices (suggested, open to change)
 
 | Concern | Choice | Why |

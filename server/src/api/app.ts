@@ -4,6 +4,7 @@
  *   POST /games                    create "Hold the Bridge": body `{ "rate"?: number }`
  *   GET  /games/:id/ws?token=...   WebSocket for one side (`@kriegsspiel/protocol` messages)
  *   GET  /healthz                  liveness, `{ ok: true }`
+ *   /admin/api/*                   read-only debug API, only when `admin.enabled` (see ../admin)
  *   GET  /*                        the built client, when `staticDir` is set
  *
  * Dev auth is a per-side token in the URL; real accounts arrive with Epic #5.
@@ -24,6 +25,8 @@ import {
   type GameStore,
   type Timers,
 } from '../game/index.js';
+import { adminApi } from '../admin/adminApi.js';
+import { TraceStore } from '../debug/trace.js';
 import type { OrderParser } from '../orders/index.js';
 import { Hub, type Socket } from './hub.js';
 
@@ -51,6 +54,11 @@ export interface AppOptions {
   scriptedOpponents?: boolean;
   /** Directory of the built client to serve at `/`. Unset: API only (dev uses the Vite server). */
   staticDir?: string;
+  /**
+   * Debug/admin view (Epic #119). Off unless `enabled`: then no `/admin` route exists and the
+   * trace is a no-op. When on, requests must be loopback or carry `token`.
+   */
+  admin?: { enabled: boolean; token?: string; trace?: TraceStore };
   onError?: (gameId: string, error: unknown) => void;
 }
 
@@ -71,6 +79,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
         }
       : false,
   });
+  const trace = options.admin?.enabled ? (options.admin.trace ?? new TraceStore()) : undefined;
   const onError = (gameId: string, e: unknown) => {
     server.log.error({ err: e, gameId }, 'game error');
     options.onError?.(gameId, e);
@@ -85,6 +94,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     timers: options.timers,
     init: startingState,
     scriptedOpponents: options.scriptedOpponents,
+    trace,
     onUpdate: (id) => hub.notify(id),
     onError,
   });
@@ -95,6 +105,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
 
   // Liveness for the container health check. Does not touch a game or the store.
   server.get('/healthz', async () => ({ ok: true }));
+
+  if (trace) await adminApi(server, { host, trace, token: options.admin?.token });
 
   if (options.staticDir) {
     await server.register(fastifyStatic, { root: resolve(options.staticDir) });
@@ -150,6 +162,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
 
   server.addHook('onClose', async () => {
     hub.closeAll();
+    await trace?.close();
     await host.shutdown();
   });
 
