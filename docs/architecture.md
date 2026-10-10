@@ -71,7 +71,7 @@ Clock modes (all required, since tests need them):
 - **Combat ticks**: while units are in contact, the engine schedules short ticks (for example every 1-5 game minutes) so a fight resolves in finer steps. Outside contact it jumps between events.
 - **Event ordering (implemented in `packages/engine`)**: events fire in ascending `(time, seq)`. `seq` is a per-game counter assigned at scheduling, so same-instant events fire in the order they were scheduled. `advanceTo(state, t)` fires every event with `time <= t` (including ones handlers schedule for `<= t` during the call), then sets the clock to `t`. Scheduling before the current time is an error. Chunking `advanceTo` never changes the result. State (clock, RNG, queue, `nextSeq`, world) is plain JSON for snapshots. Handlers are registered by event type in an `EventRegistry`; all dice come from the seeded RNG passed to the handler.
 - **Single writer per game**: each game runs as one serial actor, with a command queue. Commands are applied in arrival order. No locks and no races, and the log is a total order. Many games can share a process.
-- **Implemented in `server/src/game`**: `GameActor` (queue, scheduler, snapshot after every command), `GameHost` (many games, reopen paused), `GameStore` with `MemoryGameStore`. Timers and wall time are injected for tests. See D12.
+- **Implemented in `server/src/game`**: `GameActor` (queue, scheduler, snapshot after every command), `GameHost` (many games, reopen paused), `GameStore` with `MemoryGameStore`. Timers and wall time are injected for tests. See D14.
 
 ## The LLM barrier
 
@@ -106,11 +106,24 @@ running ──request──► pause_proposed ──all humans yes──► paus
 - **Engine** (`packages/engine`): pure, deterministic, no network or clock access. Map, units, orders-as-intents, movement (A* paths played out as per-tile step events, see D10), courier-delivered orders (D11), line of sight, combat, morale, supply, seeded RNG, and `advanceTo(t)`. Fully unit-tested.
 - **Umpire service**: wraps the LLM with strict JSON schemas (tool use / structured outputs). Stages: `parseOrders`, `judge`, `narrate`, plus the staff-check, staff-conference and deputy calls. Prompts are versioned files. Results are recorded.
   The parse seam is the async `OrderParser` interface in `server/src/orders/orderParser.ts`: `parse(orderText, context)` resolves to intents, a clarification request or a rejection, and always carries the original wording. The server depends on the interface only; a rule-based `StubOrderParser` stands in until the LLM umpire exists.
-- **Visibility service**: from master state and a side, produces that side's knowledge: seen units, stale contact reports, received messages. The *only* path from master state to a client.
+  The model seam is `UmpireClient` in `server/src/umpire/` (`call(request)` returns schema-validated output plus a call record). `AnthropicUmpireClient` sends structured-output requests (`output_config.format`, no forced tool choice) through an injectable `UmpireTransport`, retries transport errors, timeouts and schema-invalid output with backoff, and sums tokens and cost across attempts. Models are set per stage by `UMPIRE_MODEL_PARSE|JUDGE|NARRATE`. Each accepted call goes to a `CallRecorder` (model, prompt version, system, input, raw output) for the input log. `PlaybackUmpireClient` serves those records by stage, prompt version and input with no transport, so replays cannot reach the network.
+- **Visibility service**: from master state and a side, produces that side's knowledge: seen units, stale contact reports, received messages. The *only* path from master state to a client. See D12.
 - **Clock and scheduler** (server): the `ClockState`, the scheduler, and pause voting.
 - **Notifier**: pushes dispatch arrivals and clock events over WebSocket, plus email or web push for players who are away. Players set thresholds (all dispatches, urgent only, contact only).
 - **Persistence**: an append-only event log of *inputs* (commands, clock changes, votes, LLM outputs, seeds), plus periodic snapshots for quick recovery. Stores the model, prompt version and raw output of each LLM call.
 - **Client**: a Three.js map table (flat map, 3D pieces) and a Svelte desk, showing a desk clock with the rate and any pause. It renders only what the server sends. See [hq-interface.md](hq-interface.md).
+
+### SideView contents
+
+An `EngineSideView` (engine type, `viewFor`; not the protocol `SideView`, see D12) may contain only:
+
+- `side`, `time`, `mapWidth`, `mapHeight`.
+- `ownUnits`: the side's own units in full (id, name, kind, position, strength, morale).
+- `visibleEnemies`: enemy units in sight now, as id, position and a coarse `sizeEstimate` phrase. Nothing else: no strength, morale, facing, intent or name.
+- `lastKnownContacts`: enemy units seen earlier and not in sight now, as id, the position where seen, `seenAt`, `ageMs`, `uncertaintyTiles` and the size phrase from the sighting.
+- `reports`: contact, unit-lost and order-delivered reports whose courier delay has passed, each with kind, `observedAt`, `deliveredAt`, `ageMs`, reporting unit name, location, size phrase, confidence and template prose.
+
+Adding a field means updating this list and the leak tests in `visibility.test.ts`.
 
 ## LLM load and cost at continuous time
 

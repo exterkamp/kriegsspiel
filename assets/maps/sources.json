@@ -1,0 +1,18 @@
+[
+  {
+    "file": "ballsbluff/corbett-seat-of-war-1861.jpg",
+    "scenario": "Ball's Bluff, 21 October 1861",
+    "title": "Map of the seat of war showing the battles of July 18th, 21st & Oct. 21st 1861",
+    "creator": "V. P. Corbett, cartographer and publisher (Washington, 1861)",
+    "holder": "Library of Congress, Geography and Map Division",
+    "callNumber": "G3884.M25S5 1861 .C65 Copy 3 (Fillmore collection)",
+    "itemUrl": "https://www.loc.gov/item/99439216/",
+    "downloadUrl": "https://tile.loc.gov/image-services/iiif/service:gmd:gmd388:g3884:g3884m:cw0564000/full/pct:50/0/default.jpg",
+    "downloadNote": "IIIF render at 50% of the 6576x7776 master scan; the full JP2 and TIFF master are at the same service.",
+    "pixels": { "width": 3288, "height": 3888 },
+    "sha256": "22e02e0236269e3b8ddf07baf142e0870f65decb6ff3950c0ce42b50181613e0",
+    "verifiedOn": "2026-10-10",
+    "licence": "Public domain. Published in the United States in 1861, so any copyright has long expired. The Library of Congress item record carries no Rights Advisory, and its standard statement says the Geography and Map Division digitized collections are free to use and reuse.",
+    "usageTerms": "No restrictions. LoC asks for the credit line 'Library of Congress, Geography and Map Division.'"
+  }
+]

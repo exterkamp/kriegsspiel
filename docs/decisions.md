@@ -50,7 +50,8 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 ## D9: First scenario (proposed, maintainer to confirm)
 **Proposal.** Ball's Bluff, 21 October 1861, recommended over Podol (1866) and Wissembourg (1870).
 **Why.** Smallest of the three, the only one with a period map and order of battle already located, public-domain English sources, and a river-crossing bottleneck that exercises couriers and fog of war.
-**Open.** The maintainer has not confirmed. Map licence and the Lander/Gorman order-of-battle conflict must be checked.
+**Map.** Verified for #84: the 1861 Corbett seat-of-war map at the Library of Congress is public domain with no usage terms beyond a credit line. Scan, holder, URL and licence are in `assets/maps/sources.json`.
+**Open.** The maintainer has not confirmed. The Lander/Gorman order-of-battle conflict must be checked.
 **See.** [scenario-candidates.md](scenario-candidates.md)
 
 ## D10: Movement is step events over A* paths
@@ -65,7 +66,13 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Open.** `order_delivered` is emitted even if the unit then cannot march (`unit.moveBlocked`, destination unreachable from where it stands); the two events are not linked yet. The courier route is fixed when the order is issued from the unit's position then, not chased as the unit moves, and couriers cannot be intercepted. Only the first parsed intent is adopted; conditional and timed intents, and `attack` (from 1.7), are not yet modelled. Strength 0 stands in for "destroyed" until combat decides how units are removed.
 **See.** [architecture.md](architecture.md), [gameplay.md](gameplay.md)
 
-## D12: Server game actor, scheduler and store
+## D12: Visibility is a pure filter over per-side intel
+**Decision.** `viewFor(world, side, now)` in `packages/engine/src/visibility.ts` is the only function that turns master state into an `EngineSideView`. A unit sees an enemy within its sight range (infantry and artillery 6 tiles, cavalry 8) when no wood tile lies on the Bresenham line between them; a unit in or looking from a wood sees or is seen only within 2 tiles. A repeating `intel.scan` event (every game minute) records sightings in `GameState.intel[side]` (last-known contacts and reports), and files a contact report the first time an enemy comes into sight. `intel.report` events file unit-lost and order-delivered reports. Every report is delivered `COURIER_DELAY_MS` (10 game minutes) after it happened, and the view shows it with its age. Enemy size is a coarse phrase, never a number. Last-known contacts show the position where the enemy was seen, its age, and an uncertainty radius in tiles that grows one tile per minute of age, capped at the map's longer side.
+**Why.** Keeping memory in state makes stale contacts replayable, and one filter function makes the leak tests meaningful.
+**Open.** The `EngineSideView` is not yet mapped to the protocol `SideView` (no clock, dispatches or supply); tracked in #109. The courier delay is a flat constant, not distance to HQ. Sight ignores facing, weather and night. Contacts are never pruned, not even for destroyed enemies; tracked in #110.
+**See.** [architecture.md](architecture.md)
+
+## D14: Server game actor, scheduler and store
 **Decision.** `server/src/game/`: a `GameActor` is the single writer for one game and owns the engine state, a `GameClock` and a serial command queue. Commands (`order`, `setRate`, `pause`, `resume`, `setMode`, `advanceTo`) run in arrival order. Each one first advances the engine to the clock's "now", then applies itself, then saves a snapshot. The scheduler sleeps until the next queued event is due (`clock.wallDueFor`) and re-plans after every command, so rate, pause and mode changes wake it. It sleeps not at all when paused, stopped, in manual mode or with an empty queue; fast-forward jumps to the next event with a zero delay. Orders are parsed through `OrderParser` and the result is awaited before the order enters the engine: the engine is not advanced during the parse, the order is stamped with the game time of signing, and the world catches up afterwards at the same game times. `GameHost` runs many actors in one process; `open` brings a stored game back **paused**. `GameStore` is the persistence seam (latest snapshot plus an append-only input log of commands and parse results); `MemoryGameStore` is the only implementation until SQLite (Epic #2). Timers and the wall clock are injected, so tests run on a fake clock, and `close`/`shutdown` clear every timer.
 **Why.** One serial writer gives a total order with no locks, and lazy advancement keeps quiet stretches free.
 **Open.** The full LLM barrier is Epic #3: here the clock keeps running during a parse and the engine catches up afterwards, so a slow parse is invisible to game results but not yet shown to players as "staff at work". `attack` intents are refused as not modelled. The snapshot is rewritten after every command and tick; a log-plus-periodic-snapshot scheme is for the SQLite store. The input log is written but replay from it is not built yet. Pause voting is not modelled: `pause` and `resume` are plain commands.
@@ -75,6 +82,14 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 - Default clock ratio (decide after the first scenario).
 - Command level and default hierarchy (assumptions above).
 - Emergency hold: keep or drop.
-- First historical scenario and map source: Ball's Bluff proposed in D9, awaiting maintainer decision; licences to verify.
+- First historical scenario and map source: Ball's Bluff proposed in D9, awaiting maintainer decision; map licence verified (D9).
 - How much auto-plotting of reports onto the map players get.
 - Rules tables (march rates, frontage, fire, casualties): first pass recorded in `src/data/` with citations (see `docs/rules.md`). Still missing: full movement table, Die 4 row, artillery tables other than 12-pdr 1500-2000, cavalry and artillery frontages.
+
+## D13: UmpireClient wraps the Anthropic SDK behind a transport seam
+
+**Decision.** All LLM calls go through `UmpireClient`. The Anthropic implementation uses structured outputs (`output_config.format` with a JSON schema) rather than forced tool use, which newer models reject. The SDK's own retries are off; the wrapper owns retry, backoff and the per-attempt timeout so behavior is testable with a fake transport. Playback matches recordings on stage, prompt version and input (key order ignored) and fails loudly on a miss rather than calling the model.
+
+**Failure handling.** A `Retry-After` longer than four times `maxBackoffMs` fails the call at once instead of sleeping. Output truncated at `max_tokens` is terminal (retrying the same request would truncate again). A failed call throws `UmpireError` carrying the summed `usage` and `costUsd` of its attempts, so spend on failures is visible, but nothing is recorded for it.
+
+**Open.** The price table in `pricing.ts` is hand-maintained. Recording to the persistent input log is behind the `CallRecorder` interface; the log itself is not built yet. Prompt files and the `OrderParser` adapter that uses this client are separate work. A failed live call leaves no recording, so on replay it surfaces as `missing-recording` rather than the original `schema` or `transport` error; callers must treat all `UmpireError` kinds alike when falling back, or failures need recording too (open).
