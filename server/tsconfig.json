@@ -1,5 +1,11 @@
 {
   "extends": "../tsconfig.base.json",
-  "compilerOptions": { "noEmit": true },
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@kriegsspiel/engine": ["../packages/engine/src/index.ts"]
+    },
+    "types": ["node"]
+  },
   "include": ["src"]
 }

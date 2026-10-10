@@ -10,6 +10,7 @@ import {
   holdTheBridge,
   issueOrder,
   loadScenario,
+  registerCombat,
   registerMovement,
   registerOrders,
   type EngineState,
@@ -21,6 +22,7 @@ import {
 function registry() {
   const r = new EventRegistry<GameState>();
   registerMovement(r);
+  registerCombat(r);
   registerOrders(r);
   return r;
 }

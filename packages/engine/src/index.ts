@@ -22,6 +22,16 @@ export {
   stepDuration,
 } from './movement.js';
 export type { Path } from './movement.js';
+export {
+  BREAK_MORALE,
+  COMBAT_TICK_MS,
+  COVER,
+  FIRE_RATE,
+  issueAttack,
+  registerCombat,
+  startGame,
+} from './combat.js';
+export { RANGE_TILES, canReach } from './contact.js';
 export { COURIER_MS_PER_TILE, issueOrder, registerOrders } from './orders.js';
 export type { Order, OrderIntent } from './orders.js';
 export { beginMarch } from './movement.js';
