@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Coord } from '@kriegsspiel/protocol';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mapCanvas } from './mapTexture.js';
 import {
@@ -171,6 +172,20 @@ export class TableScene {
   snapTopDown(): void {
     this.controls.target.set(0, 0, 0);
     this.camera.position.set(0, this.fitDistance(), 0.001);
+    this.controls.update();
+  }
+
+  /** Slide the camera so the map point (metres) is under the view target, keeping zoom and tilt. */
+  panTo(coord: Coord): void {
+    const map = this.state?.map;
+    if (!map) return;
+    const to = mapToWorld(map, {
+      x: Math.min(map.width, Math.max(0, coord.x)),
+      y: Math.min(map.height, Math.max(0, coord.y)),
+    });
+    const delta = to.sub(this.controls.target).setY(0);
+    this.controls.target.add(delta);
+    this.camera.position.add(delta);
     this.controls.update();
   }
 
