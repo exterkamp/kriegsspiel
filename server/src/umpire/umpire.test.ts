@@ -91,7 +91,7 @@ describe('ProviderUmpireClient', () => {
   it('uses the per-stage model', async () => {
     const t = scripted(good());
     await client(t).c.call({ ...request, stage: 'parse' });
-    expect(t.generate.mock.calls[0]![0]).toMatchObject({ model: 'claude-sonnet-5-5' });
+    expect(t.generate.mock.calls[0]![0]).toMatchObject({ model: 'claude-haiku-5-5' });
   });
 
   it('retries retryable transport errors with exponential backoff, then succeeds', async () => {

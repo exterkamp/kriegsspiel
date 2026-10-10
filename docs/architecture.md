@@ -131,7 +131,8 @@ Adding a field means updating this list and the leak tests in `visibility.test.t
 
 - LLM calls fire on discrete triggers: an order issued (parse), an order delivered (interpretation), an ambiguity (judge), and a report due (narrate). Quiet stretches cost nothing.
 - Narration is **batched in short game-time windows**, so a burst of events yields one set of reports per side. Window size scales with the rate.
-- Per-game rate limits and a budget cap, with a clear "staff overloaded" fallback.
+- Per-game rate limits and a budget cap (`GameUmpireClient`, `gameBudget` in the umpire config), with a clear "staff overloaded" fallback. A capped game is refused before any call is sent, so stages use their conservative fallback at once and game time never waits on it. Narration then returns the engine's template text plus `STAFF_OVERLOADED_NOTICE`. Each call and refusal is logged as a metric, and `report()` gives the cost of the game.
+- Parsing defaults to the cheap model (`claude-haiku-5-5`); judgment keeps the strong one.
 - Cheaper model for parsing, stronger for judgment and narration.
 - Deputy mode (the LLM acting for an absent player) only runs when the player has enabled it, and only when a trigger in their standing orders fires.
 
