@@ -204,6 +204,38 @@ describe('crash recovery', () => {
     expect(serialize(reopened.state)).toBe(before);
   });
 
+  it('keeps seqs unique after reopening a log whose last entry is not the highest seq', async () => {
+    const path = tmpDb();
+    const time = new FakeTime();
+    let release!: () => void;
+    const slow: OrderParser = {
+      parse: async (text) => {
+        await new Promise<void>((r) => (release = r));
+        return { kind: 'intents', text, unitId: 'blue-1', intents: [{ kind: 'move', to: BRIDGE }] };
+      },
+    };
+    const host = new GameHost({
+      store: open(path),
+      parser: slow,
+      registry: registry(),
+      wallNow: time.now,
+      timers: time,
+      snapshotEvery: 100,
+    });
+    hosts.push(host);
+    const game = await host.create('g1', loadScenario(holdTheBridge), { rate: 12 });
+    const done = game.submit(order);
+    await time.advance(1_000);
+    await game.submit({ kind: 'setRate', rate: 4 });
+    release();
+    await done;
+    // No snapshot since the start, so the reopened tail is [2, 1]: the order is logged last.
+    const time2 = new FakeTime(time.now() + 1_000);
+    const reopened = await hostFor(open(path), time2, 100).open('g1');
+    await reopened.submit({ kind: 'pause' });
+    expect((await open(path).inputLog('g1')).map((e) => e.seq)).toEqual([2, 1, 3]);
+  });
+
   it('replay from the database equals the in-memory run', async () => {
     const path = tmpDb();
     const time = new FakeTime();
