@@ -47,8 +47,21 @@ export {
 } from './movement.js';
 export { findPath, legCost } from './navigation.js';
 export type { Path, RouteOptions } from './navigation.js';
-export { OVERLAP_TOLERANCE_MM, validatePlacement } from './placement.js';
-export type { Placement, PlacementProposal, PlacementVerdict } from './placement.js';
+export {
+  MAX_SHAPE_EXTENT_MM,
+  MAX_SHAPE_POINTS,
+  OVERLAP_TOLERANCE_MM,
+  PLACEMENT_EVENT,
+  issuePlacement,
+  registerPlacement,
+  validatePlacement,
+} from './placement.js';
+export type {
+  Placement,
+  PlacementProposal,
+  PlacementRuling,
+  PlacementVerdict,
+} from './placement.js';
 export {
   BREAK_MORALE,
   COMBAT_TICK_MS,

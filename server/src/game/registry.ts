@@ -5,6 +5,7 @@ import {
   registerCombat,
   registerMovement,
   registerOrders,
+  registerPlacement,
   registerVisibility,
   type GameState,
 } from '@kriegsspiel/engine';
@@ -15,6 +16,7 @@ export function createRegistry(): EventRegistry<GameState> {
   registerMovement(r);
   registerCombat(r);
   registerOrders(r);
+  registerPlacement(r);
   registerVisibility(r);
   return r;
 }

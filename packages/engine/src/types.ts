@@ -1,3 +1,5 @@
+import type { PlacementProposal, PlacementVerdict } from './placement.js';
+
 /** Game time in integer milliseconds since the scenario start. Never derived from the wall clock. */
 export type GameTime = number;
 
@@ -232,4 +234,22 @@ export interface GameState {
   /** Set once, when the game ends. Nothing happens in combat or victory handlers after that. */
   outcome: Outcome | null;
   intel: Record<SideId, SideIntel>;
+  /** Every umpire placement ruling so far, in order. Master state only: never sent to a client. */
+  rulings: Ruling[];
+}
+
+/**
+ * An umpire judgment call about where a unit stands, kept whole so a game can be replayed and
+ * audited with no model call: what the umpire proposed, what the engine made of it, and why.
+ */
+export interface Ruling {
+  id: string;
+  /** Game time the engine ruled on the proposal. */
+  time: GameTime;
+  proposal: PlacementProposal;
+  verdict: PlacementVerdict;
+  /** The umpire's reasoning. */
+  rationale: string;
+  /** What the table is told happened ("the column strung out along the road"). */
+  narrative: string;
 }

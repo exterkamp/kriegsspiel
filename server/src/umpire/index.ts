@@ -44,3 +44,11 @@ export {
 } from './providers/index.js';
 export { MockUmpireClient, loadFixtures, loadFixtureFile } from './mockUmpireClient.js';
 export type { FixtureFailure, MockUmpireClientOptions, UmpireFixture } from './mockUmpireClient.js';
+export {
+  JUDGE_PLACEMENT_PROMPT_VERSION,
+  JUDGE_PLACEMENT_SCHEMA,
+  JUDGE_PLACEMENT_SYSTEM,
+  judgePlacementInput,
+  judgePlacements,
+} from './judgePlacement.js';
+export type { JudgePlacementOutput } from './judgePlacement.js';
