@@ -5,6 +5,7 @@ export { validateWaterPhysics } from './physics.js';
 export {
   crossingCandidate,
   validateCrossingCandidate,
+  validateCrossingCandidateMetered,
   findCrossingCandidates,
 } from './crossings.js';
 export { geographyPreset, GEOGRAPHY_PRESET_VERSION } from './presets.js';

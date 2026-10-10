@@ -123,7 +123,7 @@ Return changed paths, verification results, limitations and dependencies needed 
 If blocked, identify the concrete blocker and continue independent authorized work.
 ```
 
-The coordinator checks a completed packet, obtains an independent review, delegates fixes, and reruns only affected checks. Record the accepted checkpoint before issuing dependent work. Review is an automated engineering gate, not a routine owner approval step. Do not answer another agent's approval/question dialog automatically: the Herdr skill requires inspecting it and asking the owner. Reduce avoidable dialogs with explicit bounded packet authority; never bypass permission controls.
+The coordinator checks a completed packet, obtains an independent review, delegates fixes, and reruns only affected checks. Record the accepted checkpoint before issuing dependent work. Review is an automated engineering gate, not a routine owner approval step. Inspect queued agent questions and resolve routine engineering decisions under the owner's instruction to proceed without routine questions. Actual permission or approval dialogs still require the owner unless existing session authorization already covers the action; never bypass permission controls. Reduce avoidable dialogs with explicit bounded packet authority.
 
 ## Durable execution state and recovery
 

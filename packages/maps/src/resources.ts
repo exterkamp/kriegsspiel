@@ -42,7 +42,11 @@ export interface ResourceUsage {
   vertices: number;
   nodes: number;
 }
-export function preflightAsset(input: unknown, limits: ImportLimits): ResourceUsage {
+export function preflightAsset(
+  input: unknown,
+  limits: ImportLimits,
+  chargeNode?: () => void,
+): ResourceUsage {
   const usage = { bytes: 0, samples: 0, sampleValues: 0, features: 0, vertices: 0, nodes: 0 };
   const active = new WeakSet<object>();
   const addBytes = (n: number, path: string) => {
@@ -51,6 +55,7 @@ export function preflightAsset(input: unknown, limits: ImportLimits): ResourceUs
       fail(path, `Object representation exceeds ${limits.maxBytes} bytes`, 'RESOURCE_LIMIT');
   };
   const visit = (value: unknown, path: string, depth: number): void => {
+    chargeNode?.();
     if (++usage.nodes > limits.maxNodes || depth > limits.maxDepth)
       fail(path, 'Object depth/node cap exceeded', 'RESOURCE_LIMIT');
     if (typeof value === 'number') {

@@ -33,11 +33,14 @@ class MeteredTopology extends TopologyBudget {
     this.budget.take(count);
   }
 }
-function checked(water: Water[], s: MapSettings) {
-  preflightAsset(
+function checked(water: Water[], s: MapSettings, budget?: Budget) {
+  const usage = preflightAsset(
     { layers: { water } },
     { ...HARD_LIMITS, maxFeatures: s.limits.maxFeatures, maxVertices: s.limits.maxVertices },
+    budget ? () => budget.take() : undefined,
   );
+  // Reserve schema traversal before it executes, including invalid candidates.
+  budget?.take(usage.nodes);
   const parsed = AssetSchema.shape.layers.shape.water.safeParse(water);
   if (!parsed.success) fail('$.water', parsed.error.message);
 }
@@ -313,14 +316,29 @@ export function validateCrossingCandidate(
   settings: MapSettings,
   limits: GeographyLimits = {},
 ): GenerationResult<CrossingCandidate> {
+  const s = parseSettings(settings);
+  return validateCrossingCandidateMetered(
+    candidate,
+    water,
+    bounds,
+    s,
+    new Budget(limits.maxCrossingWork ?? s.limits.maxTopologyChecks, 'crossing work'),
+  );
+}
+/** Charges a caller-owned budget across all candidate checks, including failed checks. */
+export function validateCrossingCandidateMetered(
+  candidate: CrossingCandidate,
+  water: Water[],
+  bounds: Bounds,
+  settings: MapSettings,
+  budget: Budget,
+): GenerationResult<CrossingCandidate> {
   return bounded(() => {
+    const usage = preflightAsset(settings, HARD_LIMITS, () => budget.take());
+    budget.take(usage.nodes);
     const s = parseSettings(settings);
-    checked(water, s);
-    preflightAsset({ candidate, bounds }, HARD_LIMITS);
-    const budget = new Budget(
-      limits.maxCrossingWork ?? s.limits.maxTopologyChecks,
-      'crossing work',
-    );
+    checked(water, s, budget);
+    preflightAsset({ candidate, bounds }, HARD_LIMITS, () => budget.take());
     validate(candidate, water, bounds, s, budget);
     return { ok: true, value: candidate, diagnostics: [] };
   });

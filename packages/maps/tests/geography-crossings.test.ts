@@ -4,7 +4,9 @@ import {
   crossingCandidate,
   findCrossingCandidates,
   validateCrossingCandidate,
+  validateCrossingCandidateMetered,
 } from '../src/geography/index.js';
+import { Budget } from '../src/geography/budget.js';
 const rect = (x0: number, y0: number, x1: number, y1: number): Polygon => ({
   outer: [
     [x0, y0],
@@ -36,6 +38,39 @@ function river(polygons = [rect(90, 20, 110, 180)]): Water {
   };
 }
 describe('buffered crossing candidates without final road links', () => {
+  it('charges repeated candidate validation against one shared budget', () => {
+    const s = settings(),
+      water = [river()];
+    const candidate = crossingCandidate(
+      'metered',
+      water[0]!.id,
+      [
+        [80, 100],
+        [120, 100],
+      ],
+      s,
+    );
+    const measured = new Budget(s.limits.maxTopologyChecks, 'shared crossing work');
+    expect(validateCrossingCandidateMetered(candidate, water, bounds, s, measured).ok).toBe(true);
+    expect(measured.used).toBeGreaterThan(0);
+    const exact = new Budget(measured.used, 'shared crossing work');
+    expect(validateCrossingCandidateMetered(candidate, water, bounds, s, exact).ok).toBe(true);
+    expect(validateCrossingCandidateMetered(candidate, water, bounds, s, exact)).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'GEOGRAPHY_RESOURCE_LIMIT' }],
+    });
+    expect(exact.used).toBe(measured.used);
+    const rejected = new Budget(measured.used * 2, 'rejected candidate work');
+    const invalid = { ...candidate, widthM: candidate.widthM + 1 };
+    expect(validateCrossingCandidateMetered(invalid, water, bounds, s, rejected)).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'CROSSING_DIMENSIONS' }],
+    });
+    expect(rejected.used).toBeGreaterThan(0);
+    const before = rejected.used;
+    validateCrossingCandidateMetered(invalid, water, bounds, s, rejected);
+    expect(rejected.used).toBeGreaterThan(before);
+  });
   it('requires full 8m reserved width and dry endpoint disks of radius 7m', () => {
     const s = settings();
     s.roads.maxReservedWidthM = 8;
