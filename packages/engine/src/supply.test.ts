@@ -16,6 +16,8 @@ import {
   issueOrder,
   msPerMetreOf,
   pointMm,
+  positionAlong,
+  positionAt,
   registerCombat,
   registerMovement,
   registerOrders,
@@ -121,6 +123,40 @@ describe('forced march', () => {
     expect(done.get('fast')!).toBeGreaterThan(done.get('fresh')!);
   });
 
+  it('re-ordering a forced march mid-leg stops the unit where it had got to', () => {
+    let s = game([{ id: 'fast', x: 100, y: 700 }]);
+    s = issueMove(s, 'fast', pointMm(4100, 700), 0, 'forced');
+    const r = registry();
+    s = advanceTo(s, 2 * M, r).state;
+    const fast = get(s, 'fast');
+    const leg = fast.leg!;
+    const t = s.time + 20_000;
+    // Where the forced leg, timed at its own rate, has the unit at `t`.
+    const expected = positionAlong(
+      s.world.map,
+      leg.from,
+      leg.to,
+      { msPerMetre: leg.msPerMetre! },
+      t - leg.startedAt,
+    );
+    s = issueMove(s, 'fast', pointMm(100, 700), t); // back at a plain march
+    s = advanceTo(s, t, r).state;
+    const turned = get(s, 'fast');
+    expect(turned.pace).toBe('march');
+    expect(turned.leg!.from).toEqual(expected);
+  });
+
+  it('a fight during a leg does not change how far along it the unit is judged to be', () => {
+    let s = game([{ id: 'fast', x: 100, y: 700 }]);
+    s = issueMove(s, 'fast', pointMm(4100, 700));
+    const r = registry();
+    s = advanceTo(s, 2 * M, r).state;
+    const u = get(s, 'fast');
+    const before = positionAt(s.world.map, u, s.time + 30_000);
+    const worn: Unit = { ...u, fatigue: 90 };
+    expect(positionAt(s.world.map, worn, s.time + 30_000)).toEqual(before);
+  });
+
   it('rides in an order: a delivered move can carry its pace', () => {
     let s = game(pair);
     s = issueOrder(s, {
@@ -202,6 +238,24 @@ describe('ammunition', () => {
     expect(lost(dry, 'r')).toBeLessThan(lost(loaded, 'r') * 0.2);
     expect(lost(dry, 'b')).toBeCloseTo(lost(loaded, 'b'));
     expect(get(dry, 'b').ammo).toBe(0); // and it cannot go below empty
+  });
+
+  it('a cavalry charge into melee spends no ammunition, though it still tires the men', () => {
+    let s = game(
+      [
+        { id: 'b', side: 'blue', kind: 'cavalry', x: 3000, y: 500 },
+        { id: 'r', side: 'red', x: 3150, y: 500 },
+      ],
+      {},
+      // Close enough for the charge, well short of the footprints touching.
+      { r: { center: pointMm(3000 + (unitTypeOf('cavalry').chargeM ?? 0) - 5, 500) } },
+    );
+    s = issueAttack(s, 'b', 'r');
+    s = advanceTo(s, 2 * M, registry()).state;
+    expect(get(s, 'b').ammo).toBe(100);
+    expect(get(s, 'r').ammo).toBe(100);
+    expect(get(s, 'b').strength).toBeLessThan(437); // the fight did happen
+    expect(get(s, 'b').fatigue).toBeGreaterThan(0);
   });
 
   it('reports low ammunition once, as a dispatch to HQ', () => {

@@ -125,6 +125,8 @@ export interface Leg {
   to: Point;
   startedAt: GameTime;
   arriveAt: GameTime;
+  /** The game ms per metre of cost-1 ground the leg was timed with (pace and fatigue at its start). */
+  msPerMetre?: number;
 }
 
 export const UNIT_KINDS = ['infantry', 'cavalry', 'artillery'] as const;

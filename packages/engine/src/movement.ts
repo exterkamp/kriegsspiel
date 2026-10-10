@@ -72,10 +72,12 @@ export function positionAlong(
   map: TerrainMap,
   a: Point,
   b: Point,
-  mover: Mover,
+  mover: Mover | { msPerMetre: number },
   elapsed: number,
 ): Point {
-  let left = (Math.max(0, elapsed) / msPerMetreOf(mover)) * 1000; // cost-mm still to spend
+  const rate =
+    typeof mover === 'object' && 'msPerMetre' in mover ? mover.msPerMetre : msPerMetreOf(mover);
+  let left = (Math.max(0, elapsed) / rate) * 1000; // cost-mm still to spend
   for (const piece of profileAlong(map, a, b)) {
     const cost = piece.length * piece.attrs.moveCost;
     if (left < cost) {
@@ -94,7 +96,9 @@ export function positionAt(map: TerrainMap, unit: Unit, time: GameTime): Point {
   // `center` only advances when the step event fires, so at the arrival instant (an order can
   // sort ahead of that event) the leg's end is where the unit stands.
   if (time >= leg.arriveAt) return leg.to;
-  return positionAlong(map, leg.from, leg.to, unit, time - leg.startedAt);
+  // The leg is walked at the rate it was timed with, however pace or fatigue have moved since.
+  const mover = leg.msPerMetre === undefined ? unit : { msPerMetre: leg.msPerMetre };
+  return positionAlong(map, leg.from, leg.to, mover, time - leg.startedAt);
 }
 
 /** Game ms to march `waypoints` in turn (the first is where the unit already stands). */
@@ -195,7 +199,7 @@ function nextLeg(
   const arriveAt = now + legDuration(map, from, to, mover)!;
   return {
     event: { time: arriveAt, type: MOVE_STEP_EVENT, payload: p as unknown as Json },
-    leg: { from, to, startedAt: now, arriveAt },
+    leg: { from, to, startedAt: now, arriveAt, msPerMetre: msPerMetreOf(mover) },
   };
 }
 
@@ -232,10 +236,11 @@ export function beginMarch(
   attackTarget?: string,
   pace: Pace = 'march',
 ): HandlerResult<GameState> {
-  unit = { ...unit, pace }; // a new march sets its own pace; the leg below is timed with it
   const to: [number, number] = [dest.x, dest.y];
   // A unit on the march is stopped where it has got to, not at the last waypoint it passed.
+  // Found before the new pace is set: the leg under way was timed with the old one.
   const here = positionAt(world.map, unit, time);
+  unit = { ...unit, pace }; // a new march sets its own pace; the leg below is timed with it
   const path = findPath(world.map, here, dest, { width: unit.footprint.frontage });
   if (!path) {
     // `tooWide` tells the umpire a narrower formation (a column) would get through.
