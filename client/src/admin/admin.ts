@@ -16,8 +16,10 @@ import {
   type LinkStatus,
   type PanelId,
 } from './model.js';
+import { StatePanel, type AdminState } from './state.js';
 
 const POLL_MS = 3000;
+const STATE_DEBOUNCE_MS = 250;
 
 export class AdminPage {
   private status: LinkStatus = 'connecting';
@@ -28,6 +30,8 @@ export class AdminPage {
   private failures = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private streamCount = 0;
+  private statePanel!: StatePanel;
+  private stateTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly token: string | undefined;
 
   private readonly picker: HTMLSelectElement;
@@ -78,6 +82,7 @@ export class AdminPage {
       main.append(sec);
       this.panels.set(id, sec);
     }
+    this.statePanel = new StatePanel(this.panels.get('State')!);
     nav.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         this.show(stepPanel(this.panel, e.key === 'ArrowRight' ? 1 : -1), true);
@@ -110,6 +115,7 @@ export class AdminPage {
 
   stop(): void {
     clearTimeout(this.timer);
+    clearTimeout(this.stateTimer);
     this.closeStream();
   }
 
@@ -131,6 +137,7 @@ export class AdminPage {
   private applyFilter(): void {
     // Shell only: later stories hook each panel's rows into this shared filter text.
     this.panels.get(this.panel)!.dataset.filter = this.filter.value;
+    this.statePanel.setFilter(this.filter.value);
   }
 
   private async poll(): Promise<void> {
@@ -151,6 +158,7 @@ export class AdminPage {
         this.openStream(this.gameId);
       }
       this.render();
+      void this.refreshState();
       this.timer = setTimeout(() => void this.poll(), POLL_MS);
     } catch {
       this.failures++;
@@ -174,7 +182,11 @@ export class AdminPage {
     this.closeStream();
     this.streamCount = 0;
     this.status = id ? 'connecting' : 'live';
-    if (id) this.openStream(id);
+    this.statePanel.showMessage(id ? 'Loading state…' : 'No game selected.');
+    if (id) {
+      this.openStream(id);
+      void this.refreshState();
+    }
     this.render();
   }
 
@@ -188,6 +200,13 @@ export class AdminPage {
     };
     es.onmessage = () => {
       this.streamCount++;
+      // A trace entry means something changed; refetch the state, at most a few times a second.
+      if (!this.stateTimer) {
+        this.stateTimer = setTimeout(() => {
+          this.stateTimer = undefined;
+          void this.refreshState();
+        }, STATE_DEBOUNCE_MS);
+      }
       this.render();
     };
     es.onerror = () => {
@@ -196,6 +215,23 @@ export class AdminPage {
       if (es.readyState === EventSource.CLOSED) this.closeStream();
       this.render();
     };
+  }
+
+  /** Fetches the master state and both side views of the selected game into the State panel. */
+  private async refreshState(): Promise<void> {
+    const id = this.gameId;
+    if (!id) return;
+    try {
+      const res = await this.fetchFn(apiUrl(`games/${encodeURIComponent(id)}/state`, this.token));
+      if (id !== this.gameId) return;
+      if (res.status === 404)
+        return this.statePanel.showMessage('This game is not open; no live state.');
+      if (!res.ok) throw new Error(String(res.status));
+      const body = (await res.json()) as AdminState;
+      if (id === this.gameId) this.statePanel.update(body);
+    } catch {
+      // The link indicator already reports connectivity; the next refresh retries.
+    }
   }
 
   private closeStream(): void {

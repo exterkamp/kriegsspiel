@@ -199,4 +199,23 @@ describe('AdminPage', () => {
     expect(FakeES.last!.url).toBe('/admin/api/games/bbbbbbbb-2/stream');
     page.stop();
   });
+
+  it('loads the state of the selected game and refreshes it on stream entries', async () => {
+    const stateBody = {
+      id: 'aaaaaaaa-1',
+      engine: { time: 1000, rng: 1, nextSeq: 1, queue: [], world: { seed: 5, units: [] } },
+      sideViews: {},
+    };
+    const fetchFn = vi.fn((url: string) => ok(url.includes('/state') ? stateBody : { games }));
+    const page = mount(fetchFn as never);
+    page.start();
+    await flush();
+    expect(fetchFn).toHaveBeenCalledWith('/admin/api/games/aaaaaaaa-1/state');
+    expect(document.querySelector('section[data-panel="State"]')!.textContent).toContain('1000 ms');
+    stateBody.engine.time = 2000;
+    FakeES.last!.onmessage!();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(document.querySelector('section[data-panel="State"]')!.textContent).toContain('2000 ms');
+    page.stop();
+  });
 });
