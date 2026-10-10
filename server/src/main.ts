@@ -14,7 +14,7 @@
 import { buildApp } from './api/app.js';
 import { adminFromEnv } from './admin/adminApi.js';
 import { SqliteAuthStore } from './auth/store.js';
-import { authFromEnv, scriptedOpponentsFromEnv } from './config.js';
+import { authFromEnv, scriptedOpponentsFromEnv, trustProxyFromEnv } from './config.js';
 import { SqliteGameStore } from './game/index.js';
 import { StubOrderParser } from './orders/stubParser.js';
 
@@ -31,6 +31,7 @@ const { server } = await buildApp({
   logger: true,
   scriptedOpponents: scriptedOpponentsFromEnv(process.env),
   admin: adminFromEnv(process.env),
+  trustProxy: trustProxyFromEnv(process.env),
   auth: { store: authStore, ...authFromEnv(process.env, port, (line) => server.log.warn(line)) },
 });
 

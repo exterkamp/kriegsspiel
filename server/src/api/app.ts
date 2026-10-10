@@ -85,6 +85,11 @@ export interface AppOptions {
     loginPerEmail?: number;
     loginPerIp?: number;
   };
+  /**
+   * Trust `X-Forwarded-For` for `req.ip`, which keys the login rate limits. On behind a reverse proxy,
+   * so each player has their own bucket; off when the port is reachable directly, where the header can be forged.
+   */
+  trustProxy?: boolean;
   onError?: (gameId: string, error: unknown) => void;
 }
 
@@ -98,6 +103,7 @@ export interface App {
 
 export async function buildApp(options: AppOptions): Promise<App> {
   const server = Fastify({
+    trustProxy: options.trustProxy ?? false,
     logger: options.logger
       ? {
           // The login token rides in the query string of /auth/verify; keep queries out of the logs.
@@ -173,7 +179,11 @@ export async function buildApp(options: AppOptions): Promise<App> {
     }
     const id = randomUUID();
     await host.create(id, world, { rate: body.data.rate });
-    authStore.claimSeat(id, side, user.id);
+    // The game is already created and the host cannot delete it; log a lost seat so it is not silent.
+    if (!authStore.claimSeat(id, side, user.id)) {
+      server.log.error({ gameId: id, userId: user.id }, 'new game left without a seat');
+      return reply.code(500).send({ error: 'seat_failed' });
+    }
     return reply.code(201).send({
       id,
       scenario: world.scenarioId,

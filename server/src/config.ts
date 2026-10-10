@@ -7,6 +7,12 @@ export function scriptedOpponentsFromEnv(env: Record<string, string | undefined>
   return !(v === '0' || v === 'false' || v === 'off');
 }
 
+/** `TRUST_PROXY` of `1`, `true` or `on` trusts `X-Forwarded-For`; set it behind a reverse proxy only. */
+export function trustProxyFromEnv(env: Record<string, string | undefined>): boolean {
+  const v = env.TRUST_PROXY?.trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'on';
+}
+
 /** Where login links point, and whether they are mailed or only logged. */
 export function authFromEnv(
   env: Record<string, string | undefined>,

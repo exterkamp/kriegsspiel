@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp, type App } from '../api/app.js';
-import { authFromEnv } from '../config.js';
+import { authFromEnv, trustProxyFromEnv } from '../config.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { LogMailer, WebhookMailer } from './mailer.js';
 import { LOGIN_LINK_TTL_MS, SESSION_TTL_MS, readCookie } from './routes.js';
@@ -169,6 +169,41 @@ describe('rate limits', () => {
     for (let i = 0; i < 4; i++) codes.push((await login(server, `u${i}@example.test`)).statusCode);
     expect(codes).toEqual([202, 202, 429, 429]);
     expect((await login(server, 'x@example.test', '10.0.0.2')).statusCode).toBe(202);
+  });
+
+  it('keys the limits on X-Forwarded-For only when trustProxy is on', async () => {
+    const via = (server: App['server'], email: string, forwarded: string) =>
+      server.inject({
+        method: 'POST',
+        url: '/auth/login',
+        payload: { email },
+        remoteAddress: '10.9.9.9',
+        headers: { 'x-forwarded-for': forwarded },
+      });
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      wallNow: () => wall,
+      trustProxy: true,
+      auth: { mailer, loginPerIp: 1 },
+    });
+    expect((await via(app.server, 'a@example.test', '203.0.113.1')).statusCode).toBe(202);
+    expect((await via(app.server, 'b@example.test', '203.0.113.2')).statusCode).toBe(202);
+    expect((await via(app.server, 'c@example.test', '203.0.113.1')).statusCode).toBe(429);
+    await app.server.close();
+    // Off (the default): the header is ignored, so the proxy's own address is one shared bucket.
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      wallNow: () => wall,
+      auth: { mailer, loginPerIp: 1 },
+    });
+    expect((await via(app.server, 'a@example.test', '203.0.113.1')).statusCode).toBe(202);
+    expect((await via(app.server, 'b@example.test', '203.0.113.2')).statusCode).toBe(429);
+  });
+
+  it('reads TRUST_PROXY from the environment', () => {
+    expect(trustProxyFromEnv({})).toBe(false);
+    expect(trustProxyFromEnv({ TRUST_PROXY: '1' })).toBe(true);
+    expect(trustProxyFromEnv({ TRUST_PROXY: 'off' })).toBe(false);
   });
 
   it('limits guesses at /auth/verify', async () => {
