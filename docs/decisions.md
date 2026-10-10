@@ -136,3 +136,13 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Boundary.** This is consistency with a sampled numerical model, not surveyed terrain accuracy. Full drainage, settlement composition and Node/browser replay remain subsequent gates.
 
 **See.** [Terrain numerical policies](../packages/maps/docs/terrain.md), [execution log](map-execution-log.md).
+
+## D18: Geography separates drainage, represented water and graded ground
+
+**Decision.** Deterministic priority flood fills a separate drainage surface; metric D8 receivers and stable pop ranks produce an acyclic graph without epsilon elevation changes. Lakes represent conservative submerged cell cores with dry holes preserved. A qualifying source drainage trunk can produce a coarse carved channel with an explicit constant backwater surface. Versioned, bounded bank grading provides a low-gradient approach band without relaxing road constraints. Original ground remains available in the stage handoff; normalized changed ground becomes authoritative and requires regenerated contours.
+
+**Validation and cover.** Independent water certification checks complete represented polygons, including boundary quadratic extrema and interior grid nodes. Crossing candidates require complete dry abutments and a transverse reserved corridor; the road planner must still establish grade-feasible connections. Independently seeded coherent cover masks water conservatively, preserves dry islands and reports achieved fractions and shoreline loss. Deterministic phase budgets return explicit failure without truncated successful output.
+
+**Boundary.** These are coarse cartographic generation policies, not discharge, erosion or surveyed bathymetry. Required-river infeasibility, unsupported geometry and exhausted work remain explicit. Whole-map connectivity, settlements and browser replay are later gates. The owner keeps combined-build distribution gated for source review.
+
+**See.** [Geography policies](../packages/maps/docs/geography.md), [cover policies](../packages/maps/docs/geography-cover.md), [execution log](map-execution-log.md).

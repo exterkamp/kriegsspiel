@@ -29,3 +29,4 @@ export {
   CONTOUR_VERSION,
   type ContourHeightEvidence,
 } from './terrain/index.js';
+export * from './geography/index.js';
