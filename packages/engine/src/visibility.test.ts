@@ -7,7 +7,6 @@ import {
   canSee,
   createState,
   issueMove,
-  loadScenario,
   registerMovement,
   registerVisibility,
   schedule,
@@ -16,40 +15,26 @@ import {
   type GameState,
   type Unit,
 } from './index.js';
+import { miniWorld, wood as woodAt } from './scenario.testkit.js';
 
-const rows = (wood: Array<[number, number]> = []) => {
-  const g = Array.from({ length: 20 }, () => Array.from({ length: 30 }, () => '.'));
-  for (const [x, y] of wood) g[y]![x] = 'W';
-  return g.map((r) => r.join(''));
-};
+/** Tile-style (x, y) in hundreds of metres to the centre of that 100 m square, in metres. */
+const at = (n: number) => n * 100 + 50;
 
 function world(
   units: Array<[string, 'blue' | 'red', number, number, number?]>,
   wood: Array<[number, number]> = [],
 ): GameState {
-  return loadScenario({
-    id: 't',
-    seed: 1,
-    map: {
-      legend: { '.': 'open', W: 'wood', B: 'bridge' },
-      rows: [...rows(wood).slice(0, 19), 'B' + '.'.repeat(29)],
-    },
-    sides: [
-      { id: 'blue', name: 'Blue', controller: 'human', hq: { x: 0, y: 0 } },
-      { id: 'red', name: 'Red', controller: 'scripted', hq: { x: 29, y: 0 } },
-    ],
+  return miniWorld({
+    features: wood.map(([x, y]) =>
+      woodAt(`wood-${x}-${y}`, x * 100, y * 100, x * 100 + 100, y * 100 + 100),
+    ),
     units: units.map(([id, side, x, y, strength]) => ({
       id,
       side,
-      kind: 'infantry',
-      name: `Unit ${id}`,
-      x,
-      y,
-      strength: strength ?? 437,
-      morale: 71,
-      facing: 'N',
+      x: at(x),
+      y: at(y),
+      ...(strength === undefined ? {} : { strength }),
     })),
-    victory: { objective: { x: 0, y: 19 }, defender: 'blue', attacker: 'red', holdMinutes: 10 },
   });
 }
 
@@ -104,6 +89,58 @@ describe('canSee', () => {
   });
 });
 
+describe('canSee over free geometry', () => {
+  const slant = (id: string) => ({
+    id,
+    kind: 'wood',
+    polygon: [
+      [900, 600],
+      [1100, 400],
+      [1150, 700],
+    ],
+  });
+
+  it('is blocked by a wood of any shape and angle, and clear when the line passes beside it', () => {
+    const base = [
+      { id: 'b', x: 700, y: 550 },
+      { id: 'r', side: 'red' as const, x: 1200, y: 550 },
+    ];
+    const blocked = miniWorld({ features: [slant('w')], units: base });
+    expect(canSee(blocked, unit(blocked, 'b'), unit(blocked, 'r'))).toBe(false);
+    const clear = miniWorld({
+      features: [slant('w')],
+      units: [base[0]!, { ...base[1]!, y: 1000, x: 850 }],
+    });
+    expect(canSee(clear, unit(clear, 'b'), unit(clear, 'r'))).toBe(true);
+  });
+
+  it('is not snapped to a grid: a few metres of offset makes the difference', () => {
+    const wood = {
+      id: 'w',
+      kind: 'wood',
+      polygon: [
+        [700, 400],
+        [760, 400],
+        [760, 480],
+        [700, 480],
+      ],
+    };
+    const see = (ry: number) => {
+      const w = miniWorld({
+        features: [wood],
+        units: [
+          { id: 'b', x: 400, y: 450 },
+          { id: 'r', side: 'red', x: 900, y: ry },
+        ],
+      });
+      return canSee(w, unit(w, 'b'), unit(w, 'r'));
+    };
+    expect(see(450)).toBe(false);
+    expect(see(480)).toBe(false); // at x=760 the line is at y=462: still inside the wood
+    expect(see(520)).toBe(true); // at x=760 the line is at y=484: just clear
+  });
+});
+
 describe('canSee symmetry', () => {
   it('gives the same answer from either end across a wood corner', () => {
     for (let wx = 3; wx <= 7; wx++) {
@@ -150,10 +187,73 @@ describe('viewFor', () => {
       ['r', 'red', 8, 5, 437],
     ]);
     const v = viewFor(w, 'blue');
-    expect(v.ownUnits[0]).toMatchObject({ id: 'b', strength: 500, morale: 71 });
+    expect(v.ownUnits[0]).toMatchObject({
+      id: 'b',
+      strength: 500,
+      morale: 71,
+      position: { x: 550, y: 550 },
+      facing: 0,
+      formation: 'line',
+    });
+    expect(v.ownUnits[0]!.footprint.frontage).toBeCloseTo(Math.sqrt(500 * 1.2 * 12), 2);
     expect(v.visibleEnemies).toEqual([
-      { id: 'r', position: { x: 8, y: 5 }, sizeEstimate: 'about a battalion' },
+      {
+        id: 'r',
+        position: { x: 850, y: 550 },
+        facing: 0,
+        formation: 'line',
+        footprint: { frontage: 80, depth: 10 },
+        sizeEstimate: 'about a battalion',
+      },
     ]);
+    expect(v.mapWidth).toBe(3000);
+    expect(v.mapHeight).toBe(2000);
+  });
+
+  it('reports positions in metres, to the millimetre, not mm', () => {
+    const w = world([
+      ['b', 'blue', 5, 5],
+      ['r', 'red', 8, 5],
+    ]);
+    unit(w, 'r').center = { x: 851_234, y: 549_001 };
+    expect(viewFor(w, 'blue').visibleEnemies[0]!.position).toEqual({ x: 851.234, y: 549.001 });
+  });
+
+  it('shows an enemy footprint only to the nearest 10 m, so strength cannot be backed out', () => {
+    const w = world([
+      ['b', 'blue', 5, 5],
+      ['r', 'red', 8, 5, 437],
+    ]);
+    const near = viewFor(w, 'blue').visibleEnemies[0]!.footprint;
+    unit(w, 'r').strength = 441;
+    unit(w, 'r').footprint = { frontage: 76_000, depth: 6_000 };
+    const same = viewFor(w, 'blue').visibleEnemies[0]!.footprint;
+    expect(same).toEqual(near);
+    expect(near.frontage % 10).toBe(0);
+    expect(near.depth % 10).toBe(0);
+    expect(near.depth).toBeGreaterThan(0);
+  });
+
+  it('shows an enemy in a loose formation by its sub-positions', () => {
+    const w = world([
+      ['b', 'blue', 5, 5],
+      ['r', 'red', 8, 5],
+    ]);
+    const r = unit(w, 'r');
+    r.formation = 'loose';
+    r.shape = [
+      { x: -50_000, y: 0 },
+      { x: 0, y: 12_345 },
+      { x: 50_000, y: 0 },
+    ];
+    expect(viewFor(w, 'blue').visibleEnemies[0]).toMatchObject({
+      formation: 'loose',
+      shape: [
+        { x: -50, y: 0 },
+        { x: 0, y: 12.345 },
+        { x: 50, y: 0 },
+      ],
+    });
   });
 
   it('leaks nothing about unseen enemies', () => {
@@ -161,9 +261,12 @@ describe('viewFor', () => {
       ['b', 'blue', 2, 2],
       ['r-secret', 'red', 25, 15, 463],
     ]);
-    w.units.find((u) => u.id === 'r-secret')!.intent = { kind: 'hold', at: { x: 24, y: 14 } };
+    w.units.find((u) => u.id === 'r-secret')!.intent = {
+      kind: 'hold',
+      at: { x: 2_400_000, y: 1_400_000 },
+    };
     const json = JSON.stringify(viewFor(w, 'blue'));
-    for (const hidden of ['r-secret', '463', '"hold"', 'Unit r-secret']) {
+    for (const hidden of ['r-secret', '463', '"hold"', 'Unit r-secret', '2550', '1550']) {
       expect(json).not.toContain(hidden);
     }
     const v = viewFor(w, 'blue');
@@ -176,14 +279,21 @@ describe('viewFor', () => {
       ['b', 'blue', 5, 5],
       ['r', 'red', 8, 5, 463],
     ]);
-    w.units.find((u) => u.id === 'r')!.intent = { kind: 'hold', at: { x: 8, y: 5 } };
+    w.units.find((u) => u.id === 'r')!.intent = { kind: 'hold', at: { x: 850_000, y: 550_000 } };
     const json = JSON.stringify(viewFor(w, 'blue'));
-    for (const s of ['463', 'intent', 'hold', 'facing', 'Unit r', 'Unit r"']) {
+    for (const s of ['463', 'intent', 'hold', 'Unit r', 'Unit r"']) {
       expect(json).not.toContain(s);
     }
     expect(json.match(/"morale"/g)).toHaveLength(1); // own unit only
     const enemy = viewFor(w, 'blue').visibleEnemies[0]!;
-    expect(Object.keys(enemy).sort()).toEqual(['id', 'position', 'sizeEstimate']);
+    expect(Object.keys(enemy).sort()).toEqual([
+      'facing',
+      'footprint',
+      'formation',
+      'id',
+      'position',
+      'sizeEstimate',
+    ]);
   });
 
   it('keeps a last-known contact at the old position after the enemy moves away', () => {
@@ -204,9 +314,9 @@ describe('viewFor', () => {
     // Never both visible and last-known.
     expect(first.lastKnownContacts).toEqual([]);
 
-    s = issueMove(s, 'r', { x: 25, y: 5 });
+    s = issueMove(s, 'r', { x: 2_550_000, y: 550_000 });
     s = advanceTo(s, 20 * MS_PER_MINUTE, reg).state;
-    expect(unit(s.world, 'r').position.x).toBeGreaterThan(11);
+    expect(unit(s.world, 'r').center.x).toBeGreaterThan(1_150_000);
 
     const v = viewFor(s.world, 'blue', s.time);
     expect(v.visibleEnemies).toEqual([]);
@@ -220,13 +330,13 @@ describe('viewFor', () => {
     expect(lastSeen % MS_PER_MINUTE).toBe(0);
     const n = (s.time - lastSeen) / MS_PER_MINUTE;
     expect(c.ageMs).toBe(n * MS_PER_MINUTE);
-    expect(c.uncertaintyTiles).toBe(n);
-    // Old position (where it was last seen), never the current one.
-    expect(c.position).not.toEqual(unit(s.world, 'r').position);
-    expect(c.position.x).toBeLessThanOrEqual(11);
+    expect(c.uncertaintyRadius).toBe(n * 100);
+    // Old position (where it was last seen, in metres), never the current one.
+    expect(c.position).not.toEqual({ x: unit(s.world, 'r').center.x / 1000, y: 550 });
+    expect(c.position.x).toBeLessThanOrEqual(1150);
     const json = JSON.stringify(v);
     expect(json).not.toContain('"intent"');
-    expect(json).not.toContain(`"x":${unit(s.world, 'r').position.x},`);
+    expect(json).not.toContain(`"x":${unit(s.world, 'r').center.x / 1000},`);
   });
 });
 
@@ -309,9 +419,9 @@ describe('reports', () => {
       ),
     );
     s = advanceTo(s, 0, reg).state;
-    s = issueMove(s, 'r', { x: 25, y: 5 });
+    s = issueMove(s, 'r', { x: 2_550_000, y: 550_000 });
     s = advanceTo(s, 40 * MS_PER_MINUTE, reg).state;
-    s = issueMove(s, 'r', { x: 8, y: 5 });
+    s = issueMove(s, 'r', { x: 850_000, y: 550_000 });
     s = advanceTo(s, 120 * MS_PER_MINUTE, reg).state;
     expect(viewFor(s.world, 'blue', s.time).visibleEnemies).toHaveLength(1);
     const contacts = viewFor(s.world, 'blue', s.time).reports.filter((r) => r.kind === 'contact');
@@ -364,19 +474,22 @@ describe('intel.report validation', () => {
 });
 
 describe('uncertainty', () => {
-  it('is capped at the longer side of the map', () => {
+  it('grows 100 m a minute and is capped at the longer side of the map', () => {
     const w = world([
       ['b', 'blue', 5, 5],
       ['r', 'red', 20, 15],
     ]);
     w.intel.blue.contacts.push({
       id: 'r',
-      position: { x: 20, y: 15 },
+      position: { x: 2_050_000, y: 1_550_000 },
       seenAt: 0,
       sizeEstimate: 'about a battalion',
     });
+    const young = viewFor(w, 'blue', 7 * MS_PER_MINUTE);
+    expect(young.lastKnownContacts[0]!.uncertaintyRadius).toBe(700);
     const v = viewFor(w, 'blue', 180 * MS_PER_MINUTE);
     expect(v.lastKnownContacts[0]!.ageMs).toBe(180 * MS_PER_MINUTE);
-    expect(v.lastKnownContacts[0]!.uncertaintyTiles).toBe(30);
+    expect(v.lastKnownContacts[0]!.uncertaintyRadius).toBe(3000);
+    expect(v.lastKnownContacts[0]!.position).toEqual({ x: 2050, y: 1550 });
   });
 });

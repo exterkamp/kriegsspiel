@@ -1,125 +1,204 @@
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
+import { distance } from './geometry.js';
 import { schedule } from './queue.js';
+import { segmentCost, segmentPassable, terrainAt } from './terrain.js';
 import {
   MS_PER_MINUTE,
-  tileAt,
   type GameState,
   type Intent,
-  type MapGrid,
   type Point,
-  type Terrain,
+  type TerrainMap,
   type Unit,
   type UnitKind,
 } from './types.js';
 
 /**
- * Cost to enter a tile, in half-units so every time stays an integer
- * (road 0.5, open 1, wood 3). `null` means impassable. A bridge is the only
- * way over the river and costs the same as open ground.
+ * Game milliseconds to march one metre of cost-1 ground. Infantry cover 100 m a minute
+ * (about the 1824 route-march ruler of 200 paces per 2-minute move), cavalry 300 m
+ * (trot), artillery 66.7 m. Whole numbers keep times integral.
  */
-const TERRAIN_COST_HALVES: Record<Terrain, number | null> = {
-  road: 1,
-  open: 2,
-  bridge: 2,
-  wood: 6,
-  river: null,
+export const MS_PER_METRE: Record<UnitKind, number> = {
+  infantry: MS_PER_MINUTE / 100,
+  cavalry: MS_PER_MINUTE / 300,
+  artillery: (MS_PER_MINUTE * 3) / 200,
 };
 
 /**
- * Game milliseconds to cross one open-ground tile (cost 1). A tile is taken as
- * 100 paces: infantry 1 tile/min (about the 1824 route-march ruler of 200
- * paces per 2-minute move), cavalry 3 tiles/min (trot), artillery 2/3 tile/min.
- * Even values keep half-cost steps integral.
+ * Route planning is a stopgap until movement is reworked for continuous space (see
+ * docs/decisions.md D13): A* over a private lattice of this pitch, with the lattice
+ * start and goal joined by straight legs. The lattice is not part of the model: paths
+ * are lists of free points and can be any shape.
  */
-export const MS_PER_TILE: Record<UnitKind, number> = {
-  infantry: MS_PER_MINUTE,
-  cavalry: MS_PER_MINUTE / 3,
-  artillery: (MS_PER_MINUTE * 3) / 2,
-};
+const ROUTE_PITCH_MM = 100_000;
 
-/** Cost in half-units to enter `p`, or `null` if it is off the map or impassable. */
-export function enterCost(map: MapGrid, p: Point): number | null {
-  const t = tileAt(map, p);
-  return t === undefined ? null : TERRAIN_COST_HALVES[t];
-}
-
-/** Game ms for a unit of `kind` to enter `p`, or `null` if it cannot. */
-export function stepDuration(map: MapGrid, p: Point, kind: UnitKind): number | null {
-  const c = enterCost(map, p);
-  return c === null ? null : (c * MS_PER_TILE[kind]) / 2;
-}
-
+/** A route as free points, `from` first and `to` last, and its cost in mm weighted by ground. */
 export interface Path {
-  /** Tiles from `from` to `to` inclusive. */
-  tiles: Point[];
-  /** Total cost in half-units. */
+  waypoints: Point[];
   cost: number;
 }
 
-const NEIGHBOURS: Point[] = [
-  { x: 0, y: -1 },
-  { x: 1, y: 0 },
-  { x: 0, y: 1 },
-  { x: -1, y: 0 },
-];
+/** Game ms for a unit of `kind` to march from `a` to `b` in a straight line, or null if blocked. */
+export function legDuration(map: TerrainMap, a: Point, b: Point, kind: UnitKind): number | null {
+  if (!segmentPassable(map, a, b)) return null;
+  return Math.round((segmentCost(map, a, b) / 1000) * MS_PER_METRE[kind]);
+}
+
+/** Game ms to march `waypoints` in turn (the first is where the unit already stands). */
+export function pathDuration(map: TerrainMap, waypoints: Point[], kind: UnitKind): number {
+  let total = 0;
+  for (let i = 1; i < waypoints.length; i++) {
+    total += legDuration(map, waypoints[i - 1] as Point, waypoints[i] as Point, kind) ?? Infinity;
+  }
+  return total;
+}
+
+function passable(map: TerrainMap, p: Point): boolean {
+  return terrainAt(map, p)?.attrs.passable === true;
+}
+
+/** Cheapest ground multiplier on the map, so the A* heuristic never overestimates. */
+function cheapest(map: TerrainMap): number {
+  let c = 1;
+  for (const f of map.features) if (f.attrs.passable) c = Math.min(c, f.attrs.moveCost);
+  return c;
+}
 
 /**
- * A* over the 4-connected grid with terrain costs. Deterministic: ties on
- * f are broken by smaller h, then by tile index. Returns null if `to` cannot
- * be reached (or either end is impassable or off the map).
+ * Plan a route from `from` to `to` over passable ground, preferring cheap ground (roads) over
+ * short ground (woods). Deterministic: ties on f are broken by smaller h, then by node
+ * index. Returns null if either end is impassable or off the map, or no route exists.
  */
-export function findPath(map: MapGrid, from: Point, to: Point): Path | null {
-  if (enterCost(map, from) === null || enterCost(map, to) === null) return null;
-  const idx = (p: Point) => p.y * map.width + p.x;
-  const h = (p: Point) => Math.abs(p.x - to.x) + Math.abs(p.y - to.y); // min step cost is 1 half-unit
-  const g = new Map<number, number>([[idx(from), 0]]);
+export function findPath(map: TerrainMap, from: Point, to: Point): Path | null {
+  if (!passable(map, from) || !passable(map, to)) return null;
+  if (from.x === to.x && from.y === to.y) return { waypoints: [{ ...from }], cost: 0 };
+
+  const cols = Math.ceil(map.width / ROUTE_PITCH_MM);
+  const rows = Math.ceil(map.height / ROUTE_PITCH_MM);
+  // Nodes: 0 is `from`, 1 is `to`, then lattice cells row by row.
+  const cellNode = (c: number, r: number) => 2 + r * cols + c;
+  const centre = (c: number, r: number): Point => ({
+    x: Math.round(
+      c * ROUTE_PITCH_MM + Math.min(ROUTE_PITCH_MM, map.width - c * ROUTE_PITCH_MM) / 2,
+    ),
+    y: Math.round(
+      r * ROUTE_PITCH_MM + Math.min(ROUTE_PITCH_MM, map.height - r * ROUTE_PITCH_MM) / 2,
+    ),
+  });
+  const point = (n: number): Point =>
+    n === 0 ? from : n === 1 ? to : centre((n - 2) % cols, Math.floor((n - 2) / cols));
+  const okCell = new Map<number, boolean>();
+  const cellOk = (n: number) => {
+    let v = okCell.get(n);
+    if (v === undefined) {
+      v = passable(map, point(n));
+      okCell.set(n, v);
+    }
+    return v;
+  };
+  const cellOf = (p: Point) => ({
+    c: Math.min(cols - 1, Math.floor(p.x / ROUTE_PITCH_MM)),
+    r: Math.min(rows - 1, Math.floor(p.y / ROUTE_PITCH_MM)),
+  });
+  const around = (p: Point): number[] => {
+    const { c, r } = cellOf(p);
+    const out: number[] = [];
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        const cc = c + dc;
+        const rr = r + dr;
+        if (cc >= 0 && rr >= 0 && cc < cols && rr < rows && cellOk(cellNode(cc, rr))) {
+          out.push(cellNode(cc, rr));
+        }
+      }
+    }
+    return out;
+  };
+  const toCells = around(to);
+
+  const neighbours = (n: number): number[] => {
+    if (n === 0) return [1, ...around(from)];
+    if (n === 1) return [];
+    const c = (n - 2) % cols;
+    const r = Math.floor((n - 2) / cols);
+    const out: number[] = [];
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const cc = c + dc;
+        const rr = r + dr;
+        if (cc >= 0 && rr >= 0 && cc < cols && rr < rows && cellOk(cellNode(cc, rr))) {
+          out.push(cellNode(cc, rr));
+        }
+      }
+    }
+    if (toCells.includes(n)) out.push(1);
+    return out;
+  };
+
+  const minCost = cheapest(map);
+  const h = (n: number) => distance(point(n), to) * minCost;
+  const g = new Map<number, number>([[0, 0]]);
   const prev = new Map<number, number>();
   const closed = new Set<number>();
-  const open: Array<{ f: number; h: number; i: number }> = [
-    { f: h(from), h: h(from), i: idx(from) },
-  ];
+  const open: Array<{ f: number; h: number; n: number }> = [{ f: h(0), h: h(0), n: 0 }];
   const less = (a: (typeof open)[number], b: (typeof open)[number]) =>
-    a.f - b.f || a.h - b.h || a.i - b.i;
+    a.f - b.f || a.h - b.h || a.n - b.n;
 
   while (open.length > 0) {
     // Pop the minimum (maps are small, so a scan beats a heap for clarity).
     let best = 0;
     for (let k = 1; k < open.length; k++) if (less(open[k]!, open[best]!) < 0) best = k;
     const cur = open.splice(best, 1)[0]!;
-    if (closed.has(cur.i)) continue;
-    closed.add(cur.i);
-    const cx = cur.i % map.width;
-    const cy = (cur.i - cx) / map.width;
-    if (cx === to.x && cy === to.y) {
-      const tiles: Point[] = [];
-      for (let i: number | undefined = cur.i; i !== undefined; i = prev.get(i)) {
-        const x = i % map.width;
-        tiles.push({ x, y: (i - x) / map.width });
-      }
-      return { tiles: tiles.reverse(), cost: g.get(cur.i)! };
+    if (closed.has(cur.n)) continue;
+    closed.add(cur.n);
+    if (cur.n === 1) {
+      const chain: number[] = [];
+      for (let n: number | undefined = 1; n !== undefined; n = prev.get(n)) chain.push(n);
+      return smooth(map, chain.reverse().map(point), g.get(1)!);
     }
-    for (const d of NEIGHBOURS) {
-      const n = { x: cx + d.x, y: cy + d.y };
-      const c = enterCost(map, n);
-      if (c === null) continue;
-      const ni = idx(n);
-      if (closed.has(ni)) continue;
-      const ng = g.get(cur.i)! + c;
-      if (ng < (g.get(ni) ?? Infinity)) {
-        g.set(ni, ng);
-        prev.set(ni, cur.i);
-        open.push({ f: ng + h(n), h: h(n), i: ni });
+    for (const m of neighbours(cur.n)) {
+      if (closed.has(m)) continue;
+      const a = point(cur.n);
+      const b = point(m);
+      if (!segmentPassable(map, a, b)) continue;
+      const ng = g.get(cur.n)! + segmentCost(map, a, b);
+      if (ng < (g.get(m) ?? Infinity)) {
+        g.set(m, ng);
+        prev.set(m, cur.n);
+        open.push({ f: ng + h(m), h: h(m), n: m });
       }
     }
   }
   return null;
 }
 
-/** Game ms to walk `path` as a unit of `kind` (the first tile is where it already stands). */
-export function pathDuration(map: MapGrid, path: Point[], kind: UnitKind): number {
-  let total = 0;
-  for (const p of path.slice(1)) total += stepDuration(map, p, kind) ?? Infinity;
-  return total;
+/**
+ * Drop waypoints that a straight leg can skip without costing more, so routes are free
+ * lines rather than lattice staircases.
+ */
+function smooth(map: TerrainMap, pts: Point[], total: number): Path {
+  const legs = [0];
+  for (let i = 1; i < pts.length; i++) {
+    legs.push(legs[i - 1]! + segmentCost(map, pts[i - 1]!, pts[i]!));
+  }
+  const out: Point[] = [pts[0]!];
+  let cost = 0;
+  let i = 0;
+  while (i < pts.length - 1) {
+    let j = pts.length - 1;
+    for (; j > i + 1; j--) {
+      if (
+        segmentPassable(map, pts[i]!, pts[j]!) &&
+        segmentCost(map, pts[i]!, pts[j]!) <= legs[j]! - legs[i]!
+      ) {
+        break;
+      }
+    }
+    cost += j === i + 1 ? legs[j]! - legs[i]! : segmentCost(map, pts[i]!, pts[j]!);
+    out.push({ ...pts[j]! });
+    i = j;
+  }
+  return { waypoints: out, cost: Math.min(cost, total) };
 }
 
 export const MOVE_INTENT_EVENT = 'intent.move';
@@ -156,7 +235,7 @@ interface StepPayload {
   unitId: string;
   startedAt: number;
   to: [number, number];
-  /** Flat x,y pairs of the tiles still to enter, nearest first. */
+  /** Flat x,y pairs (mm): the point just left, then the waypoints still to reach, nearest first. */
   path: number[];
 }
 
@@ -168,10 +247,11 @@ function updateUnit(world: GameState, unitId: string, patch: Partial<Unit>, time
   };
 }
 
-function scheduleStep(map: MapGrid, kind: UnitKind, now: number, p: StepPayload): NewEvent {
-  const next = { x: p.path[2]!, y: p.path[3]! }; // path[0..1] is the tile just left
+function scheduleStep(map: TerrainMap, kind: UnitKind, now: number, p: StepPayload): NewEvent {
+  const prev = { x: p.path[0]!, y: p.path[1]! }; // the point just left
+  const next = { x: p.path[2]!, y: p.path[3]! };
   return {
-    time: now + stepDuration(map, next, kind)!,
+    time: now + legDuration(map, prev, next, kind)!,
     type: MOVE_STEP_EVENT,
     payload: p as unknown as Json,
   };
@@ -200,14 +280,14 @@ export function beginMarch(
   how: 'move' | 'withdraw' | 'hold' = 'move',
 ): HandlerResult<GameState> {
   const to: [number, number] = [dest.x, dest.y];
-  const path = findPath(world.map, unit.position, dest);
+  const path = findPath(world.map, unit.center, dest);
   if (!path) {
     return {
       world: updateUnit(world, unit.id, {}, time),
       emit: [{ type: 'unit.moveBlocked', payload: { unitId: unit.id, to } }],
     };
   }
-  if (path.tiles.length === 1) {
+  if (path.waypoints.length === 1) {
     const intent: Intent = how === 'hold' ? { kind: 'hold', at: dest } : { kind: 'idle' };
     return {
       world: updateUnit(world, unit.id, { intent }, time),
@@ -224,7 +304,7 @@ export function beginMarch(
     unitId: unit.id,
     startedAt: time,
     to,
-    path: path.tiles.flatMap((t) => [t.x, t.y]),
+    path: path.waypoints.flatMap((t) => [t.x, t.y]),
   };
   return {
     world: updateUnit(world, unit.id, { intent }, time),
@@ -234,10 +314,10 @@ export function beginMarch(
 
 /**
  * Register the movement handlers. Movement is event-driven: a move order
- * plans a path from where the unit stands now and schedules one step event per
- * tile, each firing when the unit finishes entering that tile. A newer intent
+ * plans a route from where the unit stands now and schedules one step event per
+ * leg, each firing when the unit reaches the end of that leg. A newer intent
  * makes the old order's pending steps stale, and they do nothing when they fire.
- * An interrupted unit stays on the last tile it completed. An order that
+ * An interrupted unit stays at the last waypoint it reached. An order that
  * cannot be carried out (unknown unit, unreachable destination) is reported
  * and changes nothing else.
  */
@@ -271,18 +351,18 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     ) {
       return { world }; // superseded by a newer intent
     }
-    const position = { x: p.path[2]!, y: p.path[3]! };
+    const center = { x: p.path[2]!, y: p.path[3]! };
     const rest = p.path.slice(2);
     if (rest.length === 2) {
       const intent: Intent =
-        i.kind === 'move' && i.thenHold ? { kind: 'hold', at: position } : { kind: 'idle' };
+        i.kind === 'move' && i.thenHold ? { kind: 'hold', at: center } : { kind: 'idle' };
       return {
-        world: updateUnit(world, p.unitId, { position, intent }, ev.time),
+        world: updateUnit(world, p.unitId, { center, intent }, ev.time),
         emit: [{ type: 'unit.arrived', payload: { unitId: p.unitId, at: p.to } }],
       };
     }
     return {
-      world: updateUnit(world, p.unitId, { position }, ev.time),
+      world: updateUnit(world, p.unitId, { center }, ev.time),
       schedule: [scheduleStep(world.map, unit.kind, ev.time, { ...p, path: rest })],
     };
   });

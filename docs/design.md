@@ -17,12 +17,12 @@ Free Kriegsspiel with a pure LLM is inconsistent and unauditable. Pure rigid Kri
 
 | Layer | Owner | Examples |
 |-------|-------|----------|
-| State and physics | Deterministic engine | positions, pathfinding, march rates, line of sight, supply, ammo, fatigue, combat odds, dice |
+| State and physics | Deterministic engine | positions in continuous space (no grid), pathfinding, march rates, line of sight, supply, ammo, fatigue, combat odds, dice |
 | Interpretation | LLM | parse free-text orders into structured intents, resolve ambiguity, flag impossible orders |
 | Judgment | LLM, bounded | assign modifiers and odds for situations the engine has no rule for (the "umpire's call"), within caps |
 | Narration | LLM | field reports, courier dispatches, after-action text, per-side fog-filtered |
 
-The LLM never edits state directly. It returns structured proposals (intents, modifiers, event requests) that the engine validates and applies. Dice are rolled by the server with a seeded RNG, never by the model.
+The LLM may propose any arrangement of units it judges realistic, subject only to the engine's physical-plausibility checks (D13). It never edits state directly. It returns structured proposals (intents, modifiers, event requests) that the engine validates and applies. Dice are rolled by the server with a seeded RNG, never by the model.
 
 ## Feature ideas
 

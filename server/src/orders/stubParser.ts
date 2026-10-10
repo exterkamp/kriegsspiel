@@ -1,4 +1,11 @@
-import type { Coord, OrderIntent, OrderParser, ParseContext, ParseResult } from './orderParser.js';
+import type {
+  Coord,
+  OrderIntent,
+  OrderParser,
+  ParseContext,
+  ParseFeature,
+  ParseResult,
+} from './orderParser.js';
 
 /**
  * Rule-based stand-in for the LLM umpire. Understands a small grammar:
@@ -9,7 +16,7 @@ import type { Coord, OrderIntent, OrderParser, ParseContext, ParseResult } from 
  *   [unit] attack|assault <place>
  *
  * Units are the issuing side's own, matched by name or id. Places are terrain features
- * (bridge, wood, road) found on the map. No wall clock, no randomness.
+ * (bridge, wood, road) found on the map, each as the anchor point of its feature. No wall clock, no randomness.
  */
 
 type Verb = 'move' | 'hold' | 'withdraw' | 'attack';
@@ -38,51 +45,9 @@ function normalize(s: string): string {
     .trim();
 }
 
-/** 4-connected components of `terrain` tiles, each reduced to the tile nearest its centroid. */
-function features(map: ParseContext['map'], terrain: string): Coord[] {
-  const seen = new Set<number>();
-  const out: Coord[] = [];
-  for (let start = 0; start < map.tiles.length; start++) {
-    if (map.tiles[start] !== terrain || seen.has(start)) continue;
-    const members: Coord[] = [];
-    const stack = [start];
-    seen.add(start);
-    while (stack.length > 0) {
-      const i = stack.pop() as number;
-      const x = i % map.width;
-      const y = Math.floor(i / map.width);
-      members.push({ x, y });
-      for (const [dx, dy] of [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1],
-      ] as const) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
-        const j = ny * map.width + nx;
-        if (map.tiles[j] === terrain && !seen.has(j)) {
-          seen.add(j);
-          stack.push(j);
-        }
-      }
-    }
-    members.sort((a, b) => a.y - b.y || a.x - b.x);
-    const cx = members.reduce((s, m) => s + m.x, 0) / members.length;
-    const cy = members.reduce((s, m) => s + m.y, 0) / members.length;
-    let best = members[0] as Coord;
-    let bestD = Infinity;
-    for (const m of members) {
-      const d = (m.x - cx) ** 2 + (m.y - cy) ** 2;
-      if (d < bestD) {
-        best = m;
-        bestD = d;
-      }
-    }
-    out.push(best);
-  }
-  return out;
+/** The places on the map of one terrain kind, in feature id order. */
+function features(map: ParseContext['map'], kind: string): ParseFeature[] {
+  return map.features.filter((f) => f.kind === kind).sort((a, b) => (a.id < b.id ? -1 : 1));
 }
 
 type PlaceResult =
@@ -111,7 +76,9 @@ function resolvePlace(phrase: string, ctx: ParseContext): PlaceResult {
     return { ok: false, kind: 'rejection', reason: `There is no ${terrain} on this map.` };
   }
   if (found.length > 1) {
-    const options = found.map((c) => `the ${terrain} at (${c.x}, ${c.y})`);
+    const options = found.map(
+      (f) => `the ${f.name ?? terrain} at (${f.anchor.x / 1000}, ${f.anchor.y / 1000}) m`,
+    );
     return {
       ok: false,
       kind: 'clarification',
@@ -119,7 +86,7 @@ function resolvePlace(phrase: string, ctx: ParseContext): PlaceResult {
       options,
     };
   }
-  return { ok: true, at: found[0] as Coord };
+  return { ok: true, at: { ...(found[0] as ParseFeature).anchor } };
 }
 
 export class StubOrderParser implements OrderParser {
@@ -230,7 +197,7 @@ export class StubOrderParser implements OrderParser {
     if (phrase === '') {
       if (verb === 'hold') {
         const unit = own.find((u) => u.id === unitId) as (typeof own)[number];
-        intents.push({ kind: 'hold', at: { ...unit.position } });
+        intents.push({ kind: 'hold', at: { ...unit.center } });
         return { kind: 'intents', text, unitId, intents };
       }
       return {
