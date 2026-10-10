@@ -10,7 +10,7 @@ const BLOCK_H = 0.5;
 /** Labels sit beside the block (toward the near edge) so they never hide it or its facing nose. */
 const TAG_OFFSET_Z = 0.8;
 
-/** Sprite materials own their texture; the sprite geometry is shared by three, so it is not disposed. */
+/** Sprite geometry is shared by three; disposeTree disposing it is harmless (it re-uploads on next use). */
 function labelSprite(text: string, ghost: boolean): THREE.Sprite {
   const c = document.createElement('canvas');
   c.width = 256;
