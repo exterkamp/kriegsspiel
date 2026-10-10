@@ -35,8 +35,8 @@ function world(
       rows: [...rows(wood).slice(0, 19), 'B' + '.'.repeat(29)],
     },
     sides: [
-      { id: 'blue', name: 'Blue', controller: 'human' },
-      { id: 'red', name: 'Red', controller: 'scripted' },
+      { id: 'blue', name: 'Blue', controller: 'human', hq: { x: 0, y: 0 } },
+      { id: 'red', name: 'Red', controller: 'scripted', hq: { x: 29, y: 0 } },
     ],
     units: units.map(([id, side, x, y, strength]) => ({
       id,
@@ -259,7 +259,7 @@ describe('reports', () => {
     expect(JSON.stringify(r)).not.toContain('437');
   });
 
-  it('reports a contact once while in sight, and tells the other side nothing of it', () => {
+  it('reports a contact once per side while in sight', () => {
     const reg = registry();
     let s = startVisibility(
       createState(

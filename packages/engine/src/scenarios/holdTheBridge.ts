@@ -42,8 +42,8 @@ export const holdTheBridge = {
     ],
   },
   sides: [
-    { id: 'blue', name: 'Blue', controller: 'human' },
-    { id: 'red', name: 'Red', controller: 'scripted' },
+    { id: 'blue', name: 'Blue', controller: 'human', hq: { x: 20, y: 29 } },
+    { id: 'red', name: 'Red', controller: 'scripted', hq: { x: 20, y: 0 } },
   ],
   units: [
     {

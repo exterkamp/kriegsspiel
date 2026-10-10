@@ -102,10 +102,10 @@ running ──request──► pause_proposed ──all humans yes──► paus
 
 ## Components
 
-- **Engine** (`packages/engine`): pure, deterministic, no network or clock access. Map, units, orders-as-intents, movement (A* paths played out as per-tile step events, see D10), line of sight, combat, morale, supply, seeded RNG, and `advanceTo(t)`. Fully unit-tested.
+- **Engine** (`packages/engine`): pure, deterministic, no network or clock access. Map, units, orders-as-intents, movement (A* paths played out as per-tile step events, see D10), courier-delivered orders (D11), line of sight, combat, morale, supply, seeded RNG, and `advanceTo(t)`. Fully unit-tested.
 - **Umpire service**: wraps the LLM with strict JSON schemas (tool use / structured outputs). Stages: `parseOrders`, `judge`, `narrate`, plus the staff-check, staff-conference and deputy calls. Prompts are versioned files. Results are recorded.
   The parse seam is the async `OrderParser` interface in `server/src/orders/orderParser.ts`: `parse(orderText, context)` resolves to intents, a clarification request or a rejection, and always carries the original wording. The server depends on the interface only; a rule-based `StubOrderParser` stands in until the LLM umpire exists.
-- **Visibility service**: from master state and a side, produces that side's knowledge: seen units, stale contact reports, received messages. The *only* path from master state to a client. See D11.
+- **Visibility service**: from master state and a side, produces that side's knowledge: seen units, stale contact reports, received messages. The *only* path from master state to a client. See D12.
 - **Clock and scheduler** (server): the `ClockState`, the scheduler, and pause voting.
 - **Notifier**: pushes dispatch arrivals and clock events over WebSocket, plus email or web push for players who are away. Players set thresholds (all dispatches, urgent only, contact only).
 - **Persistence**: an append-only event log of *inputs* (commands, clock changes, votes, LLM outputs, seeds), plus periodic snapshots for quick recovery. Stores the model, prompt version and raw output of each LLM call.
@@ -113,7 +113,7 @@ running ──request──► pause_proposed ──all humans yes──► paus
 
 ### SideView contents
 
-An `EngineSideView` (engine type, `viewFor`; not the protocol `SideView`, see D11) may contain only:
+An `EngineSideView` (engine type, `viewFor`; not the protocol `SideView`, see D12) may contain only:
 
 - `side`, `time`, `mapWidth`, `mapHeight`.
 - `ownUnits`: the side's own units in full (id, name, kind, position, strength, morale).

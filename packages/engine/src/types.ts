@@ -28,7 +28,9 @@ export type Facing = (typeof FACINGS)[number];
 export type Intent =
   | { kind: 'idle' }
   /** `startedAt` ties scheduled step events to this order, so a newer intent makes them stale. */
-  | { kind: 'move'; to: Point; startedAt: GameTime }
+  | { kind: 'move'; to: Point; startedAt: GameTime; thenHold?: boolean }
+  /** Like a move, but a retreat; the unit stays in this intent until it arrives. */
+  | { kind: 'withdraw'; toward: Point; startedAt: GameTime }
   | { kind: 'hold'; at: Point };
 
 export const UNIT_KINDS = ['infantry', 'cavalry', 'artillery'] as const;
@@ -53,6 +55,8 @@ export interface Side {
   name: string;
   /** Human-controlled or scripted. */
   controller: 'human' | 'scripted';
+  /** Where this side's orders start from. Couriers ride from here. */
+  hq: Point;
 }
 
 /** The `defender` wins by holding `objective` for `holdMs`; the `attacker` wins by taking it. */
