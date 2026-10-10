@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@kriegsspiel/settlemaker": "file:../../vendor/settlemaker-runtime.tgz",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "polygon-clipping": "0.15.7"
   }
 }
