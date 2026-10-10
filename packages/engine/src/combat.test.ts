@@ -571,7 +571,7 @@ describe('fire by range', () => {
     ]);
 
   it('falls off linearly from point-blank to the edge of range', () => {
-    const near = { kind: 'infantry', center: { x: 0, y: 0 } } as never;
+    const near = { kind: 'infantry', type: 'line_infantry', center: { x: 0, y: 0 } } as never;
     expect(rangeFactor(near, { center: { x: 0, y: 0 } } as never)).toBe(1);
     expect(rangeFactor(near, { center: { x: 200_000, y: 0 } } as never)).toBe(LONG_RANGE_FACTOR);
     expect(rangeFactor(near, { center: { x: 100_000, y: 0 } } as never)).toBeCloseTo(0.625);

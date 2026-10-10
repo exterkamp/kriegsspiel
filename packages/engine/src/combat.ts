@@ -18,6 +18,7 @@ import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from '
 import { rejectOrder, startMarch } from './movement.js';
 import { schedule } from './queue.js';
 import { terrainAt } from './terrain.js';
+import { FORMATION_RULES, unitTypeOf } from './unitTypes.js';
 import {
   MS_PER_MINUTE,
   type GameState,
@@ -31,15 +32,16 @@ import {
 export const COMBAT_TICK_MS = 2 * MS_PER_MINUTE;
 
 /**
- * Placeholder numbers; the rules tables arrive with Epic #2. A unit's casualties
- * per tick are `strength * FIRE_RATE * (die / 3.5) * moraleFactor * cover`, times a
- * range factor (or the melee factor) and a flank or rear factor, so a
- * 600-man battalion on a fair roll costs a target about 18 men every 2 minutes.
+ * Casualties per tick are `strength * fireRate * (die / 3.5) * moraleFactor * cover`, times
+ * a range factor (or the melee factor), a flank or rear factor, the shooter's formation
+ * `fireFactor` and the target's formation vulnerability, so a 600-man line battalion on a
+ * fair roll costs a target about 18 men every 2 minutes. `fireRate` and the rest come from
+ * each unit's type and formation (`unitTypes.ts`); this table lists the default types' rates.
  */
 export const FIRE_RATE: Record<UnitKind, number> = {
-  infantry: 0.03,
-  cavalry: 0.06,
-  artillery: 0.04,
+  infantry: unitTypeOf('infantry').fireRate,
+  cavalry: unitTypeOf('cavalry').fireRate,
+  artillery: unitTypeOf('artillery').fireRate,
 };
 
 /** Multiplier on casualties taken by a target on ground with the given `cover` (0..1). */
@@ -49,8 +51,8 @@ export function coverFactor(cover: number): number {
 
 /** Morale lost per percent of strength lost in one tick. */
 export const MORALE_PER_LOSS_PERCENT = 2;
-/** A unit whose morale falls below this breaks and withdraws. */
-export const BREAK_MORALE = 25;
+/** The morale below which a default-type unit breaks and withdraws; each type has its own. */
+export const BREAK_MORALE = unitTypeOf('infantry').breakMorale;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -307,7 +309,11 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       const reach = melee ? MELEE_FACTOR : rangeFactor(shooter, target);
       const casualties = round2(
         shooter.strength *
-          FIRE_RATE[shooter.kind] *
+          unitTypeOf(shooter).fireRate *
+          FORMATION_RULES[shooter.formation].fireFactor *
+          (melee
+            ? FORMATION_RULES[target.formation].meleeVulnerability
+            : FORMATION_RULES[target.formation].fireVulnerability) *
           (die / 3.5) *
           moraleFactor *
           cover *
@@ -390,7 +396,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
           ...w,
           units: w.units.map((x) => (x.id === u.id ? { ...x, intent: { kind: 'idle' } } : x)),
         };
-      } else if (u.status === 'active' && u.morale < BREAK_MORALE) {
+      } else if (u.status === 'active' && u.morale < unitTypeOf(u).breakMorale) {
         const broken: Unit = { ...u, status: 'withdrawn', intent: { kind: 'idle' } };
         w = { ...w, units: w.units.map((x) => (x.id === u.id ? broken : x)) };
         const res = startMarch(w, broken, u.home, ev.time);

@@ -5,8 +5,8 @@ import { schedule } from './queue.js';
 import { defaultFootprint } from './formation.js';
 import { findPath, legCost } from './navigation.js';
 import { profileAlong } from './terrain.js';
+import { msPerMetreOf, unitTypeOf } from './unitTypes.js';
 import {
-  MS_PER_MINUTE,
   type Formation,
   type GameState,
   type GameTime,
@@ -19,14 +19,13 @@ import {
 } from './types.js';
 
 /**
- * Game milliseconds to march one metre of cost-1 ground. Infantry cover 100 m a minute
- * (about the 1824 route-march ruler of 200 paces per 2-minute move), cavalry 300 m
- * (trot), artillery 66.7 m. Whole numbers keep times integral.
+ * Game milliseconds to march one metre of cost-1 ground, for each arm's default type in its
+ * base formation. A unit's own pace comes from its type and formation (`msPerMetreOf`).
  */
 export const MS_PER_METRE: Record<UnitKind, number> = {
-  infantry: MS_PER_MINUTE / 100,
-  cavalry: MS_PER_MINUTE / 300,
-  artillery: (MS_PER_MINUTE * 3) / 200,
+  infantry: msPerMetreOf('infantry'),
+  cavalry: msPerMetreOf('cavalry'),
+  artillery: msPerMetreOf('artillery'),
 };
 
 /**
@@ -53,10 +52,13 @@ function stepped(waypoints: Point[]): Point[] {
   return out;
 }
 
-/** Game ms for a unit of `kind` to march from `a` to `b` in a straight line, or null if blocked. */
-export function legDuration(map: TerrainMap, a: Point, b: Point, kind: UnitKind): number | null {
+/** Who marches: a unit (its type and formation set the pace) or a bare arm (base pace). */
+export type Mover = Pick<Unit, 'type' | 'kind' | 'formation'> | UnitKind;
+
+/** Game ms for `mover` to march from `a` to `b` in a straight line, or null if blocked. */
+export function legDuration(map: TerrainMap, a: Point, b: Point, mover: Mover): number | null {
   const cost = legCost(map, a, b);
-  return cost === null ? null : Math.round((cost / 1000) * MS_PER_METRE[kind]);
+  return cost === null ? null : Math.round((cost / 1000) * msPerMetreOf(mover));
 }
 
 /**
@@ -67,10 +69,10 @@ export function positionAlong(
   map: TerrainMap,
   a: Point,
   b: Point,
-  kind: UnitKind,
+  mover: Mover,
   elapsed: number,
 ): Point {
-  let left = (Math.max(0, elapsed) / MS_PER_METRE[kind]) * 1000; // cost-mm still to spend
+  let left = (Math.max(0, elapsed) / msPerMetreOf(mover)) * 1000; // cost-mm still to spend
   for (const piece of profileAlong(map, a, b)) {
     const cost = piece.length * piece.attrs.moveCost;
     if (left < cost) {
@@ -89,26 +91,26 @@ export function positionAt(map: TerrainMap, unit: Unit, time: GameTime): Point {
   // `center` only advances when the step event fires, so at the arrival instant (an order can
   // sort ahead of that event) the leg's end is where the unit stands.
   if (time >= leg.arriveAt) return leg.to;
-  return positionAlong(map, leg.from, leg.to, unit.kind, time - leg.startedAt);
+  return positionAlong(map, leg.from, leg.to, unit, time - leg.startedAt);
 }
 
 /** Game ms to march `waypoints` in turn (the first is where the unit already stands). */
-export function pathDuration(map: TerrainMap, waypoints: Point[], kind: UnitKind): number {
+export function pathDuration(map: TerrainMap, waypoints: Point[], mover: Mover): number {
   let total = 0;
   for (let i = 1; i < waypoints.length; i++) {
-    total += legDuration(map, waypoints[i - 1] as Point, waypoints[i] as Point, kind) ?? Infinity;
+    total += legDuration(map, waypoints[i - 1] as Point, waypoints[i] as Point, mover) ?? Infinity;
   }
   return total;
 }
 
 /**
- * Game ms a unit stands still to change formation (column to line and back, going into
- * square). Placeholders until the rules tables: guns need longer to limber and unlimber.
+ * Game ms the default type of each arm stands still to change formation (column to line and
+ * back, going into square). A unit's own time is its type's `formationChangeMs`.
  */
 export const FORMATION_CHANGE_MS: Record<UnitKind, number> = {
-  infantry: 2 * MS_PER_MINUTE,
-  cavalry: MS_PER_MINUTE,
-  artillery: 3 * MS_PER_MINUTE,
+  infantry: unitTypeOf('infantry').formationChangeMs,
+  cavalry: unitTypeOf('cavalry').formationChangeMs,
+  artillery: unitTypeOf('artillery').formationChangeMs,
 };
 
 export const MOVE_INTENT_EVENT = 'intent.move';
@@ -179,13 +181,13 @@ export function updateUnit(world: GameState, unitId: string, patch: Partial<Unit
 /** The step event that ends the leg `p.path` starts with, and the leg itself. */
 function nextLeg(
   map: TerrainMap,
-  kind: UnitKind,
+  mover: Mover,
   now: number,
   p: StepPayload,
 ): { event: NewEvent; leg: Leg } {
   const from = { x: p.path[0]!, y: p.path[1]! }; // the point just left
   const to = { x: p.path[2]!, y: p.path[3]! };
-  const arriveAt = now + legDuration(map, from, to, kind)!;
+  const arriveAt = now + legDuration(map, from, to, mover)!;
   return {
     event: { time: arriveAt, type: MOVE_STEP_EVENT, payload: p as unknown as Json },
     leg: { from, to, startedAt: now, arriveAt },
@@ -268,7 +270,7 @@ export function beginMarch(
     to,
     path: stepped(path.waypoints).flatMap((t) => [t.x, t.y]),
   };
-  const { event, leg } = nextLeg(world.map, unit.kind, time, step);
+  const { event, leg } = nextLeg(world.map, unit, time, step);
   return {
     world: updateUnit(world, unit.id, { intent, center: here, leg }, time),
     schedule: [event],
@@ -329,6 +331,9 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     const unit = world.units.find((u) => u.id === unitId);
     if (!unit) return rejectUnknown(world, unitId);
     if (unit.status !== 'active') return rejectOrder(world, unitId, 'unit not active');
+    if (!unitTypeOf(unit).formations.includes(formation)) {
+      return rejectOrder(world, unitId, `${unitTypeOf(unit).name} cannot form ${formation}`);
+    }
     if (unit.formation === formation) {
       if (unit.intent.kind !== 'reform')
         return rejectOrder(world, unitId, 'already in that formation');
@@ -342,7 +347,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
       world: updateUnit(world, unitId, { intent, center, leg: undefined }, ev.time),
       schedule: [
         {
-          time: ev.time + FORMATION_CHANGE_MS[unit.kind],
+          time: ev.time + unitTypeOf(unit).formationChangeMs,
           type: FORMATION_DONE_EVENT,
           payload: { unitId, formation, startedAt: ev.time },
         },
@@ -357,7 +362,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     if (!unit || i?.kind !== 'reform' || i.startedAt !== p.startedAt) return { world }; // superseded
     const next: Partial<Unit> = {
       formation: p.formation,
-      footprint: defaultFootprint(unit.kind, p.formation, unit.strength),
+      footprint: defaultFootprint(unitTypeOf(unit), p.formation, unit.strength),
       shape: undefined, // a loose arrangement does not survive a change of formation
       intent: { kind: 'idle' },
     };
@@ -437,7 +442,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
         schedule: [check],
       };
     }
-    const { event, leg } = nextLeg(world.map, unit.kind, ev.time, { ...p, path: rest });
+    const { event, leg } = nextLeg(world.map, unit, ev.time, { ...p, path: rest });
     return {
       world: updateUnit(world, p.unitId, { center, leg }, ev.time),
       schedule: [check, event],

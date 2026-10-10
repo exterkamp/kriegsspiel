@@ -173,3 +173,10 @@ Retry, backoff, the per-attempt timeout and schema validation stay in `ProviderU
 **Why.** One human can play against it, and the fog and order-lag rules apply to it without special cases.
 **Open.** The engine has no attack order yet, so "attack" is a move onto the enemy's position. Agents are enabled with `GameHostOptions.scriptedOpponents` (off by default) until a server entry point creates games. A restarted game keeps the decision times but not the agent's memory of earlier orders, so it may reissue one.
 **See.** [architecture.md](architecture.md)
+
+## Unit types, formations and data-driven stats (story 2.2, #27)
+
+**Decision.** A unit has a `type` (line infantry, skirmishers, cavalry, artillery) naming an entry in the engine's unit data (`packages/engine/src/unitTypes.ts`). The type gives the arm (`kind`), ground per man, march pace, fire rate, range, charge distance, sight range, break morale, formation change time and the formations it may take. A single formation table gives, relative to `line`, the footprint shape, march pace, outgoing fire, and casualties taken from fire and from melee. `parseUnitData` validates the data and throws `UnitDataError` naming the bad field. A scenario unit names a `type`, or only a `kind` (that arm's first type); it starts in the type's default formation. Changing formation costs the type's `formationChangeMs`, during which the unit stands still, and is refused for a formation the type lacks.
+**Why.** The per-arm placeholder tables in movement, combat, contact and visibility are now derived from one place, and skirmishers are a type of their own, not a formation of line infantry.
+**Open.** The numbers are placeholders, except the infantry and cavalry march rates (see [rules.md](rules.md)). Fitting them to the fire and casualty tables, and loading the data from the JSON files of story 2.1 rather than a typed module, is later work. The data is compiled in, so a replay needs the engine version that recorded it.
+**See.** [rules.md](rules.md), [design.md](design.md)

@@ -39,6 +39,10 @@ The 1824 scan confirms the march ruler and the scale. The fire and close-combat 
 - `march.json`: the 3rd ruler band note mentions a foot battery in few cases; the calibre is illegible in the OCR.
 - Units are paces and 2-minute moves, as in the source. The engine can convert to game time (see `architecture.md`), but the data files stay in source units.
 
+## Unit types and formations in the engine
+
+The engine reads its unit stats from `packages/engine/src/unitTypes.ts` (decision "Unit types, formations and data-driven stats"). Types: `line_infantry`, `skirmishers`, `cavalry`, `artillery`. Formations: `line`, `column`, `square`, `skirmish`, `loose`, each with multipliers relative to `line` for ground per man and shape, march pace, outgoing fire, and casualties taken from fire and melee. Only these are traced to the tables above: infantry march (200 paces per 2-minute move, `march.json`), cavalry trot (600 paces), and line infantry ground per man (450 men in 125 x 75 paces, `frontage.json`). Everything else (fire rates, ranges, formation multipliers, change times, skirmisher and artillery pace) is a placeholder, not from the rulebook. Column moves faster than line (route march against deployed), which is a simplification of the 1824 pace bands.
+
 ## Gaps
 
 - Full 1824 movement table (cavalry, horse artillery, other terrain and slopes). It is an image in the edition.

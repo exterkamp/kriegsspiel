@@ -8,6 +8,7 @@ import { COMBAT_CHECK_EVENT } from './contact.js';
 import type { EngineState, EventRegistry, Json } from './events.js';
 import { schedule } from './queue.js';
 import { findPath } from './navigation.js';
+import { unitTypeOf } from './unitTypes.js';
 import { legDuration, pathDuration, positionAlong, positionAt, updateUnit } from './movement.js';
 import { metres, mm } from './geometry.js';
 import { terrainAt } from './terrain.js';
@@ -171,7 +172,7 @@ export function validatePlacement(world: GameState, proposal: PlacementProposal)
     ? shapeFootprint(shape)
     : formation === unit.formation && !unit.shape
       ? unit.footprint
-      : defaultFootprint(unit.kind, formation, unit.strength);
+      : defaultFootprint(unitTypeOf(unit), formation, unit.strength);
   const wanted = arranged(unit, { center: proposal.center, facing, formation, footprint, shape });
   const wrong = problems(world, wanted);
   if (wrong.length > 0) return { verdict: 'reject', reasons: wrong };
@@ -181,7 +182,7 @@ export function validatePlacement(world: GameState, proposal: PlacementProposal)
   if (!path) {
     return { verdict: 'reject', reasons: ['no passable route from where the unit stands'] };
   }
-  const needed = pathDuration(world.map, path.waypoints, unit.kind);
+  const needed = pathDuration(world.map, path.waypoints, unit);
   if (needed <= proposal.elapsedMs) {
     return {
       verdict: 'accept',
@@ -202,9 +203,9 @@ export function validatePlacement(world: GameState, proposal: PlacementProposal)
   for (let i = 1; i < path.waypoints.length; i++) {
     const a = path.waypoints[i - 1] as Point;
     const b = path.waypoints[i] as Point;
-    const d = legDuration(world.map, a, b, unit.kind) as number;
+    const d = legDuration(world.map, a, b, unit) as number;
     if (d > left) {
-      center = positionAlong(world.map, a, b, unit.kind, left);
+      center = positionAlong(world.map, a, b, unit, left);
       break;
     }
     left -= d;
