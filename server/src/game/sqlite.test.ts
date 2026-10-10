@@ -1,0 +1,215 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  EventRegistry,
+  holdTheBridge,
+  loadScenario,
+  registerCombat,
+  registerMovement,
+  registerOrders,
+  registerVisibility,
+  serialize,
+  type GameState,
+} from '@kriegsspiel/engine';
+import { afterEach, describe, expect, it } from 'vitest';
+import type { OrderParser, ParseResult } from '../orders/index.js';
+import { GameHost, MemoryGameStore, SqliteGameStore, replayLog } from './index.js';
+import { MIGRATIONS } from './sqlite.js';
+import { FakeTime } from './testing.js';
+
+const BRIDGE = { x: 2_050_000, y: 1_500_000 };
+
+function registry() {
+  const r = new EventRegistry<GameState>();
+  registerMovement(r);
+  registerCombat(r);
+  registerOrders(r);
+  registerVisibility(r);
+  return r;
+}
+
+class FixedParser implements OrderParser {
+  async parse(text: string): Promise<ParseResult> {
+    return { kind: 'intents', text, unitId: 'blue-1', intents: [{ kind: 'move', to: BRIDGE }] };
+  }
+}
+
+const dirs: string[] = [];
+const stores: SqliteGameStore[] = [];
+const hosts: GameHost[] = [];
+afterEach(async () => {
+  await Promise.all(hosts.splice(0).map((h) => h.shutdown()));
+  for (const s of stores.splice(0)) {
+    try {
+      s.close();
+    } catch {
+      // already closed by the test
+    }
+  }
+  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+});
+
+function tmpDb(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'ks-sqlite-'));
+  dirs.push(dir);
+  return join(dir, 'nested', 'games.db');
+}
+
+function open(path: string) {
+  const s = new SqliteGameStore(path);
+  stores.push(s);
+  return s;
+}
+
+function hostFor(store: SqliteGameStore | MemoryGameStore, time: FakeTime, snapshotEvery?: number) {
+  const h = new GameHost({
+    store,
+    parser: new FixedParser(),
+    registry: registry(),
+    wallNow: time.now,
+    timers: time,
+    snapshotEvery,
+  });
+  hosts.push(h);
+  return h;
+}
+
+const order = { kind: 'order', side: 'blue', text: 'blue-1 march' } as const;
+
+describe('SqliteGameStore', () => {
+  it('migrates a new database and is idempotent on reopen', () => {
+    const path = tmpDb();
+    expect(open(path).schemaVersion).toBe(MIGRATIONS.length);
+    expect(open(path).schemaVersion).toBe(MIGRATIONS.length);
+  });
+
+  it('stores header, log, progress, clock history and views', async () => {
+    const store = open(':memory:');
+    await store.saveLogHeader({ gameId: 'g', scenarioId: 's', seed: 7 });
+    await expect(store.saveLogHeader({ gameId: 'g', scenarioId: 's', seed: 8 })).rejects.toThrow();
+    expect(await store.logHeader('g')).toEqual({ gameId: 'g', scenarioId: 's', seed: 7 });
+    for (const seq of [1, 2, 3]) {
+      await store.appendInput('g', { seq, wallMs: 1, gameMs: seq, command: { kind: 'pause' } });
+    }
+    expect((await store.inputLog('g')).map((e) => e.seq)).toEqual([1, 2, 3]);
+    expect((await store.inputLog('g', 2)).map((e) => e.seq)).toEqual([3]);
+    await store.saveProgress('g', 50);
+    await store.saveProgress('g', 40);
+    expect(await store.loadProgress('g')).toBe(50);
+    const change = {
+      wallMs: 1,
+      gameMs: 2,
+      kind: 'pause',
+      rate: 1,
+      status: 'paused',
+      mode: 'realtime',
+    } as const;
+    await store.appendClockHistory('g', [change]);
+    await store.appendClockHistory('g', [change, change]);
+    expect(await store.clockHistory('g')).toHaveLength(3);
+    await store.saveViews('g', { seq: 3, gameMs: 9, views: { blue: { a: 1 } } });
+    expect(await store.loadViews('g')).toEqual({ seq: 3, gameMs: 9, views: { blue: { a: 1 } } });
+  });
+
+  it('keeps the newest snapshots and loads the latest', async () => {
+    const store = open(':memory:');
+    const clock = {
+      gameMsAtAnchor: 0,
+      wallMsAtAnchor: 0,
+      rate: 1,
+      status: 'paused',
+      mode: 'realtime',
+    } as const;
+    for (let seq = 0; seq < 8; seq++)
+      await store.saveSnapshot('g', { seq, engine: `e${seq}`, clock });
+    expect(await store.loadSnapshot('g')).toEqual({ seq: 7, engine: 'e7', clock });
+    expect(await store.listGames()).toEqual(['g']);
+  });
+});
+
+describe('crash recovery', () => {
+  // A crash is modelled by abandoning the first store handle without closing it or the host:
+  // every write is already committed to the file, exactly as after `kill -9`.
+  for (const snapshotEvery of [1, 3, 100]) {
+    it(`comes back paused with identical state (snapshot every ${snapshotEvery})`, async () => {
+      const path = tmpDb();
+      const time = new FakeTime();
+      const store = open(path);
+      const host = hostFor(store, time, snapshotEvery);
+      const world = loadScenario(holdTheBridge);
+      const game = await host.create('g1', world, { rate: 12 });
+      await game.submit(order);
+      await time.advance(2_000);
+      await game.submit({ kind: 'setRate', rate: 4 });
+      await game.submit({ kind: 'pause' });
+      await game.submit({ kind: 'resume' });
+      await time.advance(3_000);
+      const before = serialize(game.state);
+      const timeBefore = game.state.time;
+
+      // kill -9: no close, no shutdown. A second process opens the same file.
+      const time2 = new FakeTime(time.now() + 3_600_000);
+      const reopened = await hostFor(open(path), time2, snapshotEvery).open('g1');
+
+      expect(reopened.gameClock.status).toBe('paused');
+      expect(reopened.gameClock.rate).toBe(4);
+      expect(reopened.state.time).toBe(timeBefore);
+      expect(serialize(reopened.state)).toBe(before);
+      await time2.advance(60_000);
+      expect(reopened.state.time).toBe(timeBefore);
+      await reopened.submit({ kind: 'resume' });
+      await time2.advance(5_000);
+      expect(reopened.gameClock.now()).toBeGreaterThan(timeBefore);
+      // Input numbering carries on from the log.
+      const log = await open(path).inputLog('g1');
+      expect(log.map((e) => e.seq)).toEqual([1, 2, 3, 4, 5]);
+    });
+  }
+
+  it('replay from the database equals the in-memory run', async () => {
+    const path = tmpDb();
+    const time = new FakeTime();
+    const sqlite = open(path);
+    const game = await hostFor(sqlite, time, 2).create('g1', loadScenario(holdTheBridge), {
+      rate: 12,
+    });
+    // The same game against a memory store, driven identically on its own fake time.
+    const mtime = new FakeTime();
+    const mem = new MemoryGameStore();
+    const mgame = await hostFor(mem, mtime).create('g1', loadScenario(holdTheBridge), { rate: 12 });
+    for (const [t, g, cmd] of [
+      [0, game, order],
+      [4_000, game, { kind: 'setRate', rate: 4 } as const],
+      [4_000, game, { kind: 'pause' } as const],
+    ] as const) {
+      await time.advance(t);
+      await g.submit(cmd);
+    }
+    for (const [t, cmd] of [
+      [0, order],
+      [4_000, { kind: 'setRate', rate: 4 } as const],
+      [4_000, { kind: 'pause' } as const],
+    ] as const) {
+      await mtime.advance(t);
+      await mgame.submit(cmd);
+    }
+    const log = await sqlite.inputLog('g1');
+    const header = (await sqlite.logHeader('g1'))!;
+    const replayed = replayLog(header, loadScenario(holdTheBridge), log, registry());
+    expect(serialize(replayed.state)).toBe(serialize(game.state));
+    expect(log).toEqual(await mem.inputLog('g1'));
+  });
+
+  it('stores the latest per-side views and the clock history', async () => {
+    const path = tmpDb();
+    const time = new FakeTime();
+    const store = open(path);
+    const game = await hostFor(store, time).create('g1', loadScenario(holdTheBridge));
+    await game.submit({ kind: 'pause' });
+    const views = await store.loadViews('g1');
+    expect(Object.keys(views!.views).sort()).toEqual(['blue', 'red']);
+    expect(views!.seq).toBe(1);
+    expect((await store.clockHistory('g1')).map((c) => c.kind)).toEqual(['pause']);
+  });
+});

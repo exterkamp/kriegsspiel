@@ -17,6 +17,7 @@ import {
   deserialize,
   featureAnchor,
   serialize,
+  viewFor,
   type EmittedEvent,
   type EngineState,
   type EventRegistry,
@@ -71,6 +72,8 @@ export interface GameActorOptions {
   onError?: (error: unknown) => void;
   /** Starting value for the input counter when resuming a game. */
   seq?: number;
+  /** Take a snapshot after this many logged inputs (default 1: after every input). */
+  snapshotEvery?: number;
 }
 
 export class GameActor {
@@ -86,6 +89,11 @@ export class GameActor {
   private readonly onEmitted?: (events: EmittedEvent[]) => void;
   private readonly onError?: (error: unknown) => void;
   private seq: number;
+  private readonly snapshotEvery: number;
+  /** Seq covered by the newest stored snapshot. */
+  private snapshotSeq: number;
+  /** How many clock history entries the store already has. */
+  private historySaved = 0;
 
   private tail: Promise<unknown> = Promise.resolve();
   private timer: unknown;
@@ -105,6 +113,8 @@ export class GameActor {
     this.onEmitted = options.onEmitted;
     this.onError = options.onError;
     this.seq = options.seq ?? 0;
+    this.snapshotSeq = -1;
+    this.snapshotEvery = Math.max(1, Math.floor(options.snapshotEvery ?? 1));
   }
 
   /** The current engine state (not advanced to "now"; use a command to do that). */
@@ -120,6 +130,7 @@ export class GameActor {
   async start(): Promise<void> {
     await this.enqueue(async () => {
       await this.persist();
+      await this.persistProgress();
       this.reschedule();
     });
   }
@@ -172,11 +183,32 @@ export class GameActor {
     }
   }
 
+  /** Store a snapshot, with the per-side views as of it. Recovery starts from the newest one. */
   private async persist(): Promise<void> {
+    const seq = this.seq;
     await this.store.saveSnapshot(this.id, {
+      seq,
       engine: serialize(this.engine),
       clock: { ...this.clock.snapshot(), mode: this.clock.mode },
     });
+    this.snapshotSeq = seq;
+    const { world, time } = this.engine;
+    const views: Record<string, unknown> = {};
+    for (const side of world.sides) views[side.id] = viewFor(world, side.id, time);
+    await this.store.saveViews(this.id, { seq, gameMs: time, views });
+  }
+
+  /**
+   * Cheap bookkeeping after anything that moved game time or the clock: how far time has run
+   * (so recovery can catch up to it) and any new clock history.
+   */
+  private async persistProgress(): Promise<void> {
+    await this.store.saveProgress(this.id, this.engine.time);
+    const history = this.clock.history();
+    if (history.length > this.historySaved) {
+      await this.store.appendClockHistory(this.id, history.slice(this.historySaved));
+      this.historySaved = history.length;
+    }
   }
 
   /**
@@ -220,7 +252,7 @@ export class GameActor {
       this.sync();
     }
     try {
-      await this.persist();
+      await this.persistProgress();
     } finally {
       this.reschedule();
     }
@@ -254,7 +286,8 @@ export class GameActor {
     try {
       await this.store.appendInput(this.id, entry);
       this.sync();
-      await this.persist();
+      await this.persistProgress();
+      if (this.seq - this.snapshotSeq >= this.snapshotEvery) await this.persist();
     } finally {
       this.reschedule();
     }
