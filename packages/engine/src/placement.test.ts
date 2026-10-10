@@ -3,6 +3,7 @@ import {
   EventRegistry,
   advanceTo,
   createState,
+  type EngineState,
   issueMove,
   issuePlacement,
   registerCombat,
@@ -319,6 +320,49 @@ describe('registerPlacement', () => {
     const a = state.world.units.find((u) => u.id === 'a')!;
     expect(a.center).toEqual(P(520, 540));
     expect(a.leg).toBeUndefined();
+  });
+
+  it('keeps a hold at the new spot, and idles a unit that was moving', () => {
+    const place = (s: EngineState<GameState>, unitId: string) =>
+      advanceTo(
+        issuePlacement(
+          s,
+          {
+            proposal: { unitId, center: P(520, 540), elapsedMs: 1e9 },
+            rationale: 'r',
+            narrative: 'n',
+          },
+          0,
+        ),
+        0,
+        registry(),
+      ).state.world.units.find((u) => u.id === unitId)!;
+    const base = createState(1, world(), 0);
+    const held = createState(
+      1,
+      {
+        ...base.world,
+        units: base.world.units.map((u) =>
+          u.id === 'a' ? { ...u, intent: { kind: 'hold' as const, at: u.center } } : u,
+        ),
+      },
+      0,
+    );
+    expect(place(held, 'a').intent).toEqual({ kind: 'hold', at: P(520, 540) });
+    const marching = issueMove(base, 'b', P(700, 900), 0);
+    expect(place(marching, 'b').intent).toEqual({ kind: 'idle' });
+  });
+
+  it('re-checks combat: a unit placed within range of an enemy starts a fight', () => {
+    const near = { unitId: 'a', center: P(2300, 500), elapsedMs: 1e9 };
+    const placed = issuePlacement(
+      createState(1, world(), 0),
+      { proposal: near, rationale: 'r', narrative: 'n' },
+      0,
+    );
+    const { state, emitted } = advanceTo(placed, 1000, registry());
+    expect(state.world.combatActive).toBe(true);
+    expect(emitted.some((e) => e.type === 'contact.begin')).toBe(true);
   });
 
   it('is deterministic: the same logged proposal gives the same state', () => {
