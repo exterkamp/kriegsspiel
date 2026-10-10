@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as joinPath } from 'node:path';
 import {
   COURIER_DELAY_MS,
   COURIER_MS_PER_METRE,
@@ -468,5 +471,27 @@ describe('scripted opponent', () => {
     [{ SCRIPTED_OPPONENTS: 'OFF' }, false],
   ])('scriptedOpponentsFromEnv(%j) is %s', (env, expected) => {
     expect(scriptedOpponentsFromEnv(env)).toBe(expected);
+  });
+});
+
+describe('deployment endpoints', () => {
+  it('answers /healthz and serves the built client from staticDir', async () => {
+    const dir = mkdtempSync(joinPath(tmpdir(), 'ks-static-'));
+    writeFileSync(joinPath(dir, 'index.html'), '<title>ks</title>');
+    const { server } = await buildApp({ parser: new StubOrderParser(), staticDir: dir });
+    try {
+      const health = await server.inject('/healthz');
+      expect(health.statusCode).toBe(200);
+      expect(health.json()).toEqual({ ok: true });
+      const page = await server.inject('/');
+      expect(page.statusCode).toBe(200);
+      expect(page.body).toContain('<title>ks</title>');
+      expect((await server.inject({ method: 'POST', url: '/games', payload: {} })).statusCode).toBe(
+        201,
+      );
+    } finally {
+      await server.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
