@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   BREAK_MORALE,
+  CHARGE_M,
+  LONG_RANGE_FACTOR,
+  MELEE_FACTOR,
+  inMelee,
+  rangeFactor,
   COMBAT_TICK_MS,
   EventRegistry,
   MS_PER_MINUTE,
@@ -21,6 +26,7 @@ import {
   type GameState,
 } from './index.js';
 import { evaluateVictory } from './combat.js';
+import { polygonCentroid } from './geometry.js';
 import { river, wood } from './scenario.testkit.js';
 
 type RawUnit = {
@@ -31,6 +37,8 @@ type RawUnit = {
   y: number;
   strength?: number;
   morale?: number;
+  facingDeg?: number;
+  formation?: 'line' | 'square';
 };
 
 /** Tile (x, y) of the old 100 m grid as the point at its centre, in mm. */
@@ -72,7 +80,12 @@ function field(
       at: { x: x * 100 + 50, y: y * 100 + 50 },
     })),
     victory: {
-      objective: { x: 550, y: 250 },
+      objective: [
+        [520, 220],
+        [580, 220],
+        [580, 280],
+        [520, 280],
+      ],
       defender: 'blue',
       attacker: 'red',
       holdMinutes: opts.holdMinutes ?? 180,
@@ -144,6 +157,8 @@ describe('contact and combat ticks', () => {
       target: 'red-1',
       distance: 100,
       cover: 1,
+      aspect: 'flank', // everyone in `field` faces north; the shot comes from the east
+      melee: false,
       die: expect.any(Number),
       casualties: expect.any(Number),
       targetStrength: expect.any(Number),
@@ -512,14 +527,202 @@ describe('Hold the Bridge', () => {
     const play = () => {
       const g = loadScenario(holdTheBridge);
       let s = startGame(createState(g.seed, g, 0));
-      for (const id of ['red-1', 'red-2']) s = issueMove(s, id, g.victory.objective);
-      for (const id of ['blue-1', 'blue-2', 'blue-3']) s = issueMove(s, id, g.victory.objective);
+      const goal = polygonCentroid(g.victory.objective);
+      for (const id of ['red-1', 'red-2']) s = issueMove(s, id, goal);
+      for (const id of ['blue-1', 'blue-2', 'blue-3']) s = issueMove(s, id, goal);
       return run(s, 200);
     };
     const a = play();
-    expect(a.state.world.outcome).toMatchObject({ winner: 'blue', reason: 'objective-held' });
+    expect(a.state.world.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
     expect(ofType(a.emitted, 'game.end')).toHaveLength(1);
     expect(ofType(a.emitted, 'combat.fire').length).toBeGreaterThan(0);
     expect(a.emitted).toEqual(play().emitted);
+  });
+});
+
+/** The first volley's shots, keyed `attacker>target`, from a field started by `rawUnits`. */
+function firstVolley(s: EngineState<GameState>) {
+  const { emitted } = run(s, 2);
+  return Object.fromEntries(
+    ofType(emitted, 'combat.fire').map((e) => {
+      const p = e.payload as { attacker: string; target: string; casualties: number };
+      return [`${p.attacker}>${p.target}`, e.payload as Record<string, unknown> & typeof p];
+    }),
+  );
+}
+
+/** Move a unit to a point given in metres, without the loader's overlap check. */
+function place(s: EngineState<GameState>, id: string, x: number, y: number) {
+  return {
+    ...s,
+    world: {
+      ...s.world,
+      units: s.world.units.map((u) => (u.id === id ? { ...u, center: pointMm(x, y) } : u)),
+    },
+  };
+}
+
+describe('fire by range', () => {
+  const facing = { blue: 90, red: 270 }; // face each other, so no flank bonus either way
+  const at = (gapTiles: number) =>
+    field([
+      { id: 'blue-1', side: 'blue', x: 0, y: 4, facingDeg: facing.blue },
+      { id: 'red-1', side: 'red', x: gapTiles, y: 4, facingDeg: facing.red },
+    ]);
+
+  it('falls off linearly from point-blank to the edge of range', () => {
+    const near = { kind: 'infantry', center: { x: 0, y: 0 } } as never;
+    expect(rangeFactor(near, { center: { x: 0, y: 0 } } as never)).toBe(1);
+    expect(rangeFactor(near, { center: { x: 200_000, y: 0 } } as never)).toBe(LONG_RANGE_FACTOR);
+    expect(rangeFactor(near, { center: { x: 100_000, y: 0 } } as never)).toBeCloseTo(0.625);
+    // Past maximum range it does not go below the floor (it cannot fire at all there).
+    expect(rangeFactor(near, { center: { x: 900_000, y: 0 } } as never)).toBe(LONG_RANGE_FACTOR);
+  });
+
+  it('costs a target more casualties the closer the shooter stands', () => {
+    const close = firstVolley(at(1))['blue-1>red-1']!;
+    const far = firstVolley(at(2))['blue-1>red-1']!;
+    expect(close.die).toBe(far.die); // same seed, same roll: only the range differs
+    expect(close.casualties / far.casualties).toBeCloseTo(0.625 / 0.25, 1);
+  });
+
+  it('reports the distance in metres', () => {
+    expect(firstVolley(at(2))['blue-1>red-1']!.distance).toBe(200);
+  });
+
+  it('is deterministic for a seed and differs between seeds', () => {
+    const a = run(at(1), 20);
+    expect(run(at(1), 20).emitted).toEqual(a.emitted);
+    const other = run(field(duel, { seed: 8 }), 20);
+    expect(other.emitted).not.toEqual(run(field(duel, { seed: 7 }), 20).emitted);
+  });
+});
+
+describe('facing and flanking', () => {
+  // Red stands east of blue and shoots at it; blue's facing decides which side red hits.
+  const volley = (blueFacingDeg: number, formation?: 'line' | 'square') =>
+    firstVolley(
+      field([
+        { id: 'blue-1', side: 'blue', x: 1, y: 4, facingDeg: blueFacingDeg, formation },
+        { id: 'red-1', side: 'red', x: 2, y: 4, facingDeg: 270 },
+      ]),
+    )['red-1>blue-1']!;
+
+  it('hits the front, flank and rear by the angle to the target facing', () => {
+    expect(volley(90).aspect).toBe('front');
+    expect(volley(0).aspect).toBe('flank');
+    expect(volley(180).aspect).toBe('flank');
+    expect(volley(270).aspect).toBe('rear');
+    expect(volley(90 - 40).aspect).toBe('front');
+    expect(volley(90 - 50).aspect).toBe('flank');
+    expect(volley(90 + 140).aspect).toBe('rear');
+  });
+
+  it('gives flank and rear bonuses', () => {
+    const front = volley(90);
+    expect(front.die).toBe(volley(270).die);
+    expect(volley(0).casualties / front.casualties).toBeCloseTo(1.5, 1);
+    expect(volley(270).casualties / front.casualties).toBeCloseTo(2, 1);
+  });
+
+  it('has no flanks on a square', () => {
+    expect(volley(270, 'square').aspect).toBe('front');
+  });
+
+  it('turns a unit that fires to face its target', () => {
+    const { state } = run(field(duel), 2);
+    expect(unit(state, 'blue-1').facing).toBeCloseTo(Math.PI / 2); // red is due east
+    expect(unit(state, 'red-1').facing).toBeCloseTo(-Math.PI / 2); // blue is due west
+  });
+
+  it('does not let a unit that was hit from the flank return the favour with its front bonus', () => {
+    // Both start facing north; after the first volley both face each other, so tick two is frontal.
+    const { emitted } = run(field(duel), 4);
+    const shots = ofType(emitted, 'combat.fire').map((e) => e.payload as { aspect: string });
+    expect(shots.map((p) => p.aspect)).toEqual(['flank', 'flank', 'front', 'front']);
+  });
+});
+
+describe('melee', () => {
+  const pair = (kind: 'infantry' | 'cavalry' = 'infantry') =>
+    field([
+      { id: 'blue-1', side: 'blue', kind, x: 1, y: 4, facingDeg: 90, strength: 100 },
+      { id: 'red-1', side: 'red', x: 2, y: 4, facingDeg: 270, strength: 100 },
+    ]);
+
+  it('is footprint contact, not a distance between centres', () => {
+    // 100 men in line are about 38 m wide and 3.2 m deep. Face to face, they touch when the
+    // centres are one depth apart.
+    const s = place(pair(), 'red-1', 150 + 8, 450);
+    const [a, b] = [unit(s, 'blue-1'), unit(s, 'red-1')];
+    expect(inMelee(a, b)).toBe(false);
+    expect(inMelee(a, unit(place(s, 'red-1', 150 + 3, 450), 'red-1'))).toBe(true);
+    expect(inMelee(a, unit(place(s, 'red-1', 150 + 12, 450), 'red-1'))).toBe(false);
+    expect(inMelee(a, unit(place(s, 'red-1', 150 + 50, 450), 'red-1'))).toBe(false);
+  });
+
+  it('is a cavalry charge inside the charge distance', () => {
+    const s = pair('cavalry');
+    const inside = unit(place(s, 'red-1', 150 + CHARGE_M - 1, 450), 'red-1');
+    const outside = unit(place(s, 'red-1', 150 + CHARGE_M + 5, 450), 'red-1');
+    const cav = unit(s, 'blue-1');
+    expect(inMelee(cav, inside)).toBe(true);
+    expect(inMelee(cav, outside)).toBe(false);
+    // Infantry get no charge.
+    const inf = unit(pair(), 'blue-1');
+    expect(inMelee(inf, inside)).toBe(false);
+  });
+
+  it('hits harder than fire and ignores range falloff', () => {
+    const fire = firstVolley(place(pair(), 'red-1', 150 + 20, 450))['blue-1>red-1']!;
+    const melee = firstVolley(place(pair(), 'red-1', 150 + 3, 450))['blue-1>red-1']!;
+    expect(fire.melee).toBe(false);
+    expect(melee.melee).toBe(true);
+    expect(melee.die).toBe(fire.die);
+    expect(melee.casualties / fire.casualties).toBeCloseTo(
+      MELEE_FACTOR /
+        rangeFactor(
+          unit(place(pair(), 'red-1', 170, 450), 'blue-1'),
+          unit(place(pair(), 'red-1', 170, 450), 'red-1'),
+        ),
+      1,
+    );
+  });
+});
+
+describe('objective area', () => {
+  // The default field's objective is the 60 m square centred on (550, 250).
+  const holder = (x: number, y: number) => {
+    const s = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'red-1', side: 'red', x: 0, y: 0 },
+    ]);
+    return place(s, 'red-1', x, y).world;
+  };
+
+  it('is held by a unit whose centre is inside the area, corners included', () => {
+    expect(evaluateVictory(holder(550, 250), 0)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(holder(579, 221), 0)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(holder(580, 280), 0)).toMatchObject({ winner: 'red' });
+  });
+
+  it('is not held from outside the area, even a few metres off', () => {
+    expect(evaluateVictory(holder(585, 250), 0)).toBeNull();
+    expect(evaluateVictory(holder(550, 215), 0)).toBeNull();
+  });
+
+  it('is not round: the same distance from the centre can be in or out', () => {
+    // 36 m from the centre along the diagonal is in the square's corner region; 36 m east is out.
+    expect(evaluateVictory(holder(550 + 29, 250 + 29), 0)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(holder(550 + 36, 250), 0)).toBeNull();
+  });
+
+  it('does not count the defender holding it jointly with the attacker', () => {
+    const w = holder(550, 250);
+    const both = {
+      ...w,
+      units: w.units.map((u) => (u.id === 'blue-1' ? { ...u, center: pointMm(560, 250) } : u)),
+    };
+    expect(evaluateVictory(both, 0)).toBeNull();
   });
 });

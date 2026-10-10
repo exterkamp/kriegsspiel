@@ -4,7 +4,7 @@ import {
   defaultFootprint,
   subPositions,
 } from './formation.js';
-import { mm, pointMm } from './geometry.js';
+import { mm, pointMm, polygonCentroid } from './geometry.js';
 import { KIND_DEFAULTS, terrainAt } from './terrain.js';
 import {
   FEATURE_KINDS,
@@ -262,11 +262,17 @@ export function loadScenario(raw: unknown): GameState {
   const units = parseUnits(o.units, map, sides);
 
   const v = obj(o.victory, 'victory');
-  const objective = parsePoint(v.objective, 'victory.objective');
-  const onBridge = terrainAt(map, objective)?.featureIds.some(
+  const objective = arr(v.objective, 'victory.objective').map((q, i) =>
+    parseVertex(q, `victory.objective[${i}]`),
+  );
+  if (objective.length < 3) fail('victory.objective needs at least 3 points');
+  for (const [i, q] of objective.entries()) {
+    if (!inside(map, q)) fail(`victory.objective[${i}] is off the map`);
+  }
+  const onBridge = terrainAt(map, polygonCentroid(objective))?.featureIds.some(
     (fid) => map.features.find((f) => f.id === fid)?.kind === 'bridge',
   );
-  if (!onBridge) fail('victory.objective must be on a bridge');
+  if (!onBridge) fail('victory.objective must be centred on a bridge');
   const sideIds: SideId[] = sides.map((s) => s.id);
   const defender = oneOf(v.defender, sideIds, 'victory.defender');
   const attacker = oneOf(v.attacker, sideIds, 'victory.attacker');

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { polygonCentroid } from './geometry.js';
 import {
   FEATURE_KINDS,
   holdTheBridge,
@@ -30,7 +31,7 @@ describe('Hold the Bridge scenario', () => {
     expect(s.victory.holdMs).toBe(180 * MS_PER_MINUTE);
     const kinds = new Set(s.map.features.map((f) => f.kind));
     for (const k of ['wood', 'river', 'road', 'bridge']) expect(kinds).toContain(k);
-    expect(terrainAt(s.map, s.victory.objective)!.featureIds).toContain('bridge');
+    expect(terrainAt(s.map, polygonCentroid(s.victory.objective))!.featureIds).toContain('bridge');
   });
 
   it('describes the ground as vector features, not cells', () => {
@@ -275,8 +276,25 @@ describe('loader validation', () => {
   it('rejects a side with no units', () =>
     bad((d) => d.units.forEach((u: any) => (u.side = 'blue')), /side "red" has no units/));
   it('rejects wrong number of sides', () => bad((d) => d.sides.pop(), /exactly two sides/));
-  it('rejects an objective that is not on a bridge', () =>
-    bad((d) => (d.victory.objective = { x: 100, y: 100 }), /must be on a bridge/));
+  it('rejects an objective area that is not centred on a bridge', () =>
+    bad(
+      (d) =>
+        (d.victory.objective = [
+          [100, 100],
+          [160, 100],
+          [160, 160],
+        ]),
+      /centred on a bridge/,
+    ));
+  it('rejects an objective with fewer than three points', () =>
+    bad(
+      (d) =>
+        (d.victory.objective = [
+          [100, 100],
+          [160, 100],
+        ]),
+      /at least 3 points/,
+    ));
   it('rejects defender equal to attacker', () =>
     bad((d) => (d.victory.attacker = 'blue'), /must differ/));
   it('rejects a non-positive hold time', () =>

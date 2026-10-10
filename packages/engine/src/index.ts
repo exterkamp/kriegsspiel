@@ -71,7 +71,20 @@ export {
   registerCombat,
   startGame,
 } from './combat.js';
-export { OBJECTIVE_RADIUS_M, RANGE_M, canReach, onObjective } from './contact.js';
+export {
+  CHARGE_M,
+  FLANK_FACTOR,
+  LONG_RANGE_FACTOR,
+  MELEE_FACTOR,
+  RANGE_M,
+  REAR_FACTOR,
+  aspectOf,
+  canReach,
+  inMelee,
+  onObjective,
+  rangeFactor,
+} from './contact.js';
+export type { Aspect } from './contact.js';
 export { COURIER_MS_PER_METRE, issueOrder, registerOrders } from './orders.js';
 export type { Order, OrderIntent } from './orders.js';
 export { describePlace } from './place.js';

@@ -92,7 +92,12 @@ export function miniWorld(opts: {
       morale: 71,
     })),
     victory: {
-      objective: { x: 50, y: height - 50 },
+      objective: [
+        [20, height - 80],
+        [80, height - 80],
+        [80, height - 20],
+        [20, height - 20],
+      ],
       defender: 'blue',
       attacker: 'red',
       holdMinutes: 10,

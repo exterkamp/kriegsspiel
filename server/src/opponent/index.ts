@@ -1,4 +1,4 @@
-import type { GameState } from '@kriegsspiel/engine';
+import { polygonCentroid, type GameState } from '@kriegsspiel/engine';
 import { ScriptedOpponent, type SideAgent } from './scriptedOpponent.js';
 
 export * from './scriptedOpponent.js';
@@ -8,7 +8,7 @@ export * from './scriptedOpponent.js';
  * public scenario facts (the objective, the side's own HQ); it reads no master state after that.
  */
 export function scriptedAgents(world: GameState): SideAgent[] {
-  const { objective } = world.victory;
+  const objective = polygonCentroid(world.victory.objective);
   return world.sides
     .filter((s) => s.controller === 'scripted')
     .map(
