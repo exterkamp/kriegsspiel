@@ -25,6 +25,13 @@ import {
   type OrderIntent as EngineIntent,
 } from '@kriegsspiel/engine';
 import { GameClock, type WallClock } from '../clock.js';
+import {
+  NOOP_TRACE,
+  currentCorrelationId,
+  newCorrelationId,
+  withCorrelationId,
+  type TraceSink,
+} from '../debug/trace.js';
 import type { OrderParser, ParseResult } from '../orders/index.js';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
@@ -56,6 +63,8 @@ export interface GameActorOptions {
   wallNow: WallClock;
   parser: OrderParser;
   store: GameStore;
+  /** Debug trace. Defaults to a no-op sink that stores nothing. */
+  trace?: TraceSink;
   timers?: Timers;
   /** Called with events the engine emitted, in firing order. */
   onEmitted?: (events: EmittedEvent[]) => void;
@@ -83,6 +92,7 @@ export class GameActor {
   private readonly wallNow: WallClock;
   private readonly parser: OrderParser;
   private readonly store: GameStore;
+  private readonly trace: TraceSink;
   private readonly timers: Timers;
   private readonly onEmitted?: (events: EmittedEvent[]) => void;
   private readonly onError?: (error: unknown) => void;
@@ -101,6 +111,7 @@ export class GameActor {
     this.wallNow = options.wallNow;
     this.parser = options.parser;
     this.store = options.store;
+    this.trace = options.trace ?? NOOP_TRACE;
     this.timers = options.timers ?? realTimers;
     this.onEmitted = options.onEmitted;
     this.onError = options.onError;
@@ -126,7 +137,10 @@ export class GameActor {
 
   /** Queue a command. Resolves when it has been applied. */
   submit(command: GameCommand): Promise<CommandResult> {
-    return this.enqueue(() => this.apply(command));
+    if (!this.trace.enabled) return this.enqueue(() => this.apply(command));
+    // The id of the request being handled, or a fresh one for a caller outside any request.
+    const id = currentCorrelationId() ?? newCorrelationId();
+    return this.enqueue(() => withCorrelationId(id, () => this.apply(command)));
   }
 
   /** Stop the scheduler, finish queued work, and refuse new commands. Safe to call twice. */
@@ -161,7 +175,12 @@ export class GameActor {
   private advanceEngine(target: number): void {
     const res = advanceTo(this.engine, target, this.registry);
     this.engine = res.state;
-    if (res.emitted.length > 0) this.onEmitted?.(res.emitted);
+    if (res.emitted.length > 0) {
+      if (this.trace.enabled) {
+        for (const event of res.emitted) this.trace.record(this.id, 'engine', event);
+      }
+      this.onEmitted?.(res.emitted);
+    }
   }
 
   private async persist(): Promise<void> {
@@ -186,9 +205,17 @@ export class GameActor {
     );
     this.timer = this.timers.setTimeout(() => {
       this.timerSet = false;
-      this.enqueue(() => this.tick()).catch((e) => this.onError?.(e));
+      this.enqueue(() => this.traced(() => this.tick())).catch((e) => {
+        if (this.trace.enabled) this.trace.record(this.id, 'error', { source: 'tick', error: e });
+        this.onError?.(e);
+      });
     }, delay);
     this.timerSet = true;
+  }
+
+  /** Give scheduler work its own correlation id, so the events it fires are grouped. */
+  private traced<T>(fn: () => Promise<T>): Promise<T> {
+    return this.trace.enabled ? withCorrelationId(newCorrelationId(), fn) : fn();
   }
 
   private async tick(): Promise<void> {
@@ -212,6 +239,9 @@ export class GameActor {
   private async apply(command: GameCommand): Promise<CommandResult> {
     const entry: InputLogEntry = { seq: ++this.seq, wallMs: this.wallNow(), gameMs: 0, command };
     let result: CommandResult;
+    const tracing = this.trace.enabled;
+    if (tracing) this.trace.record(this.id, 'command', { seq: entry.seq, command });
+    const before = tracing ? this.clockView() : undefined;
     try {
       this.sync();
       entry.gameMs = this.engine.time;
@@ -219,6 +249,14 @@ export class GameActor {
     } catch (e) {
       entry.error = e instanceof Error ? e.message : String(e);
       result = { ok: false, kind: 'rejection', reason: entry.error };
+    }
+    if (tracing) {
+      if (entry.error)
+        this.trace.record(this.id, 'error', { source: 'command', error: entry.error });
+      const after = this.clockView();
+      if (JSON.stringify(before) !== JSON.stringify(after)) {
+        this.trace.record(this.id, 'clock', { seq: entry.seq, before, after });
+      }
     }
     // A failing store must not leave the scheduler unarmed after the clock already changed.
     try {
@@ -229,6 +267,15 @@ export class GameActor {
       this.reschedule();
     }
     return result;
+  }
+
+  private clockView() {
+    return {
+      status: this.clock.status,
+      mode: this.clock.mode,
+      rate: this.clock.rate,
+      gameMs: this.clock.now(),
+    };
   }
 
   private async run(command: GameCommand, entry: InputLogEntry): Promise<CommandResult> {

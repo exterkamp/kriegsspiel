@@ -9,6 +9,7 @@ import {
 import { GameClock, type WallClock } from '../clock.js';
 import type { OrderParser } from '../orders/index.js';
 import { GameActor, type GameActorOptions, type Timers } from './actor.js';
+import type { TraceSink } from '../debug/trace.js';
 import type { GameStore } from './store.js';
 
 export interface GameHostOptions {
@@ -17,6 +18,7 @@ export interface GameHostOptions {
   registry: EventRegistry<GameState>;
   wallNow: WallClock;
   timers?: Timers;
+  trace?: TraceSink;
   onError?: (gameId: string, error: unknown) => void;
   /** Events the engine emitted for a game, in firing order. */
   onEmitted?: (gameId: string, events: EmittedEvent[]) => void;
@@ -46,6 +48,7 @@ export class GameHost {
       parser: o.parser,
       store: o.store,
       timers: o.timers,
+      trace: o.trace,
       onError: (e) => o.onError?.(id, e),
       onEmitted: (events) => o.onEmitted?.(id, events),
     };

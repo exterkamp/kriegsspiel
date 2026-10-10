@@ -137,6 +137,15 @@ Adding a field means updating this list and the leak tests in `visibility.test.t
 
 The simulation is a function of: scenario, seed, and the **ordered log of inputs with their game timestamps** (commands, LLM outputs, pause and rate changes). Replaying that log through the engine on a manual clock gives identical state, regardless of the wall-clock rate used during the original game. LLM outputs are recorded and played back, so replays never call the model.
 
+## Debug trace
+
+`server/src/debug/` holds the debug trace store behind the admin view (Epic #119). It is read-only diagnostics: the engine never reads it and no game client ever receives it.
+
+- Entries have a `kind` (`request`, `command`, `engine`, `clock`, `error`, `llm`), a wall timestamp, the game id and a **correlation id**. `traceRequest` assigns the id to each inbound HTTP request or WebSocket message and carries it through `AsyncLocalStorage`, so the commands, engine events, clock changes and LLM calls it causes share it. Work the scheduler starts on its own gets a fresh id per tick.
+- `TraceStore` keeps a bounded ring buffer per game (`maxEntriesPerGame`, default 2000) and can append every entry to a JSON Lines file.
+- Everything passes through `Redactor` before storage: secret-named keys, key-shaped strings (`sk-ant-...`, bearer tokens) and any exact secret values registered at startup. Token counts are not treated as secrets.
+- When the admin view is off the server passes `NOOP_TRACE` (or nothing). Producers check `trace.enabled` before building a payload, and `traceUmpire` returns the umpire client unwrapped, so a disabled trace costs nothing and stores nothing.
+
 ## Tech choices (suggested, open to change)
 
 | Concern | Choice | Why |

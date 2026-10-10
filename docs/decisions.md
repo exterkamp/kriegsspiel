@@ -99,3 +99,9 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Failure handling.** A `Retry-After` longer than four times `maxBackoffMs` fails the call at once instead of sleeping. Output truncated at `max_tokens` is terminal (retrying the same request would truncate again). A failed call throws `UmpireError` carrying the summed `usage` and `costUsd` of its attempts, so spend on failures is visible, but nothing is recorded for it.
 
 **Open.** The price table in `pricing.ts` is hand-maintained. Recording to the persistent input log is behind the `CallRecorder` interface; the log itself is not built yet. Prompt files and the `OrderParser` adapter that uses this client are separate work. A failed live call leaves no recording, so on replay it surfaces as `missing-recording` rather than the original `schema` or `transport` error; callers must treat all `UmpireError` kinds alike when falling back, or failures need recording too (open).
+
+### Debug trace store (story 8.1, #120)
+
+**Decision.** Tracing is an injected `TraceSink`; a no-op sink is the default so the disabled admin view has zero overhead. Correlation ids travel by `AsyncLocalStorage` rather than being threaded through every signature. Redaction happens inside the store, so no producer can forget it. Details in `docs/architecture.md` (Debug trace).
+
+**Open.** HTTP and WebSocket transports do not exist yet; they should wrap each request in `traceRequest`. The composition root still has to construct the `TraceStore` from config (size, file path, the API key as a registered secret) and wrap the live umpire client with `traceUmpire`.
