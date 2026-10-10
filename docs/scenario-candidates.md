@@ -13,7 +13,7 @@ Research for issue #83. The maintainer decides. Items marked **(verify)** come f
 ## Candidate A: Ball's Bluff, 21 October 1861 (American Civil War)
 
 - **Forces.** A Union division detachment under Stone (Baker, Lander, Gorman and others) crosses the Potomac against a Confederate brigade-level force under Evans. Each side is on the order of 1,700 to 2,000 men engaged **(verify)**.
-- **Maps.** US Library of Congress holds period maps, including an A. Hoen & Co. lithograph of the seat of war and battle plans ([Crossroads of War map list](https://crossroadsofwar.org/?p=1114)). US federal and pre-1900 works are normally public domain, but each LoC item's rights statement must be read **(verify)**.
+- **Maps.** US Library of Congress holds period maps, including an A. Hoen & Co. lithograph of the seat of war and battle plans ([Crossroads of War map list](https://crossroadsofwar.org/?p=1114)). US federal and pre-1900 works are normally public domain, but each LoC item's rights statement must be read. Done for #84: the Corbett map (LoC 99439216) is free to use, see `assets/maps/sources.json`.
 - **Order of battle.** Good. Separate Union and Confederate pages exist ([Union](https://en.wikipedia.org/wiki/Battle_of_Ball%27s_Bluff_order_of_battle:_Union), [Confederate](https://en.wikipedia.org/wiki/Battle_of_Ball%27s_Bluff_order_of_battle:_Confederate)). Note that the Official Records and most secondary works list Lander's and Gorman's brigades in the reverse order and place the 15th Massachusetts and 42nd New York under Gorman, while the Union page follows National Archives Record Group 393. This source conflict needs a decision before data entry. The Official Records are public domain.
 - **Pacing.** One day. At 1:1 the fight is a long afternoon and evening, with the real tension in the slow river crossing by a few boats. At 12:1 it is a short live session.
 - **Hooks.** A single bottleneck (the crossing) makes courier delay and reinforcement lag decisive. The Union side starts with poor knowledge of the Confederate strength. The Confederate side must guess where the main effort lies. Both generals can be left to the LLM if roles are empty.
@@ -54,7 +54,7 @@ Research for issue #83. The maintainer decides. Items marked **(verify)** come f
 
 ## Next steps once chosen
 
-1. Read the rights statement on the chosen map and record it.
+1. ~~Read the rights statement on the chosen map and record it.~~ Done (#84), see `assets/maps/README.md`.
 2. Resolve the Lander/Gorman order-of-battle conflict against the Official Records.
 3. Pull march rates and tables per [research.md](research.md) section 6.
 4. Hand-annotate the map for the terrain grid (roadmap, milestone with the first historical scenario).

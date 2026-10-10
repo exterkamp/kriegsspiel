@@ -50,7 +50,8 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 ## D9: First scenario (proposed, maintainer to confirm)
 **Proposal.** Ball's Bluff, 21 October 1861, recommended over Podol (1866) and Wissembourg (1870).
 **Why.** Smallest of the three, the only one with a period map and order of battle already located, public-domain English sources, and a river-crossing bottleneck that exercises couriers and fog of war.
-**Open.** The maintainer has not confirmed. Map licence and the Lander/Gorman order-of-battle conflict must be checked.
+**Map.** Verified for #84: the 1861 Corbett seat-of-war map at the Library of Congress is public domain with no usage terms beyond a credit line. Scan, holder, URL and licence are in `assets/maps/sources.json`.
+**Open.** The maintainer has not confirmed. The Lander/Gorman order-of-battle conflict must be checked.
 **See.** [scenario-candidates.md](scenario-candidates.md)
 
 ## D10: Movement is step events over A* paths
@@ -63,6 +64,6 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 - Default clock ratio (decide after the first scenario).
 - Command level and default hierarchy (assumptions above).
 - Emergency hold: keep or drop.
-- First historical scenario and map source: Ball's Bluff proposed in D9, awaiting maintainer decision; licences to verify.
+- First historical scenario and map source: Ball's Bluff proposed in D9, awaiting maintainer decision; map licence verified (D9).
 - How much auto-plotting of reports onto the map players get.
 - Rules tables (march rates, frontage, fire, casualties): first pass recorded in `src/data/` with citations (see `docs/rules.md`). Still missing: full movement table, Die 4 row, artillery tables other than 12-pdr 1500-2000, cavalry and artillery frontages.
