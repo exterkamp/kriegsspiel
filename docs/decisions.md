@@ -167,3 +167,10 @@ Retry, backoff, the per-attempt timeout and schema validation stay in `ProviderU
 **Why.** One human can play against it, and the fog and order-lag rules apply to it without special cases.
 **Open.** The engine has no attack order yet, so "attack" is a move onto the enemy's position. Agents are enabled with `GameHostOptions.scriptedOpponents` (off by default) until a server entry point creates games. A restarted game keeps the decision times but not the agent's memory of earlier orders, so it may reissue one.
 **See.** [architecture.md](architecture.md)
+
+## Conditional and timed intents (story 2.8, #33)
+
+**Decision.** An order's intents may include `{kind:'when', trigger, then}` and `{kind:'at', gameTime, then}` (an `at` is a `timeReached` trigger). On delivery a unit adopts the first immediate intent (move, hold, withdraw) and keeps each `when` / `at` as a `StandingOrder` on `Unit.standing` until its trigger fires, once. Triggers: `enemySighted {area}`, `strengthBelow {strength}` (men), `orderReceived {from}` (`Order.from`, default `'hq'`) and `timeReached {gameTime}`. They are judged right after each intel scan, and a `timeReached` one also gets its own `standing.check` event at its moment, so a timed order fires on time at any clock rate.
+**Fog.** `enemySighted` uses the unit's own `canSee`, never master state and never what a sibling unit or the side's shared intel knows. An enemy inside the area but out of sight (range, wood, ridge) does not trigger it.
+**Rules.** A standing order carried from an earlier order is kept when a new order arrives, and an `orderReceived` one fires on an arriving order from the named sender after that order is applied, so it overrides it. The order that carries a standing order never sets it off. A fired `then` can itself hold `when` / `at`. Destroyed or withdrawn units do not act. Firing emits `standing_fired`.
+**Open.** The parser does not produce `when` / `at` yet, and the wire protocol and client do not show standing orders. `strengthBelow` is an absolute count, not a fraction of the unit's starting strength.
