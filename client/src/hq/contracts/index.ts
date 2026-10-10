@@ -213,6 +213,7 @@ export interface MapPresentation {
   readonly artwork: PublicArtwork;
   readonly mode: 'fixture-knowledge-preview';
   readonly pieces: readonly MapPiece[];
+  readonly marks: readonly PersonalMark[];
   readonly selection: Selection;
 }
 export type Pick =

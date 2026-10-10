@@ -1,10 +1,24 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
-  import type { HqDataSource, HqRepository, MapSurface, PublicArtwork, Result } from './contracts';
+  import { onDestroy, onMount, untrack } from 'svelte';
+  import type {
+    HqDataSource,
+    HqRepository,
+    MapSurface,
+    PublicArtwork,
+    Result,
+    PersonalMarksRepository,
+  } from './contracts';
   import Shell from './shell/Shell.svelte';
   import Roster from './views/roster/Roster.svelte';
   import Journal from './views/journal/Journal.svelte';
   import Clock from './views/clock/Clock.svelte';
+  import Marks from './interactions/marks/Marks.svelte';
+  import {
+    BrowserPersonalMarksRepository,
+    createPersonalMarksController,
+    type PersonalMarksState,
+  } from './data/marks';
+  import { failure, sameScope } from './data/common';
   import { createFormationFocus } from './sessionActions';
   import type { ShellViewContext } from './shell/types';
   import { projectGameTime } from './data/fixture';
@@ -13,14 +27,41 @@
     surface,
     repository,
     artwork,
+    marksRepository,
   }: {
     source: HqDataSource;
     surface: MapSurface;
     repository: HqRepository;
     artwork: PublicArtwork;
+    marksRepository?: PersonalMarksRepository;
   } = $props();
   const life = new AbortController();
-  const focusFormation = createFormationFocus(life.signal);
+  const personalMarks = untrack(() =>
+    createPersonalMarksController(
+      marksRepository ??
+        new BrowserPersonalMarksRepository(source.scope, artwork, () => window.localStorage),
+    ),
+  );
+  let markState = $state.raw<PersonalMarksState>(personalMarks.getState());
+  onMount(() => {
+    const stop = personalMarks.subscribe((state) => {
+      markState = state;
+    });
+    if (
+      sameScope(personalMarks.scope, source.scope) &&
+      JSON.stringify(personalMarks.artwork) === JSON.stringify(artwork)
+    )
+      void personalMarks.initialize();
+    else feedback = 'Personal marks belong to another headquarters or map.';
+    return stop;
+  });
+  let focusOperation: AbortController | null = null;
+  function beginFocus() {
+    focusOperation?.abort();
+    focusOperation = new AbortController();
+    if (life.signal.aborted) focusOperation.abort();
+    return focusOperation;
+  }
   let feedback = $state('');
   let action = 0;
   let monotonicMs = $state(performance.now());
@@ -32,15 +73,50 @@
   });
   async function focus(context: ShellViewContext, id: string): Promise<Result<void>> {
     const ticket = ++action;
-    const result = await focusFormation(context, id);
+    const operation = beginFocus();
+    const result = await createFormationFocus(operation.signal)(context, id);
     if (!life.signal.aborted && ticket === action)
       feedback = result.ok ? 'Formation located on the map.' : result.error.message;
     return result;
   }
-  onDestroy(() => life.abort());
+  async function focusMark(context: ShellViewContext, id: string): Promise<Result<void>> {
+    const ticket = ++action;
+    const operation = beginFocus();
+    const mark = markState.marks.find((item) => item.id === id);
+    let result: Result<void>;
+    if (!mark || life.signal.aborted)
+      result = failure('not-found', 'This personal mark is unavailable.');
+    else if (
+      !sameScope(mark.scope, context.surface.scope) ||
+      !sameScope(mark.scope, context.state.scope)
+    )
+      result = failure('scope-mismatch', 'This mark belongs to another headquarters.');
+    else {
+      const at =
+        mark.geometry.kind === 'ring'
+          ? mark.geometry.centre
+          : 'at' in mark.geometry
+            ? mark.geometry.at
+            : mark.geometry.points[0]!;
+      try {
+        result = await context.surface.focusAt(at, { signal: operation.signal });
+      } catch {
+        result = failure('internal', 'The personal mark could not be located.');
+      }
+    }
+    if (operation.signal.aborted) result = failure('aborted', 'Personal mark focus was cancelled.');
+    if (!life.signal.aborted && ticket === action)
+      feedback = result.ok ? 'Personal mark located on the map.' : result.error.message;
+    return result;
+  }
+  onDestroy(() => {
+    life.abort();
+    focusOperation?.abort();
+    personalMarks.dispose();
+  });
 </script>
 
-<Shell {source} {surface} {repository} {artwork}>
+<Shell {source} {surface} {repository} {artwork} marks={markState.marks}>
   {#snippet clock(context: ShellViewContext)}
     <Clock
       state={context.sourceState}
@@ -49,6 +125,42 @@
       compact={context.state.view === 'table'}
     />
     <p class="session-feedback" role="status" aria-live="polite">{feedback}</p>
+  {/snippet}
+  {#snippet tableTools(context: ShellViewContext)}
+    <Marks
+      marks={markState.marks}
+      {artwork}
+      papers={context.sourceState.snapshot?.papers ?? []}
+      busy={markState.busy}
+      writable={markState.writable}
+      dirty={markState.dirty}
+      status={markState.error?.message ??
+        (markState.busy
+          ? 'Personal marks storage is busy.'
+          : markState.dirty
+            ? 'Personal marks have unsaved changes.'
+            : 'Personal marks are saved in this browser.')}
+      onCreate={(input) =>
+        personalMarks.create(
+          input,
+          context.sourceState.snapshot,
+          context.sourceState.snapshot
+            ? projectGameTime(context.sourceState, source.kind, monotonicMs)
+            : null,
+        )}
+      onEdit={(id, input) =>
+        personalMarks.edit(
+          id,
+          input,
+          context.sourceState.snapshot
+            ? projectGameTime(context.sourceState, source.kind, monotonicMs)
+            : null,
+        )}
+      onDelete={(id) => personalMarks.remove(id)}
+      onSave={() => personalMarks.save()}
+      onReload={() => personalMarks.reload()}
+      onFocus={(id) => focusMark(context, id)}
+    />
   {/snippet}
   {#snippet view(context: ShellViewContext)}
     {#if context.state.view === 'roster'}

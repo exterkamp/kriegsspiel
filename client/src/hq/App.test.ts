@@ -151,3 +151,150 @@ it('focuses a formation after navigation unmounts the roster and cancels on HQ t
   expect(focusSignal?.aborted).toBe(true);
   expect(ports.surface.dispose).toHaveBeenCalledOnce();
 });
+
+it('keeps personal marks through source refresh, saves explicitly and restores them in the next HQ session', async () => {
+  const { BrowserPersonalMarksRepository } = await import('./data/marks');
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+  const records = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => records.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      records.set(key, value);
+    },
+  };
+  let revision = 0;
+  const ports = makePorts();
+  target = document.createElement('div');
+  document.body.append(target);
+  const repository = new BrowserPersonalMarksRepository(
+    ports.source.scope,
+    artwork,
+    () => storage,
+    () => `marks-${++revision}`,
+  );
+  component = mount(App, { target, props: { ...ports, artwork, marksRepository: repository } });
+  await flush();
+  const panel = target.querySelector('[aria-label="Personal fixture marks"]')!;
+  for (const [name, value] of Object.entries({ label: 'Road watch', x: '325.75', y: '815.125' })) {
+    const input = panel.querySelector<HTMLInputElement>(`input[name="${name}"]`)!;
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  panel
+    .querySelector('form')!
+    .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await flush();
+  expect(records.size).toBe(0);
+  expect(vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks[0]?.geometry).toEqual({
+    kind: 'pin',
+    at: { x: 325.75, y: 815.125 },
+  });
+  ports.emit({
+    connection: 'ready',
+    stale: false,
+    snapshot: { ...ports.snapshot, ordinal: 2, atGame: 20 },
+    error: null,
+  });
+  await flush();
+  expect(vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks[0]?.label).toBe('Road watch');
+  Array.from(panel.querySelectorAll('button'))
+    .find((b) => b.textContent === 'Save local marks')!
+    .click();
+  await flush();
+  expect(records.size).toBe(1);
+  await unmount(component);
+  component = null;
+  const next = makePorts();
+  component = mount(App, {
+    target,
+    props: {
+      ...next,
+      artwork,
+      marksRepository: new BrowserPersonalMarksRepository(
+        next.source.scope,
+        artwork,
+        () => storage,
+        () => `marks-${++revision}`,
+      ),
+    },
+  });
+  await flush();
+  expect(vi.mocked(next.surface.apply).mock.calls.at(-1)![0].marks[0]?.label).toBe('Road watch');
+  expect(target.textContent).toContain('No unsaved local mark changes.');
+});
+
+it('reports a late mark-focus failure in persistent session feedback after the mark panel unmounts', async () => {
+  const { BrowserPersonalMarksRepository } = await import('./data/marks');
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+  const ports = makePorts();
+  const saved = {
+    schemaVersion: 1,
+    scope: ports.source.scope,
+    map: { id: artwork.id, revision: artwork.revision },
+    revision: 'saved-1',
+    marks: [
+      {
+        id: 'watch',
+        scope: ports.source.scope,
+        map: { id: artwork.id, revision: artwork.revision },
+        label: 'Watch point',
+        geometry: { kind: 'pin', at: { x: 325.75, y: 815.125 } },
+        source: { kind: 'manual' },
+        placedAtGame: null,
+        editedAtGame: null,
+      },
+    ],
+  };
+  const repository = new BrowserPersonalMarksRepository(ports.source.scope, artwork, () => ({
+    getItem: () => JSON.stringify(saved),
+    setItem: () => {},
+  }));
+  target = document.createElement('div');
+  document.body.append(target);
+  let finish!: (result: import('./contracts').Result<void>) => void;
+  vi.mocked(ports.surface.focusAt).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  component = mount(App, { target, props: { ...ports, artwork, marksRepository: repository } });
+  await flush();
+  target.querySelector<HTMLButtonElement>('[aria-label="Focus mark Watch point"]')!.click();
+  await flush();
+  Array.from(target.querySelectorAll('nav button'))
+    .find((b) => b.textContent?.includes('Journal'))!
+    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await flush();
+  expect(target.querySelector('[aria-label="Personal fixture marks"]')).toBeNull();
+  finish({
+    ok: false,
+    error: { code: 'internal', message: 'The map could not focus this mark.', retry: 'never' },
+  });
+  await flush();
+  expect(target.querySelector('.session-feedback')?.textContent).toContain(
+    'The map could not focus this mark.',
+  );
+});

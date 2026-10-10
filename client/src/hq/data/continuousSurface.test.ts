@@ -89,6 +89,7 @@ function presentation(ordinal = 1): MapPresentation {
     artwork: demoArtwork,
     mode: 'fixture-knowledge-preview',
     pieces: s.pieces,
+    marks: [],
     selection: { kind: 'none' },
     snapshot: { atGame: s.atGame, epoch: s.epoch, ordinal },
   };

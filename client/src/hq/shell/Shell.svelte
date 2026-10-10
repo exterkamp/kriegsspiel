@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick, type Snippet } from 'svelte';
+  import { onMount, tick, untrack, type Snippet } from 'svelte';
   import type {
     HqDataSource,
     HqNavigation,
@@ -7,6 +7,7 @@
     HqSnapshot,
     LocalDocument,
     MapSurface,
+    PersonalMark,
     PublicArtwork,
     Result,
     ShellState,
@@ -24,6 +25,8 @@
     navigation,
     view,
     clock,
+    tableTools,
+    marks = [],
   }: {
     surface: MapSurface;
     source: HqDataSource;
@@ -32,6 +35,8 @@
     navigation?: HqNavigation;
     view?: Snippet<[ShellViewContext]>;
     clock?: Snippet<[ShellViewContext]>;
+    tableTools?: Snippet<[ShellViewContext]>;
+    marks?: readonly PersonalMark[];
   } = $props();
   let root: HTMLElement;
   let canvas: HTMLCanvasElement;
@@ -57,6 +62,7 @@
   let saveQueue: Promise<unknown> = Promise.resolve();
   let newest: HqSnapshot | null = null;
   let candidate: SourceState | null = null;
+  let healthGeneration = 0;
   let synchronizingSelection = false;
   const choices = { view: 0, selection: 0, contrast: 0, motion: 0, camera: 0 };
   let cameraRestoreChoice = 0;
@@ -175,8 +181,9 @@
     // Valid source health is independent of renderer success. Keep rendered knowledge
     // but revoke freshness until the current presentation accepts it.
     applyController?.abort();
-    candidate = null;
+    healthGeneration++;
     data = { ...data, connection: next.connection, error: next.error, stale: true };
+    candidate = newest ? { ...data, snapshot: newest, stale: true } : null;
     if (next.error) error = next.error.message;
   }
   function receive(next: SourceState) {
@@ -217,7 +224,11 @@
     candidate = next;
     applyCandidate();
   }
-  function applyCandidate() {
+  $effect(() => {
+    const annotations = marks;
+    untrack(() => applyCandidate(annotations));
+  });
+  function applyCandidate(annotations: readonly PersonalMark[] = marks) {
     const next = candidate;
     const snapshot = next?.snapshot;
     if (!snapshot || !ready || !alive) return;
@@ -226,6 +237,8 @@
     applyController = controller;
     data = { ...data, stale: true };
     const selection = selectionFor(snapshot);
+    const health = healthGeneration;
+    const capturedMarks = structuredClone(annotations);
     const apply = async () => {
       if (!alive || controller.signal.aborted) return;
       try {
@@ -237,11 +250,12 @@
             artwork,
             mode: 'fixture-knowledge-preview',
             pieces: snapshot.pieces,
+            marks: capturedMarks,
             selection,
           },
           { signal: controller.signal },
         );
-        if (!alive || controller.signal.aborted) return;
+        if (!alive || controller.signal.aborted || health !== healthGeneration) return;
         if (!report(result)) return;
         // Desk data becomes authoritative for this UI only after the same map apply succeeds.
         data = { ...next, stale: next.stale || next.connection !== 'ready' || next.error !== null };
@@ -540,6 +554,7 @@
           onclick={focusSelection}>Focus selected piece</button
         >
       </div>
+      {#if tableTools && context}{@render tableTools(context)}{/if}
       <p class="credit">{artwork.credit} · {artwork.licence}</p>
     {:else}
       <button onclick={() => go('table')}>Return to map table</button>

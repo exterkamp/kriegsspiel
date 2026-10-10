@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { MapPresentation } from '../contracts/index.js';
 import { demoArtwork } from './fixture.js';
 import { sameScope } from './common.js';
+import { validateMarks } from './marks/index.js';
 
 const id = z.string().min(1).max(128);
 const time = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -58,6 +59,7 @@ const schema = z
     artwork,
     mode: z.literal('fixture-knowledge-preview'),
     pieces: z.array(piece).max(1000),
+    marks: z.array(z.unknown()).max(200),
     selection: z.discriminatedUnion('kind', [
       z.object({ kind: z.literal('none') }).strict(),
       z.object({ kind: z.enum(['unit', 'paper']), id, scope }).strict(),
@@ -121,5 +123,6 @@ export function parsePresentation(raw: unknown): MapPresentation | null {
     )
       return null;
   }
-  return p;
+  const marks = validateMarks(p.marks, p.scope, p.artwork);
+  return marks.ok ? { ...p, marks: marks.value } : null;
 }
