@@ -8,23 +8,18 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import websocket from '@fastify/websocket';
-import {
-  EventRegistry,
-  holdTheBridge,
-  loadScenario,
-  registerCombat,
-  registerMovement,
-  registerOrders,
-  registerVisibility,
-  startGame,
-  startVisibility,
-  type GameState,
-  type SideId,
-} from '@kriegsspiel/engine';
+import { holdTheBridge, loadScenario, type GameState, type SideId } from '@kriegsspiel/engine';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { WallClock } from '../clock.js';
-import { GameHost, MemoryGameStore, type GameStore, type Timers } from '../game/index.js';
+import {
+  GameHost,
+  MemoryGameStore,
+  createRegistry,
+  startingState,
+  type GameStore,
+  type Timers,
+} from '../game/index.js';
 import type { OrderParser } from '../orders/index.js';
 import { Hub, type Socket } from './hub.js';
 
@@ -49,15 +44,6 @@ export interface AppOptions {
   /** Log lines from Fastify; off by default so tests stay quiet. */
   logger?: boolean;
   onError?: (gameId: string, error: unknown) => void;
-}
-
-function registry(): EventRegistry<GameState> {
-  const r = new EventRegistry<GameState>();
-  registerMovement(r);
-  registerCombat(r);
-  registerOrders(r);
-  registerVisibility(r);
-  return r;
 }
 
 export interface App {
@@ -86,10 +72,10 @@ export async function buildApp(options: AppOptions): Promise<App> {
   const host: GameHost = new GameHost({
     store: options.store ?? new MemoryGameStore(),
     parser: options.parser,
-    registry: registry(),
+    registry: createRegistry(),
     wallNow: options.wallNow ?? Date.now,
     timers: options.timers,
-    init: (state) => startGame(startVisibility(state)),
+    init: startingState,
     onUpdate: (id) => hub.notify(id),
     onError,
   });

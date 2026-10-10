@@ -68,7 +68,8 @@ export interface ReplayResult {
  * Replay `entries` from the scenario `world` (the one named by `header.scenarioId`). Pass
  * `untilGameMs` to stop at that game time: inputs logged after it are not applied, and a time
  * past the last input runs the world on to it. By default it ends where the last logged input
- * left the world.
+ * left the world. `init` is applied to the fresh state first, the same hook `GameHost` was given
+ * when it created the game (the server passes `startingState`).
  */
 export function replayLog(
   header: InputLogHeader,
@@ -76,11 +77,13 @@ export function replayLog(
   entries: readonly InputLogEntry[],
   registry: EventRegistry<GameState>,
   untilGameMs?: number,
+  init?: (state: EngineState<GameState>) => EngineState<GameState>,
 ): ReplayResult {
   if (world.scenarioId !== header.scenarioId) {
     throw new Error(`log is for scenario ${header.scenarioId}, got ${world.scenarioId}`);
   }
-  let state = createState(header.seed, structuredClone(world), 0);
+  const state0 = createState(header.seed, structuredClone(world), 0);
+  let state = init?.(state0) ?? state0;
   const emitted: EmittedEvent[] = [];
   const advance = (t: number) => {
     if (t < state.time) return;

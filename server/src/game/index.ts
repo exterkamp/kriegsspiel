@@ -12,3 +12,4 @@ export type {
 } from './store.js';
 export { applyLoggedOrder, replayLog } from './replay.js';
 export type { ReplayResult } from './replay.js';
+export { createRegistry, loadScenarioById, startingState } from './registry.js';

@@ -7,7 +7,13 @@ import {
 } from '@kriegsspiel/engine';
 import { PROTOCOL_VERSION, parseServerMessage, type ServerMessage } from '@kriegsspiel/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
-import { MemoryGameStore } from '../game/index.js';
+import {
+  MemoryGameStore,
+  createRegistry,
+  loadScenarioById,
+  replayLog,
+  startingState,
+} from '../game/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { buildApp, type App } from './app.js';
 
@@ -283,6 +289,29 @@ describe('orders', () => {
     // Let the game move on so a push reaches the second socket as well.
     await second.waitFor('viewUpdate', (m) => m.view.atGame > view.view.atGame + 60_000);
     expect(second.messages.some((m) => m.kind === 'dispatch')).toBe(false);
+  });
+
+  it('logs a game made through the API so that it replays to the same state', async () => {
+    const { base } = await start();
+    const game = (await createGame(base)).json;
+    const actor = app!.host.get(game.id)!;
+    await actor.submit({ kind: 'setMode', mode: 'manual' });
+    await actor.submit({ kind: 'advanceTo', gameMs: 30 * 60_000 });
+    await actor.submit({ kind: 'order', side: 'blue', text: 'blue-1 march to the bridge' });
+    await actor.submit({ kind: 'advanceTo', gameMs: 60 * 60_000 });
+
+    const header = (await store.logHeader(game.id))!;
+    const entries = await store.inputLog(game.id);
+    const replayed = replayLog(
+      header,
+      loadScenarioById(header.scenarioId),
+      entries,
+      createRegistry(),
+      undefined,
+      startingState,
+    );
+    expect(actor.state.queue.length).toBeGreaterThan(0);
+    expect(replayed.state).toEqual(actor.state);
   });
 
   it('answers an order the umpire cannot read with an error, and keeps the connection', async () => {
