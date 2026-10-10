@@ -83,6 +83,18 @@ describe('at (timed intents)', () => {
     expect(fired(late.emitted)).toHaveLength(1);
   });
 
+  it('fires at its exact moment when that is between scans', () => {
+    // 17 s past a minute: no 1-minute scan lands here, so only the scheduled check can fire it.
+    const t = 30 * MS_PER_MINUTE + 17_000;
+    const early = run(start(), [[order([at(t)]), 0]], t - 1);
+    expect(unit(early.state, 'b').intent).toEqual({ kind: 'idle' });
+    expect(fired(early.emitted)).toHaveLength(0);
+    const late = advanceTo(early.state, t, registry());
+    expect(unit(late.state, 'b').intent.kind).toBe('move');
+    expect(fired(late.emitted)).toHaveLength(1);
+    expect(unit(late.state, 'b').standing).toBeUndefined();
+  });
+
   it('fires on delivery when its time has already passed', () => {
     const r = run(start(), [[order([at(1)]), 0]], 60 * MS_PER_MINUTE);
     expect(fired(r.emitted)).toHaveLength(1);
