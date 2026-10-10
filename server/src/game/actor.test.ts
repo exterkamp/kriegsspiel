@@ -361,6 +361,19 @@ describe('order parsing', () => {
     expect(calls).toBe(callsAtShutdown);
   });
 
+  it('arms no retry timer when a parse fails after shutdown', async () => {
+    const { time, game, parser } = await newGame(1);
+    let fail: (e: Error) => void = () => undefined;
+    parser.parse = () => new Promise<ParseResult>((_, reject) => (fail = reject));
+    void game.submit(order).catch(() => undefined);
+    await time.advance(1_000);
+    await host?.shutdown();
+    host = undefined;
+    fail(new Error('503'));
+    await time.flush();
+    expect(time.pendingTimers).toBe(0);
+  });
+
   it('logs an order at its completion, so the input log is not in signing order', async () => {
     const { time, game, parser, store } = await newGame(1);
     let release: () => void = () => undefined;

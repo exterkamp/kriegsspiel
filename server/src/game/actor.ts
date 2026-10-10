@@ -413,7 +413,8 @@ export class GameActor {
         } catch (e) {
           // Leave nothing held for a parse that will never start.
           this.dependencies.delete(dep.id);
-          this.syncBarrier();
+          this.refreshBarrier();
+          this.announceStaff(before);
           throw e;
         }
         const entry: InputLogEntry = {
@@ -425,7 +426,7 @@ export class GameActor {
         // The parse sees the world as it is at signing time, which the barrier keeps current.
         const context = this.parseContext(command.side);
         if (this.trace.enabled) this.trace.record(this.id, 'command', { seq: entry.seq, command });
-        this.syncBarrier();
+        this.refreshBarrier();
         this.announceStaff(before);
         this.reschedule();
         void this.parseWithRetries(dep, command.text, context).then((outcome) =>
@@ -452,9 +453,12 @@ export class GameActor {
     const attempts = this.parseRetries + 1;
     let error = '';
     for (let attempt = 1; attempt <= attempts; attempt++) {
-      if (attempt > 1) await this.sleep(this.parseRetryDelayMs);
       // A closed game's abandoned parse stops here: no more paid calls and no new timers.
       if (dep.abandoned) break;
+      if (attempt > 1) {
+        await this.sleep(this.parseRetryDelayMs);
+        if (dep.abandoned) break;
+      }
       try {
         return { parsed: await this.withTimeout(this.parser.parse(text, context)) };
       } catch (e) {
@@ -521,12 +525,17 @@ export class GameActor {
   /** Hold the clock at the earliest pending dependency, or release it. */
   private syncBarrier(): void {
     const before = this.clock.barrier;
+    this.refreshBarrier();
+    this.announceStaff(before);
+  }
+
+  /** Move the clock's barrier to the earliest pending dependency, without announcing it. */
+  private refreshBarrier(): void {
     let earliest: number | undefined;
     for (const d of this.dependencies.values()) {
       if (earliest === undefined || d.neededAt < earliest) earliest = d.neededAt;
     }
     this.clock.setBarrier(earliest);
-    this.announceStaff(before);
   }
 
   /** Tell the listener when the barrier moved from `before`. */
