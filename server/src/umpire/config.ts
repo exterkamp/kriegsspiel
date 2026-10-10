@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import type { StructuredOutputSupport } from './provider.js';
+import type { GameLimits } from './gameLimits.js';
 import type { UmpireStage } from './umpireClient.js';
 
 export const UMPIRE_STAGES: readonly UmpireStage[] = ['parse', 'judge', 'narrate'];
@@ -43,12 +44,14 @@ export interface UmpireConfig {
   rateLimit?: { maxConcurrent?: number; minIntervalMs?: number };
   /** Caps on spend across the life of the client. Cost is only counted for priced models. */
   budget?: { maxCostUsd?: number; maxTotalTokens?: number };
+  /** Caps for each game (see `GameUmpireClient`). Absent: no per-game cap. */
+  gameBudget?: GameLimits;
 }
 
 export const DEFAULT_UMPIRE_CONFIG: UmpireConfig = {
   providers: { anthropic: { type: 'anthropic' } },
   stages: {
-    parse: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
+    parse: { provider: 'anthropic', model: 'claude-haiku-5-5' },
     judge: { provider: 'anthropic', model: 'claude-opus-5-5' },
     narrate: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
   },
@@ -92,13 +95,26 @@ function checkFile(file: UmpireConfigFile): void {
     }
     if (typeof spec.type !== 'string') throw new Error(`provider "${id}": missing type`);
   }
+  const caps: [string, number | undefined][] = [
+    ['budget.maxCostUsd', file.budget?.maxCostUsd],
+    ['budget.maxTotalTokens', file.budget?.maxTotalTokens],
+    ['gameBudget.maxCostUsd', file.gameBudget?.maxCostUsd],
+    ['gameBudget.maxTotalTokens', file.gameBudget?.maxTotalTokens],
+    ['gameBudget.maxCallsPerMinute', file.gameBudget?.maxCallsPerMinute],
+  ];
+  for (const [name, value] of caps) {
+    if (value !== undefined && !(Number.isFinite(value) && value > 0)) {
+      throw new Error(`${name} must be a positive number, got ${String(value)}`);
+    }
+  }
 }
 
 /**
  * Builds the config: defaults, then the optional file, then env overrides. Env reads
  * `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE`, `UMPIRE_TIMEOUT_MS`,
  * `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`,
- * `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD` and `UMPIRE_BUDGET_TOKENS`. Throws if a stage names
+ * `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS` and the per-game
+ * `UMPIRE_GAME_BUDGET_USD`, `UMPIRE_GAME_BUDGET_TOKENS` and `UMPIRE_GAME_CALLS_PER_MINUTE`. Throws if a stage names
  * a provider that is not configured.
  */
 export function umpireConfigFromEnv(
@@ -136,6 +152,13 @@ export function umpireConfigFromEnv(
   );
   const maxCostUsd = positiveNumber(env, 'UMPIRE_BUDGET_USD') ?? file.budget?.maxCostUsd;
   const maxTotalTokens = positiveNumber(env, 'UMPIRE_BUDGET_TOKENS') ?? file.budget?.maxTotalTokens;
+  const gameCostUsd = positiveNumber(env, 'UMPIRE_GAME_BUDGET_USD') ?? file.gameBudget?.maxCostUsd;
+  const gameTokens =
+    positiveNumber(env, 'UMPIRE_GAME_BUDGET_TOKENS') ?? file.gameBudget?.maxTotalTokens;
+  const gameCalls =
+    env.UMPIRE_GAME_CALLS_PER_MINUTE === undefined || env.UMPIRE_GAME_CALLS_PER_MINUTE === ''
+      ? file.gameBudget?.maxCallsPerMinute
+      : positiveInt(env, 'UMPIRE_GAME_CALLS_PER_MINUTE', 0);
   return {
     providers,
     stages,
@@ -152,6 +175,15 @@ export function umpireConfigFromEnv(
           rateLimit: {
             ...(maxConcurrent ? { maxConcurrent } : {}),
             ...(minIntervalMs ? { minIntervalMs } : {}),
+          },
+        }
+      : {}),
+    ...(gameCostUsd !== undefined || gameTokens !== undefined || gameCalls !== undefined
+      ? {
+          gameBudget: {
+            ...(gameCostUsd !== undefined ? { maxCostUsd: gameCostUsd } : {}),
+            ...(gameTokens !== undefined ? { maxTotalTokens: gameTokens } : {}),
+            ...(gameCalls !== undefined ? { maxCallsPerMinute: gameCalls } : {}),
           },
         }
       : {}),
