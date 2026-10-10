@@ -90,7 +90,10 @@ describe('formation-aware crossings', () => {
 
   it('does not make a bridge over open ground a bottleneck', () => {
     const open = miniWorld({ features: [bridge('b', 1450, 1000, 20)], units });
-    expect(findPath(open.map, P(1450, 450), P(1450, 1550), { width: line })).not.toBeNull();
+    const p = findPath(open.map, P(1450, 450), P(1450, 1550), { width: line });
+    expect(p).not.toBeNull();
+    expect(p!.waypoints).toHaveLength(2); // straight across, not round the bridge circle
+    expect(p!.cost).toBe(legCost(open.map, P(1450, 450), P(1450, 1550)));
   });
 });
 

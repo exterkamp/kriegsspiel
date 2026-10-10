@@ -254,6 +254,16 @@ describe('movement events', () => {
     expect(unit(halted.state, 'blue-1').center).toEqual(P(1850, 2200));
   });
 
+  it('halts at the exact instant a step ends without losing the step', () => {
+    // The first 90 m step ends at 54 000 ms; the halt sorts ahead of the step event.
+    const s = issueHalt(issueMove(game(), 'blue-1', P(1850, 2000)), 'blue-1', 54_000);
+    const halted = advanceTo(s, 54_000, registry());
+    expect(unit(halted.state, 'blue-1').center).toEqual(P(1850, 2360));
+    const late = advanceTo(issueMove(game(), 'blue-1', P(1850, 2000)), 54_000, registry());
+    const s2 = advanceTo(issueHalt(late.state, 'blue-1', 54_000), 54_000, registry());
+    expect(unit(s2.state, 'blue-1').center).toEqual(P(1850, 2360));
+  });
+
   it('reports an unreachable destination and stays put', () => {
     const r = advanceTo(issueMove(game(), 'blue-1', P(500, 1500)), 0, registry());
     expect(r.emitted.map((e) => e.type)).toEqual(['unit.moveBlocked']);
@@ -365,6 +375,26 @@ describe('formation changes', () => {
     expect(unit(s, 'blue-1').center).toEqual(P(1850, 2350)); // 100 m into the march, part way along its 90 m steps
     s = advanceTo(issueHalt(s, 'blue-1', 90_000), 10 * MINUTE, regs()).state;
     expect(unit(s, 'blue-1').formation).toBe('line');
+  });
+
+  it('a second reform supersedes the first, whose completion must not apply', () => {
+    let s = advanceTo(issueFormation(game(), 'blue-1', 'column'), 0, regs()).state;
+    s = advanceTo(issueFormation(s, 'blue-1', 'square', MINUTE), MINUTE, regs()).state;
+    // The column reform's done event (2 min) fires while the square reform is under way.
+    s = advanceTo(s, 2 * MINUTE + 1, regs()).state;
+    expect(unit(s, 'blue-1').formation).toBe('line');
+    expect(unit(s, 'blue-1').intent).toMatchObject({ kind: 'reform', formation: 'square' });
+    s = advanceTo(s, 3 * MINUTE, regs()).state;
+    expect(unit(s, 'blue-1').formation).toBe('square');
+  });
+
+  it('ordering back to the formation it is still in cancels the reform', () => {
+    let s = advanceTo(issueFormation(game(), 'blue-1', 'column'), 0, regs()).state;
+    s = advanceTo(issueFormation(s, 'blue-1', 'line', MINUTE), MINUTE, regs()).state;
+    expect(unit(s, 'blue-1').intent).toEqual({ kind: 'idle' });
+    const done = advanceTo(s, 10 * MINUTE, regs());
+    expect(unit(done.state, 'blue-1').formation).toBe('line');
+    expect(done.emitted.map((e) => e.type)).not.toContain('unit.reformed');
   });
 
   it('rejects a change to the formation the unit is already in', () => {

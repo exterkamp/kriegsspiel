@@ -85,9 +85,10 @@ export function positionAlong(
 /** Where the unit stands at `time`: part way along its current leg if it is marching one. */
 export function positionAt(map: TerrainMap, unit: Unit, time: GameTime): Point {
   const leg = unit.leg;
-  if (!leg || !marchTarget(unit.intent) || time >= leg.arriveAt || time <= leg.startedAt) {
-    return unit.center;
-  }
+  if (!leg || !marchTarget(unit.intent) || time <= leg.startedAt) return unit.center;
+  // `center` only advances when the step event fires, so at the arrival instant (an order can
+  // sort ahead of that event) the leg's end is where the unit stands.
+  if (time >= leg.arriveAt) return leg.to;
   return positionAlong(map, leg.from, leg.to, unit.kind, time - leg.startedAt);
 }
 
@@ -328,8 +329,11 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     const unit = world.units.find((u) => u.id === unitId);
     if (!unit) return rejectUnknown(world, unitId);
     if (unit.status !== 'active') return rejectOrder(world, unitId, 'unit not active');
-    if (unit.formation === formation && unit.intent.kind !== 'reform') {
-      return rejectOrder(world, unitId, 'already in that formation');
+    if (unit.formation === formation) {
+      if (unit.intent.kind !== 'reform')
+        return rejectOrder(world, unitId, 'already in that formation');
+      // Ordered back to the formation it is still in: stand down where it is, no second reform.
+      return { world: updateUnit(world, unitId, { intent: { kind: 'idle' } }, ev.time) };
     }
     // The unit stops where it has got to and stands still while it re-forms.
     const center = positionAt(world.map, unit, ev.time);
