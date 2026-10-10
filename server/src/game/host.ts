@@ -1,5 +1,6 @@
 /** GameHost: many games in one process, one `GameActor` each. */
 import {
+  advanceTo,
   createState,
   deserialize,
   type EmittedEvent,
@@ -10,6 +11,7 @@ import { GameClock, type WallClock } from '../clock.js';
 import type { OrderParser } from '../orders/index.js';
 import { GameActor, type GameActorOptions, type StaffAtWork, type Timers } from './actor.js';
 import type { TraceSink } from '../debug/trace.js';
+import { replayFrom } from './replay.js';
 import type { GameStore } from './store.js';
 
 export interface GameHostOptions {
@@ -19,6 +21,8 @@ export interface GameHostOptions {
   wallNow: WallClock;
   timers?: Timers;
   trace?: TraceSink;
+  /** Take a snapshot after this many logged inputs (default 1). */
+  snapshotEvery?: number;
   onError?: (gameId: string, error: unknown) => void;
   /** Events the engine emitted for a game, in firing order. */
   onEmitted?: (gameId: string, events: EmittedEvent[]) => void;
@@ -54,6 +58,7 @@ export class GameHost {
       store: o.store,
       timers: o.timers,
       trace: o.trace,
+      snapshotEvery: o.snapshotEvery,
       onError: (e) => o.onError?.(id, e),
       onEmitted: (events) => o.onEmitted?.(id, events),
       onStaffAtWork: (state) => o.onStaffAtWork?.(id, state),
@@ -113,21 +118,38 @@ export class GameHost {
   }
 
   private async doOpen(id: string): Promise<GameActor> {
-    const snap = await this.options.store.loadSnapshot(id);
+    const { store } = this.options;
+    const snap = await store.loadSnapshot(id);
     if (!snap) throw new Error(`no such game: ${id}`);
-    const state = deserialize<GameState>(snap.engine);
-    const log = await this.options.store.inputLog(id);
+    // Recovery: the latest snapshot, then the inputs logged after it, then the game time the
+    // scheduler had reached since the last input. Replay is the same code the live game ran,
+    // and chunking `advanceTo` never changes a result, so the state equals the one before the stop.
+    const tail = await store.inputLog(id, snap.seq);
+    let state = deserialize<GameState>(snap.engine);
+    state = replayFrom(state, id, tail, this.options.registry).state;
+    const progress = await store.loadProgress(id);
+    if (progress !== undefined && progress > state.time) {
+      state = advanceTo(state, progress, this.options.registry).state;
+    }
+    // Rate and mode may have changed in the replayed inputs.
+    let { rate, mode } = snap.clock;
+    for (const e of tail) {
+      if (e.error) continue;
+      if (e.command.kind === 'setRate') rate = e.command.rate;
+      else if (e.command.kind === 'setMode') mode = e.command.mode;
+    }
     const clock = new GameClock(this.options.wallNow, {
       gameMs: state.time,
-      rate: snap.clock.rate,
-      mode: snap.clock.mode,
+      rate,
+      mode,
       status: snap.clock.status === 'stopped' ? 'stopped' : 'paused',
     });
     const actor = new GameActor({
       ...this.actorOptions(id),
       state,
       clock,
-      seq: log.at(-1)?.seq ?? 0,
+      // The log is in insertion order, which is not always seq order (see D14b).
+      seq: tail.reduce((max, e) => Math.max(max, e.seq), snap.seq),
     });
     this.games.set(id, actor);
     await actor.start();
