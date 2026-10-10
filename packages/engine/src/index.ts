@@ -105,6 +105,13 @@ export {
 export type { Aspect } from './contact.js';
 export { COURIER_MS_PER_METRE, issueOrder, registerOrders } from './orders.js';
 export type { Order, OrderIntent } from './orders.js';
+export {
+  STANDING_EVENT,
+  applyIntents,
+  evaluateStanding,
+  fireOnReceipt,
+  triggerHolds,
+} from './standing.js';
 export { describePlace } from './place.js';
 export { beginMarch } from './movement.js';
 export {
