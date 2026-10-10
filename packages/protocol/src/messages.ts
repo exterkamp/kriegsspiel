@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PROTOCOL_VERSION, ClockState } from './common.js';
+import { PROTOCOL_VERSION, ClockState, GameMs } from './common.js';
 import { Dispatch, SideView } from './view.js';
 
 const Id = z.string().min(1);
@@ -25,6 +25,17 @@ export const ServerMessage = z.discriminatedUnion('kind', [
   z.object({ ...Envelope, kind: z.literal('viewUpdate'), view: SideView }).strict(),
   z.object({ ...Envelope, kind: z.literal('dispatch'), dispatch: Dispatch }).strict(),
   z.object({ ...Envelope, kind: z.literal('clockState'), clock: ClockState }).strict(),
+  // "Staff at work": the umpire is still on something game time depends on. While `working`, game
+  // time may be held at `needAtMs` (the earliest game time that needs a result); it carries on
+  // from there when the result arrives.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('staffAtWork'),
+      working: z.boolean(),
+      needAtMs: GameMs.optional(),
+    })
+    .strict(),
   z
     .object({
       ...Envelope,

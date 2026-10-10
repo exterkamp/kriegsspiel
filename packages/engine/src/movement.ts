@@ -2,11 +2,16 @@ import { ATTACK_INTENT_EVENT, COMBAT_CHECK_EVENT, canReach } from './contact.js'
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { distance } from './geometry.js';
 import { schedule } from './queue.js';
-import { segmentCost, segmentPassable, terrainAt } from './terrain.js';
+import { defaultFootprint } from './formation.js';
+import { findPath, legCost } from './navigation.js';
+import { profileAlong } from './terrain.js';
 import {
   MS_PER_MINUTE,
+  type Formation,
   type GameState,
+  type GameTime,
   type Intent,
+  type Leg,
   type Point,
   type TerrainMap,
   type Unit,
@@ -23,14 +28,6 @@ export const MS_PER_METRE: Record<UnitKind, number> = {
   cavalry: MS_PER_MINUTE / 300,
   artillery: (MS_PER_MINUTE * 3) / 200,
 };
-
-/**
- * Route planning is a stopgap until movement is reworked for continuous space (see
- * docs/decisions.md D15): A* over a private lattice of this pitch, with the lattice
- * start and goal joined by straight legs. The lattice is not part of the model: paths
- * are lists of free points and can be any shape.
- */
-const ROUTE_PITCH_MM = 100_000;
 
 /**
  * A march is stepped at most this far at a time (100 m), so contact, the objective and an
@@ -56,16 +53,43 @@ function stepped(waypoints: Point[]): Point[] {
   return out;
 }
 
-/** A route as free points, `from` first and `to` last, and its cost in mm weighted by ground. */
-export interface Path {
-  waypoints: Point[];
-  cost: number;
-}
-
 /** Game ms for a unit of `kind` to march from `a` to `b` in a straight line, or null if blocked. */
 export function legDuration(map: TerrainMap, a: Point, b: Point, kind: UnitKind): number | null {
-  if (!segmentPassable(map, a, b)) return null;
-  return Math.round((segmentCost(map, a, b) / 1000) * MS_PER_METRE[kind]);
+  const cost = legCost(map, a, b);
+  return cost === null ? null : Math.round((cost / 1000) * MS_PER_METRE[kind]);
+}
+
+/**
+ * Where a unit of `kind` is `elapsed` game ms after leaving `a` for `b`: it walks each stretch
+ * of ground at that ground's rate, so it is part way along a wood when a wood is slow.
+ */
+export function positionAlong(
+  map: TerrainMap,
+  a: Point,
+  b: Point,
+  kind: UnitKind,
+  elapsed: number,
+): Point {
+  let left = (Math.max(0, elapsed) / MS_PER_METRE[kind]) * 1000; // cost-mm still to spend
+  for (const piece of profileAlong(map, a, b)) {
+    const cost = piece.length * piece.attrs.moveCost;
+    if (left < cost) {
+      const t = piece.t0 + (piece.t1 - piece.t0) * (left / cost);
+      return { x: Math.round(a.x + (b.x - a.x) * t), y: Math.round(a.y + (b.y - a.y) * t) };
+    }
+    left -= cost;
+  }
+  return { ...b };
+}
+
+/** Where the unit stands at `time`: part way along its current leg if it is marching one. */
+export function positionAt(map: TerrainMap, unit: Unit, time: GameTime): Point {
+  const leg = unit.leg;
+  if (!leg || !marchTarget(unit.intent) || time <= leg.startedAt) return unit.center;
+  // `center` only advances when the step event fires, so at the arrival instant (an order can
+  // sort ahead of that event) the leg's end is where the unit stands.
+  if (time >= leg.arriveAt) return leg.to;
+  return positionAlong(map, leg.from, leg.to, unit.kind, time - leg.startedAt);
 }
 
 /** Game ms to march `waypoints` in turn (the first is where the unit already stands). */
@@ -77,156 +101,19 @@ export function pathDuration(map: TerrainMap, waypoints: Point[], kind: UnitKind
   return total;
 }
 
-function passable(map: TerrainMap, p: Point): boolean {
-  return terrainAt(map, p)?.attrs.passable === true;
-}
-
-/** Cheapest ground multiplier on the map, so the A* heuristic never overestimates. */
-function cheapest(map: TerrainMap): number {
-  let c = 1;
-  for (const f of map.features) if (f.attrs.passable) c = Math.min(c, f.attrs.moveCost);
-  return c;
-}
-
 /**
- * Plan a route from `from` to `to` over passable ground, preferring cheap ground (roads) over
- * short ground (woods). Deterministic: ties on f are broken by smaller h, then by node
- * index. Returns null if either end is impassable or off the map, or no route exists.
+ * Game ms a unit stands still to change formation (column to line and back, going into
+ * square). Placeholders until the rules tables: guns need longer to limber and unlimber.
  */
-export function findPath(map: TerrainMap, from: Point, to: Point): Path | null {
-  if (!passable(map, from) || !passable(map, to)) return null;
-  if (from.x === to.x && from.y === to.y) return { waypoints: [{ ...from }], cost: 0 };
-
-  const cols = Math.ceil(map.width / ROUTE_PITCH_MM);
-  const rows = Math.ceil(map.height / ROUTE_PITCH_MM);
-  // Nodes: 0 is `from`, 1 is `to`, then lattice cells row by row.
-  const cellNode = (c: number, r: number) => 2 + r * cols + c;
-  const centre = (c: number, r: number): Point => ({
-    x: Math.round(
-      c * ROUTE_PITCH_MM + Math.min(ROUTE_PITCH_MM, map.width - c * ROUTE_PITCH_MM) / 2,
-    ),
-    y: Math.round(
-      r * ROUTE_PITCH_MM + Math.min(ROUTE_PITCH_MM, map.height - r * ROUTE_PITCH_MM) / 2,
-    ),
-  });
-  const point = (n: number): Point =>
-    n === 0 ? from : n === 1 ? to : centre((n - 2) % cols, Math.floor((n - 2) / cols));
-  const okCell = new Map<number, boolean>();
-  const cellOk = (n: number) => {
-    let v = okCell.get(n);
-    if (v === undefined) {
-      v = passable(map, point(n));
-      okCell.set(n, v);
-    }
-    return v;
-  };
-  const cellOf = (p: Point) => ({
-    c: Math.min(cols - 1, Math.floor(p.x / ROUTE_PITCH_MM)),
-    r: Math.min(rows - 1, Math.floor(p.y / ROUTE_PITCH_MM)),
-  });
-  const around = (p: Point): number[] => {
-    const { c, r } = cellOf(p);
-    const out: number[] = [];
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        const cc = c + dc;
-        const rr = r + dr;
-        if (cc >= 0 && rr >= 0 && cc < cols && rr < rows && cellOk(cellNode(cc, rr))) {
-          out.push(cellNode(cc, rr));
-        }
-      }
-    }
-    return out;
-  };
-  const toCells = around(to);
-
-  const neighbours = (n: number): number[] => {
-    if (n === 0) return [1, ...around(from)];
-    if (n === 1) return [];
-    const c = (n - 2) % cols;
-    const r = Math.floor((n - 2) / cols);
-    const out: number[] = [];
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        if (dr === 0 && dc === 0) continue;
-        const cc = c + dc;
-        const rr = r + dr;
-        if (cc >= 0 && rr >= 0 && cc < cols && rr < rows && cellOk(cellNode(cc, rr))) {
-          out.push(cellNode(cc, rr));
-        }
-      }
-    }
-    if (toCells.includes(n)) out.push(1);
-    return out;
-  };
-
-  const minCost = cheapest(map);
-  const h = (n: number) => distance(point(n), to) * minCost;
-  const g = new Map<number, number>([[0, 0]]);
-  const prev = new Map<number, number>();
-  const closed = new Set<number>();
-  const open: Array<{ f: number; h: number; n: number }> = [{ f: h(0), h: h(0), n: 0 }];
-  const less = (a: (typeof open)[number], b: (typeof open)[number]) =>
-    a.f - b.f || a.h - b.h || a.n - b.n;
-
-  while (open.length > 0) {
-    // Pop the minimum (maps are small, so a scan beats a heap for clarity).
-    let best = 0;
-    for (let k = 1; k < open.length; k++) if (less(open[k]!, open[best]!) < 0) best = k;
-    const cur = open.splice(best, 1)[0]!;
-    if (closed.has(cur.n)) continue;
-    closed.add(cur.n);
-    if (cur.n === 1) {
-      const chain: number[] = [];
-      for (let n: number | undefined = 1; n !== undefined; n = prev.get(n)) chain.push(n);
-      return smooth(map, chain.reverse().map(point), g.get(1)!);
-    }
-    for (const m of neighbours(cur.n)) {
-      if (closed.has(m)) continue;
-      const a = point(cur.n);
-      const b = point(m);
-      if (!segmentPassable(map, a, b)) continue;
-      const ng = g.get(cur.n)! + segmentCost(map, a, b);
-      if (ng < (g.get(m) ?? Infinity)) {
-        g.set(m, ng);
-        prev.set(m, cur.n);
-        open.push({ f: ng + h(m), h: h(m), n: m });
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * Drop waypoints that a straight leg can skip without costing more, so routes are free
- * lines rather than lattice staircases.
- */
-function smooth(map: TerrainMap, pts: Point[], total: number): Path {
-  const legs = [0];
-  for (let i = 1; i < pts.length; i++) {
-    legs.push(legs[i - 1]! + segmentCost(map, pts[i - 1]!, pts[i]!));
-  }
-  const out: Point[] = [pts[0]!];
-  let cost = 0;
-  let i = 0;
-  while (i < pts.length - 1) {
-    let j = pts.length - 1;
-    for (; j > i + 1; j--) {
-      if (
-        segmentPassable(map, pts[i]!, pts[j]!) &&
-        segmentCost(map, pts[i]!, pts[j]!) <= legs[j]! - legs[i]!
-      ) {
-        break;
-      }
-    }
-    cost += j === i + 1 ? legs[j]! - legs[i]! : segmentCost(map, pts[i]!, pts[j]!);
-    out.push({ ...pts[j]! });
-    i = j;
-  }
-  return { waypoints: out, cost: Math.min(cost, total) };
-}
+export const FORMATION_CHANGE_MS: Record<UnitKind, number> = {
+  infantry: 2 * MS_PER_MINUTE,
+  cavalry: MS_PER_MINUTE,
+  artillery: 3 * MS_PER_MINUTE,
+};
 
 export const MOVE_INTENT_EVENT = 'intent.move';
+export const FORMATION_INTENT_EVENT = 'intent.formation';
+export const FORMATION_DONE_EVENT = 'formation.done';
 export const HALT_INTENT_EVENT = 'intent.halt';
 export const MOVE_STEP_EVENT = 'move.step';
 
@@ -251,6 +138,16 @@ export function issueHalt(
   return schedule(state, [{ time, type: HALT_INTENT_EVENT, payload: { unitId } }]);
 }
 
+/** Queue an order for `unitId` to change formation, firing at `time` (default: now). */
+export function issueFormation(
+  state: EngineState<GameState>,
+  unitId: string,
+  formation: Formation,
+  time = state.time,
+): EngineState<GameState> {
+  return schedule(state, [{ time, type: FORMATION_INTENT_EVENT, payload: { unitId, formation } }]);
+}
+
 interface MovePayload {
   unitId: string;
   to: [number, number];
@@ -264,21 +161,34 @@ interface StepPayload {
   path: number[];
 }
 
-function updateUnit(world: GameState, unitId: string, patch: Partial<Unit>, time: number) {
+/** Apply `patch` to a unit; a patched field set to undefined is removed (snapshots stay lean). */
+export function updateUnit(world: GameState, unitId: string, patch: Partial<Unit>, time: number) {
   return {
     ...world,
     time,
-    units: world.units.map((u) => (u.id === unitId ? { ...u, ...patch } : u)),
+    units: world.units.map((u) => {
+      if (u.id !== unitId) return u;
+      const next = { ...u, ...patch };
+      for (const k of Object.keys(patch) as Array<keyof Unit>)
+        if (next[k] === undefined) delete next[k];
+      return next;
+    }),
   };
 }
 
-function scheduleStep(map: TerrainMap, kind: UnitKind, now: number, p: StepPayload): NewEvent {
-  const prev = { x: p.path[0]!, y: p.path[1]! }; // the point just left
-  const next = { x: p.path[2]!, y: p.path[3]! };
+/** The step event that ends the leg `p.path` starts with, and the leg itself. */
+function nextLeg(
+  map: TerrainMap,
+  kind: UnitKind,
+  now: number,
+  p: StepPayload,
+): { event: NewEvent; leg: Leg } {
+  const from = { x: p.path[0]!, y: p.path[1]! }; // the point just left
+  const to = { x: p.path[2]!, y: p.path[3]! };
+  const arriveAt = now + legDuration(map, from, to, kind)!;
   return {
-    time: now + legDuration(map, prev, next, kind)!,
-    type: MOVE_STEP_EVENT,
-    payload: p as unknown as Json,
+    event: { time: arriveAt, type: MOVE_STEP_EVENT, payload: p as unknown as Json },
+    leg: { from, to, startedAt: now, arriveAt },
   };
 }
 
@@ -315,21 +225,32 @@ export function beginMarch(
   attackTarget?: string,
 ): HandlerResult<GameState> {
   const to: [number, number] = [dest.x, dest.y];
-  const path = findPath(world.map, unit.center, dest);
+  // A unit on the march is stopped where it has got to, not at the last waypoint it passed.
+  const here = positionAt(world.map, unit, time);
+  const path = findPath(world.map, here, dest, { width: unit.footprint.frontage });
   if (!path) {
+    // `tooWide` tells the umpire a narrower formation (a column) would get through.
+    const tooWide = findPath(world.map, here, dest) !== null;
     return {
       world: updateUnit(world, unit.id, {}, time),
-      emit: [{ type: 'unit.moveBlocked', payload: { unitId: unit.id, to } }],
+      emit: [
+        {
+          type: 'unit.moveBlocked',
+          payload: { unitId: unit.id, to, ...(tooWide ? { tooWide: true } : {}) },
+        },
+      ],
     };
   }
   if (path.waypoints.length === 1) {
     if (how === 'attack' && attackTarget) {
       const intent: Intent = { kind: 'attack', target: attackTarget, to: dest, startedAt: time };
-      return { world: updateUnit(world, unit.id, { intent }, time) };
+      return {
+        world: updateUnit(world, unit.id, { intent, center: here, leg: undefined }, time),
+      };
     }
     const intent: Intent = how === 'hold' ? { kind: 'hold', at: dest } : { kind: 'idle' };
     return {
-      world: updateUnit(world, unit.id, { intent }, time),
+      world: updateUnit(world, unit.id, { intent, center: here, leg: undefined }, time),
       emit: [{ type: 'unit.arrived', payload: { unitId: unit.id, at: to } }],
     };
   }
@@ -347,9 +268,10 @@ export function beginMarch(
     to,
     path: stepped(path.waypoints).flatMap((t) => [t.x, t.y]),
   };
+  const { event, leg } = nextLeg(world.map, unit.kind, time, step);
   return {
-    world: updateUnit(world, unit.id, { intent }, time),
-    schedule: [scheduleStep(world.map, unit.kind, time, step)],
+    world: updateUnit(world, unit.id, { intent, center: here, leg }, time),
+    schedule: [event],
   };
 }
 
@@ -387,7 +309,62 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
   registry.register(HALT_INTENT_EVENT, (world, ev) => {
     const { unitId } = ev.payload as unknown as { unitId: string };
     if (!world.units.some((u) => u.id === unitId)) return rejectUnknown(world, unitId);
-    return { world: updateUnit(world, unitId, { intent: { kind: 'idle' } }, ev.time) };
+    const unit = world.units.find((u) => u.id === unitId)!;
+    const center = positionAt(world.map, unit, ev.time);
+    return {
+      world: updateUnit(
+        world,
+        unitId,
+        { intent: { kind: 'idle' }, center, leg: undefined },
+        ev.time,
+      ),
+    };
+  });
+
+  registry.register(FORMATION_INTENT_EVENT, (world, ev) => {
+    const { unitId, formation } = ev.payload as unknown as {
+      unitId: string;
+      formation: Formation;
+    };
+    const unit = world.units.find((u) => u.id === unitId);
+    if (!unit) return rejectUnknown(world, unitId);
+    if (unit.status !== 'active') return rejectOrder(world, unitId, 'unit not active');
+    if (unit.formation === formation) {
+      if (unit.intent.kind !== 'reform')
+        return rejectOrder(world, unitId, 'already in that formation');
+      // Ordered back to the formation it is still in: stand down where it is, no second reform.
+      return { world: updateUnit(world, unitId, { intent: { kind: 'idle' } }, ev.time) };
+    }
+    // The unit stops where it has got to and stands still while it re-forms.
+    const center = positionAt(world.map, unit, ev.time);
+    const intent: Intent = { kind: 'reform', formation, startedAt: ev.time };
+    return {
+      world: updateUnit(world, unitId, { intent, center, leg: undefined }, ev.time),
+      schedule: [
+        {
+          time: ev.time + FORMATION_CHANGE_MS[unit.kind],
+          type: FORMATION_DONE_EVENT,
+          payload: { unitId, formation, startedAt: ev.time },
+        },
+      ],
+    };
+  });
+
+  registry.register(FORMATION_DONE_EVENT, (world, ev) => {
+    const p = ev.payload as unknown as { unitId: string; formation: Formation; startedAt: number };
+    const unit = world.units.find((u) => u.id === p.unitId);
+    const i = unit?.intent;
+    if (!unit || i?.kind !== 'reform' || i.startedAt !== p.startedAt) return { world }; // superseded
+    const next: Partial<Unit> = {
+      formation: p.formation,
+      footprint: defaultFootprint(unit.kind, p.formation, unit.strength),
+      shape: undefined, // a loose arrangement does not survive a change of formation
+      intent: { kind: 'idle' },
+    };
+    return {
+      world: updateUnit(world, p.unitId, next, ev.time),
+      emit: [{ type: 'unit.reformed', payload: { unitId: p.unitId, formation: p.formation } }],
+    };
   });
 
   registry.register(MOVE_STEP_EVENT, (world, ev) => {
@@ -414,7 +391,12 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
       const foe = world.units.find((u) => u.id === i.target);
       if (!foe || foe.status !== 'active') {
         return {
-          world: updateUnit(world, p.unitId, { center, intent: { kind: 'idle' } }, ev.time),
+          world: updateUnit(
+            world,
+            p.unitId,
+            { center, intent: { kind: 'idle' }, leg: undefined },
+            ev.time,
+          ),
           schedule: [check],
         };
       }
@@ -423,14 +405,19 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
         // In reach: stop here. `to` becomes the stopping point, so the unit counts as
         // stopped and `combat.check` re-plans it if the foe later walks out of reach.
         return {
-          world: updateUnit(world, p.unitId, { center, intent: { ...i, to: center } }, ev.time),
+          world: updateUnit(
+            world,
+            p.unitId,
+            { center, intent: { ...i, to: center }, leg: undefined },
+            ev.time,
+          ),
           schedule: [check],
         };
       }
       if (arrived) {
         // The foe moved on; plan a fresh march toward where it is now.
         return {
-          world: updateUnit(world, p.unitId, { center }, ev.time),
+          world: updateUnit(world, p.unitId, { center, leg: undefined }, ev.time),
           schedule: [
             check,
             {
@@ -445,14 +432,15 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
       const intent: Intent =
         i.kind === 'move' && i.thenHold ? { kind: 'hold', at: center } : { kind: 'idle' };
       return {
-        world: updateUnit(world, p.unitId, { center, intent }, ev.time),
+        world: updateUnit(world, p.unitId, { center, intent, leg: undefined }, ev.time),
         emit: [{ type: 'unit.arrived', payload: { unitId: p.unitId, at: p.to } }],
         schedule: [check],
       };
     }
+    const { event, leg } = nextLeg(world.map, unit.kind, ev.time, { ...p, path: rest });
     return {
-      world: updateUnit(world, p.unitId, { center }, ev.time),
-      schedule: [check, scheduleStep(world.map, unit.kind, ev.time, { ...p, path: rest })],
+      world: updateUnit(world, p.unitId, { center, leg }, ev.time),
+      schedule: [check, event],
     };
   });
 }

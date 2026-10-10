@@ -105,7 +105,20 @@ export type Intent =
   | { kind: 'withdraw'; toward: Point; startedAt: GameTime }
   | { kind: 'hold'; at: Point }
   /** Close on `target` (a unit id) and fight it. `to` is where it stood when the march was planned. */
-  | { kind: 'attack'; target: string; to: Point; startedAt: GameTime };
+  | { kind: 'attack'; target: string; to: Point; startedAt: GameTime }
+  /** Changing formation: the unit stands still until `formation.done` fires. */
+  | { kind: 'reform'; formation: Formation; startedAt: GameTime };
+
+/**
+ * The stretch of a march a unit is on: it left `from` at `startedAt` and reaches `to` at
+ * `arriveAt`. `center` only moves at the end of a leg; the leg says where the unit is in between.
+ */
+export interface Leg {
+  from: Point;
+  to: Point;
+  startedAt: GameTime;
+  arriveAt: GameTime;
+}
 
 export const UNIT_KINDS = ['infantry', 'cavalry', 'artillery'] as const;
 export type UnitKind = (typeof UNIT_KINDS)[number];
@@ -134,6 +147,8 @@ export interface Unit {
   /** 0..100. */
   morale: number;
   intent: Intent;
+  /** Set while the unit is marching along a leg, so a new order can stop it mid-leg. */
+  leg?: Leg;
   status: UnitStatus;
   /** Where the unit starts, and where it withdraws to if it breaks. */
   home: Point;

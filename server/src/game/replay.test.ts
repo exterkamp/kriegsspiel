@@ -148,7 +148,7 @@ describe('replay edge cases', () => {
     expect(run().state.time).toBe(30 * 60_000);
   });
 
-  it('carries the world through a slow parse that ends the log', async () => {
+  it('replays a slow parse that ends the log: the barrier held the world at signing', async () => {
     const store = new MemoryGameStore();
     const time = new FakeTime();
     let release!: () => void;
@@ -176,7 +176,47 @@ describe('replay edge cases', () => {
     release();
     await done;
     const [entry] = await store.inputLog('g1');
-    expect(entry!.endGameMs!).toBeGreaterThan(entry!.gameMs);
+    // Game time stalled during the parse, so the entry ends where it was signed.
+    expect(entry!.endGameMs).toBe(entry!.gameMs);
+    expect((await replayOf(store)()).state).toEqual(game.state);
+  });
+
+  it('replays a command served during a parse, which the log appends before the order', async () => {
+    const store = new MemoryGameStore();
+    const time = new FakeTime();
+    let release!: () => void;
+    const parser: OrderParser = {
+      parse: async (text) => {
+        await new Promise<void>((r) => (release = r));
+        return {
+          kind: 'intents',
+          text,
+          unitId: 'blue-1',
+          intents: [{ kind: 'move', to: { x: 20, y: 20 } }],
+        };
+      },
+    };
+    host = new GameHost({
+      store,
+      parser,
+      registry: createRegistry(),
+      wallNow: time.now,
+      timers: time,
+    });
+    const game = await host.create('g1', loadScenario(holdTheBridge), { rate: 4 });
+    await time.advance(3_000);
+    const done = game.submit({ kind: 'order', side: 'blue', text: 'march' });
+    await time.advance(2_000);
+    await game.submit({ kind: 'setRate', rate: 8 });
+    release();
+    await done;
+    await time.advance(60_000);
+    await game.submit({ kind: 'pause' });
+    const log = await store.inputLog('g1');
+    const kinds = log.map((e) => e.command.kind);
+    expect(kinds.indexOf('setRate')).toBeLessThan(kinds.indexOf('order'));
+    const order = log.find((e) => e.command.kind === 'order')!;
+    expect(log.find((e) => e.command.kind === 'setRate')!.gameMs).toBe(order.gameMs);
     expect((await replayOf(store)()).state).toEqual(game.state);
   });
 
