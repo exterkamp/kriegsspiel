@@ -36,6 +36,11 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Open.** Default hierarchy is assumed to be shared HQ, with chain-of-command as an option. Command level is assumed to be brigades and battalions.
 **See.** [gameplay.md](gameplay.md)
 
+## D7: Engine world model and scenario data
+**Decision.** Game time is an integer count of game milliseconds. The map is a row-major tile grid (open, wood, river, bridge, road). Scenarios are plain JSON-compatible data, and `loadScenario` validates them and builds the initial `GameState` at t=0. "Hold the Bridge" is 40x30 tiles, with 3 units per side. Blue wins by holding the bridge for 180 game minutes, and Red wins by taking it. A test greps the engine sources for wall-clock and ambient-random calls.
+**Why.** Integer time keeps replay exact, and validated plain data keeps state JSON round-trippable.
+**See.** [architecture.md](architecture.md)
+
 ## Open questions
 - Default clock ratio (decide after the first scenario).
 - Command level and default hierarchy (assumptions above).
