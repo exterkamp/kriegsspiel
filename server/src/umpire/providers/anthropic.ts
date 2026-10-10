@@ -1,19 +1,28 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { TransportError } from './transport.js';
-import type { TransportRequest, TransportResponse, UmpireTransport } from './transport.js';
+import { TransportError } from '../provider.js';
+import type {
+  LlmProvider,
+  ProviderCapabilities,
+  ProviderRequest,
+  ProviderResponse,
+} from '../provider.js';
+import { isRetryableStatus, retryAfterMs } from './http.js';
 
 /**
  * Sends one request through the Anthropic SDK using structured outputs
- * (`output_config.format`). SDK retries are off: `AnthropicUmpireClient` owns retry and backoff.
+ * (`output_config.format`). SDK retries are off: `ProviderUmpireClient` owns retry and backoff.
+ * This is the only file that imports the SDK.
  */
-export class AnthropicTransport implements UmpireTransport {
+export class AnthropicProvider implements LlmProvider {
+  readonly id = 'anthropic';
+  readonly capabilities: ProviderCapabilities = { structuredOutput: 'native', toolUse: true };
   private readonly client: Anthropic;
 
   constructor(client?: Anthropic) {
     this.client = client ?? new Anthropic({ maxRetries: 0 });
   }
 
-  async send(req: TransportRequest, signal: AbortSignal): Promise<TransportResponse> {
+  async generate(req: ProviderRequest, signal: AbortSignal): Promise<ProviderResponse> {
     let message: Anthropic.Message;
     try {
       message = await this.client.messages.create(
@@ -21,7 +30,8 @@ export class AnthropicTransport implements UmpireTransport {
           model: req.model,
           max_tokens: req.maxTokens,
           system: req.system,
-          messages: [{ role: 'user', content: req.user }],
+          messages: req.messages,
+          ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
           output_config: { format: { type: 'json_schema', schema: req.schema } },
         },
         { signal },
@@ -45,23 +55,18 @@ export class AnthropicTransport implements UmpireTransport {
 }
 
 function toTransportError(err: unknown): Error {
-  // Aborts come from our own timeout; let the wrapper classify them.
+  // Aborts come from our own timeout; let the client classify them.
   if (err instanceof Anthropic.APIUserAbortError) return err;
   if (err instanceof Anthropic.APIConnectionError) {
     return new TransportError(err.message, true);
   }
   if (err instanceof Anthropic.APIError) {
     const status = err.status ?? 0;
-    const retryable = status === 408 || status === 409 || status === 429 || status >= 500;
-    const ms = Number(err.headers?.get('retry-after-ms'));
-    const secs = Number(err.headers?.get('retry-after'));
-    const retryAfterMs =
-      Number.isFinite(ms) && ms > 0
-        ? ms
-        : Number.isFinite(secs) && secs > 0
-          ? secs * 1000
-          : undefined;
-    return new TransportError(`${status}: ${err.message}`, retryable, retryAfterMs);
+    return new TransportError(
+      `${status}: ${err.message}`,
+      isRetryableStatus(status),
+      err.headers ? retryAfterMs(err.headers) : undefined,
+    );
   }
   return err instanceof Error ? err : new Error(String(err));
 }
