@@ -18,6 +18,8 @@ const CATEGORY: Record<ViewReport['kind'], Dispatch['category']> = {
   contact: 'scouts',
   unitLost: 'subordinates',
   orderDelivered: 'subordinates',
+  lowAmmo: 'staff',
+  exhausted: 'subordinates',
 };
 
 export function toDispatch(r: ViewReport): Dispatch {
@@ -62,8 +64,8 @@ export function toSideView(view: EngineSideView, clock: ClockState): SideView {
       strength: u.strength,
       // The engine scores morale 0..100; the wire uses 0..1.
       morale: Math.min(1, Math.max(0, u.morale / 100)),
-      // There is no supply model yet, so every unit is fully supplied.
-      supply: 1,
+      // The wire's supply is the share of ammunition left (engine 0..100).
+      supply: Math.min(1, Math.max(0, u.ammo / 100)),
     })),
     visibleEnemies: view.visibleEnemies.map((e) => ({
       id: e.id,

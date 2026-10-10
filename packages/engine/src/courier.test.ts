@@ -44,7 +44,7 @@ const ORDER: Order = {
 };
 
 /** A game with red's hussars sitting on blue's courier route to blue-1, unless `lurk` is false. */
-function game(seed: number, opts: { lurk?: boolean; sightFactor?: number } = {}) {
+function game(seed: number, opts: { lurk?: boolean; sightFactor?: number; order?: Order } = {}) {
   const g = loadScenario(holdTheBridge);
   const world: GameState = {
     ...g,
@@ -54,7 +54,7 @@ function game(seed: number, opts: { lurk?: boolean; sightFactor?: number } = {})
       u.id === 'red-3' && opts.lurk !== false ? { ...u, center: pointMm(1950, 2700) } : u,
     ),
   };
-  return issueOrder(createState(seed, world, 0), ORDER);
+  return issueOrder(createState(seed, world, 0), opts.order ?? ORDER);
 }
 
 const END = 60 * MS_PER_MINUTE;
@@ -159,6 +159,40 @@ describe('courier loss and garbling', () => {
     expect(types(r.emitted)).toContain('order_delivered');
     const u = unit(r.state, 'blue-1');
     expect(u.center).not.toEqual(DEST);
+  });
+
+  it('garbles the intent the unit adopts, not a leading conditional one', () => {
+    const later = pointMm(2600, 2600);
+    const order: Order = {
+      ...ORDER,
+      intents: [
+        { kind: 'at', gameTime: 500 * MS_PER_MINUTE, then: [{ kind: 'hold', at: later }] },
+        { kind: 'move', to: DEST },
+      ],
+    };
+    const mixed = (seed: number) => game(seed, { lurk: false, sightFactor: 0.25, order });
+    const seeds = seedsWhere(500, mixed, 'order_garbled');
+    expect(seeds.length).toBeGreaterThan(0);
+    const r = run(mixed(seeds[0]!));
+    const u = unit(r.state, 'blue-1');
+    // The unit marched to the garbled destination, not DEST.
+    expect(u.center).not.toEqual(DEST);
+    expect(u.center).not.toEqual(later);
+    // The standing order keeps its own destination.
+    expect(u.standing?.[0]?.then).toEqual([{ kind: 'hold', at: later }]);
+  });
+
+  it('does not garble an order with no destination to move', () => {
+    const order: Order = {
+      ...ORDER,
+      intents: [{ kind: 'at', gameTime: 50 * MS_PER_MINUTE, then: [] }],
+    };
+    const none = seedsWhere(
+      200,
+      (s) => game(s, { lurk: false, sightFactor: 0.25, order }),
+      'order_garbled',
+    );
+    expect(none).toEqual([]);
   });
 
   it('is rarer in clear weather', () => {

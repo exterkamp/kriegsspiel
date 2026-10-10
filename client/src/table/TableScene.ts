@@ -11,6 +11,7 @@ import {
   type PickResult,
 } from './picking.js';
 import { facingToRotationY, fitDistance } from './framing.js';
+import { deskPose, easeInOut, lerpPose, type CameraPose } from './transition.js';
 import type { GhostPiece, OwnPiece, SceneState } from './types.js';
 
 const SIDE_COLOURS: Record<string, number> = { blue: 0x2f55a4, red: 0xa83232 };
@@ -58,6 +59,10 @@ export class TableScene {
   private pieces = new Map<string, PieceObject>();
   private piecesRoot = new THREE.Group();
   private raf = 0;
+  private atDesk = false;
+  /** Camera pose to return to when leaving the desk, so the table looks the same as it was left. */
+  private tablePose: CameraPose | undefined;
+  private dolly: { from: CameraPose; to: CameraPose; start: number; ms: number } | undefined;
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -170,6 +175,7 @@ export class TableScene {
 
   /** Camera straight above the map centre, for precise plotting. */
   snapTopDown(): void {
+    if (this.atDesk) return;
     this.controls.target.set(0, 0, 0);
     this.camera.position.set(0, this.fitDistance(), 0.001);
     this.controls.update();
@@ -183,6 +189,16 @@ export class TableScene {
       x: Math.min(map.width, Math.max(0, coord.x)),
       y: Math.min(map.height, Math.max(0, coord.y)),
     });
+    if (this.atDesk && this.tablePose) {
+      // The camera is at the desk: move the saved table pose, so the table is there when the player returns.
+      const { position: p, target: t } = this.tablePose;
+      const delta = to.sub(new THREE.Vector3(t.x, t.y, t.z)).setY(0);
+      p.x += delta.x;
+      p.z += delta.z;
+      t.x += delta.x;
+      t.z += delta.z;
+      return;
+    }
     const delta = to.sub(this.controls.target).setY(0);
     this.controls.target.add(delta);
     this.camera.position.add(delta);
@@ -191,6 +207,7 @@ export class TableScene {
 
   /** Angled view from the near edge of the table. */
   snapOblique(): void {
+    if (this.atDesk) return;
     const { height } = this.state?.map ?? { height: 3000 };
     this.controls.target.set(0, 0, 0);
     this.camera.position
@@ -198,6 +215,55 @@ export class TableScene {
       .normalize()
       .multiplyScalar(this.fitDistance() * 0.85);
     this.controls.update();
+  }
+
+  private currentPose(): CameraPose {
+    const { position: p } = this.camera;
+    const t = this.controls.target;
+    return { position: { x: p.x, y: p.y, z: p.z }, target: { x: t.x, y: t.y, z: t.z } };
+  }
+
+  private setPose(pose: CameraPose): void {
+    this.camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+    this.controls.target.set(pose.target.x, pose.target.y, pose.target.z);
+    this.camera.lookAt(this.controls.target);
+  }
+
+  /** True while the camera is at, or moving to, the desk. */
+  get deskActive(): boolean {
+    return this.atDesk;
+  }
+
+  /**
+   * Dolly the camera from the table to the desk, or back. The scene keeps rendering and keeps its pieces and
+   * map throughout; only the camera moves. Orbit input is off while at the desk. `ms` of 0 jumps.
+   */
+  setDesk(on: boolean, ms = 600, now = performance.now()): void {
+    if (on === this.atDesk) return;
+    this.atDesk = on;
+    this.controls.enabled = !on;
+    const from = this.currentPose();
+    let to: CameraPose;
+    if (on) {
+      // A dolly still running means the camera is mid-flight back to the table: keep the pose it is heading to.
+      if (!this.dolly || !this.tablePose) this.tablePose = from;
+      const { height } = this.state?.map ?? { height: 3000 };
+      to = deskPose(this.tablePose, height, this.span);
+    } else {
+      to = this.tablePose ?? from;
+    }
+    this.dolly = { from, to, start: now, ms };
+    this.stepDolly(now);
+  }
+
+  /** Advance a running dolly to wall time `now`. Returns true while still moving. */
+  stepDolly(now: number): boolean {
+    const d = this.dolly;
+    if (!d) return false;
+    const t = d.ms <= 0 ? 1 : (now - d.start) / d.ms;
+    this.setPose(lerpPose(d.from, d.to, easeInOut(t)));
+    if (t >= 1) this.dolly = undefined;
+    return t < 1;
   }
 
   /** Number of pieces currently in the scene (for tests and debugging). */
@@ -384,7 +450,8 @@ export class TableScene {
   start(): void {
     if (this.raf) return;
     const loop = (): void => {
-      this.controls.update();
+      if (this.dolly) this.stepDolly(performance.now());
+      else if (this.controls.enabled) this.controls.update();
       this.renderer.render(this.scene, this.camera);
       this.raf = requestAnimationFrame(loop);
     };

@@ -1,3 +1,4 @@
+import type { Pace } from './fatigue.js';
 import type { Order, OrderIntent } from './orders.js';
 import type { PlacementProposal, PlacementVerdict } from './placement.js';
 
@@ -124,6 +125,8 @@ export interface Leg {
   to: Point;
   startedAt: GameTime;
   arriveAt: GameTime;
+  /** The game ms per metre of cost-1 ground the leg was timed with (pace and fatigue at its start). */
+  msPerMetre?: number;
 }
 
 export const UNIT_KINDS = ['infantry', 'cavalry', 'artillery'] as const;
@@ -177,6 +180,12 @@ export interface Unit {
   strength: number;
   /** 0..100. */
   morale: number;
+  /** 0 fresh .. 100 spent. Slows the march and, when high, wears morale down. */
+  fatigue: number;
+  /** 0..100: the share of its ammunition left. At 0 its fire is nearly useless. */
+  ammo: number;
+  /** How hard the current march is pushed. Only matters while marching. */
+  pace: Pace;
   intent: Intent;
   /** Conditional and timed orders waiting on their trigger. Absent when there are none. */
   standing?: StandingOrder[];
@@ -194,6 +203,8 @@ export interface Side {
   controller: 'human' | 'scripted';
   /** Where this side's orders start from. Couriers ride from here. */
   hq: Point;
+  /** Where wagons load ammunition. Defaults to the HQ when a scenario names none. */
+  depots?: Point[];
 }
 
 /**
@@ -220,7 +231,7 @@ export interface Outcome {
 /** A report waiting for, or already past, its courier delay. Belongs to one side's intel. */
 export interface Report {
   id: string;
-  kind: 'contact' | 'unitLost' | 'orderDelivered';
+  kind: 'contact' | 'unitLost' | 'orderDelivered' | 'lowAmmo' | 'exhausted';
   /** Game time of the thing reported. */
   observedAt: GameTime;
   /** Game time the report reaches HQ (observedAt plus courier delay). */

@@ -13,6 +13,10 @@ import {
 } from './net/state.js';
 import { Hud, buildOrderText } from './hud/hud.js';
 import { parseSession, wsUrl } from './session.js';
+import { mount } from 'svelte';
+import Desk from './desk/Desk.svelte';
+import { activeView, gameState } from './desk/store.js';
+import { isDeskView } from './desk/views.js';
 
 async function createGame(side: string, rate?: number): Promise<{ game: string; token: string }> {
   const res = await fetch('/games', {
@@ -38,6 +42,15 @@ async function main(app: HTMLElement): Promise<void> {
   window.addEventListener('resize', () => table.resize());
   app.querySelector('#top')?.addEventListener('click', () => table.snapTopDown());
   app.querySelector('#obl')?.addEventListener('click', () => table.snapOblique());
+  // The desk shell sits over the canvas. The table keeps rendering whichever view is open.
+  mount(Desk, { target: app });
+  activeView.subscribe((v) => {
+    app.dataset.view = v;
+    table.setDesk(
+      isDeskView(v),
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 600,
+    );
+  });
   if (import.meta.env.DEV) (window as unknown as { table: TableScene }).table = table;
 
   let params = parseSession(window.location.search);
@@ -64,17 +77,20 @@ async function main(app: HTMLElement): Promise<void> {
       if (!conn.sendOrder(orderId, full)) return 'Not connected. Try again when the link is back.';
       const now = state.clock ? gameNowMs(state.clock, Date.now()) : 0;
       state = withPendingOrder(state, { orderId, text: full, sentAtGame: now });
+      gameState.set(state);
       hud.render(state, Date.now());
       return undefined;
     },
     onOpenDispatch(d) {
       state = withRead(state, d.id);
+      gameState.set(state);
       hud.render(state, Date.now());
       if (d.location) table.panTo(d.location);
     },
   });
 
   const rerender = () => {
+    gameState.set(state);
     hud.render(state, Date.now());
     if (state.view) table.apply(buildSceneState(state.view, fixtureMap));
   };
@@ -105,6 +121,7 @@ async function main(app: HTMLElement): Promise<void> {
   } else {
     // No server: the fixture board with an empty desk.
     state = { ...withLink(state, 'offline'), view: fixtureView };
+    gameState.set(state);
     hud.render(state, Date.now());
   }
 }

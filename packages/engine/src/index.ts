@@ -150,3 +150,16 @@ export type {
   ViewReport,
   ViewUnit,
 } from './visibility.js';
+export * from './fatigue.js';
+export {
+  AMMO_PER_FIRE_TICK,
+  LOW_AMMO,
+  OUT_OF_AMMO_FACTOR,
+  RESUPPLY_PER_TICK,
+  SUPPLY_TICK_EVENT,
+  SUPPLY_TICK_MS,
+  WAGON_REACH_COST_M,
+  depotsOf,
+  registerSupply,
+  wagonsReach,
+} from './supply.js';

@@ -10,6 +10,7 @@ import {
   rideRisk,
 } from './courier.js';
 import { distance } from './geometry.js';
+import type { Pace } from './fatigue.js';
 import { findPath, legCost } from './navigation.js';
 import { describePlace } from './place.js';
 import { schedule } from './queue.js';
@@ -28,7 +29,7 @@ import {
 
 /** What an order asks a unit to do, as parsed. The engine turns it into an `Intent` on delivery. */
 export type OrderIntent =
-  | { kind: 'move'; to: Point }
+  | { kind: 'move'; to: Point; pace?: Pace }
   | { kind: 'hold'; at: Point }
   | { kind: 'withdraw'; toward: Point }
   /** Do `then` once `trigger` fires, judged from what the unit itself knows. */
@@ -166,15 +167,21 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       later.push({ time: at, type: COURIER_LOST_EVENT, payload: { courierId: courier.id } });
     }
     if (rng.next() < risk.garble) {
-      const intent = order.intents[0]!;
+      // All draws are taken whatever the order holds, so the RNG stream does not depend on it.
       const angle = rng.next() * 2 * Math.PI;
       const away = (GARBLE_MIN_M + rng.next() * (GARBLE_MAX_M - GARBLE_MIN_M)) * 1000;
-      const d = destinationOf(intent) ?? unit.center;
-      const to = {
-        x: Math.min(world.map.width, Math.max(0, Math.round(d.x + Math.cos(angle) * away))),
-        y: Math.min(world.map.height, Math.max(0, Math.round(d.y + Math.sin(angle) * away))),
-      };
-      courier.garbled = [redirect(intent, to), ...order.intents.slice(1)];
+      // The intent the unit adopts is the first immediate one (see `applyIntents`); an order of
+      // conditionals only garbles the first that names a destination, and none if none does.
+      const at = order.intents.findIndex((i) => i.kind !== 'when' && i.kind !== 'at');
+      const i = at >= 0 ? at : order.intents.findIndex((x) => destinationOf(x) !== undefined);
+      const d = i >= 0 ? destinationOf(order.intents[i]!) : undefined;
+      if (d) {
+        const to = {
+          x: Math.min(world.map.width, Math.max(0, Math.round(d.x + Math.cos(angle) * away))),
+          y: Math.min(world.map.height, Math.max(0, Math.round(d.y + Math.sin(angle) * away))),
+        };
+        courier.garbled = order.intents.map((x, n) => (n === i ? redirect(x, to) : x));
+      }
     }
     for (let t = ev.time + INTERCEPT_CHECK_MS; t < arrival; t += INTERCEPT_CHECK_MS) {
       later.push({ time: t, type: COURIER_STEP_EVENT, payload: { courierId: courier.id } });

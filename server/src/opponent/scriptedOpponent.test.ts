@@ -51,6 +51,8 @@ function view(over: Partial<EngineSideView> = {}): EngineSideView {
         footprint: { frontage: 100, depth: 30 },
         strength: 650,
         morale: 80,
+        fatigue: 0,
+        ammo: 100,
       },
     ],
     visibleEnemies: [],

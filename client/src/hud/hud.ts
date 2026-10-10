@@ -99,7 +99,7 @@ export class Hud {
          <ul id="pending"></ul>
          <ul id="notices"></ul>
        </section>
-       <section id="tray" aria-label="In-tray"><h2>In-tray</h2><ul id="tray-list"></ul></section>`,
+       <section id="tray" aria-label="In-tray" tabindex="-1"><h2>In-tray</h2><ul id="tray-list"></ul></section>`,
     );
     const q = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
     this.clockEl = q('#clock-text');

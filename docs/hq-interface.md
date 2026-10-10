@@ -23,7 +23,7 @@ The game is played from a general's headquarters. There is no HUD and no minimap
 | **Journal / war diary** | A chronological record of orders sent and reports received, plus your own notes. | Reconstructing what happened, and the after-action reveal |
 | **Umpire's window** (post-game) | The same map with the true positions and every ruling revealed. | Learning from the game |
 
-Navigation is by clicking desk objects, plus hotkeys. A small clock on the desk and a "new papers" indicator avoid a constant need to check every view.
+Navigation is by clicking desk objects, plus hotkeys (T table, I in-tray, O orders, R order of battle, J journal, C conference, Esc back to the table). The desk shell is built; moving to a desk view dollies the camera down to the desk and fades the canvas, and the canvas keeps rendering and keeps its state. A small clock on the desk and a "new papers" indicator avoid a constant need to check every view.
 
 ## The map layers
 

@@ -6,15 +6,18 @@
   "scripts": {
     "dev": "vite --host --port \"${PORT:-5173}\"",
     "build": "vite build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
     "@kriegsspiel/protocol": "*",
+    "svelte": "^5.57.2",
     "three": "^0.170.0"
   },
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.1.1",
     "@types/three": "^0.170.0",
-    "jsdom": "^30.1.2"
+    "jsdom": "^30.1.2",
+    "svelte-check": "^4.7.6"
   }
 }
