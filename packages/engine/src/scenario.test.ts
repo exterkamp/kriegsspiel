@@ -166,6 +166,10 @@ describe('loader validation', () => {
     expect(() => loadScenario(d)).toThrow(message);
   };
 
+  it('rejects an empty loose shape, which the wire format refuses', () => {
+    bad((d) => (d.units[0].shape = []), /shape must have at least one sub-position/);
+  });
+
   it('rejects a side HQ in the river', () => {
     bad((d) => (d.sides[0].hq = { x: 500, y: 1450 }), /hq must be on passable ground/);
   });

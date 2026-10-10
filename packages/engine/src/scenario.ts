@@ -229,6 +229,9 @@ function parseUnits(raw: unknown, map: TerrainMap, sides: Side[]): Unit[] {
       status: 'active',
       home: { ...center },
     };
+    if (unit.shape && unit.shape.length === 0) {
+      fail(`${p}.shape must have at least one sub-position`);
+    }
     const where = `(${center.x / 1000}, ${center.y / 1000})`;
     if (!inside(map, center)) fail(`${p} center ${where} is off the map`);
     for (const sp of subPositions(unit)) {
