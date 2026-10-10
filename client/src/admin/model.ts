@@ -72,3 +72,30 @@ export function apiUrl(
 export function backoffMs(attempt: number): number {
   return Math.min(10_000, 1000 * 2 ** Math.max(0, attempt));
 }
+
+export type MarkKind = 'input' | 'event' | 'contact' | 'order' | 'llm';
+
+export interface ReplayMark {
+  ms: number;
+  kind: MarkKind;
+  label: string;
+}
+
+/** Index of the first mark strictly after `ms` (of `kind`, if given), or -1. */
+export function nextMarkIndex(marks: ReplayMark[], ms: number, kind?: MarkKind): number {
+  return marks.findIndex((m) => m.ms > ms && (!kind || m.kind === kind));
+}
+
+/** Index of the last mark strictly before `ms` (of `kind`, if given), or -1. */
+export function prevMarkIndex(marks: ReplayMark[], ms: number, kind?: MarkKind): number {
+  for (let i = marks.length - 1; i >= 0; i--) {
+    if (marks[i]!.ms < ms && (!kind || marks[i]!.kind === kind)) return i;
+  }
+  return -1;
+}
+
+/** `m:ss` for a game time; the scrubber and mark list share it. */
+export function formatGameMs(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}

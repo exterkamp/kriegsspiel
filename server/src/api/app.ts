@@ -86,8 +86,9 @@ export async function buildApp(options: AppOptions): Promise<App> {
   };
   // The hub and host refer to each other: the host notifies the hub, the hub looks games up.
   const hub: Hub = new Hub((id) => host.get(id), onError);
+  const store = options.store ?? new MemoryGameStore();
   const host: GameHost = new GameHost({
-    store: options.store ?? new MemoryGameStore(),
+    store,
     parser: options.parser,
     registry: createRegistry(),
     wallNow: options.wallNow ?? Date.now,
@@ -106,7 +107,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   // Liveness for the container health check. Does not touch a game or the store.
   server.get('/healthz', async () => ({ ok: true }));
 
-  if (trace) await adminApi(server, { host, trace, token: options.admin?.token });
+  if (trace) await adminApi(server, { host, trace, store, token: options.admin?.token });
 
   if (options.staticDir) {
     await server.register(fastifyStatic, { root: resolve(options.staticDir), redirect: true });

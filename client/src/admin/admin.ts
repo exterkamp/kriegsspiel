@@ -2,6 +2,7 @@
  * Admin page shell: game picker, live indicator and empty tabbed panels with a shared filter bar.
  * Read-only: it only issues GETs to `/admin/api` and shares nothing with the game client.
  */
+import { ReplayPanel } from './replay.js';
 import {
   PANELS,
   adminToken,
@@ -36,6 +37,7 @@ export class AdminPage {
   private readonly tabs = new Map<PanelId, HTMLButtonElement>();
   private readonly panels = new Map<PanelId, HTMLElement>();
   private readonly note: HTMLElement;
+  private replay!: ReplayPanel;
 
   constructor(
     private readonly root: HTMLElement,
@@ -74,9 +76,11 @@ export class AdminPage {
       const sec = document.createElement('section');
       sec.setAttribute('role', 'tabpanel');
       sec.dataset.panel = id;
-      sec.innerHTML = `<p class="empty">${id} panel — not implemented yet.</p>`;
+      if (id !== 'Replay')
+        sec.innerHTML = `<p class="empty">${id} panel — not implemented yet.</p>`;
       main.append(sec);
       this.panels.set(id, sec);
+      if (id === 'Replay') this.replay = new ReplayPanel(sec, this.token, this.fetchFn);
     }
     nav.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
@@ -126,6 +130,7 @@ export class AdminPage {
     }
     for (const [pid, sec] of this.panels) sec.hidden = pid !== id;
     this.applyFilter();
+    if (id === 'Replay') void this.replay.setGame(this.gameId);
   }
 
   private applyFilter(): void {
@@ -174,6 +179,7 @@ export class AdminPage {
     this.closeStream();
     this.streamCount = 0;
     this.status = id ? 'connecting' : 'live';
+    if (this.panel === 'Replay') void this.replay.setGame(id);
     if (id) this.openStream(id);
     this.render();
   }

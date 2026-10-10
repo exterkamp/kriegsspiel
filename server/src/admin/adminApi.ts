@@ -4,6 +4,8 @@
  *   GET /admin/api/games                       open games with clock and trace counts
  *   GET /admin/api/games/:id/state             master state snapshot (unfiltered; never sent to clients)
  *   GET /admin/api/games/:id/entries           trace entries: ?kind= &correlationId= &after= &limit=
+ *   GET /admin/api/games/:id/replay            timeline of the input log: end time and marks to jump to
+ *   GET /admin/api/games/:id/replay/at?at=ms   master state, both side views and events at a game time
  *   GET /admin/api/games/:id/stream            server-sent events of new entries; ?after= replays first
  *
  * Gating: `buildApp` registers this plugin only when the admin view is enabled, so otherwise every
@@ -17,6 +19,9 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { GameHost } from '../game/index.js';
 import type { TraceEntry, TraceStore } from '../debug/trace.js';
+import type { GameStore } from '../game/store.js';
+import { createRegistry, loadScenarioById, startingState } from '../game/registry.js';
+import { replayAt, replayTimeline, type ReplayInput } from './replayView.js';
 
 export const ADMIN_PREFIX = '/admin/api';
 export const DEFAULT_ENTRY_LIMIT = 200;
@@ -26,6 +31,8 @@ const HEARTBEAT_MS = 15_000;
 export interface AdminOptions {
   host: GameHost;
   trace: TraceStore;
+  /** Where the input log lives; replay reads it and never writes. */
+  store: GameStore;
   /** Lets non-loopback callers in when they present it. Unset: loopback only. */
   token?: string;
 }
@@ -67,6 +74,11 @@ const EntryQuery = z.object({
   correlationId: z.string().min(1).optional(),
   after: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().min(1).max(MAX_ENTRY_LIMIT).optional(),
+  token: z.string().optional(),
+});
+
+const AtQuery = z.object({
+  at: z.coerce.number().finite().min(0),
   token: z.string().optional(),
 });
 
@@ -137,6 +149,41 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
         entries,
         next: entries.length === limit ? entries[entries.length - 1]!.seq : undefined,
       };
+    },
+  );
+
+  /** The input log of a game, or why it cannot be replayed. Replay never touches a parser or umpire. */
+  async function replayInput(id: string): Promise<ReplayInput | undefined> {
+    const header = await options.store.logHeader(id);
+    if (!header) return undefined;
+    return {
+      header,
+      world: loadScenarioById(header.scenarioId),
+      entries: await options.store.inputLog(id),
+      registry: createRegistry(),
+      init: startingState,
+    };
+  }
+
+  server.get<{ Params: { id: string } }>(`${ADMIN_PREFIX}/games/:id/replay`, async (req, reply) => {
+    const input = await replayInput(req.params.id).catch(() => null);
+    if (input === null) return reply.code(422).send({ error: 'cannot_replay' });
+    if (!input) return reply.code(404).send({ error: 'no_such_game' });
+    // A running game replays up to now; a finished or closed one to where its log ends.
+    return replayTimeline(input, host.get(req.params.id)?.state.time);
+  });
+
+  server.get<{ Params: { id: string }; Querystring: Record<string, string> }>(
+    `${ADMIN_PREFIX}/games/:id/replay/at`,
+    async (req, reply) => {
+      const q = AtQuery.safeParse(req.query);
+      if (!q.success)
+        return reply.code(400).send({ error: 'bad_request', message: q.error.message });
+      const input = await replayInput(req.params.id).catch(() => null);
+      if (input === null) return reply.code(422).send({ error: 'cannot_replay' });
+      if (!input) return reply.code(404).send({ error: 'no_such_game' });
+      const live = host.get(req.params.id)?.state.time;
+      return replayAt(input, live === undefined ? q.data.at : Math.min(q.data.at, live));
     },
   );
 

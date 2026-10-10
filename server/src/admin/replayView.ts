@@ -1,0 +1,112 @@
+/**
+ * Admin replay (Epic #119, story 8.7): rebuild a game at a chosen game time from its input log.
+ * Read-only diagnostics. It runs `replayLog` on a manual clock, so it makes no model calls and
+ * waits on no wall clock: orders use the parse result recorded in the log.
+ *
+ * The per-side views come from the same visibility filter the live game uses, but they are only
+ * ever returned by the admin API, never to a game client.
+ */
+import {
+  viewFor,
+  type EmittedEvent,
+  type EngineState,
+  type EventRegistry,
+  type GameState,
+  type SideId,
+} from '@kriegsspiel/engine';
+import type { SideView } from '@kriegsspiel/protocol';
+import { toSideView } from '../api/sideView.js';
+import { replayLog } from '../game/replay.js';
+import type { InputLogEntry, InputLogHeader } from '../game/store.js';
+
+export type MarkKind = 'input' | 'event' | 'contact' | 'order' | 'llm';
+
+/** A point on the scrubber's time line worth jumping to. */
+export interface ReplayMark {
+  ms: number;
+  kind: MarkKind;
+  label: string;
+}
+
+export interface ReplayTimeline {
+  /** Last game time the scrubber can reach. */
+  endMs: number;
+  marks: ReplayMark[];
+}
+
+export interface ReplayAt {
+  gameMs: number;
+  /** Unfiltered master state, as `GET /state` shows it for a live game. */
+  engine: EngineState<GameState>;
+  views: Record<string, SideView>;
+  /** Events the engine emitted up to `gameMs`, in firing order. */
+  events: EmittedEvent[];
+  /** Always 0: replay has no model client to call. Reported so the admin page can say so. */
+  llmCalls: 0;
+}
+
+export interface ReplayInput {
+  header: InputLogHeader;
+  world: GameState;
+  entries: readonly InputLogEntry[];
+  registry: EventRegistry<GameState>;
+  init?: (state: EngineState<GameState>) => EngineState<GameState>;
+}
+
+const EVENT_KIND: Record<string, MarkKind> = {
+  'contact.begin': 'contact',
+  order_delivered: 'order',
+};
+
+function describeInput(e: InputLogEntry): string {
+  const c = e.command;
+  return c.kind === 'order' ? `${c.side} order: ${c.text}` : `command ${c.kind}`;
+}
+
+/** Replay to `untilMs` (or to where the log ends) and list the moments worth stopping at. */
+export function replayTimeline(input: ReplayInput, untilMs?: number): ReplayTimeline {
+  const { state, emitted } = replayLog(
+    input.header,
+    input.world,
+    input.entries,
+    input.registry,
+    untilMs,
+    input.init,
+  );
+  const marks: ReplayMark[] = [];
+  for (const e of input.entries) {
+    if (e.error || (untilMs !== undefined && e.gameMs > untilMs)) continue;
+    marks.push({ ms: e.gameMs, kind: 'input', label: describeInput(e) });
+    // A parsed order is the one place a model was called while the game was played.
+    if (e.command.kind === 'order' && e.parse && !e.agent) {
+      marks.push({ ms: e.gameMs, kind: 'llm', label: `order parse: ${e.command.text}` });
+    }
+  }
+  for (const ev of emitted) {
+    marks.push({ ms: ev.time, kind: EVENT_KIND[ev.type] ?? 'event', label: ev.type });
+  }
+  marks.sort((a, b) => a.ms - b.ms);
+  return { endMs: state.time, marks };
+}
+
+/** The game as it stood at `gameMs`: master state, each side's view and the events so far. */
+export function replayAt(input: ReplayInput, gameMs: number): ReplayAt {
+  const { state, emitted } = replayLog(
+    input.header,
+    input.world,
+    input.entries,
+    input.registry,
+    gameMs,
+    input.init,
+  );
+  const views: Record<string, SideView> = {};
+  for (const side of state.world.sides) {
+    views[side.id] = toSideView(viewFor(state.world, side.id as SideId, state.time), {
+      gameMsAtAnchor: state.time,
+      wallMsAtAnchor: 0,
+      rate: 1,
+      status: 'stopped',
+    });
+  }
+  return { gameMs: state.time, engine: state, views, events: emitted, llmCalls: 0 };
+}
