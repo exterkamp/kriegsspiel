@@ -31,7 +31,7 @@ Layers are what let one historical map serve both sides and the engine.
 
 1. **Base map**: a scanned or redrawn period map (hachured hills, roads, woods, villages). Both players see the same base. It is slightly *wrong* in places, as period maps were.
 2. **Truth layer** (server only): the engine's vector terrain features (woods, rivers, roads, bridges, buildings, with cover, concealment and height tags), derived from the base map and corrected where needed. It is continuous: there is no grid or tile.
-3. **Player marks layer**: pins and counters the player places, plus marks the staff add automatically when a report arrives. Each mark records its source report and time, and fades or greys with age.
+3. **Player marks layer**: pins and counters the player places, plus marks the staff add automatically when a report arrives. Each mark records its source report and time, and fades or greys with age. Built as D16b: pins, pencil lines, arrows and range rings, stored per side on the server and never corrected.
 4. **Report sketches**: scouts' sketches attached to a location, for example "bridge at Hohenau, intact, 2 companies".
 5. **Overlays** (toggle): order arrows, planned routes, estimated march times, and a "last known" fog shading showing how old your knowledge is per area.
 

@@ -7,6 +7,7 @@
  */
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { Mark } from '@kriegsspiel/protocol';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
 import type { PauseTransition } from '../pause.js';
@@ -96,6 +97,9 @@ export interface GameStore {
   /** Keep the latest per-side views, as of a snapshot. */
   saveViews(gameId: string, views: SideViews): Promise<void>;
   loadViews(gameId: string): Promise<SideViews | undefined>;
+  /** A side's marks (player drawings). Not game input: they are not logged or replayed. */
+  saveMarks(gameId: string, side: string, marks: readonly Mark[]): Promise<void>;
+  loadMarks(gameId: string, side: string): Promise<Mark[]>;
   listGames(): Promise<string[]>;
 }
 
@@ -106,6 +110,15 @@ export class MemoryGameStore implements GameStore {
   private readonly progress = new Map<string, number>();
   private readonly clockLogs = new Map<string, ClockChange[]>();
   private readonly views = new Map<string, SideViews>();
+  private readonly marks = new Map<string, Mark[]>();
+
+  async saveMarks(gameId: string, side: string, marks: readonly Mark[]): Promise<void> {
+    this.marks.set(`${gameId}\0${side}`, structuredClone([...marks]));
+  }
+
+  async loadMarks(gameId: string, side: string): Promise<Mark[]> {
+    return structuredClone(this.marks.get(`${gameId}\0${side}`) ?? []);
+  }
 
   async saveProgress(gameId: string, gameMs: number): Promise<void> {
     this.progress.set(gameId, Math.max(gameMs, this.progress.get(gameId) ?? gameMs));

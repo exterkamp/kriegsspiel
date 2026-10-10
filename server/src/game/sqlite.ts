@@ -11,6 +11,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import type { Mark } from '@kriegsspiel/protocol';
 import type { ClockChange } from '../clock.js';
 import type { GameSnapshot, GameStore, InputLogEntry, InputLogHeader, SideViews } from './store.js';
 
@@ -52,6 +53,12 @@ export const MIGRATIONS: readonly string[] = [
      game_ms REAL NOT NULL,
      views TEXT NOT NULL
    );`,
+  `CREATE TABLE side_marks (
+     game_id TEXT NOT NULL,
+     side TEXT NOT NULL,
+     marks TEXT NOT NULL,
+     PRIMARY KEY (game_id, side)
+   ) WITHOUT ROWID;`,
 ];
 
 /** Older snapshots kept besides the newest (not yet used as a fallback: recovery reads the newest). */
@@ -208,6 +215,19 @@ export class SqliteGameStore implements GameStore {
       .prepare('SELECT seq, game_ms, views FROM side_views WHERE game_id = ?')
       .get(gameId) as { seq: number; game_ms: number; views: string } | undefined;
     return r && { seq: r.seq, gameMs: r.game_ms, views: JSON.parse(r.views) };
+  }
+
+  async saveMarks(gameId: string, side: string, marks: readonly Mark[]): Promise<void> {
+    this.db
+      .prepare('INSERT OR REPLACE INTO side_marks (game_id, side, marks) VALUES (?, ?, ?)')
+      .run(gameId, side, JSON.stringify(marks));
+  }
+
+  async loadMarks(gameId: string, side: string): Promise<Mark[]> {
+    const r = this.db
+      .prepare('SELECT marks FROM side_marks WHERE game_id = ? AND side = ?')
+      .get(gameId, side) as { marks: string } | undefined;
+    return r ? (JSON.parse(r.marks) as Mark[]) : [];
   }
 
   async listGames(): Promise<string[]> {
