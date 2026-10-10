@@ -7,3 +7,7 @@ export { compareEvents, schedule } from './queue.js';
 export { advanceTo, createState } from './advance.js';
 export type { AdvanceResult } from './advance.js';
 export { serialize, deserialize } from './snapshot.js';
+
+export * from './types.js';
+export { loadScenario, ScenarioError } from './scenario.js';
+export { holdTheBridge } from './scenarios/holdTheBridge.js';

@@ -11,7 +11,7 @@ export function seedRng(seed: number): RngState {
 
 /**
  * Seeded RNG (mulberry32). Its whole state is one number, so it can be saved
- * in a snapshot and restored with `new Rng(state)`. Never uses `Math.random`.
+ * in a snapshot and restored with `new Rng(state)`. Never uses ambient randomness.
  */
 export class Rng {
   private s: number;
