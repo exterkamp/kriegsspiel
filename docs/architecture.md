@@ -213,4 +213,5 @@ type Ruling = {                          // an umpire judgment call, always reco
 - **Umpire**: golden tests of order parsing on a corpus of sample orders (including nonsense and injection attempts). A mock umpire with fixtures for all non-LLM tests.
 - **Leak tests**: scripted games checking nothing from the other side's private state appears in a side's payload or narration.
 - **Replay**: a recorded game replays to an identical state with no model calls.
+- **End to end**: `server/src/game/endToEnd.test.ts` plays Hold the Bridge headless (scripted Blue orders against the scripted Red, on a fake wall clock) at rates 1, 4, 12 and in fast-forward, checks the final states and event logs are identical (a failure prints the first divergence) and that replay from the log matches.
 - **Crash recovery**: kill the server mid-game, restart, and check the game comes back paused with state intact.

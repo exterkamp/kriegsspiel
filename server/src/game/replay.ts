@@ -123,7 +123,10 @@ export function replayFrom(
     // A refused or failed command left the engine untouched (the order is queued last).
     if (!entry.error) {
       const { command } = entry;
-      if (command.kind === 'advanceTo') advance(command.gameMs);
+      // An advance is logged at the game time it started from, and agents think (and log orders)
+      // part way through it. So do not run to its target now: later entries catch the world up as
+      // they come, and the settle at the end covers the rest.
+      if (command.kind === 'advanceTo') settled = Math.max(settled, command.gameMs);
       else if (command.kind === 'order' && entry.parse) {
         const res = applyLoggedOrder(state, gameId, entry.seq, command.side, entry.parse);
         if ('state' in res) state = res.state;
