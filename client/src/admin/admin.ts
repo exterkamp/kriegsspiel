@@ -2,6 +2,7 @@
  * Admin page shell: game picker, live indicator and empty tabbed panels with a shared filter bar.
  * Read-only: it only issues GETs to `/admin/api` and shares nothing with the game client.
  */
+import { LlmPanel } from './llm.js';
 import {
   PANELS,
   adminToken,
@@ -36,6 +37,7 @@ export class AdminPage {
   private readonly tabs = new Map<PanelId, HTMLButtonElement>();
   private readonly panels = new Map<PanelId, HTMLElement>();
   private readonly note: HTMLElement;
+  private readonly llm: LlmPanel;
 
   constructor(
     private readonly root: HTMLElement,
@@ -78,6 +80,7 @@ export class AdminPage {
       main.append(sec);
       this.panels.set(id, sec);
     }
+    this.llm = new LlmPanel(this.panels.get('LLM')!);
     nav.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         this.show(stepPanel(this.panel, e.key === 'ArrowRight' ? 1 : -1), true);
@@ -131,6 +134,7 @@ export class AdminPage {
   private applyFilter(): void {
     // Shell only: later stories hook each panel's rows into this shared filter text.
     this.panels.get(this.panel)!.dataset.filter = this.filter.value;
+    this.llm.setFilter(this.filter.value);
   }
 
   private async poll(): Promise<void> {
@@ -173,6 +177,7 @@ export class AdminPage {
     this.gameId = id;
     this.closeStream();
     this.streamCount = 0;
+    this.llm.reset();
     this.status = id ? 'connecting' : 'live';
     if (id) this.openStream(id);
     this.render();
@@ -186,8 +191,13 @@ export class AdminPage {
       this.status = 'live';
       this.render();
     };
-    es.onmessage = () => {
+    es.onmessage = (e) => {
       this.streamCount++;
+      try {
+        this.llm.add(JSON.parse(e.data as string));
+      } catch {
+        // A malformed frame is skipped; the stream carries on.
+      }
       this.render();
     };
     es.onerror = () => {

@@ -14,7 +14,7 @@ class FakeES {
   readyState = 1;
   onopen?: () => void;
   onerror?: () => void;
-  onmessage?: () => void;
+  onmessage?: (e: { data: string }) => void;
   closed = false;
   constructor(public url: string) {
     FakeES.last = this;
@@ -91,6 +91,25 @@ describe('AdminPage', () => {
     expect(document.querySelector<HTMLElement>('#live')!.dataset.status).toBe('live');
     FakeES.last!.onerror!();
     expect(page.linkStatus).toBe('reconnecting');
+    page.stop();
+  });
+
+  it('fills the LLM panel from streamed entries and clears it on a game switch', async () => {
+    const page = mount(vi.fn(() => ok({ games })));
+    page.start();
+    await flush();
+    const msg = (seq: number, kind: string) => ({
+      data: JSON.stringify({ seq, ts: 1, kind, data: { stage: 'judge', ok: true } }),
+    });
+    FakeES.last!.onmessage!(msg(1, 'llm'));
+    FakeES.last!.onmessage!(msg(2, 'engine'));
+    FakeES.last!.onmessage!({ data: 'not json' });
+    const rows = () => document.querySelectorAll('section[data-panel="LLM"] tbody tr[data-seq]');
+    expect(rows()).toHaveLength(1);
+    const picker = document.querySelector<HTMLSelectElement>('#game')!;
+    picker.value = 'bbbbbbbb-2';
+    picker.dispatchEvent(new Event('change'));
+    expect(rows()).toHaveLength(0);
     page.stop();
   });
 
