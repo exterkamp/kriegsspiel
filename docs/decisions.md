@@ -126,3 +126,13 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Boundary.** The reference map and numerical fixtures are not a generated playable scenario. Cross-browser generation/replay and resource targets remain milestone gates; the GPL combined-work distribution decision remains open. No gameplay tile migration or hidden-state delivery path is introduced.
 
 **See.** [Map contract and numerical policies](../packages/maps/README.md), [map architecture](map-architecture.md), [execution log](map-execution-log.md).
+
+## D17: Terrain contours certify the canonical bilinear ground
+
+**Decision.** Standalone terrain uses independently seeded multiscale value noise with configurable ridge and valley shaping. The authoritative ground and grid metadata must be stable under `decimal-6-v1` before contour extraction. Contours use a bilinear graph, determinant-based saddle connectivity, explicit exact-level branches and bounded adaptive refinement. A separate query-based validator checks the complete rounded segment, including interior quadratic extrema, against the recorded vertical tolerance.
+
+**Failure handling.** Sample, level, cell-level, refinement, stitching and vertex work are bounded. Precision that cannot satisfy the requested tolerance produces an explicit failure rather than accepted inconsistent geometry. Hydrology must normalize any changed authoritative ground before regenerating contours; a filled drainage surface remains separate.
+
+**Boundary.** This is consistency with a sampled numerical model, not surveyed terrain accuracy. Full drainage, settlement composition and Node/browser replay remain subsequent gates.
+
+**See.** [Terrain numerical policies](../packages/maps/docs/terrain.md), [execution log](map-execution-log.md).

@@ -82,3 +82,21 @@ Use seeds `1, 2, 3, 7, 17, 31, 97, 55337` for each of flat countryside, wooded h
 - Coordinator root checks all pass: lint, typecheck, build, 335 Vitest tests plus 18 Node tests (353 total). Logs retained locally as `.local/map-gate-b-tests.log` and `.local/map-gate-b-build.log`. D16 and architecture/docs updated with frozen contract and contract-vs-composition boundary.
 - Gate B accepts contract validity only. Full connectivity/local joins/terrain suitability and authoring remain later gates; no distribution authorization inferred.
 - Next: integrate story-sized #134 commit, assign #135 terrain; permit a second exclusive client writer to prepare fixture-based preview after this freeze.
+
+## Active gate C and preview preparation
+
+- Contract checkpoint `28a611c`. #135 assigned map-implementer / w1:p6, gpt-6.1-sol/high for bilinear contours/geometry. Exclusive `packages/maps/src/terrain/**`, `packages/maps/tests/terrain*.test.ts`, `packages/maps/docs/terrain.md`; frozen common source/index remains coordinator-owned. Analytical oracle packet includes determinant saddles, exact four-way saddle, complete-segment height deviation and deterministic work caps.
+- Second writer map-client / w1:p8, gpt-6.1-sol/medium (configured default, bounded UI), owns `client/src/map-authoring/**` and `client/map-authoring.html`. Prepares #140 fixture preview only; no acceptance until #139. No worker/control generator yet. Coordinator integrated maps dependency, source aliases and root lockfile offline.
+- Reviewer map-reviewer / w1:p7 remains read-only, preparing #136 drainage/geography oracles; final #135 review follows implementation. Two writers plus one reviewer; same cwd/tab, no additional worktrees.
+
+- #136 independent preparation: minimax bowl-fill oracle, deterministic flat rank/acyclic paths, distance-aware receiver rule, exact Y-junction accumulation, lake dry-island holes, complete river surface/area policy, buffered dry-abutment crossing candidates and coherent cover. Additive geography output/candidate types are needed because frozen HydrologyOutput intentionally has no final road links/cover. These are later implementation handoffs, not accepted geography.
+- #135 source/in-memory independent review started as terrain modules became available; writer retains all source/test ownership and compiled-artifact checks.
+
+- #140 fixture shell handoff: focused client typecheck and 9 viewport/geometry tests pass. Coordinator added production multi-entry Vite configuration alongside the player entry. No browser/real-map acceptance yet. Client writer resumed exclusive owned paths for concrete preview lifecycle/DPR, crossing contrast and stroke-culling fixes identified by its preparatory inspection.
+
+## Accepted gate C — #135
+
+- Versioned independent terrain and bilinear contour graph with determinant saddles/exact-level branches, adaptive refinement, canonical precision preconditions and complete-segment independent height certification. D17 records this numerical policy. Writer gpt-6.1-sol/high; independent reviewer final PASS, no material findings remain.
+- Focused 35/35 tests; coordinator integrated public exports and reran full maps suite: 97/97 pass. Build/typecheck and scoped lint/format pass. 5/10/15 km terrain-only probe combined 1.33 s, 201.64 MiB peak process RSS; maximum certified contour error .024983 m against .05 m. Full composition/browser performance remains later evidence.
+- Client preparatory fixes pass 15 focused tests/typecheck. Coordinator production client build passes with both entries; existing player bundle has Vite's size advisory. Preview remains unaccepted until real maps/browser gates.
+- Next: story-sized terrain commit, then #136 drainage/water/cover/crossing candidates. Normalize modified ground before dependent contours. No implicit acceptance of complete geography or public distribution.

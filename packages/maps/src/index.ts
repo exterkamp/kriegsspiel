@@ -20,3 +20,12 @@ export {
 } from './canonical.js';
 export { placeId, resolveOverrides, deriveSeed } from './overrides.js';
 export { createReferenceAsset } from './fixtures/reference.js';
+export {
+  generateElevation,
+  generateTerrain,
+  extractContours,
+  validateContourHeights,
+  TERRAIN_VERSION,
+  CONTOUR_VERSION,
+  type ContourHeightEvidence,
+} from './terrain/index.js';
