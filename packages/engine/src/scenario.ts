@@ -82,7 +82,15 @@ function parseMap(raw: unknown): MapGrid {
   return { width, height: rows.length, tiles };
 }
 
-function parseSides(raw: unknown): Side[] {
+function parseHq(o: Record<string, unknown>, i: number, map: MapGrid): Point {
+  const hq = obj(o.hq, `sides[${i}].hq`);
+  const p: Point = { x: int(hq.x, `sides[${i}].hq.x`), y: int(hq.y, `sides[${i}].hq.y`) };
+  const t = tileAt(map, p);
+  if (t === undefined || t === 'river') fail(`sides[${i}].hq must be on passable ground`);
+  return p;
+}
+
+function parseSides(raw: unknown, map: MapGrid): Side[] {
   const list = arr(raw, 'sides');
   if (list.length !== 2) fail('sides must contain exactly two sides');
   const sides = list.map((s, i): Side => {
@@ -91,6 +99,7 @@ function parseSides(raw: unknown): Side[] {
       id: oneOf(o.id, ['blue', 'red'] as const, `sides[${i}].id`),
       name: str(o.name, `sides[${i}].name`),
       controller: oneOf(o.controller, ['human', 'scripted'] as const, `sides[${i}].controller`),
+      hq: parseHq(o, i, map),
     };
   });
   if (sides[0]?.id === sides[1]?.id) fail('sides must have distinct ids');
@@ -137,7 +146,7 @@ function parseUnits(raw: unknown, map: MapGrid, sides: Side[]): Unit[] {
 export function loadScenario(raw: unknown): GameState {
   const o = obj(raw, 'scenario');
   const map = parseMap(o.map);
-  const sides = parseSides(o.sides);
+  const sides = parseSides(o.sides, map);
   const units = parseUnits(o.units, map, sides);
 
   const v = obj(o.victory, 'victory');
