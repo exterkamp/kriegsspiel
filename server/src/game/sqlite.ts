@@ -54,7 +54,7 @@ export const MIGRATIONS: readonly string[] = [
    );`,
 ];
 
-/** Older snapshots kept besides the newest, as a fallback should a recent one be unreadable. */
+/** Older snapshots kept besides the newest (not yet used as a fallback: recovery reads the newest). */
 const KEEP_OLD_SNAPSHOTS = 2;
 
 export class SqliteGameStore implements GameStore {

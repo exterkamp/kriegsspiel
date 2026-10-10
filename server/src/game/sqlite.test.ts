@@ -144,9 +144,13 @@ describe('crash recovery', () => {
       await game.submit({ kind: 'setRate', rate: 4 });
       await game.submit({ kind: 'pause' });
       await game.submit({ kind: 'resume' });
-      await time.advance(3_000);
+      // Long enough for queued events to fire from scheduler ticks after the last input, so the
+      // progress catch-up on reopen is what makes the states equal.
+      await time.advance(300_000);
       const before = serialize(game.state);
       const timeBefore = game.state.time;
+      const lastInput = (await open(path).inputLog('g1')).at(-1)!;
+      expect(timeBefore).toBeGreaterThan(lastInput.endGameMs ?? lastInput.gameMs);
 
       // kill -9: no close, no shutdown. A second process opens the same file.
       const time2 = new FakeTime(time.now() + 3_600_000);

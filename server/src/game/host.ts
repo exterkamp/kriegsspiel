@@ -148,7 +148,8 @@ export class GameHost {
       ...this.actorOptions(id),
       state,
       clock,
-      seq: tail.at(-1)?.seq ?? snap.seq,
+      // The log is in insertion order, which is not always seq order (see D14b).
+      seq: tail.reduce((max, e) => Math.max(max, e.seq), snap.seq),
     });
     this.games.set(id, actor);
     await actor.start();
