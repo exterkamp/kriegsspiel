@@ -87,6 +87,42 @@ export interface Outcome {
   time: GameTime;
 }
 
+/** A report waiting for, or already past, its courier delay. Belongs to one side's intel. */
+export interface Report {
+  id: string;
+  kind: 'contact' | 'unitLost' | 'orderDelivered';
+  /** Game time of the thing reported. */
+  observedAt: GameTime;
+  /** Game time the report reaches HQ (observedAt plus courier delay). */
+  deliverAt: GameTime;
+  /** The side's own reporting unit. */
+  from: string;
+  /** Where it happened; for a contact, where the enemy was seen. */
+  location: Point;
+  /** Coarse size of the enemy force; only for contacts. */
+  sizeEstimate?: string;
+  confidence: 'low' | 'medium' | 'high';
+  /** Enemy unit id; only for contacts. */
+  subject?: string;
+}
+
+/** Last sighting of an enemy unit, as the side saw it then. */
+export interface Contact {
+  id: string;
+  position: Point;
+  seenAt: GameTime;
+  sizeEstimate: string;
+}
+
+/** What one side has learned so far. Never sent to a client except through `viewFor`. */
+export interface SideIntel {
+  /** Latest sighting per enemy unit id. */
+  contacts: Contact[];
+  /** Enemy ids visible at the last scan, so a report fires only on first sight. */
+  inSight: string[];
+  reports: Report[];
+}
+
 export interface GameState {
   scenarioId: string;
   time: GameTime;
@@ -99,6 +135,7 @@ export interface GameState {
   combatActive: boolean;
   /** Set once, when the game ends. Nothing happens in combat or victory handlers after that. */
   outcome: Outcome | null;
+  intel: Record<SideId, SideIntel>;
 }
 
 export function tileAt(map: MapGrid, p: Point): Terrain | undefined {
