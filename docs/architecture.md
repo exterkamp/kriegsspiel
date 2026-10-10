@@ -136,7 +136,7 @@ Adding a field means updating this list and the leak tests in `visibility.test.t
 
 ## Determinism and replay
 
-The simulation is a function of: scenario, seed, and the **ordered log of inputs with their game timestamps** (commands, LLM outputs, pause and rate changes). Replaying that log through the engine on a manual clock gives identical state, regardless of the wall-clock rate used during the original game. LLM outputs are recorded and played back, so replays never call the model.
+The simulation is a function of: scenario, seed, and the **ordered log of inputs with their game timestamps** (commands, LLM outputs, pause and rate changes). Replaying that log through the engine on a manual clock gives identical state, regardless of the wall-clock rate used during the original game. LLM outputs are recorded and played back, so replays never call the model. Implemented in `server/src/game/replay.ts` (see D14a); run it with `npm run replay -w server -- <logfile>`.
 
 ## Debug trace
 

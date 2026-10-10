@@ -19,14 +19,11 @@ import {
   advanceTo,
   deserialize,
   featureAnchor,
-  issueOrder,
   serialize,
   type EmittedEvent,
   type EngineState,
   type EventRegistry,
   type GameState,
-  type Order,
-  type OrderIntent as EngineIntent,
 } from '@kriegsspiel/engine';
 import { GameClock, type WallClock } from '../clock.js';
 import {
@@ -37,6 +34,7 @@ import {
   type TraceSink,
 } from '../debug/trace.js';
 import type { OrderParser, ParseContext, ParseResult } from '../orders/index.js';
+import { applyLoggedOrder } from './replay.js';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
 /** Timer functions, injectable so tests can run on a fake clock. */
@@ -96,16 +94,6 @@ export interface GameActorOptions {
   parseRetryDelayMs?: number;
   /** Starting value for the input counter when resuming a game. */
   seq?: number;
-}
-
-/** Maps a parsed intent to one the engine knows, or the reason it cannot. */
-function toEngineIntents(intents: ParseResult & { kind: 'intents' }): EngineIntent[] | string {
-  const out: EngineIntent[] = [];
-  for (const i of intents.intents) {
-    if (i.kind === 'attack') return 'attack orders are not modelled yet';
-    out.push(i);
-  }
-  return out;
 }
 
 interface Dependency {
@@ -310,6 +298,8 @@ export class GameActor {
       this.sync();
       entry.gameMs = this.engine.time;
       result = await this.run(command);
+      this.sync();
+      entry.endGameMs = this.engine.time;
     } catch (e) {
       entry.error = e instanceof Error ? e.message : String(e);
       result = { ok: false, kind: 'rejection', reason: entry.error };
@@ -566,7 +556,9 @@ export class GameActor {
     }
     let result: CommandResult;
     try {
-      result = this.applyParsed(dep, command, entry.seq, parsed);
+      result = this.applyParsed(command, entry.seq, parsed);
+      this.sync();
+      entry.endGameMs = this.engine.time;
     } catch (e) {
       entry.error = e instanceof Error ? e.message : String(e);
       result = { ok: false, kind: 'rejection', reason: entry.error };
@@ -588,34 +580,26 @@ export class GameActor {
   }
 
   private applyParsed(
-    dep: Dependency,
     command: Extract<GameCommand, { kind: 'order' }>,
     seq: number,
     parsed: ParseResult,
   ): CommandResult {
-    if (parsed.kind === 'clarification') {
-      return {
-        ok: false,
-        kind: 'clarification',
-        question: parsed.question,
-        options: parsed.options,
-      };
+    // The barrier held the engine at the signing time, so the order is queued at it, never in the
+    // past, exactly as replay builds it.
+    const applied = applyLoggedOrder(this.engine, this.id, seq, command.side, parsed);
+    if ('reason' in applied) {
+      if (parsed.kind === 'clarification') {
+        return {
+          ok: false,
+          kind: 'clarification',
+          question: parsed.question,
+          options: parsed.options,
+        };
+      }
+      return { ok: false, kind: 'rejection', reason: applied.reason };
     }
-    if (parsed.kind === 'rejection') return { ok: false, kind: 'rejection', reason: parsed.reason };
-    const intents = toEngineIntents(parsed);
-    if (typeof intents === 'string') return { ok: false, kind: 'rejection', reason: intents };
-
-    const order: Order = {
-      id: `${this.id}-o${seq}`,
-      side: command.side as Order['side'],
-      to: parsed.unitId,
-      issuedAt: dep.neededAt,
-      text: parsed.text,
-      intents,
-    };
-    // The barrier held the engine at the signing time, so queueing at it is never in the past.
-    this.engine = issueOrder(this.engine, order, dep.neededAt);
-    return { ok: true, orderId: order.id };
+    this.engine = applied.state;
+    return { ok: true, orderId: applied.orderId };
   }
 }
 
