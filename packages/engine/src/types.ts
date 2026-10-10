@@ -132,6 +132,29 @@ export type UnitKind = (typeof UNIT_KINDS)[number];
 /** `withdrawn`: broke and is falling back (out of the fight for good). `destroyed`: no men left. */
 export type UnitStatus = 'active' | 'withdrawn' | 'destroyed';
 
+/**
+ * What sets off a standing order. Each is judged from the unit's own knowledge: an enemy it
+ * can see itself, its own strength, the orders it has been handed, the clock.
+ */
+export type Trigger =
+  /** An enemy unit the unit itself can see has its centre inside `area` (a closed polygon). */
+  | { kind: 'enemySighted'; area: Point[] }
+  /** The unit's own strength (men) has dropped below `strength`. */
+  | { kind: 'strengthBelow'; strength: number }
+  /** An order from `from` (an `Order.from`, 'hq' unless stated) reaches the unit. */
+  | { kind: 'orderReceived'; from: string }
+  /** Game time has reached `gameTime`. */
+  | { kind: 'timeReached'; gameTime: GameTime };
+
+/** A conditional or timed instruction the unit carries until its trigger fires (once). */
+export interface StandingOrder {
+  /** `<orderId>#<n>`; unique among a unit's standing orders. */
+  id: string;
+  orderId: string;
+  trigger: Trigger;
+  then: OrderIntent[];
+}
+
 export interface Unit {
   id: string;
   side: SideId;
@@ -155,6 +178,8 @@ export interface Unit {
   /** 0..100. */
   morale: number;
   intent: Intent;
+  /** Conditional and timed orders waiting on their trigger. Absent when there are none. */
+  standing?: StandingOrder[];
   /** Set while the unit is marching along a leg, so a new order can stop it mid-leg. */
   leg?: Leg;
   status: UnitStatus;

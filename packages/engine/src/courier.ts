@@ -82,7 +82,7 @@ export function interceptChance(world: GameState, enemy: Unit, at: Point): numbe
   return threat.chance * (hidden ? 0.5 : 1) * Math.min(1, world.sightFactor ?? 1);
 }
 
-/** The `intent` with its destination moved to `to`. */
+/** The `intent` with its destination moved to `to`; a conditional intent has its nested ones moved. */
 export function redirect(intent: OrderIntent, to: Point): OrderIntent {
   switch (intent.kind) {
     case 'move':
@@ -91,8 +91,27 @@ export function redirect(intent: OrderIntent, to: Point): OrderIntent {
       return { kind: 'hold', at: to };
     case 'withdraw':
       return { kind: 'withdraw', toward: to };
+    case 'when':
+      return { ...intent, then: intent.then.map((i) => redirect(i, to)) };
+    case 'at':
+      return { ...intent, then: intent.then.map((i) => redirect(i, to)) };
   }
 }
 
-export const destinationOf = (intent: OrderIntent): Point =>
-  intent.kind === 'move' ? intent.to : intent.kind === 'hold' ? intent.at : intent.toward;
+/** Where the intent sends the unit: for a conditional one, the first nested destination, if any. */
+export function destinationOf(intent: OrderIntent): Point | undefined {
+  switch (intent.kind) {
+    case 'move':
+      return intent.to;
+    case 'hold':
+      return intent.at;
+    case 'withdraw':
+      return intent.toward;
+    default:
+      for (const i of intent.then) {
+        const d = destinationOf(i);
+        if (d) return d;
+      }
+      return undefined;
+  }
+}

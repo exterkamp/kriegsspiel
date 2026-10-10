@@ -1,5 +1,4 @@
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
-import { beginMarch } from './movement.js';
 import {
   GARBLE_MAX_M,
   GARBLE_MIN_M,
@@ -14,19 +13,28 @@ import { distance } from './geometry.js';
 import { findPath, legCost } from './navigation.js';
 import { describePlace } from './place.js';
 import { schedule } from './queue.js';
+import { applyIntents, fireOnReceipt, registerStanding } from './standing.js';
 import { COURIER_DELAY_MS, REPORT_EVENT } from './visibility.js';
 import {
   MS_PER_MINUTE,
   type Courier,
   type GameState,
+  type GameTime,
   type Leg,
   type Point,
   type TerrainMap,
+  type Trigger,
 } from './types.js';
 
 /** What an order asks a unit to do, as parsed. The engine turns it into an `Intent` on delivery. */
 export type OrderIntent =
-  { kind: 'move'; to: Point } | { kind: 'hold'; at: Point } | { kind: 'withdraw'; toward: Point };
+  | { kind: 'move'; to: Point }
+  | { kind: 'hold'; at: Point }
+  | { kind: 'withdraw'; toward: Point }
+  /** Do `then` once `trigger` fires, judged from what the unit itself knows. */
+  | { kind: 'when'; trigger: Trigger; then: OrderIntent[] }
+  /** Do `then` at game time `gameTime`. */
+  | { kind: 'at'; gameTime: GameTime; then: OrderIntent[] };
 
 /** A signed order. Plain JSON so it can ride in event payloads and replay logs. */
 export interface Order {
@@ -36,11 +44,13 @@ export interface Order {
   to: string;
   /** Game time of signing. `issueOrder` overwrites it with the time the order leaves HQ. */
   issuedAt: number;
+  /** Who sent it, for `orderReceived` triggers. Absent means 'hq'. */
+  from?: string;
   /** Original wording, preserved. */
   text: string;
   /**
-   * Parsed by the umpire service. The unit adopts the first on delivery;
-   * the rest are reserved for conditional and timed orders.
+   * Parsed by the umpire service. On delivery the unit adopts the first immediate intent
+   * (move, hold, withdraw) and keeps each `when` / `at` as a standing order until it fires.
    */
   intents: OrderIntent[];
 }
@@ -125,6 +135,7 @@ const arrivalOf = (c: Courier, issuedAt: number) => c.legs.at(-1)?.arriveAt ?? i
  * taken one `courier_intercepted` (master log only).
  */
 export function registerOrders(registry: EventRegistry<GameState>): void {
+  registerStanding(registry);
   registry.register(ORDER_ISSUE_EVENT, (world, ev, rng) => {
     const order = ev.payload as unknown as Order;
     const reason = undeliverable(world, order);
@@ -158,7 +169,7 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       const intent = order.intents[0]!;
       const angle = rng.next() * 2 * Math.PI;
       const away = (GARBLE_MIN_M + rng.next() * (GARBLE_MAX_M - GARBLE_MIN_M)) * 1000;
-      const d = destinationOf(intent);
+      const d = destinationOf(intent) ?? unit.center;
       const to = {
         x: Math.min(world.map.width, Math.max(0, Math.round(d.x + Math.cos(angle) * away))),
         y: Math.min(world.map.height, Math.max(0, Math.round(d.y + Math.sin(angle) * away))),
@@ -233,17 +244,14 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     const reason = undeliverable(world, order);
     if (reason) return failed(world, order, reason);
     const unit = world.units.find((u) => u.id === order.to)!;
-    const intent = (c.garbled ?? order.intents)[0]!;
     const delivered = {
       type: 'order_delivered',
       payload: { orderId: order.id, unitId: unit.id, issuedAt: order.issuedAt },
     };
-    const res =
-      intent.kind === 'move'
-        ? beginMarch(world, unit, intent.to, ev.time, 'move')
-        : intent.kind === 'withdraw'
-          ? beginMarch(world, unit, intent.toward, ev.time, 'withdraw')
-          : beginMarch(world, unit, intent.at, ev.time, 'hold');
+    // Standing orders already carried may fire on this arrival; the new order's own may not.
+    const had = unit.standing ?? [];
+    const res = applyIntents(world, unit, c.garbled ?? order.intents, ev.time, order.id);
+    const fired = fireOnReceipt(res.world, unit.id, had, order.from ?? 'hq', ev.time);
     // The unit's courier rides back: HQ hears of the delivery after the usual report delay.
     const ack = {
       time: ev.time,
@@ -255,8 +263,9 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       : [];
     return {
       ...res,
-      schedule: [ack, ...(res.schedule ?? [])],
-      emit: [delivered, ...garbled, ...(res.emit ?? [])],
+      world: fired.world,
+      schedule: [ack, ...(res.schedule ?? []), ...(fired.schedule ?? [])],
+      emit: [delivered, ...garbled, ...(res.emit ?? []), ...(fired.emit ?? [])],
     };
   });
 }

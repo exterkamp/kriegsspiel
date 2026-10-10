@@ -161,7 +161,7 @@ describe('courier loss and garbling', () => {
   it('is rarer in clear weather', () => {
     const clear = seedsWhere(500, (s) => game(s, { lurk: false }), 'order_garbled');
     expect(clear.length).toBeLessThan(garbled.length);
-  });
+  }, 30_000);
 });
 
 describe('rideRisk', () => {

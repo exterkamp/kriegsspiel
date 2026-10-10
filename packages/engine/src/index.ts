@@ -120,6 +120,13 @@ export {
   rideRisk,
 } from './courier.js';
 export type { Order, OrderIntent } from './orders.js';
+export {
+  STANDING_EVENT,
+  applyIntents,
+  evaluateStanding,
+  fireOnReceipt,
+  triggerHolds,
+} from './standing.js';
 export { describePlace } from './place.js';
 export { beginMarch } from './movement.js';
 export {
