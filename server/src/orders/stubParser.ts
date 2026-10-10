@@ -92,9 +92,18 @@ type PlaceResult =
 
 function resolvePlace(phrase: string, ctx: ParseContext): PlaceResult {
   const words = phrase.split(' ').filter((w) => w !== 'the' && w !== 'a');
-  const word = words.find((w) => w in PLACE_TERRAIN);
+  const word = words.find((w) => Object.hasOwn(PLACE_TERRAIN, w));
   if (word === undefined) {
     return { ok: false, kind: 'rejection', reason: `I don't know the place "${words.join(' ')}".` };
+  }
+  // Exactly one place word and nothing else, so a second clause is never silently dropped.
+  if (words.length !== 1) {
+    return {
+      ok: false,
+      kind: 'clarification',
+      question: `I could not fully understand "${phrase}". Please give one action and one place at a time.`,
+      options: [],
+    };
   }
   const terrain = PLACE_TERRAIN[word] as string;
   const found = features(ctx.map, terrain);
@@ -120,11 +129,46 @@ export class StubOrderParser implements OrderParser {
     const norm = normalize(orderText);
     if (norm === '') return reject('The order is empty.');
 
+    const own = context.units.filter((u) => u.side === context.side);
+
+    // Unit first: a unit name (or id) at the start of the order wins over any verb word inside
+    // it ("Advance Guard march to the bridge"). Longest match wins ("1st Battalion Reserve").
+    let unitId: string | undefined;
+    let remainder: string | undefined;
+    const text0 = norm.replace(/^the /, '');
+    let bestLen = 0;
+    let tied: string[] = [];
+    for (const u of own) {
+      for (const key of [normalize(u.name), u.id]) {
+        if (key === '' || !(text0 === key || text0.startsWith(`${key} `))) continue;
+        if (key.length > bestLen) {
+          bestLen = key.length;
+          tied = [u.id];
+        } else if (key.length === bestLen && !tied.includes(u.id)) {
+          tied.push(u.id);
+        }
+      }
+    }
+    if (tied.length > 1) {
+      return {
+        kind: 'clarification',
+        text,
+        question: `"${text0.slice(0, bestLen)}" could mean more than one unit. Which one?`,
+        options: own.filter((u) => tied.includes(u.id)).map((u) => u.name),
+      };
+    }
+    if (tied.length === 1) {
+      unitId = tied[0];
+      remainder = text0.slice(bestLen).trim();
+    }
+
+    // Otherwise the subject is whatever precedes the leftmost verb.
     let verb: Verb | undefined;
-    let verbAt = Infinity;
     let verbEnd = 0;
+    const search = remainder ?? norm;
+    let verbAt = Infinity;
     for (const [re, v] of VERBS) {
-      const m = re.exec(norm);
+      const m = re.exec(search);
       if (m && m.index < verbAt) {
         verb = v;
         verbAt = m.index;
@@ -133,41 +177,46 @@ export class StubOrderParser implements OrderParser {
     }
     if (verb === undefined)
       return reject('I could not find an action (march, hold, withdraw, attack) in that order.');
+    if (remainder !== undefined && search.slice(0, verbAt).trim() !== '') {
+      return reject(
+        `I could not understand "${search.slice(0, verbAt).trim()}" before the action.`,
+      );
+    }
 
-    // Subject: whatever precedes the verb.
-    const subject = norm.slice(0, verbAt).replace(/^the /, '').trim();
-    const own = context.units.filter((u) => u.side === context.side);
-    let unitId: string | undefined;
-    if (subject === '') {
-      return {
-        kind: 'clarification',
-        text,
-        question: 'Which unit is this order for?',
-        options: own.map((u) => u.name),
-      };
-    }
-    for (const u of own) {
-      const name = normalize(u.name);
-      if (
-        subject === name ||
-        subject === u.id ||
-        (name.startsWith(subject) && subject.length >= 3)
-      ) {
-        if (unitId !== undefined && unitId !== u.id) {
-          return {
-            kind: 'clarification',
-            text,
-            question: `"${subject}" could mean more than one unit. Which one?`,
-            options: own.filter((o) => normalize(o.name).startsWith(subject)).map((o) => o.name),
-          };
-        }
-        unitId = u.id;
+    if (unitId === undefined) {
+      const subject = norm.slice(0, verbAt).replace(/^the /, '').trim();
+      if (subject === '') {
+        return {
+          kind: 'clarification',
+          text,
+          question: 'Which unit is this order for?',
+          options: own.map((u) => u.name),
+        };
       }
+      // An exact name or id beats a prefix match, so "1st Battalion" can be addressed
+      // even when "1st Battalion Reserve" exists.
+      const exact = own.filter((u) => subject === normalize(u.name) || subject === u.id);
+      const matched =
+        exact.length > 0
+          ? exact
+          : subject.length >= 3
+            ? own.filter((u) => normalize(u.name).startsWith(subject))
+            : [];
+      if (matched.length > 1) {
+        return {
+          kind: 'clarification',
+          text,
+          question: `"${subject}" could mean more than one unit. Which one?`,
+          options: matched.map((u) => u.name),
+        };
+      }
+      if (matched.length === 0) return reject(`I don't know a unit called "${subject}".`);
+      unitId = (matched[0] as (typeof own)[number]).id;
     }
-    if (unitId === undefined) return reject(`I don't know a unit called "${subject}".`);
+    const rest0 = search.slice(verbEnd).trim();
 
     // Object: what follows the verb, split off a trailing "and hold".
-    let rest = norm.slice(verbEnd).trim();
+    let rest = rest0;
     let thenHold = false;
     const tail = /\s*\band (?:then )?(?:hold|defend|occupy)(?: there| it)?$/.exec(rest);
     if (tail && verb === 'move') {
@@ -194,7 +243,12 @@ export class StubOrderParser implements OrderParser {
     if (!place.ok) {
       return place.kind === 'rejection'
         ? reject(place.reason)
-        : { kind: 'clarification', text, question: place.question, options: place.options };
+        : {
+            kind: 'clarification',
+            text,
+            question: place.question,
+            options: place.options.length > 0 ? place.options : undefined,
+          };
     }
     const at = place.at;
     switch (verb) {

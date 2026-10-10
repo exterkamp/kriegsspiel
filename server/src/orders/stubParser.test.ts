@@ -121,6 +121,60 @@ describe('StubOrderParser', () => {
     expect(r.kind === 'clarification' && r.options).toHaveLength(2);
   });
 
+  it.each([
+    'withdraw from the bridge to the wood',
+    'march along the road to the bridge',
+    'march to the bridge and attack the wood',
+    'attack the wood and hold',
+    'march to the wood or the bridge',
+  ])('asks for one action at a time instead of dropping a clause: %s', async (phrase) => {
+    const r = await parser.parse(`1st Battalion ${phrase}`, ctx(ONE_WOOD));
+    expect(r.kind).toBe('clarification');
+  });
+
+  it('does not treat prototype keys as places', async () => {
+    // Input is lowercased, so `constructor` is the only reachable prototype key.
+    for (const w of ['constructor']) {
+      const r = await parser.parse(`1st Battalion march to the ${w}`, ctx(ONE_WOOD));
+      expect(r).toMatchObject({ kind: 'rejection', reason: `I don't know the place "${w}".` });
+    }
+  });
+
+  it('prefers an exact unit name over a longer name sharing its prefix', async () => {
+    const c = ctx(ONE_WOOD);
+    c.units = [
+      ...c.units,
+      { id: 'blue-4', side: 'blue', name: '1st Battalion Reserve', position: { x: 0, y: 4 } },
+    ];
+    expect(await parser.parse('1st Battalion hold', c)).toMatchObject({ unitId: 'blue-1' });
+    expect(await parser.parse('1st Battalion Reserve hold', c)).toMatchObject({ unitId: 'blue-4' });
+    const amb = await parser.parse('1st hold', c);
+    expect(amb).toMatchObject({ kind: 'clarification' });
+    expect(amb.kind === 'clarification' && amb.options).toEqual([
+      '1st Battalion',
+      '1st Battalion Reserve',
+    ]);
+  });
+
+  it('addresses units whose names contain verb words', async () => {
+    const c = ctx(ONE_WOOD);
+    c.units = [
+      ...c.units,
+      { id: 'blue-5', side: 'blue', name: 'Advance Guard', position: { x: 0, y: 3 } },
+      { id: 'blue-6', side: 'blue', name: 'Hold Fast Regiment', position: { x: 4, y: 3 } },
+    ];
+    expect(await parser.parse('Advance Guard march to the bridge', c)).toMatchObject({
+      kind: 'intents',
+      unitId: 'blue-5',
+      intents: [{ kind: 'move', to: { x: 2, y: 2 } }],
+    });
+    expect(await parser.parse('Hold Fast Regiment hold', c)).toMatchObject({
+      kind: 'intents',
+      unitId: 'blue-6',
+      intents: [{ kind: 'hold', at: { x: 4, y: 3 } }],
+    });
+  });
+
   it('preserves the original wording byte for byte in every result kind', async () => {
     const texts = ['  1st Battalion   MARCH to the bridge ', 'nonsense', 'march to the bridge'];
     for (const text of texts) {
