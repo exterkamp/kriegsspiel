@@ -149,6 +149,51 @@ describe('GameClock realtime', () => {
   });
 });
 
+describe('GameClock robustness', () => {
+  it('never moves game time backwards when the wall source steps back', () => {
+    const wall = fakeWall();
+    const clock = new GameClock(wall, { rate: 4 });
+    wall.advance(1000);
+    expect(clock.now()).toBe(4000);
+    wall.advance(-500);
+    expect(clock.now()).toBe(4000);
+    expect(clock.gameMsAtWall(999_000)).toBe(0);
+  });
+
+  it('rejects a non-finite initial game time', () => {
+    expect(() => new GameClock(fakeWall(), { gameMs: NaN })).toThrow(RangeError);
+    expect(() => new GameClock(fakeWall(), { gameMs: Infinity })).toThrow(RangeError);
+  });
+
+  it('history returns a copy that callers cannot use to change the log', () => {
+    const clock = new GameClock(fakeWall());
+    clock.setRate(2);
+    const h = clock.history();
+    (h[0] as { rate: number }).rate = 99;
+    clock.pause();
+    expect(clock.history()).toHaveLength(2);
+    expect(clock.history()[0]!.rate).toBe(2);
+  });
+
+  it('logs mode, advance and stop entries', () => {
+    const wall = fakeWall();
+    const clock = new GameClock(wall, { rate: 2 });
+    wall.advance(1000);
+    clock.setMode('manual');
+    clock.advanceTo(5000);
+    clock.setMode('fast-forward');
+    clock.stop();
+    expect(
+      clock.history().map((c) => [c.kind, c.wallMs, c.gameMs, c.rate, c.status, c.mode]),
+    ).toEqual([
+      ['mode', 1_001_000, 2000, 2, 'running', 'manual'],
+      ['advance', 1_001_000, 5000, 2, 'running', 'manual'],
+      ['mode', 1_001_000, 5000, 2, 'running', 'fast-forward'],
+      ['stop', 1_001_000, 5000, 2, 'stopped', 'fast-forward'],
+    ]);
+  });
+});
+
 describe('GameClock manual', () => {
   it('ignores wall time and moves only when told', () => {
     const wall = fakeWall();
@@ -181,10 +226,11 @@ describe('GameClock manual', () => {
   });
 
   it('is never due by wall time until reached', () => {
-    const clock = new GameClock(fakeWall(), { mode: 'manual' });
+    const wall = fakeWall();
+    const clock = new GameClock(wall, { mode: 'manual' });
     expect(clock.wallDueFor(1000)).toBe(Infinity);
     clock.advanceTo(1000);
-    expect(clock.wallDueFor(1000)).toBeLessThanOrEqual(1_000_000);
+    expect(clock.wallDueFor(1000)).toBe(wall());
   });
 
   it('advanceTo is not available in realtime mode', () => {

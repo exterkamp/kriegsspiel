@@ -52,6 +52,8 @@ export class GameClock {
   private state: ClockState;
   private clockMode: ClockMode;
   private readonly changes: ClockChange[] = [];
+  /** Highest game time reported so far, so a wall source stepping back never rewinds `now()`. */
+  private highWater: number;
 
   constructor(
     private readonly wallNow: WallClock,
@@ -59,6 +61,9 @@ export class GameClock {
   ) {
     const rate = options.rate ?? 1;
     assertRate(rate);
+    if (options.gameMs !== undefined && !Number.isFinite(options.gameMs)) {
+      throw new RangeError(`gameMs must be finite, got ${options.gameMs}`);
+    }
     this.clockMode = options.mode ?? 'realtime';
     this.state = {
       gameMsAtAnchor: options.gameMs ?? 0,
@@ -66,6 +71,7 @@ export class GameClock {
       rate,
       status: options.status ?? 'running',
     };
+    this.highWater = this.state.gameMsAtAnchor;
   }
 
   get mode(): ClockMode {
@@ -85,27 +91,32 @@ export class GameClock {
     return { ...this.state };
   }
 
-  /** Every clock change so far, with its wall time (for the clock history log). */
+  /** Copy of every clock change so far, with its wall time (for the clock history log). */
   history(): readonly ClockChange[] {
-    return this.changes;
+    return this.changes.map((c) => ({ ...c }));
   }
 
   private get following(): boolean {
     return this.clockMode === 'realtime' && this.state.status === 'running';
   }
 
+  /** Wall ms since the anchor, clamped at 0 so a wall source stepping back never moves game time back. */
+  private wallElapsed(wallMs: number): number {
+    return Math.max(0, wallMs - this.state.wallMsAtAnchor);
+  }
+
   /** Current game time in ms. */
   now(): number {
     if (!this.following) return this.state.gameMsAtAnchor;
-    return (
-      this.state.gameMsAtAnchor + (this.wallNow() - this.state.wallMsAtAnchor) * this.state.rate
-    );
+    const t = this.state.gameMsAtAnchor + this.wallElapsed(this.wallNow()) * this.state.rate;
+    this.highWater = Math.max(this.highWater, t);
+    return this.highWater;
   }
 
   /** Game time at an arbitrary wall time, assuming the clock keeps its current settings. */
   gameMsAtWall(wallMs: number): number {
     if (!this.following) return this.state.gameMsAtAnchor;
-    return this.state.gameMsAtAnchor + (wallMs - this.state.wallMsAtAnchor) * this.state.rate;
+    return this.state.gameMsAtAnchor + this.wallElapsed(wallMs) * this.state.rate;
   }
 
   /**
@@ -122,9 +133,24 @@ export class GameClock {
     return gameMs <= this.state.gameMsAtAnchor ? this.state.wallMsAtAnchor : Infinity;
   }
 
-  private reanchor(kind: ClockChange['kind'], gameMs = this.now()): void {
+  /**
+   * Re-anchor at `gameMs` (default: the current game time) and apply `patch` to the
+   * rate, status and mode, recording one history entry with the new values.
+   */
+  private reanchor(
+    kind: ClockChange['kind'],
+    patch: { rate?: number; status?: ClockStatus; mode?: ClockMode } = {},
+    gameMs = this.now(),
+  ): void {
     const wallMs = this.wallNow();
-    this.state = { ...this.state, gameMsAtAnchor: gameMs, wallMsAtAnchor: wallMs };
+    this.highWater = gameMs;
+    this.clockMode = patch.mode ?? this.clockMode;
+    this.state = {
+      gameMsAtAnchor: gameMs,
+      wallMsAtAnchor: wallMs,
+      rate: patch.rate ?? this.state.rate,
+      status: patch.status ?? this.state.status,
+    };
     this.changes.push({
       wallMs,
       gameMs,
@@ -137,39 +163,29 @@ export class GameClock {
 
   setRate(rate: number): void {
     assertRate(rate);
-    this.reanchor('rate');
-    this.state.rate = rate;
-    this.changes[this.changes.length - 1]!.rate = rate;
+    this.reanchor('rate', { rate });
   }
 
   pause(): void {
     if (this.state.status !== 'running') return;
-    this.reanchor('pause');
-    this.state.status = 'paused';
-    this.changes[this.changes.length - 1]!.status = 'paused';
+    this.reanchor('pause', { status: 'paused' });
   }
 
   resume(): void {
     if (this.state.status === 'stopped') throw new Error('clock is stopped');
     if (this.state.status !== 'paused') return;
-    this.reanchor('resume');
-    this.state.status = 'running';
-    this.changes[this.changes.length - 1]!.status = 'running';
+    this.reanchor('resume', { status: 'running' });
   }
 
   /** Permanently freeze the clock (game over). */
   stop(): void {
     if (this.state.status === 'stopped') return;
-    this.reanchor('stop');
-    this.state.status = 'stopped';
-    this.changes[this.changes.length - 1]!.status = 'stopped';
+    this.reanchor('stop', { status: 'stopped' });
   }
 
   setMode(mode: ClockMode): void {
     if (mode === this.clockMode) return;
-    this.reanchor('mode');
-    this.clockMode = mode;
-    this.changes[this.changes.length - 1]!.mode = mode;
+    this.reanchor('mode', { mode });
   }
 
   /** Manual and fast-forward modes: move game time to `gameMs`. Never backwards. */
@@ -183,7 +199,7 @@ export class GameClock {
         `cannot move game time backwards (${gameMs} < ${this.state.gameMsAtAnchor})`,
       );
     }
-    this.reanchor('advance', gameMs);
+    this.reanchor('advance', {}, gameMs);
   }
 
   /** Manual and fast-forward modes: advance game time by `dtMs`. */
