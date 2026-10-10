@@ -17,3 +17,5 @@ export { AnthropicTransport } from './anthropicTransport.js';
 export { PlaybackUmpireClient } from './playbackUmpireClient.js';
 export { TransportError } from './transport.js';
 export type { UmpireTransport, TransportRequest, TransportResponse } from './transport.js';
+export { MockUmpireClient, loadFixtures, loadFixtureFile } from './mockUmpireClient.js';
+export type { FixtureFailure, MockUmpireClientOptions, UmpireFixture } from './mockUmpireClient.js';

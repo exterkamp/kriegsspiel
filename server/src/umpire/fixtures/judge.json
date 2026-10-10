@@ -1,0 +1,9 @@
+{
+  "fixtures": [
+    {
+      "name": "judge: any attack succeeds",
+      "stage": "judge",
+      "output": { "verdict": "ok" }
+    }
+  ]
+}
