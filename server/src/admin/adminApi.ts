@@ -76,7 +76,10 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
 
   server.addHook('onRequest', async (req, reply) => {
     if (!req.url.startsWith(ADMIN_PREFIX)) return;
-    if (isLoopback(req.socket.remoteAddress)) return;
+    // A proxy on the same host connects over loopback, but always forwards the caller's address in a header.
+    const proxied =
+      req.headers['x-forwarded-for'] !== undefined || req.headers.forwarded !== undefined;
+    if (!proxied && isLoopback(req.socket.remoteAddress)) return;
     if (tokenMatches(givenToken(req), options.token)) return;
     return reply.code(401).send({ error: 'admin_unauthorized' });
   });

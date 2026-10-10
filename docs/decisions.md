@@ -162,7 +162,7 @@ Retry, backoff, the per-attempt timeout and schema validation stay in `ProviderU
 
 **Decision.** `/admin/api` is registered only when `ADMIN_ENABLED` is set, so with the flag off it is a 404, not a 401. When on, it accepts loopback sockets or the `ADMIN_TOKEN` bearer token, and offers only `GET` routes (games, state, paged entries, an SSE stream). The live stream is fed by `TraceStore.subscribe`. Details in `docs/architecture.md` (Admin API).
 **Why.** The admin view exposes master state, so it is off by default, never mounted on the hosted demo unless asked for, and shares no code path with the clients' views.
-**Open.** Token gating uses the socket address; a deployment behind a proxy must set `ADMIN_TOKEN`.
+**Open.** Token gating uses the socket address, and treats requests with proxy headers as non-loopback; a deployment behind a proxy must set `ADMIN_TOKEN` (a proxy that strips those headers would defeat the check).
 
 ## Scripted Red opponent (story 1.11, #18)
 

@@ -69,6 +69,25 @@ describe('gating', () => {
     expect((await get(`/admin/api/games?token=${TOKEN}`, remote)).statusCode).toBe(200);
   });
 
+  it('does not treat a loopback request carrying proxy headers as local', async () => {
+    await start({ enabled: true, token: TOKEN });
+    const proxyHeaders: Record<string, string>[] = [
+      { 'x-forwarded-for': '203.0.113.9' },
+      { forwarded: 'for=203.0.113.9' },
+    ];
+    for (const headers of proxyHeaders) {
+      expect((await get('/admin/api/games', '127.0.0.1', headers)).statusCode).toBe(401);
+      expect(
+        (
+          await get('/admin/api/games', '127.0.0.1', {
+            ...headers,
+            authorization: `Bearer ${TOKEN}`,
+          })
+        ).statusCode,
+      ).toBe(200);
+    }
+  });
+
   it('rejects every non-loopback request when no token is configured', async () => {
     await start({ enabled: true });
     expect((await get('/admin/api/games', '203.0.113.9')).statusCode).toBe(401);
@@ -163,6 +182,30 @@ describe('live stream', () => {
     expect(entries.every((e) => e.seq > cursor)).toBe(true);
     expect(entries.some((e) => e.kind === 'command')).toBe(true);
     await reader.cancel();
+  });
+
+  it('applies ?after= to live entries too, not only to the backlog', async () => {
+    const { base, id } = await start({ enabled: true });
+    const backlog = (await get(`/admin/api/games/${id}/entries?limit=1000`, '127.0.0.1')).json();
+    const last = backlog.entries.at(-1)?.seq ?? 0;
+    // Skip the first live entry: it is recorded after the stream opens, so only the live path can drop it.
+    const res = await fetch(`${base}/admin/api/games/${id}/stream?after=${last + 1}`);
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    await app!.host.get(id)!.submit({ kind: 'advanceTo', gameMs: 120_000 });
+    const seqs: number[] = [];
+    let buf = '';
+    const deadline = Date.now() + 5000;
+    while (seqs.length < 1 && Date.now() < deadline) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value);
+      for (const m of buf.matchAll(/^id: (\d+)$/gm)) seqs.push(Number(m[1]));
+      buf = '';
+    }
+    await reader.cancel();
+    expect(seqs.length).toBeGreaterThan(0);
+    expect(seqs.every((s) => s > last + 1)).toBe(true);
   });
 
   it('replays the backlog after a cursor, then follows live', async () => {
