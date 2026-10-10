@@ -112,7 +112,7 @@ running ──request──► pause_proposed ──all humans yes──► paus
 - **Clock and scheduler** (server): the `ClockState`, the scheduler, and pause voting.
 - **API** (server, `server/src/api`): Fastify. `POST /games` creates a game; `GET /games/:id/ws?token=` is one side's WebSocket, speaking the `packages/protocol` messages. Inbound frames are validated with the protocol schemas, and the hub sends only `SideView` data built by the visibility filter. See D16.
 - **Notifier**: pushes dispatch arrivals and clock events over WebSocket, plus email or web push for players who are away. Players set thresholds (all dispatches, urgent only, contact only).
-- **Persistence**: an append-only event log of *inputs* (commands, clock changes, votes, LLM outputs, seeds), plus periodic snapshots for quick recovery. Stores the model, prompt version and raw output of each LLM call.
+- **Persistence**: an append-only event log of *inputs* (commands, clock changes, votes, LLM outputs, seeds), plus periodic snapshots for quick recovery. Implemented as `SqliteGameStore` (D14b): recovery is the latest snapshot plus replay of the later inputs, and the game resumes paused. Stores the model, prompt version and raw output of each LLM call.
 - **Client**: a Three.js map table (flat map, 3D pieces) and a Svelte desk, showing a desk clock with the rate and any pause. It renders only what the server sends. See [hq-interface.md](hq-interface.md).
 
 ### SideView contents
