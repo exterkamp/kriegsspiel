@@ -16,7 +16,7 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Decision.** A Three.js scene with a **flat** historical map on a table and 3D wooden-block pieces, plus a Papers Please-style 2D desk built in HTML/Svelte. Phaser is dropped.
 **Why.** The game is mostly documents plus one map. A DOM UI is much better for text and drag-and-drop, and a 3D table gives the physical Kriegsspiel feel. A flat map avoids needing elevation data.
 **Alternatives considered.** Phaser, PixiJS, Babylon.js, Godot web export, full 3D room, fully 2D desk.
-**Consequence.** The existing Phaser prototype is replaced. Its order, turn, pathfinding and generator logic moves into the engine package.
+**Consequence.** The earlier Phaser prototype is abandoned and removed from the repo. The new engine and client are written fresh against the continuous-clock design. (The old code is kept outside the repo as a reference only.)
 **See.** [hq-interface.md](hq-interface.md), [architecture.md](architecture.md)
 
 ## D4: Continuous game clock with an adjustable ratio, not turns

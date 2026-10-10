@@ -64,7 +64,3 @@ The LLM never edits state directly. It returns structured proposals (intents, mo
 | Hallucinated units or terrain | Narration is generated from validated event lists, and checked against entity IDs |
 | Cost and latency | Turn-based so batch calls; cache; cheap model for parsing, stronger for judgment and narration |
 | Unfairness feeling | Post-game reveal of all rulings and dice |
-
-## Existing client scaffold
-
-`src/` already has a Phaser + Vite prototype: tile map generators (noise forest, roads), a `TurnSystem` (2 h/turn from 06:00), an `OrderSystem` with lost/intercepted/misinterpreted order chances driven by training, A* pathfinding, and tile/unit info panels. This lines up well with the design. Much of the order-friction logic currently lives client-side and will move to the server, where the hidden state has to live.

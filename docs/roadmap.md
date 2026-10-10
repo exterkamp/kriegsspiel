@@ -3,13 +3,13 @@
 Each milestone should end in something playable.
 
 ## M0: Foundations (now)
-- [x] Phaser/Vite client prototype: procedural map, one unit type, move orders with friction
+- [x] Earlier Phaser/Vite prototype abandoned and removed from the repo
 - [x] Background research and design docs (`docs/`)
 - [ ] Decide server stack (TypeScript recommended) and set up workspace (`packages/engine`, `server`, `client`)
 - [ ] Pull real rules tables (march rates, frontage, fire ranges) into data files
 
 ## M1: Deterministic engine, headless
-- [ ] Move map/units/orders/turn logic out of the Phaser scenes into `engine`
+- [ ] Map, units, orders and movement in `engine`, written fresh against the event-queue design
 - [ ] Seeded RNG, event log, replay
 - [ ] Unit types: line infantry, skirmishers, cavalry, artillery; formations (column/line)
 - [ ] Line of sight and per-side visibility function

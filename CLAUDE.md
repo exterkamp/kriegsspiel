@@ -20,7 +20,7 @@ Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a serve
 - Any change to the clock must work at rates 1, 4, 12 and in manual and fast-forward modes.
 
 ## Current state
-- `src/` is an earlier Phaser prototype that is being replaced (Three.js table + Svelte desk). Reuse its pure logic (orders, turns, pathfinding, map generators) in the engine, not its rendering.
+- There is no code yet. An earlier Phaser prototype was abandoned and removed. Do not revive it. Build the engine and client fresh from the docs.
 - Node version is in `.nvmrc`. Start dev servers with `devrun` (see `~/CLAUDE.md`), not bare `npm run dev`.
 
 ## Keep docs current

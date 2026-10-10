@@ -44,7 +44,7 @@ The engine needs a terrain grid, but players should see the original map. Option
 | **A. Hand-annotate** each scenario: trace roads, woods, rivers, slope onto the scan as vector layers, and generate the grid from them. | Accurate, controllable, great quality | Labour per map |
 | **B. Semi-automatic**: use a vision model plus colour segmentation to propose features, then a human cleans up in an editor. | Faster once the tool exists | Needs an annotation editor, and maps vary |
 | **C. Real elevation data** (DEM) georeferenced to the historical map. *Dropped: the table is flat, see the rendering decision below.* | Real slopes and viewsheds | Terrain has changed, and georeferencing takes work |
-| **D. Procedural** (what the prototype does now) restyled to look like a period map | Infinite scenarios | Not "historical" |
+| **D. Procedural** (generated terrain) restyled to look like a period map | Infinite scenarios | Not "historical" |
 
 Suggested path: **D now, A for the first historical scenario, build a small annotation editor (B) when we want a second one.** C is worth a spike for line of sight.
 
@@ -79,11 +79,11 @@ Period style, not a fantasy skin: aged paper, ink, sealing wax, pencil, brass in
 
 Because the map is flat, **elevation data is no longer needed** (option C above is dropped). Line of sight and cover come from the annotated terrain layer plus per-feature height tags (woods, ridges, buildings) in the engine.
 
-## Implications for the existing prototype
+## Implications for the build
 
-- The Phaser tile grid becomes the **truth layer** and a debug view only. The player never sees it.
-- `MapRenderer`, `UnitRenderer`, `TileInfoPanel`, `UnitLogPanel` and `BottomBar` are replaced by the Three.js table and the DOM desk. The pure logic (orders, turns, pathfinding, generators) moves to the shared engine package.
-- Info panels are replaced by diegetic equivalents: terrain notes and sketches instead of the tile panel, and the journal and roster instead of the unit log.
+- The engine's terrain grid is the **truth layer** and a debug view only. The player never sees it.
+- The player-facing client is the Three.js table and the Svelte desk, built fresh.
+- Info panels are diegetic: terrain notes and sketches for places, the journal and roster for units.
 
 ## Open questions
 
