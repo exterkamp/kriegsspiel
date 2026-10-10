@@ -129,6 +129,7 @@ describe('behaviour', () => {
         {
           id: 'blue-2',
           position: { x: 1950, y: 500 },
+          facing: 0,
           observedAtGame: 0,
           seenAt: 0,
           ageMs: 3_600_000,
