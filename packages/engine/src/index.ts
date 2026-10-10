@@ -11,3 +11,14 @@ export { serialize, deserialize } from './snapshot.js';
 export * from './types.js';
 export { loadScenario, ScenarioError } from './scenario.js';
 export { holdTheBridge } from './scenarios/holdTheBridge.js';
+export {
+  MS_PER_TILE,
+  enterCost,
+  findPath,
+  issueHalt,
+  issueMove,
+  pathDuration,
+  registerMovement,
+  stepDuration,
+} from './movement.js';
+export type { Path } from './movement.js';

@@ -5,7 +5,7 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 
 /** An event waiting in the queue. */
 export interface QueuedEvent {
-  /** Game time (seconds) at which the event fires. */
+  /** Game time at which the event fires (milliseconds when the world is a `GameState`). */
   time: number;
   /** Insertion sequence id, unique per game. Breaks ties between equal times. */
   seq: number;
@@ -34,7 +34,7 @@ export interface EmittedEvent {
  * `JSON.parse` resumes it. `world` is owned by other tasks and must be JSON-safe.
  */
 export interface EngineState<W = Json> {
-  /** Current game time in seconds. Only moves forward, only via `advanceTo`. */
+  /** Current game time, same unit as event times. Only moves forward, only via `advanceTo`. */
   time: number;
   rng: RngState;
   /** Always sorted by (time, seq). */
