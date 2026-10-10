@@ -58,6 +58,12 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Open.** A new order replans from the last completed tile, so progress on the tile being entered is lost (re-issuing an order more often than a tile takes would pin a unit in place); carrying over an unchanged first step is future work. A* uses a linear open-list scan, which is fine for small maps; switch to a binary heap if maps or order bursts grow. Units may share tiles for now (no collision or stacking rules yet). Diagonal moves, slopes and pace (march/quick/forced) are not modelled. Rates are a first pass, not the 1824 movement table.
 **See.** [architecture.md](architecture.md)
 
+## D11: Orders are couriers carrying intents
+**Decision.** An `Order` (id, side, target unit, issue time, original text, parsed `OrderIntent`s) is queued with `issueOrder` as an `order.issue` event. When it fires, a courier route is planned from the side's `hq` (a new `Side` field, validated on passable ground) to where the unit stands, using the same A* as movement; delivery time is the route cost times `COURIER_MS_PER_TILE` (4 tiles/min on open ground, so 8 on roads). An `order.deliver` event fires then and the unit adopts the intent: `move`, `withdraw` (a retreat that marches and then idles) or `hold` (march to the point if elsewhere, then hold). Until delivery, and after it, the unit keeps its standing intent. Orders to a missing, destroyed (strength 0) or enemy unit, or with no courier route, emit `order_failed` with a reason and change nothing; delivery emits `order_delivered`. The unit is checked again at delivery, so a unit destroyed in the meantime also fails.
+**Why.** Orders lag by real game time, and everything stays an event, so replay and chunking guarantees hold.
+**Open.** The courier route is fixed when the order is issued from the unit's position then, not chased as the unit moves, and couriers cannot be intercepted. Only the first parsed intent is adopted; conditional and timed intents, and `attack` (from 1.7), are not yet modelled. Strength 0 stands in for "destroyed" until combat decides how units are removed.
+**See.** [architecture.md](architecture.md), [gameplay.md](gameplay.md)
+
 ## Open questions
 - Default clock ratio (decide after the first scenario).
 - Command level and default hierarchy (assumptions above).

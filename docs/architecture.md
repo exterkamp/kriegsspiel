@@ -102,7 +102,7 @@ running ──request──► pause_proposed ──all humans yes──► paus
 
 ## Components
 
-- **Engine** (`packages/engine`): pure, deterministic, no network or clock access. Map, units, orders-as-intents, movement (A* paths played out as per-tile step events, see D10), line of sight, combat, morale, supply, seeded RNG, and `advanceTo(t)`. Fully unit-tested.
+- **Engine** (`packages/engine`): pure, deterministic, no network or clock access. Map, units, orders-as-intents, movement (A* paths played out as per-tile step events, see D10), courier-delivered orders (D11), line of sight, combat, morale, supply, seeded RNG, and `advanceTo(t)`. Fully unit-tested.
 - **Umpire service**: wraps the LLM with strict JSON schemas (tool use / structured outputs). Stages: `parseOrders`, `judge`, `narrate`, plus the staff-check, staff-conference and deputy calls. Prompts are versioned files. Results are recorded.
 - **Visibility service**: from master state and a side, produces that side's knowledge: seen units, stale contact reports, received messages. The *only* path from master state to a client.
 - **Clock and scheduler** (server): the `ClockState`, the scheduler, and pause voting.

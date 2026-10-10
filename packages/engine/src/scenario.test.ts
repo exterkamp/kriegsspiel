@@ -38,6 +38,14 @@ describe('loader validation', () => {
     expect(() => loadScenario(d)).toThrow(message);
   };
 
+  it('rejects a side HQ in the river', () => {
+    bad((d) => (d.sides[0].hq = { x: 0, y: 14 }), /hq must be on passable ground/);
+  });
+
+  it('rejects a side without an HQ', () => {
+    bad((d) => delete d.sides[0].hq, /sides\[0\]\.hq/);
+  });
+
   it('rejects non-objects', () => {
     expect(() => loadScenario(null)).toThrow(ScenarioError);
     expect(() => loadScenario('x')).toThrow(/scenario must be an object/);
