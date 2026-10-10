@@ -65,7 +65,7 @@ export const holdTheBridge = {
     {
       id: 'blue-1',
       side: 'blue',
-      kind: 'infantry',
+      type: 'line_infantry',
       name: '1st Battalion',
       at: { x: 1850, y: 2450 },
       facingDeg: 0,
@@ -76,7 +76,7 @@ export const holdTheBridge = {
     {
       id: 'blue-2',
       side: 'blue',
-      kind: 'infantry',
+      type: 'line_infantry',
       name: '2nd Battalion',
       at: { x: 2250, y: 2550 },
       facingDeg: 0,
@@ -87,7 +87,7 @@ export const holdTheBridge = {
     {
       id: 'blue-3',
       side: 'blue',
-      kind: 'cavalry',
+      type: 'cavalry',
       name: 'Cavalry Squadron',
       at: { x: 2050, y: 2750 },
       facingDeg: 0,
@@ -98,7 +98,7 @@ export const holdTheBridge = {
     {
       id: 'red-1',
       side: 'red',
-      kind: 'infantry',
+      type: 'line_infantry',
       name: 'Vanguard Battalion',
       at: { x: 1950, y: 450 },
       facingDeg: 180,
@@ -109,7 +109,7 @@ export const holdTheBridge = {
     {
       id: 'red-2',
       side: 'red',
-      kind: 'infantry',
+      type: 'line_infantry',
       name: 'Line Battalion',
       at: { x: 2250, y: 250 },
       facingDeg: 180,
@@ -120,7 +120,7 @@ export const holdTheBridge = {
     {
       id: 'red-3',
       side: 'red',
-      kind: 'cavalry',
+      type: 'cavalry',
       name: 'Hussar Squadron',
       at: { x: 1550, y: 550 },
       facingDeg: 180,

@@ -1,6 +1,7 @@
 import { distSegmentSegment, distance, mm, pointInPolygon, polygonsIntersect } from './geometry.js';
 import { footprintCorners } from './formation.js';
 import type { Point, Unit, UnitKind } from './types.js';
+import { unitTypeOf } from './unitTypes.js';
 
 export const COMBAT_CHECK_EVENT = 'combat.check';
 export const COMBAT_TICK_EVENT = 'combat.tick';
@@ -8,14 +9,13 @@ export const ATTACK_INTENT_EVENT = 'intent.attack';
 export const VICTORY_DEADLINE_EVENT = 'victory.deadline';
 
 /**
- * How far each kind can hurt an enemy, in metres. Placeholder numbers: infantry
- * fire at 200 m, cavalry only in a charge, guns much further. Real tables
- * arrive with Epic #2.
+ * How far each arm's default type can hurt an enemy, in metres. A unit's own range is its
+ * type's `rangeM` (see `unitTypes.ts`); this table is a convenience for the default types.
  */
 export const RANGE_M: Record<UnitKind, number> = {
-  infantry: 200,
-  cavalry: 100,
-  artillery: 400,
+  infantry: unitTypeOf('infantry').rangeM,
+  cavalry: unitTypeOf('cavalry').rangeM,
+  artillery: unitTypeOf('artillery').rangeM,
 };
 
 /**
@@ -24,8 +24,8 @@ export const RANGE_M: Record<UnitKind, number> = {
  */
 export const LONG_RANGE_FACTOR = 0.25;
 
-/** Cavalry closes to melee from this far (metres between centres): the charge distance. */
-export const CHARGE_M = 60;
+/** Cavalry closes to melee from this far (metres between centres): the default charge distance. */
+export const CHARGE_M = unitTypeOf('cavalry').chargeM!;
 
 /** Casualty multiplier for a melee blow against fire at the same target. */
 export const MELEE_FACTOR = 2;
@@ -41,12 +41,15 @@ export function distanceMm(a: Point, b: Point): number {
 
 /** True if `shooter` can hit `target` from where they stand. */
 export function canReach(shooter: Unit, target: Unit): boolean {
-  return distance(shooter.center, target.center) <= mm(RANGE_M[shooter.kind]);
+  return distance(shooter.center, target.center) <= mm(unitTypeOf(shooter).rangeM);
 }
 
 /** Effect of range on fire: 1 at point-blank, `LONG_RANGE_FACTOR` at maximum range. */
 export function rangeFactor(shooter: Unit, target: Unit): number {
-  const frac = Math.min(1, distance(shooter.center, target.center) / mm(RANGE_M[shooter.kind]));
+  const frac = Math.min(
+    1,
+    distance(shooter.center, target.center) / mm(unitTypeOf(shooter).rangeM),
+  );
   return 1 - (1 - LONG_RANGE_FACTOR) * frac;
 }
 
@@ -67,7 +70,8 @@ export function footprintGap(a: Unit, b: Unit): number {
 /** True if `shooter` is in melee with `target`: footprints in contact, or a cavalry charge distance. */
 export function inMelee(shooter: Unit, target: Unit): boolean {
   if (footprintGap(shooter, target) === 0) return true;
-  return shooter.kind === 'cavalry' && distance(shooter.center, target.center) <= mm(CHARGE_M);
+  const charge = unitTypeOf(shooter).chargeM;
+  return charge !== undefined && distance(shooter.center, target.center) <= mm(charge);
 }
 
 /** Where `shooter` is relative to `target`'s facing. A square has no flanks. */
