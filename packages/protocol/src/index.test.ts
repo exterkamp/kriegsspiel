@@ -116,6 +116,8 @@ describe('ServerMessage', () => {
       },
     },
     { v, kind: 'clockState', clock },
+    { v, kind: 'staffAtWork', working: true, needAtMs: 5000 },
+    { v, kind: 'staffAtWork', working: false },
     { v, kind: 'error', code: 'bad_command', message: 'nope' },
   ];
   it.each(good)('round-trips $kind', (m) => {

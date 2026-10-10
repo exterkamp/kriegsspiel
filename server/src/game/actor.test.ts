@@ -217,22 +217,209 @@ describe('clock changes wake the scheduler', () => {
 });
 
 describe('order parsing', () => {
-  it('waits for the parse before the courier leaves', async () => {
+  it('holds game time at the signing time until the parse arrives, then carries on', async () => {
     const { time, game, parser } = await newGame(1);
     await time.advance(1_000);
     let release!: () => void;
     parser.gate = new Promise((r) => (release = r));
     const pending = game.submit(order);
     await time.advance(DELIVERY_MS * 2);
-    // The parse is still out: no courier, and the engine has not moved past the signing time.
+    // The parse is still out: no courier, and game time has stalled at the signing time.
     expect(game.state.queue).toEqual([]);
     expect(game.state.time).toBe(1_000);
+    expect(game.gameClock.now()).toBe(1_000);
+    expect(game.staffAtWork).toEqual({ working: true, needAtMs: 1_000 });
 
     release();
     expect(await pending).toEqual({ ok: true, orderId: 'g1-o1' });
-    expect(game.state.time).toBeGreaterThan(1_000 + DELIVERY_MS);
-    // Signed at 1,000, so it was delivered at 1,000 + the courier ride, not at parse time.
+    // No jump: game time resumes from the barrier, not from the wall.
+    expect(game.gameClock.now()).toBe(1_000);
+    expect(game.staffAtWork).toEqual({ working: false });
+    expect(blue1(game).intent.kind).toBe('idle');
+    await time.advance(DELIVERY_MS);
     expect(blue1(game).intent).toMatchObject({ kind: 'move', startedAt: 1_000 + DELIVERY_MS });
+  });
+
+  it('gives identical outcomes with a slow parser and an instant one', async () => {
+    const run = async (parseWallMs: number) => {
+      const { time, game, parser } = await newGame(12);
+      await time.advance(2_000);
+      let release: () => void = () => undefined;
+      if (parseWallMs > 0) parser.gate = new Promise((r) => (release = r));
+      const pending = game.submit(order);
+      await time.advance(parseWallMs);
+      release();
+      await pending;
+      // Run until delivery and well into the march, then bring the world up to "now".
+      await time.advance((DELIVERY_MS + 3 * 60_000) / 12);
+      await game.submit({ kind: 'pause' });
+      await host?.shutdown();
+      return { intent: blue1(game).intent, gameMs: game.state.time };
+    };
+    const instant = await run(0);
+    const slow = await run(45_000);
+    // The slow parse cost wall time, not game time: the order was signed, left and arrived at
+    // the same game times, and the march began at the same instant.
+    expect(slow.intent).toMatchObject({ kind: 'move', startedAt: 2_000 * 12 + DELIVERY_MS });
+    expect(slow.intent).toEqual(instant.intent);
+    // Equal up to float rounding in the wall-to-game conversion (the extra wake-ups of a slow
+    // parse split the same span differently), far below a millisecond.
+    expect(slow.gameMs).toBeCloseTo(instant.gameMs, 3);
+  });
+
+  it('keeps serving other commands while the staff work', async () => {
+    const { time, game, parser } = await newGame(1);
+    let release!: () => void;
+    parser.gate = new Promise((r) => (release = r));
+    const pending = game.submit(order);
+    await time.advance(500);
+    await game.submit({ kind: 'setRate', rate: 4 });
+    expect(game.gameClock.rate).toBe(4);
+    expect(game.gameClock.now()).toBe(0);
+    release();
+    await pending;
+  });
+
+  it('reports staff at work as it starts and finishes', async () => {
+    const s = setup();
+    const seen: unknown[] = [];
+    const h = new GameHost({
+      store: s.store,
+      parser: s.parser,
+      registry: registry(),
+      wallNow: s.time.now,
+      timers: s.time,
+      onStaffAtWork: (_id, st) => seen.push(st),
+    });
+    host = h;
+    const game = await h.create('g1', loadScenario(holdTheBridge));
+    let release!: () => void;
+    s.parser.gate = new Promise((r) => (release = r));
+    const pending = game.submit(order);
+    await s.time.advance(10);
+    release();
+    await pending;
+    expect(seen).toEqual([{ working: true, needAtMs: 0 }, { working: false }]);
+  });
+
+  it('retries a failing parse, then succeeds', async () => {
+    const { time, game, parser } = await newGame(1);
+    const real = parser.parse.bind(parser);
+    let calls = 0;
+    parser.parse = (t) => (++calls < 3 ? Promise.reject(new Error('503')) : real(t));
+    const pending = game.submit(order);
+    await time.advance(5_000);
+    expect(await pending).toEqual({ ok: true, orderId: 'g1-o1' });
+    expect(calls).toBe(3);
+    // Game time was held through the retries, so the courier left at the signing time.
+    await time.advance(DELIVERY_MS);
+    expect(blue1(game).intent).toMatchObject({ kind: 'move', startedAt: DELIVERY_MS });
+  });
+
+  it.each([1, 4, 12])(
+    'accepts an order while the wall clock moves on every read (rate %i)',
+    async (rate) => {
+      const time = new FakeTime();
+      let ticks = 0;
+      const store = new MemoryGameStore();
+      const h = new GameHost({
+        store,
+        parser: new FixedParser(),
+        registry: registry(),
+        // Like Date.now(): every read is a little later than the last.
+        wallNow: () => time.now() + ticks++,
+        timers: time,
+      });
+      host = h;
+      const game = await h.create('g1', loadScenario(holdTheBridge), { rate });
+      await time.advance(2_000);
+      expect(await game.submit(order)).toEqual({ ok: true, orderId: 'g1-o1' });
+      const signedAt = (await store.inputLog('g1')).find((e) => e.command.kind === 'order')!.gameMs;
+      // The clock was held at the signing time; the courier left then, whatever the parse took.
+      expect(game.gameClock.barrier).toBeUndefined();
+      // The skewed wall source shifts the scheduler's due times by the ticks so far.
+      await time.advance(DELIVERY_MS / rate + ticks + 100);
+      expect(blue1(game).intent).toMatchObject({ kind: 'move', startedAt: signedAt + DELIVERY_MS });
+    },
+  );
+
+  it('leaves no timers and makes no more calls once a game with a hanging parse is shut down', async () => {
+    const { time, game, parser } = await newGame(1);
+    let calls = 0;
+    parser.parse = () => {
+      calls++;
+      return new Promise<ParseResult>(() => undefined);
+    };
+    const pending = game.submit(order);
+    await time.advance(1_000);
+    void pending.catch(() => undefined);
+    await host?.shutdown();
+    host = undefined;
+    const callsAtShutdown = calls;
+    expect(time.pendingTimers).toBe(0);
+    await time.advance(10 * 60_000);
+    expect(calls).toBe(callsAtShutdown);
+  });
+
+  it('arms no retry timer when a parse fails after shutdown', async () => {
+    const { time, game, parser } = await newGame(1);
+    let fail: (e: Error) => void = () => undefined;
+    parser.parse = () => new Promise<ParseResult>((_, reject) => (fail = reject));
+    void game.submit(order).catch(() => undefined);
+    await time.advance(1_000);
+    await host?.shutdown();
+    host = undefined;
+    fail(new Error('503'));
+    await time.flush();
+    expect(time.pendingTimers).toBe(0);
+  });
+
+  it('logs an order at its completion, so the input log is not in signing order', async () => {
+    const { time, game, parser, store } = await newGame(1);
+    let release: () => void = () => undefined;
+    parser.gate = new Promise((r) => (release = r));
+    const pending = game.submit(order);
+    await time.advance(1_000);
+    await game.submit({ kind: 'setRate', rate: 2 });
+    release();
+    await pending;
+    const log = await store.inputLog('g1');
+    // The order was signed first (seq 1) but is appended after the command served meanwhile.
+    // Replay must therefore go by seq/gameMs, not by log position (docs/decisions.md D14).
+    expect(log.map((e) => [e.seq, e.command.kind])).toEqual([
+      [2, 'setRate'],
+      [1, 'order'],
+    ]);
+  });
+
+  it('falls back to a clarification and logs it when every attempt fails or hangs', async () => {
+    const { time, game, parser, store } = await newGame(1);
+    let calls = 0;
+    parser.parse = () => {
+      calls++;
+      return calls === 1
+        ? new Promise<ParseResult>(() => undefined)
+        : Promise.reject(new Error('boom'));
+    };
+    const pending = game.submit(order);
+    await time.advance(5 * 60_000);
+    expect(await pending).toMatchObject({ ok: false, kind: 'clarification' });
+    expect(calls).toBe(3);
+    expect(game.staffAtWork).toEqual({ working: false });
+    const [entry] = await store.inputLog('g1');
+    expect(entry?.fallback).toEqual({ attempts: 3, error: 'boom' });
+    expect(entry?.parse?.kind).toBe('clarification');
+    await time.advance(DELIVERY_MS);
+    expect(blue1(game).intent.kind).toBe('idle');
+  });
+
+  it('abandons work with the staff when the game closes', async () => {
+    const { time, host: h, game, parser } = await newGame(1);
+    parser.gate = new Promise(() => undefined);
+    const pending = game.submit(order);
+    await time.advance(10);
+    await h.shutdown();
+    expect(await pending).toMatchObject({ ok: false, kind: 'rejection' });
   });
 
   it('does not issue clarifications, rejections or parser failures', async () => {
@@ -248,12 +435,10 @@ describe('order parsing', () => {
       intents: [{ kind: 'attack', target: { x: 1, y: 1 } }],
     };
     expect(await game.submit(order)).toMatchObject({ ok: false, kind: 'rejection' });
-    parser.parse = () => Promise.reject(new Error('boom'));
-    expect(await game.submit(order)).toMatchObject({ ok: false, reason: 'parser failed: boom' });
 
     await time.advance(DELIVERY_MS * 2);
     expect(blue1(game).intent.kind).toBe('idle');
-    expect((await store.inputLog('g1')).map((e) => e.seq)).toEqual([1, 2, 3, 4]);
+    expect((await store.inputLog('g1')).map((e) => e.seq)).toEqual([1, 2, 3]);
   });
 
   it('logs commands with their parse results for replay', async () => {
