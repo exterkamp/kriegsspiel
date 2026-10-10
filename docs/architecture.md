@@ -52,6 +52,8 @@ type ClockState = {
 
 Changing the rate or pausing **re-anchors** the clock at the current game time, so game time never jumps. Every clock change is logged with its wall time.
 
+Implemented in `server/src/clock.ts` (`GameClock`, with an injected wall-time source). `wallDueFor(gameMs)` and `gameMsAtWall(wallMs)` convert in both directions for the scheduler. `wallDueFor` is `Infinity` when paused or manual, and "now" in fast-forward.
+
 Clock modes (all required, since tests need them):
 
 | Mode | Behaviour | Used for |
