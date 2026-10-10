@@ -20,10 +20,12 @@ import {
   deserialize,
   featureAnchor,
   serialize,
+  viewFor,
   type EmittedEvent,
   type EngineState,
   type EventRegistry,
   type GameState,
+  type SideId,
 } from '@kriegsspiel/engine';
 import { GameClock, type WallClock } from '../clock.js';
 import {
@@ -34,6 +36,7 @@ import {
   type TraceSink,
 } from '../debug/trace.js';
 import type { OrderParser, ParseContext, ParseResult } from '../orders/index.js';
+import type { SideAgent } from '../opponent/index.js';
 import { applyLoggedOrder } from './replay.js';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
@@ -94,6 +97,14 @@ export interface GameActorOptions {
   parseRetryDelayMs?: number;
   /** Starting value for the input counter when resuming a game. */
   seq?: number;
+  /** Server-side agents that play scripted sides (see `opponent/`). */
+  agents?: SideAgent[];
+}
+
+interface AgentSlot {
+  agent: SideAgent;
+  /** Game time of its next decision. */
+  nextAt: number;
 }
 
 interface Dependency {
@@ -127,6 +138,9 @@ export class GameActor {
   private readonly parseTimeoutMs: number;
   private readonly parseRetryDelayMs: number;
   private seq: number;
+  private readonly agents: AgentSlot[];
+  /** Agent orders issued since the last flush, to be appended to the input log in order. */
+  private agentLog: InputLogEntry[] = [];
   /** Pending LLM dependencies: the game time each is needed and how to answer its caller. */
   private readonly dependencies = new Map<number, Dependency>();
   private nextDependency = 1;
@@ -153,6 +167,12 @@ export class GameActor {
     this.parseTimeoutMs = options.parseTimeoutMs ?? DEFAULT_PARSE_TIMEOUT_MS;
     this.parseRetryDelayMs = options.parseRetryDelayMs ?? DEFAULT_PARSE_RETRY_DELAY_MS;
     this.seq = options.seq ?? 0;
+    // Decisions fall on multiples of the interval; a resumed game picks up at the next one.
+    const t = this.engine.time;
+    this.agents = (options.agents ?? []).map((agent) => ({
+      agent,
+      nextAt: t === 0 ? 0 : (Math.floor(t / agent.intervalMs) + 1) * agent.intervalMs,
+    }));
   }
 
   /** Whether the game is waiting on the umpire. */
@@ -223,18 +243,81 @@ export class GameActor {
     this.advanceEngine(target);
   }
 
+  /**
+   * Advance to `target`, stopping at each time a scripted agent is due to think. An agent sees
+   * the world as `viewFor` shows its side at that instant, and its orders are issued then, so the
+   * outcome does not depend on how often the scheduler wakes.
+   */
   private advanceEngine(target: number): void {
-    const res = advanceTo(this.engine, target, this.registry);
-    this.engine = res.state;
-    if (res.emitted.length > 0) {
-      if (this.trace.enabled) {
-        for (const event of res.emitted) this.trace.record(this.id, 'engine', event);
+    const emitted: EmittedEvent[] = [];
+    const step = (to: number) => {
+      const res = advanceTo(this.engine, to, this.registry);
+      this.engine = res.state;
+      emitted.push(...res.emitted);
+    };
+    try {
+      for (;;) {
+        const due = this.nextAgent();
+        if (!due || due.nextAt > target || this.engine.world.outcome) break;
+        step(due.nextAt);
+        due.nextAt += due.agent.intervalMs;
+        if (!this.engine.world.outcome) this.think(due.agent);
       }
-      this.onEmitted?.(res.emitted);
+      step(target);
+    } finally {
+      if (emitted.length > 0) {
+        if (this.trace.enabled) {
+          for (const event of emitted) this.trace.record(this.id, 'engine', event);
+        }
+        this.onEmitted?.(emitted);
+      }
+    }
+  }
+
+  private nextAgent(): AgentSlot | undefined {
+    return this.agents.reduce<AgentSlot | undefined>(
+      (best, a) => (!best || a.nextAt < best.nextAt ? a : best),
+      undefined,
+    );
+  }
+
+  /** Run one decision: the same order path as a human's, logged so replay needs no agent. */
+  private think(agent: SideAgent): void {
+    const view = viewFor(this.engine.world, agent.side as SideId, this.engine.time);
+    for (const o of agent.think(view)) {
+      const parsed: ParseResult = {
+        kind: 'intents',
+        text: o.text,
+        unitId: o.unitId,
+        intents: [o.intent],
+      };
+      const entry: InputLogEntry = {
+        seq: ++this.seq,
+        wallMs: this.wallNow(),
+        gameMs: this.engine.time,
+        endGameMs: this.engine.time,
+        command: { kind: 'order', side: agent.side, text: o.text },
+        parse: parsed,
+        agent: true,
+      };
+      const applied = applyLoggedOrder(this.engine, this.id, entry.seq, agent.side, parsed);
+      if ('reason' in applied) entry.error = applied.reason;
+      else this.engine = applied.state;
+      if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+      this.agentLog.push(entry);
+    }
+  }
+
+  /** Append the agent orders issued so far, before anything logged after them. */
+  private async flushAgentLog(): Promise<void> {
+    while (this.agentLog.length > 0) {
+      const entry = this.agentLog.shift()!;
+      await this.store.appendInput(this.id, entry);
     }
   }
 
   private async persist(): Promise<void> {
+    await this.flushAgentLog();
     await this.store.saveSnapshot(this.id, {
       engine: serialize(this.engine),
       clock: { ...this.clock.snapshot(), mode: this.clock.mode },
@@ -248,12 +331,19 @@ export class GameActor {
   private reschedule(): void {
     this.clearTimer();
     if (this.closed) return;
-    const next = this.engine.queue[0];
-    if (!next || this.clock.status !== 'running' || this.clock.mode === 'manual') return;
+    const nextEvent = this.engine.queue[0];
+    const nextThink = this.engine.world.outcome ? undefined : this.nextAgent()?.nextAt;
+    const nextTime =
+      nextEvent && nextThink !== undefined
+        ? Math.min(nextEvent.time, nextThink)
+        : (nextEvent?.time ?? nextThink);
+    if (nextTime === undefined || this.clock.status !== 'running' || this.clock.mode === 'manual') {
+      return;
+    }
     const delay = Math.min(
       MAX_SLEEP_MS,
       // Round up: waking a fraction early finds the event not yet due and spins at zero delay.
-      Math.max(0, Math.ceil(this.clock.wallDueFor(next.time) - this.wallNow())),
+      Math.max(0, Math.ceil(this.clock.wallDueFor(nextTime) - this.wallNow())),
     );
     this.timer = this.timers.setTimeout(() => {
       this.timerSet = false;
@@ -273,9 +363,14 @@ export class GameActor {
   private async tick(): Promise<void> {
     if (this.clock.status === 'running' && this.clock.mode === 'fast-forward') {
       // Nothing is waited for: jump to the next event, one instant per tick.
-      const next = this.engine.queue[0];
-      if (next && next.time <= (this.clock.barrier ?? Infinity)) {
-        this.clock.advanceTo(Math.max(next.time, this.clock.now()));
+      const nextEvent = this.engine.queue[0];
+      const nextThink = this.engine.world.outcome ? undefined : this.nextAgent()?.nextAt;
+      const next =
+        nextEvent && nextThink !== undefined
+          ? Math.min(nextEvent.time, nextThink)
+          : (nextEvent?.time ?? nextThink);
+      if (next !== undefined && next <= (this.clock.barrier ?? Infinity)) {
+        this.clock.advanceTo(Math.max(next, this.clock.now()));
         this.sync();
       }
     } else {
@@ -320,6 +415,7 @@ export class GameActor {
   private async commit(entry: InputLogEntry): Promise<void> {
     // A failing store must not leave the scheduler unarmed after the clock already changed.
     try {
+      await this.flushAgentLog();
       await this.store.appendInput(this.id, entry);
       this.sync();
       await this.persist();

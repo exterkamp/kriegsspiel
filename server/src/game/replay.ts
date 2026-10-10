@@ -89,7 +89,16 @@ export function replayLog(
     emitted.push(...res.emitted);
   };
 
-  for (const entry of entries) {
+  // Agent orders are logged when the actor next flushes, which can be after a later command;
+  // game time puts them back in order, an agent's first at the same instant (it thought on the
+  // way to that instant, before the command was applied).
+  const ordered = [...entries].sort(
+    (a, b) => a.gameMs - b.gameMs || Number(b.agent ?? false) - Number(a.agent ?? false),
+  );
+  // Where the world stood after the latest input. The world only needs to be caught up to an
+  // input's time when the next input arrives, so the settle is applied lazily, at the end.
+  let settled = 0;
+  for (const entry of ordered) {
     // Stop before the first input after the target, so an earlier `untilGameMs` leaves later
     // inputs out of the state.
     if (untilGameMs !== undefined && entry.gameMs > untilGameMs) break;
@@ -103,9 +112,8 @@ export function replayLog(
         if ('state' in res) state = res.state;
       }
     }
-    const settled = entry.endGameMs ?? state.time;
-    advance(untilGameMs === undefined ? settled : Math.min(settled, untilGameMs));
+    settled = Math.max(settled, entry.endGameMs ?? state.time);
   }
-  if (untilGameMs !== undefined) advance(untilGameMs);
+  advance(untilGameMs === undefined ? settled : untilGameMs);
   return { state, emitted };
 }
