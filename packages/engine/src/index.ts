@@ -43,6 +43,16 @@ export {
   registerMovement,
 } from './movement.js';
 export type { Path } from './movement.js';
+export {
+  BREAK_MORALE,
+  COMBAT_TICK_MS,
+  coverFactor,
+  FIRE_RATE,
+  issueAttack,
+  registerCombat,
+  startGame,
+} from './combat.js';
+export { OBJECTIVE_RADIUS_M, RANGE_M, canReach, onObjective } from './contact.js';
 export { COURIER_MS_PER_METRE, issueOrder, registerOrders } from './orders.js';
 export type { Order, OrderIntent } from './orders.js';
 export { beginMarch } from './movement.js';

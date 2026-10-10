@@ -1,3 +1,4 @@
+import { ATTACK_INTENT_EVENT, COMBAT_CHECK_EVENT, canReach } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { distance } from './geometry.js';
 import { schedule } from './queue.js';
@@ -25,11 +26,35 @@ export const MS_PER_METRE: Record<UnitKind, number> = {
 
 /**
  * Route planning is a stopgap until movement is reworked for continuous space (see
- * docs/decisions.md D13): A* over a private lattice of this pitch, with the lattice
+ * docs/decisions.md D15): A* over a private lattice of this pitch, with the lattice
  * start and goal joined by straight legs. The lattice is not part of the model: paths
  * are lists of free points and can be any shape.
  */
 const ROUTE_PITCH_MM = 100_000;
+
+/**
+ * A march is stepped at most this far at a time (100 m), so contact, the objective and an
+ * attacker's range are checked at least that often along a long straight leg.
+ */
+export const MAX_STEP_MM = 100_000;
+
+/** Split legs longer than `MAX_STEP_MM` into equal collinear steps. */
+function stepped(waypoints: Point[]): Point[] {
+  const out: Point[] = [waypoints[0]!];
+  for (let i = 1; i < waypoints.length; i++) {
+    const a = waypoints[i - 1]!;
+    const b = waypoints[i]!;
+    const n = Math.max(1, Math.ceil(distance(a, b) / MAX_STEP_MM));
+    for (let k = 1; k < n; k++) {
+      out.push({
+        x: Math.round(a.x + ((b.x - a.x) * k) / n),
+        y: Math.round(a.y + ((b.y - a.y) * k) / n),
+      });
+    }
+    out.push(b);
+  }
+  return out;
+}
 
 /** A route as free points, `from` first and `to` last, and its cost in mm weighted by ground. */
 export interface Path {
@@ -259,25 +284,35 @@ function scheduleStep(map: TerrainMap, kind: UnitKind, now: number, p: StepPaylo
 
 /** An order for a unit that does not exist is rejected, so one bad id cannot wedge the queue. */
 function rejectUnknown(world: GameState, unitId: string) {
-  return { world, emit: [{ type: 'order.rejected', payload: { unitId, reason: 'unknown unit' } }] };
+  return rejectOrder(world, unitId, 'unknown unit');
+}
+
+export function rejectOrder(world: GameState, unitId: string, reason: string) {
+  return { world, emit: [{ type: 'order.rejected', payload: { unitId, reason } }] };
 }
 
 /** The destination a march intent is heading for, or undefined if the intent is not a march. */
 function marchTarget(i: Intent): Point | undefined {
-  return i.kind === 'move' ? i.to : i.kind === 'withdraw' ? i.toward : undefined;
+  return i.kind === 'move' || i.kind === 'attack'
+    ? i.to
+    : i.kind === 'withdraw'
+      ? i.toward
+      : undefined;
 }
 
 /**
- * Start `unit` marching to `dest` at `time`, as a plain move, a withdrawal, or a
- * move that ends in a hold. Shared by move orders and delivered courier orders.
- * An unreachable destination is reported and leaves any march under way alone.
+ * Start `unit` marching to `dest` at `time`, as a plain move, a withdrawal, a move that
+ * ends in a hold, or (with `attackTarget`) an attack march that the combat code takes
+ * over once the target is in reach. Shared by move orders, attack orders and delivered
+ * courier orders. An unreachable destination is reported and leaves any march under way alone.
  */
 export function beginMarch(
   world: GameState,
   unit: Unit,
   dest: Point,
   time: number,
-  how: 'move' | 'withdraw' | 'hold' = 'move',
+  how: 'move' | 'withdraw' | 'hold' | 'attack' = 'move',
+  attackTarget?: string,
 ): HandlerResult<GameState> {
   const to: [number, number] = [dest.x, dest.y];
   const path = findPath(world.map, unit.center, dest);
@@ -288,6 +323,10 @@ export function beginMarch(
     };
   }
   if (path.waypoints.length === 1) {
+    if (how === 'attack' && attackTarget) {
+      const intent: Intent = { kind: 'attack', target: attackTarget, to: dest, startedAt: time };
+      return { world: updateUnit(world, unit.id, { intent }, time) };
+    }
     const intent: Intent = how === 'hold' ? { kind: 'hold', at: dest } : { kind: 'idle' };
     return {
       world: updateUnit(world, unit.id, { intent }, time),
@@ -295,21 +334,36 @@ export function beginMarch(
     };
   }
   const intent: Intent =
-    how === 'withdraw'
-      ? { kind: 'withdraw', toward: dest, startedAt: time }
-      : how === 'hold'
-        ? { kind: 'move', to: dest, startedAt: time, thenHold: true }
-        : { kind: 'move', to: dest, startedAt: time };
+    how === 'attack' && attackTarget
+      ? { kind: 'attack', target: attackTarget, to: dest, startedAt: time }
+      : how === 'withdraw'
+        ? { kind: 'withdraw', toward: dest, startedAt: time }
+        : how === 'hold'
+          ? { kind: 'move', to: dest, startedAt: time, thenHold: true }
+          : { kind: 'move', to: dest, startedAt: time };
   const step: StepPayload = {
     unitId: unit.id,
     startedAt: time,
     to,
-    path: path.waypoints.flatMap((t) => [t.x, t.y]),
+    path: stepped(path.waypoints).flatMap((t) => [t.x, t.y]),
   };
   return {
     world: updateUnit(world, unit.id, { intent }, time),
     schedule: [scheduleStep(world.map, unit.kind, time, step)],
   };
+}
+
+/** Plan a march for `unit` to `dest`; with `attackTarget` the intent becomes `attack`. */
+export function startMarch(
+  world: GameState,
+  unit: Unit,
+  dest: Point,
+  time: number,
+  attackTarget?: string,
+): HandlerResult<GameState> {
+  return attackTarget
+    ? beginMarch(world, unit, dest, time, 'attack', attackTarget)
+    : beginMarch(world, unit, dest, time, 'move');
 }
 
 /**
@@ -326,6 +380,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     const { unitId, to } = ev.payload as unknown as MovePayload;
     const unit = world.units.find((u) => u.id === unitId);
     if (!unit) return rejectUnknown(world, unitId);
+    if (unit.status !== 'active') return rejectOrder(world, unitId, 'unit not active');
     return beginMarch(world, unit, { x: to[0], y: to[1] }, ev.time);
   });
 
@@ -344,7 +399,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
       !unit ||
       !i ||
       !target ||
-      (i.kind !== 'move' && i.kind !== 'withdraw') ||
+      (i.kind !== 'move' && i.kind !== 'withdraw' && i.kind !== 'attack') ||
       i.startedAt !== p.startedAt ||
       target.x !== p.to[0] ||
       target.y !== p.to[1]
@@ -353,17 +408,51 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     }
     const center = { x: p.path[2]!, y: p.path[3]! };
     const rest = p.path.slice(2);
-    if (rest.length === 2) {
+    // Every step may start or end a contact, or put a unit on the objective.
+    const check: NewEvent = { time: ev.time, type: COMBAT_CHECK_EVENT };
+    if (i.kind === 'attack') {
+      const foe = world.units.find((u) => u.id === i.target);
+      if (!foe || foe.status !== 'active') {
+        return {
+          world: updateUnit(world, p.unitId, { center, intent: { kind: 'idle' } }, ev.time),
+          schedule: [check],
+        };
+      }
+      const arrived = rest.length === 2;
+      if (canReach({ ...unit, center }, foe)) {
+        // In reach: stop here. `to` becomes the stopping point, so the unit counts as
+        // stopped and `combat.check` re-plans it if the foe later walks out of reach.
+        return {
+          world: updateUnit(world, p.unitId, { center, intent: { ...i, to: center } }, ev.time),
+          schedule: [check],
+        };
+      }
+      if (arrived) {
+        // The foe moved on; plan a fresh march toward where it is now.
+        return {
+          world: updateUnit(world, p.unitId, { center }, ev.time),
+          schedule: [
+            check,
+            {
+              time: ev.time,
+              type: ATTACK_INTENT_EVENT,
+              payload: { unitId: p.unitId, target: i.target },
+            },
+          ],
+        };
+      }
+    } else if (rest.length === 2) {
       const intent: Intent =
         i.kind === 'move' && i.thenHold ? { kind: 'hold', at: center } : { kind: 'idle' };
       return {
         world: updateUnit(world, p.unitId, { center, intent }, ev.time),
         emit: [{ type: 'unit.arrived', payload: { unitId: p.unitId, at: p.to } }],
+        schedule: [check],
       };
     }
     return {
       world: updateUnit(world, p.unitId, { center }, ev.time),
-      schedule: [scheduleStep(world.map, unit.kind, ev.time, { ...p, path: rest })],
+      schedule: [check, scheduleStep(world.map, unit.kind, ev.time, { ...p, path: rest })],
     };
   });
 }

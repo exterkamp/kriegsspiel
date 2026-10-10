@@ -15,6 +15,7 @@ import {
   pathDuration,
   pointMm,
   profileAlong,
+  registerCombat,
   registerMovement,
   segmentPassable,
   serialize,
@@ -28,6 +29,7 @@ const P = (x: number, y: number): Point => pointMm(x, y);
 function registry() {
   const r = new EventRegistry<GameState>();
   registerMovement(r);
+  registerCombat(r);
   return r;
 }
 
@@ -258,9 +260,9 @@ describe('movement events', () => {
     // The old step event is still queued but stale, plus the new order's step.
     expect(again.state.queue).toHaveLength(2);
     const done = advanceTo(again.state, 600 * MINUTE, registry());
-    // Replanned from the start at 2 min, so it arrives at 6.5 min; the stale chain would
-    // have arrived at 4.5.
-    expect(done.emitted.map((e) => [e.time, e.type])).toEqual([[6.5 * MINUTE, 'unit.arrived']]);
+    // Replanned at 2 min from the last 90 m step it reached (180 m along), so the 270 m left
+    // arrive at 4.7 min; the stale chain would have arrived at 4.5.
+    expect(done.emitted.map((e) => [e.time, e.type])).toEqual([[4.7 * MINUTE, 'unit.arrived']]);
     expect(unit(done.state, 'blue-1').center).toEqual(to);
     expect(done.state.queue).toEqual([]);
   });

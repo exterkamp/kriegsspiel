@@ -226,6 +226,8 @@ function parseUnits(raw: unknown, map: TerrainMap, sides: Side[]): Unit[] {
       strength,
       morale: int(o.morale, `${p}.morale`, 0, 100),
       intent: { kind: 'idle' },
+      status: 'active',
+      home: { ...center },
     };
     const where = `(${center.x / 1000}, ${center.y / 1000})`;
     if (!inside(map, center)) fail(`${p} center ${where} is off the map`);
@@ -283,5 +285,7 @@ export function loadScenario(raw: unknown): GameState {
       attacker,
       holdMs: int(v.holdMinutes, 'victory.holdMinutes', 1) * MS_PER_MINUTE,
     },
+    combatActive: false,
+    outcome: null,
   };
 }

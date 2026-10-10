@@ -11,6 +11,7 @@ import {
   issueOrder,
   loadScenario,
   pointMm,
+  registerCombat,
   registerMovement,
   registerOrders,
   type EngineState,
@@ -25,6 +26,7 @@ const P = (x: number, y: number): Point => pointMm(x, y);
 function registry() {
   const r = new EventRegistry<GameState>();
   registerMovement(r);
+  registerCombat(r);
   registerOrders(r);
   return r;
 }

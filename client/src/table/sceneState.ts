@@ -10,7 +10,7 @@ export type FacingById = Readonly<Record<string, Facing>>;
 /**
  * Stopgap: the wire speaks metres on a continuous plane, but the table still draws a tile
  * display map, so metres are divided by this to get tile units. Goes away when the table
- * is redrawn from the vector map (follow-up to decision D13).
+ * is redrawn from the vector map (follow-up to decision D15).
  */
 export const METRES_PER_TILE = 100;
 

@@ -68,9 +68,10 @@ Clock modes (all required, since tests need them):
 - **Event queue**: a priority queue keyed by game time, persisted. Events include order dispatched, courier arrives, unit reaches waypoint, contact begins, combat tick, scheduled/timed orders, weather changes, and report delivery.
 - **Scheduler**: sleeps until the next event is due in wall time: `wallDue = wallAnchor + (eventGame - gameAnchor) / rate`. It wakes early whenever the queue, the rate or the pause state changes. When running, it advances the engine through each due event in order.
 - **Lazy simulation**: when a player command arrives, the server first advances the world to "now", then applies the command. Quiet stretches cost nothing.
-- **Combat ticks**: while units are in contact, the engine schedules short ticks (for example every 1-5 game minutes) so a fight resolves in finer steps. Outside contact it jumps between events.
+- **Combat ticks**: while units are in contact, the engine schedules short ticks (every 2 game minutes in the engine, see D13) so a fight resolves in finer steps. Outside contact it jumps between events.
 - **Event ordering (implemented in `packages/engine`)**: events fire in ascending `(time, seq)`. `seq` is a per-game counter assigned at scheduling, so same-instant events fire in the order they were scheduled. `advanceTo(state, t)` fires every event with `time <= t` (including ones handlers schedule for `<= t` during the call), then sets the clock to `t`. Scheduling before the current time is an error. Chunking `advanceTo` never changes the result. State (clock, RNG, queue, `nextSeq`, world) is plain JSON for snapshots. Handlers are registered by event type in an `EventRegistry`; all dice come from the seeded RNG passed to the handler.
 - **Single writer per game**: each game runs as one serial actor, with a command queue. Commands are applied in arrival order. No locks and no races, and the log is a total order. Many games can share a process.
+- **Implemented in `server/src/game`**: `GameActor` (queue, scheduler, snapshot after every command), `GameHost` (many games, reopen paused), `GameStore` with `MemoryGameStore`. Timers and wall time are injected for tests. See D14.
 
 ## The LLM barrier
 
@@ -102,9 +103,10 @@ running ──request──► pause_proposed ──all humans yes──► paus
 
 ## Components
 
-- **Engine** (`packages/engine`): pure, deterministic, no network or clock access. Continuous-space map (vector terrain features in metres, no grid, see D13), units with free position, facing and footprint, orders-as-intents, movement (routes played out as per-leg step events, see D10), courier-delivered orders (D11), line of sight, combat, morale, supply, seeded RNG, and `advanceTo(t)`. Fully unit-tested.
+- **Engine** (`packages/engine`): pure, deterministic, no network or clock access. Continuous-space map (vector terrain features in metres, no grid, see D15), units with free position, facing and footprint, orders-as-intents, movement (routes played out as per-leg step events, see D10), courier-delivered orders (D11), line of sight, combat, morale, supply, seeded RNG, and `advanceTo(t)`. Fully unit-tested.
 - **Umpire service**: wraps the LLM with strict JSON schemas (tool use / structured outputs). Stages: `parseOrders`, `judge`, `narrate`, plus the staff-check, staff-conference and deputy calls. Prompts are versioned files. Results are recorded.
-  The parse seam is the async `OrderParser` interface in `server/src/orders/orderParser.ts`: `parse(orderText, context)` resolves to intents, a clarification request or a rejection, and always carries the original wording. The server depends on the interface only; a rule-based `StubOrderParser` stands in until the LLM umpire exists.
+  The parse seam is the async `OrderParser` interface in `server/src/orders/orderParser.ts`: `parse(orderText, context)` resolves to intents, a clarification request or a rejection, and always carries the original wording. The server depends on the interface only; a rule-based `StubOrderParser` stands in until the LLM umpire exists. Parsers are scored against a golden corpus by the harness in `server/src/orders/eval`, see [order-eval.md](order-eval.md).
+  The model seam is `UmpireClient` in `server/src/umpire/` (`call(request)` returns schema-validated output plus a call record). `AnthropicUmpireClient` sends structured-output requests (`output_config.format`, no forced tool choice) through an injectable `UmpireTransport`, retries transport errors, timeouts and schema-invalid output with backoff, and sums tokens and cost across attempts. Models are set per stage by `UMPIRE_MODEL_PARSE|JUDGE|NARRATE`. Each accepted call goes to a `CallRecorder` (model, prompt version, system, input, raw output) for the input log. `PlaybackUmpireClient` serves those records by stage, prompt version and input with no transport, so replays cannot reach the network.
 - **Visibility service**: from master state and a side, produces that side's knowledge: seen units, stale contact reports, received messages. The *only* path from master state to a client. See D12.
 - **Clock and scheduler** (server): the `ClockState`, the scheduler, and pause voting.
 - **Notifier**: pushes dispatch arrivals and clock events over WebSocket, plus email or web push for players who are away. Players set thresholds (all dispatches, urgent only, contact only).
@@ -115,7 +117,7 @@ running ──request──► pause_proposed ──all humans yes──► paus
 
 An `EngineSideView` (engine type, `viewFor`; not the protocol `SideView`, see D12) may contain only:
 
-- `side`, `time`, `mapWidth`, `mapHeight`. All lengths in a view are metres; master state is integer millimetres (D13).
+- `side`, `time`, `mapWidth`, `mapHeight`. All lengths in a view are metres; master state is integer millimetres (D15).
 - `ownUnits`: the side's own units in full (id, name, kind, position, facing, formation, footprint, loose-formation shape, strength, morale).
 - `visibleEnemies`: enemy units in sight now, as id, position, facing, formation, footprint (rounded to the nearest 10 m, since an exact one would give the strength away), any loose shape, and a coarse `sizeEstimate` phrase. Nothing else: no strength, morale, intent or name.
 - `lastKnownContacts`: enemy units seen earlier and not in sight now, as id, the position where seen, `seenAt`, `ageMs`, `uncertaintyRadius` (metres, growing with age) and the size phrase from the sighting.
