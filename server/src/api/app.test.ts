@@ -191,6 +191,19 @@ describe('restart notice', () => {
     const view = await c.waitFor('viewUpdate');
     expect(view.view.clock.status).toBe('paused');
   });
+
+  it('does not tell a later joiner once the game has been resumed', async () => {
+    const { base, ws } = await start();
+    const { json: game } = await createGame(base);
+    await app!.host.close(game.id);
+    const reopened = await app!.host.open(game.id);
+    await reopened.submit({ kind: 'resume' });
+    expect(reopened.gameClock.status).toBe('running');
+    const c = await join(ws, game, 'blue');
+    const view = await c.waitFor('viewUpdate');
+    expect(view.view.clock.status).toBe('running');
+    expect(c.messages.some((m) => m.kind === 'serverRestarted')).toBe(false);
+  });
 });
 
 describe('WebSocket auth', () => {

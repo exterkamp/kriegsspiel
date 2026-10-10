@@ -139,6 +139,31 @@ describe('order delivery on a fake clock', () => {
   });
 });
 
+describe('clean stop', () => {
+  it('measures downtime from the close, not from the last tick', async () => {
+    const { time, store, host: h } = setup();
+    await h.create('g1', loadScenario(holdTheBridge));
+    // A quiet stretch with no events, then a clean close.
+    await time.advance(10 * 60_000);
+    await h.close('g1');
+    expect(await store.loadHeartbeat('g1')).toBe(time.now());
+
+    const closedAt = time.now();
+    const gap = 5 * 60_000;
+    const time2 = new FakeTime(closedAt + gap);
+    const h2 = new GameHost({
+      store,
+      parser: new FixedParser(),
+      registry: registry(),
+      wallNow: time2.now,
+      timers: time2,
+    });
+    host = h2;
+    const reopened = await h2.open('g1');
+    expect(reopened.restart?.downMs).toBe(gap);
+  });
+});
+
 describe('clock changes wake the scheduler', () => {
   it('re-times a pending delivery when the rate changes', async () => {
     const { time, game } = await newGame(1);

@@ -94,7 +94,7 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       return { ...s, staffAtWork: m.working };
     case 'serverRestarted': {
       const mins = Math.round(m.downMs / 60_000);
-      const away = mins >= 1 ? `about ${mins} min` : 'a short while';
+      const away = mins >= 1 ? `at least ${mins} min` : 'a short while';
       const message = `The server was down for ${away}. The game came back paused; no game time passed. Confirm to resume.`;
       const notices = [...s.notices, { code: 'server_restart', message }].slice(-MAX_NOTICES);
       return { ...s, notices };

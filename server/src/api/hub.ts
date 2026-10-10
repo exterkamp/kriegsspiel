@@ -121,7 +121,8 @@ export class Hub {
         conn.lastClock = clockJson;
       }
       const first = conn.lastView === '';
-      if (first && game.restart) {
+      // Only while the game is still waiting on the confirm: later joiners must not be told it is paused.
+      if (first && game.restart && clock.status === 'paused' && !game.state.world.outcome) {
         this.send(conn, {
           v: PROTOCOL_VERSION,
           kind: 'serverRestarted',
