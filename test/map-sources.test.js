@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 
 const dir = new URL('../assets/maps/', import.meta.url);
 const entries = JSON.parse(readFileSync(new URL('sources.json', dir), 'utf8'));
@@ -15,7 +15,10 @@ const required = [
   'licence',
   'usageTerms',
 ];
-const scans = readdirSync(dir, { recursive: true }).filter((f) => /\.(jpe?g|png|tiff?)$/i.test(f));
+const docs = /^(sources\.json|README\.md)$/;
+const scans = readdirSync(dir, { recursive: true }).filter(
+  (f) => !docs.test(f) && statSync(new URL(f, dir)).isFile(),
+);
 
 test('every map entry is complete and matches its file', () => {
   for (const e of entries) {
