@@ -17,6 +17,7 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Why.** The game is mostly documents plus one map. A DOM UI is much better for text and drag-and-drop, and a 3D table gives the physical Kriegsspiel feel. A flat map avoids needing elevation data.
 **Alternatives considered.** Phaser, PixiJS, Babylon.js, Godot web export, full 3D room, fully 2D desk.
 **Consequence.** The earlier Phaser prototype is abandoned and removed from the repo. The new engine and client are written fresh against the continuous-clock design. (The old code is kept outside the repo as a reference only.)
+**Client structure.** `client/src/table/`: `buildSceneState(view, map, facings)` is a pure `SideView` to `SceneState` function; `TableScene` reconciles the Three.js scene to it (idempotent); picking is pieces by mesh raycast, then the map plane. Facing is not yet on the wire, so the client takes it as a side input (default N). Runs from a fixture with no server.
 **See.** [hq-interface.md](hq-interface.md), [architecture.md](architecture.md)
 
 ## D4: Continuous game clock with an adjustable ratio, not turns
