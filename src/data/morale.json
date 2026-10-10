@@ -5,13 +5,51 @@
   "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.2.5 and 4.2.1, 4.3" },
   "data": {
     "recovery_moves": [
-      { "result": "R", "defence": 2, "offence": 3, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 4.2.1 Repulsed Troops (2 moves for defence; 3 for offence per the edition's summary table)" } },
-      { "result": "D", "defence": 3, "offence": 6, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 4.2.1 Defeated Troops" } },
-      { "result": "T", "defence": 5, "offence": 10, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 4.2.1 Totally Defeated Troops" } }
+      {
+        "result": "R",
+        "defence": 2,
+        "offence": 3,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 4.2.1 Repulsed Troops (2 moves for defence; 3 for offence per the edition's summary table)"
+        }
+      },
+      {
+        "result": "D",
+        "defence": 3,
+        "offence": 6,
+        "source": { "source": "rulespal-reisswitz", "locator": "Part Three 4.2.1 Defeated Troops" }
+      },
+      {
+        "result": "T",
+        "defence": 5,
+        "offence": 10,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 4.2.1 Totally Defeated Troops"
+        }
+      }
     ],
     "retreat_paces_per_move": [
-      { "troops": "infantry", "normal": 250, "forced_fast": 500, "fast_downgrades_result": true, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 4.3.3 Retreating Infantry" } },
-      { "troops": "beaten_skirmishers", "normal": 400, "moves_without_penalty": 2, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 4.3.3 Retreating Infantry" } }
+      {
+        "troops": "infantry",
+        "normal": 250,
+        "forced_fast": 500,
+        "fast_downgrades_result": true,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 4.3.3 Retreating Infantry"
+        }
+      },
+      {
+        "troops": "beaten_skirmishers",
+        "normal": 400,
+        "moves_without_penalty": 2,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 4.3.3 Retreating Infantry"
+        }
+      }
     ],
     "cavalry_pursuit_paces_per_move": [
       { "move": 1, "light": null, "heavy": null, "note": "wait" },
@@ -20,9 +58,33 @@
       { "move": 4, "light": 900, "heavy": 800 },
       { "move": 5, "light": 600, "heavy": 600 }
     ],
-    "cavalry_pursuit_source": { "source": "rulespal-reisswitz", "locator": "Part Three 4.3 Retreats & Pursuits table" },
-    "canister_morale_check": { "die": 2, "odds": "3:2 in favour of the battery", "failed_roll_effect": "target retires 250 paces next move", "applies_to": "battalion or two squadrons under good-effect canister from a half battery", "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.2.5 The Morale Effect of Artillery" } },
-    "infantry_victor_follow_up_without_halt": { "loss_multiplier": 0.5, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 4.3.2 Victorious Infantry" } },
-    "renewed_attack_on_beaten_troops": { "index_shift": -1, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 4.3.6; Appendix Two 4.3.6 (one die poorer odds)" } }
+    "cavalry_pursuit_source": {
+      "source": "rulespal-reisswitz",
+      "locator": "Part Three 4.3 Retreats & Pursuits table"
+    },
+    "canister_morale_check": {
+      "die": 2,
+      "odds": "3:2 in favour of the battery",
+      "failed_roll_effect": "target retires 250 paces next move",
+      "applies_to": "battalion or two squadrons under good-effect canister from a half battery",
+      "source": {
+        "source": "rulespal-reisswitz",
+        "locator": "Part Three 3.2.5 The Morale Effect of Artillery"
+      }
+    },
+    "infantry_victor_follow_up_without_halt": {
+      "loss_multiplier": 0.5,
+      "source": {
+        "source": "rulespal-reisswitz",
+        "locator": "Part Three 4.3.2 Victorious Infantry"
+      }
+    },
+    "renewed_attack_on_beaten_troops": {
+      "index_shift": -1,
+      "source": {
+        "source": "rulespal-reisswitz",
+        "locator": "Part Three 4.3.6; Appendix Two 4.3.6 (one die poorer odds)"
+      }
+    }
   }
 }

@@ -2,7 +2,10 @@
   "id": "fire",
   "title": "Fire ranges and effects (points inflicted by d6 roll)",
   "edition": "1824",
-  "source": { "source": "rulespal-reisswitz", "locator": "Part Three Section Three, 3.1 Infantry Fire" },
+  "source": {
+    "source": "rulespal-reisswitz",
+    "locator": "Part Three Section Three, 3.1 Infantry Fire"
+  },
   "data": {
     "infantry_half_battalion": {
       "unit": "points_inflicted",
@@ -11,31 +14,89 @@
         { "range_paces": [200, 300], "by_die_face": [10, 10, 4, 12, 25, 3] },
         { "range_paces": [100, 200], "by_die_face": [20, 20, 10, 25, 50, 6] }
       ],
-      "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.1.1 Infantry Fire Table" }
+      "source": {
+        "source": "rulespal-reisswitz",
+        "locator": "Part Three 3.1.1 Infantry Fire Table"
+      }
     },
     "artillery_12pdr_good_effect": {
-      "rows": [
-        { "range_paces": [1500, 2000], "by_die_face": [9, 9, 6, 8, 6, 12] }
-      ],
-      "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.2.2 Artillery Fire Table, 12 Pounder Battery, 1500-2000, Good 1-6" }
+      "rows": [{ "range_paces": [1500, 2000], "by_die_face": [9, 9, 6, 8, 6, 12] }],
+      "source": {
+        "source": "rulespal-reisswitz",
+        "locator": "Part Three 3.2.2 Artillery Fire Table, 12 Pounder Battery, 1500-2000, Good 1-6"
+      }
     },
     "artillery_12pdr_bad_effect": {
-      "rows": [
-        { "range_paces": [1500, 2000], "by_die_face": [3, 3, 5, 2, 1, 1] }
-      ],
-      "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.2.2 Artillery Fire Table, 12 Pounder Battery, 1500-2000, Bad 1-6" }
+      "rows": [{ "range_paces": [1500, 2000], "by_die_face": [3, 3, 5, 2, 1, 1] }],
+      "source": {
+        "source": "rulespal-reisswitz",
+        "locator": "Part Three 3.2.2 Artillery Fire Table, 12 Pounder Battery, 1500-2000, Bad 1-6"
+      }
     },
     "max_range_paces": [
-      { "arm": "infantry", "paces": 400, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.1.1 Infantry Fire Table (outermost band)" } },
-      { "arm": "artillery", "paces": 2000, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.2.2 Artillery Fire Table (outermost band); Part Two 4. Artillery Ranges" } }
+      {
+        "arm": "infantry",
+        "paces": 400,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 3.1.1 Infantry Fire Table (outermost band)"
+        }
+      },
+      {
+        "arm": "artillery",
+        "paces": 2000,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 3.2.2 Artillery Fire Table (outermost band); Part Two 4. Artillery Ranges"
+        }
+      }
     ],
     "modifiers": [
-      { "id": "target_in_cover_infantry_fire", "effect": "losses x 0.5", "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.1.2 Target Under Cover" } },
-      { "id": "target_in_cover_canister", "effect": "losses x 0.5", "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.2.3 Target Under Cover" } },
-      { "id": "target_in_cover_ball_howitzer", "effect": "losses x 1/3", "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.2.3 Target Under Cover" } },
-      { "id": "artillery_vs_columns_second_lines", "effect": "losses x 1.25", "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.2.4 Adjustments, a), c), d)" } },
-      { "id": "howitzer_grenade", "effect": "losses x 1.33", "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.2.4 Adjustments, b)" } },
-      { "id": "artillery_vs_flank", "effect": "losses x 1.25", "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.2.4 Artillery Fire Against Flanks" } }
+      {
+        "id": "target_in_cover_infantry_fire",
+        "effect": "losses x 0.5",
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 3.1.2 Target Under Cover"
+        }
+      },
+      {
+        "id": "target_in_cover_canister",
+        "effect": "losses x 0.5",
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 3.2.3 Target Under Cover"
+        }
+      },
+      {
+        "id": "target_in_cover_ball_howitzer",
+        "effect": "losses x 1/3",
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 3.2.3 Target Under Cover"
+        }
+      },
+      {
+        "id": "artillery_vs_columns_second_lines",
+        "effect": "losses x 1.25",
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 3.2.4 Adjustments, a), c), d)"
+        }
+      },
+      {
+        "id": "howitzer_grenade",
+        "effect": "losses x 1.33",
+        "source": { "source": "rulespal-reisswitz", "locator": "Part Three 3.2.4 Adjustments, b)" }
+      },
+      {
+        "id": "artillery_vs_flank",
+        "effect": "losses x 1.25",
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 3.2.4 Artillery Fire Against Flanks"
+        }
+      }
     ]
   },
   "gaps": [

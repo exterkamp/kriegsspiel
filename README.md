@@ -20,4 +20,35 @@ A deterministic engine owns the world: terrain, movement, line of sight, combat,
 
 ## Current state
 
-Design phase. There is no code yet. The planned client is a Three.js map table (flat historical map, 3D pieces) plus a Papers Please-style Svelte desk, backed by a TypeScript server with a continuous-time engine and an LLM umpire. An earlier Phaser prototype was abandoned.
+Early scaffold. The monorepo is set up (engine, protocol, server and client packages with tests, lint and CI); there is no game logic yet. The planned client is a Three.js map table (flat historical map, 3D pieces) plus a Papers Please-style Svelte desk, backed by a TypeScript server with a continuous-time engine and an LLM umpire. An earlier Phaser prototype was abandoned.
+
+## Development
+
+Node version is in `.nvmrc` (`nvm use`). This is an npm workspaces monorepo:
+
+- `packages/engine`: pure, deterministic game engine
+- `packages/protocol`: shared types between server and client
+- `server`: Node.js server
+- `client`: Vite + TypeScript client
+
+```bash
+npm install
+npm test          # Vitest in every package
+npm run lint      # ESLint + Prettier check
+npm run typecheck # tsc --noEmit in every package
+npm run build
+npm run format    # Prettier write
+```
+
+CI (`.github/workflows/ci.yml`) runs lint, typecheck, tests and build on pull requests.
+
+### Dev servers
+
+Start dev servers with `devrun`, not a bare `npm run dev`:
+
+```bash
+devrun up --name web --port-env PORT -- npm run dev -w client
+devrun url web
+devrun logs web -n 50
+devrun stop web
+```

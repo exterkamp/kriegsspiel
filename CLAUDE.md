@@ -20,7 +20,7 @@ Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a serve
 - Any change to the clock must work at rates 1, 4, 12 and in manual and fast-forward modes.
 
 ## Current state
-- There is no code yet. An earlier Phaser prototype was abandoned and removed. Do not revive it. Build the engine and client fresh from the docs.
+- Only the monorepo scaffold exists (`packages/engine`, `packages/protocol`, `server`, `client`; `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`). An earlier Phaser prototype was abandoned and removed. Do not revive it. Build the engine and client fresh from the docs.
 - Node version is in `.nvmrc`. Start dev servers with `devrun` (see `~/CLAUDE.md`), not bare `npm run dev`.
 
 ## Keep docs current

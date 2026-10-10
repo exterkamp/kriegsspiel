@@ -36,7 +36,17 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Open.** Default hierarchy is assumed to be shared HQ, with chain-of-command as an option. Command level is assumed to be brigades and battalions.
 **See.** [gameplay.md](gameplay.md)
 
-## D7: First scenario (proposed, maintainer to confirm)
+## D7: Wire format is zod schemas in `packages/protocol`
+**Decision.** Every command and server message carries a version field `v` and is validated with strict zod schemas (unknown fields rejected). Types are inferred from the schemas. The package exports no master-state types.
+**Why.** One source of truth for server and client, and strict parsing keeps hidden state from leaking onto the wire.
+**See.** [architecture.md](architecture.md), `packages/protocol/README.md`
+
+## D8: Engine world model and scenario data
+**Decision.** Game time is an integer count of game milliseconds. The map is a row-major tile grid (open, wood, river, bridge, road). Scenarios are plain JSON-compatible data, and `loadScenario` validates them and builds the initial `GameState` at t=0. "Hold the Bridge" is 40x30 tiles, with 3 units per side. Blue wins by holding the bridge for 180 game minutes, and Red wins by taking it. A test greps the engine sources for wall-clock and ambient-random calls.
+**Why.** Integer time keeps replay exact, and validated plain data keeps state JSON round-trippable.
+**See.** [architecture.md](architecture.md)
+
+## D9: First scenario (proposed, maintainer to confirm)
 **Proposal.** Ball's Bluff, 21 October 1861, recommended over Podol (1866) and Wissembourg (1870).
 **Why.** Smallest of the three, the only one with a period map and order of battle already located, public-domain English sources, and a river-crossing bottleneck that exercises couriers and fog of war.
 **Open.** The maintainer has not confirmed. Map licence and the Lander/Gorman order-of-battle conflict must be checked.
@@ -46,6 +56,6 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 - Default clock ratio (decide after the first scenario).
 - Command level and default hierarchy (assumptions above).
 - Emergency hold: keep or drop.
-- First historical scenario and map source: Ball's Bluff proposed in D7, awaiting maintainer decision; licences to verify.
+- First historical scenario and map source: Ball's Bluff proposed in D9, awaiting maintainer decision; licences to verify.
 - How much auto-plotting of reports onto the map players get.
 - Rules tables (march rates, frontage, fire, casualties): first pass recorded in `src/data/` with citations (see `docs/rules.md`). Still missing: full movement table, Die 4 row, artillery tables other than 12-pdr 1500-2000, cavalry and artillery frontages.

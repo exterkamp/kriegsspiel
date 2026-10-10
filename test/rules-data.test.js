@@ -8,7 +8,7 @@ const load = (f) => JSON.parse(readFileSync(new URL(f, dir), 'utf8'));
 const ajv = new Ajv({ allErrors: true, strict: false });
 const sources = load('sources.json');
 const tableFiles = readdirSync(dir).filter(
-  (f) => f.endsWith('.json') && !f.endsWith('.schema.json') && f !== 'sources.json'
+  (f) => f.endsWith('.json') && !f.endsWith('.schema.json') && f !== 'sources.json',
 );
 
 test('sources.json validates', () => {
@@ -75,7 +75,11 @@ test('dice and fire rows are well formed', () => {
   const cc = load('casualties.json').data.close_combat_faces;
   for (const k of ['die_1', 'die_2', 'die_3', 'die_5']) assert.equal(cc[k].length, 6, k);
   const fire = load('fire.json').data;
-  for (const t of ['infantry_half_battalion', 'artillery_12pdr_good_effect', 'artillery_12pdr_bad_effect'])
+  for (const t of [
+    'infantry_half_battalion',
+    'artillery_12pdr_good_effect',
+    'artillery_12pdr_bad_effect',
+  ])
     for (const r of fire[t].rows) {
       assert.equal(r.by_die_face.length, 6);
       assert.ok(r.range_paces[0] < r.range_paces[1]);
@@ -84,7 +88,13 @@ test('dice and fire rows are well formed', () => {
 
 test('pinned values unchanged (regression pins; checked against the sources by hand)', () => {
   // 1824 scan, march ruler bands; 1 Decimalzoll = 400 Schritt
-  assert.deepEqual(load('march.json').data.ruler_bands.map((b) => b.paces), [200, 250, 600, 800, 900]);
+  assert.deepEqual(
+    load('march.json').data.ruler_bands.map((b) => b.paces),
+    [200, 250, 600, 800, 900],
+  );
   assert.equal(load('scale.json').data.scale.paces_per_decimal_zoll, 400);
-  assert.deepEqual(load('fire.json').data.infantry_half_battalion.rows[2].by_die_face, [20, 20, 10, 25, 50, 6]);
+  assert.deepEqual(
+    load('fire.json').data.infantry_half_battalion.rows[2].by_die_face,
+    [20, 20, 10, 25, 50, 6],
+  );
 });

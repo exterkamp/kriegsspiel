@@ -2,21 +2,36 @@
   "id": "scale",
   "title": "Map scale, time and unit scale",
   "edition": "1824",
-  "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3798 (scale); lines 3366-3369 (a Zug is 2 minutes)" },
+  "source": {
+    "source": "reisswitz-1824-scan",
+    "locator": "djvu.txt line 3798 (scale); lines 3366-3369 (a Zug is 2 minutes)"
+  },
   "data": {
     "move": {
       "minutes": 2,
-      "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt lines 3366-3369 (a Zug is 2 minutes)" }
+      "source": {
+        "source": "reisswitz-1824-scan",
+        "locator": "djvu.txt lines 3366-3369 (a Zug is 2 minutes)"
+      }
     },
     "scale": {
       "paces_per_decimal_zoll": 400,
-      "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3798 (1 Decimalzoll = 400 Schritt)" }
+      "source": {
+        "source": "reisswitz-1824-scan",
+        "locator": "djvu.txt line 3798 (1 Decimalzoll = 400 Schritt)"
+      }
     },
     "map_ratio": {
       "ratio": "1:8000",
-      "source": { "source": "rulespal-reisswitz", "locator": "Part Two 1. Maps & Scale (1:8000 or 1 decimal Zoll equals 400 paces). Not legible in the scan OCR of line 3798, which has only the 400 Schritt part." }
+      "source": {
+        "source": "rulespal-reisswitz",
+        "locator": "Part Two 1. Maps & Scale (1:8000 or 1 decimal Zoll equals 400 paces). Not legible in the scan OCR of line 3798, which has only the 400 Schritt part."
+      }
     },
     "note": "The modern edition uses 1:7500 (1 cm = 100 paces) for convenience. We use the 1824 values."
   },
-  "cross_check": { "source": "rulespal-reisswitz", "locator": "Part Two 1. Maps & Scale; Part Two intro (two-minute moves)" }
+  "cross_check": {
+    "source": "rulespal-reisswitz",
+    "locator": "Part Two 1. Maps & Scale; Part Two intro (two-minute moves)"
+  }
 }

@@ -2,30 +2,118 @@
   "id": "march",
   "title": "March rates, maximum paces per 2-minute move",
   "edition": "1824",
-  "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt lines 3941-3960 (description of the march ruler, Fig. 25)" },
+  "source": {
+    "source": "reisswitz-1824-scan",
+    "locator": "djvu.txt lines 3941-3960 (description of the march ruler, Fig. 25)"
+  },
   "data": {
     "unit": "paces_per_move",
     "ruler_bands": [
-      { "paces": 200, "applies_to": "infantry and mixed columns on route marches", "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3945, 1st band" } },
-      { "paces": 250, "applies_to": "infantry and foot artillery deploying for battle and in the fight", "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3948, 2nd band" } },
-      { "paces": 600, "applies_to": "trot of closed cavalry and horse artillery; also a foot battery in few cases (calibre illegible in the OCR)", "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3950, 3rd band" } },
-      { "paces": 800, "applies_to": "gallop of closed cavalry and horse artillery; heavy cavalry charge; adjutants and orderlies", "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3952, 4th band" } },
-      { "paces": 900, "applies_to": "light cavalry charge going into the carrière", "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3956, 5th band" } }
+      {
+        "paces": 200,
+        "applies_to": "infantry and mixed columns on route marches",
+        "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3945, 1st band" }
+      },
+      {
+        "paces": 250,
+        "applies_to": "infantry and foot artillery deploying for battle and in the fight",
+        "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3948, 2nd band" }
+      },
+      {
+        "paces": 600,
+        "applies_to": "trot of closed cavalry and horse artillery; also a foot battery in few cases (calibre illegible in the OCR)",
+        "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3950, 3rd band" }
+      },
+      {
+        "paces": 800,
+        "applies_to": "gallop of closed cavalry and horse artillery; heavy cavalry charge; adjutants and orderlies",
+        "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3952, 4th band" }
+      },
+      {
+        "paces": 900,
+        "applies_to": "light cavalry charge going into the carrière",
+        "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3956, 5th band" }
+      }
     ],
     "special": [
-      { "id": "alter_formation_infantry", "paces": 250, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 2.5 Altering Formation" } },
-      { "id": "alter_formation_foot_artillery", "paces": 300, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 2.5 Altering Formation" } },
-      { "id": "patrol_infantry", "paces": 200, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 2.7 Reconnaissance Patrols" } },
-      { "id": "patrol_cavalry", "paces": 400, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 2.7 Reconnaissance Patrols" } },
-      { "id": "messenger_up_to_2000_paces", "paces": 900, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 2.8 Messengers" } },
-      { "id": "messenger_beyond_2000_paces", "paces": 700, "source": { "source": "rulespal-reisswitz", "locator": "Part Three 2.8 Messengers" } }
+      {
+        "id": "alter_formation_infantry",
+        "paces": 250,
+        "source": { "source": "rulespal-reisswitz", "locator": "Part Three 2.5 Altering Formation" }
+      },
+      {
+        "id": "alter_formation_foot_artillery",
+        "paces": 300,
+        "source": { "source": "rulespal-reisswitz", "locator": "Part Three 2.5 Altering Formation" }
+      },
+      {
+        "id": "patrol_infantry",
+        "paces": 200,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 2.7 Reconnaissance Patrols"
+        }
+      },
+      {
+        "id": "patrol_cavalry",
+        "paces": 400,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three 2.7 Reconnaissance Patrols"
+        }
+      },
+      {
+        "id": "messenger_up_to_2000_paces",
+        "paces": 900,
+        "source": { "source": "rulespal-reisswitz", "locator": "Part Three 2.8 Messengers" }
+      },
+      {
+        "id": "messenger_beyond_2000_paces",
+        "paces": 700,
+        "source": { "source": "rulespal-reisswitz", "locator": "Part Three 2.8 Messengers" }
+      }
     ],
     "terrain_infantry": [
-      { "terrain": "even_ground_under_5deg", "paces": 200, "source": { "source": "rulespal-reisswitz", "locator": "Part Three Section Two, Movement Table, Infantry row" } },
-      { "terrain": "light_woods", "paces": 200, "source": { "source": "rulespal-reisswitz", "locator": "Part Three Section Two, Movement Table, Infantry row" } },
-      { "terrain": "swamp", "paces": null, "source": { "source": "rulespal-reisswitz", "locator": "Part Three Section Two, Movement Table, Infantry row (dash = no movement)" } },
-      { "terrain": "thick_woods", "paces": null, "source": { "source": "rulespal-reisswitz", "locator": "Part Three Section Two, Movement Table, Infantry row (dash = no movement)" } },
-      { "terrain": "rising_5_to_10deg_no_road", "paces": 150, "source": { "source": "rulespal-reisswitz", "locator": "Part Three Section Two, Movement Table, Infantry row" } }
+      {
+        "terrain": "even_ground_under_5deg",
+        "paces": 200,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three Section Two, Movement Table, Infantry row"
+        }
+      },
+      {
+        "terrain": "light_woods",
+        "paces": 200,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three Section Two, Movement Table, Infantry row"
+        }
+      },
+      {
+        "terrain": "swamp",
+        "paces": null,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three Section Two, Movement Table, Infantry row (dash = no movement)"
+        }
+      },
+      {
+        "terrain": "thick_woods",
+        "paces": null,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three Section Two, Movement Table, Infantry row (dash = no movement)"
+        }
+      },
+      {
+        "terrain": "rising_5_to_10deg_no_road",
+        "paces": 150,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Three Section Two, Movement Table, Infantry row"
+        }
+      }
     ],
     "supplement_1828_infantry_by_incline": [
       { "incline_deg": 5, "paces": 200 },
@@ -33,7 +121,10 @@
       { "incline_deg": 15, "paces": 100 },
       { "incline_deg": 20, "paces": 50 }
     ],
-    "supplement_1828_source": { "source": "rulespal-reisswitz", "locator": "Appendix Two, Section 2.1 in the Existing Rules, Table of March Rates (Infantry, Foot Artillery, All Trains row)" }
+    "supplement_1828_source": {
+      "source": "rulespal-reisswitz",
+      "locator": "Appendix Two, Section 2.1 in the Existing Rules, Table of March Rates (Infantry, Foot Artillery, All Trains row)"
+    }
   },
   "gaps": [
     "The full 1824 movement table (cavalry, horse artillery, other terrain and slope columns) is an image in the edition and was not transcribed. Only the infantry row up to 10 degrees is legible. See follow-up issue."
