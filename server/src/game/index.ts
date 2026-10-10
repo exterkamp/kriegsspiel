@@ -15,3 +15,5 @@ export type {
 export { applyLoggedOrder, replayFrom, replayLog } from './replay.js';
 export type { ReplayResult } from './replay.js';
 export { createRegistry, loadScenarioById, startingState } from './registry.js';
+export { PauseVoting } from '../pause.js';
+export type { PauseConfig, PauseTransition } from '../pause.js';

@@ -36,6 +36,7 @@ import {
 } from '../debug/trace.js';
 import type { OrderParser, ParseContext, ParseResult } from '../orders/index.js';
 import type { SideAgent } from '../opponent/index.js';
+import { PauseVoting, type PauseConfig, type PauseTransition } from '../pause.js';
 import { advanceUntilOver, applyLoggedOrder } from './replay.js';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
@@ -105,6 +106,8 @@ export interface GameActorOptions {
   snapshotEvery?: number;
   /** Server-side agents that play scripted sides (see `opponent/`). */
   agents?: SideAgent[];
+  /** Pause voting: who votes and the host's rules. Unset: the vote commands are refused. */
+  pause?: PauseConfig;
 }
 
 interface AgentSlot {
@@ -162,6 +165,11 @@ export class GameActor {
   private readonly dependencies = new Map<number, Dependency>();
   private nextDependency = 1;
 
+  /** The pause state machine; absent when the game has no voters configured. */
+  private readonly pauseVoting: PauseVoting | undefined;
+  private pauseTimer: unknown;
+  private pauseTimerSet = false;
+
   private tail: Promise<unknown> = Promise.resolve();
   private timer: unknown;
   private timerSet = false;
@@ -192,6 +200,12 @@ export class GameActor {
       nextAt: t === 0 ? 0 : (Math.floor(t / agent.intervalMs) + 1) * agent.intervalMs,
       idle: false,
     }));
+    if (options.pause) {
+      this.pauseVoting = new PauseVoting(options.pause, {
+        phase: this.clock.status === 'running' ? 'running' : 'paused',
+        nowMs: this.wallNow(),
+      });
+    }
     this.snapshotSeq = -1;
     this.snapshotEvery = Math.max(1, Math.floor(options.snapshotEvery ?? 1));
   }
@@ -209,6 +223,11 @@ export class GameActor {
 
   get gameClock(): GameClock {
     return this.clock;
+  }
+
+  /** The pause vote: its phase and the open proposal, for the views. Undefined without voters. */
+  get pauseState(): { phase: PauseVoting['phase']; proposal: PauseVoting['open'] } | undefined {
+    return this.pauseVoting && { phase: this.pauseVoting.phase, proposal: this.pauseVoting.open };
   }
 
   /** Persist the starting snapshot and start the scheduler. */
@@ -234,6 +253,7 @@ export class GameActor {
     if (!this.closed) {
       this.closed = true;
       this.clearTimer();
+      this.clearPauseTimer();
       for (const handle of [...this.parseTimers]) this.clearParseTimer(handle);
       // Abandon work still with the umpire: its callers are told, and a late result is ignored.
       for (const dep of [...this.dependencies.values()]) {
@@ -387,6 +407,7 @@ export class GameActor {
    */
   private reschedule(): void {
     this.clearTimer();
+    this.reschedulePause();
     if (this.closed) return;
     const nextEvent = this.engine.queue[0];
     const nextThink = this.engine.world.outcome ? undefined : this.nextAgent()?.nextAt;
@@ -410,6 +431,30 @@ export class GameActor {
       });
     }, delay);
     this.timerSet = true;
+  }
+
+  private clearPauseTimer(): void {
+    if (this.pauseTimerSet) this.timers.clearTimeout(this.pauseTimer);
+    this.pauseTimerSet = false;
+  }
+
+  /** Wake at the next vote or pause deadline (wall time), which no game event accounts for. */
+  private reschedulePause(): void {
+    this.clearPauseTimer();
+    const deadline = this.pauseVoting?.deadlineMs;
+    if (this.closed || deadline === undefined) return;
+    const delay = Math.min(MAX_SLEEP_MS, Math.max(0, deadline - this.wallNow()));
+    this.pauseTimer = this.timers.setTimeout(() => {
+      this.pauseTimerSet = false;
+      // Checked when the job runs, so a vote that settled meanwhile logs nothing.
+      this.enqueue(async () => {
+        if (this.pauseVoting?.isDue(this.wallNow())) await this.apply({ kind: 'pauseExpire' });
+      }).catch((e) => {
+        if (this.trace.enabled) this.trace.record(this.id, 'error', { source: 'pause', error: e });
+        this.onError?.(e);
+      });
+    }, delay);
+    this.pauseTimerSet = true;
   }
 
   /** Give scheduler work its own correlation id, so the events it fires are grouped. */
@@ -458,7 +503,7 @@ export class GameActor {
     try {
       this.sync();
       entry.gameMs = this.engine.time;
-      result = await this.run(command);
+      result = await this.run(command, entry);
       this.sync();
       entry.endGameMs = this.engine.time;
     } catch (e) {
@@ -505,16 +550,52 @@ export class GameActor {
     };
   }
 
-  private async run(command: GameCommand): Promise<CommandResult> {
+  /** Apply what the pause machine decided to the game clock, and note it in the journal entry. */
+  private applyPause(entry: InputLogEntry, steps: (PauseTransition | undefined)[]): void {
+    for (const t of steps) {
+      if (!t) continue;
+      (entry.pause ??= []).push(t);
+      if (t.to === 'paused' && t.from !== 'resume_proposed') this.clock.pause();
+      else if (t.to === 'running' && t.from !== 'pause_proposed') this.clock.resume();
+    }
+  }
+
+  private requirePauseVoting(): PauseVoting {
+    if (!this.pauseVoting) throw new Error('pause voting is not set up for this game');
+    if (this.clock.status === 'stopped') throw new Error('clock is stopped');
+    return this.pauseVoting;
+  }
+
+  private async run(command: GameCommand, entry: InputLogEntry): Promise<CommandResult> {
     switch (command.kind) {
+      case 'proposePause':
+      case 'proposeResume': {
+        const pv = this.requirePauseVoting();
+        const want = command.kind === 'proposePause' ? 'running' : 'paused';
+        if (pv.phase !== want) throw new Error(`cannot ${command.kind} while ${pv.phase}`);
+        const reason = command.kind === 'proposePause' ? command.reason : undefined;
+        this.applyPause(entry, [pv.propose(`p${entry.seq}`, command.by, this.wallNow(), reason)]);
+        return { ok: true };
+      }
+      case 'vote': {
+        const pv = this.requirePauseVoting();
+        this.applyPause(entry, pv.vote(command.by, command.proposal, command.yes, this.wallNow()));
+        return { ok: true };
+      }
+      case 'pauseExpire': {
+        this.applyPause(entry, [this.pauseVoting?.expire(this.wallNow())]);
+        return { ok: true };
+      }
       case 'setRate':
         this.clock.setRate(command.rate);
         return { ok: true };
       case 'pause':
         this.clock.pause();
+        this.pauseVoting?.force('paused', this.wallNow());
         return { ok: true };
       case 'resume':
         this.clock.resume();
+        this.pauseVoting?.force('running', this.wallNow());
         return { ok: true };
       case 'setMode':
         this.clock.setMode(command.mode);
