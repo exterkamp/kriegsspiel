@@ -38,7 +38,7 @@ Each milestone should end in something playable.
 - [ ] Map table: flat historical base map + 3D pieces + player marks layer (Three.js)
 - [ ] In-tray, orders desk, order of battle, journal as Svelte views over the canvas; table ↔ desk transition
 - [ ] Reports carry structured data (location, size, confidence, time) beside the prose
-- [ ] First historical scenario: hand-annotated map feeding the engine's terrain grid
+- [ ] First historical scenario: hand-annotated map feeding the engine's vector terrain features
 - [ ] Decide on an annotation editor for future maps
 
 ## M4: Judgment and personality

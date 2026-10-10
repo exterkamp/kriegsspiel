@@ -57,6 +57,11 @@ describe('picking', () => {
     expect(terrain).toBe('wood');
   });
 
+  it("converts the wire's metres to display tile units", () => {
+    expect(state.own[0]!.position).toEqual({ x: 18.5, y: 12.5 });
+    expect(state.ghosts.find((g) => g.id === 'contact-1')!.position).toEqual({ x: 21.5, y: 3.5 });
+  });
+
   it('reports the own unit on a tile', () => {
     expect(pickFromRay(state, rayDownAt(18.5, 12.5))).toEqual({
       type: 'piece',

@@ -15,6 +15,7 @@
 import {
   advanceTo,
   deserialize,
+  featureAnchor,
   issueOrder,
   serialize,
   type EmittedEvent,
@@ -32,7 +33,7 @@ import {
   withCorrelationId,
   type TraceSink,
 } from '../debug/trace.js';
-import type { OrderParser, ParseResult } from '../orders/index.js';
+import type { OrderParser, ParseContext, ParseResult } from '../orders/index.js';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
 /** Timer functions, injectable so tests can run on a fake clock. */
@@ -201,7 +202,8 @@ export class GameActor {
     if (!next || this.clock.status !== 'running' || this.clock.mode === 'manual') return;
     const delay = Math.min(
       MAX_SLEEP_MS,
-      Math.max(0, this.clock.wallDueFor(next.time) - this.wallNow()),
+      // Round up: waking a fraction early finds the event not yet due and spins at zero delay.
+      Math.max(0, Math.ceil(this.clock.wallDueFor(next.time) - this.wallNow())),
     );
     this.timer = this.timers.setTimeout(() => {
       this.timerSet = false;
@@ -300,6 +302,23 @@ export class GameActor {
     }
   }
 
+  /** What the parser may read: the issuing side, named places and the side's own units. */
+  private parseContext(side: string): ParseContext {
+    const { map, units } = this.engine.world;
+    return {
+      side,
+      map: {
+        features: map.features.map((f) => ({
+          id: f.id,
+          kind: f.kind,
+          ...(f.name === undefined ? {} : { name: f.name }),
+          anchor: featureAnchor(f.geometry),
+        })),
+      },
+      units: units.map((u) => ({ id: u.id, side: u.side, name: u.name, center: u.center })),
+    };
+  }
+
   private async runOrder(
     command: Extract<GameCommand, { kind: 'order' }>,
     entry: InputLogEntry,
@@ -309,7 +328,7 @@ export class GameActor {
     const issuedAt = this.engine.time;
     let parsed: ParseResult;
     try {
-      parsed = await this.parser.parse(command.text, { ...this.engine.world, side: command.side });
+      parsed = await this.parser.parse(command.text, this.parseContext(command.side));
     } catch (e) {
       const reason = `parser failed: ${e instanceof Error ? e.message : String(e)}`;
       entry.parse = { kind: 'rejection', text: command.text, reason };

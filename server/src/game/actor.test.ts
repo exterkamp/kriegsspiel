@@ -1,5 +1,6 @@
 import {
-  COURIER_MS_PER_TILE,
+  COURIER_MS_PER_METRE,
+  findPath,
   EventRegistry,
   holdTheBridge,
   loadScenario,
@@ -15,8 +16,19 @@ import type { OrderParser, ParseResult } from '../orders/index.js';
 import { GameHost, MemoryGameStore, type GameActor } from './index.js';
 import { FakeTime } from './testing.js';
 
-// Blue HQ (20,29) to blue-1 (18,24): 9 half-units of courier travel.
-const DELIVERY_MS = (9 * COURIER_MS_PER_TILE) / 2;
+// The bridge, which is the scenario's objective (metres in the scenario, mm in state).
+const BRIDGE = { x: 2_050_000, y: 1_500_000 };
+
+// A courier rides from blue HQ to blue-1 along the planned route.
+const START = loadScenario(holdTheBridge);
+const ROUTE = findPath(
+  START.map,
+  START.sides.find((s) => s.id === 'blue')!.hq,
+  START.units.find((u) => u.id === 'blue-1')!.center,
+)!;
+const DELIVERY_MS = Math.round((ROUTE.cost / 1000) * COURIER_MS_PER_METRE);
+// Wall ms for that much game time at rate 12, rounded up to a whole millisecond.
+const WALL_AT_12 = Math.ceil(DELIVERY_MS / 12);
 
 function registry() {
   const r = new EventRegistry<GameState>();
@@ -40,7 +52,7 @@ class FixedParser implements OrderParser {
         kind: 'intents',
         text,
         unitId: 'blue-1',
-        intents: [{ kind: 'move', to: { x: 20, y: 20 } }],
+        intents: [{ kind: 'move', to: BRIDGE }],
       }
     );
   }
@@ -92,7 +104,7 @@ describe('order delivery on a fake clock', () => {
     expect(blue1(game).intent).toMatchObject({ kind: 'move', startedAt: DELIVERY_MS });
 
     await time.advance(5 * 60_000);
-    expect(blue1(game).position).not.toEqual({ x: 18, y: 24 });
+    expect(blue1(game).center).not.toEqual(START.units.find((u) => u.id === 'blue-1')!.center);
     // The world is advanced lazily; any command brings it up to "now".
     await game.submit({ kind: 'pause' });
     expect(game.state.time).toBe(DELIVERY_MS + 5 * 60_000);
@@ -101,7 +113,7 @@ describe('order delivery on a fake clock', () => {
   it('runs 12 times faster at rate 12', async () => {
     const { time, game } = await newGame(12);
     await game.submit(order);
-    await time.advance(DELIVERY_MS / 12 - 1);
+    await time.advance(WALL_AT_12 - 1);
     expect(blue1(game).intent.kind).toBe('idle');
     await time.advance(1);
     expect(blue1(game).intent.kind).toBe('move');
@@ -133,8 +145,9 @@ describe('clock changes wake the scheduler', () => {
     await game.submit(order);
     await time.advance(30_000);
     await game.submit({ kind: 'setRate', rate: 12 });
-    // 37,500 game ms remain, which is 3,125 wall ms at 12x.
-    await time.advance(3_124);
+    // The rest of the ride, rounded up to whole wall ms at 12x.
+    const left = Math.ceil((DELIVERY_MS - 30_000) / 12);
+    await time.advance(left - 1);
     expect(blue1(game).intent.kind).toBe('idle');
     await time.advance(1);
     expect(blue1(game).intent).toMatchObject({ kind: 'move', startedAt: DELIVERY_MS });
@@ -188,7 +201,7 @@ describe('clock changes wake the scheduler', () => {
     await game.submit({ kind: 'setMode', mode: 'fast-forward' });
     await time.advance(0);
     // The march ran to its end without any wall time passing.
-    expect(blue1(game).position).toEqual({ x: 20, y: 20 });
+    expect(blue1(game).center).toEqual(BRIDGE);
     expect(game.state.queue.length).toBe(0);
     expect(game.state.time).toBeGreaterThan(DELIVERY_MS);
     expect(time.pendingTimers).toBe(0);
@@ -281,7 +294,7 @@ describe('many games, restore and shutdown', () => {
     const b = await s.host.create('b', loadScenario(holdTheBridge), { rate: 12 });
     await a.submit(order);
     await b.submit(order);
-    await s.time.advance(DELIVERY_MS / 12);
+    await s.time.advance(WALL_AT_12);
     expect(blue1(b).intent.kind).toBe('move');
     expect(blue1(a).intent.kind).toBe('idle');
   });

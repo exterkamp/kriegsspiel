@@ -8,6 +8,7 @@ export interface TracedUmpireOptions {
   gameId: string;
   /** `playback` for replays served from recordings, `live` for real model calls. */
   mode: 'live' | 'playback';
+  /** Fallback label when a call's record or error carries no provider (playback, failures). */
   provider?: string;
   now?: () => number;
 }
@@ -28,7 +29,6 @@ export class TracedUmpireClient implements UmpireClient {
   async call<T>(request: UmpireRequest): Promise<UmpireResponse<T>> {
     const start = this.now();
     const base = {
-      provider: this.o.provider ?? 'anthropic',
       mode: this.o.mode,
       stage: request.stage,
       promptVersion: request.promptVersion,
@@ -41,6 +41,7 @@ export class TracedUmpireClient implements UmpireClient {
       const r = res.record;
       this.o.trace.record(this.o.gameId, 'llm', {
         ...base,
+        provider: r.provider ?? this.o.provider ?? 'unknown',
         model: r.model,
         response: r.rawOutput,
         latencyMs: this.now() - start,
@@ -55,6 +56,7 @@ export class TracedUmpireClient implements UmpireClient {
       const failed = e instanceof UmpireError ? e : undefined;
       this.o.trace.record(this.o.gameId, 'llm', {
         ...base,
+        provider: this.o.provider ?? 'unknown',
         latencyMs: this.now() - start,
         usage: failed?.usage,
         costUsd: failed?.costUsd,

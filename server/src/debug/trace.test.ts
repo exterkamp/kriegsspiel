@@ -1,5 +1,6 @@
 import {
-  COURIER_MS_PER_TILE,
+  COURIER_MS_PER_METRE,
+  findPath,
   EventRegistry,
   holdTheBridge,
   loadScenario,
@@ -16,7 +17,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { GameHost, MemoryGameStore } from '../game/index.js';
 import { FakeTime } from '../game/testing.js';
 import type { OrderParser, ParseResult } from '../orders/index.js';
-import type { UmpireClient, UmpireRequest, UmpireResponse } from '../umpire/index.js';
+import {
+  UmpireError,
+  type UmpireClient,
+  type UmpireRequest,
+  type UmpireResponse,
+} from '../umpire/index.js';
 import {
   MAX_STRING_LENGTH,
   Redactor,
@@ -26,8 +32,16 @@ import {
   type TraceSink,
 } from './index.js';
 
-// Blue HQ to blue-1 courier travel time.
-const DELIVERY_MS = (9 * COURIER_MS_PER_TILE) / 2;
+// Blue HQ to blue-1 courier travel time along the planned route.
+const START = loadScenario(holdTheBridge);
+const ROUTE = findPath(
+  START.map,
+  START.sides.find((s) => s.id === 'blue')!.hq,
+  START.units.find((u) => u.id === 'blue-1')!.center,
+)!;
+const DELIVERY_MS = Math.round((ROUTE.cost / 1000) * COURIER_MS_PER_METRE);
+// The bridge, in state units (mm).
+const BRIDGE = { x: 2_050_000, y: 1_500_000 };
 
 const API_KEY = 'sk-ant-api03-SUPERSECRETKEYVALUE1234567890';
 
@@ -48,6 +62,7 @@ const fakeUmpire: UmpireClient = {
       output: { ok: true } as T,
       record: {
         stage: request.stage,
+        provider: 'local',
         model: 'test-model',
         promptVersion: request.promptVersion,
         system: `${request.system} key=${API_KEY}`,
@@ -77,7 +92,7 @@ function setup(trace: Parameters<typeof traceUmpire>[1]['trace']) {
         kind: 'intents',
         text,
         unitId: 'blue-1',
-        intents: [{ kind: 'move', to: { x: 20, y: 20 } }],
+        intents: [{ kind: 'move', to: BRIDGE }],
       };
     },
   };
@@ -131,7 +146,7 @@ describe('debug trace store', () => {
     expect(new Set(linked.map((e) => e.kind))).toEqual(new Set(['request', 'command', 'llm']));
     const llm = linked.find((e) => e.kind === 'llm')!.data as Record<string, unknown>;
     expect(llm).toMatchObject({
-      provider: 'anthropic',
+      provider: 'local',
       model: 'test-model',
       stage: 'parse',
       mode: 'live',
@@ -281,6 +296,43 @@ describe('debug trace store', () => {
     expect(trace.entries('g1')).toHaveLength(1);
     expect(new Redactor().value(proxy)).toBe('[unserializable]');
     expect(errors).toEqual([]);
+  });
+
+  it('labels LLM entries with the provider that served the call, with fallbacks', async () => {
+    const trace = new TraceStore();
+    const noProvider: UmpireClient = {
+      async call<T>(request: UmpireRequest): Promise<UmpireResponse<T>> {
+        const res = await fakeUmpire.call<T>(request);
+        return { ...res, record: { ...res.record, provider: undefined } };
+      },
+    };
+    const request = {
+      stage: 'parse',
+      promptVersion: 'p1',
+      system: 's',
+      input: {},
+      schema: {},
+    } as const;
+    await traceUmpire(noProvider, { trace, gameId: 'g1', mode: 'live' }).call(request);
+    await traceUmpire(noProvider, { trace, gameId: 'g1', mode: 'live', provider: 'ollama' }).call(
+      request,
+    );
+    await traceUmpire(fakeUmpire, { trace, gameId: 'g1', mode: 'live', provider: 'ollama' }).call(
+      request,
+    );
+    const failing: UmpireClient = {
+      async call() {
+        throw new UmpireError('down', 'transport', 1);
+      },
+    };
+    await traceUmpire(failing, { trace, gameId: 'g1', mode: 'live', provider: 'ollama' })
+      .call(request)
+      .catch(() => undefined);
+    const providers = trace
+      .entries('g1', { kind: 'llm' })
+      .map((e) => (e.data as { provider: string }).provider);
+    // Record provider wins; then the option; then 'unknown'.
+    expect(providers).toEqual(['unknown', 'ollama', 'local', 'ollama']);
   });
 
   it('bounds the ring buffer per game', () => {

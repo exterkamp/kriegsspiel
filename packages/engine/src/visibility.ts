@@ -1,10 +1,12 @@
 import type { EventRegistry, NewEvent } from './events.js';
 import { schedule } from './queue.js';
 import type { EngineState } from './events.js';
+import { distance, metres } from './geometry.js';
+import { BLOCKS_SIGHT, profileAlong, terrainAt } from './terrain.js';
 import {
   MS_PER_MINUTE,
-  tileAt,
   type Contact,
+  type Formation,
   type GameState,
   type GameTime,
   type Point,
@@ -14,11 +16,35 @@ import {
   type UnitKind,
 } from './types.js';
 
-/** Sight range in tiles (one tile is 100 paces). */
-export const SIGHT_RANGE: Record<UnitKind, number> = { infantry: 6, cavalry: 8, artillery: 6 };
+/** Lengths in a view are metres; master state is integer mm. */
+const viewPoint = (p: Point): Point => ({ x: metres(p.x), y: metres(p.y) });
+const viewFootprint = (u: Unit) => ({
+  frontage: metres(u.footprint.frontage),
+  depth: metres(u.footprint.depth),
+});
 
-/** A unit standing in or looking out of a wood sees and is seen only this close. */
-const WOOD_RANGE = 2;
+/**
+ * What a watcher can judge of an enemy's footprint: to the nearest 10 m. A footprint follows
+ * from the formation and strength, so an exact one would give the strength away.
+ */
+const coarse = (mmLen: number) => Math.max(10, Math.round(metres(mmLen) / 10) * 10);
+const viewEnemyFootprint = (u: Unit) => ({
+  frontage: coarse(u.footprint.frontage),
+  depth: coarse(u.footprint.depth),
+});
+
+/** Sight range in mm: infantry and artillery 600 m, cavalry 800 m. */
+export const SIGHT_RANGE_MM: Record<UnitKind, number> = {
+  infantry: 600_000,
+  cavalry: 800_000,
+  artillery: 600_000,
+};
+
+/** A unit standing in or looking out of a wood sees and is seen only this close (200 m). */
+const COVERED_RANGE_MM = 200_000;
+
+/** How far, in mm, a contact's possible position spreads per minute of age (100 m). */
+export const UNCERTAINTY_MM_PER_MINUTE = 100_000;
 
 /** How often (game time) the engine rescans who sees whom. */
 export const SCAN_INTERVAL_MS = MS_PER_MINUTE;
@@ -29,46 +55,26 @@ export const COURIER_DELAY_MS = 10 * MS_PER_MINUTE;
 export const SCAN_EVENT = 'intel.scan';
 export const REPORT_EVENT = 'intel.report';
 
-/** Tiles strictly between `a` and `b` on a Bresenham line. */
-function between(a: Point, b: Point): Point[] {
-  const out: Point[] = [];
-  let x = a.x;
-  let y = a.y;
-  const dx = Math.abs(b.x - a.x);
-  const dy = Math.abs(b.y - a.y);
-  const sx = a.x < b.x ? 1 : -1;
-  const sy = a.y < b.y ? 1 : -1;
-  let err = dx - dy;
-  while (x !== b.x || y !== b.y) {
-    const e2 = 2 * err;
-    if (e2 > -dy) {
-      err -= dy;
-      x += sx;
-    }
-    if (e2 < dx) {
-      err += dx;
-      y += sy;
-    }
-    if (x !== b.x || y !== b.y) out.push({ x, y });
-  }
-  return out;
+function concealedAt(world: GameState, p: Point): boolean {
+  return (terrainAt(world.map, p)?.attrs.concealment ?? 0) >= BLOCKS_SIGHT;
 }
 
 /**
- * Whether `observer` can see `target`: within sight range, no wood tile on the
- * line between them, and a unit in or looking from a wood only within 2 tiles.
+ * Whether `observer` can see `target`: within sight range, no sight-blocking ground (a
+ * wood) on the straight line between them, and a unit in or looking from a wood only
+ * within 200 m. Facing does not matter yet.
  */
 export function canSee(world: GameState, observer: Unit, target: Unit): boolean {
-  const a = observer.position;
-  const b = target.position;
-  const dist = Math.hypot(a.x - b.x, a.y - b.y);
-  if (dist > SIGHT_RANGE[observer.kind]) return false;
-  if (dist > WOOD_RANGE && (tileAt(world.map, a) === 'wood' || tileAt(world.map, b) === 'wood')) {
-    return false;
-  }
+  const a = observer.center;
+  const b = target.center;
+  const dist = distance(a, b);
+  if (dist > SIGHT_RANGE_MM[observer.kind]) return false;
+  if (concealedAt(world, a) || concealedAt(world, b)) return dist <= COVERED_RANGE_MM;
   // Walk the line from a canonical endpoint so sight is symmetric.
   const [p, q] = a.y < b.y || (a.y === b.y && a.x <= b.x) ? [a, b] : [b, a];
-  return between(p, q).every((t) => tileAt(world.map, t) !== 'wood');
+  return !profileAlong(world.map, p, q).some(
+    (piece) => piece.attrs.concealment >= BLOCKS_SIGHT && piece.length > 0,
+  );
 }
 
 function visibleTo(world: GameState, side: SideId): Unit[] {
@@ -90,27 +96,39 @@ export interface ViewUnit {
   id: string;
   name: string;
   kind: UnitKind;
+  /** Centre of the footprint, in metres. */
   position: Point;
+  /** Compass bearing in radians (0 north, growing clockwise). */
+  facing: number;
+  formation: Formation;
+  /** Metres. */
+  footprint: { frontage: number; depth: number };
+  /** Loose-formation sub-positions as metre offsets in the unit's own frame, if it has any. */
+  shape?: Point[];
   strength: number;
   morale: number;
 }
 
-/** An enemy unit in sight now. */
+/** An enemy unit in sight now. What a watcher can make out: where, which way, and about how big a patch of ground (footprint to the nearest 10 m). */
 export interface ViewEnemy {
   id: string;
   position: Point;
+  facing: number;
+  formation: Formation;
+  footprint: { frontage: number; depth: number };
+  shape?: Point[];
   sizeEstimate: string;
 }
 
 /** An enemy unit seen earlier, not in sight now. */
 export interface ViewContact {
   id: string;
-  /** Where it was when seen, not where it is. */
+  /** Where it was when seen, not where it is. Metres. */
   position: Point;
   seenAt: GameTime;
   ageMs: number;
-  /** Radius in tiles it may have moved since (grows with age). */
-  uncertaintyTiles: number;
+  /** Radius in metres it may have moved since (grows with age). */
+  uncertaintyRadius: number;
   sizeEstimate: string;
 }
 
@@ -122,6 +140,7 @@ export interface ViewReport {
   /** Game ms since the thing happened. */
   ageMs: number;
   from: string;
+  /** Metres. */
   location: Point;
   sizeEstimate?: string;
   confidence: Report['confidence'];
@@ -135,6 +154,7 @@ export interface ViewReport {
 export interface EngineSideView {
   side: SideId;
   time: GameTime;
+  /** Map size in metres. */
   mapWidth: number;
   mapHeight: number;
   ownUnits: ViewUnit[];
@@ -147,7 +167,7 @@ export interface EngineSideView {
 /** Plain template prose for a report. The LLM replaces this later. */
 export function renderReport(r: Report, ageMs: number): string {
   const mins = Math.round(ageMs / MS_PER_MINUTE);
-  const where = `(${r.location.x}, ${r.location.y})`;
+  const where = `(${Math.round(metres(r.location.x))}, ${Math.round(metres(r.location.y))} m)`;
   const when = `${mins} min ago`;
   switch (r.kind) {
     case 'contact':
@@ -176,21 +196,29 @@ export function viewFor(
   return {
     side,
     time: state.time,
-    mapWidth: state.map.width,
-    mapHeight: state.map.height,
+    mapWidth: metres(state.map.width),
+    mapHeight: metres(state.map.height),
     ownUnits: state.units
       .filter((u) => u.side === side)
       .map((u) => ({
         id: u.id,
         name: u.name,
         kind: u.kind,
-        position: { ...u.position },
+        position: viewPoint(u.center),
+        facing: u.facing,
+        formation: u.formation,
+        footprint: viewFootprint(u),
+        ...(u.shape ? { shape: u.shape.map(viewPoint) } : {}),
         strength: u.strength,
         morale: u.morale,
       })),
     visibleEnemies: seen.map((u) => ({
       id: u.id,
-      position: { ...u.position },
+      position: viewPoint(u.center),
+      facing: u.facing,
+      formation: u.formation,
+      footprint: viewEnemyFootprint(u),
+      ...(u.shape ? { shape: u.shape.map(viewPoint) } : {}),
       sizeEstimate: sizeEstimate(u.strength),
     })),
     lastKnownContacts: intel.contacts
@@ -199,12 +227,14 @@ export function viewFor(
         const ageMs = state.time - c.seenAt;
         return {
           id: c.id,
-          position: { ...c.position },
+          position: viewPoint(c.position),
           seenAt: c.seenAt,
           ageMs,
-          uncertaintyTiles: Math.min(
-            Math.ceil(ageMs / MS_PER_MINUTE),
-            Math.max(state.map.width, state.map.height),
+          uncertaintyRadius: metres(
+            Math.min(
+              Math.ceil(ageMs / MS_PER_MINUTE) * UNCERTAINTY_MM_PER_MINUTE,
+              Math.max(state.map.width, state.map.height),
+            ),
           ),
           sizeEstimate: c.sizeEstimate,
         };
@@ -220,7 +250,7 @@ export function viewFor(
           deliveredAt: r.deliverAt,
           ageMs,
           from: r.from,
-          location: { ...r.location },
+          location: viewPoint(r.location),
           ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
           confidence: r.confidence,
           text: renderReport(r, ageMs),
@@ -248,25 +278,22 @@ function scan(world: GameState, time: GameTime): GameState {
     for (const u of seen) {
       contacts.set(u.id, {
         id: u.id,
-        position: { ...u.position },
+        position: { ...u.center },
         seenAt: time,
         sizeEstimate: sizeEstimate(u.strength),
       });
       if (intel.inSight.includes(u.id)) continue;
       const observer = mine.find((m) => canSee(w, m, u))!;
-      const dist = Math.hypot(
-        observer.position.x - u.position.x,
-        observer.position.y - u.position.y,
-      );
+      const dist = distance(observer.center, u.center);
       reports.push({
         id: `${side}-r${reports.length + 1}`,
         kind: 'contact',
         observedAt: time,
         deliverAt: time + COURIER_DELAY_MS,
         from: observer.name,
-        location: { ...u.position },
+        location: { ...u.center },
         sizeEstimate: sizeEstimate(u.strength),
-        confidence: dist <= SIGHT_RANGE[observer.kind] / 2 ? 'high' : 'medium',
+        confidence: dist <= SIGHT_RANGE_MM[observer.kind] / 2 ? 'high' : 'medium',
         subject: u.id,
       });
     }
@@ -304,7 +331,7 @@ export function registerVisibility(registry: EventRegistry<GameState>): void {
       observedAt: ev.time,
       deliverAt: ev.time + COURIER_DELAY_MS,
       from: unit.name,
-      location: { ...unit.position },
+      location: { ...unit.center },
       confidence: 'high',
     };
     return {
