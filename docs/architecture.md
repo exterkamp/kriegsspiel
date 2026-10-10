@@ -71,6 +71,7 @@ Clock modes (all required, since tests need them):
 - **Combat ticks**: while units are in contact, the engine schedules short ticks (for example every 1-5 game minutes) so a fight resolves in finer steps. Outside contact it jumps between events.
 - **Event ordering (implemented in `packages/engine`)**: events fire in ascending `(time, seq)`. `seq` is a per-game counter assigned at scheduling, so same-instant events fire in the order they were scheduled. `advanceTo(state, t)` fires every event with `time <= t` (including ones handlers schedule for `<= t` during the call), then sets the clock to `t`. Scheduling before the current time is an error. Chunking `advanceTo` never changes the result. State (clock, RNG, queue, `nextSeq`, world) is plain JSON for snapshots. Handlers are registered by event type in an `EventRegistry`; all dice come from the seeded RNG passed to the handler.
 - **Single writer per game**: each game runs as one serial actor, with a command queue. Commands are applied in arrival order. No locks and no races, and the log is a total order. Many games can share a process.
+- **Implemented in `server/src/game`**: `GameActor` (queue, scheduler, snapshot after every command), `GameHost` (many games, reopen paused), `GameStore` with `MemoryGameStore`. Timers and wall time are injected for tests. See D12.
 
 ## The LLM barrier
 
