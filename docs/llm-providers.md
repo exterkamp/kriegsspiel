@@ -28,11 +28,12 @@ Example file: parse on a local model, judging and narration in the cloud.
   "timeoutMs": 60000,
   "maxAttempts": 3,
   "rateLimit": { "maxConcurrent": 2, "minIntervalMs": 250 },
-  "budget": { "maxCostUsd": 5, "maxTotalTokens": 2000000 }
+  "budget": { "maxCostUsd": 5, "maxTotalTokens": 2000000 },
+  "gameBudget": { "maxCostUsd": 1, "maxTotalTokens": 400000, "maxCallsPerMinute": 20 }
 }
 ```
 
-Env overrides (they win over the file): `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE`, `UMPIRE_TIMEOUT_MS`, `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`, `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS`.
+Env overrides (they win over the file): `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE`, `UMPIRE_TIMEOUT_MS`, `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`, `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS`, `UMPIRE_GAME_BUDGET_USD`, `UMPIRE_GAME_BUDGET_TOKENS`, `UMPIRE_GAME_CALLS_PER_MINUTE`.
 
 **API keys come only from the environment.** A provider names the variable in `apiKeyEnv`; a literal key in a file is rejected. `anthropic` defaults to `ANTHROPIC_API_KEY`. `openai-compatible` sends no key unless `apiKeyEnv` is set. Never commit keys.
 
@@ -95,4 +96,5 @@ Only adapter files may import a vendor SDK; a test enforces it.
 | Retry, backoff, timeout, validation, repair | `ProviderUmpireClient` | Per stage, same for every provider. |
 | Rate limit | `RateLimitedUmpireClient` | `maxConcurrent`, `minIntervalMs`. |
 | Budget | `BudgetedUmpireClient` | Counts failed attempts. Dollars only for priced models. |
+| Per-game caps and cost report | `GameUmpireClient` | One per game over the shared client. `gameBudget`: dollars, tokens, calls per sliding minute. Refuses with `UmpireError` kind `budget` or `rate-limit` (nothing sent), so stage code falls back. `report()` gives calls, tokens, cost and refusals per stage; `onMetric` logs each call and refusal. |
 | Record / playback | `CallRecorder`, `PlaybackUmpireClient` | Playback has no provider, so no network. |
