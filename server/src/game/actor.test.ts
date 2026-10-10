@@ -3,8 +3,10 @@ import {
   EventRegistry,
   holdTheBridge,
   loadScenario,
+  registerCombat,
   registerMovement,
   registerOrders,
+  registerVisibility,
   type EmittedEvent,
   type GameState,
 } from '@kriegsspiel/engine';
@@ -19,7 +21,9 @@ const DELIVERY_MS = (9 * COURIER_MS_PER_TILE) / 2;
 function registry() {
   const r = new EventRegistry<GameState>();
   registerMovement(r);
+  registerCombat(r);
   registerOrders(r);
+  registerVisibility(r);
   return r;
 }
 
