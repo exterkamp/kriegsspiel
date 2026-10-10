@@ -5,11 +5,13 @@ import {
   EventRegistry,
   MS_PER_MINUTE,
   advanceTo,
+  canReach,
   createState,
   holdTheBridge,
   issueAttack,
   issueMove,
   loadScenario,
+  pointMm,
   registerCombat,
   registerMovement,
   serialize,
@@ -19,6 +21,7 @@ import {
   type GameState,
 } from './index.js';
 import { evaluateVictory } from './combat.js';
+import { river, wood } from './scenario.testkit.js';
 
 type RawUnit = {
   id: string;
@@ -30,31 +33,46 @@ type RawUnit = {
   morale?: number;
 };
 
-/** 10x5 open field with the bridge (the objective) at (5,2) and a wood tile at (7,1). */
+/** Tile (x, y) of the old 100 m grid as the point at its centre, in mm. */
+const T = (x: number, y: number) => pointMm(x * 100 + 50, y * 100 + 50);
+
+/**
+ * A 1000 x 500 m open field with the bridge (the objective) at tile (5,2) and a wood at
+ * tile (7,1). Units are placed by tile (the centre of a 100 m square), which keeps the
+ * numbers readable; `river` adds a river along x = 350 m that only the bridge side avoids.
+ */
 function field(
   rawUnits: RawUnit[],
-  opts: { holdMinutes?: number; seed?: number; rows?: string[] } = {},
+  opts: { holdMinutes?: number; seed?: number; river?: boolean } = {},
 ) {
-  const rows = opts.rows ?? ['..........', '.......W..', '.....B....', '..........', '..........'];
   const raw = {
     id: 'test',
     name: 'Test',
     seed: opts.seed ?? 7,
-    map: { legend: { '.': 'open', W: 'wood', B: 'bridge', R: 'river' }, rows },
+    map: {
+      width: 1000,
+      height: 500,
+      features: [
+        { id: 'bridge', kind: 'bridge', at: { x: 550, y: 250 }, radius: 40 },
+        wood('wood', 700, 100, 800, 200),
+        ...(opts.river ? [river('river', 100, [350, 0], [350, 500])] : []),
+      ],
+    },
     sides: [
-      { id: 'blue', name: 'Blue', controller: 'human', hq: { x: 0, y: 0 } },
-      { id: 'red', name: 'Red', controller: 'scripted', hq: { x: 0, y: 0 } },
+      { id: 'blue', name: 'Blue', controller: 'human', hq: { x: 5, y: 5 } },
+      { id: 'red', name: 'Red', controller: 'scripted', hq: { x: 5, y: 495 } },
     ],
-    units: rawUnits.map((u) => ({
+    units: rawUnits.map(({ x, y, ...u }) => ({
       name: u.id,
       kind: 'infantry',
       strength: 600,
       morale: 80,
-      facing: 'N',
+      facingDeg: 0,
       ...u,
+      at: { x: x * 100 + 50, y: y * 100 + 50 },
     })),
     victory: {
-      objective: { x: 5, y: 2 },
+      objective: { x: 550, y: 250 },
       defender: 'blue',
       attacker: 'red',
       holdMinutes: opts.holdMinutes ?? 180,
@@ -111,7 +129,7 @@ describe('contact and combat ticks', () => {
       { id: 'blue-1', side: 'blue', x: 0, y: 4 },
       { id: 'red-1', side: 'red', x: 4, y: 4 },
     ]);
-    s = issueMove(s, 'red-1', { x: 2, y: 4 });
+    s = issueMove(s, 'red-1', T(2, 4));
     const { emitted } = run(s, 10);
     const begin = ofType(emitted, 'contact.begin')[0]!;
     expect(begin.time).toBe(2 * MS_PER_MINUTE); // two tiles in, distance 2
@@ -124,7 +142,7 @@ describe('contact and combat ticks', () => {
     expect(fire.payload).toEqual({
       attacker: 'blue-1',
       target: 'red-1',
-      distance: 1,
+      distance: 100,
       cover: 1,
       die: expect.any(Number),
       casualties: expect.any(Number),
@@ -154,13 +172,13 @@ describe('contact and combat ticks', () => {
       ofType(emitted, 'combat.fire').find(
         (e) => (e.payload as { target: string }).target === target,
       )!;
-    expect((at('blue-1').payload as { cover: number }).cover).toBe(0.6);
+    expect((at('blue-1').payload as { cover: number }).cover).toBe(0.5);
     expect((at('red-1').payload as { cover: number }).cover).toBe(1);
   });
 
   it('stops ticking when contact is lost, and restarts later', () => {
     let s = field(duel);
-    s = issueMove(s, 'red-1', { x: 8, y: 4 }, MS_PER_MINUTE); // marches away after the first minute
+    s = issueMove(s, 'red-1', T(8, 4), MS_PER_MINUTE); // marches away after the first minute
     const a = run(s, 20);
     expect(ofType(a.emitted, 'contact.end')).toHaveLength(1);
     expect(a.state.world.combatActive).toBe(false);
@@ -229,7 +247,7 @@ describe('attack orders', () => {
     ]);
     s = issueAttack(s, 'red-1', 'blue-1');
     const { state, emitted } = run(s, 12);
-    expect(unit(state, 'red-1').position.x).toBe(2); // stops at infantry range
+    expect(unit(state, 'red-1').center).toEqual(T(2, 4)); // stops at infantry range
     expect(ofType(emitted, 'contact.begin')).toHaveLength(1);
     expect(unit(state, 'blue-1').strength).toBeLessThan(600);
   });
@@ -239,10 +257,10 @@ describe('attack orders', () => {
       { id: 'blue-1', side: 'blue', x: 1, y: 4 },
       { id: 'red-1', side: 'red', x: 9, y: 4 },
     ]);
-    s = issueMove(s, 'blue-1', { x: 1, y: 0 });
+    s = issueMove(s, 'blue-1', T(1, 0));
     s = issueAttack(s, 'red-1', 'blue-1');
     const { state } = run(s, 12);
-    expect(unit(state, 'red-1').position.y).toBeLessThan(4);
+    expect(unit(state, 'red-1').center.y).toBeLessThan(T(0, 4).y);
   });
 
   it('follows a target that walks away after contact was made', () => {
@@ -252,32 +270,32 @@ describe('attack orders', () => {
     ]);
     s = issueAttack(s, 'red-1', 'blue-1');
     const stopped = run(s, 12);
-    expect(unit(stopped.state, 'red-1').position).toEqual({ x: 2, y: 4 });
+    expect(unit(stopped.state, 'red-1').center).toEqual(T(2, 4));
     expect(ofType(stopped.emitted, 'contact.begin')).toHaveLength(1);
-    // Blue now marches off; red must give chase and catch it up again.
-    const moved = run(issueMove(stopped.state, 'blue-1', { x: 0, y: 0 }), 5);
-    expect(unit(moved.state, 'red-1').position.y).toBeLessThan(4);
+    // Blue now marches off; red must give chase and keep up.
+    const moved = run(issueMove(stopped.state, 'blue-1', T(0, 0)), 5);
+    expect(unit(moved.state, 'red-1').center.y).toBeLessThan(T(0, 4).y);
     expect(unit(moved.state, 'red-1').intent.kind).toBe('attack');
-    expect(ofType(moved.emitted, 'contact.end').length).toBeGreaterThan(0);
-    expect(ofType(moved.emitted, 'contact.begin').length).toBeGreaterThan(0);
+    // It keeps up: still in reach of blue at the end, and still firing.
+    expect(canReach(unit(moved.state, 'red-1'), unit(moved.state, 'blue-1'))).toBe(true);
+    expect(ofType(moved.emitted, 'combat.fire').length).toBeGreaterThan(0);
   });
 
   it('gives up on a target it cannot path to instead of looping', () => {
-    // A river column at x=3 splits the map; nothing crosses it.
-    const rows = ['...R......', '...R......', '...R.B....', '...R......', '...R......'];
+    // A river along x = 350 m splits the map; the bridge is on the east bank, so nothing crosses.
     let s = field(
       [
         { id: 'blue-1', side: 'blue', x: 4, y: 2 },
         { id: 'red-1', side: 'red', x: 2, y: 2 },
       ],
-      { rows },
+      { river: true },
     );
     s = issueAttack(s, 'red-1', 'blue-1');
     const first = run(s, 1);
     expect(unit(first.state, 'red-1').intent.kind).toBe('attack');
     // Blue walks off; red cannot follow (no path), so it must stop trying and the run must end.
-    const { state, emitted } = run(issueMove(first.state, 'blue-1', { x: 9, y: 0 }), 10);
-    expect(unit(state, 'blue-1').position).toEqual({ x: 9, y: 0 });
+    const { state, emitted } = run(issueMove(first.state, 'blue-1', T(9, 0)), 10);
+    expect(unit(state, 'blue-1').center).toEqual(T(9, 0));
     expect(unit(state, 'red-1').intent.kind).toBe('idle');
     expect(ofType(emitted, 'unit.moveBlocked').length).toBeGreaterThan(0);
   });
@@ -330,7 +348,7 @@ describe('morale and withdrawal', () => {
       ...s,
       world: {
         ...s.world,
-        units: s.world.units.map((u) => (u.id === 'blue-1' ? { ...u, home: { x: 0, y: 4 } } : u)),
+        units: s.world.units.map((u) => (u.id === 'blue-1' ? { ...u, home: T(0, 4) } : u)),
       },
     };
     const { state, emitted } = run(s, 10);
@@ -340,7 +358,7 @@ describe('morale and withdrawal', () => {
     const blue = unit(state, 'blue-1');
     expect(blue.status).toBe('withdrawn');
     expect(blue.morale).toBeLessThan(BREAK_MORALE);
-    expect(blue.position).toEqual({ x: 0, y: 4 });
+    expect(blue.center).toEqual(T(0, 4));
     // No more shooting once it has broken.
     expect(ofType(emitted, 'combat.fire').filter((e) => e.time > COMBAT_TICK_MS)).toEqual([]);
   });
@@ -353,7 +371,7 @@ describe('morale and withdrawal', () => {
       { id: 'blue-2', side: 'blue', x: 9, y: 4 },
     ]);
     const { state } = run(base, 3);
-    const { emitted } = run(issueMove(state, 'blue-1', { x: 4, y: 4 }), 1);
+    const { emitted } = run(issueMove(state, 'blue-1', T(4, 4)), 1);
     expect(ofType(emitted, 'order.rejected')).toHaveLength(1);
   });
 });
@@ -364,7 +382,7 @@ describe('victory conditions', () => {
       { id: 'blue-1', side: 'blue', x: 9, y: 4 },
       { id: 'red-1', side: 'red', x: 3, y: 2 },
     ]);
-    s = issueMove(s, 'red-1', { x: 5, y: 2 });
+    s = issueMove(s, 'red-1', T(5, 2));
     const { state, emitted } = run(s, 30);
     expect(ofType(emitted, 'game.end')).toEqual([
       {
@@ -406,7 +424,7 @@ describe('victory conditions', () => {
       ],
       { holdMinutes: 1 },
     );
-    s = issueMove(s, 'red-1', { x: 5, y: 2 });
+    s = issueMove(s, 'red-1', T(5, 2));
     const { emitted } = run(s, 5);
     // Red steps on at exactly 1 minute; the deadline was queued earlier, so it wins the tie.
     expect(ofType(emitted, 'game.end')).toHaveLength(1);
