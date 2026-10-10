@@ -115,6 +115,35 @@
       #order-err {
         color: #ff9a8a;
       }
+      /* Orders and in-tray are desk objects: shown as papers over the dollied-in desk, hidden at the table. */
+      #app:not([data-view='orders']) #orders,
+      #app:not([data-view='inTray']) #tray {
+        display: none;
+      }
+      #app[data-view='orders'] #orders,
+      #app[data-view='inTray'] #tray {
+        left: 50%;
+        right: auto;
+        top: 8%;
+        bottom: auto;
+        transform: translateX(-50%);
+        width: min(560px, calc(100% - 16px));
+        max-height: 70%;
+        background: #f4eedb;
+        color: #2a2014;
+        padding: 16px 20px;
+        z-index: 3;
+      }
+      #app[data-view='orders'] #orders:focus-visible,
+      #app[data-view='inTray'] #tray:focus-visible {
+        outline: 3px solid #ffd76a;
+      }
+      #app[data-view='inTray'] #tray li {
+        border-top-color: #cbbf9b;
+      }
+      #app[data-view='orders'] #order-err {
+        color: #a83232;
+      }
       @media (max-width: 600px) {
         #clock {
           top: 44px;
@@ -131,6 +160,12 @@
         #orders {
           bottom: calc(22% + 16px);
           max-height: 30%;
+        }
+        #app[data-view='orders'] #orders,
+        #app[data-view='inTray'] #tray {
+          top: 8%;
+          bottom: auto;
+          max-height: 70%;
         }
       }
     </style>

@@ -1,3 +1,4 @@
+import { speedFactor } from './fatigue.js';
 import {
   FORMATIONS,
   MS_PER_MINUTE,
@@ -299,8 +300,17 @@ export function unitTypeOf(u: Pick<Unit, 'type' | 'kind'> | UnitKind): UnitType 
   return t;
 }
 
-/** Game ms to march one metre of cost-1 ground. A bare arm marches at its type's base speed. */
-export function msPerMetreOf(u: Pick<Unit, 'type' | 'kind' | 'formation'> | UnitKind): number {
+/**
+ * Game ms to march one metre of cost-1 ground. A bare arm marches at its type's base speed;
+ * a unit's pace and fatigue (fatigue.ts) change its own.
+ */
+export function msPerMetreOf(
+  u:
+    | (Pick<Unit, 'type' | 'kind' | 'formation'> & Partial<Pick<Unit, 'pace' | 'fatigue'>>)
+    | UnitKind,
+): number {
   const base = MS_PER_MINUTE / unitTypeOf(u).marchMetresPerMinute;
-  return typeof u === 'string' ? base : base / FORMATION_RULES[u.formation].moveFactor;
+  return typeof u === 'string'
+    ? base
+    : base / (FORMATION_RULES[u.formation].moveFactor * speedFactor(u));
 }

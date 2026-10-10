@@ -77,7 +77,7 @@ export function applyIntents(
   if (!imm) return { world: w, schedule: checks };
   const res =
     imm.kind === 'move'
-      ? beginMarch(w, now, imm.to, time, 'move')
+      ? beginMarch(w, now, imm.to, time, 'move', undefined, imm.pace)
       : imm.kind === 'withdraw'
         ? beginMarch(w, now, imm.toward, time, 'withdraw')
         : beginMarch(w, now, (imm as { at: Unit['center'] }).at, time, 'hold');

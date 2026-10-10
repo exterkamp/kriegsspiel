@@ -1,4 +1,5 @@
 import type { EngineState, EventRegistry, HandlerResult, Json } from './events.js';
+import type { Pace } from './fatigue.js';
 import { findPath } from './navigation.js';
 import { schedule } from './queue.js';
 import { REPORT_EVENT } from './visibility.js';
@@ -7,7 +8,7 @@ import { MS_PER_MINUTE, type GameState, type GameTime, type Point, type Trigger 
 
 /** What an order asks a unit to do, as parsed. The engine turns it into an `Intent` on delivery. */
 export type OrderIntent =
-  | { kind: 'move'; to: Point }
+  | { kind: 'move'; to: Point; pace?: Pace }
   | { kind: 'hold'; at: Point }
   | { kind: 'withdraw'; toward: Point }
   /** Do `then` once `trigger` fires, judged from what the unit itself knows. */

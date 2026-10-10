@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 /** `/admin` (no slash) is the admin page; Vite would otherwise fall back to the game page. */
 const adminRedirect: Plugin = {
@@ -16,7 +17,7 @@ const adminRedirect: Plugin = {
 };
 
 export default defineConfig({
-  plugins: [adminRedirect],
+  plugins: [svelte(), adminRedirect],
   build: {
     rollupOptions: {
       input: {
@@ -36,6 +37,8 @@ export default defineConfig({
     },
   },
   resolve: {
+    // Svelte's client build, not its server build, when vitest runs under jsdom.
+    ...(process.env.VITEST ? { conditions: ['browser'] } : {}),
     alias: {
       '@kriegsspiel/protocol': fileURLToPath(
         new URL('../packages/protocol/src/index.ts', import.meta.url),
