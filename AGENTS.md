@@ -11,6 +11,9 @@ Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a serve
 - `docs/research.md`: history and sources
 - `docs/roadmap.md`: milestones
 - `docs/map-implementation-plan.md`: M3c implementation sequence, Herdr agent ownership, validation and recovery
+- `docs/map-architecture.md`: pinned planner assessment, coordinate adapter and fork constraints
+- `docs/map-execution-log.md`: active assignments, accepted checkpoints and recovery state
+- `packages/maps/README.md`: frozen map contract, numerical policies and validation boundaries
 - `docs/order-eval.md`: golden order corpus and parser evaluation harness
 
 ## Rules of the design

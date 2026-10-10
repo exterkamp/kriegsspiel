@@ -113,6 +113,10 @@ running ──request──► pause_proposed ──all humans yes──► paus
 - **Persistence**: an append-only event log of *inputs* (commands, clock changes, votes, LLM outputs, seeds), plus periodic snapshots for quick recovery. Stores the model, prompt version and raw output of each LLM call.
 - **Client**: a Three.js map table (flat map, 3D pieces) and a Svelte desk, showing a desk clock with the rate and any pause. It renders only what the server sends. See [hq-interface.md](hq-interface.md).
 
+### Standalone map authoring
+
+`packages/maps` defines a portable, versioned local-metre map asset and numerical/geometry queries independently of the game engine and protocol (D16). Original/carved ground, filled drainage, land cover and infrastructure are separate layers. Strict imports and canonical replay establish contract validity; complete geography/placement certification remains an independent composition gate. This public authoring data does not read or deliver live game state. See [the map contract](../packages/maps/README.md) and [map architecture](map-architecture.md).
+
 ### SideView contents
 
 An `EngineSideView` (engine type, `viewFor`; not the protocol `SideView`, see D12) may contain only:

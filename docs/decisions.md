@@ -115,3 +115,14 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Completion boundary.** The milestone ends with reproducible map authoring and export, not a playable generated scenario. Numerical elevation accompanies a flat map; no 3D terrain is required. Scenario assembly/objectives/OOB and balance remain #90; game loading and elevation-based movement/visibility remain separate work. Coordinate with continuous-space work #113/#114/#115, vector table work #118/#129 and movement-routing follow-up #130 without duplicating them. Historical annotation remains #85/#88.
 
 **See.** [roadmap.md](roadmap.md), [hq-interface.md](hq-interface.md), [milestone M3c](https://github.com/exterkamp/kriegsspiel/milestone/1).
+
+
+## D16: Standalone maps use a versioned local-metre asset contract
+
+**Decision.** `packages/maps` defines `kriegsspiel/local-map` v1, independent of engine state, protocol, clock, LLM and rendering. Its north-west origin uses x east, y south and elevation up in metres. Original/carved elevation, filled drainage, cover, water, roads/crossings, settlements/buildings and contours remain independent layers. Bilinear interpolation and analytic derivatives share one surface; seam ownership and boundary handling are explicit. Regional boundary exits and reserved round-capped road corridors have versioned geometry policies.
+
+**Replay and validation.** Strict descriptor-safe imports cap bytes, sample values, features, vertices and deterministic work before expensive processing. `decimal-6-v1` canonicalization revalidates rounded geometry and provides separate asset, geometry and recipe identities. Stable place slots and ordered overrides preserve naming without changing geometry. Seed, stage/fork versions, source/package identities, settings and overrides are recorded. Parsing establishes contract validity; complete terrain suitability, connectivity and local street joins must pass the later independent composition validator before an asset is exported as validated.
+
+**Boundary.** The reference map and numerical fixtures are not a generated playable scenario. Cross-browser generation/replay and resource targets remain milestone gates; the GPL combined-work distribution decision remains open. No gameplay tile migration or hidden-state delivery path is introduced.
+
+**See.** [Map contract and numerical policies](../packages/maps/README.md), [map architecture](map-architecture.md), [execution log](map-execution-log.md).
