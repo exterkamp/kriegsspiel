@@ -196,6 +196,8 @@ type Ruling = {                          // an umpire judgment call, always reco
   modifiers: { target: UnitId; kind: string; value: number }[];
   rationale: string;
 };
+// Placement rulings (D15) are kept in GameState.rulings as
+// { id, time, proposal, verdict: accept|clamp|reject + reasons, rationale, narrative }.
 ```
 
 ## Testing strategy

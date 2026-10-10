@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  EventRegistry,
+  advanceTo,
+  createState,
+  type EngineState,
+  issueMove,
+  issuePlacement,
+  registerCombat,
+  registerMovement,
+  registerPlacement,
+  MAX_SHAPE_EXTENT_MM,
   MS_PER_MINUTE,
   OVERLAP_TOLERANCE_MM,
   footprintCorners,
@@ -37,7 +47,12 @@ describe('validatePlacement', () => {
     });
     expect(r).toEqual({
       verdict: 'accept',
-      placement: { center: { x: 612_345, y: 678_901 }, facing: 1.234 },
+      placement: {
+        center: { x: 612_345, y: 678_901 },
+        facing: 1.234,
+        formation: w.units[0]!.formation,
+        footprint: w.units[0]!.footprint,
+      },
       reasons: [],
     });
     expect(JSON.stringify(w)).toBe(before);
@@ -167,5 +182,191 @@ describe('validatePlacement', () => {
     const r = validatePlacement(g, { unitId: 'blue-1', center: u.center, elapsedMs: 0 });
     expect(r.verdict).toBe('accept');
     expect(footprintCorners(u)).toHaveLength(4);
+  });
+});
+
+describe('arbitrary arrangements', () => {
+  const arc: Point[] = [-60, -30, 0, 30, 60].map((x) => pointMm(x, x * x * 0.01));
+
+  it('accepts a loose arc, with the footprint bounding it', () => {
+    const r = validatePlacement(world(), {
+      unitId: 'a',
+      center: P(500, 600),
+      formation: 'skirmish',
+      shape: arc,
+      elapsedMs: 1e9,
+    });
+    expect(r.verdict).toBe('accept');
+    if (r.verdict !== 'accept') return;
+    expect(r.placement.formation).toBe('skirmish');
+    expect(r.placement.shape).toEqual(arc);
+    expect(r.placement.footprint).toEqual({ frontage: mm(120), depth: mm(72) });
+  });
+
+  it('rejects a sub-position in the river, or one that is far away', () => {
+    const w = world();
+    // Facing north, local -y is behind the unit: 100 m behind (500, 900) is the river.
+    const wet = validatePlacement(w, {
+      unitId: 'a',
+      center: P(500, 900),
+      shape: [pointMm(0, 0), pointMm(0, -100)],
+      facing: 0,
+      elapsedMs: 1e9,
+    });
+    expect(wet.verdict).toBe('reject');
+    expect(wet.reasons.join()).toMatch(/impassable/);
+    const far = validatePlacement(w, {
+      unitId: 'a',
+      center: P(500, 600),
+      shape: [{ x: MAX_SHAPE_EXTENT_MM + 1, y: 0 }],
+      elapsedMs: 1e9,
+    });
+    expect(far.verdict).toBe('reject');
+    expect(far.reasons.join()).toMatch(/from the centre/);
+  });
+
+  it('rejects an unknown formation and a non-finite shape', () => {
+    const base = { unitId: 'a', center: P(500, 600), elapsedMs: 1e9 };
+    expect(
+      validatePlacement(world(), { ...base, formation: 'blob' as never }).reasons.join(),
+    ).toMatch(/formation/);
+    expect(validatePlacement(world(), { ...base, shape: [{ x: NaN, y: 0 }] }).verdict).toBe(
+      'reject',
+    );
+  });
+
+  it('keeps the shape when it clamps a proposal that is too far', () => {
+    const r = validatePlacement(world(), {
+      unitId: 'a',
+      center: P(2500, 600),
+      shape: arc,
+      elapsedMs: MS_PER_MINUTE,
+    });
+    expect(r.verdict).toBe('clamp');
+    if (r.verdict === 'clamp') expect(r.placement.shape).toEqual(arc);
+  });
+});
+
+describe('registerPlacement', () => {
+  const registry = () => {
+    const r = new EventRegistry<GameState>();
+    registerMovement(r);
+    registerCombat(r);
+    registerPlacement(r);
+    return r;
+  };
+  const ruled = (proposal: Parameters<typeof issuePlacement>[1]['proposal']) => {
+    const s = issuePlacement(
+      createState(1, world(), 0),
+      { proposal, rationale: 'because', narrative: 'they deployed' },
+      0,
+    );
+    return advanceTo(s, 0, registry());
+  };
+
+  it('applies an irregular formation exactly and records the ruling', () => {
+    const arc: Point[] = [pointMm(-40, 0), pointMm(0, 10), pointMm(40, 0)];
+    const { state, emitted } = ruled({
+      unitId: 'a',
+      center: P(500, 600),
+      facing: 0.5,
+      formation: 'loose',
+      shape: arc,
+      elapsedMs: 1e9,
+    });
+    const a = state.world.units.find((u) => u.id === 'a')!;
+    expect(a).toMatchObject({ center: P(500, 600), facing: 0.5, formation: 'loose', shape: arc });
+    expect(a.intent).toEqual({ kind: 'idle' });
+    const [ruling] = state.world.rulings;
+    expect(ruling).toMatchObject({
+      id: 'ruling-1',
+      rationale: 'because',
+      narrative: 'they deployed',
+      verdict: { verdict: 'accept' },
+    });
+    expect(emitted.map((e) => e.type)).toContain('umpire.ruling');
+  });
+
+  it('clamps an implausible jump and logs why', () => {
+    const { state } = ruled({ unitId: 'a', center: P(2500, 600), elapsedMs: MS_PER_MINUTE });
+    const a = state.world.units.find((u) => u.id === 'a')!;
+    expect(a.center.x).toBeLessThan(P(700, 0).x);
+    expect(a.center.x).toBeGreaterThan(P(500, 0).x);
+    const [ruling] = state.world.rulings;
+    expect(ruling!.verdict.verdict).toBe('clamp');
+    expect(ruling!.verdict.reasons.join()).toMatch(/too far/);
+  });
+
+  it('refuses a unit through the river: nothing moves, the rejection is on record', () => {
+    const before = world().units.find((u) => u.id === 'a')!;
+    const { state } = ruled({ unitId: 'a', center: P(300, 1000), elapsedMs: 1e9 });
+    expect(state.world.units.find((u) => u.id === 'a')).toEqual(before);
+    expect(state.world.rulings[0]!.verdict.verdict).toBe('reject');
+  });
+
+  it('ends a march in progress: the old steps go stale', () => {
+    let s = createState(1, world(), 0);
+    s = issueMove(s, 'a', P(500, 900), 0);
+    s = issuePlacement(
+      s,
+      {
+        proposal: { unitId: 'a', center: P(520, 540), elapsedMs: 1e9 },
+        rationale: 'r',
+        narrative: 'n',
+      },
+      1000,
+    );
+    const { state } = advanceTo(s, 20 * MS_PER_MINUTE, registry());
+    const a = state.world.units.find((u) => u.id === 'a')!;
+    expect(a.center).toEqual(P(520, 540));
+    expect(a.leg).toBeUndefined();
+  });
+
+  it('keeps a hold at the new spot, and idles a unit that was moving', () => {
+    const place = (s: EngineState<GameState>, unitId: string) =>
+      advanceTo(
+        issuePlacement(
+          s,
+          {
+            proposal: { unitId, center: P(520, 540), elapsedMs: 1e9 },
+            rationale: 'r',
+            narrative: 'n',
+          },
+          0,
+        ),
+        0,
+        registry(),
+      ).state.world.units.find((u) => u.id === unitId)!;
+    const base = createState(1, world(), 0);
+    const held = createState(
+      1,
+      {
+        ...base.world,
+        units: base.world.units.map((u) =>
+          u.id === 'a' ? { ...u, intent: { kind: 'hold' as const, at: u.center } } : u,
+        ),
+      },
+      0,
+    );
+    expect(place(held, 'a').intent).toEqual({ kind: 'hold', at: P(520, 540) });
+    const marching = issueMove(base, 'b', P(700, 900), 0);
+    expect(place(marching, 'b').intent).toEqual({ kind: 'idle' });
+  });
+
+  it('re-checks combat: a unit placed within range of an enemy starts a fight', () => {
+    const near = { unitId: 'a', center: P(2300, 500), elapsedMs: 1e9 };
+    const placed = issuePlacement(
+      createState(1, world(), 0),
+      { proposal: near, rationale: 'r', narrative: 'n' },
+      0,
+    );
+    const { state, emitted } = advanceTo(placed, 1000, registry());
+    expect(state.world.combatActive).toBe(true);
+    expect(emitted.some((e) => e.type === 'contact.begin')).toBe(true);
+  });
+
+  it('is deterministic: the same logged proposal gives the same state', () => {
+    const p = { unitId: 'a', center: P(900, 600), elapsedMs: 5 * MS_PER_MINUTE };
+    expect(JSON.stringify(ruled(p).state)).toBe(JSON.stringify(ruled(p).state));
   });
 });

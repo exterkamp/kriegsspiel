@@ -1,0 +1,44 @@
+{
+  "fixtures": [
+    {
+      "name": "judge placement: skirmish arc and a strung-out column (hold-the-bridge)",
+      "stage": "judge",
+      "promptVersion": "judge-placement-v1",
+      "output": {
+        "placements": [
+          {
+            "unitId": "blue-1",
+            "x": 1850,
+            "y": 2300,
+            "facingDeg": 20,
+            "formation": "skirmish",
+            "shape": [
+              { "x": -60, "y": -4 },
+              { "x": -30, "y": 6 },
+              { "x": 0, "y": 10 },
+              { "x": 35, "y": 3 },
+              { "x": 70, "y": -8 }
+            ],
+            "rationale": "Ordered to screen the approach; the battalion shakes out into a loose arc, sagging in the middle where the ground is softer.",
+            "narrative": "The 1st Battalion deploys skirmishers in a ragged arc across the road."
+          },
+          {
+            "unitId": "blue-2",
+            "x": 2250,
+            "y": 2450,
+            "facingDeg": 350,
+            "formation": "column",
+            "shape": [
+              { "x": 0, "y": -90 },
+              { "x": 3, "y": -30 },
+              { "x": -2, "y": 30 },
+              { "x": 4, "y": 95 }
+            ],
+            "rationale": "Marching up the road; the tail has lagged and the head is a little ahead of its orders.",
+            "narrative": "The 2nd Battalion strings out along the road, stragglers trailing."
+          }
+        ]
+      }
+    }
+  ]
+}

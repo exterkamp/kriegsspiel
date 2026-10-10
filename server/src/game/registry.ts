@@ -5,6 +5,7 @@ import {
   registerCombat,
   registerMovement,
   registerOrders,
+  registerPlacement,
   registerVisibility,
   startGame,
   startVisibility,
@@ -18,6 +19,7 @@ export function createRegistry(): EventRegistry<GameState> {
   registerMovement(r);
   registerCombat(r);
   registerOrders(r);
+  registerPlacement(r);
   registerVisibility(r);
   return r;
 }
