@@ -13,7 +13,7 @@ export interface Order {
   side: 'blue' | 'red';
   /** Id of the unit the order is addressed to. */
   to: string;
-  /** Game time of signing. */
+  /** Game time of signing. `issueOrder` overwrites it with the time the order leaves HQ. */
   issuedAt: number;
   /** Original wording, preserved. */
   text: string;
@@ -34,7 +34,8 @@ export const ORDER_ISSUE_EVENT = 'order.issue';
 export const ORDER_DELIVER_EVENT = 'order.deliver';
 
 /**
- * Queue `order` to leave HQ at `time` (default: now). The courier's route and
+ * Queue `order` to leave HQ at `time` (default: now). The order is stamped
+ * `issuedAt = time`, whatever the caller put there. The courier's route and
  * delivery time are worked out when the order fires, from where the unit then is.
  */
 export function issueOrder(
@@ -42,7 +43,9 @@ export function issueOrder(
   order: Order,
   time = state.time,
 ): EngineState<GameState> {
-  return schedule(state, [{ time, type: ORDER_ISSUE_EVENT, payload: order as unknown as Json }]);
+  return schedule(state, [
+    { time, type: ORDER_ISSUE_EVENT, payload: { ...order, issuedAt: time } as unknown as Json },
+  ]);
 }
 
 function failed(world: GameState, order: Order, reason: string): HandlerResult<GameState> {

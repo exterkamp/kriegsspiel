@@ -34,6 +34,7 @@ function order(to: string, intent: OrderIntent, id = 'o1', side: 'blue' | 'red' 
   return { id, side, to, issuedAt: 0, text: 'do it', intents: [intent] };
 }
 
+const DELIVERY_MS = (9 * COURIER_MS_PER_TILE) / 2;
 const unit = (s: EngineState<GameState>, id: string) => s.world.units.find((u) => u.id === id)!;
 
 describe('courier delivery', () => {
@@ -86,6 +87,61 @@ describe('courier delivery', () => {
     const last = advanceTo(s, 30 * MS_PER_MINUTE, registry());
     expect(last.state).toEqual(whole.state);
     expect([...emitted, ...last.emitted]).toEqual(whole.emitted);
+  });
+});
+
+describe('unreachable orders', () => {
+  /** The bridge is down: blue-1 is cut off from its HQ side of the river... */
+  function cutOff(unitAt?: { x: number; y: number }): EngineState<GameState> {
+    const g = game();
+    const world = {
+      ...g.world,
+      map: {
+        ...g.world.map,
+        tiles: g.world.map.tiles.map((t) => (t === 'bridge' ? ('river' as const) : t)),
+      },
+      units: g.world.units.map((u) =>
+        u.id === 'blue-1' && unitAt ? { ...u, position: unitAt } : u,
+      ),
+    };
+    return { ...g, world };
+  }
+
+  it('fails with no route for courier when the unit is cut off from HQ', () => {
+    const s = issueOrder(
+      cutOff({ x: 18, y: 5 }),
+      order('blue-1', { kind: 'hold', at: { x: 18, y: 5 } }),
+      3 * MS_PER_MINUTE,
+    );
+    const r = advanceTo(s, 60 * MS_PER_MINUTE, registry());
+    expect(r.emitted).toEqual([
+      {
+        time: 3 * MS_PER_MINUTE,
+        type: 'order_failed',
+        payload: { orderId: 'o1', unitId: 'blue-1', reason: 'no route for courier' },
+      },
+    ]);
+    expect(unit(r.state, 'blue-1').intent).toEqual({ kind: 'idle' });
+    expect(unit(r.state, 'blue-1').position).toEqual({ x: 18, y: 5 });
+  });
+
+  it('a delivered move to an unreachable tile reports moveBlocked and keeps the standing march', () => {
+    let s = issueOrder(cutOff(), order('blue-1', { kind: 'move', to: { x: 18, y: 26 } }, 'a'));
+    s = issueOrder(s, order('blue-1', { kind: 'move', to: { x: 18, y: 5 } }, 'b'), 1000);
+    const r = advanceTo(s, 120 * MS_PER_MINUTE, registry());
+    const types = r.emitted.map((e) => e.type);
+    expect(types).toContain('unit.moveBlocked');
+    expect(r.emitted.filter((e) => e.type === 'order_delivered')).toHaveLength(2);
+    expect(r.emitted.some((e) => e.type === 'order_failed')).toBe(false);
+    // Order b was blocked, so the march from order a is untouched.
+    expect(unit(r.state, 'blue-1').position).toEqual({ x: 18, y: 26 });
+  });
+
+  it('stamps issuedAt from the issue time, not the caller', () => {
+    const t = 5 * MS_PER_MINUTE;
+    const s = issueOrder(game(), order('blue-1', { kind: 'hold', at: { x: 18, y: 24 } }), t);
+    const r = advanceTo(s, t + DELIVERY_MS, registry());
+    expect(r.emitted[0]!.payload).toMatchObject({ orderId: 'o1', issuedAt: t });
   });
 });
 
