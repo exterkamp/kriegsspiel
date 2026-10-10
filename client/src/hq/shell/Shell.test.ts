@@ -705,8 +705,12 @@ describe('fixture desk DOM', () => {
     select.value = 'one';
     select.dispatchEvent(new Event('change', { bubbles: true }));
     await flush();
-    const contrast = target.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[0]!;
-    const motion = target.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[1]!;
+    const contrast = Array.from(target.querySelectorAll('footer label'))
+      .find((label) => label.textContent?.includes('High contrast'))!
+      .querySelector<HTMLInputElement>('input')!;
+    const motion = Array.from(target.querySelectorAll('footer label'))
+      .find((label) => label.textContent?.includes('Reduce motion'))!
+      .querySelector<HTMLInputElement>('input')!;
     contrast.click();
     contrast.click();
     motion.click();
@@ -795,4 +799,24 @@ it('navigation rejects cross-player selections, canceled operations and disposed
   expect(focus).toHaveBeenCalledExactlyOnceWith('table', 'orders', expect.any(AbortSignal));
   nav.dispose();
   expect((await nav.navigate('table', null, { signal: controller.signal })).ok).toBe(false);
+});
+
+it('lets players disable letter shortcuts while retaining keyboard buttons and Escape', async () => {
+  await render();
+  const setting = Array.from(target.querySelectorAll('footer label'))
+    .find((label) => label.textContent?.includes('Enable letter shortcuts'))!
+    .querySelector<HTMLInputElement>('input')!;
+  setting.click();
+  await flush();
+  target.dispatchEvent(new KeyboardEvent('keydown', { key: 'o', bubbles: true }));
+  await flush();
+  expect(heading()).toBe('Map table');
+  button('Orders').focus();
+  button('Orders').click();
+  await flush();
+  expect(heading()).toBe('Orders');
+  target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  await flush();
+  expect(heading()).toBe('Map table');
+  expect(document.activeElement).toBe(button('Orders'));
 });

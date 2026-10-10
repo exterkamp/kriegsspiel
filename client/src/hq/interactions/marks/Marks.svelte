@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import type {
     MarkCreateInput,
     MarkEditInput,
@@ -56,6 +56,16 @@
   let exported = $state<string | null>(null);
   let exportedDirty = $state(false);
   let alive = true;
+  let focusAction = 0;
+  let labelEditor = $state<HTMLInputElement | undefined>();
+  let listHeading = $state<HTMLHeadingElement | undefined>();
+  let markList = $state<HTMLUListElement | undefined>();
+  async function moveFocus(action: number, target: () => HTMLElement | undefined) {
+    await tick();
+    if (!alive || action !== focusAction) return;
+    const element = target();
+    if (element?.isConnected && !element.matches(':disabled')) element.focus();
+  }
   const occupied = $derived(busy || pending !== null);
   const locked = $derived(occupied || !writable);
   const discardNeeded = $derived(dirty || formDirty);
@@ -66,9 +76,11 @@
   });
   onDestroy(() => {
     alive = false;
+    focusAction++;
   });
 
   function edited() {
+    focusAction++;
     formDirty = true;
     reloadConfirmed = false;
   }
@@ -87,6 +99,7 @@
   }
   function guard(write: boolean): boolean {
     if (!alive) return false;
+    focusAction++;
     if (occupied) {
       feedback = 'Please wait for the pending marks action.';
       return false;
@@ -224,16 +237,28 @@
     formDirty = false;
     reloadConfirmed = false;
     feedback = '';
+    void moveFocus(focusAction, () => labelEditor);
   }
   function remove(id: string) {
     if (!guard(true)) return;
+    const action = focusAction;
+    const index = marks.findIndex((mark) => mark.id === id);
+    const neighbor = marks[index + 1]?.id ?? marks[index - 1]?.id;
     pending = 'mutation';
     try {
-      if (
-        accept(onDelete(id), 'Local deletion accepted. Use Save to persist it.') &&
-        original?.id === id
-      )
-        reset();
+      if (accept(onDelete(id), 'Local deletion accepted. Use Save to persist it.')) {
+        if (original?.id === id) reset();
+        void moveFocus(action, () => {
+          const buttons = [
+            ...(markList?.querySelectorAll<HTMLButtonElement>('button[data-edit-mark]') ?? []),
+          ];
+          return (
+            buttons.find((button) => button.dataset.editMark === neighbor) ??
+            buttons[0] ??
+            listHeading
+          );
+        });
+      }
     } catch {
       if (alive) feedback = 'Deletion failed. Local edits have been retained.';
     } finally {
@@ -284,6 +309,7 @@
     }
   }
   function exportJson() {
+    focusAction++;
     exported = JSON.stringify(marks, null, 2);
     exportedDirty = dirty;
   }
@@ -336,6 +362,7 @@
       <legend>{original ? 'Label and geometry only; source is frozen' : 'New local mark'}</legend>
       <label
         >Label (plain text, up to 256 characters)<input
+          bind:this={labelEditor}
           name="label"
           maxlength="256"
           bind:value={label}
@@ -449,13 +476,16 @@
       {/if}
     </section>
   {/if}
-  <h4>Local marks ({marks.length}/200)</h4>
-  {#if marks.length === 0}<p>No personal marks in the local list.</p>{:else}<ul>
+  <h4 bind:this={listHeading} tabindex="-1">Local marks ({marks.length}/200)</h4>
+  {#if marks.length === 0}<p>No personal marks in the local list.</p>{:else}<ul
+      bind:this={markList}
+    >
       {#each marks as mark (mark.id)}<li>
           <strong>{mark.label || 'Unlabelled mark'}</strong> · {mark.geometry.kind}
           <div class="actions">
             <button
               disabled={locked}
+              data-edit-mark={mark.id}
               aria-label={`Edit mark ${mark.label || mark.id}`}
               onclick={() => startEdit(mark)}>Edit</button
             ><button
@@ -474,6 +504,8 @@
 
 <style>
   .marks {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
     color: var(--ink, inherit);
     font-family: Georgia, 'Times New Roman', serif;
     line-height: 1.5;
@@ -502,11 +534,22 @@
   select,
   textarea,
   button {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    overflow-wrap: anywhere;
     font: inherit;
     color: inherit;
     background: var(--paper, transparent);
     border: 1px solid currentColor;
     padding: 0.45rem;
+  }
+  textarea {
+    white-space: pre-wrap;
+  }
+  legend {
+    max-inline-size: 100%;
   }
   input[type='checkbox'] {
     margin-right: 0.5rem;
@@ -523,6 +566,7 @@
     border-style: dashed;
   }
   fieldset {
+    min-inline-size: 0;
     border: 1px solid currentColor;
     padding: 0.8rem;
     margin: 1rem 0;
@@ -545,7 +589,7 @@
   }
   dl {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
     gap: 0.4rem 1rem;
   }
   dt {

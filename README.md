@@ -20,7 +20,7 @@ A deterministic engine owns the world: terrain, movement, line of sight, combat,
 
 ## Current state
 
-The engine, filtered game API and live client are implemented. The default client page now opens a fixture-driven Three.js map table and Svelte HQ desk with scoped browser notes, personal marks and paper dispositions. It is an interface demonstration; live HQ integration and browser acceptance remain pending. [HQ contracts](docs/hq-contracts.md) and the [execution log](docs/hq-execution-log.md) record the gates.
+The engine, filtered game API and live client are implemented. The default client page now opens a fixture-driven Three.js map table and Svelte HQ desk with scoped browser notes, personal marks, paper dispositions and autosaved order drafts. It is an interface demonstration; live HQ integration and browser acceptance remain pending. [HQ contracts](docs/hq-contracts.md) and the [execution log](docs/hq-execution-log.md) record the gates.
 
 The accepted live client remains available at `/?new=1&side=blue&rate=12` to create a game, or `/?game=<id>&token=<t>` to join. Vite proxies `/games` HTTP and WebSocket requests to `API_URL` (default `http://localhost:3000`).
 

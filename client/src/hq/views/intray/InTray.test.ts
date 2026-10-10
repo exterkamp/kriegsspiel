@@ -38,6 +38,7 @@ afterEach(async () => {
   if (component) await unmount(component);
   component = null;
   document.body.replaceChildren();
+  vi.restoreAllMocks();
 });
 it('shows six piles, sorts 200 arrivals, searches and safely reads full supplied text', async () => {
   const papers = Array.from({ length: 200 }, (_, i) =>
@@ -104,7 +105,7 @@ it('opening while save is busy preserves reading selection without mutating stat
   button('Open a — Supplied scout').click();
   button('Open b — Supplied scout').click();
   await flush();
-  expect(document.querySelector('article h2')?.textContent).toBe('Paper b');
+  expect(document.querySelector('article h4')?.textContent).toBe('Paper b');
   expect(document.body.textContent).toContain('Unread: 1');
 });
 it('retains dirty state on quota, exports JSON and guards explicit reload', async () => {
@@ -242,4 +243,101 @@ it('uses inherited paper/ink tokens for reader and controls, with ink-based visi
   const file = button('File');
   file.focus();
   expect(document.activeElement).toBe(file);
+});
+it.each(['writable', 'blocked', 'busy'])(
+  'Open moves focus into the rendered reader when storage is %s',
+  async (mode) => {
+    const storage = new MemoryStorage();
+    storage.blocked = mode === 'blocked';
+    await render({ snapshot: snapshot([paper('a'), paper('b')]), storageFactory: () => storage });
+    if (mode === 'busy') button('Open a — Supplied scout').click();
+    const trigger = button('Open b — Supplied scout');
+    trigger.focus();
+    trigger.click();
+    await flush();
+    const reader = document.querySelector('article');
+    expect(document.activeElement).toBe(reader);
+    expect(reader?.querySelector('h4')?.textContent).toBe('Paper b');
+  },
+);
+it('latest Open wins focus, and teardown cancels scheduled reader focus', async () => {
+  await render({ snapshot: snapshot([paper('a'), paper('b')]) });
+  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+  button('Open a — Supplied scout').click();
+  button('Open b — Supplied scout').click();
+  await flush();
+  expect(focus).toHaveBeenCalledTimes(1);
+  expect(document.activeElement?.querySelector('h4')?.textContent).toBe('Paper b');
+  focus.mockClear();
+  button('Open a — Supplied scout').click();
+  const removal = unmount(component!);
+  component = null;
+  await removal;
+  await flush();
+  expect(focus).not.toHaveBeenCalled();
+});
+it('keeps reader outline at h3/h4 and wraps long IDs and metadata with constrained controls', async () => {
+  const id = 'a'.repeat(128);
+  await render({
+    snapshot: snapshot([
+      paper(id, {
+        from: 'Sender'.repeat(100),
+        unitId: 'Unit'.repeat(100),
+        text: 'Prose'.repeat(1000),
+      }),
+    ]),
+  });
+  await click(`Open ${id} — ${'Sender'.repeat(100)}`);
+  expect(Array.from(document.querySelectorAll('h1,h2,h3,h4,h5,h6')).map((h) => h.tagName)).toEqual([
+    'H3',
+    'H4',
+    'H4',
+    'H4',
+  ]);
+  expect(document.activeElement).toBe(document.querySelector('article'));
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync('src/hq/views/intray/InTray.svelte', 'utf8');
+  expect(source).toContain('max-inline-size: 100%');
+  expect(source).toContain('overflow-wrap: anywhere');
+  expect(source).toMatch(/:focus-visible\s*\{[^}]*outline: 3px solid currentColor/);
+});
+it('measures mounted 200-paper headless reading, pile navigation and reopen scenario', async () => {
+  const started = performance.now();
+  await render({
+    snapshot: snapshot(
+      Array.from({ length: 200 }, (_, i) =>
+        paper(`bench-${i}`, { receivedAtGame: i, category: i % 2 ? 'urgent' : 'scouts' }),
+      ),
+    ),
+  });
+  expect(document.querySelectorAll('li')).toHaveLength(200);
+  await click('Open bench-199 — Supplied scout');
+  expect(document.activeElement).toBe(document.querySelector('article'));
+  await click('File');
+  await click('filed');
+  await click('Open bench-199 — Supplied scout');
+  await click('Restore to active');
+  await click('active');
+  const search = document.querySelector('input[type="search"]') as HTMLInputElement;
+  search.value = 'bench-198';
+  search.dispatchEvent(new Event('input', { bubbles: true }));
+  await flush();
+  expect(document.querySelectorAll('li')).toHaveLength(1);
+  await click('Open bench-198 — Supplied scout');
+  expect(document.activeElement?.querySelector('h4')?.textContent).toBe('Paper bench-198');
+  const elapsed = performance.now() - started;
+  expect(Number.isFinite(elapsed)).toBe(true);
+  console.info(
+    `Headless jsdom 200-paper mounted reading/pile navigation scenario: ${elapsed.toFixed(1)} ms; not browser latency evidence.`,
+  );
+});
+it('a newer pile action prevents queued Open from stealing navigation focus', async () => {
+  await render();
+  button('Open paper-1 — Supplied scout').click();
+  const pile = button('filed');
+  pile.focus();
+  pile.click();
+  await flush();
+  expect(document.activeElement).toBe(pile);
+  expect(document.querySelector('article')).not.toBeNull();
 });

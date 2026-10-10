@@ -50,10 +50,10 @@
 
   function loadNotes(next: NotesStore) {
     const result = next.load();
-    notes = result.ok ? result.text : '';
+    notes = result.ok === true ? result.text : '';
     savedNotes = notes;
     canSave = result.ok;
-    status = result.ok ? 'Local notes loaded. Changes need Save.' : result.message;
+    status = result.ok === true ? 'Local notes loaded. Changes need Save.' : result.message;
     exportText = null;
   }
   $effect(() => {
@@ -72,7 +72,7 @@
   function saveNotes() {
     if (!store || !current) return;
     const result = store.save(notes);
-    if (result.ok) {
+    if (result.ok === true) {
       savedNotes = notes;
       status = 'Notes saved in this browser for this game, side and player.';
     } else status = result.message;
@@ -93,7 +93,7 @@
 </script>
 
 <section class="journal" aria-label="Fixture journal">
-  <h2>Journal</h2>
+  <h3>Journal</h3>
   <p>
     Fixture journal: only papers in the supplied snapshot. Order history and pause history are
     unavailable in this fixture contract.
@@ -128,7 +128,7 @@
       {#each visible as paper (paper.id)}
         <li>
           <article aria-label={`Paper ${paper.id}`}>
-            <h3>{paper.from} · {paper.category}</h3>
+            <h4>{paper.from} · {paper.category}</h4>
             <p>Paper ID: {paper.id}</p>
             <dl>
               <dt>Written</dt>
@@ -147,7 +147,7 @@
     </ol>
   {/if}
   <section aria-label="Local personal notebook">
-    <h3>Personal notebook</h3>
+    <h4>Personal notebook</h4>
     <p>Notes have no supplied game timestamp and are separate from the paper chronology.</p>
     <label
       >Personal notes
@@ -200,13 +200,15 @@
 
 <style>
   .journal {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
     color: var(--ink, #21180f);
     background: var(--paper, #f3e7c8);
     font-family: Georgia, 'Times New Roman', serif;
     max-width: 64rem;
   }
-  h2,
-  h3 {
+  h3,
+  h4 {
     font-weight: normal;
   }
   p {
@@ -219,12 +221,17 @@
     align-items: end;
   }
   label {
+    min-inline-size: 0;
+    max-inline-size: 100%;
     display: block;
   }
   input,
   select,
   textarea,
   button {
+    min-inline-size: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
     font: inherit;
     color: inherit;
     background: var(--paper, #f3e7c8);
@@ -236,9 +243,11 @@
   input,
   select,
   textarea {
+    white-space: pre-wrap;
     display: block;
   }
   textarea {
+    white-space: pre-wrap;
     width: 100%;
   }
   button {

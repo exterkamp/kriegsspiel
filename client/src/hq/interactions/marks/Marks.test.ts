@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, tick, unmount } from 'svelte';
+import { fromStore, writable } from 'svelte/store';
 import Marks from './Marks.svelte';
 import { fail, mark, ok, paper, props } from './fakes';
 import type { MarkGeometry, Result } from '../../contracts';
@@ -44,6 +45,7 @@ afterEach(async () => {
   if (component) await unmount(component);
   component = null;
   target.remove();
+  vi.restoreAllMocks();
 });
 const shapes: MarkGeometry[] = [
   { kind: 'pin', at: { x: 0, y: 3000 } },
@@ -338,4 +340,97 @@ describe('numeric personal fixture marks', () => {
     expect(target.textContent).toContain('form has been retained');
     expect(target.textContent).not.toContain('private stack');
   });
+});
+it('Edit focuses the label after rendering; latest edit alone receives focus', async () => {
+  const first = mark();
+  const second = { ...mark(), id: 'second', label: 'Second' };
+  await render(props([first, second]));
+  const editButtons = Array.from(
+    target.querySelectorAll<HTMLButtonElement>('button[data-edit-mark]'),
+  );
+  const focus = vi.spyOn(control('label'), 'focus');
+  editButtons[0]!.click();
+  editButtons[1]!.click();
+  await flush();
+  expect(document.activeElement).toBe(control('label'));
+  expect(control('label').value).toBe('Second');
+  expect(focus).toHaveBeenCalledTimes(1);
+});
+it('Delete transfers focus to next, previous, then stable list heading', async () => {
+  const list = fromStore(
+    writable([
+      mark(),
+      { ...mark(), id: 'second', label: 'Second' },
+      { ...mark(), id: 'third', label: 'Third' },
+    ]),
+  );
+  const options = props();
+  Object.defineProperty(options, 'marks', { get: () => list.current });
+  options.onDelete.mockImplementation((id) => {
+    list.current = list.current.filter((mark) => mark.id !== id);
+    return ok();
+  });
+  await render(options);
+  const remove = (id: string) =>
+    target.querySelector<HTMLButtonElement>(`[aria-label="Delete mark ${id}"]`)!.click();
+  remove('Second');
+  await flush();
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Edit mark Third');
+  remove('Third');
+  await flush();
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Edit mark Road junction');
+  remove('Road junction');
+  await flush();
+  expect(document.activeElement).toBe(target.querySelector('h4[tabindex="-1"]'));
+  expect(target.querySelectorAll('li')).toHaveLength(0);
+});
+it('a newer delete cancels editor focus, failed deletion keeps initiating focus, teardown cancels focus', async () => {
+  const list = fromStore(writable([mark(), { ...mark(), id: 'second', label: 'Second' }]));
+  const options = props();
+  Object.defineProperty(options, 'marks', { get: () => list.current });
+  options.onDelete.mockImplementation((id) => {
+    list.current = list.current.filter((mark) => mark.id !== id);
+    return ok();
+  });
+  await render(options);
+  button('Edit').click();
+  target.querySelector<HTMLButtonElement>('[aria-label="Delete mark Second"]')!.click();
+  await flush();
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Edit mark Road junction');
+  options.onDelete.mockReturnValue(fail('Delete rejected'));
+  const remove = button('Delete');
+  remove.focus();
+  remove.click();
+  await flush();
+  expect(document.activeElement).toBe(remove);
+  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+  button('Edit').click();
+  const removal = unmount(component!);
+  component = null;
+  await removal;
+  await flush();
+  expect(focus).not.toHaveBeenCalled();
+});
+it('uses panel h3/subsection h4 outline and narrow wrapping including fieldset and focus target', async () => {
+  const existing = { ...mark(), label: 'Long'.repeat(64) };
+  await render(props([existing]));
+  button('Edit').click();
+  await flush();
+  const headings = Array.from(target.querySelectorAll('h1,h2,h3,h4,h5,h6'));
+  expect(headings.map((h) => h.tagName)).toEqual(['H3', 'H4', 'H4', 'H4']);
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync('src/hq/interactions/marks/Marks.svelte', 'utf8');
+  expect(source).toMatch(/fieldset\s*\{[^}]*min-inline-size: 0/);
+  expect(source).toContain('max-inline-size: 100%');
+  expect(source).toContain('overflow-wrap: anywhere');
+  expect(source).toMatch(/:focus-visible\s*\{[^}]*outline: 3px solid currentColor/);
+});
+it('newer export action cancels queued Edit focus', async () => {
+  await render(props([mark()]));
+  button('Edit').click();
+  const exportButton = button('Export marks as JSON');
+  exportButton.focus();
+  exportButton.click();
+  await flush();
+  expect(document.activeElement).toBe(exportButton);
 });

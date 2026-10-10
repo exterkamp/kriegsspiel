@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, untrack } from 'svelte';
+  import { onDestroy, tick, untrack } from 'svelte';
   import type { HqSnapshot, Scope, Result, Paper } from '../../contracts';
   import { createInTrayStore, sameScope, type StoragePort, type PaperStatus } from './store';
   import { categories, collectPapers, gameDate } from './papers';
@@ -21,6 +21,19 @@
     ui = next;
   });
   let alive = true;
+  let reader = $state<HTMLElement | undefined>();
+  let focusAction = 0;
+  async function focusReader(paperId: string, action: number) {
+    await tick();
+    if (
+      alive &&
+      action === focusAction &&
+      scopeValid &&
+      opened?.id === paperId &&
+      reader?.isConnected
+    )
+      reader.focus();
+  }
   let openedId = $state<string | null>(null);
   let category = $state<string>('all');
   let disposition = $state('active');
@@ -60,7 +73,9 @@
   }
   void report(store.load(), 'Saved state loaded.');
   function open(p: Paper) {
+    if (!alive || !scopeValid) return;
     openedId = p.id;
+    void focusReader(p.id, ++focusAction);
     const status = statusOf(p);
     if (!mutable) {
       notice = 'Paper opened. Read-state was not saved: storage is unavailable or busy.';
@@ -70,10 +85,12 @@
     else notice = 'Paper opened; its disposition is unchanged.';
   }
   function change(status: PaperStatus) {
+    focusAction++;
     if (!opened || !mutable) return;
     void report(store.update(opened.id, status), 'Disposition saved.');
   }
   async function plot() {
+    focusAction++;
     if (!opened?.location || !onPlotPaper || plotting || !scopeValid) return;
     plotting = true;
     notice = 'Plotting paper…';
@@ -87,19 +104,21 @@
     }
   }
   async function reload() {
+    focusAction++;
     if (ui.dirty && !discard) return;
     await report(store.load(discard), 'Saved state reloaded.');
     if (alive) discard = false;
   }
   onDestroy(() => {
     alive = false;
+    focusAction++;
     unsubscribe();
     store.dispose();
   });
 </script>
 
 <section class="intray" aria-label="In-tray">
-  <h1>In-tray</h1>
+  <h3>In-tray</h3>
   <p>Fixture papers — local reading and filing state only.</p>
   <p role="status" aria-live="polite">
     {!scopeValid
@@ -122,10 +141,19 @@
       Excluded {collected.conflicts} conflicting paper IDs and {collected.invalid} invalid papers.
     </p>{/if}
   <nav aria-label="Category piles">
-    <button aria-pressed={category === 'all'} onclick={() => (category = 'all')}>All papers</button>
+    <button
+      aria-pressed={category === 'all'}
+      onclick={() => {
+        focusAction++;
+        category = 'all';
+      }}>All papers</button
+    >
     {#each categories as name (name)}<button
         aria-pressed={category === name}
-        onclick={() => (category = name)}
+        onclick={() => {
+          focusAction++;
+          category = name;
+        }}
         >{name} ({collected.papers.filter((p) => p.category === name && pileOf(p) === disposition)
           .length})</button
       >{/each}
@@ -133,11 +161,16 @@
   <nav aria-label="Disposition piles">
     {#each ['active', 'filed', 'discarded'] as name (name)}<button
         aria-pressed={disposition === name}
-        onclick={() => (disposition = name)}>{name}</button
+        onclick={() => {
+          focusAction++;
+          disposition = name;
+        }}>{name}</button
       >{/each}
   </nav>
-  <label>Search papers <input type="search" bind:value={search} /></label>
-  <h2>Arrivals — newest received first</h2>
+  <label
+    >Search papers <input type="search" bind:value={search} oninput={() => focusAction++} /></label
+  >
+  <h4>Arrivals — newest received first</h4>
   {#if !visible.length}<p>No supplied papers in this pile.</p>{/if}
   <ol>
     {#each visible as paper (paper.id)}
@@ -152,8 +185,8 @@
     {/each}
   </ol>
   {#if opened}
-    <article aria-label="Opened paper" tabindex="-1">
-      <h2>Paper {opened.id}</h2>
+    <article bind:this={reader} aria-label="Opened paper" tabindex="-1">
+      <h4>Paper {opened.id}</h4>
       <dl>
         <dt>From</dt>
         <dd>{opened.from}</dd>
@@ -187,7 +220,7 @@
       >
     </article>
   {/if}
-  <h2>Local state</h2>
+  <h4>Local state</h4>
   <button
     disabled={!mutable || !ui.dirty}
     onclick={() => report(store.save(), 'Local state saved.')}>Retry save</button
@@ -195,6 +228,7 @@
   <button
     disabled={!ui.document}
     onclick={() => {
+      focusAction++;
       exportText = JSON.stringify(ui.document, null, 2);
       exportDirty = ui.dirty;
     }}>Export JSON</button
@@ -214,6 +248,9 @@
 
 <style>
   .intray {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+    box-sizing: border-box;
     color: var(--ink, #231b12);
     background: var(--paper, #fff8e7);
     padding: 1.5rem;
@@ -229,6 +266,12 @@
   button,
   input,
   textarea {
+    white-space: pre-wrap;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    overflow-wrap: anywhere;
     font: inherit;
     color: inherit;
     background: var(--paper, #fff8e7);
@@ -269,13 +312,14 @@
     overflow-wrap: anywhere;
   }
   textarea {
+    white-space: pre-wrap;
     display: block;
     width: 100%;
     min-height: 12rem;
     box-sizing: border-box;
   }
-  h1,
-  h2 {
+  h3,
+  h4 {
     line-height: 1.2;
   }
 </style>

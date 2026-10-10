@@ -362,3 +362,25 @@ describe('fixture journal DOM and storage', () => {
     }
   });
 });
+it('uses h3/h4 journal outline and preserves keyboard focus with long paper metadata', async () => {
+  const long = paper('id'.repeat(64), 2000, 'LongProse'.repeat(1000));
+  await render(snapshot([{ ...long, from: 'Sender'.repeat(100) }]));
+  expect(Array.from(target.querySelectorAll('h1,h2,h3,h4,h5,h6')).map((h) => h.tagName)).toEqual([
+    'H3',
+    'H4',
+    'H4',
+  ]);
+  const search = target.querySelector('input[type="search"]') as HTMLInputElement;
+  search.focus();
+  expect(document.activeElement).toBe(search);
+  search.value = 'LongProse';
+  search.dispatchEvent(new Event('input', { bubbles: true }));
+  await flush();
+  expect(document.activeElement).toBe(search);
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync('src/hq/views/journal/Journal.svelte', 'utf8');
+  expect(source).toContain('min-inline-size: 0');
+  expect(source).toContain('max-inline-size: 100%');
+  expect(source).toContain('overflow-wrap: anywhere');
+  expect(source).toMatch(/:focus-visible\s*\{[^}]*outline: 3px solid currentColor/);
+});

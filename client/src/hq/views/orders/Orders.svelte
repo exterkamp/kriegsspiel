@@ -115,7 +115,7 @@
 </script>
 
 <section class="orders" aria-label="Local order draft">
-  <h1>Orders</h1>
+  <h3>Orders</h3>
   <p>Local draft only. Signing and sending unavailable.</p>
   <p role="status" aria-live="polite">{notice}</p>
   <p>
@@ -150,7 +150,7 @@
   <p id="draft-limit">
     {text.length} / 16384 characters. Longer text remains editable and exportable but cannot be saved.
   </p>
-  <h2>Draft preview</h2>
+  <h4>Draft preview</h4>
   <article aria-label="Draft preview">
     <p>
       To: {recipient?.name ??
@@ -161,7 +161,7 @@
   <p>Courier choice, courier risk, delivery estimate, annexes and delivery status unavailable.</p>
   <button disabled aria-describedby="sign-unavailable">Sign and send</button>
   <p id="sign-unavailable">Signing requires a supported command and delivery contract.</p>
-  <h2>Local draft recovery</h2>
+  <h4>Local draft recovery</h4>
   <button disabled={!dirty || !available || !matchingScope} onclick={save}>Retry save</button>
   <button onclick={exportDraft}>Export draft</button>
   {#if exported}
@@ -179,6 +179,9 @@
 
 <style>
   .orders {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+    box-sizing: border-box;
     color: var(--ink, #231b12);
     background: var(--paper, #fff8e7);
     padding: 1.5rem;
@@ -193,6 +196,11 @@
   select,
   textarea,
   input {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    overflow-wrap: anywhere;
     font: inherit;
     color: inherit;
     background: var(--paper, #fff8e7);
@@ -200,6 +208,7 @@
     padding: 0.4rem 0.65rem;
   }
   textarea {
+    white-space: pre-wrap;
     display: block;
     box-sizing: border-box;
     width: 100%;

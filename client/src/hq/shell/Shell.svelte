@@ -51,6 +51,7 @@
   let storageStatus = $state('Preferences not loaded.');
   let highContrast = $state(false);
   let reducedMotion = $state(false);
+  let letterShortcuts = $state(true);
   let systemMotion = $state(false);
   let ready = $state(false);
   let busy = $state(false);
@@ -326,7 +327,7 @@
     )
       return;
     const route = routes.find((r) => r.key === event.key.toLowerCase());
-    if (route) {
+    if (route && letterShortcuts) {
       event.preventDefault();
       void go(route.view, route.view);
     } else if (event.key === 'Escape' && shellState.view !== 'table') {
@@ -473,16 +474,17 @@
 </script>
 
 <svelte:window onkeydown={shortcut} />
-<section
+<div
   bind:this={root}
   class="hq"
   class:high-contrast={highContrast}
   class:reduced-motion={motion()}
-  aria-label="Headquarters desk"
   aria-busy={busy}
 >
   <div
     class="map-layer"
+    role="region"
+    aria-label="Fixture map table"
     class:at-desk={shellState.view !== 'table'}
     inert={shellState.view !== 'table'}
   >
@@ -516,7 +518,7 @@
         disabled={!ready}
         onclick={() => go(route.view, route.view)}
         ><span>{route.object}</span><strong>{route.label}</strong><small
-          >Key {route.key.toUpperCase()}</small
+          >{letterShortcuts ? `Key ${route.key.toUpperCase()}` : 'Use Tab and Enter'}</small
         ></button
       >{/each}
   </nav>
@@ -572,6 +574,9 @@
   </main>
   <footer>
     <label
+      ><input type="checkbox" bind:checked={letterShortcuts} /> Enable letter shortcuts (this session)</label
+    >
+    <label
       ><input type="checkbox" checked={highContrast} onchange={changeContrast} /> High contrast</label
     >
     <label
@@ -580,7 +585,7 @@
     <p role="status" aria-live="polite">{storageStatus}</p>
     <p class="error" role="status" aria-live="polite">{error}</p>
   </footer>
-</section>
+</div>
 
 <style>
   .hq {
@@ -699,6 +704,22 @@
   .high-contrast {
     --paper: #fff;
     --ink: #000;
+  }
+  .high-contrast [aria-current='page'] {
+    outline-color: var(--ink);
+  }
+  .map-tools label {
+    min-width: 0;
+    max-width: 100%;
+  }
+  select {
+    max-width: 100%;
+    min-width: 0;
+  }
+  header,
+  footer,
+  main {
+    overflow-wrap: anywhere;
   }
   .high-contrast button,
   .high-contrast select {

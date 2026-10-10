@@ -213,3 +213,25 @@ A restricted-network lock regeneration hung. Root identified and terminated only
 Rebased accepted commits: `cd3816a` contracts, `7c97fd6` table polish, `87e4b8b` shell/data/tooling, `8ef163d` roster, `852ec45` journal, `975e6bb` clock, `1268f03` composition, `21f36d5` evidence, `b20b5cf` continuous reconciliation, `4e09fd8` mark data/controls, `e66ad0f` renderer, `3787e07` in-tray/report plotting.
 
 User requested pane names: w3:p1 “HQ · Coordinator”, w3:p2 now “HQ · Plotting”, w3:p3 “HQ · Review”, w3:p4 now “HQ · Orders”. Labels follow assignments; map panes and checkout remain untouched. Medium `hq-shell` owns only `hq/views/orders/**` for accepted #53 local-draft implementation. High `hq-continuous` is preparing read-only #52 plotting architecture; no implementation dispatch until independent review. Root owns integration/shared files. No dev server, browser checks, merge or deployment; the user is handling devrun separately.
+
+
+### Local drafts and review checkpoint — 15:36 PDT
+
+Published checkpoint commit `ec6b0e3` as draft [PR #193](https://github.com/exterkamp/kriegsspiel/pull/193), assigned to dfezzie. GitHub CI passed on this checkpoint. It remains draft during ready-work integration; no story-closing reference, merge or deploy.
+
+Medium Orders packet settled after 3m54s: 43 tests, strict compilation/lint/format and zero Svelte warnings. Root added the actual navigation/last-keystroke restoration test (9 App tests). High independent runtime review accepted scoped validation, synchronous reentrancy, raw conflicts, disposal/physical commit, quota recovery, dirty reload, text safety and missing recipients (57s; independently 43+9 tests). No signing/delivery command exists in HQ; full #53 remains open.
+
+High accessibility audit (1m38s) found shortcut opt-out, reader/editor/delete focus, heading hierarchy, high-contrast current-route outline and narrow layout gaps. Medium writer now owns only the named InTray/Marks/Journal component+test files and Orders component heading; root owns Shell, roster heading and App outline. Root letter-shortcut opt-out and ink current-route outline repairs pass 41 shell tests. An existing positional checkbox test was updated to identify settings by labels. Browser/axe/visual/FPS gates remain pending.
+
+
+### Accessibility checkpoint — 15:43 PDT
+
+Medium exclusive repair packet settled after 3m15s: 149 focused tests, strict compile/lint/format and zero Svelte warnings. The mounted 200-paper scenario measured 41.6 ms in jsdom; no browser latency claim. High independent review accepted the bounded runtime gate (2m12s, including context compaction), independently reproducing 135 component/Shell/axe cases and focused lint. Root adopted the nonblocking route-heading assertion so axe cannot silently audit a prior route after failed navigation.
+
+Added axe-core 4.14.0 as a client development dependency (12 manifest/lock lines). The initial headless axe run found a nested main landmark, then uncovered the unlandmarked map layer; root repaired the semantic wrapper and added a named map region. All eight fixture routes now pass with zero violations, a single h1 and no skipped heading levels. Only color-contrast is disabled because axe documents jsdom support limitations; browser contrast/layout and full keyboard playthrough remain pending. Original asset sources are in `docs/hq-assets.md`. Current install audit reported zero vulnerabilities; no forced dependency upgrades were made.
+
+Integrated accepted main `2e6d70d97ed5f80efec63dc70aa5841964273ae4` into the already published HQ branch without rewriting it or touching the map checkout. Incoming changes are engine/server/decisions only. Full lint passed; typecheck passed with zero Svelte warnings after correcting two root test CSS selector generic types; all 1,230 tests passed (290 engine, 45 protocol, 367 server, 515 client, 13 root) plus one optional server skip; full build passed. Bundle warning is now 802.63 kB / 220.05 kB gzip. Evidence: `/private/tmp/hq-review-final-{lint,types,tests,build}.log`.
+
+Dependency refresh: #109 is open/unassigned, #132 open/assigned dfezzie with open PR151 at `659893c2e8ae19d11dcb1d2ee96d2e9e6f6ce3ef`, #134 open/unassigned, #37 closed, #21 closed/assigned exterkamp. Accepted replay/conference implementations still do not supply the required HQ services. No map work was taken over.
+
+#52 high architecture proposal settled after about 8m. Independent reviewer found no blockers (2m01s) but withheld freeze pending factual author completion. Its native question dialog temporarily blocked; root asked user as required by Herdr. The dialog subsequently ended without root answering it. Root then supplied the now-settled author status through an ordinary agent prompt for final acceptance. No implementation dispatch before that gate. The proposal is saved for review in `docs/hq-plotting-proposal.md`.
