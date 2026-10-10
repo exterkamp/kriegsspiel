@@ -135,7 +135,13 @@ Ready independent fixture work after review: author two scoped snapshots, public
 
 #49 still requires actual browser visual evidence and measured 60 fps with 60 pieces on a recorded mid-range laptop: record hardware, browser, viewport/DPR, measurement method, steady-state frame-time distribution and worst navigation/texture interval. A mocked surface/typecheck cannot prove rendering or performance. Retain overview/detail/desk/reduced-motion/high-contrast evidence. Browser servers must use the repository's approved `devrun` launcher; no server was started here.
 
-**Next gate:** independent review of this document and the small compiling draft, then coordinator approval of signatures/capability profiles, exact #48/#49 criteria and disjoint path ownership. Coordinator integrates production ports/fakes/tests and resolves Svelte composition. #48 fixture shell can proceed with a labelled legacy preview; #49 continuous correctness waits for accepted #118/coordinate ownership. #20/PR158, #109/#23, marks, conference and reveal remain external gates, not accepted dependencies. Keep their story criteria open.
+**Gate status:** the bounded fixture signatures were independently reviewed and accepted in `f3d4878`. Coordinator integrates production ports/fakes/tests and Svelte composition. #48 fixture shell proceeds with a labelled legacy preview; #49 continuous correctness waits for accepted #118/coordinate ownership. #20/PR158, #109/#23, marks, conference and reveal remain external gates, not accepted dependencies. Keep their story criteria open.
+
+### Fixture journal notebook extension
+
+The journal's personal notebook is a separate browser document, not an extension of `HqRepository` preferences. Its strict version-1 schema is `{ schemaVersion: 1, scope: { gameId, sideId, playerId }, text }`; each scope ID is 1–128 characters, text is at most 16,384 characters and serialized records at most 131,072 characters. The key is `JSON.stringify(['kriegsspiel.hq.journal-notes', gameId, sideId, playerId])`, avoiding delimiter collisions. It contains player-authored prose only, with no invented game timestamp or server visibility authority.
+
+Load validates before enabling Save. Corrupt, oversized, wrong-scope and future-version records remain untouched and block saving. Save compares the observed raw record before writing, reports external change or deletion, and preserves edits on quota/access failure. This is one view writer with observed-change detection, not cross-tab atomicity. Explicit Save persists notes across reloads in that browser; unsaved edits remain local to the open view. Export includes the visible filtered papers and notes, clearly marking unsaved notes. Missing order and pause histories are stated rather than synthesized. The writer owns `hq/views/journal/**`; independent review is required before acceptance.
 
 ## Packet verification
 
