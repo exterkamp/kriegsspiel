@@ -354,3 +354,10 @@ are small context-reuse observations, not full composition/performance acceptanc
 Four focused regressions cover numerical parity, detached mutation, exact shared
 exhaustion across repeated failures and zero getter invocation. Integration and
 independent review are recorded in the execution log.
+
+The reusable certificate factory also accepts an optional ephemeral work-charge
+callback. It reserves the caller's work before every metered operation and
+propagates callback exceptions without changing their identity. Composition can
+bind the fork's local callback budget during an authority call while retaining
+the factory's aggregate global budget; work is never charged only after a query
+has already run. This hook is not serialized as a generation input.

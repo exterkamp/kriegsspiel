@@ -6,6 +6,8 @@ import {
   type Polygon,
 } from '../src/contract.js';
 import { preflightAsset } from '../src/resources.js';
+import { MapValidationError } from '../src/errors.js';
+import { PlanningFailure } from '../src/planning/budget.js';
 import {
   createPlanningCertificates,
   certifyFootprint,
@@ -44,6 +46,50 @@ function value<T>(result: GenerationResult<T>): T {
   if (!result.ok) throw Error(JSON.stringify(result));
   return result.value;
 }
+it('charges an injected caller budget before queries and preserves its exception', () => {
+  let active = false;
+  const denied = new Error('caller budget exhausted');
+  const certificates = value(
+    createPlanningCertificates(input(), () => {
+      if (active) throw denied;
+    }),
+  );
+  const initial = certificates.work;
+  active = true;
+  expect(() => certificates.heightAt(25, 25)).toThrow(denied);
+  expect(() => certificates.footprint(rectangle(25, 35))).toThrow(denied);
+  expect(certificates.work).toBe(initial);
+  active = false;
+  expect(certificates.heightAt(25, 25)).toBe(0.75);
+  expect(certificates.work).toBe(initial + 1);
+});
+it.each([
+  new PlanningFailure('CALLER_FAILURE', 'external budget', 'external failure'),
+  new MapValidationError([{ code: 'RESOURCE_LIMIT', path: '$', message: 'external failure' }]),
+])('preserves caller error identity even when its class is locally recoverable: %s', (error) => {
+  let active = false;
+  const certificates = value(
+    createPlanningCertificates(input(), () => {
+      if (active) throw error;
+    }),
+  );
+  const initial = certificates.work;
+  active = true;
+  for (const query of [
+    () => certificates.footprint(rectangle(25, 35)),
+    () => certificates.heightAt(25, 25),
+    () => certificates.gradientAt(25, 25),
+  ]) {
+    let caught;
+    try {
+      query();
+    } catch (thrown) {
+      caught = thrown;
+    }
+    expect(caught).toBe(error);
+    expect(certificates.work).toBe(initial);
+  }
+});
 it('reuses the same bilinear certificates with numerical parity and shared work', () => {
   const source = input(),
     certificates = value(createPlanningCertificates(source));

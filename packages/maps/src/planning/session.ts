@@ -3,7 +3,7 @@ import { preflightAsset } from '../resources.js';
 import { parseSettings } from '../validation.js';
 import type { ElevationQueries } from '../queries.js';
 import type { CrossingCandidate } from '../geography/types.js';
-import { bounded, Work } from './budget.js';
+import { bounded, withCallerErrorIdentity, Work } from './budget.js';
 import { Context } from './context.js';
 import { footprint, corridor, segmentGrade } from './certificates.js';
 import { bridge } from './bridges.js';
@@ -38,6 +38,7 @@ export interface PlanningCertificates {
 
 export function createPlanningCertificates(
   input: PlanningInput,
+  chargeWork?: (units: number) => void,
 ): GenerationResult<PlanningCertificates> {
   return bounded(() => {
     const limits = configurationValue(input, 'limits', '$');
@@ -55,6 +56,7 @@ export function createPlanningCertificates(
     const shared = new Work(
       (override as number | undefined) ?? Math.min(100_000_000, topology * 20),
       'composition certificates',
+      chargeWork,
     );
     const charge = () => shared.take();
     const usage = preflightAsset(input, HARD_LIMITS, charge, charge);
@@ -86,14 +88,16 @@ export function createPlanningCertificates(
         }),
       bridge: (candidate: CrossingCandidate, profile?: DeckProfile) =>
         bounded(() => bridge(c, candidate, profile)),
-      heightAt: (x: number, y: number) => {
-        c.validation.take();
-        return c.q.heightAt(x, y);
-      },
-      gradientAt: (x: number, y: number) => {
-        c.validation.take();
-        return c.q.gradientAt(x, y);
-      },
+      heightAt: (x: number, y: number) =>
+        withCallerErrorIdentity(() => {
+          c.validation.take();
+          return c.q.heightAt(x, y);
+        }),
+      gradientAt: (x: number, y: number) =>
+        withCallerErrorIdentity(() => {
+          c.validation.take();
+          return c.q.gradientAt(x, y);
+        }),
     });
   });
 }

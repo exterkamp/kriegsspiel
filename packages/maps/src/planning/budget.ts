@@ -9,11 +9,26 @@ export class PlanningFailure extends Error {
     super(message);
   }
 }
+class ExternalWorkFailure extends Error {
+  constructor(readonly reason: unknown) {
+    super('External work charge failed');
+  }
+}
+/** Numeric queries throw directly rather than returning a bounded result. */
+export function withCallerErrorIdentity<T>(query: () => T): T {
+  try {
+    return query();
+  } catch (error) {
+    if (error instanceof ExternalWorkFailure) throw error.reason;
+    throw error;
+  }
+}
 export class Work {
   used = 0;
   constructor(
     readonly max: number,
     readonly label: string,
+    private readonly chargeExternal?: (units: number) => void,
   ) {
     if (!Number.isSafeInteger(max) || max < 1 || max > 100_000_000)
       throw new RangeError(`Invalid ${label} limit`);
@@ -26,6 +41,13 @@ export class Work {
         this.label,
         `Work exceeds ${this.max} ${this.label}.`,
       );
+    if (this.chargeExternal) {
+      try {
+        this.chargeExternal(n);
+      } catch (error) {
+        throw new ExternalWorkFailure(error);
+      }
+    }
     this.used += n;
   }
 }
@@ -41,6 +63,7 @@ export function bounded<T>(f: () => T): GenerationResult<T> {
   try {
     return { ok: true, value: f(), diagnostics: [] };
   } catch (e) {
+    if (e instanceof ExternalWorkFailure) throw e.reason;
     if (e instanceof PlanningFailure)
       return infeasible([
         {
