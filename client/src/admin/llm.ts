@@ -160,6 +160,8 @@ export class LlmPanel {
   private seen = new Set<number>();
   private filter = '';
   private selected: number | undefined;
+  /** Seq of the call the detail view currently shows; it is only rebuilt when this changes. */
+  private detailSeq: number | undefined;
   private readonly totals = el('div', undefined, 'llm-totals');
   private readonly table = el('table', undefined, 'llm-table');
   private readonly body = el('tbody');
@@ -187,6 +189,13 @@ export class LlmPanel {
     this.body.addEventListener('click', (e) => {
       const row = (e.target as HTMLElement).closest<HTMLElement>('tr[data-seq]');
       if (row) this.select(Number(row.dataset.seq));
+    });
+    this.body.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const row = (e.target as HTMLElement).closest<HTMLElement>('tr[data-seq]');
+      if (!row) return;
+      e.preventDefault();
+      this.select(Number(row.dataset.seq));
     });
     root.replaceChildren(this.totals, this.table, this.detail);
     this.render();
@@ -241,6 +250,7 @@ export class LlmPanel {
         ...rows.map((c) => {
           const tr = el('tr');
           tr.dataset.seq = String(c.seq);
+          tr.tabIndex = 0;
           if (c.seq === this.selected) tr.setAttribute('aria-selected', 'true');
           if (!c.ok) tr.classList.add('bad');
           const cells = [
@@ -263,8 +273,13 @@ export class LlmPanel {
       );
     }
 
+    // A recorded call never changes, so keep the detail (open sections, scroll, text selection) while
+    // live entries arrive; rebuild it only when a different call is shown.
     const sel = this.calls.find((c) => c.seq === this.selected);
-    this.detail.replaceChildren(...(sel ? this.detailOf(sel) : []));
+    if (sel?.seq !== this.detailSeq) {
+      this.detail.replaceChildren(...(sel ? this.detailOf(sel) : []));
+      this.detailSeq = sel?.seq;
+    }
   }
 
   private detailOf(c: LlmCall): HTMLElement[] {

@@ -120,4 +120,31 @@ describe('LlmPanel', () => {
     sys!.querySelector('button')!.click();
     expect(writeText).toHaveBeenCalledWith(long);
   });
+
+  it('keeps the detail view (open sections) when live entries arrive or the filter changes', () => {
+    const p = mount();
+    const long = 'x'.repeat(COLLAPSE_OVER + 1);
+    p.add(entry(5, { stage: 'narrate', system: long }));
+    p.select(5);
+    const detail = document.querySelector('.llm-detail')!;
+    const sys = detail.querySelector('details')!;
+    sys.open = true;
+    const before = detail.firstElementChild;
+    p.add(judge);
+    p.setFilter('narrate');
+    expect(detail.querySelector('details')).toBe(sys);
+    expect(detail.firstElementChild).toBe(before);
+    expect(sys.open).toBe(true);
+    p.select(1);
+    expect(detail.querySelector('details')).not.toBe(sys);
+  });
+
+  it('selects a row from the keyboard', () => {
+    const p = mount();
+    p.add(judge);
+    const row = document.querySelector<HTMLElement>('tbody tr')!;
+    expect(row.tabIndex).toBe(0);
+    row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(document.querySelector('.llm-detail')!.textContent).toContain('You are the umpire');
+  });
 });
