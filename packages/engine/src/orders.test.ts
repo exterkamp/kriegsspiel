@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COURIER_DELAY_MS,
   COURIER_MS_PER_METRE,
   EventRegistry,
   MS_PER_METRE,
@@ -14,6 +15,8 @@ import {
   registerCombat,
   registerMovement,
   registerOrders,
+  registerVisibility,
+  viewFor,
   type EngineState,
   type GameState,
   type Order,
@@ -28,6 +31,7 @@ function registry() {
   registerMovement(r);
   registerCombat(r);
   registerOrders(r);
+  registerVisibility(r);
   return r;
 }
 
@@ -83,6 +87,23 @@ describe('courier delivery', () => {
         payload: { orderId: 'o1', unitId: 'blue-1', issuedAt: 0 },
       },
     ]);
+  });
+
+  it('tells HQ of the delivery once the report has ridden back, and only HQ', () => {
+    const s0 = issueOrder(game(), order('blue-1', { kind: 'hold', at: P(1850, 2450) }));
+    const delivered = advanceTo(s0, DELIVERY_MS, registry()).state;
+    expect(viewFor(delivered.world, 'blue', DELIVERY_MS).reports).toEqual([]);
+
+    const t = DELIVERY_MS + COURIER_DELAY_MS;
+    const later = advanceTo(delivered, t, registry()).state;
+    const reports = viewFor(later.world, 'blue', t).reports;
+    expect(reports).toHaveLength(1);
+    expect(reports[0]).toMatchObject({
+      kind: 'orderDelivered',
+      observedAt: DELIVERY_MS,
+      deliveredAt: t,
+    });
+    expect(viewFor(later.world, 'red', t).reports).toEqual([]);
   });
 
   it('starts the courier at the issue time, and the march from delivery', () => {

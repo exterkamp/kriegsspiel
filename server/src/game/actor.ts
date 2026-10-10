@@ -83,6 +83,11 @@ export interface GameActorOptions {
   timers?: Timers;
   /** Called with events the engine emitted, in firing order. */
   onEmitted?: (events: EmittedEvent[]) => void;
+  /**
+   * Called after every tick and every command has been applied and saved, whether or not the
+   * world changed. Listeners read `state` and `gameClock`; they must not throw.
+   */
+  onUpdate?: () => void;
   /** Called when a background tick fails (a command's failure is returned to its caller). */
   onError?: (error: unknown) => void;
   /** Called when the set of pending LLM dependencies changes. */
@@ -124,6 +129,7 @@ export class GameActor {
   private readonly timers: Timers;
   private readonly parseTimers = new Set<unknown>();
   private readonly onEmitted?: (events: EmittedEvent[]) => void;
+  private readonly onUpdate?: () => void;
   private readonly onError?: (error: unknown) => void;
   private readonly onStaffAtWork?: (state: StaffAtWork) => void;
   private readonly parseRetries: number;
@@ -155,6 +161,7 @@ export class GameActor {
     this.trace = options.trace ?? NOOP_TRACE;
     this.timers = options.timers ?? realTimers;
     this.onEmitted = options.onEmitted;
+    this.onUpdate = options.onUpdate;
     this.onError = options.onError;
     this.onStaffAtWork = options.onStaffAtWork;
     this.parseRetries = options.parseRetries ?? DEFAULT_PARSE_RETRIES;
@@ -317,6 +324,15 @@ export class GameActor {
       await this.persistProgress();
     } finally {
       this.reschedule();
+      this.notify();
+    }
+  }
+
+  private notify(): void {
+    try {
+      this.onUpdate?.();
+    } catch (e) {
+      this.onError?.(e);
     }
   }
 
@@ -362,6 +378,7 @@ export class GameActor {
       }
     } finally {
       this.reschedule();
+      this.notify();
     }
   }
 

@@ -4,6 +4,7 @@ import {
   createState,
   deserialize,
   type EmittedEvent,
+  type EngineState,
   type EventRegistry,
   type GameState,
 } from '@kriegsspiel/engine';
@@ -20,6 +21,10 @@ export interface GameHostOptions {
   registry: EventRegistry<GameState>;
   wallNow: WallClock;
   timers?: Timers;
+  /** Called after each tick or command of a game, once its state is saved. */
+  onUpdate?: (gameId: string) => void;
+  /** Applied to a new game's state before it starts, e.g. to queue its first scheduled events. */
+  init?: (state: EngineState<GameState>) => EngineState<GameState>;
   trace?: TraceSink;
   /** Take a snapshot after this many logged inputs (default 1). */
   snapshotEvery?: number;
@@ -57,6 +62,7 @@ export class GameHost {
       parser: o.parser,
       store: o.store,
       timers: o.timers,
+      onUpdate: () => o.onUpdate?.(id),
       trace: o.trace,
       snapshotEvery: o.snapshotEvery,
       onError: (e) => o.onError?.(id, e),
@@ -91,7 +97,8 @@ export class GameHost {
     if (await this.options.store.loadSnapshot(id)) {
       throw new Error(`game already exists: ${id}`);
     }
-    const state = createState(world.seed, world, 0);
+    const state0 = createState(world.seed, world, 0);
+    const state = this.options.init?.(state0) ?? state0;
     await this.options.store.saveLogHeader({
       gameId: id,
       scenarioId: world.scenarioId,
