@@ -60,6 +60,8 @@ interface Placed {
 
 export interface OwnPiece extends Placed {
   kind: 'own';
+  /** Player-visible snapshot strength; absence remains unknown. */
+  strength?: number;
   id: string;
   label: string;
   side: string;
@@ -67,6 +69,10 @@ export interface OwnPiece extends Placed {
   footprint: Footprint;
   /** Loose sub-positions, as offsets in metres in the unit's own frame (x right, y front). */
   shape?: Coord[];
+  /** Source snapshot time, never a report date. */
+  snapshotAtGame?: number;
+  /** Supplied observation time; never inferred from age. */
+  observedAtGame?: number;
 }
 
 export interface GhostPiece extends Placed {
@@ -82,6 +88,8 @@ export interface GhostPiece extends Placed {
   formation?: Formation;
   footprint?: Footprint;
   shape?: Coord[];
+  snapshotAtGame?: number;
+  observedAtGame?: number;
 }
 
 export interface SceneState {

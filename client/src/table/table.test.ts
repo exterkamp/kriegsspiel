@@ -171,3 +171,25 @@ describe('picking in continuous space', () => {
     expect(pickFromRay(state, up)).toEqual({ type: 'none' });
   });
 });
+
+describe('continuous map boundary regression', () => {
+  it('includes all exact corners and rejects epsilon misses', () => {
+    for (const point of [
+      { x: 0, y: 0 },
+      { x: 4000, y: 0 },
+      { x: 0, y: 3000 },
+      { x: 4000, y: 3000 },
+    ]) {
+      expect(onMap(fixtureMap, point)).toBe(true);
+      const hit = pickFromRay(state, rayDownAt(point.x, point.y));
+      expect(hit).toMatchObject({ type: 'point', coord: point });
+    }
+    for (const point of [
+      { x: -0.001, y: 0 },
+      { x: 4000.001, y: 0 },
+      { x: 0, y: -0.001 },
+      { x: 0, y: 3000.001 },
+    ])
+      expect(pickFromRay(state, rayDownAt(point.x, point.y))).toEqual({ type: 'none' });
+  });
+});

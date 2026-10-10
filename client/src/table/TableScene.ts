@@ -2,49 +2,45 @@ import * as THREE from 'three';
 import type { Coord } from '@kriegsspiel/protocol';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mapCanvas } from './mapTexture.js';
-import {
-  mapToWorld,
-  pickFromRay,
-  pickMinSize,
-  rayToMap,
-  worldToMap,
-  type PickResult,
-} from './picking.js';
+import { mapToWorld, pickFromRay, pickMinSize, rayToMap, type PickResult } from './picking.js';
 import { facingToRotationY, fitDistance } from './framing.js';
-import type { GhostPiece, OwnPiece, SceneState } from './types.js';
+import { createDressing, positionDressing } from './dressing.js';
+import { ghostOpacity, tagLines } from './tagText.js';
+import type { BaseMap, GhostPiece, OwnPiece, SceneState } from './types.js';
 
 const SIDE_COLOURS: Record<string, number> = { blue: 0x2f55a4, red: 0xa83232 };
+export const MAX_ARTWORK_TEXTURE_PX = 4096;
 
-/** Sprite geometry is shared by three; disposeTree disposing it is harmless (it re-uploads on next use). */
-function labelSprite(text: string, ghost: boolean, width: number): THREE.Sprite {
+function labelTexture(lines: readonly string[], ghost: boolean): THREE.CanvasTexture {
   const c = document.createElement('canvas');
-  c.width = 256;
-  c.height = 64;
+  c.width = 512;
+  c.height = 160;
   const ctx = c.getContext('2d');
   if (ctx) {
     ctx.fillStyle = ghost ? '#efe6c8' : '#f4eedb';
-    ctx.fillRect(0, 0, 256, 64);
+    ctx.fillRect(0, 0, c.width, c.height);
     ctx.strokeStyle = '#3b2f1c';
-    ctx.strokeRect(1, 1, 254, 62);
+    ctx.strokeRect(1, 1, c.width - 2, c.height - 2);
     ctx.fillStyle = '#2a2014';
-    ctx.font = 'bold 34px serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, 128, 34, 240);
+    lines.forEach((line, index) => {
+      ctx.font = index === 0 ? 'bold 28px serif' : '24px serif';
+      ctx.fillText(line, c.width / 2, 25 + index * 35, c.width - 24);
+    });
   }
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c) }));
-  sprite.scale.set(width, width / 4, 1);
-  return sprite;
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
-
-const invisible = (): THREE.MeshBasicMaterial => new THREE.MeshBasicMaterial({ visible: false });
 
 interface PieceObject {
   group: THREE.Group;
-  key: string;
+  geometrySignature: string;
+  tagSignature: string;
 }
 
-/** The map table: owns the Three.js scene. `apply` is idempotent for a given SceneState. */
+/** Owns a continuous metre scene. Replacements are prepared before the commit. */
 export class TableScene {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
@@ -52,12 +48,15 @@ export class TableScene {
   readonly controls: OrbitControls;
   private state: SceneState | undefined;
   private mapKey = '';
-  private mapRef: SceneState['map'] | undefined;
   private mapMesh: THREE.Mesh | undefined;
   private tableMesh: THREE.Mesh | undefined;
   private pieces = new Map<string, PieceObject>();
   private piecesRoot = new THREE.Group();
+  private dressing: THREE.Group | undefined;
+  private artworkImage: HTMLImageElement | undefined;
   private raf = 0;
+  private renderGeneration = 0;
+  private disposed = false;
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -66,115 +65,420 @@ export class TableScene {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
-      // Costly on mobile GPUs; only enable for screenshots/debugging.
       preserveDrawingBuffer: opts.preserveDrawingBuffer ?? false,
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.scene.background = new THREE.Color(0x2a2118);
     this.camera = new THREE.PerspectiveCamera(45, 1, 10, 100_000);
-    this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.enablePan = true;
-    this.controls.enableDamping = false;
-    this.controls.minPolarAngle = 0;
-    this.controls.maxPolarAngle = Math.PI * 0.42;
-    this.scene.add(new THREE.AmbientLight(0xfff2d8, 0.7));
-    const lamp = new THREE.DirectionalLight(0xffe2b0, 1.1);
-    lamp.position.set(-12, 25, 10);
-    this.scene.add(lamp);
-    this.scene.add(this.piecesRoot);
-    this.resize();
+    let controls: OrbitControls | undefined;
+    try {
+      this.renderer.localClippingEnabled = true;
+      this.scene.background = new THREE.Color(0x2a2118);
+      controls = new OrbitControls(this.camera, canvas);
+      this.controls = controls;
+      controls.enablePan = true;
+      controls.enableDamping = false;
+      controls.minPolarAngle = 0;
+      controls.maxPolarAngle = Math.PI * 0.42;
+      this.scene.add(new THREE.AmbientLight(0xfff2d8, 0.7));
+      const lamp = new THREE.DirectionalLight(0xffe2b0, 1.1);
+      lamp.position.set(-12, 25, 10);
+      this.scene.add(lamp, this.piecesRoot);
+      this.dressing = createDressing();
+      this.scene.add(this.dressing);
+      this.resize();
+    } catch (error) {
+      controls?.dispose();
+      disposeTree(this.scene);
+      this.scene.clear();
+      this.renderer.dispose();
+      throw error;
+    }
   }
 
-  /** Reconcile the scene with `state`. Safe to call repeatedly with equal states. */
-  apply(state: SceneState): void {
-    this.state = state;
-    // Same reference means same map; only a new reference pays for the deep compare.
-    const mapChanged = state.map !== this.mapRef;
-    this.mapRef = state.map;
-    const key = mapChanged ? JSON.stringify(state.map) : this.mapKey;
-    if (key !== this.mapKey) {
-      this.mapKey = key;
-      this.buildMap();
-      this.setCameraLimits();
-      this.snapTopDown();
+  /** The adapter loads/cancels images; this synchronous operation validates before mutation. */
+  apply(state: SceneState, loadedImage?: HTMLImageElement): void {
+    if (this.disposed) return;
+    this.validateState(state);
+    if (loadedImage) this.validateArtwork(loadedImage, state.map);
+    const mapKey = JSON.stringify(state.map);
+    const dimensionsChanged =
+      !this.state ||
+      this.state.map.width !== state.map.width ||
+      this.state.map.height !== state.map.height;
+    const image = loadedImage ?? (dimensionsChanged ? undefined : this.artworkImage);
+    // Public art supersedes fallback features. Equal extents/art do not reallocate the map.
+    const rebuildMap = dimensionsChanged || (!image && mapKey !== this.mapKey);
+    const nextPieces = new Map<string, PieceObject>();
+    const created: THREE.Object3D[] = [];
+    const tags = new Map<string, THREE.CanvasTexture>();
+    let mapGroup: THREE.Group | undefined;
+    let replacementTexture: THREE.Texture | undefined;
+    try {
+      if (rebuildMap) mapGroup = this.makeMap(state.map, image);
+      else if (image && image !== this.artworkImage) replacementTexture = this.artTexture(image);
+      for (const p of [...state.own, ...state.ghosts]) {
+        const key = `${p.kind}:${p.id}`;
+        const geometrySignature = JSON.stringify([
+          Math.max(state.map.width, state.map.height),
+          p.footprint,
+          p.shape,
+          p.kind === 'ghost' ? p.uncertaintyRadius : null,
+        ]);
+        const tagSignature = JSON.stringify(tagLines(p));
+        const old = this.pieces.get(key);
+        if (!old || old.geometrySignature !== geometrySignature) {
+          const group = this.makePiece(p, state.map);
+          created.push(group);
+          nextPieces.set(key, { group, geometrySignature, tagSignature });
+        } else {
+          nextPieces.set(key, { ...old, tagSignature });
+          if (old.tagSignature !== tagSignature)
+            tags.set(key, labelTexture(tagLines(p), p.kind === 'ghost'));
+        }
+      }
+    } catch (error) {
+      if (mapGroup) disposeTree(mapGroup);
+      replacementTexture?.dispose();
+      created.forEach(disposeTree);
+      tags.forEach((texture) => texture.dispose());
+      throw error;
     }
-    const seen = new Set<string>();
-    for (const o of state.own) this.syncPiece(`own:${o.id}`, o, seen);
-    for (const g of state.ghosts) this.syncPiece(`ghost:${g.id}`, g, seen);
-    for (const [k, p] of this.pieces) {
-      if (!seen.has(k)) {
-        this.piecesRoot.remove(p.group);
-        disposeTree(p.group);
-        this.pieces.delete(k);
+
+    // All candidate geometry, paper and artwork is now allocated and validated.
+    if (mapGroup) {
+      for (const old of [this.mapMesh, this.tableMesh]) {
+        if (old) {
+          this.scene.remove(old);
+          disposeTree(old);
+        }
+      }
+      this.mapMesh = mapGroup.getObjectByName('map-artwork') as THREE.Mesh;
+      this.tableMesh = mapGroup.getObjectByName('table-board') as THREE.Mesh;
+      this.scene.add(this.mapMesh, this.tableMesh);
+    } else if (replacementTexture) {
+      const material = this.mapMesh!.material as THREE.MeshStandardMaterial;
+      const previous = material.map;
+      material.map = replacementTexture;
+      material.needsUpdate = true;
+      previous?.dispose();
+    }
+    for (const [key, old] of this.pieces) {
+      if (nextPieces.get(key)?.group !== old.group) {
+        this.piecesRoot.remove(old.group);
+        disposeTree(old.group);
       }
     }
+    const clippingPlanes = this.mapClipping(state.map);
+    for (const p of [...state.own, ...state.ghosts]) {
+      const key = `${p.kind}:${p.id}`;
+      const obj = nextPieces.get(key)!;
+      if (obj.group.parent !== this.piecesRoot) this.piecesRoot.add(obj.group);
+      const tag = obj.group.getObjectByName('paper-tag') as THREE.Sprite;
+      const texture = tags.get(key);
+      if (texture) {
+        const previous = tag.material.map;
+        tag.material.map = texture;
+        tag.material.needsUpdate = true;
+        tag.userData.lines = tagLines(p);
+        previous?.dispose();
+      }
+      obj.group.position.copy(mapToWorld(state.map, p.position));
+      obj.group.getObjectByName('body')!.rotation.y = facingToRotationY(p.facing);
+      obj.group.traverse((object) => {
+        const mesh = object as THREE.Mesh;
+        if (!(
+          mesh.material instanceof THREE.MeshStandardMaterial ||
+          mesh.material instanceof THREE.MeshBasicMaterial
+        ))
+          return;
+        if (p.kind === 'ghost' && mesh.userData.fadeRatio !== undefined)
+          mesh.material.opacity = ghostOpacity(p.ageMs) * mesh.userData.fadeRatio;
+        if (p.kind === 'own' && mesh.userData.sideColour)
+          mesh.material.color.setHex(SIDE_COLOURS[p.side] ?? 0x666666);
+        if (object.userData.clipToMap) mesh.material.clippingPlanes = clippingPlanes;
+      });
+      tag.material.opacity = p.kind === 'ghost' ? 0.65 + ghostOpacity(p.ageMs) * 0.5 : 1;
+    }
+    this.pieces = nextPieces;
+    this.state = state;
+    this.mapKey = mapKey;
+    this.artworkImage = image;
+    if (this.dressing) positionDressing(this.dressing, state.map.width, state.map.height);
+    this.updateCameraLimits();
+    if (dimensionsChanged) this.snapTopDown();
   }
 
-  /** The larger side of the map in metres: every size in the scene is scaled from it. */
-  private get span(): number {
-    const { width, height } = this.state?.map ?? { width: 4000, height: 3000 };
-    return Math.max(width, height);
+  private validateState(state: SceneState): void {
+    const { map } = state;
+    if (
+      !Number.isFinite(map.width) ||
+      !Number.isFinite(map.height) ||
+      map.width <= 0 ||
+      map.height <= 0 ||
+      !Array.isArray(map.features)
+    )
+      throw new RangeError('Invalid continuous map dimensions');
+    const ids = new Set<string>();
+    for (const p of [...state.own, ...state.ghosts]) {
+      const key = `${p.kind}:${p.id}`;
+      if (
+        ids.has(key) ||
+        !Number.isFinite(p.position.x) ||
+        !Number.isFinite(p.position.y) ||
+        p.position.x < 0 ||
+        p.position.x > map.width ||
+        p.position.y < 0 ||
+        p.position.y > map.height ||
+        !Number.isFinite(p.facing) ||
+        (p.footprint &&
+          (!Number.isFinite(p.footprint.frontage) ||
+            !Number.isFinite(p.footprint.depth) ||
+            p.footprint.frontage <= 0 ||
+            p.footprint.depth <= 0)) ||
+        p.shape?.some((s) => !Number.isFinite(s.x) || !Number.isFinite(s.y)) ||
+        (p.kind === 'ghost' && (!Number.isFinite(p.uncertaintyRadius) || p.uncertaintyRadius < 0))
+      )
+        throw new RangeError('Invalid continuous piece geometry');
+      ids.add(key);
+    }
   }
 
-  private buildMap(): void {
-    const map = this.state!.map;
-    if (this.mapMesh) {
-      this.scene.remove(this.mapMesh);
-      disposeTree(this.mapMesh);
+  private validateArtwork(image: HTMLImageElement, map: BaseMap): void {
+    const source = new URL(image.currentSrc || image.src, window.location.href);
+    const limit = Math.min(
+      MAX_ARTWORK_TEXTURE_PX,
+      this.renderer.capabilities?.maxTextureSize ?? MAX_ARTWORK_TEXTURE_PX,
+    );
+    if (
+      source.origin !== window.location.origin ||
+      source.pathname !== '/hq-preview.svg' ||
+      source.search ||
+      source.hash ||
+      source.username ||
+      source.password ||
+      !['http:', 'https:'].includes(source.protocol) ||
+      !image.complete ||
+      image.naturalWidth !== 1200 ||
+      image.naturalHeight !== 900 ||
+      image.naturalWidth > limit ||
+      image.naturalHeight > limit ||
+      image.naturalWidth * map.height !== image.naturalHeight * map.width
+    )
+      throw new RangeError('Public fixture artwork is unavailable or outside preview limits');
+  }
+
+  private artTexture(image: HTMLImageElement): THREE.Texture {
+    const texture = new THREE.Texture(image);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 8;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  /** Standalone sampling utility; no network work or camera change. */
+  setArtwork(image: HTMLImageElement): void {
+    if (this.disposed || !this.state || !this.mapMesh) return;
+    this.validateArtwork(image, this.state.map);
+    if (this.artworkImage === image) return;
+    const texture = this.artTexture(image);
+    const material = this.mapMesh.material as THREE.MeshStandardMaterial;
+    const previous = material.map;
+    material.map = texture;
+    material.needsUpdate = true;
+    this.artworkImage = image;
+    previous?.dispose();
+  }
+
+  private makeMap(map: BaseMap, image?: HTMLImageElement): THREE.Group {
+    const group = new THREE.Group();
+    try {
+      const texture = image ? this.artTexture(image) : new THREE.CanvasTexture(mapCanvas(map));
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = 8;
+      const surface = new THREE.Mesh(
+        new THREE.PlaneGeometry(map.width, map.height),
+        new THREE.MeshStandardMaterial({
+          map: texture,
+          roughness: 0.95,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+          polygonOffsetUnits: -1,
+        }),
+      );
+      surface.name = 'map-artwork';
+      surface.rotation.x = -Math.PI / 2;
+      group.add(surface);
+      const span = Math.max(map.width, map.height);
+      const thickness = span * 0.012;
+      // A tenth of the span contains the existing scaled ruler, dividers, inkwell and lamp.
+      const margin = span * 0.1;
+      const board = new THREE.Mesh(
+        new THREE.BoxGeometry(map.width + 2 * margin, thickness, map.height + 2 * margin),
+        new THREE.MeshStandardMaterial({ color: 0x5a3b22, roughness: 0.8 }),
+      );
+      board.name = 'table-board';
+      board.position.y = -thickness / 2 - span * 0.0005;
+      group.add(board);
+      return group;
+    } catch (error) {
+      disposeTree(group);
+      throw error;
     }
-    if (this.tableMesh) {
-      this.scene.remove(this.tableMesh);
-      disposeTree(this.tableMesh);
+  }
+
+  private mapClipping(map: BaseMap): THREE.Plane[] {
+    return [
+      new THREE.Plane(new THREE.Vector3(1, 0, 0), map.width / 2),
+      new THREE.Plane(new THREE.Vector3(-1, 0, 0), map.width / 2),
+      new THREE.Plane(new THREE.Vector3(0, 0, 1), map.height / 2),
+      new THREE.Plane(new THREE.Vector3(0, 0, -1), map.height / 2),
+    ];
+  }
+
+  private makePiece(p: OwnPiece | GhostPiece, map: BaseMap): THREE.Group {
+    const span = Math.max(map.width, map.height);
+    const minSize = pickMinSize(map);
+    const markerSize = span / 300;
+    const height = Math.max(span / 400, 3);
+    const own = p.kind === 'own';
+    const fp = p.footprint ?? { frontage: minSize, depth: minSize };
+    const w = fp.frontage;
+    const d = fp.depth;
+    const group = new THREE.Group();
+    group.userData = { pieceKind: p.kind, id: p.id };
+    const body = new THREE.Group();
+    body.name = 'body';
+    group.add(body);
+    try {
+      const material = new THREE.MeshStandardMaterial(
+        own
+          ? { color: SIDE_COLOURS[p.side] ?? 0x666666, roughness: 0.6 }
+          : {
+              color: 0xc9c2b0,
+              transparent: true,
+              opacity: ghostOpacity(p.ageMs),
+              depthWrite: false,
+              roughness: 1,
+            },
+      );
+      const visible = (
+        geometry: THREE.BufferGeometry,
+        name: string,
+        mat = material,
+      ): THREE.Mesh => {
+        const mesh = new THREE.Mesh(geometry, mat);
+        mesh.name = name;
+        mesh.userData.sideColour = own;
+        mesh.userData.fadeRatio = mat === material ? 1 : 0.4;
+        mesh.userData.clipToMap = !own && !p.footprint;
+        body.add(mesh);
+        return mesh;
+      };
+      let reach = Math.hypot(w, d) / 2;
+      if (p.shape?.length) {
+        const bound = visible(
+          new THREE.BoxGeometry(w, height / 4, d),
+          'bound',
+          new THREE.MeshStandardMaterial({
+            color: material.color,
+            transparent: true,
+            opacity: 0.25,
+            depthWrite: false,
+          }),
+        );
+        bound.position.y = height / 8;
+        for (const s of p.shape) {
+          const marker = visible(new THREE.BoxGeometry(markerSize, height, markerSize), 'marker');
+          marker.position.set(s.x, height / 2, -s.y);
+          const pick = new THREE.Mesh(
+            new THREE.CylinderGeometry(minSize / 2, minSize / 2, height, 32),
+            new THREE.MeshBasicMaterial({ visible: false }),
+          );
+          pick.name = 'pick';
+          pick.position.copy(marker.position);
+          body.add(pick);
+          reach = Math.max(reach, Math.hypot(s.x, s.y) + minSize / 2);
+        }
+      } else {
+        const block = visible(new THREE.BoxGeometry(w, height, d), 'block');
+        block.position.y = height / 2;
+      }
+      const pick = new THREE.Mesh(
+        new THREE.BoxGeometry(Math.max(w, minSize), height, Math.max(d, minSize)),
+        new THREE.MeshBasicMaterial({ visible: false }),
+      );
+      pick.name = 'pick';
+      pick.position.y = height / 2;
+      body.add(pick);
+      if (own) {
+        const noseWidth = Math.min(w, markerSize * 2);
+        const noseDepth = Math.min(d, markerSize / 2);
+        const nose = new THREE.Mesh(
+          new THREE.BoxGeometry(noseWidth, height * 0.5, noseDepth),
+          new THREE.MeshStandardMaterial({ color: 0xf1e7c6 }),
+        );
+        nose.name = 'nose';
+        nose.position.set(0, height, -d / 2 + noseDepth / 2);
+        body.add(nose);
+      }
+      if (p.kind === 'ghost' && p.uncertaintyRadius > 0)
+        group.add(this.uncertaintyCircle(p.uncertaintyRadius, span));
+      const tag = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: labelTexture(tagLines(p), !own), depthWrite: false }),
+      );
+      tag.name = 'paper-tag';
+      tag.userData.lines = tagLines(p);
+      const scale = span / 40;
+      tag.scale.set(3.4 * scale, 1.0625 * scale, 1);
+      tag.position.set(0, height + 0.6 * scale, reach + 1.1 * scale);
+      group.add(tag);
+      return group;
+    } catch (error) {
+      disposeTree(group);
+      throw error;
     }
-    const span = this.span;
-    const tex = new THREE.CanvasTexture(mapCanvas(map));
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 8;
-    this.mapMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(map.width, map.height),
-      new THREE.MeshStandardMaterial({
-        map: tex,
-        roughness: 0.95,
-        polygonOffset: true,
-        polygonOffsetFactor: -1,
-        polygonOffsetUnits: -1,
+  }
+
+  private uncertaintyCircle(radius: number, span: number): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'uncertainty';
+    const fill = new THREE.Mesh(
+      new THREE.CircleGeometry(radius, 64),
+      new THREE.MeshBasicMaterial({
+        color: 0xa83232,
+        transparent: true,
+        opacity: 0.06,
+        depthWrite: false,
       }),
     );
-    this.mapMesh.rotation.x = -Math.PI / 2;
-    this.scene.add(this.mapMesh);
-    const margin = span * 0.05;
-    const thickness = span * 0.012;
-    this.tableMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(map.width + margin * 2, thickness, map.height + margin * 2),
-      new THREE.MeshStandardMaterial({ color: 0x5a3b22, roughness: 0.8 }),
+    const edge = new THREE.Mesh(
+      new THREE.RingGeometry(Math.max(radius - span * 0.0015, 0), radius, 64),
+      new THREE.MeshBasicMaterial({
+        color: 0xa83232,
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false,
+      }),
     );
-    this.tableMesh.position.y = -thickness / 2 - span * 0.0005;
-    this.scene.add(this.tableMesh);
+    for (const mesh of [fill, edge]) {
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = span * 0.001;
+      mesh.userData.clipToMap = true;
+      group.add(mesh);
+    }
+    return group;
   }
 
-  private setCameraLimits(): void {
-    const span = this.span;
-    this.camera.near = span / 200;
-    this.camera.far = span * 10;
-    this.camera.updateProjectionMatrix();
-    this.controls.minDistance = span / 50;
-    this.controls.maxDistance = Math.max(span * 1.8, this.fitDistance() * 1.2);
-    this.controls.target.set(0, 0, 0);
+  private get span(): number {
+    return Math.max(this.state?.map.width ?? 4000, this.state?.map.height ?? 3000);
   }
-
-  /** Distance at which the whole map fits the current fov and aspect. */
   private fitDistance(): number {
-    const { width, height } = this.state?.map ?? { width: 4000, height: 3000 };
-    return fitDistance(width, height, this.camera.fov, this.camera.aspect);
+    return fitDistance(
+      this.state?.map.width ?? 4000,
+      this.state?.map.height ?? 3000,
+      this.camera.fov,
+      this.camera.aspect,
+    );
   }
-
-  /** Camera straight above the map centre, for precise plotting. */
-  snapTopDown(): void {
-    this.controls.target.set(0, 0, 0);
-    this.camera.position.set(0, this.fitDistance(), 0.001);
-    this.controls.update();
-  }
-
   /** Slide the camera so the map point (metres) is under the view target, keeping zoom and tilt. */
   panTo(coord: Coord): void {
     const map = this.state?.map;
@@ -189,233 +493,147 @@ export class TableScene {
     this.controls.update();
   }
 
-  /** Angled view from the near edge of the table. */
+  /** Updates projection/limits only; never moves a settled target or camera. */
+  private updateCameraLimits(): void {
+    this.camera.near = this.span / 200;
+    this.camera.far = this.span * 10;
+    this.camera.updateProjectionMatrix();
+    this.controls.minDistance = this.span / 50;
+    this.controls.maxDistance = Math.max(this.span * 1.8, this.fitDistance() * 1.2);
+  }
+  snapTopDown(): void {
+    if (this.disposed) return;
+    this.controls.target.set(0, 0, 0);
+    this.camera.position.set(0, this.fitDistance(), 0.001);
+    this.controls.update();
+  }
   snapOblique(): void {
-    const { height } = this.state?.map ?? { height: 3000 };
+    if (this.disposed) return;
     this.controls.target.set(0, 0, 0);
     this.camera.position
-      .set(0, this.span * 0.7, height * 0.75)
+      .set(0, this.span * 0.7, (this.state?.map.height ?? 3000) * 0.75)
       .normalize()
       .multiplyScalar(this.fitDistance() * 0.85);
     this.controls.update();
   }
-
-  /** Number of pieces currently in the scene (for tests and debugging). */
   get pieceCount(): number {
     return this.pieces.size;
   }
 
-  private syncPiece(key: string, p: OwnPiece | GhostPiece, seen: Set<string>): void {
-    seen.add(key);
-    const map = this.state!.map;
-    let obj = this.pieces.get(key);
-    const sig = JSON.stringify(
-      p.kind === 'own'
-        ? [p.side, p.label, p.footprint, p.shape]
-        : [p.ageTag, p.sizeEstimate, p.uncertaintyRadius, p.footprint, p.shape],
-    );
-    if (obj && obj.group.userData.sig !== sig) {
-      this.piecesRoot.remove(obj.group);
-      disposeTree(obj.group);
-      obj = undefined;
-    }
-    if (!obj) {
-      obj = { group: this.makePiece(p), key };
-      obj.group.userData = { sig, pieceKind: p.kind, id: p.id };
-      this.piecesRoot.add(obj.group);
-      this.pieces.set(key, obj);
-    }
-    obj.group.position.copy(mapToWorld(map, p.position));
-    const body = obj.group.getObjectByName('body');
-    if (body) body.rotation.y = facingToRotationY(p.facing);
-  }
-
-  /**
-   * A piece drawn from its oriented footprint in metres. The group sits at the footprint
-   * centre and is not rotated (so the label stays upright); the child `body` carries the
-   * facing. Loose units draw a marker per sub-position inside a faint bound.
-   */
-  private makePiece(p: OwnPiece | GhostPiece): THREE.Group {
-    const span = this.span;
-    const minSize = pickMinSize(this.state!.map);
-    const seeable = span / 300;
-    const height = Math.max(span / 400, 3);
-    const own = p.kind === 'own';
-    const fp = p.footprint ?? { frontage: minSize, depth: minSize };
-    const w = Math.max(fp.frontage, seeable);
-    const d = Math.max(fp.depth, seeable);
-    const material = own
-      ? new THREE.MeshStandardMaterial({ color: SIDE_COLOURS[p.side] ?? 0x666666, roughness: 0.6 })
-      : new THREE.MeshStandardMaterial({
-          color: 0xc9c2b0,
-          transparent: true,
-          opacity: 0.55,
-          roughness: 1,
-        });
-    const g = new THREE.Group();
-    const body = new THREE.Group();
-    body.name = 'body';
-    g.add(body);
-    let reach = Math.hypot(w, d) / 2;
-    if (p.shape) {
-      const bound = new THREE.Mesh(
-        new THREE.BoxGeometry(w, height / 4, d),
-        new THREE.MeshStandardMaterial({ color: material.color, transparent: true, opacity: 0.25 }),
-      );
-      bound.position.y = height / 8;
-      body.add(bound);
-      for (const s of p.shape) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(seeable, height, seeable), material);
-        m.position.set(s.x, height / 2, -s.y);
-        body.add(m);
-        const pick = new THREE.Mesh(new THREE.BoxGeometry(minSize, height, minSize), invisible());
-        pick.position.copy(m.position);
-        pick.name = 'pick';
-        body.add(pick);
-        reach = Math.max(reach, Math.hypot(s.x, s.y) + minSize / 2);
-      }
-    } else {
-      const block = new THREE.Mesh(new THREE.BoxGeometry(w, height, d), material);
-      block.position.y = height / 2;
-      body.add(block);
-    }
-    const pick = new THREE.Mesh(
-      new THREE.BoxGeometry(Math.max(w, minSize), height, Math.max(d, minSize)),
-      invisible(),
-    );
-    pick.position.y = height / 2;
-    pick.name = 'pick';
-    body.add(pick);
-    if (own) {
-      // A pale nose on the front (-Z, "north") edge shows facing.
-      const nose = new THREE.Mesh(
-        new THREE.BoxGeometry(Math.min(w, seeable * 2), height * 1.4, seeable / 2),
-        new THREE.MeshStandardMaterial({ color: 0xf1e7c6 }),
-      );
-      nose.position.set(0, height * 0.7, -d / 2);
-      body.add(nose);
-    }
-    if (p.kind === 'ghost' && p.uncertaintyRadius > 0) {
-      g.add(this.uncertaintyCircle(p.uncertaintyRadius));
-    }
-    const labelW = span * 0.07;
-    const tag = labelSprite(own ? p.label : p.ageTag, !own, labelW);
-    tag.position.set(0, height + labelW / 8, reach + labelW / 8);
-    g.add(tag);
-    return g;
-  }
-
-  /** Where a stale contact may now be: a translucent disc with an outline, flat on the map. */
-  private uncertaintyCircle(radius: number): THREE.Group {
-    const c = new THREE.Group();
-    const lift = this.span * 0.001;
-    const fill = new THREE.Mesh(
-      new THREE.CircleGeometry(radius, 64),
-      new THREE.MeshBasicMaterial({
-        color: 0xa83232,
-        transparent: true,
-        opacity: 0.06,
-        depthWrite: false,
-      }),
-    );
-    const edge = new THREE.Mesh(
-      new THREE.RingGeometry(Math.max(radius - this.span * 0.0015, 0), radius, 64),
-      new THREE.MeshBasicMaterial({
-        color: 0xa83232,
-        transparent: true,
-        opacity: 0.6,
-        depthWrite: false,
-      }),
-    );
-    for (const m of [fill, edge]) {
-      m.rotation.x = -Math.PI / 2;
-      m.position.y = lift;
-      c.add(m);
-    }
-    c.name = 'uncertainty';
-    return c;
-  }
-
-  /** Pick at a pointer position in client (CSS pixel) coordinates. Pieces first, then the map plane. Coordinates are metres. */
   pickAt(clientX: number, clientY: number): PickResult {
-    if (!this.state) return { type: 'none' };
+    if (this.disposed || !this.state) return { type: 'none' };
     const rect = this.canvas.getBoundingClientRect();
-    const ndc = new THREE.Vector2(
-      ((clientX - rect.left) / rect.width) * 2 - 1,
-      -((clientY - rect.top) / rect.height) * 2 + 1,
+    if (
+      !Number.isFinite(clientX) ||
+      !Number.isFinite(clientY) ||
+      rect.width <= 0 ||
+      rect.height <= 0 ||
+      clientX < rect.left ||
+      clientX > rect.right ||
+      clientY < rect.top ||
+      clientY > rect.bottom
+    )
+      return { type: 'none' };
+    return this.pickNdc(
+      new THREE.Vector2(
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1,
+      ),
     );
-    return this.pickNdc(ndc);
   }
-
   pickNdc(ndc: THREE.Vector2): PickResult {
-    if (!this.state) return { type: 'none' };
-    // Pieces may have moved since the last render.
+    if (
+      this.disposed ||
+      !this.state ||
+      !Number.isFinite(ndc.x) ||
+      !Number.isFinite(ndc.y) ||
+      Math.abs(ndc.x) > 1 ||
+      Math.abs(ndc.y) > 1
+    )
+      return { type: 'none' };
     this.scene.updateMatrixWorld();
     this.camera.updateMatrixWorld();
     const rc = new THREE.Raycaster();
     rc.setFromCamera(ndc, this.camera);
+    const coord = rayToMap(this.state.map, rc.ray);
+    if (!coord) return { type: 'none' };
     const meshes: THREE.Object3D[] = [];
-    this.piecesRoot.traverse((o) => {
-      if (o.name === 'pick') meshes.push(o);
+    this.piecesRoot.traverse((object) => {
+      if (object.name === 'pick') meshes.push(object);
     });
     const hit = rc.intersectObjects(meshes, false)[0];
     if (hit) {
-      let o: THREE.Object3D | null = hit.object;
-      while (o && o.userData.id === undefined) o = o.parent;
-      if (o) {
-        const { pieceKind, id } = o.userData as { pieceKind: 'own' | 'ghost'; id: string };
-        // Which piece comes from the pick mesh; where is the ray's point on the map plane,
-        // not the point on the mesh's top or side, which is shifted toward the camera.
-        const coord = rayToMap(this.state.map, rc.ray) ?? worldToMap(this.state.map, hit.point);
+      let object: THREE.Object3D | null = hit.object;
+      while (object && object.userData.id === undefined) object = object.parent;
+      if (object) {
+        const { pieceKind, id } = object.userData as { pieceKind: 'own' | 'ghost'; id: string };
         return { type: 'piece', pieceKind, id, coord };
       }
     }
     return pickFromRay(this.state, rc.ray);
   }
 
-  resize(): void {
-    const w = this.canvas.clientWidth || 800;
-    const h = this.canvas.clientHeight || 600;
-    this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+  resize(widthCssPx?: number, heightCssPx?: number, dpr?: number): void {
+    if (this.disposed) return;
+    const width = widthCssPx ?? (this.canvas.clientWidth || 800);
+    const height = heightCssPx ?? (this.canvas.clientHeight || 600);
+    const ratio = dpr ?? window.devicePixelRatio;
+    if (![width, height, ratio].every((value) => Number.isFinite(value) && value > 0))
+      throw new RangeError('Invalid table viewport');
+    this.renderer.setPixelRatio(Math.min(ratio, 2));
+    this.renderer.setSize(width, height, false);
+    this.camera.aspect = width / height;
+    this.updateCameraLimits();
   }
-
   start(): void {
-    if (this.raf) return;
+    if (this.disposed || this.raf) return;
+    const generation = ++this.renderGeneration;
     const loop = (): void => {
+      if (this.disposed || generation !== this.renderGeneration) return;
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
-      this.raf = requestAnimationFrame(loop);
+      if (!this.disposed && generation === this.renderGeneration)
+        this.raf = requestAnimationFrame(loop);
     };
     loop();
   }
-
   stop(): void {
+    this.renderGeneration++;
     cancelAnimationFrame(this.raf);
     this.raf = 0;
   }
-
-  /** Stop rendering and release the renderer, controls and every scene resource. */
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.stop();
     this.controls.dispose();
-    for (const p of this.pieces.values()) disposeTree(p.group);
+    disposeTree(this.scene);
     this.pieces.clear();
-    if (this.mapMesh) disposeTree(this.mapMesh);
-    if (this.tableMesh) disposeTree(this.tableMesh);
+    this.scene.clear();
+    this.piecesRoot.clear();
+    this.state = undefined;
+    this.mapMesh = this.tableMesh = undefined;
+    this.dressing = undefined;
+    this.artworkImage = undefined;
     this.renderer.dispose();
   }
 }
 
-function disposeTree(o: THREE.Object3D): void {
-  o.traverse((c) => {
-    const m = c as THREE.Mesh;
-    m.geometry?.dispose();
-    const mat = m.material as THREE.Material | THREE.Material[] | undefined;
-    for (const x of Array.isArray(mat) ? mat : mat ? [mat] : []) {
-      (x as THREE.MeshStandardMaterial).map?.dispose();
-      x.dispose();
+function disposeTree(object: THREE.Object3D): void {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
+  object.traverse((child) => {
+    const mesh = child as THREE.Mesh | THREE.Sprite;
+    if (!(mesh instanceof THREE.Sprite) && mesh.geometry) geometries.add(mesh.geometry);
+    const material = mesh.material as THREE.Material | THREE.Material[] | undefined;
+    for (const item of Array.isArray(material) ? material : material ? [material] : []) {
+      const texture = (item as THREE.MeshStandardMaterial).map;
+      if (texture) textures.add(texture);
+      materials.add(item);
     }
   });
+  textures.forEach((texture) => texture.dispose());
+  materials.forEach((material) => material.dispose());
+  geometries.forEach((geometry) => geometry.dispose());
 }
