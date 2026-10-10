@@ -9,6 +9,7 @@ import {
   loadScenario,
 } from '@kriegsspiel/engine';
 import {
+  MAX_LINE_POINTS,
   MAX_MARKS,
   PROTOCOL_VERSION,
   parseServerMessage,
@@ -426,6 +427,26 @@ describe('marks', () => {
     await again.waitFor('marks', (m) => m.marks.length === 1);
     await vi.waitFor(async () =>
       expect((await store.loadMarks(game.id, 'blue')).map((m) => m.id)).toEqual(['m2']),
+    );
+  });
+
+  it('carries a maximum-size pencil line of full-precision points without dropping the connection', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const a = await join(ws, game, 'blue');
+    await a.waitFor('marks');
+    const points = Array.from({ length: MAX_LINE_POINTS }, (_, i) => ({
+      x: 1234.5678901234567 + i * 1.0000000000001,
+      y: 2345.678901234567 + i * 1.0000000000001,
+    }));
+    const line = { id: 'big', kind: 'line', points, madeAtGame: 60_000, label: 'x'.repeat(80) };
+    const frame = put(line);
+    expect(Buffer.byteLength(frame)).toBeLessThan(16 * 1024);
+    a.send(frame);
+    const seen = await a.waitFor('marks', (m) => m.marks.length === 1);
+    expect(seen.marks[0]).toEqual(line);
+    await vi.waitFor(async () =>
+      expect((await store.loadMarks(game.id, 'blue')).map((m) => m.id)).toEqual(['big']),
     );
   });
 

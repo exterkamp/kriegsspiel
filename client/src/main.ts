@@ -122,8 +122,10 @@ async function main(app: HTMLElement): Promise<void> {
       const d = lastReport;
       if (!d?.location) return;
       const label = [d.sizeEstimate, d.unit].filter(Boolean).join(' ') || d.from;
+      // Plotting the same report again moves its pin rather than stacking a second one.
+      const already = state.marks.find((m) => m.sourceReport === d.id);
       commitMark({
-        id: newMarkId(++markSeq, Date.now()),
+        id: already?.id ?? newMarkId(++markSeq, Date.now()),
         kind: 'pin',
         at: d.location,
         label,
@@ -151,7 +153,9 @@ async function main(app: HTMLElement): Promise<void> {
   const commitMark = (mark: Mark): void => {
     state = withMarkPut(state, mark);
     if (conn && !conn.putMark(mark)) {
-      if (out) out.textContent = 'Not connected: that mark is only on this screen for now.';
+      if (out)
+        out.textContent =
+          'Not connected: that mark was not saved, and will be lost when the connection comes back.';
     }
     redrawMarks();
   };

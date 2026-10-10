@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Mark } from '@kriegsspiel/protocol';
+import { MAX_LINE_POINTS, type Mark } from '@kriegsspiel/protocol';
 import { Gesture, type GestureContext } from './markTools.js';
 import {
   MARK_FADE_MS,
@@ -135,8 +135,24 @@ describe('Gesture', () => {
     expect(m?.kind).toBe('line');
     if (m?.kind === 'line') {
       expect(m.points.length).toBeGreaterThanOrEqual(2);
-      expect(m.points.length).toBeLessThanOrEqual(400);
+      expect(m.points.length).toBeLessThanOrEqual(MAX_LINE_POINTS);
     }
+  });
+  it('rounds pencil points to a decimetre so a long line stays small on the wire', () => {
+    const g = new Gesture(
+      'line',
+      { x: 1234.5678901234567, y: 2345.678901234567 },
+      ctx({ minStep: 4 }),
+    );
+    for (let i = 1; i <= 50; i++)
+      g.update({ x: 1234.5678901234567 + i * 7.123456789, y: 2345.678901234567 });
+    const m = g.finish({ x: 1700.1234567, y: 2345.678901234567 });
+    expect(m?.kind).toBe('line');
+    if (m?.kind === 'line')
+      for (const p of m.points) {
+        expect(Math.round(p.x * 10)).toBeCloseTo(p.x * 10, 6);
+        expect(Math.round(p.y * 10)).toBeCloseTo(p.y * 10, 6);
+      }
   });
   it('moves a grabbed mark and keeps its id and time; a click on empty ground grabs nothing', () => {
     const g = new Gesture('select', { x: 101, y: 100 }, ctx({ marks: [pin] }));

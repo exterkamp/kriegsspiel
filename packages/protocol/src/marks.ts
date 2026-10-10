@@ -3,8 +3,11 @@ import { Coord, GameMs } from './common.js';
 
 /** Most marks a side may keep on its table. */
 export const MAX_MARKS = 500;
-/** Most points in one pencil line. */
-export const MAX_LINE_POINTS = 400;
+/**
+ * Most points in one pencil line. Kept small enough that even a line of full-precision floats
+ * (about 50 bytes a point) fits in one 16 KiB socket frame.
+ */
+export const MAX_LINE_POINTS = 200;
 
 const Base = {
   /** Chosen by the client that makes the mark; unique within a side. */

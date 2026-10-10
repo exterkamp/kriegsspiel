@@ -74,8 +74,10 @@ export class Gesture {
           : undefined;
       case 'line': {
         let step = ctx.minStep / 4;
-        let points = simplifyPath(this.path, step);
-        while (points.length > MAX_LINE_POINTS) points = simplifyPath(this.path, (step *= 2));
+        // A decimetre is plenty on a table drawn in metres, and keeps each point short on the wire.
+        const path = this.path.map(roundToDecimetre);
+        let points = simplifyPath(path, step);
+        while (points.length > MAX_LINE_POINTS) points = simplifyPath(path, (step *= 2));
         return points.length >= 2 &&
           this.moved() + pathLength(points) > 0 &&
           pathLength(points) >= ctx.minStep
@@ -90,6 +92,10 @@ export class Gesture {
     this.update(c);
     return this.draft();
   }
+}
+
+function roundToDecimetre(c: Coord): Coord {
+  return { x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10 };
 }
 
 function pathLength(points: readonly Coord[]): number {

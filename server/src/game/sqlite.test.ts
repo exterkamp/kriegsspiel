@@ -12,6 +12,7 @@ import {
   serialize,
   type GameState,
 } from '@kriegsspiel/engine';
+import type { Mark } from '@kriegsspiel/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser, ParseResult } from '../orders/index.js';
 import { GameHost, MemoryGameStore, SqliteGameStore, replayLog } from './index.js';
@@ -110,6 +111,41 @@ describe('SqliteGameStore', () => {
     expect(await store.clockHistory('g')).toHaveLength(3);
     await store.saveViews('g', { seq: 3, gameMs: 9, views: { blue: { a: 1 } } });
     expect(await store.loadViews('g')).toEqual({ seq: 3, gameMs: 9, views: { blue: { a: 1 } } });
+  });
+
+  it('stores marks per game and side, replaces a list, and keeps them across a reopen', async () => {
+    const path = tmpDb();
+    const pin = (id: string, x: number): Mark => ({
+      id,
+      kind: 'pin',
+      at: { x, y: 2 },
+      label: 'cav',
+      madeAtGame: 5,
+    });
+    const line: Mark = {
+      id: 'l',
+      kind: 'line',
+      points: [
+        { x: 1.5, y: 2.5 },
+        { x: 3.5, y: 4.5 },
+      ],
+      madeAtGame: 9,
+    };
+    const first = open(path);
+    expect(await first.loadMarks('g1', 'blue')).toEqual([]);
+    await first.saveMarks('g1', 'blue', [pin('a', 1), pin('b', 2), line]);
+    await first.saveMarks('g1', 'red', [pin('r', 3)]);
+    await first.saveMarks('g2', 'blue', [pin('other', 4)]);
+    await first.saveMarks('g1', 'blue', [pin('b', 7)]);
+    first.close();
+
+    const again = open(path);
+    expect(await again.loadMarks('g1', 'blue')).toEqual([pin('b', 7)]);
+    expect(await again.loadMarks('g1', 'red')).toEqual([pin('r', 3)]);
+    expect(await again.loadMarks('g2', 'blue')).toEqual([pin('other', 4)]);
+    expect(await again.loadMarks('g2', 'red')).toEqual([]);
+    await again.saveMarks('g1', 'blue', []);
+    expect(await again.loadMarks('g1', 'blue')).toEqual([]);
   });
 
   it('keeps the newest snapshots and loads the latest', async () => {
