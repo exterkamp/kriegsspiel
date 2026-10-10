@@ -86,6 +86,32 @@ describe('GameUmpireClient', () => {
     await expect(g.call(request)).rejects.toMatchObject({ kind: 'budget' });
   });
 
+  it('refuses when spend equals the cap exactly', async () => {
+    const tokens = new GameUmpireClient(inner().client, {
+      gameId: 'g',
+      limits: { maxTotalTokens: 200 },
+    });
+    await tokens.call(request);
+    await tokens.call(request);
+    await expect(tokens.call(request)).rejects.toMatchObject({ kind: 'budget' });
+    const dollars = new GameUmpireClient(inner().client, {
+      gameId: 'g',
+      limits: { maxCostUsd: 0.02 },
+    });
+    await dollars.call(request);
+    await dollars.call(request);
+    await expect(dollars.call(request)).rejects.toMatchObject({ kind: 'budget' });
+  });
+
+  it('logs a failed call that carries no usage', async () => {
+    const metrics: GameUmpireMetric[] = [];
+    const { client } = inner({}, () => new UmpireError('timeout', 'timeout', 1));
+    const g = new GameUmpireClient(client, { gameId: 'g', onMetric: (m) => metrics.push(m) });
+    await expect(g.call(request)).rejects.toMatchObject({ kind: 'timeout' });
+    expect(g.report()).toMatchObject({ calls: 1, failedCalls: 1, totalTokens: 0 });
+    expect(metrics).toEqual([expect.objectContaining({ kind: 'call', ok: false, costUsd: null })]);
+  });
+
   it('counts the spend of a failed call', async () => {
     const usage = { inputTokens: 80, outputTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0 };
     const { client } = inner({}, () => new UmpireError('bad', 'schema', 3, usage, 0.02));
@@ -179,5 +205,14 @@ describe('per-game config', () => {
 
   it('rejects a bad per-minute cap', () => {
     expect(() => umpireConfigFromEnv({ UMPIRE_GAME_CALLS_PER_MINUTE: '0' })).toThrow();
+  });
+
+  it('rejects non-positive caps in the config file', () => {
+    expect(() => umpireConfigFromEnv({}, { gameBudget: { maxCallsPerMinute: 0 } })).toThrow(
+      /gameBudget.maxCallsPerMinute/,
+    );
+    expect(() => umpireConfigFromEnv({}, { budget: { maxCostUsd: -1 } })).toThrow(
+      /budget.maxCostUsd/,
+    );
   });
 });

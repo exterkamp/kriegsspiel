@@ -138,9 +138,7 @@ export class GameUmpireClient implements UmpireClient {
       if (err instanceof UmpireError && err.usage) {
         this.add(stage, err.usage, err.costUsd ?? null, false, '');
       } else {
-        this.calls++;
-        this.failedCalls++;
-        this.byStage[stage].calls++;
+        this.add(stage, ZERO_USAGE, null, false, '');
       }
       throw err;
     }

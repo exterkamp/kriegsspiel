@@ -95,6 +95,18 @@ function checkFile(file: UmpireConfigFile): void {
     }
     if (typeof spec.type !== 'string') throw new Error(`provider "${id}": missing type`);
   }
+  const caps: [string, number | undefined][] = [
+    ['budget.maxCostUsd', file.budget?.maxCostUsd],
+    ['budget.maxTotalTokens', file.budget?.maxTotalTokens],
+    ['gameBudget.maxCostUsd', file.gameBudget?.maxCostUsd],
+    ['gameBudget.maxTotalTokens', file.gameBudget?.maxTotalTokens],
+    ['gameBudget.maxCallsPerMinute', file.gameBudget?.maxCallsPerMinute],
+  ];
+  for (const [name, value] of caps) {
+    if (value !== undefined && !(Number.isFinite(value) && value > 0)) {
+      throw new Error(`${name} must be a positive number, got ${String(value)}`);
+    }
+  }
 }
 
 /**
