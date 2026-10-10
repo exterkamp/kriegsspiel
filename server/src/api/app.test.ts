@@ -247,6 +247,9 @@ describe('game over', () => {
     const late = await join(ws, game, 'red');
     const l = await late.waitFor('gameOver');
     expect(l).toEqual(b);
+    // Force further pushes after the notice: only the per-connection guard keeps it to one.
+    for (let i = 0; i < 3; i++) app!.hub.notify(game.id);
+    blue.send(JSON.stringify({ v, kind: 'issueOrder', orderId: 'after', text: 'hold' }));
     await new Promise((resolve) => setTimeout(resolve, 100));
     for (const c of [blue, red, late]) {
       expect(c.messages.filter((m) => m.kind === 'gameOver')).toHaveLength(1);

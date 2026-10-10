@@ -284,6 +284,39 @@ describe('Hud', () => {
     expect(orderPrefix(fixtureView, 'nope')).toBe('');
   });
 
+  it('shows the result and stops accepting orders once the game is over', () => {
+    const { hud, sent } = mount();
+    const running = applyServerMessage(
+      initialState,
+      { v, kind: 'viewUpdate', view: fixtureView },
+      0,
+    );
+    const q = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
+    hud.render(running, 0);
+    expect(q('#order-text').hasAttribute('disabled')).toBe(false);
+    expect(q('#order-send').hasAttribute('disabled')).toBe(false);
+    expect(q('#order-unit').hasAttribute('disabled')).toBe(false);
+    expect(q('#gameover').hidden).toBe(true);
+
+    const over = applyServerMessage(
+      running,
+      { v, kind: 'gameOver', winner: 'blue', reason: 'objective-held', atGame: 3_600_000 },
+      0,
+    );
+    hud.render(over, 0);
+    expect(q('#order-text').hasAttribute('disabled')).toBe(true);
+    expect(q('#order-send').hasAttribute('disabled')).toBe(true);
+    expect(q('#order-unit').hasAttribute('disabled')).toBe(true);
+    expect(q('#gameover').hidden).toBe(false);
+    expect(q('#gameover').textContent).toBe(gameOverText(over));
+
+    const text = q<HTMLTextAreaElement>('#order-text');
+    text.value = '1st Battalion, advance';
+    q<HTMLButtonElement>('#order-send').click();
+    text.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true }));
+    expect(sent).toEqual([]);
+  });
+
   it('replaces the auto-inserted prefix when another unit is selected, but keeps typed text', () => {
     const { hud } = mount();
     hud.render(
