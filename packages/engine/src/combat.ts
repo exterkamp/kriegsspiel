@@ -223,6 +223,20 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       };
     }
     const res = startMarch(world, unit, target.position, ev.time, targetId);
+    if (res.emit?.some((e) => e.type === 'unit.moveBlocked')) {
+      // No way to the target. A unit that was already attacking it gives up, or
+      // `combat.check` would ask for the same chase again at this very instant.
+      const stale = unit.intent.kind === 'attack' && unit.intent.target === targetId;
+      const w = stale
+        ? {
+            ...res.world,
+            units: res.world.units.map((u) =>
+              u.id === unitId ? { ...u, intent: { kind: 'idle' as const } } : u,
+            ),
+          }
+        : res.world;
+      return { ...res, world: w };
+    }
     return { ...res, schedule: [...(res.schedule ?? []), check] };
   });
 

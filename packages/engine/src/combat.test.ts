@@ -31,13 +31,16 @@ type RawUnit = {
 };
 
 /** 10x5 open field with the bridge (the objective) at (5,2) and a wood tile at (7,1). */
-function field(rawUnits: RawUnit[], opts: { holdMinutes?: number; seed?: number } = {}) {
-  const rows = ['..........', '.......W..', '.....B....', '..........', '..........'];
+function field(
+  rawUnits: RawUnit[],
+  opts: { holdMinutes?: number; seed?: number; rows?: string[] } = {},
+) {
+  const rows = opts.rows ?? ['..........', '.......W..', '.....B....', '..........', '..........'];
   const raw = {
     id: 'test',
     name: 'Test',
     seed: opts.seed ?? 7,
-    map: { legend: { '.': 'open', W: 'wood', B: 'bridge' }, rows },
+    map: { legend: { '.': 'open', W: 'wood', B: 'bridge', R: 'river' }, rows },
     sides: [
       { id: 'blue', name: 'Blue', controller: 'human', hq: { x: 0, y: 0 } },
       { id: 'red', name: 'Red', controller: 'scripted', hq: { x: 0, y: 0 } },
@@ -257,6 +260,26 @@ describe('attack orders', () => {
     expect(unit(moved.state, 'red-1').intent.kind).toBe('attack');
     expect(ofType(moved.emitted, 'contact.end').length).toBeGreaterThan(0);
     expect(ofType(moved.emitted, 'contact.begin').length).toBeGreaterThan(0);
+  });
+
+  it('gives up on a target it cannot path to instead of looping', () => {
+    // A river column at x=3 splits the map; nothing crosses it.
+    const rows = ['...R......', '...R......', '...R.B....', '...R......', '...R......'];
+    let s = field(
+      [
+        { id: 'blue-1', side: 'blue', x: 4, y: 2 },
+        { id: 'red-1', side: 'red', x: 2, y: 2 },
+      ],
+      { rows },
+    );
+    s = issueAttack(s, 'red-1', 'blue-1');
+    const first = run(s, 1);
+    expect(unit(first.state, 'red-1').intent.kind).toBe('attack');
+    // Blue walks off; red cannot follow (no path), so it must stop trying and the run must end.
+    const { state, emitted } = run(issueMove(first.state, 'blue-1', { x: 9, y: 0 }), 10);
+    expect(unit(state, 'blue-1').position).toEqual({ x: 9, y: 0 });
+    expect(unit(state, 'red-1').intent.kind).toBe('idle');
+    expect(ofType(emitted, 'unit.moveBlocked').length).toBeGreaterThan(0);
   });
 
   it('rejects bad orders without side effects', () => {
