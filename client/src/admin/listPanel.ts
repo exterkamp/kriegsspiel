@@ -60,8 +60,8 @@ export class ListPanel {
   private text = '';
   private correlationId: string | undefined;
   private paused = false;
-  /** Rows frozen while paused, so new arrivals do not move the list under the reader's eyes. */
-  private frozen: Row[] | undefined;
+  /** Highest seq shown when paused: later arrivals stay hidden, but filters still apply. */
+  private frozenSeq: number | undefined;
   private rows: Row[] = [];
   private selected: TraceEntry | undefined;
   private shownInDetail: TraceEntry | undefined;
@@ -142,7 +142,7 @@ export class ListPanel {
   reset(): void {
     this.selected = undefined;
     this.shownInDetail = undefined;
-    this.frozen = undefined;
+    this.frozenSeq = undefined;
     this.paused = false;
     this.autoPaused = false;
     this.following = true;
@@ -168,9 +168,9 @@ export class ListPanel {
   renderNow(): void {
     this.updateOptions();
     const live = this.store.filter(this.currentFilter());
-    if (!this.paused) this.frozen = undefined;
-    this.rows = this.frozen ?? live;
-    const fresh = this.paused ? Math.max(0, live.length - this.rows.length) : 0;
+    const cutoff = this.paused ? this.frozenSeq : undefined;
+    this.rows = cutoff === undefined ? live : live.filter((r) => r.entry.seq <= cutoff);
+    const fresh = live.length - this.rows.length;
     this.pauseBtn.textContent = this.paused ? `resume${fresh ? ` (${fresh} new)` : ''}` : 'pause';
     this.pauseBtn.setAttribute('aria-pressed', String(this.paused));
     this.count.textContent = `${this.rows.length.toLocaleString()} of ${this.store.size.toLocaleString()} entries`;
@@ -192,8 +192,8 @@ export class ListPanel {
     if (paused === this.paused) return;
     this.autoPaused = false;
     this.paused = paused;
-    if (paused) this.frozen = this.rows;
-    else this.following = true;
+    this.frozenSeq = paused ? this.store.lastSeq : undefined;
+    if (!paused) this.following = true;
     this.renderNow();
   }
 

@@ -61,7 +61,10 @@ export const REQUESTS_PANEL: PanelConfig = {
     {
       label: 'ms',
       width: '60px',
-      cell: (r) => String(Math.round(Number(field(r.entry.data, 'durationMs') ?? NaN)) || ''),
+      cell: (r) => {
+        const ms = Number(field(r.entry.data, 'durationMs') ?? NaN);
+        return Number.isFinite(ms) ? String(Math.round(ms)) : '';
+      },
     },
     {
       label: 'size',

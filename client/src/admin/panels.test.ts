@@ -85,6 +85,8 @@ describe('EntryStore', () => {
     [r, c, e, other, loose, loose2].forEach((x) => s.add(x));
     expect(s.chain(e).map((x) => x.entry.kind)).toEqual(['request', 'command', 'engine']);
     expect(s.chain(loose)).toHaveLength(1);
+    // Entries with no correlation id are never indexed.
+    expect([...s['byCorrelation'].keys()].sort()).toEqual(['c1', 'c2']);
   });
 
   it('filters and searches 10,000 entries quickly', () => {
@@ -189,6 +191,34 @@ describe('ListPanel', () => {
     expect(panel.visibleRows).toHaveLength(3);
   });
 
+  it('applies filters, search and chain while paused, hiding only later arrivals', () => {
+    const { store, panel } = mount();
+    store.add(ev(0, 'a', { side: 'red' }, 'c1'));
+    store.add(ev(0, 'b', { side: 'blue' }, 'c2'));
+    panel.renderNow();
+    panel.setPaused(true);
+    store.add(ev(0, 'c', { side: 'red' }, 'c1'));
+    panel.setText('nomatch');
+    panel.renderNow();
+    expect(panel.visibleRows).toHaveLength(0);
+    panel.setText('');
+    panel.renderNow();
+    expect(panel.visibleRows.map((r) => r.type)).toEqual(['a', 'b']);
+    panel.setCorrelation('c1');
+    panel.renderNow();
+    expect(panel.visibleRows.map((r) => r.type)).toEqual(['a']);
+    panel.setPaused(false);
+    expect(panel.visibleRows.map((r) => r.type)).toEqual(['a', 'c']);
+  });
+
+  it('shows a 0 ms request as 0, not blank', () => {
+    const { store, panel, el } = mount(REQUESTS_PANEL);
+    store.add(req('/fast', { durationMs: 0 }));
+    panel.renderNow();
+    const cells = [...el.querySelectorAll('.lp-row [role=gridcell]')].map((c) => c.textContent);
+    expect(cells).toContain('0');
+  });
+
   it('pauses itself when the reader scrolls up, and resumes at the bottom', () => {
     const { store, panel, el } = mount();
     for (let i = 0; i < 200; i++) store.add(ev(i, 'tick', {}));
@@ -248,7 +278,8 @@ describe('AdminPage panels', () => {
     const e1 = ev(1000, 'unit.moved', { unitId: 'u1' });
     send(e1);
     send(e1);
-    send(req('/orders'));
+    const r1 = req('/orders');
+    send(r1);
     await vi.advanceTimersByTimeAsync(50);
     const rowsIn = (panel: string) =>
       document.querySelectorAll(`section[data-panel=${panel}] .lp-row`).length;
@@ -260,8 +291,17 @@ describe('AdminPage panels', () => {
     filter.dispatchEvent(new Event('input'));
     await vi.advanceTimersByTimeAsync(50);
     expect(rowsIn('Events')).toBe(0);
-    // A reopened stream resumes after what the page already holds.
-    ES.last!.onerror!();
+    // A stream that gives up is reopened by the next poll, resuming after what the page holds.
+    const first = ES.last!;
+    first.readyState = ES.CLOSED;
+    first.onerror!();
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(ES.last).not.toBe(first);
+    expect(new URL(ES.last!.url, 'http://x').searchParams.get('after')).toBe(String(r1.seq));
+    // A replayed duplicate is still dropped.
+    send(e1);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(rowsIn('Events')).toBe(0); // 'nomatch' filter still applied, and no extra rows leak in
     page.stop();
   });
 });

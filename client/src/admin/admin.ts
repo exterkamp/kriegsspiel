@@ -135,6 +135,8 @@ export class AdminPage {
     }
     for (const [pid, sec] of this.panels) sec.hidden = pid !== id;
     this.applyFilter();
+    // A list built while hidden had no layout; re-render so it opens at the tail, not the top.
+    this.lists.get(id)?.renderNow();
   }
 
   private applyFilter(): void {
