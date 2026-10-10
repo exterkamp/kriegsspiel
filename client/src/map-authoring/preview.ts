@@ -2,6 +2,7 @@ import type { Point } from '@kriegsspiel/maps';
 import { loadPreviewAsset, type AssetLoadResult, type PreviewAsset } from './asset.js';
 import { DEFAULT_LAYERS, MapRenderer, type Layer, type Layers } from './renderer.js';
 import { observeDisplayLifecycle } from './display-lifecycle.js';
+import { geometryBounds } from './geometry.js';
 import {
   fitViewport,
   panViewport,
@@ -151,6 +152,13 @@ export class MapPreview {
     const [width, height] = this.size();
     this.view = fitViewport(bounds, width, height);
     this.schedule();
+  }
+  /** Fit one stable site ID with 15 m context. Missing IDs leave the current view intact. */
+  fitSite(siteId: string): boolean {
+    const site = this.renderer?.asset.layers.sites.find((candidate) => candidate.id === siteId);
+    if (!site) return false;
+    this.fit(geometryBounds(site.placementArea.outer, 15));
+    return true;
   }
   zoom(factor: number, anchor?: Point): void {
     if (!this.view || !this.renderer) return;

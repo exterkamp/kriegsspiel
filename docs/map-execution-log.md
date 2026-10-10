@@ -176,9 +176,13 @@ Use seeds `1, 2, 3, 7, 17, 31, 97, 55337` for each of flat countryside, wooded h
 ## Accepted composition certificate preparation
 
 - Independent reviewer PASS for reusable detached planning certificates and aggregate work accounting. Six focused session regressions cover parity, detached input, persistent exhaustion, getter rejection and descriptor traversal stopping before the budget is exceeded. Coordinator65 affected maps tests and repository typecheck pass; scoped lint/format pass. Earlier timing probe is preliminary, before final descriptor accounting, and is not J performance evidence.
+- Final compiled-source isolated10km plane probe: ten complete footprint queries plus shared initialization144.47ms,804914 work units,115.20MiB peak RSS. This measures the reusable component only; full-map J targets remain unverified.
 - Public fork constraint exports added at the index footer; protected experimental terrain exports remain outside accepted source changes. F continues independently.
 
 ## Accepted authoring controls preparation — #141 remains open
 
 - Isolated settings/preset/ordered overrides/status/cancel/load/export panel around the injected controller. It preserves unsupported recorded replay requirements across edits, rejects generation before queued rendering, and prevents old validation/file reads from overwriting newer drafts. Readers cancel on replacement, draft edits and disposal; export remains tied to the current complete validation.
 - Writer gpt-6.1-sol/medium; independent source review PASS. Coordinator21 controls tests, repository typecheck and scoped lint/format pass. Combined affected preparation checks86/86. Actual worker/generator/full-validator integration and browser acceptance remain I.
+
+- Client writer resumed bounded H preparation in preview.ts and its focused tests only: stable-ID detail selection across multiple sites, with missing-ID recovery and input immutability. Main/worker wiring stays gated on G. Reviewer remains on F; coordinator reviews this isolated preparation after handoff.
+- Coordinator source review PASS for `fitSite(siteId)`: stable selection uses the frozen parsed asset, missing IDs preserve the existing view, and normal fit remains unchanged.10 affected viewport/renderer/preview tests, scoped lint/format and writer client typecheck pass. Preparation only; actual multi-site UI/browser acceptance remains H.
