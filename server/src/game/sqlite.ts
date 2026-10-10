@@ -52,6 +52,7 @@ export const MIGRATIONS: readonly string[] = [
      game_ms REAL NOT NULL,
      views TEXT NOT NULL
    );`,
+  `ALTER TABLE games ADD COLUMN alive_wall_ms REAL;`,
 ];
 
 /** Older snapshots kept besides the newest (not yet used as a fallback: recovery reads the newest). */
@@ -173,6 +174,20 @@ export class SqliteGameStore implements GameStore {
     const r = this.db.prepare('SELECT progress_ms FROM games WHERE game_id = ?').get(gameId) as
       { progress_ms: number | null } | undefined;
     return r?.progress_ms ?? undefined;
+  }
+
+  async saveHeartbeat(gameId: string, wallMs: number): Promise<void> {
+    this.db
+      .prepare(
+        'UPDATE games SET alive_wall_ms = max(coalesce(alive_wall_ms, ?1), ?1) WHERE game_id = ?2',
+      )
+      .run(wallMs, gameId);
+  }
+
+  async loadHeartbeat(gameId: string): Promise<number | undefined> {
+    const r = this.db.prepare('SELECT alive_wall_ms FROM games WHERE game_id = ?').get(gameId) as
+      { alive_wall_ms: number | null } | undefined;
+    return r?.alive_wall_ms ?? undefined;
   }
 
   async appendClockHistory(gameId: string, changes: readonly ClockChange[]): Promise<void> {

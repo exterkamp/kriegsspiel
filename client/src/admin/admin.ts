@@ -3,6 +3,10 @@
  * Read-only: it only issues GETs to `/admin/api` and shares nothing with the game client.
  */
 import { ReplayPanel } from './replay.js';
+import { LlmPanel } from './llm.js';
+import { EntryStore, type TraceEntry } from './entries.js';
+import { ListPanel } from './listPanel.js';
+import { EVENTS_PANEL, REQUESTS_PANEL } from './panels.js';
 import {
   PANELS,
   adminToken,
@@ -38,6 +42,9 @@ export class AdminPage {
   private readonly panels = new Map<PanelId, HTMLElement>();
   private readonly note: HTMLElement;
   private replay!: ReplayPanel;
+  private readonly llm: LlmPanel;
+  private readonly entries = new EntryStore();
+  private readonly lists = new Map<PanelId, ListPanel>();
 
   constructor(
     private readonly root: HTMLElement,
@@ -76,12 +83,16 @@ export class AdminPage {
       const sec = document.createElement('section');
       sec.setAttribute('role', 'tabpanel');
       sec.dataset.panel = id;
-      if (id !== 'Replay')
-        sec.innerHTML = `<p class="empty">${id} panel — not implemented yet.</p>`;
       main.append(sec);
+      const config =
+        id === 'Events' ? EVENTS_PANEL : id === 'Requests' ? REQUESTS_PANEL : undefined;
+      if (config) this.lists.set(id, new ListPanel(sec, this.entries, config));
+      else if (id !== 'Replay')
+        sec.innerHTML = `<p class="empty">${id} panel — not implemented yet.</p>`;
       this.panels.set(id, sec);
       if (id === 'Replay') this.replay = new ReplayPanel(sec, this.token, this.fetchFn);
     }
+    this.llm = new LlmPanel(this.panels.get('LLM')!);
     nav.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         this.show(stepPanel(this.panel, e.key === 'ArrowRight' ? 1 : -1), true);
@@ -113,6 +124,7 @@ export class AdminPage {
   }
 
   stop(): void {
+    for (const list of this.lists.values()) list.destroy();
     clearTimeout(this.timer);
     this.closeStream();
   }
@@ -130,12 +142,14 @@ export class AdminPage {
     }
     for (const [pid, sec] of this.panels) sec.hidden = pid !== id;
     this.applyFilter();
-    if (id === 'Replay') void this.replay.setGame(this.gameId);
+    // A list built while hidden had no layout; re-render so it opens at the tail, not the top.
+    this.lists.get(id)?.renderNow();
   }
 
   private applyFilter(): void {
-    // Shell only: later stories hook each panel's rows into this shared filter text.
     this.panels.get(this.panel)!.dataset.filter = this.filter.value;
+    this.llm.setFilter(this.filter.value);
+    for (const list of this.lists.values()) list.setText(this.filter.value);
   }
 
   private async poll(): Promise<void> {
@@ -178,6 +192,9 @@ export class AdminPage {
     this.gameId = id;
     this.closeStream();
     this.streamCount = 0;
+    this.llm.reset();
+    this.entries.clear();
+    for (const list of this.lists.values()) list.reset();
     this.status = id ? 'connecting' : 'live';
     if (this.panel === 'Replay') void this.replay.setGame(id);
     if (id) this.openStream(id);
@@ -186,14 +203,29 @@ export class AdminPage {
 
   private openStream(id: string): void {
     // EventSource reconnects by itself after network errors; we mirror its state and reopen it if it gives up.
-    const es = new EventSource(apiUrl(`games/${encodeURIComponent(id)}/stream`, this.token));
+    // Resume after what we already hold; the server replays the backlog from there, then goes live.
+    const after = this.entries.lastSeq;
+    const es = new EventSource(
+      apiUrl(
+        `games/${encodeURIComponent(id)}/stream`,
+        this.token,
+        after ? { after: String(after) } : {},
+      ),
+    );
     this.stream = es;
     es.onopen = () => {
       this.status = 'live';
       this.render();
     };
-    es.onmessage = () => {
+    es.onmessage = (e: MessageEvent<string>) => {
       this.streamCount++;
+      try {
+        const entry = JSON.parse(e.data) as TraceEntry;
+        this.llm.add(entry);
+        if (this.entries.add(entry)) for (const list of this.lists.values()) list.refresh();
+      } catch {
+        // A malformed frame is skipped; the stream carries on.
+      }
       this.render();
     };
     es.onerror = () => {

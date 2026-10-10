@@ -3,11 +3,13 @@
  * filter (`viewFor`) and nothing else from the world, so a client can never be sent hidden state.
  */
 import {
+  renderDocument,
   viewFor,
   type EngineSideView,
   type EngineState,
   type GameState,
   type SideId,
+  type ViewDocument,
   type ViewReport,
 } from '@kriegsspiel/engine';
 import type { ClockState, Dispatch, SideView } from '@kriegsspiel/protocol';
@@ -31,6 +33,19 @@ export function toDispatch(r: ViewReport): Dispatch {
     ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
     confidence: r.confidence,
     text: r.text,
+  };
+}
+
+/** A captured enemy dispatch reaches the desk as an intelligence paper, in the enemy's own words. */
+export function documentToDispatch(d: ViewDocument): Dispatch {
+  return {
+    id: d.id,
+    from: 'Captured dispatch',
+    writtenAtGame: d.issuedAt,
+    receivedAtGame: d.deliveredAt,
+    category: 'intelligence',
+    location: d.location,
+    text: renderDocument(d),
   };
 }
 
@@ -69,7 +84,7 @@ export function toSideView(view: EngineSideView, clock: ClockState): SideView {
       uncertaintyRadius: c.uncertaintyRadius,
       sizeEstimate: c.sizeEstimate,
     })),
-    dispatches: view.reports.map(toDispatch),
+    dispatches: [...view.reports.map(toDispatch), ...view.documents.map(documentToDispatch)],
     clock,
   };
 }
