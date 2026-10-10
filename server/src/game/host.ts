@@ -24,6 +24,8 @@ export interface GameHostOptions {
 
 export class GameHost {
   private readonly games = new Map<string, GameActor>();
+  /** In-flight `create` / `open` calls, registered synchronously so a game never gets two actors. */
+  private readonly pending = new Map<string, Promise<GameActor>>();
 
   constructor(private readonly options: GameHostOptions) {}
 
@@ -50,8 +52,26 @@ export class GameHost {
   }
 
   /** Start a new game from a loaded scenario. The clock starts running at game time 0. */
-  async create(id: string, world: GameState, clock: { rate?: number } = {}): Promise<GameActor> {
-    if (this.games.has(id) || (await this.options.store.loadSnapshot(id))) {
+  create(id: string, world: GameState, clock: { rate?: number } = {}): Promise<GameActor> {
+    if (this.games.has(id) || this.pending.has(id)) {
+      return Promise.reject(new Error(`game already exists: ${id}`));
+    }
+    return this.register(id, () => this.doCreate(id, world, clock));
+  }
+
+  /** Run `build` as the one in-flight start for `id`; the id is claimed before the first await. */
+  private register(id: string, build: () => Promise<GameActor>): Promise<GameActor> {
+    const promise = build().finally(() => this.pending.delete(id));
+    this.pending.set(id, promise);
+    return promise;
+  }
+
+  private async doCreate(
+    id: string,
+    world: GameState,
+    clock: { rate?: number },
+  ): Promise<GameActor> {
+    if (await this.options.store.loadSnapshot(id)) {
       throw new Error(`game already exists: ${id}`);
     }
     const state = createState(world.seed, world, 0);
@@ -69,9 +89,13 @@ export class GameHost {
    * Load a game from the store. Per the pause design, a game that was running when the server
    * went down comes back paused, so game time never silently skips.
    */
-  async open(id: string): Promise<GameActor> {
+  open(id: string): Promise<GameActor> {
     const existing = this.games.get(id);
-    if (existing) return existing;
+    if (existing) return Promise.resolve(existing);
+    return this.pending.get(id) ?? this.register(id, () => this.doOpen(id));
+  }
+
+  private async doOpen(id: string): Promise<GameActor> {
     const snap = await this.options.store.loadSnapshot(id);
     if (!snap) throw new Error(`no such game: ${id}`);
     const state = deserialize<GameState>(snap.engine);

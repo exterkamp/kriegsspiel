@@ -6,6 +6,7 @@
  * game can be replayed with no model calls. SQLite replaces `MemoryGameStore` in Epic #2.
  */
 import type { ClockMode, ClockState } from '../clock.js';
+import type { ParseResult } from '../orders/index.js';
 
 /** Everything needed to resume a game: serialised engine state and the clock's anchor. */
 export interface GameSnapshot {
@@ -33,7 +34,7 @@ export interface InputLogEntry {
   gameMs: number;
   command: GameCommand;
   /** For `order` commands: the parser's result, so replay needs no model call. */
-  parse?: unknown;
+  parse?: ParseResult;
   /** The command was refused or failed; the reason. */
   error?: string;
 }

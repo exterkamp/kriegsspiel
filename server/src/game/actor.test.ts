@@ -287,6 +287,50 @@ describe('many games, restore and shutdown', () => {
     await expect(h.create('g1', loadScenario(holdTheBridge))).rejects.toThrow(/already exists/);
   });
 
+  it('returns one actor for concurrent opens of the same game', async () => {
+    const { host: h, store, time } = await newGame(1);
+    await h.close('g1');
+    const s2 = new GameHost({
+      store,
+      parser: new FixedParser(),
+      registry: registry(),
+      wallNow: time.now,
+      timers: time,
+    });
+    host = s2;
+    const [a, b] = await Promise.all([s2.open('g1'), s2.open('g1')]);
+    expect(a).toBe(b);
+    expect(s2.size).toBe(1);
+    await s2.shutdown();
+    expect(time.pendingTimers).toBe(0);
+  });
+
+  it('lets only one of two concurrent creates of the same id win', async () => {
+    const s = setup();
+    host = s.host;
+    const results = await Promise.allSettled([
+      s.host.create('g', loadScenario(holdTheBridge)),
+      s.host.create('g', loadScenario(holdTheBridge)),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(s.host.size).toBe(1);
+    await s.host.shutdown();
+    expect(s.time.pendingTimers).toBe(0);
+  });
+
+  it('keeps the scheduler armed when the store fails to save after a command', async () => {
+    const { time, store, game } = await newGame(1);
+    await game.submit(order);
+    await game.submit({ kind: 'pause' });
+    expect(time.pendingTimers).toBe(0);
+    const save = store.saveSnapshot.bind(store);
+    store.saveSnapshot = () => Promise.reject(new Error('disk full'));
+    await expect(game.submit({ kind: 'resume' })).rejects.toThrow(/disk full/);
+    expect(game.gameClock.status).toBe('running');
+    expect(time.pendingTimers).toBe(1);
+    store.saveSnapshot = save;
+  });
+
   it('leaves no timers after shutdown, and refuses new commands', async () => {
     const { time, host: h, game } = await newGame(1);
     await game.submit(order);

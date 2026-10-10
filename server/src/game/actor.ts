@@ -202,8 +202,11 @@ export class GameActor {
     } else {
       this.sync();
     }
-    await this.persist();
-    this.reschedule();
+    try {
+      await this.persist();
+    } finally {
+      this.reschedule();
+    }
   }
 
   private async apply(command: GameCommand): Promise<CommandResult> {
@@ -217,10 +220,14 @@ export class GameActor {
       entry.error = e instanceof Error ? e.message : String(e);
       result = { ok: false, kind: 'rejection', reason: entry.error };
     }
-    await this.store.appendInput(this.id, entry);
-    this.sync();
-    await this.persist();
-    this.reschedule();
+    // A failing store must not leave the scheduler unarmed after the clock already changed.
+    try {
+      await this.store.appendInput(this.id, entry);
+      this.sync();
+      await this.persist();
+    } finally {
+      this.reschedule();
+    }
     return result;
   }
 
