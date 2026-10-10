@@ -94,11 +94,12 @@ export async function runEval(
       };
     }
     const after = meter?.usage() ?? ZERO;
+    const unsafe = result.kind === 'intents' && !own.has(result.unitId);
     outcomes.push({
       id: order.id,
       category: order.category,
-      pass: !crashed && matches(order, result),
-      unsafe: result.kind === 'intents' && !own.has(result.unitId),
+      pass: !crashed && !unsafe && matches(order, result),
+      unsafe,
       usage: {
         inputTokens: after.inputTokens - before.inputTokens,
         outputTokens: after.outputTokens - before.outputTokens,

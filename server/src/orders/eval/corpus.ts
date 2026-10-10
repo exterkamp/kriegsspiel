@@ -1,4 +1,4 @@
-import type { ParseContext } from '../orderParser.js';
+import type { OrderIntent, ParseContext } from '../orderParser.js';
 
 /**
  * The golden order corpus: realistic orders with the outcome a correct parser should produce.
@@ -27,7 +27,7 @@ export type Expectation = {
   /** For `intents`: the unit that must carry the order out. */
   unitId?: string;
   /** For `intents`: the exact intent sequence (compared with deep equality). */
-  intents?: readonly object[];
+  intents?: readonly OrderIntent[];
 };
 
 export type GoldenOrder = {
@@ -66,7 +66,7 @@ export const CORPUS_CONTEXT: ParseContext = {
 const BRIDGE = { x: 2, y: 2 };
 const ROAD = { x: 2, y: 3 };
 
-const intents = (unitId: string, ...list: object[]): Expectation => ({
+const intents = (unitId: string, ...list: OrderIntent[]): Expectation => ({
   kinds: ['intents'],
   unitId,
   intents: list,
