@@ -138,6 +138,8 @@ The simulation is a function of: scenario, seed, and the **ordered log of inputs
 
 ## Key data shapes (sketch)
 
+The implemented wire schemas live in `packages/protocol` (see its README). Each message also carries a version field `v`, omitted from the sketch below.
+
 ```ts
 type Command =                          // everything a player can send; all are logged
   | { kind: 'issueOrder'; orderId: string; draft: DraftId }
