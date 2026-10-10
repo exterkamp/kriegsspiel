@@ -29,22 +29,17 @@ const SCRIPT: { atMs: number; text: string }[] = [
   { atMs: 20 * MIN, text: 'blue-1 hold the bridge' },
 ];
 
-const PARSED: Record<string, { unitId: string; intents: ParseResult & { kind: 'intents' } }> = {};
 /** A fixed parser: no model, the same answer every time. */
 const parser: OrderParser = {
   async parse(text: string): Promise<ParseResult> {
     const unitId = text.split(' ')[0]!;
     const hold = text.includes('hold');
-    PARSED[text] ??= {
+    return {
+      kind: 'intents',
+      text,
       unitId,
-      intents: {
-        kind: 'intents',
-        text,
-        unitId,
-        intents: [hold ? { kind: 'hold', at: BRIDGE } : { kind: 'move', to: BRIDGE }],
-      } as ParseResult & { kind: 'intents' },
-    };
-    return PARSED[text]!.intents;
+      intents: [hold ? { kind: 'hold', at: BRIDGE } : { kind: 'move', to: BRIDGE }],
+    } as ParseResult;
   },
 };
 
@@ -130,10 +125,11 @@ function firstDivergence(
 
 /** The final world, key by key, so a failure names the first differing field. */
 function worldDivergence(a: GameState, b: GameState): string | null {
-  const ea = Object.entries(a);
-  for (const [k, v] of ea) {
-    if (JSON.stringify(v) !== JSON.stringify((b as unknown as Record<string, unknown>)[k])) {
-      return `final world: first divergence in "${k}"\n  a: ${JSON.stringify(v)}\n  b: ${JSON.stringify((b as unknown as Record<string, unknown>)[k])}`;
+  const ra = a as unknown as Record<string, unknown>;
+  const rb = b as unknown as Record<string, unknown>;
+  for (const k of new Set([...Object.keys(ra), ...Object.keys(rb)])) {
+    if (JSON.stringify(ra[k]) !== JSON.stringify(rb[k])) {
+      return `final world: first divergence in "${k}"\n  a: ${JSON.stringify(ra[k])}\n  b: ${JSON.stringify(rb[k])}`;
     }
   }
   return null;
