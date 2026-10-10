@@ -1,5 +1,7 @@
 # The HQ interface
 
+Implementation ports and capability gates are recorded in [HQ contracts](hq-contracts.md), with packet evidence in [HQ execution log](hq-execution-log.md). The current HQ composition is an explicitly identified fixture demonstration; its temporary table adapter does not certify continuous rendering or live-server behavior.
+
 The game is played from a general's headquarters. There is no HUD and no minimap. The screen is a **desk in a tent or requisitioned farmhouse**, and everything you know arrives as paper.
 
 ## Principles

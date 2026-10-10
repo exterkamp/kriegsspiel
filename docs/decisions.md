@@ -180,3 +180,11 @@ Retry, backoff, the per-attempt timeout and schema validation stay in `ProviderU
 **Why.** The per-arm placeholder tables in movement, combat, contact and visibility are now derived from one place, and skirmishers are a type of their own, not a formation of line infantry.
 **Open.** The numbers are placeholders, except the infantry and cavalry march rates (see [rules.md](rules.md)). Fitting them to the fire and casualty tables, and loading the data from the JSON files of story 2.1 rather than a typed module, is later work. The data is compiled in, so a replay needs the engine version that recorded it.
 **See.** [rules.md](rules.md), [design.md](design.md)
+
+## HQ fixture composition and explicit capability gates
+
+**Decision.** Implement the Svelte desk over one persistent Three.js canvas through the bounded ports in [hq-contracts.md](hq-contracts.md). UI navigation/selection remains separate from fixture or server knowledge. All public port positions use metres; the existing 100-metre tile display remains an explicitly degraded fixture adapter until the owned continuous-table handoff is accepted. Fixture pieces preview supplied knowledge and do not establish an automatic live report-plotting policy.
+
+**Persistence and clock.** First-gate local storage is scoped by game/side/player and persists only versioned shell preferences. It reports failures and observed revision conflicts and requires one writer per scoped document. Snapshot values remain labelled as snapshots, with unavailable commander/report provenance unknown. Only atomic, fresh, running real-time fixture clocks with a clear barrier interpolate from a monotonic receipt anchor; unsupported modes or live-v1 coherence freeze at the authoritative observation.
+
+**Open.** Live transport/projection, atomic reconnect clocks, shared annotation authority, signing/delivery, conference and authorized arbitrary-time replay retain their existing owner/dependency gates. No fixture adapter satisfies these server criteria. Browser and performance evidence remain required before UI story acceptance.
