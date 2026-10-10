@@ -36,10 +36,16 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Open.** Default hierarchy is assumed to be shared HQ, with chain-of-command as an option. Command level is assumed to be brigades and battalions.
 **See.** [gameplay.md](gameplay.md)
 
+## D7: First scenario (proposed, maintainer to confirm)
+**Proposal.** Ball's Bluff, 21 October 1861, recommended over Podol (1866) and Wissembourg (1870).
+**Why.** Smallest of the three, the only one with a period map and order of battle already located, public-domain English sources, and a river-crossing bottleneck that exercises couriers and fog of war.
+**Open.** The maintainer has not confirmed. Map licence and the Lander/Gorman order-of-battle conflict must be checked.
+**See.** [scenario-candidates.md](scenario-candidates.md)
+
 ## Open questions
 - Default clock ratio (decide after the first scenario).
 - Command level and default hierarchy (assumptions above).
 - Emergency hold: keep or drop.
-- First historical scenario and map source (licences to verify).
+- First historical scenario and map source: Ball's Bluff proposed in D7, awaiting maintainer decision; licences to verify.
 - How much auto-plotting of reports onto the map players get.
 - Rules tables (march rates, frontage, fire, casualties): to be taken from the primary sources.
