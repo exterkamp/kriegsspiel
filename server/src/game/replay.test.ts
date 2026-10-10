@@ -142,8 +142,8 @@ describe('replay edge cases', () => {
       replayLog(header, loadScenarioById(header.scenarioId), entries, createRegistry(), until);
     const early = run(30_000);
     expect(early.state.time).toBe(30_000);
-    expect(early.state.queue.some((e) => e.kind === 'order.issue')).toBe(false);
-    expect(early.emitted.some((e) => e.kind.startsWith('order'))).toBe(false);
+    expect(early.state.queue.some((e) => e.type === 'order.issue')).toBe(false);
+    expect(early.emitted.some((e) => e.type.startsWith('order'))).toBe(false);
     expect(run(90_000).state.time).toBe(90_000);
     expect(run().state.time).toBe(30 * 60_000);
   });
