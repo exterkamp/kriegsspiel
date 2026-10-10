@@ -51,6 +51,8 @@ export interface InputLogEntry {
   parse?: ParseResult;
   /** The parser failed on every attempt and the conservative fallback was used instead. */
   fallback?: { attempts: number; error: string };
+  /** Issued by a scripted side's agent, not a player. Replay applies it at `gameMs` before any command at the same instant. */
+  agent?: boolean;
   /** The command was refused or failed; the reason. */
   error?: string;
 }

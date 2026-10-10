@@ -9,6 +9,7 @@ import {
   type GameState,
 } from '@kriegsspiel/engine';
 import { GameClock, type WallClock } from '../clock.js';
+import { scriptedAgents } from '../opponent/index.js';
 import type { OrderParser } from '../orders/index.js';
 import { GameActor, type GameActorOptions, type StaffAtWork, type Timers } from './actor.js';
 import type { TraceSink } from '../debug/trace.js';
@@ -36,6 +37,8 @@ export interface GameHostOptions {
   parseRetries?: number;
   parseTimeoutMs?: number;
   parseRetryDelayMs?: number;
+  /** Play every side the scenario marks `scripted` with the built-in opponent. Default off. */
+  scriptedOpponents?: boolean;
 }
 
 export class GameHost {
@@ -74,6 +77,10 @@ export class GameHost {
     };
   }
 
+  private agentsFor(world: GameState) {
+    return this.options.scriptedOpponents ? scriptedAgents(world) : [];
+  }
+
   /** Start a new game from a loaded scenario. The clock starts running at game time 0. */
   create(id: string, world: GameState, clock: { rate?: number } = {}): Promise<GameActor> {
     if (this.games.has(id) || this.pending.has(id)) {
@@ -107,6 +114,7 @@ export class GameHost {
     const actor = new GameActor({
       ...this.actorOptions(id),
       state,
+      agents: this.agentsFor(world),
       clock: new GameClock(this.options.wallNow, { rate: clock.rate }),
     });
     this.games.set(id, actor);
@@ -155,6 +163,7 @@ export class GameHost {
       ...this.actorOptions(id),
       state,
       clock,
+      agents: this.agentsFor(state.world),
       // The log is in insertion order, which is not always seq order (see D14b).
       seq: tail.reduce((max, e) => Math.max(max, e.seq), snap.seq),
     });
