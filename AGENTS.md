@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a server. Read `docs/decisions.md` first, then the doc that matches your task.
 
