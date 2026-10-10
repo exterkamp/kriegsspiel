@@ -5,3 +5,10 @@ export const ENGINE_NAME = 'kriegsspiel-engine';
 export function advance(gameTime: number, delta: number): number {
   return gameTime + delta;
 }
+
+export * from './rng.js';
+export * from './events.js';
+export { compareEvents, schedule } from './queue.js';
+export { advanceTo, createState } from './advance.js';
+export type { AdvanceResult } from './advance.js';
+export { serialize, deserialize } from './snapshot.js';
