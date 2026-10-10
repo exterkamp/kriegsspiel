@@ -1,0 +1,16 @@
+{
+  "id": "frontage",
+  "title": "Frontage and depth by formation, in paces",
+  "edition": "1824",
+  "source": { "source": "rulespal-reisswitz", "locator": "Part Two 2. The Troop Symbols and Appendix One (Prussian Army Organisation & Formations)" },
+  "data": {
+    "unit": "paces",
+    "formations": [
+      { "id": "half_battalion_line", "men": 450, "frontage": 125, "depth": 75, "note": "Close-ordered block of 3 ranks; two make a 900-man battalion.", "source": { "source": "rulespal-reisswitz", "locator": "Part Two 2. The Troop Symbols" } },
+      { "id": "battalion_line", "men": 900, "frontage": 250, "depth": null, "source": { "source": "rulespal-reisswitz", "locator": "Part Two 2. The Troop Symbols (two blocks of 125 paces)" } }
+    ]
+  },
+  "gaps": [
+    "Cavalry squadron, battery, and column frontages from the edition's Part Two were only seen through a partial extraction and are not yet verified against the page. Not recorded until checked. See follow-up issue."
+  ]
+}

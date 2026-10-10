@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sources.schema.json",
+  "type": "object",
+  "additionalProperties": {
+    "type": "object",
+    "required": ["title", "kind", "edition", "url", "locator_note"],
+    "additionalProperties": false,
+    "properties": {
+      "title": { "type": "string" },
+      "kind": { "enum": ["primary", "secondary-edition"] },
+      "edition": { "type": "string" },
+      "url": { "type": "string", "format": "uri" },
+      "locator_note": { "type": "string" }
+    }
+  }
+}

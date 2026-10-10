@@ -1,0 +1,16 @@
+{
+  "reisswitz-1824-scan": {
+    "title": "Anleitung zur Darstellung militairischer Manöver mit dem Apparat des Kriegs-Spieles (G. H. R. von Reisswitz, Berlin, 1824)",
+    "kind": "primary",
+    "edition": "1824",
+    "url": "https://archive.org/stream/reisswitz-1824/Reisswitz1824_djvu.txt",
+    "locator_note": "Locators are line numbers in the archive.org OCR text file (djvu.txt) at this URL. The OCR does not keep page numbers reliably, so page numbers are not recorded."
+  },
+  "rulespal-reisswitz": {
+    "title": "The von Reisswitz Kriegsspiel: The Prussian Army Wargame Rulebook (modern English edition of the 1824 rules with the 1828 supplement as Appendix Two)",
+    "kind": "secondary-edition",
+    "edition": "1824 + 1828 supplement",
+    "url": "https://rulespal.com/the-von-reisswitz-kriegsspiel/rulebook",
+    "locator_note": "Locators are the edition's own section numbers (Part/Section/paragraph). The edition has no page numbers online. Some tables are images there and were not transcribed."
+  }
+}

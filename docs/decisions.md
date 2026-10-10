@@ -42,4 +42,4 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 - Emergency hold: keep or drop.
 - First historical scenario and map source (licences to verify).
 - How much auto-plotting of reports onto the map players get.
-- Rules tables (march rates, frontage, fire, casualties): to be taken from the primary sources.
+- Rules tables (march rates, frontage, fire, casualties): first pass recorded in `src/data/` with citations (see `docs/rules.md`). Still missing: full movement table, Die 4 row, artillery tables other than 12-pdr 1500-2000, cavalry and artillery frontages.

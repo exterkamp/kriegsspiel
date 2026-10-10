@@ -1,0 +1,13 @@
+{
+  "id": "scale",
+  "title": "Map scale, time and unit scale",
+  "edition": "1824",
+  "source": { "source": "reisswitz-1824-scan", "locator": "djvu.txt line 3798 (scale); lines 3366-3369 (a Zug is 2 minutes)" },
+  "data": {
+    "move_minutes": 2,
+    "paces_per_decimal_zoll": 400,
+    "map_ratio": "1:8000",
+    "note": "The modern edition uses 1:7500 (1 cm = 100 paces) for convenience. We use the 1824 values."
+  },
+  "cross_check": { "source": "rulespal-reisswitz", "locator": "Part Two 1. Maps & Scale; Part Two intro (two-minute moves)" }
+}
