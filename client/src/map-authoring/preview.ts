@@ -19,6 +19,17 @@ export interface PreviewState {
   issues: Extract<AssetLoadResult, { ok: false }>['issues'];
   view?: Viewport;
 }
+/** Optional diagnostic timing only; no asset/view references and no retained samples. */
+export interface PreviewFrame {
+  rafTimestampMs: number;
+  requestToStartMs: number;
+  drawMs: number;
+  workMs: number;
+  requestToEndMs: number;
+  width: number;
+  height: number;
+  dpr: number;
+}
 
 /** Standalone asset-loading seam for later generation/worker controls. No game state. */
 export class MapPreview {
@@ -38,6 +49,7 @@ export class MapPreview {
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly changed: (state: PreviewState) => void = () => {},
+    private readonly onFrame?: (frame: Readonly<PreviewFrame>) => void,
   ) {
     const context = canvas.getContext('2d');
     if (!context) throw new Error('This preview requires Canvas2D');
@@ -193,16 +205,36 @@ export class MapPreview {
   }
   private schedule(): void {
     if (this.frame) return;
-    this.frame = requestAnimationFrame(() => {
+    const requested = this.onFrame ? performance.now() : 0;
+    this.frame = requestAnimationFrame((rafTimestampMs) => {
       this.frame = 0;
       if (!this.view || !this.renderer) return;
+      const started = this.onFrame ? performance.now() : 0;
+      const view = this.view;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const width = Math.round(this.view.width * dpr);
-      const height = Math.round(this.view.height * dpr);
+      const width = Math.round(view.width * dpr);
+      const height = Math.round(view.height * dpr);
       if (this.canvas.width !== width) this.canvas.width = width;
       if (this.canvas.height !== height) this.canvas.height = height;
-      this.renderer.render(this.context, this.view, this.layers, this.highContrast, dpr);
+      const drawStarted = this.onFrame ? performance.now() : 0;
+      this.renderer.render(this.context, view, this.layers, this.highContrast, dpr);
+      const drawEnded = this.onFrame ? performance.now() : 0;
       this.publish();
+      if (this.onFrame) {
+        const ended = performance.now();
+        this.onFrame(
+          Object.freeze({
+            rafTimestampMs,
+            requestToStartMs: started - requested,
+            drawMs: drawEnded - drawStarted,
+            workMs: ended - started,
+            requestToEndMs: ended - requested,
+            width: view.width,
+            height: view.height,
+            dpr,
+          }),
+        );
+      }
     });
   }
   /** Centre of the displayed viewport in the authoritative map frame. */

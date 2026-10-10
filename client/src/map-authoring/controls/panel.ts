@@ -38,6 +38,9 @@ export interface PanelOptions {
   onDraftChange?: (recipe: ReadonlyData<ReplayParameters>) => void;
   onValidatedAsset?: (asset: ReadonlyData<MapAsset>) => void;
   onFocusOverride?: (override: ReadonlyData<MapOverride>, index: number) => void;
+  /** Supply current worker-certified JSON without serializing the asset on the UI thread.
+   * Returning null blocks export; it never falls back to local canonicalization. */
+  currentCertifiedJson?: () => string | null;
   onExport?: (file: JsonExport) => void | Promise<void>;
   readFileText?: (file: File, signal: AbortSignal) => Promise<string>;
 }
@@ -136,7 +139,7 @@ export function createAuthoringPanel(
   heading.textContent = 'Map authoring';
   element.append(heading);
   const note = document.createElement('p');
-  note.textContent = 'Generation and complete validation are supplied by the integration adapter.';
+  note.textContent = 'Generate a map or load a saved file. Only validated maps can be exported.';
   element.append(note);
   const form = document.createElement('form');
   form.noValidate = true;
@@ -578,10 +581,16 @@ export function createAuthoringPanel(
       return null;
     }
     try {
+      const text = options.currentCertifiedJson
+        ? options.currentCertifiedJson()
+        : canonicalizeAsset(structuredClone(asset) as MapAsset);
+      if (text === null || exportable() !== asset) return null;
+      if (typeof text !== 'string')
+        throw new TypeError('Certified JSON provider must return text or null');
       return {
         filename: `map-seed-${asset.provenance.seed}.json`,
         mimeType: 'application/json',
-        text: canonicalizeAsset(structuredClone(asset) as MapAsset),
+        text,
       };
     } catch (error) {
       fail('input', error);

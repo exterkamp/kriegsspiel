@@ -245,3 +245,72 @@ footer p {
     padding: 6px 9px;
   }
 }
+
+/* Authoring inputs are independent from compact layer checkboxes. */
+.map-authoring-controls {
+  margin-bottom: 24px;
+}
+.map-authoring-controls label {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+  cursor: default;
+}
+.map-authoring-controls input:not([type='checkbox']),
+.map-authoring-controls select,
+.map-authoring-controls textarea {
+  width: 100%;
+  height: auto;
+  min-height: 32px;
+  padding: 6px;
+  font: inherit;
+  border: 1px solid #b4bdb0;
+  background: #fffefa;
+}
+.map-authoring-controls input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+}
+.map-authoring-controls details {
+  margin: 12px 0;
+}
+.map-authoring-controls summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.map-authoring-controls fieldset {
+  margin: 18px 0;
+}
+.map-authoring-controls button {
+  margin: 4px 4px 4px 0;
+}
+.map-authoring-controls pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+}
+.map-authoring-controls progress {
+  width: 100%;
+}
+.map-authoring-controls ol,
+.map-authoring-controls ul {
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+nav select {
+  min-width: 0;
+  max-width: 220px;
+  font: inherit;
+}
+@media (max-width: 760px) {
+  nav {
+    flex-wrap: wrap;
+  }
+  nav select {
+    max-width: 100%;
+    flex: 1;
+  }
+}

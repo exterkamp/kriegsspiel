@@ -11,6 +11,7 @@ vi.mock('./renderer.js', async (importOriginal) => {
     ...original,
     MapRenderer: class {
       constructor(readonly asset: PreviewAsset) {}
+      render() {}
     },
   };
 });
@@ -44,6 +45,7 @@ function multiSiteAsset() {
 
 describe('stable site detail selection', () => {
   let preview: MapPreview;
+  let canvas: HTMLCanvasElement;
   beforeEach(() => {
     vi.stubGlobal(
       'ResizeObserver',
@@ -58,7 +60,7 @@ describe('stable site detail selection', () => {
     );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
     vi.stubGlobal('matchMedia', () => ({ addEventListener() {}, removeEventListener() {} }));
-    const canvas = document.createElement('canvas');
+    canvas = document.createElement('canvas');
     Object.defineProperties(canvas, {
       clientWidth: { value: 1000 },
       clientHeight: { value: 600 },
@@ -106,5 +108,62 @@ describe('stable site detail selection', () => {
     expect(preview.center()).toEqual(center);
     expect(preview.fitSite('site:village:0000')).toBe(true);
     expect(preview.center()).toEqual([expect.closeTo(120, 9), expect.closeTo(70, 9)]);
+  });
+  it('observes bounded frozen frame timings without exposing or mutating assets', () => {
+    preview.dispose();
+    const callbacks: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    });
+    const frames: unknown[] = [];
+    preview = new MapPreview(
+      canvas,
+      () => {},
+      (frame) => frames.push(frame),
+    );
+    const now = vi
+      .spyOn(performance, 'now')
+      .mockReturnValueOnce(100)
+      .mockReturnValueOnce(110)
+      .mockReturnValueOnce(112)
+      .mockReturnValueOnce(118)
+      .mockReturnValueOnce(125);
+    const input = multiSiteAsset(),
+      before = structuredClone(input);
+    const loaded = preview.loadAsset(input);
+    if (!loaded.ok) throw new Error(JSON.stringify(loaded.issues));
+    const snapshot = JSON.stringify(loaded.asset);
+    preview.fitSite('site:farm:0000');
+    expect(callbacks).toHaveLength(1);
+    callbacks[0]!(120);
+    expect(frames).toEqual([
+      {
+        rafTimestampMs: 120,
+        requestToStartMs: 10,
+        drawMs: 6,
+        workMs: 15,
+        requestToEndMs: 25,
+        width: 1000,
+        height: 600,
+        dpr: 1,
+      },
+    ]);
+    expect(Object.isFrozen(frames[0])).toBe(true);
+    expect(Reflect.set(frames[0] as object, 'width', 1)).toBe(false);
+    expect(now).toHaveBeenCalledTimes(5);
+    expect(input).toEqual(before);
+    expect(JSON.stringify(loaded.asset)).toBe(snapshot);
+  });
+  it('does not read measurement clocks when the optional observer is absent', () => {
+    let draw!: FrameRequestCallback;
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      draw = callback;
+      return 1;
+    });
+    const now = vi.spyOn(performance, 'now');
+    expect(preview.loadAsset(multiSiteAsset()).ok).toBe(true);
+    draw(100);
+    expect(now).not.toHaveBeenCalled();
   });
 });

@@ -16,6 +16,11 @@ import {
 import { createAuthoringPanel, type AuthoringPanel, type PanelOptions } from './panel.js';
 import { editOverrides, type OverrideEdit } from './recipe.js';
 
+vi.mock('@kriegsspiel/maps', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@kriegsspiel/maps')>();
+  return { ...actual, canonicalizeAsset: vi.fn(actual.canonicalizeAsset) };
+});
+
 // Contract fixture and validators below are lifecycle test doubles, not generated/certified geography.
 const accept: ValidationOutcome = { ok: true, diagnostics: [] };
 const reject: ValidationOutcome = {
@@ -502,8 +507,10 @@ describe('bounded authoring DOM panel', () => {
     panel.loadText(canonicalizeAsset(asset));
     await settle();
     expect(button(panel, 'export').disabled).toBe(false);
+    vi.mocked(canonicalizeAsset).mockClear();
     button(panel, 'export').click();
     await settle();
+    expect(canonicalizeAsset).toHaveBeenCalledOnce();
     expect(onExport.mock.calls[0]![0].text).toBe(canonicalizeAsset(asset));
     change(panel, 'terrain.roughness', '0.2');
     expect(panel.exportJson()).toBeNull();
@@ -520,6 +527,36 @@ describe('bounded authoring DOM panel', () => {
     expect(panel.exportJson()).toBeNull();
     await settle();
     expect(button(panel, 'export').disabled).toBe(true);
+  });
+  it('uses certified JSON without asset cloning/canonical parsing, and never falls back when unavailable', async () => {
+    const asset = createReferenceAsset();
+    const json = canonicalizeAsset(asset);
+    const provider = vi.fn<() => string | null>(() => json);
+    const onExport = vi.fn();
+    const { panel, controller } = setup({ currentCertifiedJson: provider, onExport });
+    panel.loadText(json);
+    await settle();
+    vi.mocked(canonicalizeAsset).mockClear();
+    const clone = vi.spyOn(globalThis, 'structuredClone');
+    button(panel, 'export').click();
+    await settle();
+    expect(onExport).toHaveBeenCalledWith({
+      filename: `map-seed-${asset.provenance.seed}.json`,
+      mimeType: 'application/json',
+      text: json,
+    });
+    expect(canonicalizeAsset).not.toHaveBeenCalled();
+    expect(clone.mock.calls.some(([value]) => value === controller.exportAsset)).toBe(false);
+    provider.mockReturnValue(null);
+    expect(panel.exportJson()).toBeNull();
+    expect(canonicalizeAsset).not.toHaveBeenCalled();
+    provider.mockImplementation(() => {
+      controller.cancel();
+      return json;
+    });
+    expect(panel.exportJson()).toBeNull();
+    expect(onExport).toHaveBeenCalledOnce();
+    clone.mockRestore();
   });
   it('keeps newer draft edits when an older candidate validates and disables its export', async () => {
     const outcome = pending<ValidationOutcome>();

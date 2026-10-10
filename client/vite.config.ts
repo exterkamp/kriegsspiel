@@ -7,6 +7,7 @@ export default defineConfig({
       input: {
         player: fileURLToPath(new URL('./index.html', import.meta.url)),
         mapAuthoring: fileURLToPath(new URL('./map-authoring.html', import.meta.url)),
+        mapBenchmark: fileURLToPath(new URL('./map-benchmark.html', import.meta.url)),
       },
     },
   },

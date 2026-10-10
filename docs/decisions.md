@@ -176,3 +176,13 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Boundary.** This is a public cartographic asset and scenario adapter seam, separate from engine state, movement, combat, visibility and objectives. Source review/local verification remain authorized; combined distribution stays gated under D20. Complete milestone acceptance still requires the authoring, replay and resource evidence in the execution log.
 
 **See.** [Composition policies](../packages/maps/docs/composition.md), [authoring guide](map-authoring-guide.md), [gameplay handoff](map-gameplay-handoff.md), [execution log](map-execution-log.md).
+
+## D22: Authoring publishes only current, independently certified worker results
+
+**Decision.** The standalone Canvas2D authoring entry generates in a replaceable worker and certifies generated or saved candidates in a separate fresh worker. Only the current ready recipe exposes its exact certified JSON/SVG files. Draft edits, failed validation, cancellation and replacement disable export while retaining the last valid preview. Saved loading certifies persisted geometry without generation; supported regeneration uses recorded settings, ordered overrides and exact stage/fork identities.
+
+**Preview and measurement.** Canonical public vectors supply independent layers, overview/detail, metric navigation and high contrast. Renderer caches and viewport culling affect presentation only. A separate diagnostic entry measures real worker results and scripted viewport operations; foreground/size/DPR changes invalidate the entire sample. Initial setup, steady-state frame intervals and synchronous drawing costs are reported separately, with raw outliers preserved.
+
+**Boundary.** No game, LLM, hidden state, movement or scenario assembly participates. Local browser review remains authorized; distribution remains gated under D20.
+
+**See.** [Authoring guide](map-authoring-guide.md), [verification report](map-verification-report.md), [execution log](map-execution-log.md).
