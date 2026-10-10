@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { serialize } from '@kriegsspiel/engine';
 import { buildApp, type App } from '../api/app.js';
+import { hashToken } from '../auth/store.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { adminFromEnv, isLoopback } from './adminApi.js';
 import { TraceStore, traceUmpire } from '../debug/index.js';
@@ -18,9 +19,11 @@ afterEach(async () => {
 async function start(admin?: { enabled: boolean; token?: string }) {
   app = await buildApp({ parser: new StubOrderParser(), admin });
   const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+  const user = app.authStore.upsertUser('admin-test@example.test', Date.now());
+  app.authStore.putSession(hashToken('test-session'), user.id, Date.now() + 3_600_000);
   const res = await fetch(`${base}/games`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', cookie: 'ks_session=test-session' },
     body: JSON.stringify({ rate: RATE }),
   });
   const game = (await res.json()) as { id: string };

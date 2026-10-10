@@ -21,22 +21,44 @@ import { newMarkId } from './table/marks.js';
 import { pickMinSize } from './table/picking.js';
 import type { Dispatch, Mark } from '@kriegsspiel/protocol';
 import { parseSession, wsUrl } from './session.js';
+import { fetchMe, showAccountBar, showLogin } from './auth.js';
 import { mount } from 'svelte';
 import Desk from './desk/Desk.svelte';
 import { activeView, gameState } from './desk/store.js';
 import { isDeskView } from './desk/views.js';
 
-async function createGame(side: string, rate?: number): Promise<{ game: string; token: string }> {
+/** Make a game as the signed-in user and take `side` (the server picks one when unset). */
+async function createGame(side?: string, rate?: number): Promise<string> {
   const res = await fetch('/games', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(rate === undefined ? {} : { rate }),
+    body: JSON.stringify({ ...(rate === undefined ? {} : { rate }), ...(side ? { side } : {}) }),
   });
   if (!res.ok) throw new Error(`could not create a game (${res.status})`);
-  const body = (await res.json()) as { id: string; tokens: Record<string, string> };
-  const token = body.tokens[side];
-  if (!token) throw new Error(`no side "${side}" in this scenario`);
-  return { game: body.id, token };
+  return ((await res.json()) as { id: string }).id;
+}
+
+/** Make sure the signed-in user has a seat in `game`, taking `side` or the first free one. */
+async function takeSeat(game: string, side?: string): Promise<void> {
+  const info = await fetch(`/games/${encodeURIComponent(game)}`);
+  if (info.status === 404) throw new Error('no such game');
+  if (!info.ok) throw new Error(`could not read the game (${info.status})`);
+  const body = (await info.json()) as {
+    you: string | null;
+    sides: Array<{ side: string; taken: boolean }>;
+  };
+  if (body.you) return;
+  const pick = side ?? body.sides.find((s) => !s.taken)?.side;
+  if (!pick) throw new Error('every side in this game is taken');
+  const res = await fetch(`/games/${encodeURIComponent(game)}/join`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ side: pick }),
+  });
+  if (!res.ok)
+    throw new Error(
+      res.status === 409 ? `${pick} is already taken` : `could not join (${res.status})`,
+    );
 }
 
 async function main(app: HTMLElement): Promise<void> {
@@ -63,11 +85,22 @@ async function main(app: HTMLElement): Promise<void> {
 
   let params = parseSession(window.location.search);
   const out = app.querySelector('#pick');
-  if (params.mode === 'create') {
+  if (params.mode !== 'fixture') {
+    const me = await fetchMe();
+    if (!me) {
+      // The emailed link opens in this browser and lands back here with a session cookie.
+      await showLogin(app);
+      return;
+    }
+    showAccountBar(app, me, () => window.location.assign('/'));
     try {
-      const made = await createGame(params.side, params.rate);
-      history.replaceState(null, '', `?game=${made.game}&token=${made.token}`);
-      params = { mode: 'join', ...made };
+      if (params.mode === 'create') {
+        const game = await createGame(params.side, params.rate);
+        history.replaceState(null, '', `?game=${game}`);
+        params = { mode: 'join', game };
+      } else {
+        await takeSeat(params.game, params.side);
+      }
     } catch (e) {
       if (out) out.textContent = e instanceof Error ? e.message : String(e);
       return;
@@ -79,7 +112,7 @@ async function main(app: HTMLElement): Promise<void> {
   let orderSeq = 0;
   const hud = new Hud(app, {
     onSendOrder(unitId, text) {
-      if (!conn) return 'Not connected to a game (open with ?new=1 or ?game=…&token=…).';
+      if (!conn) return 'Not connected to a game (open with ?new=1 or ?game=…).';
       const orderId = `o-${Date.now().toString(36)}-${++orderSeq}`;
       const full = buildOrderText(state.view, unitId, text);
       if (!conn.sendOrder(orderId, full)) return 'Not connected. Try again when the link is back.';
@@ -241,7 +274,7 @@ async function main(app: HTMLElement): Promise<void> {
 
   if (params.mode === 'join') {
     conn = new GameConnection({
-      url: wsUrl(window.location, params.game, params.token),
+      url: wsUrl(window.location, params.game),
       onStatus: (s) => {
         state = withLink(state, s);
         rerender();
