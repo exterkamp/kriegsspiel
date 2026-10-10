@@ -78,6 +78,12 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Open.** The `EngineSideView` is not yet mapped to the protocol `SideView` (no clock, dispatches or supply); tracked in #109. The courier delay is a flat constant, not distance to HQ. Sight ignores facing, weather and night. Contacts are never pruned, not even for destroyed enemies; tracked in #110.
 **See.** [architecture.md](architecture.md)
 
+## D14: Server game actor, scheduler and store
+**Decision.** `server/src/game/`: a `GameActor` is the single writer for one game and owns the engine state, a `GameClock` and a serial command queue. Commands (`order`, `setRate`, `pause`, `resume`, `setMode`, `advanceTo`) run in arrival order. Each one first advances the engine to the clock's "now", then applies itself, then saves a snapshot. The scheduler sleeps until the next queued event is due (`clock.wallDueFor`) and re-plans after every command, so rate, pause and mode changes wake it. It sleeps not at all when paused, stopped, in manual mode or with an empty queue; fast-forward jumps to the next event with a zero delay. Orders are parsed through `OrderParser` and the result is awaited before the order enters the engine: the engine is not advanced during the parse, the order is stamped with the game time of signing, and the world catches up afterwards at the same game times. `GameHost` runs many actors in one process; `open` brings a stored game back **paused**. `GameStore` is the persistence seam (latest snapshot plus an append-only input log of commands and parse results); `MemoryGameStore` is the only implementation until SQLite (Epic #2). Timers and the wall clock are injected, so tests run on a fake clock, and `close`/`shutdown` clear every timer.
+**Why.** One serial writer gives a total order with no locks, and lazy advancement keeps quiet stretches free.
+**Open.** The full LLM barrier is Epic #3: here the clock keeps running during a parse and the engine catches up afterwards, so a slow parse is invisible to game results but not yet shown to players as "staff at work". `attack` intents are refused as not modelled. The snapshot is rewritten after every command and tick; a log-plus-periodic-snapshot scheme is for the SQLite store. The input log is written but replay from it is not built yet. Pause voting is not modelled: `pause` and `resume` are plain commands.
+**See.** [architecture.md](architecture.md)
+
 ## Open questions
 - Default clock ratio (decide after the first scenario).
 - Command level and default hierarchy (assumptions above).

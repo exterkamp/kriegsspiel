@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
+    "@kriegsspiel/engine": "*",
     "ajv": "^8.20.0"
   }
 }
