@@ -64,7 +64,13 @@ export interface NarrateResult {
   calls: number;
   /** Why each rejected reply was rejected, in order. For the log. */
   rejections: string[][];
+  /** Set when the game's budget or rate limit refused the call: the in-fiction notice to show. */
+  overloaded?: string;
 }
+
+/** Shown in place of narration when the umpire's per-game budget or rate limit is hit. */
+export const STAFF_OVERLOADED_NOTICE =
+  'The staff are overwhelmed, sir. Dispatches reach you as written, without a fair copy.';
 
 /** What the model sees for one report. Metres and minutes, no ids of anything the side cannot know. */
 export function narrateInput(side: SideId, reports: readonly ViewReport[]) {
@@ -394,8 +400,17 @@ export async function narrateReports(
         schema: NARRATE_SCHEMA,
       }));
     } catch (e) {
-      if (e instanceof UmpireError)
-        return { dispatches: template(), fellBack: true, calls, rejections };
+      if (e instanceof UmpireError) {
+        const overloaded = e.kind === 'budget' || e.kind === 'rate-limit';
+        return {
+          dispatches: template(),
+          fellBack: true,
+          // A refused call was never sent, so it is not a model call.
+          calls: overloaded ? calls - 1 : calls,
+          rejections,
+          ...(overloaded ? { overloaded: STAFF_OVERLOADED_NOTICE } : {}),
+        };
+      }
       throw e;
     }
     const problems = checkNarration(output, input);

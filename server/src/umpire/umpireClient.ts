@@ -68,7 +68,14 @@ export interface CallRecorder {
 export class UmpireError extends Error {
   constructor(
     message: string,
-    readonly kind: 'transport' | 'timeout' | 'schema' | 'refusal' | 'missing-recording' | 'budget',
+    readonly kind:
+      | 'transport'
+      | 'timeout'
+      | 'schema'
+      | 'refusal'
+      | 'missing-recording'
+      | 'budget'
+      | 'rate-limit',
     readonly attempts: number,
     /** Tokens spent on the attempts of a failed call. Absent when nothing was spent. */
     readonly usage?: TokenUsage,
