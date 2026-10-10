@@ -5,10 +5,10 @@ import {
   MS_PER_MINUTE,
   tileAt,
   type GameState,
+  type Intent,
   type MapGrid,
   type Point,
   type Terrain,
-  type Intent,
   type Unit,
   type UnitKind,
 } from './types.js';
@@ -187,17 +187,27 @@ export function rejectOrder(world: GameState, unitId: string, reason: string) {
   return { world, emit: [{ type: 'order.rejected', payload: { unitId, reason } }] };
 }
 
+/** The destination a march intent is heading for, or undefined if the intent is not a march. */
+function marchTarget(i: Intent): Point | undefined {
+  return i.kind === 'move' || i.kind === 'attack'
+    ? i.to
+    : i.kind === 'withdraw'
+      ? i.toward
+      : undefined;
+}
+
 /**
- * Plan a march for `unit` to `dest` and return the handler result. With `attackTarget`
- * the unit's intent becomes `attack` (it walks to where the target stands and the
- * combat code takes over); otherwise it becomes `move`. An unreachable destination
- * is reported and leaves any march already under way alone.
+ * Start `unit` marching to `dest` at `time`, as a plain move, a withdrawal, a move that
+ * ends in a hold, or (with `attackTarget`) an attack march that the combat code takes
+ * over once the target is in reach. Shared by move orders, attack orders and delivered
+ * courier orders. An unreachable destination is reported and leaves any march under way alone.
  */
-export function startMarch(
+export function beginMarch(
   world: GameState,
   unit: Unit,
   dest: Point,
   time: number,
+  how: 'move' | 'withdraw' | 'hold' | 'attack' = 'move',
   attackTarget?: string,
 ): HandlerResult<GameState> {
   const to: [number, number] = [dest.x, dest.y];
@@ -208,15 +218,25 @@ export function startMarch(
       emit: [{ type: 'unit.moveBlocked', payload: { unitId: unit.id, to } }],
     };
   }
-  const intent: Intent = attackTarget
-    ? { kind: 'attack', target: attackTarget, to: dest, startedAt: time }
-    : { kind: 'move', to: dest, startedAt: time };
   if (path.tiles.length === 1) {
+    if (how === 'attack' && attackTarget) {
+      const intent: Intent = { kind: 'attack', target: attackTarget, to: dest, startedAt: time };
+      return { world: updateUnit(world, unit.id, { intent }, time) };
+    }
+    const intent: Intent = how === 'hold' ? { kind: 'hold', at: dest } : { kind: 'idle' };
     return {
-      world: updateUnit(world, unit.id, { intent: attackTarget ? intent : { kind: 'idle' } }, time),
-      emit: attackTarget ? [] : [{ type: 'unit.arrived', payload: { unitId: unit.id, at: to } }],
+      world: updateUnit(world, unit.id, { intent }, time),
+      emit: [{ type: 'unit.arrived', payload: { unitId: unit.id, at: to } }],
     };
   }
+  const intent: Intent =
+    how === 'attack' && attackTarget
+      ? { kind: 'attack', target: attackTarget, to: dest, startedAt: time }
+      : how === 'withdraw'
+        ? { kind: 'withdraw', toward: dest, startedAt: time }
+        : how === 'hold'
+          ? { kind: 'move', to: dest, startedAt: time, thenHold: true }
+          : { kind: 'move', to: dest, startedAt: time };
   const step: StepPayload = {
     unitId: unit.id,
     startedAt: time,
@@ -227,6 +247,19 @@ export function startMarch(
     world: updateUnit(world, unit.id, { intent }, time),
     schedule: [scheduleStep(world.map, unit.kind, time, step)],
   };
+}
+
+/** Plan a march for `unit` to `dest`; with `attackTarget` the intent becomes `attack`. */
+export function startMarch(
+  world: GameState,
+  unit: Unit,
+  dest: Point,
+  time: number,
+  attackTarget?: string,
+): HandlerResult<GameState> {
+  return attackTarget
+    ? beginMarch(world, unit, dest, time, 'attack', attackTarget)
+    : beginMarch(world, unit, dest, time, 'move');
 }
 
 /**
@@ -244,7 +277,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     const unit = world.units.find((u) => u.id === unitId);
     if (!unit) return rejectUnknown(world, unitId);
     if (unit.status !== 'active') return rejectOrder(world, unitId, 'unit not active');
-    return startMarch(world, unit, { x: to[0], y: to[1] }, ev.time);
+    return beginMarch(world, unit, { x: to[0], y: to[1] }, ev.time);
   });
 
   registry.register(HALT_INTENT_EVENT, (world, ev) => {
@@ -257,12 +290,15 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     const p = ev.payload as unknown as StepPayload;
     const unit = world.units.find((u) => u.id === p.unitId);
     const i = unit?.intent;
+    const target = i && marchTarget(i);
     if (
       !unit ||
-      (i?.kind !== 'move' && i?.kind !== 'attack') ||
+      !i ||
+      !target ||
+      (i.kind !== 'move' && i.kind !== 'withdraw' && i.kind !== 'attack') ||
       i.startedAt !== p.startedAt ||
-      i.to.x !== p.to[0] ||
-      i.to.y !== p.to[1]
+      target.x !== p.to[0] ||
+      target.y !== p.to[1]
     ) {
       return { world }; // superseded by a newer intent
     }
@@ -271,19 +307,19 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     // Every step may start or end a contact, or put a unit on the objective.
     const check: NewEvent = { time: ev.time, type: COMBAT_CHECK_EVENT };
     if (i.kind === 'attack') {
-      const target = world.units.find((u) => u.id === i.target);
-      if (!target || target.status !== 'active') {
+      const foe = world.units.find((u) => u.id === i.target);
+      if (!foe || foe.status !== 'active') {
         return {
           world: updateUnit(world, p.unitId, { position, intent: { kind: 'idle' } }, ev.time),
           schedule: [check],
         };
       }
       const arrived = rest.length === 2;
-      if (canReach({ ...unit, position }, target)) {
+      if (canReach({ ...unit, position }, foe)) {
         return { world: updateUnit(world, p.unitId, { position }, ev.time), schedule: [check] };
       }
       if (arrived) {
-        // The target moved on; plan a fresh march toward where it is now.
+        // The foe moved on; plan a fresh march toward where it is now.
         return {
           world: updateUnit(world, p.unitId, { position }, ev.time),
           schedule: [
@@ -297,8 +333,10 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
         };
       }
     } else if (rest.length === 2) {
+      const intent: Intent =
+        i.kind === 'move' && i.thenHold ? { kind: 'hold', at: position } : { kind: 'idle' };
       return {
-        world: updateUnit(world, p.unitId, { position, intent: { kind: 'idle' } }, ev.time),
+        world: updateUnit(world, p.unitId, { position, intent }, ev.time),
         emit: [{ type: 'unit.arrived', payload: { unitId: p.unitId, at: p.to } }],
         schedule: [check],
       };

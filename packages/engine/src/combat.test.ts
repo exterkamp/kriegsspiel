@@ -38,8 +38,8 @@ function field(rawUnits: RawUnit[], opts: { holdMinutes?: number; seed?: number 
     seed: opts.seed ?? 7,
     map: { legend: { '.': 'open', W: 'wood', B: 'bridge' }, rows },
     sides: [
-      { id: 'blue', name: 'Blue', controller: 'human' },
-      { id: 'red', name: 'Red', controller: 'scripted' },
+      { id: 'blue', name: 'Blue', controller: 'human', hq: { x: 0, y: 0 } },
+      { id: 'red', name: 'Red', controller: 'scripted', hq: { x: 0, y: 0 } },
     ],
     units: rawUnits.map((u) => ({
       name: u.id,
