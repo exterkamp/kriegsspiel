@@ -64,6 +64,8 @@ export const LastKnownContact = z
   .object({
     id: z.string().min(1),
     position: Coord,
+    /** Which way it faced when seen, to the nearest eighth of a turn; a guess once it has moved. */
+    facing: Facing.optional(),
     observedAtGame: GameMs,
     ageMs: GameMs,
     uncertaintyRadius: z.number().finite().nonnegative(),

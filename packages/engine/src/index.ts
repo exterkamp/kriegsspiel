@@ -55,6 +55,7 @@ export {
 export { OBJECTIVE_RADIUS_M, RANGE_M, canReach, onObjective } from './contact.js';
 export { COURIER_MS_PER_METRE, issueOrder, registerOrders } from './orders.js';
 export type { Order, OrderIntent } from './orders.js';
+export { describePlace } from './place.js';
 export { beginMarch } from './movement.js';
 export {
   COURIER_DELAY_MS,
@@ -62,6 +63,7 @@ export {
   SIGHT_RANGE_MM,
   UNCERTAINTY_MM_PER_MINUTE,
   canSee,
+  sightRangeMm,
   registerVisibility,
   startVisibility,
   viewFor,
