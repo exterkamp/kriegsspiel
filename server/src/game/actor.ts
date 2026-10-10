@@ -108,6 +108,8 @@ export interface GameActorOptions {
   agents?: SideAgent[];
   /** Pause voting: who votes and the host's rules. Unset: the vote commands are refused. */
   pause?: PauseConfig;
+  /** Set when the game was reopened after the server went down: wall ms it was down (estimated). */
+  restart?: { downMs: number };
 }
 
 interface AgentSlot {
@@ -169,6 +171,7 @@ export class GameActor {
   private readonly pauseVoting: PauseVoting | undefined;
   private pauseTimer: unknown;
   private pauseTimerSet = false;
+  private readonly restartInfo: { downMs: number } | undefined;
 
   private tail: Promise<unknown> = Promise.resolve();
   private timer: unknown;
@@ -193,6 +196,7 @@ export class GameActor {
     this.parseTimeoutMs = options.parseTimeoutMs ?? DEFAULT_PARSE_TIMEOUT_MS;
     this.parseRetryDelayMs = options.parseRetryDelayMs ?? DEFAULT_PARSE_RETRY_DELAY_MS;
     this.seq = options.seq ?? 0;
+    this.restartInfo = options.restart;
     // Decisions fall on multiples of the interval; a resumed game picks up at the next one.
     const t = this.engine.time;
     this.agents = (options.agents ?? []).map((agent) => ({
@@ -230,9 +234,16 @@ export class GameActor {
     return this.pauseVoting && { phase: this.pauseVoting.phase, proposal: this.pauseVoting.open };
   }
 
+  /** Set when this game was reopened after downtime: the players are told it came back paused. */
+  get restart(): { downMs: number } | undefined {
+    return this.restartInfo;
+  }
+
   /** Persist the starting snapshot and start the scheduler. */
   async start(): Promise<void> {
     await this.enqueue(async () => {
+      // Journal the downtime first, so the log shows the gap before anything else happens.
+      if (this.restartInfo) await this.apply({ kind: 'restart', downMs: this.restartInfo.downMs });
       await this.persist();
       await this.persistProgress();
       this.reschedule();
@@ -263,6 +274,8 @@ export class GameActor {
       }
     }
     await this.tail.catch(() => undefined);
+    // A clean stop: the next start measures downtime from here, not from the last tick.
+    await this.store.saveHeartbeat(this.id, this.wallNow()).catch(() => undefined);
   }
 
   private enqueue<T>(job: () => Promise<T>): Promise<T> {
@@ -394,6 +407,7 @@ export class GameActor {
     // Agents think on ticks with no command to carry their orders into the log.
     await this.flushAgentLog();
     await this.store.saveProgress(this.id, this.engine.time);
+    await this.store.saveHeartbeat(this.id, this.wallNow());
     const history = this.clock.history();
     if (history.length > this.historySaved) {
       await this.store.appendClockHistory(this.id, history.slice(this.historySaved));
@@ -586,6 +600,8 @@ export class GameActor {
         this.applyPause(entry, [this.pauseVoting?.expire(this.wallNow())]);
         return { ok: true };
       }
+      case 'restart':
+        return { ok: true };
       case 'setRate':
         this.clock.setRate(command.rate);
         return { ok: true };

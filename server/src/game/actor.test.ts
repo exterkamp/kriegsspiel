@@ -571,6 +571,6 @@ describe('many games, restore and shutdown', () => {
     await reopened.submit({ kind: 'resume' });
     await time.advance(DELIVERY_MS);
     expect(blue1(reopened).intent.kind).toBe('move');
-    expect((await store.inputLog('g1')).map((e) => e.seq)).toEqual([1, 2]);
+    expect((await store.inputLog('g1')).map((e) => e.seq)).toEqual([1, 2, 3]);
   });
 });

@@ -152,6 +152,8 @@ export class GameHost {
     let state = deserialize<GameState>(snap.engine);
     state = replayFrom(state, id, tail, this.options.registry).state;
     const progress = await store.loadProgress(id);
+    const lastAlive = await store.loadHeartbeat(id);
+    const downMs = lastAlive === undefined ? 0 : Math.max(0, this.options.wallNow() - lastAlive);
     if (progress !== undefined && progress > state.time) {
       state = advanceTo(state, progress, this.options.registry).state;
     }
@@ -174,6 +176,7 @@ export class GameHost {
       clock,
       agents: this.agentsFor(state.world),
       pause: this.options.pause?.(id, state.world),
+      restart: { downMs },
       // The log is in insertion order, which is not always seq order (see D14b).
       seq: tail.reduce((max, e) => Math.max(max, e.seq), snap.seq),
     });

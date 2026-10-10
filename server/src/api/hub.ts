@@ -121,6 +121,13 @@ export class Hub {
         conn.lastClock = clockJson;
       }
       const first = conn.lastView === '';
+      if (first && game.restart) {
+        this.send(conn, {
+          v: PROTOCOL_VERSION,
+          kind: 'serverRestarted',
+          downMs: game.restart.downMs,
+        });
+      }
       for (const dispatch of view.dispatches) {
         if (conn.sentDispatches.has(dispatch.id)) continue;
         conn.sentDispatches.add(dispatch.id);

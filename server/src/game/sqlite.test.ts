@@ -97,6 +97,10 @@ describe('SqliteGameStore', () => {
     await store.saveProgress('g', 50);
     await store.saveProgress('g', 40);
     expect(await store.loadProgress('g')).toBe(50);
+    expect(await store.loadHeartbeat('g')).toBeUndefined();
+    await store.saveHeartbeat('g', 900);
+    await store.saveHeartbeat('g', 800);
+    expect(await store.loadHeartbeat('g')).toBe(900);
     const change = {
       wallMs: 1,
       gameMs: 2,
@@ -157,6 +161,9 @@ describe('crash recovery', () => {
       const reopened = await hostFor(open(path), time2, snapshotEvery).open('g1');
 
       expect(reopened.gameClock.status).toBe('paused');
+      // The downtime is told to the players and journaled; the heartbeat is the last wall time
+      // before the crash, so it is at least the hour the second process waited less the run.
+      expect(reopened.restart?.downMs).toBeGreaterThanOrEqual(3_600_000);
       expect(reopened.gameClock.rate).toBe(4);
       expect(reopened.state.time).toBe(timeBefore);
       expect(serialize(reopened.state)).toBe(before);
@@ -167,7 +174,11 @@ describe('crash recovery', () => {
       expect(reopened.gameClock.now()).toBeGreaterThan(timeBefore);
       // Input numbering carries on from the log.
       const log = await open(path).inputLog('g1');
-      expect(log.map((e) => e.seq)).toEqual([1, 2, 3, 4, 5]);
+      expect(log.map((e) => e.seq)).toEqual([1, 2, 3, 4, 5, 6]);
+      const restart = log[4]!;
+      expect(restart.command.kind).toBe('restart');
+      expect(restart.gameMs).toBe(timeBefore);
+      expect(restart.endGameMs).toBe(timeBefore);
     });
   }
 
@@ -233,7 +244,7 @@ describe('crash recovery', () => {
     const time2 = new FakeTime(time.now() + 1_000);
     const reopened = await hostFor(open(path), time2, 100).open('g1');
     await reopened.submit({ kind: 'pause' });
-    expect((await open(path).inputLog('g1')).map((e) => e.seq)).toEqual([2, 1, 3]);
+    expect((await open(path).inputLog('g1')).map((e) => e.seq)).toEqual([2, 1, 3, 4]);
   });
 
   it('replay from the database equals the in-memory run', async () => {
