@@ -3,6 +3,7 @@ import { schedule } from './queue.js';
 import type { EngineState } from './events.js';
 import { distance, metres } from './geometry.js';
 import { describePlace } from './place.js';
+import { evaluateStanding } from './standing.js';
 import { unitTypeOf } from './unitTypes.js';
 import { BLOCKS_SIGHT, profileAlong, terrainAt } from './terrain.js';
 import {
@@ -357,10 +358,15 @@ function scan(world: GameState, time: GameTime): GameState {
  * report for the named unit's side; combat and orders schedule it.
  */
 export function registerVisibility(registry: EventRegistry<GameState>): void {
-  registry.register(SCAN_EVENT, (world, ev) => ({
-    world: scan(world, ev.time),
-    schedule: [{ time: ev.time + SCAN_INTERVAL_MS, type: SCAN_EVENT }],
-  }));
+  registry.register(SCAN_EVENT, (world, ev) => {
+    // Standing orders are judged right after the scan, from each unit's own sight.
+    const res = evaluateStanding(scan(world, ev.time), ev.time);
+    return {
+      world: res.world,
+      schedule: [{ time: ev.time + SCAN_INTERVAL_MS, type: SCAN_EVENT }, ...(res.schedule ?? [])],
+      ...(res.emit ? { emit: res.emit } : {}),
+    };
+  });
 
   registry.register(REPORT_EVENT, (world, ev) => {
     const p = ev.payload as unknown as { kind: string; unitId: string };
