@@ -79,3 +79,11 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 - First historical scenario and map source: Ball's Bluff proposed in D9, awaiting maintainer decision; map licence verified (D9).
 - How much auto-plotting of reports onto the map players get.
 - Rules tables (march rates, frontage, fire, casualties): first pass recorded in `src/data/` with citations (see `docs/rules.md`). Still missing: full movement table, Die 4 row, artillery tables other than 12-pdr 1500-2000, cavalry and artillery frontages.
+
+## D13: UmpireClient wraps the Anthropic SDK behind a transport seam
+
+**Decision.** All LLM calls go through `UmpireClient`. The Anthropic implementation uses structured outputs (`output_config.format` with a JSON schema) rather than forced tool use, which newer models reject. The SDK's own retries are off; the wrapper owns retry, backoff and the per-attempt timeout so behavior is testable with a fake transport. Playback matches recordings on stage, prompt version and input (key order ignored) and fails loudly on a miss rather than calling the model.
+
+**Failure handling.** A `Retry-After` longer than four times `maxBackoffMs` fails the call at once instead of sleeping. Output truncated at `max_tokens` is terminal (retrying the same request would truncate again). A failed call throws `UmpireError` carrying the summed `usage` and `costUsd` of its attempts, so spend on failures is visible, but nothing is recorded for it.
+
+**Open.** The price table in `pricing.ts` is hand-maintained. Recording to the persistent input log is behind the `CallRecorder` interface; the log itself is not built yet. Prompt files and the `OrderParser` adapter that uses this client are separate work. A failed live call leaves no recording, so on replay it surfaces as `missing-recording` rather than the original `schema` or `transport` error; callers must treat all `UmpireError` kinds alike when falling back, or failures need recording too (open).
