@@ -1,0 +1,58 @@
+{
+  "id": "frontage",
+  "title": "Frontage and depth by formation, in paces",
+  "edition": "1824",
+  "source": {
+    "source": "rulespal-reisswitz",
+    "locator": "Part Two 2. The Troop Symbols and Appendix One (Prussian Army Organisation & Formations)"
+  },
+  "data": {
+    "unit": "paces",
+    "formations": [
+      {
+        "id": "half_battalion_line",
+        "men": 450,
+        "frontage": 125,
+        "depth": 75,
+        "note": "Close-ordered block of 3 ranks; two make a 900-man battalion.",
+        "source": { "source": "rulespal-reisswitz", "locator": "Part Two 2. The Troop Symbols" }
+      },
+      {
+        "id": "battalion_line",
+        "men": 900,
+        "frontage": 250,
+        "depth": null,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Two 2. The Troop Symbols (two blocks of 125 paces)"
+        }
+      },
+      {
+        "id": "squadron_line",
+        "men": 150,
+        "frontage": 100,
+        "depth": null,
+        "note": "Cavalry, 150 riders.",
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Two 2. The Troop Symbols (a squadron of 150 riders has a frontage of 100 paces)"
+        }
+      },
+      {
+        "id": "battery_line",
+        "guns": 8,
+        "frontage": 200,
+        "depth": null,
+        "note": "Guns 24 paces apart.",
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Two 2. The Troop Symbols (a battery of 8 guns has a frontage of 200 paces when the guns are placed 24 paces apart)"
+        }
+      }
+    ]
+  },
+  "gaps": [
+    "Column depths and other formations are not recorded yet. See follow-up issue.",
+    "The edition is inconsistent about a half-battalion block: one passage says 75 deep and 125 long (used here), another says width 75 and length 125. See docs/rules.md."
+  ]
+}

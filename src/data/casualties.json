@@ -1,0 +1,120 @@
+{
+  "id": "casualties",
+  "title": "Casualty points, close-combat dice and odds",
+  "edition": "1824",
+  "source": {
+    "source": "rulespal-reisswitz",
+    "locator": "Part Two Points and Losses; Part Three Section Four, 4.1-4.2"
+  },
+  "data": {
+    "points_to_men": [
+      {
+        "troops": "infantry_3_ranks",
+        "rule": "1 point = 5 men",
+        "source": { "source": "rulespal-reisswitz", "locator": "Part Two, Points and Losses" }
+      },
+      {
+        "troops": "infantry_2_ranks",
+        "rule": "3 points = 10 men",
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Two, Points and Losses; Part Three 3.2.4 example (3 points = 10 men)"
+        }
+      },
+      {
+        "troops": "skirmishers",
+        "rule": "2 points = 3 men",
+        "source": { "source": "rulespal-reisswitz", "locator": "Part Two, Points and Losses" }
+      },
+      {
+        "troops": "cavalry_2_ranks",
+        "rule": "2 points = 3 riders",
+        "source": { "source": "rulespal-reisswitz", "locator": "Part Two, Points and Losses" }
+      },
+      {
+        "troops": "artillery",
+        "rule": "25 points = 2 guns",
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Appendix Two, The New Dice, Losses a) 25 points = 2 guns"
+        }
+      }
+    ],
+    "odds_by_strength_difference": [
+      { "difference": "equal to 1/6", "die": 1, "odds": "1:1", "index_shift": 0 },
+      { "difference": "1/6 to 1/4", "die": 2, "odds": "3:2", "index_shift": 1 },
+      { "difference": "1/4 to 1/2", "die": 3, "odds": "2:1", "index_shift": 2 },
+      { "difference": "1/2 to 1", "die": 4, "odds": "3:1", "index_shift": 3 },
+      { "difference": "1 to 1 2/3", "die": 5, "odds": "4:1", "index_shift": 4 }
+    ],
+    "odds_source": {
+      "source": "rulespal-reisswitz",
+      "locator": "Part Three 4.1.2 (strength difference table)"
+    },
+    "close_combat_faces": {
+      "note": "Each face is [circle, result, infantry_loss_per_half_battalion, cavalry_loss_per_squadron, flame]. circle: black or white. result: R repulsed, D defeated, T totally defeated, blank means roll again.",
+      "die_1": [
+        { "circle": "black", "result": "D", "inf": 25, "cav": 10, "flame": true },
+        { "circle": "black", "result": "T", "inf": 30, "cav": 12, "flame": false },
+        { "circle": "black", "result": "R", "inf": 18, "cav": 6, "flame": false },
+        { "circle": "white", "result": "D", "inf": 25, "cav": 10, "flame": false },
+        {
+          "circle": "white",
+          "result": "T",
+          "inf": 30,
+          "cav": 12,
+          "flame": false,
+          "note": "The edition's table prints 30/18, its picture of the dice prints 30/12. 12 chosen to match every other T face. Unresolved, check against the scan."
+        },
+        { "circle": "white", "result": "R", "inf": 18, "cav": 6, "flame": false }
+      ],
+      "die_2": [
+        { "circle": "blank" },
+        { "circle": "black", "result": "R", "inf": 18, "cav": 6, "flame": true },
+        { "circle": "black", "result": "R", "inf": 18, "cav": 6, "flame": true },
+        { "circle": "white", "result": "D", "inf": 25, "cav": 10, "flame": false },
+        { "circle": "white", "result": "T", "inf": 30, "cav": 12, "flame": false },
+        { "circle": "white", "result": "R", "inf": 18, "cav": 6, "flame": false }
+      ],
+      "die_3": [
+        { "circle": "black", "result": "R", "inf": 18, "cav": 6, "flame": true },
+        { "circle": "black", "result": "R", "inf": 18, "cav": 6, "flame": true },
+        { "circle": "white", "result": "T", "inf": 30, "cav": 12, "flame": true },
+        { "circle": "white", "result": "D", "inf": 25, "cav": 10, "flame": false },
+        { "circle": "white", "result": "R", "inf": 18, "cav": 6, "flame": false },
+        { "circle": "white", "result": "R", "inf": 18, "cav": 6, "flame": false }
+      ],
+      "die_5": [
+        { "circle": "black", "result": "R", "inf": 18, "cav": 6, "flame": false },
+        { "circle": "blank" },
+        { "circle": "white", "result": "D", "inf": 25, "cav": 10, "flame": false },
+        { "circle": "white", "result": "D", "inf": 25, "cav": 10, "flame": false },
+        { "circle": "white", "result": "T", "inf": 30, "cav": 12, "flame": false },
+        { "circle": "white", "result": "R", "inf": 18, "cav": 6, "flame": false }
+      ],
+      "source": {
+        "source": "rulespal-reisswitz",
+        "locator": "Part Three 4.2 Close Combat Table, rows Die 1, 2, 3, 5"
+      }
+    },
+    "victor_losses": {
+      "per_half_battalion": 10,
+      "per_skirmish_block": 5,
+      "source": { "source": "rulespal-reisswitz", "locator": "Part Three 4.2.2 Recording Losses" }
+    },
+    "unit_removal": [
+      {
+        "id": "half_battalion_block_total_points",
+        "points": 90,
+        "source": {
+          "source": "rulespal-reisswitz",
+          "locator": "Part Two 2. The Troop Symbols and Points and Losses (a half battalion of 450 men in three ranks = 90 points at 5 men per point; 90 points of losses remove the block)"
+        }
+      }
+    ]
+  },
+  "gaps": [
+    "Die 4 (3:1) close combat row not recorded: in the edition page text the Die 4 and Die 5 rows come out of order, and a run of cells (Black R 18/6 | Blank | Blank | White T 30/12 | White R 18/6 | White D 25/10) appears after section 4.2.1, near the Die 5 row. Their row assignment is ambiguous, so check the page image. See follow-up issue.",
+    "The 1828 supplement replaces the odds with a 6-die scheme (Appendix Two, 4.1.2 New Dice Odds). Not encoded yet."
+  ]
+}

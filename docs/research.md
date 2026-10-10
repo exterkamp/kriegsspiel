@@ -61,6 +61,6 @@ An LLM umpire is structurally a free-Kriegsspiel umpire. That is exactly the fai
 
 ## 6. Open research TODOs
 
-- [ ] Pull actual march rates, frontage, fire-range and casualty tables from the 1824 rulebook / kriegsspiel.org and write them into `src/data/`.
+- [~] Pull actual march rates, frontage, fire-range and casualty tables and write them into `src/data/`. First pass done, see `docs/rules.md` for what is recorded and what is still missing.
 - [ ] Find a public-domain topographic map style to emulate for the renderer.
 - [ ] Look for arXiv work benchmarking LLM adjudication consistency.
