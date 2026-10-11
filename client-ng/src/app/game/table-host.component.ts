@@ -10,14 +10,13 @@ import {
   viewChild,
 } from '@angular/core';
 import * as THREE from 'three';
-import { TableScene } from '@legacy/table/TableScene';
 import { buildSceneState } from '@legacy/table/sceneState';
 import { fixtureMap } from '@legacy/table/fixture';
 import { buildWindowScene } from '@legacy/window/model';
 import { DeskStore } from '../desk/desk.store';
 import { GameService } from './game.service';
 import { MarksService } from './marks.service';
-import { TableService } from './table.service';
+import { TABLE_SCENE_FACTORY, TableService } from './table.service';
 
 /**
  * Hosts the framework-agnostic Three.js `TableScene` on one canvas. The scene is built once, after the first render,
@@ -52,11 +51,12 @@ export class TableHostComponent implements OnDestroy {
   private readonly desk = inject(DeskStore);
   protected readonly marks = inject(MarksService);
   protected readonly tableService = inject(TableService);
+  private readonly makeScene = inject(TABLE_SCENE_FACTORY);
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('table');
 
   constructor() {
     afterNextRender(() => {
-      const scene = new TableScene(this.canvas().nativeElement);
+      const scene = this.makeScene(this.canvas().nativeElement);
       scene.start();
       this.tableService.scene.set(scene);
     });

@@ -24,7 +24,13 @@ import { TableService } from './table.service';
  */
 @Component({
   selector: 'ks-game',
-  imports: [TableHostComponent, HudComponent, MarksBarComponent, SideSwitchComponent, DeskComponent],
+  imports: [
+    TableHostComponent,
+    HudComponent,
+    MarksBarComponent,
+    SideSwitchComponent,
+    DeskComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <ks-table-host />

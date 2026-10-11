@@ -98,6 +98,8 @@ export class DeskComponent {
   }
 
   protected playAgain(e: { id: string; side: string | undefined }): void {
-    this.goTo(`/?game=${encodeURIComponent(e.id)}${e.side ? `&side=${encodeURIComponent(e.side)}` : ''}`);
+    this.goTo(
+      `/?game=${encodeURIComponent(e.id)}${e.side ? `&side=${encodeURIComponent(e.side)}` : ''}`,
+    );
   }
 }

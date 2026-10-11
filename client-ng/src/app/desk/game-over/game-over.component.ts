@@ -40,7 +40,9 @@ export class GameOverComponent {
 
   private readonly over = computed(() => this.game.state().gameOver);
   private readonly side = computed(() => this.game.state().view?.side);
-  protected readonly result = computed(() => resultFor(this.over() ?? { winner: null }, this.side()));
+  protected readonly result = computed(() =>
+    resultFor(this.over() ?? { winner: null }, this.side()),
+  );
   protected readonly headline = computed(() => HEADLINE[this.result()]);
   protected readonly reason = computed(() => {
     const o = this.over();

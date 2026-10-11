@@ -24,7 +24,9 @@ function mount(state: Parameters<typeof fakeGame>[0] = {}, gameId?: string) {
   return { g, desk, f, el, key, tick: () => f.whenStable() };
 }
 const dialog = (el: HTMLElement) => el.querySelector('[role=dialog]');
-const dialogButtons = (el: HTMLElement) => [...el.querySelectorAll<HTMLButtonElement>('[role=dialog] button')];
+const dialogButtons = (el: HTMLElement) => [
+  ...el.querySelectorAll<HTMLButtonElement>('[role=dialog] button'),
+];
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -164,7 +166,13 @@ describe('game over screen (held PR #266)', () => {
       return url === '/games'
         ? new Response(JSON.stringify({ id: 'g2' }), { status: 200 })
         : new Response(
-            JSON.stringify({ id: 'g1', scenario: 'bridge', rate: 4, sessionType: 'team_vs_team', side: 'red' }),
+            JSON.stringify({
+              id: 'g1',
+              scenario: 'bridge',
+              rate: 4,
+              sessionType: 'team_vs_team',
+              side: 'red',
+            }),
             { status: 200 },
           );
     });
@@ -187,7 +195,9 @@ describe('game over screen (held PR #266)', () => {
     vi.stubGlobal('fetch', async (url: string) =>
       url === '/games'
         ? new Response('{}', { status: 500 })
-        : new Response(JSON.stringify({ scenario: 's', rate: 1, sessionType: 'solo' }), { status: 200 }),
+        : new Response(JSON.stringify({ scenario: 's', rate: 1, sessionType: 'solo' }), {
+            status: 200,
+          }),
     );
     const { el, tick } = mount({ gameOver: over }, 'g1');
     await tick();
@@ -200,10 +210,23 @@ describe('game over screen (held PR #266)', () => {
   describe('losses', () => {
     const fp = { frontage: 100, depth: 50 };
     const u = (id: string, side: string, strength: number) => ({
-      id, side, name: id, position: { x: 0, y: 0 }, facing: 0, formation: 'line', footprint: fp, strength, morale: 80, ammo: 90,
+      id,
+      side,
+      name: id,
+      position: { x: 0, y: 0 },
+      facing: 0,
+      formation: 'line',
+      footprint: fp,
+      strength,
+      morale: 80,
+      ammo: 90,
     });
     const frame = (gameMs: number, units: ReturnType<typeof u>[]) => ({
-      gameMs, units, beliefs: {}, events: [], rulings: [],
+      gameMs,
+      units,
+      beliefs: {},
+      events: [],
+      rulings: [],
     });
 
     it('fetches the first and final frames for the side and shows the losses', async () => {
