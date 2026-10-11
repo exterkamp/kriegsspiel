@@ -679,7 +679,8 @@ export class TableScene {
     const marks = validateSceneMarks(rawMarks, map);
     const next = new Map<string, MarkObject>();
     const created: THREE.Group[] = [];
-    const previous = this.marks;
+    // Keep ownership even when terminal disposal clears the live mark registry.
+    const previous = new Map(this.marks);
     let previousState = this.state;
     let committed = false;
     this.applyingLocal = true;
@@ -737,6 +738,9 @@ export class TableScene {
             /* Caller receives the failed update. */
           }
         }
+      }
+      if (this.disposed) {
+        for (const old of previous.values()) this.releaseTree(old.group);
       }
       for (const group of created) {
         if (!committed || this.disposed) this.releaseTree(group);

@@ -923,4 +923,45 @@ describe('local HQ board scene isolation', () => {
     expect(() => local.applyLocalBoard(saved, [])).toThrow('unavailable');
     expect(local.scene.children).toHaveLength(0);
   });
+  it.each(['render', 'retirement'] as const)(
+    'releases every detached predecessor exactly once when disposal re-enters during %s',
+    (phase) => {
+      const local = make('local-hq-board');
+      const saved = raster();
+      local.applyLocalBoard(saved, [
+        { id: 'first', label: '', geometry: { kind: 'pin', at: { x: 100, y: 100 } } },
+        { id: 'second', label: '', geometry: { kind: 'pin', at: { x: 200, y: 200 } } },
+      ]);
+      const root = local.scene.getObjectByName('marks-root')!;
+      const resources = new Set<THREE.BufferGeometry | THREE.Material | THREE.Texture>();
+      for (const group of root.children) {
+        group.traverse((object) => {
+          const child = object as THREE.Mesh;
+          if (child.geometry) resources.add(child.geometry);
+          for (const material of Array.isArray(child.material)
+            ? child.material
+            : child.material
+              ? [child.material]
+              : []) {
+            resources.add(material);
+            const texture = (material as THREE.MeshStandardMaterial).map;
+            if (texture) resources.add(texture);
+          }
+        });
+      }
+      expect(resources.size).toBeGreaterThan(2);
+      const disposals = [...resources].map((resource) => vi.spyOn(resource, 'dispose'));
+      if (phase === 'render') {
+        vi.spyOn(local.renderer, 'render').mockImplementationOnce(() => local.dispose());
+      } else {
+        const first = root.children[0]!.children[0] as THREE.Mesh;
+        const material = first.material as THREE.Material;
+        material.addEventListener('dispose', () => local.dispose());
+      }
+      expect(() => local.applyLocalBoard(saved, [])).toThrow();
+      local.dispose();
+      for (const dispose of disposals) expect(dispose).toHaveBeenCalledExactlyOnceWith();
+      expect(local.scene.children).toHaveLength(0);
+    },
+  );
 });
