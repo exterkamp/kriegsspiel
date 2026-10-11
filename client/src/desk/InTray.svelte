@@ -2,7 +2,7 @@
   import { tick } from 'svelte';
   import { formatGameTime } from '../net/state.js';
   import { PILES, sortTray, type Pile } from './tray.js';
-  import { discard, gameState, markRead, setFiled, showOnTable, trayMarks, activeView } from './store.js';
+  import { discard, gameState, markRead, setFiled, showOnTable, trayMarks, activeView, viewedDispatch } from './store.js';
 
   let pile = $state<Pile>('urgent');
   let openId = $state<string | undefined>(undefined);
@@ -13,6 +13,10 @@
   const current = $derived(sorted.piles.find((p) => p.id === pile)!);
   const list = $derived(showFiled ? sorted.filed : current.items);
   const open = $derived(list.find((d) => d.id === openId));
+
+  $effect(() => {
+    viewedDispatch.set(open);
+  });
 
   function pick(id: Pile): void {
     pile = id;

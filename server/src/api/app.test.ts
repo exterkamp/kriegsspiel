@@ -8,8 +8,14 @@ import {
   holdTheBridge,
   loadScenario,
 } from '@kriegsspiel/engine';
-import { PROTOCOL_VERSION, parseServerMessage, type ServerMessage } from '@kriegsspiel/protocol';
-import { afterEach, describe, expect, it } from 'vitest';
+import {
+  MAX_LINE_POINTS,
+  MAX_MARKS,
+  PROTOCOL_VERSION,
+  parseServerMessage,
+  type ServerMessage,
+} from '@kriegsspiel/protocol';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   MemoryGameStore,
   createRegistry,
@@ -566,6 +572,98 @@ describe('orders', () => {
       'error',
       (m) => m.code === 'not_implemented' && m.message.includes('setReady'),
     );
+  });
+});
+
+describe('marks', () => {
+  const pin = (id: string, x = 100) => ({
+    id,
+    kind: 'pin',
+    at: { x, y: 200 },
+    label: 'enemy cav',
+    madeAtGame: 60_000,
+    sourceReport: 'd1',
+  });
+  const put = (mark: unknown) => JSON.stringify({ v, kind: 'putMark', mark });
+
+  it('starts empty, shares a side’s marks between its connections, and keeps them from the other side', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const a = await join(ws, game, 'blue');
+    const b = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    expect((await a.waitFor('marks')).marks).toEqual([]);
+    a.send(put(pin('m1')));
+    const seen = await b.waitFor('marks', (m) => m.marks.length === 1);
+    expect(seen.marks[0]).toEqual(pin('m1'));
+    // Not corrected: the mark comes back exactly as sent, wherever the truth is.
+    a.send(put({ ...pin('m1'), at: { x: 5, y: 6 } }));
+    await b.waitFor(
+      'marks',
+      (m) => m.marks.length === 1 && 'at' in m.marks[0]! && m.marks[0].at.x === 5,
+    );
+    expect((await red.waitFor('marks')).marks).toEqual([]);
+    expect(red.messages.filter((m) => m.kind === 'marks')).toHaveLength(1);
+  });
+
+  it('persists across a reload (a new connection) and survives delete', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const a = await join(ws, game, 'blue');
+    a.send(put(pin('m1')));
+    a.send(put(pin('m2', 300)));
+    await a.waitFor('marks', (m) => m.marks.length === 2);
+    a.socket.close();
+    const again = await join(ws, game, 'blue');
+    expect((await again.waitFor('marks')).marks.map((m) => m.id)).toEqual(['m1', 'm2']);
+    again.send(JSON.stringify({ v, kind: 'deleteMark', markId: 'm1' }));
+    await again.waitFor('marks', (m) => m.marks.length === 1);
+    await vi.waitFor(async () =>
+      expect((await store.loadMarks(game.id, 'blue')).map((m) => m.id)).toEqual(['m2']),
+    );
+  });
+
+  it('carries a maximum-size pencil line of full-precision points without dropping the connection', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const a = await join(ws, game, 'blue');
+    await a.waitFor('marks');
+    const points = Array.from({ length: MAX_LINE_POINTS }, (_, i) => ({
+      x: 1234.5678901234567 + i * 1.0000000000001,
+      y: 2345.678901234567 + i * 1.0000000000001,
+    }));
+    const line = { id: 'big', kind: 'line', points, madeAtGame: 60_000, label: 'x'.repeat(80) };
+    const frame = put(line);
+    expect(Buffer.byteLength(frame)).toBeLessThan(16 * 1024);
+    a.send(frame);
+    const seen = await a.waitFor('marks', (m) => m.marks.length === 1);
+    expect(seen.marks[0]).toEqual(line);
+    await vi.waitFor(async () =>
+      expect((await store.loadMarks(game.id, 'blue')).map((m) => m.id)).toEqual(['big']),
+    );
+  });
+
+  it('refuses an invalid mark and a side’s 501st mark', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    // A side already at the cap (written straight to the store, so the test is not 500 round trips).
+    await store.saveMarks(
+      game.id,
+      'blue',
+      Array.from({ length: MAX_MARKS }, (_, i) => pin(`p${i}`, i)) as never,
+    );
+    const a = await join(ws, game, 'blue');
+    await a.waitFor('marks', (m) => m.marks.length === MAX_MARKS);
+    a.send(put({ id: 'bad', kind: 'ring', at: { x: 1, y: 1 }, radius: -5, madeAtGame: 0 }));
+    await a.waitFor('error', (m) => m.code === 'bad_message');
+    a.send(put(pin('one-too-many')));
+    await a.waitFor('error', (m) => m.code === 'too_many_marks');
+    // Replacing a mark that exists is still allowed at the cap.
+    a.send(put(pin('p0', 9)));
+    await a.waitFor('marks', (m) => {
+      const first = m.marks[0];
+      return m.marks.length === MAX_MARKS && first?.kind === 'pin' && first.at.x === 9;
+    });
   });
 });
 

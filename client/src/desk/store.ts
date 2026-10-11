@@ -1,5 +1,5 @@
 import { derived, get, writable } from 'svelte/store';
-import type { Coord } from '@kriegsspiel/protocol';
+import type { Coord, Dispatch } from '@kriegsspiel/protocol';
 import { initialState, withRead, type ClientState } from '../net/state.js';
 import { loadMarks, saveMarks, type TrayMarks } from './tray.js';
 import type { ViewId } from './views.js';
@@ -11,6 +11,9 @@ export const activeView = writable<ViewId>('table');
 /** Dispatches the player has filed (kept in the drawer) or discarded (gone from the desk). */
 export const trayFiled = writable<ReadonlySet<string>>(new Set());
 export const trayDiscarded = writable<ReadonlySet<string>>(new Set());
+
+/** The dispatch the in-tray viewer is showing, so the table's Plot report can pin it. */
+export const viewedDispatch = writable<Dispatch | undefined>(undefined);
 
 /** Set by the desk to ask the table to show a place; the table clears it once it has panned. */
 export const showOnTable = writable<Coord | undefined>(undefined);

@@ -3,6 +3,7 @@ import {
   parseServerMessage,
   serializeCommand,
   type Command,
+  type Mark,
   type ServerMessage,
 } from '@kriegsspiel/protocol';
 
@@ -65,6 +66,14 @@ export class GameConnection {
 
   sendOrder(orderId: string, text: string): boolean {
     return this.send({ v: PROTOCOL_VERSION, kind: 'issueOrder', orderId, text });
+  }
+
+  putMark(mark: Mark): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'putMark', mark });
+  }
+
+  deleteMark(markId: string): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'deleteMark', markId });
   }
 
   private open(): void {
