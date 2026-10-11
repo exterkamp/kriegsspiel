@@ -6,7 +6,7 @@ This guide describes the verified source workflow. Independent source review, ac
 
 ## Fresh local setup
 
-Use the Node version in `.nvmrc` (currently Node 22) and run these commands from the Kriegsspiel repository root, in this order:
+Use the Node version in `.nvmrc` (currently Node22.22.2, with npm10.9.7) and run these commands from the Kriegsspiel repository root, in this order:
 
 ```sh
 npm run setup:map-source
@@ -14,7 +14,7 @@ npm ci
 npm run build
 ```
 
-`setup:map-source` verifies the attributed SettleMaker snapshot, installs its separately locked build dependencies and produces the exact local package tarball required by the root lockfile. It must precede root `npm ci`. The build verifies the source payload again. Neither setup nor generation depends on `.local/settlemaker`, its dirty prototype or a separately running game. See [the snapshot instructions](../vendor/settlemaker/README.md) for the immutable source, archive identity, notices and retrieval/build details.
+`setup:map-source` verifies the attributed SettleMaker snapshot, installs its separately locked build dependencies and produces the exact local package tarball required by the root lockfile. It must precede root `npm ci`. The full rebuilt tar payload must match the pinned SHA; setup verifies and stages the original canonical gzip encoding to preserve exact package integrity across platform-specific zlib versions. The build verifies the source payload again. Neither setup nor generation depends on `.local/settlemaker`, its dirty prototype or a separately running game. See [the snapshot instructions](../vendor/settlemaker/README.md) for the immutable source, archive identity, notices and retrieval/build details.
 
 Start the local client through the configured launcher, with a name:
 

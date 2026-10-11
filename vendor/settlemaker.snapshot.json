@@ -173,6 +173,7 @@
   },
   "artifact": {
     "packageSha256": "df41ca6e340f068f68600be702a74d3db74e165a4f61727916279ccfd3785f84",
-    "packageIntegrity": "sha512-zQ+OxvqIDirZ9TqYxgaOV/Wq1aw7Q+RKeJIsM6RrPlHuiVgo8NShoqQm689XTzZ7Kx2weVe5lAbJNiU/bgh0ww=="
+    "packageIntegrity": "sha512-zQ+OxvqIDirZ9TqYxgaOV/Wq1aw7Q+RKeJIsM6RrPlHuiVgo8NShoqQm689XTzZ7Kx2weVe5lAbJNiU/bgh0ww==",
+    "tarSha256": "efd518d1f308fb86abf4ddfd892f3730a7dcd8c3c96c32d78edcb541cb824fed"
   }
 }

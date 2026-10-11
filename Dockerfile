@@ -8,6 +8,7 @@ COPY client ./client
 COPY scripts ./scripts
 COPY vendor/settlemaker ./vendor/settlemaker
 COPY vendor/settlemaker.snapshot.json ./vendor/settlemaker.snapshot.json
+COPY vendor/settlemaker-runtime.canonical.tgz ./vendor/settlemaker-runtime.canonical.tgz
 # Source-review build only; combined distribution remains gated by D23.
 RUN npm run setup:map-source && npm ci && npm run build \
  && npm prune --omit=dev
