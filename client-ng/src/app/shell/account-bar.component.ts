@@ -17,8 +17,8 @@ import { SHELL_API } from './shell-api';
   styles: `
     #account {
       position: fixed;
+      top: 8px;
       right: 8px;
-      bottom: 8px;
       z-index: 20;
       display: flex;
       gap: 8px;
@@ -31,7 +31,7 @@ import { SHELL_API } from './shell-api';
         serif;
     }
     a {
-      color: #f2c94c;
+      color: #efe6c8;
     }
     button {
       font: inherit;
