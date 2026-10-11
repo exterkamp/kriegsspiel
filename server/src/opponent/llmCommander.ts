@@ -202,30 +202,39 @@ export class LlmCommander implements SideAgent {
         center: { x: Math.round(u.position.x * 1000), y: Math.round(u.position.y * 1000) },
       })),
     };
+    // Parse in parallel (each parse can be a model call, all inside the actor's one timeout);
+    // the own-unit and de-duplication checks then run in order.
+    const parsed = await Promise.all(
+      written.map(async (w) => {
+        const text = typeof w?.text === 'string' ? w.text.trim() : '';
+        if (!text) return undefined;
+        try {
+          return { text, result: await this.cfg.parser.parse(text, context) };
+        } catch (err) {
+          this.note({
+            kind: 'order-dropped',
+            reason: `${err instanceof Error ? err.message : String(err)}: ${text}`,
+          });
+          return undefined;
+        }
+      }),
+    );
     const orders: AgentOrder[] = [];
     const seen = new Set<string>();
-    for (const w of written) {
-      const text = typeof w?.text === 'string' ? w.text.trim() : '';
-      if (!text) continue;
-      try {
-        const parsed = await this.cfg.parser.parse(text, context);
-        if (parsed.kind !== 'intents') {
-          this.note({ kind: 'order-dropped', reason: `${parsed.kind}: ${text}` });
-        } else if (!own.has(parsed.unitId) || seen.has(parsed.unitId)) {
-          this.note({ kind: 'order-dropped', reason: `unit ${parsed.unitId}: ${text}` });
-        } else {
-          seen.add(parsed.unitId);
-          orders.push({
-            unitId: parsed.unitId,
-            text,
-            intent: parsed.intents[0]!,
-            intents: parsed.intents,
-          });
-        }
-      } catch (err) {
-        this.note({
-          kind: 'order-dropped',
-          reason: `${err instanceof Error ? err.message : String(err)}: ${text}`,
+    for (const p of parsed) {
+      if (!p) continue;
+      const { text, result } = p;
+      if (result.kind !== 'intents') {
+        this.note({ kind: 'order-dropped', reason: `${result.kind}: ${text}` });
+      } else if (!own.has(result.unitId) || seen.has(result.unitId)) {
+        this.note({ kind: 'order-dropped', reason: `unit ${result.unitId}: ${text}` });
+      } else {
+        seen.add(result.unitId);
+        orders.push({
+          unitId: result.unitId,
+          text,
+          intent: result.intents[0]!,
+          intents: result.intents,
         });
       }
     }

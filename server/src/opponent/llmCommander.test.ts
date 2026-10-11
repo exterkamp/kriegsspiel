@@ -146,6 +146,54 @@ describe('fog of war', () => {
   });
 });
 
+describe('translating orders', () => {
+  it('drops an order the parser resolves to a unit of the other side, and says so', async () => {
+    const world = loadScenario(holdTheBridge);
+    const foreign: OrderParser = {
+      async parse(text: string): Promise<ParseResult> {
+        const unitId = text.split(' ')[0]!;
+        return { kind: 'intents', text, unitId, intents: [{ kind: 'move', to: BRIDGE }] };
+      },
+    };
+    const model = new FakeModel(() => ({
+      orders: [
+        { unit: 'x', text: 'blue-1 march to the bridge' },
+        { unit: 'x', text: 'red-1 march to the bridge' },
+      ],
+    }));
+    const notes: string[] = [];
+    const [agent] = llmAgents(world, {
+      client: model,
+      parser: foreign,
+      onNote: (_s, n) => notes.push(n.reason),
+    });
+    const orders = await agent!.decide!(viewFor(world, 'red', 0));
+    expect(orders.map((o) => o.unitId)).toEqual(['red-1']);
+    expect(notes).toEqual([expect.stringContaining('blue-1')]);
+  });
+
+  it('parses the orders in parallel and keeps them all, in order', async () => {
+    const world = loadScenario(holdTheBridge);
+    let inFlight = 0;
+    let peak = 0;
+    const slowParser: OrderParser = {
+      async parse(text: string, ctx): Promise<ParseResult> {
+        inFlight++;
+        peak = Math.max(peak, inFlight);
+        await new Promise((r) => setTimeout(r, 10));
+        inFlight--;
+        return parser.parse(text, ctx);
+      },
+    };
+    const [agent] = llmAgents(world, { client: new FakeModel(), parser: slowParser });
+    const view = viewFor(world, 'red', 0);
+    const orders = await agent!.decide!(view);
+    expect(orders.map((o) => o.unitId)).toEqual(view.ownUnits.map((u) => u.id));
+    expect(view.ownUnits.length).toBeGreaterThan(1);
+    expect(peak).toBe(view.ownUnits.length);
+  });
+});
+
 describe('failure', () => {
   it.each(['transport', 'budget', 'rate-limit', 'schema'] as const)(
     'plays the scripted opponent when the call fails (%s)',
@@ -303,6 +351,40 @@ describe('a full game', () => {
     await time.advance(60_000);
     expect(game.staffAtWork.working).toBe(false);
     expect(game.gameClock.now()).toBeGreaterThan(0);
+  });
+
+  it('does not start a second decision while one is in flight', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const inner = new FakeModel();
+    const slow: UmpireClient = {
+      async call<T>(req: UmpireRequest) {
+        await gate;
+        return inner.call<T>(req);
+      },
+    };
+    let asked = 0;
+    const counting: UmpireClient = {
+      call<T>(req: UmpireRequest) {
+        asked++;
+        return slow.call<T>(req);
+      },
+    };
+    const time = new FakeTime();
+    host = new GameHost({
+      store: new MemoryGameStore(),
+      parser,
+      registry: registry(),
+      wallNow: time.now,
+      timers: time,
+      scriptedOpponents: true,
+      aiAgents: (_id, world) => llmAgents(world, { client: counting, parser }),
+    });
+    await host.create('g1', loadScenario(holdTheBridge), { rate: 12 });
+    await time.advance(30_000);
+    expect(asked).toBe(1);
+    release();
+    await time.advance(60_000);
   });
 
   it('keeps playing when the model is down: the scripted opponent takes the bridge', async () => {
