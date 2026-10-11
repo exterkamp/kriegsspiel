@@ -93,6 +93,14 @@ describe('guest play', () => {
     expect(list.statusCode).toBe(200);
   });
 
+  it('gives the guest cookie a lifetime longer than the idle window, so an active guest is never logged out', async () => {
+    const server = await start({ guestIdleMs: 24 * HOUR });
+    const g = await guest(server);
+    const maxAge = Number(/Max-Age=(\d+)/.exec(String(g.res.headers['set-cookie']))![1]);
+    expect(maxAge).toBeGreaterThan((24 * HOUR) / 1000);
+    expect(maxAge).toBeGreaterThanOrEqual(365 * 24 * 3600);
+  });
+
   it('reuses the current session instead of making another guest', async () => {
     const server = await start();
     const a = await guest(server);
@@ -143,6 +151,16 @@ describe('guest play', () => {
     expect((await guest(server, '10.0.0.2')).res.statusCode).toBe(200);
     wall += HOUR + 1;
     expect((await guest(server)).res.statusCode).toBe(200);
+  });
+
+  it('does not use a rate-limit slot when the caller already has a session', async () => {
+    const server = await start({ guestPerIp: 1 });
+    const a = await guest(server);
+    expect(a.res.statusCode).toBe(200);
+    for (let i = 0; i < 3; i++) {
+      expect((await guest(server, '10.0.0.1', a.cookie)).res.statusCode).toBe(200);
+    }
+    expect((await guest(server)).res.statusCode).toBe(429);
   });
 
   it('removes idle guests and their seats, and keeps ones in use', async () => {

@@ -47,6 +47,8 @@ export interface AuthOptions {
 }
 
 export const GUEST_IDLE_MS = 7 * 24 * 3_600_000;
+/** The guest cookie outlives any idle window: the server-side session row alone decides when a guest is idle. */
+export const GUEST_COOKIE_MAX_AGE_S = 400 * 24 * 3600;
 
 export interface Auth {
   /** The signed-in user for a request, from its session cookie. */
@@ -86,9 +88,9 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
     const user = userId ? o.store.getUser(userId) : undefined;
     // A guest session slides, so "idle" means unused; refreshed at most hourly to spare the store.
     if (user?.guest && hash) {
-      const last = lastTouch.get(hash) ?? 0;
+      const last = lastTouch.get(user.id) ?? 0;
       if (now() - last > 3_600_000) {
-        lastTouch.set(hash, now());
+        lastTouch.set(user.id, now());
         o.store.putSession(hash, user.id, now() + guestIdleMs);
       }
     }
@@ -100,6 +102,7 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
     o.store.prune(now());
     for (const id of o.store.idleGuests(now())) {
       const games = o.store.deleteUser(id);
+      lastTouch.delete(id);
       o.onAccountDeleted?.(id, games);
     }
   };
@@ -111,15 +114,17 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
 
   server.post('/auth/guest', async (req, reply) => {
     if (!o.guestPlay) return reply.code(404).send({ error: 'guest_play_disabled' });
-    if (!perGuestIp.hit(req.ip)) {
-      return reply.code(429).header('retry-after', '3600').send({ error: 'rate_limited' });
-    }
     // Already signed in (guest or not): keep that session rather than minting another account.
-    const user = userOf(req) ?? o.store.createGuest(now());
-    if (!userOf(req)) {
+    let user = userOf(req);
+    if (!user) {
+      // Only a request that creates a guest uses up a slot.
+      if (!perGuestIp.hit(req.ip)) {
+        return reply.code(429).header('retry-after', '3600').send({ error: 'rate_limited' });
+      }
+      user = o.store.createGuest(now());
       const session = randomBytes(32).toString('base64url');
       o.store.putSession(hashToken(session), user.id, now() + guestIdleMs);
-      reply.header('set-cookie', cookie(session, guestIdleMs / 1000));
+      reply.header('set-cookie', cookie(session, GUEST_COOKIE_MAX_AGE_S));
     }
     return reply
       .header('cache-control', 'no-store')
