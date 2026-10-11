@@ -290,9 +290,6 @@
   .prose {
     white-space: pre-wrap;
   }
-  form {
-    touch-action: none;
-  }
   fieldset {
     min-inline-size: 0;
   }

@@ -649,6 +649,7 @@ describe('fixture desk DOM', () => {
   it('ignores late application completion when a newer source observation is queued', async () => {
     const ports = await render();
     let complete: ((result: Result<void>) => void) | undefined;
+    let completeNewer: ((result: Result<void>) => void) | undefined;
     vi.mocked(ports.surface.apply).mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -662,6 +663,12 @@ describe('fixture desk DOM', () => {
       error: null,
     });
     await flush();
+    vi.mocked(ports.surface.apply).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          completeNewer = resolve;
+        }),
+    );
     ports.emit({
       connection: 'ready',
       stale: false,
@@ -670,6 +677,11 @@ describe('fixture desk DOM', () => {
     });
     await flush();
     complete!(ok(undefined));
+    await flush();
+    expect(completeNewer).toBeTypeOf('function');
+    // The newer renderer is still pending: late old success must never become visible.
+    expect(target.querySelector('header time')?.getAttribute('datetime')).toBe('PT0.01S');
+    completeNewer!(ok(undefined));
     await flush();
     expect(target.querySelector('header time')?.getAttribute('datetime')).toBe('PT0.03S');
     expect(target.querySelector('header time')?.getAttribute('datetime')).not.toBe('PT0.02S');

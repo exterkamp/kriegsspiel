@@ -102,8 +102,11 @@ async function input(selector: string, value: string, event = 'input') {
   el.dispatchEvent(new Event(event, { bubbles: true }));
   await flush();
 }
-const notebook = () => target.querySelector<HTMLTextAreaElement>('textarea:not([readonly])')!;
-const exported = () => target.querySelector<HTMLTextAreaElement>('textarea[readonly]')!;
+const notebook = () =>
+  target.querySelector<HTMLTextAreaElement>(
+    'section[aria-label="Local personal notebook"] textarea',
+  )!;
+const exported = () => target.querySelector<HTMLTextAreaElement>('textarea[rows="12"]')!;
 
 describe('fixture journal DOM and storage', () => {
   it('floors visible time while preserving original export milliseconds and timestamp kinds', async () => {
@@ -413,4 +416,119 @@ it('uses h3/h4 journal outline and preserves keyboard focus with long paper meta
   expect(source).toContain('max-inline-size: 100%');
   expect(source).toContain('overflow-wrap: anywhere');
   expect(source).toMatch(/:focus-visible\s*\{[^}]*outline: 3px solid currentColor/);
+});
+
+describe('notebook recovery regressions', () => {
+  it.each(['factory', 'getter'] as const)(
+    'rejects nested load/save through %s without replacing the outer baseline',
+    (phase) => {
+      for (const nestedOperation of ['load', 'save']) {
+        const storage = memory();
+        const key = notesKey(scope);
+        const original = JSON.stringify({ schemaVersion: 1, scope, text: 'Original' });
+        const external = JSON.stringify({ schemaVersion: 1, scope, text: 'Other writer' });
+        storage.records.set(key, original);
+        let callback: (() => void) | undefined;
+        const invoke = (at: string) => {
+          if (at === phase && callback) {
+            const next = callback;
+            callback = undefined;
+            next();
+          }
+        };
+        const read = storage.storage.getItem;
+        storage.storage.getItem = (k) => {
+          invoke('getter');
+          return read(k);
+        };
+        const store = new NotesStore(scope, () => {
+          invoke('factory');
+          return storage.storage;
+        });
+        expect(store.load()).toEqual({ ok: true, text: 'Original' });
+        callback = () => {
+          storage.records.set(key, external);
+          expect((nestedOperation === 'load' ? store.load() : store.save('Nested')).ok).toBe(false);
+        };
+        expect(store.save('Old edits').ok).toBe(false);
+        expect(storage.records.get(key)).toBe(external);
+        expect(storage.storage.setItem).not.toHaveBeenCalled();
+        expect(store.load()).toEqual({ ok: true, text: 'Other writer' });
+        expect(store.save('Recovered')).toEqual({ ok: true, text: 'Recovered' });
+      }
+    },
+  );
+  it.each(['denied', 'corrupt', 'future'])(
+    'preserves dirty RAM, status and export on failed %s reload',
+    async (mode) => {
+      const storage = memory();
+      const key = notesKey(scope);
+      storage.records.set(key, JSON.stringify({ schemaVersion: 1, scope, text: 'Saved' }));
+      await render(snapshot(), storage.factory);
+      await input('textarea:not([readonly])', 'Retain these edits');
+      vi.mocked(storage.storage.setItem).mockImplementation(() => {
+        const e = new Error('Full');
+        e.name = 'QuotaExceededError';
+        throw e;
+      });
+      button('Save personal notes').click();
+      await flush();
+      button('Prepare text export').click();
+      await flush();
+      const beforeExport = exported().value;
+      if (mode === 'denied')
+        vi.mocked(storage.storage.getItem).mockImplementation(() => {
+          throw new Error('Denied');
+        });
+      else
+        storage.records.set(
+          key,
+          mode === 'corrupt' ? '{broken' : JSON.stringify({ schemaVersion: 99 }),
+        );
+      const beforeRecord = storage.records.get(key);
+      button('Reload local notes (discard edits)').click();
+      await flush();
+      expect(notebook().value).toBe('Retain these edits');
+      expect(notebook().disabled).toBe(false);
+      expect(notebook().readOnly).toBe(true);
+      expect(target.textContent).toContain('Unsaved edits.');
+      expect(button('Save personal notes').disabled).toBe(true);
+      expect(exported().value).toBe(beforeExport);
+      button('Prepare text export').click();
+      await flush();
+      expect(exported().value).toContain('Retain these edits');
+      expect(exported().value).toContain('unsaved edits');
+      expect(storage.records.get(key)).toBe(beforeRecord);
+      vi.mocked(storage.storage.getItem).mockImplementation((k) => storage.records.get(k) ?? null);
+      storage.records.set(
+        key,
+        JSON.stringify({ schemaVersion: 1, scope, text: 'Recovered record' }),
+      );
+      button('Reload local notes (discard edits)').click();
+      await flush();
+      expect(notebook().value).toBe('Recovered record');
+      expect(notebook().readOnly).toBe(false);
+      expect(exported()).toBeNull();
+      expect(target.textContent).not.toContain('Unsaved edits.');
+    },
+  );
+  it('clears old-scope RAM/export even when loading the new scope fails', async () => {
+    const storage = memory();
+    const session = writable({ snapshot: snapshot(), scope });
+    component = mount(TestHarness, { target, props: { session, storageFactory: storage.factory } });
+    await flush();
+    await input('textarea:not([readonly])', 'Private old scope');
+    button('Prepare text export').click();
+    await flush();
+    const other = { ...scope, playerId: 'two' };
+    storage.records.set(notesKey(other), '{broken');
+    session.set({ scope: other, snapshot: snapshot([], other) });
+    await flush();
+    expect(notebook().value).toBe('');
+    expect(notebook().disabled).toBe(true);
+    expect(exported()).toBeNull();
+    button('Prepare text export').click();
+    await flush();
+    expect(exported().value).not.toContain('Private old scope');
+  });
 });

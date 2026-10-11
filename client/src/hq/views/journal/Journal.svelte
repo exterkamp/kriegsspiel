@@ -29,6 +29,7 @@
   let store = $state<NotesStore | null>(null);
   let loadedKey = $state('');
   let canSave = $state(false);
+  let hasNotes = $state(false);
   let exportText = $state<string | null>(null);
   const scopeKey = $derived(notesKey(scope));
   const current = $derived(loadedKey === scopeKey);
@@ -37,18 +38,21 @@
   const visible = $derived(supplied.papers.filter((paper) => matchesPaper(paper, query, filter)));
   const showNotes = $derived(
     current &&
-      canSave &&
+      hasNotes &&
       (filter === 'all' || filter === 'notes') &&
       notes.toLowerCase().includes(query.trim().toLowerCase()),
   );
 
   function loadNotes(next: NotesStore) {
     const result = next.load();
-    notes = result.ok === true ? result.text : '';
-    savedNotes = notes;
+    if (result.ok) {
+      notes = result.text;
+      savedNotes = notes;
+      hasNotes = true;
+      exportText = null;
+    }
     canSave = result.ok;
     status = result.ok === true ? 'Local notes loaded. Changes need Save.' : result.message;
-    exportText = null;
   }
   $effect(() => {
     const key = scopeKey;
@@ -57,6 +61,12 @@
       untrack(() => scope),
       factory,
     );
+    if (untrack(() => loadedKey) !== key) {
+      notes = '';
+      savedNotes = '';
+      hasNotes = false;
+      exportText = null;
+    }
     store = next;
     loadedKey = key;
     query = '';
@@ -152,7 +162,8 @@
           exportText = null;
         }}
         maxlength={NOTE_LIMIT}
-        disabled={!current || !canSave}
+        disabled={!current || (!canSave && !hasNotes)}
+        readonly={current && hasNotes && !canSave}
         rows="8"
       ></textarea>
     </label>

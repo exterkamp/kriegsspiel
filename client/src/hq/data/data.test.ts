@@ -250,3 +250,157 @@ describe('scoped preference repository', () => {
     expect(!result.ok && result.error.code).toBe('storage-unavailable');
   });
 });
+
+describe('preference commit boundary regressions', () => {
+  const key = JSON.stringify([
+    'kriegsspiel.hq.preferences.v1',
+    demoScope.gameId,
+    demoScope.sideId,
+    demoScope.playerId,
+  ]);
+  it.each(['revision', 'factory', 'getter'] as const)(
+    'blocks %s callbacks that replace, delete, cancel or reenter before commit',
+    async (phase) => {
+      for (const action of ['replace', 'delete', 'dispose', 'abort', 'load', 'save']) {
+        const records = new Map<string, string>();
+        const controller = new AbortController();
+        let callback: (() => void) | undefined;
+        let counter = 0;
+        let repository: BrowserRepository;
+        let nested: Promise<unknown> | undefined;
+        const invoke = (at: string) => {
+          if (at === phase && callback) {
+            const next = callback;
+            callback = undefined;
+            next();
+          }
+        };
+        const storage: StoragePort = {
+          getItem: (k) => {
+            invoke('getter');
+            return records.get(k) ?? null;
+          },
+          setItem: (k, v) => {
+            records.set(k, v);
+          },
+        };
+        repository = new BrowserRepository(
+          demoScope,
+          () => {
+            invoke('factory');
+            return storage;
+          },
+          () => {
+            invoke('revision');
+            return `r${++counter}`;
+          },
+        );
+        const initial = await repository.load(operation());
+        if (!initial.ok) throw new Error('Initial load failed');
+        const saved = await repository.save(
+          initial.value.document,
+          initial.value.document.revision,
+          operation(),
+        );
+        if (!saved.ok) throw new Error('Initial save failed');
+        const document = saved.value.document;
+        const original = records.get(key)!;
+        const external = JSON.stringify({ schemaVersion: 99 });
+        callback = () => {
+          if (action === 'replace') records.set(key, external);
+          if (action === 'delete') records.delete(key);
+          if (action === 'dispose') repository.dispose();
+          if (action === 'abort') controller.abort();
+          if (action === 'load') nested = repository.load(operation());
+          if (action === 'save') nested = repository.save(document, document.revision, operation());
+        };
+        const result = await repository.save(
+          { ...document, highContrast: true },
+          document.revision,
+          { signal: controller.signal },
+        );
+        expect(result.ok, `${phase}/${action}`).toBe(false);
+        if (nested) expect(((await nested) as { ok: boolean }).ok).toBe(false);
+        expect(records.get(key)).toBe(
+          action === 'replace' ? external : action === 'delete' ? undefined : original,
+        );
+      }
+    },
+  );
+  it.each(['', 'x'.repeat(129), 'r1'])(
+    'rejects invalid or reused generated revisions without advancing the baseline: %s',
+    async (invalid) => {
+      const records = new Map<string, string>();
+      let revision = 'r1';
+      const repository = new BrowserRepository(
+        demoScope,
+        () => ({
+          getItem: (k) => records.get(k) ?? null,
+          setItem: (k, v) => {
+            records.set(k, v);
+          },
+        }),
+        () => revision,
+      );
+      const initial = await repository.load(operation());
+      if (!initial.ok) throw new Error('Initial load failed');
+      revision = invalid;
+      const failed = await repository.save(initial.value.document, 'r1', operation());
+      expect(!failed.ok && failed.error.code).toBe('invalid-data');
+      expect(records.size).toBe(0);
+      revision = 'r2';
+      const recovered = await repository.save(initial.value.document, 'r1', operation());
+      expect(recovered.ok && recovered.value.document.revision).toBe('r2');
+      expect((await repository.save(initial.value.document, 'r1', operation())).ok).toBe(false);
+    },
+  );
+  it.each(['', 'x'.repeat(129)])(
+    'validates initial generated revisions and permits retry: %s',
+    async (invalid) => {
+      let revision = invalid;
+      let writes = 0;
+      const repository = new BrowserRepository(
+        demoScope,
+        () => ({
+          getItem: () => null,
+          setItem: () => {
+            writes++;
+          },
+        }),
+        () => revision,
+      );
+      const result = await repository.load(operation());
+      expect(!result.ok && result.error.code).toBe('invalid-data');
+      expect(writes).toBe(0);
+      revision = 'valid';
+      const recovered = await repository.load(operation());
+      expect(recovered.ok && recovered.value.document.revision).toBe('valid');
+    },
+  );
+  it('returns committed success after write-time disposal without reopening the session', async () => {
+    let raw: string | null = null;
+    let revision = 0;
+    const repository = new BrowserRepository(
+      demoScope,
+      () => ({
+        getItem: () => raw,
+        setItem: (_k, v) => {
+          raw = v;
+          repository.dispose();
+        },
+      }),
+      () => `r${++revision}`,
+    );
+    const loaded = await repository.load(operation());
+    if (!loaded.ok) throw new Error('Initial load failed');
+    const saved = await repository.save(
+      loaded.value.document,
+      loaded.value.document.revision,
+      operation(),
+    );
+    expect(saved.ok).toBe(true);
+    expect(JSON.parse(raw!).revision).toBe('r2');
+    const later = await repository.load(operation());
+    expect(!later.ok && later.error.code).toBe('disposed');
+  });
+});

@@ -34,6 +34,8 @@ const invalid = (): NotesResult => ({
 export class NotesStore {
   private baseline: string | null | undefined;
   private writable = false;
+  private busy = false;
+  private reentered = false;
   private readonly scope: Scope;
   constructor(
     scope: Scope,
@@ -41,13 +43,32 @@ export class NotesStore {
   ) {
     this.scope = { ...scope };
   }
+  private enter(): NotesResult | null {
+    if (this.busy) {
+      this.reentered = true;
+      return { ok: false, message: 'A notebook operation is already in progress. Retry loading.' };
+    }
+    this.busy = true;
+    this.reentered = false;
+    return null;
+  }
+  private interrupted(): NotesResult {
+    this.writable = false;
+    return {
+      ok: false,
+      message: 'The notebook operation was interrupted. Saving is blocked; retry loading.',
+    };
+  }
   load(): NotesResult {
+    const blocked = this.enter();
+    if (blocked) return blocked;
     this.writable = false;
     try {
       // Validate scope even if no record exists.
       if (!notesSchema.safeParse({ schemaVersion: 1, scope: this.scope, text: '' }).success)
         return { ok: false, message: 'Invalid journal scope. Saving is blocked.' };
       const raw = this.storage().getItem(notesKey(this.scope));
+      if (this.reentered) return this.interrupted();
       if (raw !== null) {
         if (raw.length > RECORD_LIMIT) return invalid();
         let value: unknown;
@@ -89,9 +110,20 @@ export class NotesStore {
         message:
           'Browser storage access failed or was denied. Notes cannot be loaded. Retry loading.',
       };
+    } finally {
+      this.busy = false;
     }
   }
   save(text: string): NotesResult {
+    const blocked = this.enter();
+    if (blocked) return blocked;
+    try {
+      return this.saveCurrent(text);
+    } finally {
+      this.busy = false;
+    }
+  }
+  private saveCurrent(text: string): NotesResult {
     if (!this.writable)
       return {
         ok: false,
@@ -104,8 +136,11 @@ export class NotesStore {
         message: `Notes exceed the ${NOTE_LIMIT} character limit and were not saved.`,
       };
     try {
+      const baseline = this.baseline;
       const storage = this.storage();
-      if (storage.getItem(notesKey(this.scope)) !== this.baseline) {
+      const observed = storage.getItem(notesKey(this.scope));
+      if (this.reentered) return this.interrupted();
+      if (observed !== baseline) {
         this.writable = false;
         return {
           ok: false,

@@ -5,8 +5,8 @@ The fixture uses original project artwork and geometry. No historical scan, exte
 | Asset | Source and registration | Use and terms |
 | --- | --- | --- |
 | `client/public/hq-preview.svg` | Original HQ illustration authored in this branch; 1200×900 pixels, artwork revision 2, full image spans 4000×3000 metres with north-west origin | Public geography preview only. Project-owned fixture; external reuse terms are unspecified. It is not a historical survey or engine terrain. |
-| Table, blocks, ruler, dividers, inkwell and lamp | Procedural Three.js geometry in `client/src/table/TableScene.ts` | Original code-generated table dressing and knowledge-preview pieces. No secret terrain or game state used as decoration. |
-| Personal marks and paper tags | Generated metre geometry and canvas text in `client/src/table/marks.ts` and `TableScene.ts` | Player labels render as plain text. Provenance is retained in the local document; source updates do not move annotations. |
+| Table, blocks, ruler, dividers, inkwell and lamp | Procedural Three.js geometry in `client/src/table/FixtureTableScene.ts` and `client/src/table/dressing.ts` | Original code-generated table dressing and knowledge-preview pieces. No secret terrain or game state used as decoration. |
+| Personal marks and paper tags | Generated metre geometry and canvas text in `client/src/table/fixtureMarks.ts` and `FixtureTableScene.ts` | Player labels render as plain text. Provenance is retained in the local document; source updates do not move annotations. |
 | Paper and ink interface | CSS in the HQ shell and views; `--paper` and `--ink` theme tokens | Restrained parchment and serif text. High contrast swaps tokens to white and black; no bitmap texture obscures reading. |
 | Typography | System Georgia, Times New Roman and serif fallbacks | No font files are redistributed or fetched. Metrics depend on available system fonts. |
 
