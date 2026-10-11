@@ -70,7 +70,12 @@ export async function runProcess(command, args, { cwd, env, directory, timeoutMs
     await closed;
     clearTimeout(timer);
     clearTimeout(killTimer);
-    // Also reap stray workers after a nominally successful parent exit.
+    // A closed parent can precede normal worker exit, especially on Linux.
+    // Wait for that owned group to drain naturally before classifying leftovers.
+    const drainStartedAt = Date.now();
+    for (let i = 0; child.pid && i < 10 && groupExists(child.pid); i++) await delay(50);
+    record.naturalDrainMs = Date.now() - drainStartedAt;
+    // Workers remaining after the bounded grace are still infrastructure failure.
     if (child.pid && groupExists(child.pid)) {
       record.strayChildren = true;
       signalGroup(child.pid, 'SIGTERM');
