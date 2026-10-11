@@ -11,6 +11,7 @@ import {
   orderSender,
   persistDraft,
   persistJournal,
+  journal,
   type OrderSender,
 } from './store.js';
 import {
@@ -20,11 +21,16 @@ import {
   estimateRideMs,
   formatEstimate,
   loadDraft,
+  noticeText,
+  ORDER_EXAMPLES,
+  deliveredBy,
+  refusalText,
   saveDraft,
   withAnnex,
 } from './orders.js';
 import { fixtureView } from '../table/fixture.js';
-import { initialState } from '../net/state.js';
+import { applyServerMessage, initialState, withPendingOrder } from '../net/state.js';
+import { MarksBar, startsCollapsed } from '../hud/marksBar.js';
 
 const arrow = (id: string, madeAtGame = 0): Mark => ({
   id,
@@ -141,7 +147,7 @@ describe('Orders desk', () => {
 
   it('shows each courier with a staff estimate once an addressee is chosen', () => {
     open();
-    expect(document.body.textContent).toContain('no estimate yet');
+    expect(document.body.textContent).toContain('choose a commander for an estimate');
     fill();
     const text = document.querySelector('.couriers')!.textContent!;
     expect(text).toContain('Fast rider');
@@ -167,7 +173,8 @@ describe('Orders desk', () => {
     expect(o.text).toContain('Annex (marked map): arrow "Main thrust"');
     expect(o.eta).toBeGreaterThan(0);
     expect(document.querySelector('.stamp')?.textContent).toBe('SENT');
-    expect(get(orderDraft)).toEqual({ ...emptyDraft(), courier: 'fast' });
+    expect(get(orderDraft)).toEqual({ ...emptyDraft(), courier: 'fast', to: unit.id });
+    expect(q<HTMLSelectElement>('#order-to').value).toBe(unit.id);
   });
 
   it('keeps the draft and shows the error when the order cannot go', () => {
@@ -176,7 +183,7 @@ describe('Orders desk', () => {
     fill();
     q('#order-sign').click();
     flushSync();
-    expect(q('.err').textContent).toBe('Not connected.');
+    expect(q('#order-err-send').textContent?.trim()).toBe('Not connected.');
     expect(get(orderDraft).text).toBe('Advance to the ford.');
     expect(document.querySelector('.stamp')).toBeNull();
   });
@@ -193,7 +200,7 @@ describe('Orders desk', () => {
     q('#order-sign').click();
     flushSync();
     expect(send).not.toHaveBeenCalled();
-    expect(q('.err').textContent).toContain('2000');
+    expect(q('#order-err-text').textContent).toContain('2000');
     expect(get(orderDraft).text).toBe(long);
     expect(document.querySelector('.stamp')).toBeNull();
   });
@@ -214,7 +221,10 @@ describe('Orders desk', () => {
     orderSender.set({ send });
     q('#order-sign').click();
     flushSync();
-    expect(q('.err').textContent).toContain('Address');
+    expect(q('#order-err-to').textContent).toContain('Address');
+    expect(q('#order-to').getAttribute('aria-describedby')).toBe('order-err-to');
+    expect(q('#order-to').getAttribute('aria-invalid')).toBe('true');
+    expect(q('#order-err-to').getAttribute('role')).toBe('alert');
     expect(send).not.toHaveBeenCalled();
   });
 
@@ -241,6 +251,116 @@ describe('Orders desk', () => {
     expect(li.textContent).toContain('Order sent to Guards by steady courier: Advance');
     expect(li.textContent).toContain('Courier riding, expected Day 1 00:10');
     expect(li.querySelector('progress')).not.toBeNull();
+  });
+});
+
+describe('refusals and outcomes', () => {
+  it('shows the player’s own words, no order id and two examples', () => {
+    const s = applyServerMessage(
+      withPendingOrder(initialState, {
+        orderId: 'o-9',
+        text: 'Fall Back to the Ford',
+        sentAtGame: 5,
+      }),
+      {
+        v: 1,
+        kind: 'error',
+        code: 'order_rejected',
+        message: 'o-9: I could not find a place.',
+      } as never,
+      0,
+    );
+    expect(s.pending).toEqual([]);
+    const text = noticeText(s.notices[0]!, s.outcomes);
+    expect(text).toContain('"Fall Back to the Ford"');
+    expect(text).toContain('I could not find a place.');
+    expect(text).not.toMatch(/o-9/);
+    for (const e of ORDER_EXAMPLES) expect(text).toContain(e);
+  });
+
+  it('writes the refusal and the addressee’s reply into the journal', () => {
+    const sent = { orderId: 'o1', text: 'Advance', sentAtGame: 0, toName: 'Guards' };
+    gameState.set({
+      ...initialState,
+      pending: [sent],
+      dispatches: [
+        {
+          id: 'd1',
+          from: 'Guards',
+          writtenAtGame: 100,
+          receivedAtGame: 200,
+          category: 'subordinates',
+          text: 'In position.',
+        },
+      ],
+      outcomes: {
+        o2: { kind: 'refused', text: 'Dance', sentAtGame: 0, reason: 'No such action.' },
+      },
+    });
+    const stop = persistJournal('outcome-test');
+    const entries = get(journal);
+    stop();
+    gameState.set(initialState);
+    expect(entries.find((e) => e.id === 'outcome:o1')?.text).toContain('Order to Guards arrived');
+    expect(entries.find((e) => e.id === 'outcome:o2')?.text).toContain('"Dance"');
+  });
+
+  it('only counts a reply from the addressee written after the order', () => {
+    const p = { orderId: 'o', text: 't', sentAtGame: 100, toName: 'Guards' };
+    const d = (from: string, written: number, received = written) => ({
+      id: from + written,
+      from,
+      writtenAtGame: written,
+      receivedAtGame: received,
+      category: 'staff' as const,
+      text: '',
+    });
+    expect(deliveredBy(p, [d('Guards', 50), d('Hussars', 200)])).toBeUndefined();
+    expect(deliveredBy(p, [d('Guards', 300), d('Guards', 150)])?.writtenAtGame).toBe(150);
+    // Written before the order was signed, received after: says nothing about delivery.
+    expect(deliveredBy(p, [d('Guards', 100 - 50, 200)])).toBeUndefined();
+    // Written after, received later still.
+    expect(deliveredBy(p, [d('Guards', 120, 200)])?.receivedAtGame).toBe(200);
+  });
+
+  it('ends a refusal reason with a full stop and phrases a clarification as a need', () => {
+    expect(refusalText({ text: 'x', reason: 'Which bridge? (A, B)' })).toContain(
+      '(A, B) The staff',
+    );
+    expect(refusalText({ text: 'x', reason: 'No such action' })).toContain(
+      'No such action. The staff',
+    );
+    const c = refusalText({ text: 'x', reason: 'Which bridge?', code: 'order_clarification' });
+    expect(c).toContain('need more');
+    expect(c).not.toContain('could not be carried out');
+  });
+});
+
+describe('marks toolbar', () => {
+  it('starts collapsed on narrow screens and toggles', () => {
+    expect(startsCollapsed(1100)).toBe(true);
+    expect(startsCollapsed(1600)).toBe(false);
+    document.body.innerHTML = '';
+    const bar = new MarksBar(
+      document.body,
+      { onTool() {}, onDelete() {}, onPlotReport() {}, onOverlays() {} },
+      true,
+    );
+    const toggle = document.querySelector<HTMLButtonElement>('#marks-toggle')!;
+    expect(document.querySelector<HTMLElement>('#marks-body')!.hidden).toBe(true);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    toggle.click();
+    expect(bar.collapsed).toBe(false);
+    expect(document.querySelector<HTMLElement>('#marks-body')!.hidden).toBe(false);
+    document.body.innerHTML = '';
+  });
+});
+
+describe('page head', () => {
+  it('declares an icon so the browser does not request a missing favicon', async () => {
+    const { readFileSync } = await import('node:fs');
+    const html = readFileSync(`${process.cwd()}/index.html`, 'utf8');
+    expect(html).toMatch(/<link rel="icon"/);
   });
 });
 

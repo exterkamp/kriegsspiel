@@ -1,5 +1,6 @@
+import { refusalText } from './orders.js';
 import type { ClockState, Dispatch } from '@kriegsspiel/protocol';
-import { formatGameTime, type PendingOrder } from '../net/state.js';
+import { formatGameTime, type OrderOutcome, type PendingOrder } from '../net/state.js';
 
 export type JournalKind = 'order' | 'dispatch' | 'pause' | 'note';
 
@@ -28,6 +29,22 @@ export const orderEntry = (p: PendingOrder): JournalEntry => {
     text: `Order sent${to}${how}: ${p.text}`,
   };
 };
+
+/** What became of an order the staff could not carry out. */
+export const refusedEntry = (id: string, o: OrderOutcome, at: number): JournalEntry => ({
+  id: `outcome:${id}`,
+  kind: 'order',
+  at,
+  text: refusalText(o),
+});
+
+/** Word came back from the addressee, so the order arrived. */
+export const arrivedEntry = (p: PendingOrder, d: Dispatch): JournalEntry => ({
+  id: `outcome:${p.orderId}`,
+  kind: 'order',
+  at: d.receivedAtGame,
+  text: `Order to ${p.toName} arrived: word came back at ${formatGameTime(d.receivedAtGame)}.`,
+});
 
 export const dispatchEntry = (d: Dispatch): JournalEntry => ({
   id: `dispatch:${d.id}`,
