@@ -296,4 +296,20 @@ describe('lobby', () => {
     ]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
   });
+
+  it('lists a started game as unfinished with its game time and last played time', async () => {
+    const base = await start();
+    const a = await signIn(base, 'a@example.test');
+    const made = (await (
+      await fetch(`${base}/games`, post(a, { sessionType: 'team_vs_team' }))
+    ).json()) as { id: string };
+    const list = (await (await fetch(`${base}/games`, get(a))).json()) as {
+      games: Array<{ id: string; finished: boolean; gameTimeMs: number; lastPlayedMs: number }>;
+    };
+    const row = list.games.find((g) => g.id === made.id)!;
+    expect(row.finished).toBe(false);
+    expect(row.gameTimeMs).toBeGreaterThanOrEqual(0);
+    expect(row.lastPlayedMs).toBeGreaterThan(0);
+    app!.hub.closeAll();
+  });
 });
