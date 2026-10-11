@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { MemoryAuthStore } from '../auth/store.js';
 import { MemoryGameStore } from '../game/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { buildApp, type App } from './app.js';
@@ -240,5 +241,59 @@ describe('lobby', () => {
       pause: unknown;
     };
     expect(info.pause).toEqual({ rule: 'majority', maxPauseMs: 60_000 });
+  });
+
+  it('opens a game that has seats but no lobby record as a started team game', async () => {
+    const store = new MemoryGameStore();
+    const authStore = new MemoryAuthStore();
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      store,
+      auth: { mailer, store: authStore },
+    });
+    let base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+    const a = await signIn(base, 'a@example.test');
+    const game = (await (await fetch(`${base}/games`, post(a, { side: 'blue' }))).json()) as {
+      id: string;
+    };
+    await app.server.close();
+    // The same stores under a fresh lobby store: what a deployment from before lobby records sees.
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      store,
+      auth: { mailer, store: authStore },
+    });
+    base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+    const info = (await (await fetch(`${base}/games/${game.id}`, get(a))).json()) as Info;
+    expect(info).toMatchObject({ id: game.id, status: 'started', you: 'blue' });
+    const list = (await (await fetch(`${base}/games`, get(a))).json()) as {
+      games: Array<{ id: string }>;
+    };
+    expect(list.games.map((g) => g.id)).toEqual([game.id]);
+    const opened = await new Promise<'open' | 'refused'>((resolve) => {
+      const sock = new WebSocket(`${base.replace('http', 'ws')}/games/${game.id}/ws`, {
+        headers: { cookie: a },
+      } as never);
+      sock.addEventListener('open', () => {
+        sock.close();
+        resolve('open');
+      });
+      sock.addEventListener('error', () => resolve('refused'));
+    });
+    expect(opened).toBe('open');
+    app!.hub.closeAll();
+  });
+
+  it('answers a second /start that arrives together with the first with 409, not 500', async () => {
+    const base = await start();
+    const a = await signIn(base, 'a@example.test');
+    const game = (await (
+      await fetch(`${base}/games`, post(a, { lobby: true, sessionType: 'hot_seat' }))
+    ).json()) as { id: string };
+    const results = await Promise.all([
+      fetch(`${base}/games/${game.id}/start`, post(a)),
+      fetch(`${base}/games/${game.id}/start`, post(a)),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
   });
 });
