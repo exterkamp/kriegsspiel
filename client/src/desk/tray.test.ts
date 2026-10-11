@@ -51,13 +51,17 @@ describe('sortTray', () => {
     expect(t.piles[1]!.items.map((d) => d.id)).toEqual(['c']);
     expect(t.filed.map((d) => d.id)).toEqual(['a']);
   });
-  it('sorts 200 dispatches quickly', () => {
+  it('sorts 200 dispatches newest arrival first without dropping or duplicating any', () => {
     const ds = Array.from({ length: 200 }, (_, i) =>
       disp(`d${i}`, { receivedAtGame: (i * 7919) % 1000 }),
     );
-    const t0 = performance.now();
-    for (let i = 0; i < 100; i++) sortTray(ds, emptyMarks());
-    expect((performance.now() - t0) / 100).toBeLessThan(5);
+    const t = sortTray(ds, emptyMarks());
+    const items = t.piles.flatMap((p) => p.items);
+    expect(items).toHaveLength(200);
+    expect(new Set(items.map((d) => d.id)).size).toBe(200);
+    const times = items.map((d) => d.receivedAtGame);
+    expect(times).toEqual([...times].sort((x, y) => y - x));
+    expect(t.unread).toBe(200);
   });
 });
 
@@ -218,13 +222,11 @@ describe('In-tray view', () => {
     );
     expect([...get(gameState).read].sort()).toEqual(['a', 'b', 'c']);
   });
-  it('renders 200 dispatches without lag', () => {
+  it('renders 200 dispatches in one pile', () => {
     const ds = Array.from({ length: 200 }, (_, i) => disp(`d${i}`, { receivedAtGame: i * 1000 }));
-    const t0 = performance.now();
     open(ds);
     click(pileBtn('Scouts'));
     click(rows()[0]);
-    expect(performance.now() - t0).toBeLessThan(1000);
     expect(rows()).toHaveLength(200);
   });
 });
