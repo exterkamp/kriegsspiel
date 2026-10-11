@@ -25,6 +25,8 @@ Coordinates are local metres: x east, y south, z up, north-west zero origin. Pre
 
 ## Proposed scenario adapter boundary
 
+For public-geography inspection now, [the saved map table](map-table-guide.md) loads certified JSON onto a flat Three.js paper. It preserves the canonical asset as authority and has no scenario, units or live connection (D26). This bounded display handoff does not supply the scenario adapter below.
+
 A future pure adapter should consume a fully validated, supported `MapAsset` and an explicit scenario specification, returning the engine's accepted static terrain/scenario representation with a source asset identity. Keep the original authoring asset immutable. Conversion should explicitly define coordinate transforms, elevation/crossing queries, terrain categories, feature reference mapping and any simulation metadata absent from the authoring contract. If the engine cannot represent a layer, reject or document that limitation instead of silently dropping water holes, local streets or narrow crossings.
 
 The scenario specification supplies factions, orders of battle, starting formations, headquarters, objectives, time/weather assumptions and win conditions. Those are not inferred from buildings, residents or a “connected” generation result. A successful settlement population/capacity result is an authoring invariant, not evidence of troop accommodation, bridge capacity or scenario balance. Generation diagnostics/provenance may be stored for scenario audit; UI progress, request IDs, elapsed time and watchdog state must not enter deterministic engine state or canonical map identity.
