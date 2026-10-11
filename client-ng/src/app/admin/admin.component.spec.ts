@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, UrlSerializer } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AdminPage } from '@legacy/admin/admin';
 import { routes } from '../app.routes';
 import { TrailingSlashUrlSerializer } from '../trailing-slash';
 
@@ -20,7 +21,10 @@ beforeEach(() => {
     ],
   });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('admin route', () => {
   it.each(['/admin', '/admin/'])('%s hosts the existing AdminPage', async (url) => {
@@ -34,13 +38,14 @@ describe('admin route', () => {
   });
 
   it('stops the page when the route is left', async () => {
+    const stop = vi.spyOn(AdminPage.prototype, 'stop');
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/admin');
     await harness.fixture.whenStable();
-    const calls = vi.mocked(fetch).mock.calls.length;
+    expect(stop).not.toHaveBeenCalled();
     await harness.navigateByUrl('/map-benchmark.html');
     expect(TestBed.inject(Router).url).toBe('/map-benchmark');
     expect(document.querySelector('ks-admin')).toBeNull();
-    expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThanOrEqual(calls);
+    expect(stop).toHaveBeenCalledTimes(1);
   });
 });
