@@ -1,9 +1,24 @@
-import { Injectable, Injector, computed, effect, inject, signal, untracked, type EffectRef } from '@angular/core';
+import {
+  Injectable,
+  Injector,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  type EffectRef,
+} from '@angular/core';
 import type { Coord, Dispatch, WindowAt } from '@kriegsspiel/protocol';
 import type { ClockState } from '@kriegsspiel/protocol';
 import type { BeliefChoice } from '@legacy/window/model';
 import { gameNowMs } from '@legacy/net/state';
-import { deliveredBy, emptyDraft, loadDraft, saveDraft, type OrderDraft } from '@legacy/desk/orders';
+import {
+  deliveredBy,
+  emptyDraft,
+  loadDraft,
+  saveDraft,
+  type OrderDraft,
+} from '@legacy/desk/orders';
 import {
   addEntries,
   arrivedEntry,
@@ -90,7 +105,8 @@ export class DeskStore {
     return this.run(() => {
       const m = this.trayMarks();
       // The game state changes on every server message; only write when a mark set actually changed.
-      if (last && last.read === m.read && last.filed === m.filed && last.discarded === m.discarded) return;
+      if (last && last.read === m.read && last.filed === m.filed && last.discarded === m.discarded)
+        return;
       last = m;
       untracked(() => saveMarks(key, m));
     });
@@ -160,7 +176,11 @@ export class DeskStore {
   }
 }
 
-function toggle(s: { update(f: (v: ReadonlySet<string>) => ReadonlySet<string>): void }, id: string, on: boolean): void {
+function toggle(
+  s: { update(f: (v: ReadonlySet<string>) => ReadonlySet<string>): void },
+  id: string,
+  on: boolean,
+): void {
   s.update((set) => {
     if (set.has(id) === on) return set;
     const next = new Set(set);

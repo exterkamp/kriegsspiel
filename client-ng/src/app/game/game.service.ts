@@ -83,10 +83,15 @@ export class GameService {
   }
 
   /** Send finished order wording and remember it as pending. Returns an error for the form, or undefined. */
-  sendOrder(text: string, extra: Partial<PendingOrder> = {}, courier?: 'fast' | 'safe'): string | undefined {
+  sendOrder(
+    text: string,
+    extra: Partial<PendingOrder> = {},
+    courier?: 'fast' | 'safe',
+  ): string | undefined {
     if (!this.conn) return 'Not connected to a game (open with ?new=1 or ?game=…).';
     const orderId = `o-${Date.now().toString(36)}-${++this.orderSeq}`;
-    if (!this.conn.sendOrder(orderId, text, courier)) return 'Not connected. Try again when the link is back.';
+    if (!this.conn.sendOrder(orderId, text, courier))
+      return 'Not connected. Try again when the link is back.';
     const s = this._state();
     const sentAtGame = s.clock ? gameNowMs(s.clock, Date.now()) : 0;
     this._state.set(withPendingOrder(s, { orderId, text, sentAtGame, ...extra }));

@@ -15,11 +15,20 @@ export interface PauseActions {
  * `eta` is the staff's estimate in game ms. Returns an error to show on the form, or undefined when the order has gone.
  */
 export interface OrderSender {
-  send(o: { text: string; toName: string; courier: Courier; eta: number | undefined }): string | undefined;
+  send(o: {
+    text: string;
+    toName: string;
+    courier: Courier;
+    eta: number | undefined;
+  }): string | undefined;
 }
 
 /** Sends a staff question; returns false when the link is down. */
-export type ConferenceSender = (questionId: string, role: ConferenceRole, question: string) => boolean;
+export type ConferenceSender = (
+  questionId: string,
+  role: ConferenceRole,
+  question: string,
+) => boolean;
 
 /** Ports the desk views depend on. By default they talk to `GameService`; tests and fixtures provide their own. */
 export const ORDER_SENDER = new InjectionToken<OrderSender>('ORDER_SENDER', {
@@ -30,7 +39,11 @@ export const ORDER_SENDER = new InjectionToken<OrderSender>('ORDER_SENDER', {
       send: (o) =>
         game.sendOrder(
           o.text,
-          { toName: o.toName, courier: o.courier, ...(o.eta === undefined ? {} : { etaGame: o.eta }) },
+          {
+            toName: o.toName,
+            courier: o.courier,
+            ...(o.eta === undefined ? {} : { etaGame: o.eta }),
+          },
           o.courier,
         ),
     };
