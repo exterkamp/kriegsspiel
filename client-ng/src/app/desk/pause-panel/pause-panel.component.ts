@@ -30,7 +30,8 @@ export class PausePanelComponent {
 
   constructor() {
     const t = setInterval(() => this.now.set(Date.now()), 250);
-    const baseTitle = typeof document === 'undefined' ? '' : document.title.replace(/^\(vote\) /, '');
+    const baseTitle =
+      typeof document === 'undefined' ? '' : document.title.replace(/^\(vote\) /, '');
     // Mark the page title while a vote waits for this player; restore it when the panel goes away.
     effect(() => {
       document.title = pageTitle(baseTitle, this.game.state());

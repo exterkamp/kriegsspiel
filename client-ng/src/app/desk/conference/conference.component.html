@@ -14,7 +14,9 @@
   <strong>{{ officer().name }}</strong
   >, {{ officer().title.toLowerCase() }}.
   <span class="traits">Traits: {{ officer().traits.join(', ') }}.</span>
-  <small>Each question takes about {{ formatCost(officer().costMs) }} of game time to answer.</small>
+  <small
+    >Each question takes about {{ formatCost(officer().costMs) }} of game time to answer.</small
+  >
 </p>
 
 @if (log().length === 0) {
@@ -29,7 +31,8 @@
           <p class="a failed">{{ officer().name }} could not be reached. Ask again.</p>
         } @else if (isPending(e, nowGame())) {
           <p class="a pending">
-            {{ officer().name }} is consulting the papers… answer due {{ formatGameTime(e.answerAtGame) }}.
+            {{ officer().name }} is consulting the papers… answer due
+            {{ formatGameTime(e.answerAtGame) }}.
           </p>
         } @else if (e.answer) {
           <p class="a">{{ e.answer.text }}</p>

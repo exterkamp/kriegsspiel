@@ -2,7 +2,9 @@
 @if (v.kind === 'idle') {
   <section class="pause idle" aria-label="Pause">
     @if (v.action === 'resume') {
-      <button type="button" data-testid="propose-resume" (click)="propose('resume')">Ask to resume</button>
+      <button type="button" data-testid="propose-resume" (click)="propose('resume')">
+        Ask to resume
+      </button>
     } @else if (asking()) {
       <form (submit)="submitPause($event)">
         <label>
@@ -39,7 +41,9 @@
     </p>
     @if (v.needsVote) {
       <div class="buttons">
-        <button type="button" data-testid="vote-yes" (click)="cast(v.id, true)">Yes, {{ v.action }}</button>
+        <button type="button" data-testid="vote-yes" (click)="cast(v.id, true)">
+          Yes, {{ v.action }}
+        </button>
         <button type="button" data-testid="vote-no" (click)="cast(v.id, false)">No</button>
       </div>
     } @else {

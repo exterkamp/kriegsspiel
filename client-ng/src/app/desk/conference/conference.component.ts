@@ -59,7 +59,9 @@ export class ConferenceComponent {
       : (s.view?.atGame ?? 0) + (this.wall() - this.opened);
   });
   protected readonly officer = computed(() => staffFor(this.role()));
-  protected readonly log = computed(() => this.desk.conferenceLog().filter((e) => e.role === this.role()));
+  protected readonly log = computed(() =>
+    this.desk.conferenceLog().filter((e) => e.role === this.role()),
+  );
 
   constructor() {
     const t = setInterval(() => this.wall.set(Date.now()), 1000);
@@ -111,13 +113,18 @@ export class ConferenceComponent {
     }
     this.desk.conferenceLog.update((l) => [...l, ex]);
     this.question.set('');
-    this.desk.conferenceClient().ask(req, state.view).then(
-      (answer) =>
-        this.desk.conferenceLog.update((l) => l.map((x) => (x.id === ex.id ? { ...x, answer } : x))),
-      () =>
-        this.desk.conferenceLog.update((l) =>
-          l.map((x) => (x.id === ex.id ? { ...x, failed: true } : x)),
-        ),
-    );
+    this.desk
+      .conferenceClient()
+      .ask(req, state.view)
+      .then(
+        (answer) =>
+          this.desk.conferenceLog.update((l) =>
+            l.map((x) => (x.id === ex.id ? { ...x, answer } : x)),
+          ),
+        () =>
+          this.desk.conferenceLog.update((l) =>
+            l.map((x) => (x.id === ex.id ? { ...x, failed: true } : x)),
+          ),
+      );
   }
 }

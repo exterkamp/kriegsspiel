@@ -52,7 +52,10 @@ export class JournalComponent {
       const p = j.kind === 'order' ? pending.find((o) => `order:${o.orderId}` === j.id) : undefined;
       if (!p) return { j, ride: undefined };
       const s = deliveryStatus(p, nowGame);
-      return { j, ride: { progress: p.etaGame === undefined ? undefined : s.fraction, label: s.label } };
+      return {
+        j,
+        ride: { progress: p.etaGame === undefined ? undefined : s.fraction, label: s.label },
+      };
     });
   });
 

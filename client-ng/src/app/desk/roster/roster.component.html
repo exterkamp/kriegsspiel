@@ -16,7 +16,11 @@
       @for (r of rows(); track r.id) {
         <tr [class]="r.freshness" [attr.data-unit]="r.id">
           <th scope="row">
-            <button type="button" (click)="focus(r)" [attr.aria-label]="'Show ' + r.name + ' on the table'">
+            <button
+              type="button"
+              (click)="focus(r)"
+              [attr.aria-label]="'Show ' + r.name + ' on the table'"
+            >
               {{ r.name }}
             </button>
           </th>
@@ -30,7 +34,9 @@
           <td>
             {{ formatGameTime(r.reportedAt) }}
             <small class="age"
-              >{{ formatAge(r.ageMs) }} old{{ r.freshness === 'fresh' ? '' : ' (' + r.freshness + ')' }}</small
+              >{{ formatAge(r.ageMs) }} old{{
+                r.freshness === 'fresh' ? '' : ' (' + r.freshness + ')'
+              }}</small
             >
           </td>
         </tr>
