@@ -215,6 +215,32 @@ describe('in a game', () => {
       });
       // The clock was not left held on the failed parse.
       expect(game.state.time).toBeGreaterThan(0);
+      // Nothing is still held: a further order is parsed (and refused) rather than blocked.
+      const again = await game.submit({ kind: 'order', side: 'blue', text: SAMPLES.cavalry });
+      expect(again).toMatchObject({
+        ok: false,
+        kind: 'clarification',
+        question: FALLBACK_QUESTION,
+      });
     },
   );
+
+  it('asks the parser factory for each game by its own id', async () => {
+    const time = new FakeTime();
+    const ids: string[] = [];
+    host = new GameHost({
+      store: new MemoryGameStore(),
+      parser: (id) => {
+        ids.push(id);
+        return new StubOrderParser();
+      },
+      registry: createRegistry(),
+      wallNow: time.now,
+      timers: time,
+      init: startingState,
+    });
+    await host.create('g1', loadScenario(holdTheBridge), { rate: 1 });
+    await host.create('g2', loadScenario(holdTheBridge), { rate: 1 });
+    expect(ids).toEqual(['g1', 'g2']);
+  });
 });

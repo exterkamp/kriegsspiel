@@ -79,7 +79,9 @@ export function authFromEnv(
 /**
  * Whether orders are parsed by the LLM: the `parse` stage's provider is usable (Anthropic needs its
  * API key; any other configured provider counts) and `ORDER_PARSER` is not `stub`. Otherwise the
- * rule-based stub parses orders, as in tests and with no key.
+ * rule-based stub parses orders, as in tests and with no key. A non-Anthropic provider is not
+ * checked for credentials here: if it is misconfigured, each order fails over to the fallback and
+ * logs an `order parser fallback` warning. That trade-off keeps the game playable and the problem visible.
  */
 export function llmOrderParserEnabled(
   env: Record<string, string | undefined>,
