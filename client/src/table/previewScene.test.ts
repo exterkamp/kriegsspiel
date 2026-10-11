@@ -36,7 +36,7 @@ import { buildSceneState } from './sceneState.js';
 import { fixtureMap, fixtureView } from './fixture.js';
 
 const tables: TableScene[] = [];
-function make(mode: 'fixture' | 'public-map-preview' = 'public-map-preview') {
+function make(mode: 'fixture' | 'public-map-preview' | 'local-hq-board' = 'public-map-preview') {
   const table = new TableScene(document.createElement('canvas'), { mode });
   tables.push(table);
   return table;
@@ -844,4 +844,124 @@ describe('preview-only frame failure reporting', () => {
     expect(report).not.toHaveBeenCalled();
     expect(schedule).toHaveBeenCalledOnce();
   });
+});
+
+describe('local HQ board scene isolation', () => {
+  it('accepts fixed raster and personal marks only on the immutable local scene mode', () => {
+    const local = make('local-hq-board');
+    const saved = { ...raster() };
+    const state = buildSceneState(fixtureView, fixtureMap);
+    expect(() => local.apply(state)).toThrow('fixture state');
+    expect(() => local.applyPreviewRaster(saved)).toThrow('preview rasters');
+    expect(() => local.setArtwork(document.createElement('img'))).toThrow('external artwork');
+    for (const other of [make('fixture'), make()]) {
+      expect(() => other.applyLocalBoard(saved, [])).toThrow('Only local HQ');
+      expect(() => other.localBoardTextureLimit()).toThrow('Only local HQ');
+      expect(() => other.renderLocalBoardFrame()).toThrow('Only local HQ');
+    }
+    local.applyLocalBoard(saved, [
+      { id: 'se', label: '', geometry: { kind: 'pin', at: { x: 14900, y: 4900 } } },
+    ]);
+    expect(local.pieceCount).toBe(0);
+    expect(local.scene.getObjectByName('marks-root')!.children).toHaveLength(1);
+    expect(() =>
+      local.applyLocalBoard(saved, [
+        {
+          id: 'truth',
+          label: '',
+          geometry: { kind: 'pin', at: { x: 1, y: 1 } },
+          privateTruth: {},
+        } as never,
+      ]),
+    ).toThrow();
+    expect(() => local.applyLocalBoard(raster('different'), [])).toThrow('cannot be replaced');
+    (saved as { widthM: number }).widthM = 100;
+    expect(() => local.applyLocalBoard(saved, [])).toThrow('cannot be replaced');
+    expect(mesh(local).geometry.parameters.width).toBe(15000);
+    expect(local.scene.getObjectByName('marks-root')!.children).toHaveLength(1);
+  });
+  it('reuses paper resources across mark updates and retains old marks after a failed rendered update', () => {
+    const local = make('local-hq-board');
+    const saved = raster();
+    const mark = {
+      id: 'private',
+      label: '',
+      geometry: { kind: 'pin' as const, at: { x: 14500.25, y: 125.75 } },
+    };
+    local.applyLocalBoard(saved, [mark]);
+    const paper = mesh(local),
+      texture = paper.material.map;
+    const root = local.scene.getObjectByName('marks-root')!;
+    const previous = root.children[0]!;
+    const render = vi.spyOn(local.renderer, 'render').mockImplementationOnce(() => {
+      throw new Error('local frame failed');
+    });
+    expect(() => local.applyLocalBoard(saved, [])).toThrow('local frame failed');
+    expect(root.children).toEqual([previous]);
+    expect(mesh(local)).toBe(paper);
+    expect(paper.material.map).toBe(texture);
+    local.applyLocalBoard(saved, []);
+    expect(root.children).toHaveLength(0);
+    expect(render).toHaveBeenCalled();
+    const dispose = vi.spyOn(texture!, 'dispose');
+    local.dispose();
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(() => local.applyLocalBoard(saved, [])).toThrow('disposed');
+  });
+  it('acknowledges framed renders and rejects nested apply/disposal during its actual frame', () => {
+    const local = make('local-hq-board'),
+      saved = raster();
+    local.applyLocalBoard(saved, []);
+    const render = vi.spyOn(local.renderer, 'render').mockImplementationOnce(() => {
+      expect(() => local.applyLocalBoard(saved, [])).toThrow('Nested');
+    });
+    local.applyLocalBoard(saved, []);
+    local.snapTopDown();
+    local.renderLocalBoardFrame();
+    expect(render).toHaveBeenCalled();
+    render.mockImplementationOnce(() => local.dispose());
+    expect(() => local.applyLocalBoard(saved, [])).toThrow('unavailable');
+    expect(local.scene.children).toHaveLength(0);
+  });
+  it.each(['render', 'retirement'] as const)(
+    'releases every detached predecessor exactly once when disposal re-enters during %s',
+    (phase) => {
+      const local = make('local-hq-board');
+      const saved = raster();
+      local.applyLocalBoard(saved, [
+        { id: 'first', label: '', geometry: { kind: 'pin', at: { x: 100, y: 100 } } },
+        { id: 'second', label: '', geometry: { kind: 'pin', at: { x: 200, y: 200 } } },
+      ]);
+      const root = local.scene.getObjectByName('marks-root')!;
+      const resources = new Set<THREE.BufferGeometry | THREE.Material | THREE.Texture>();
+      for (const group of root.children) {
+        group.traverse((object) => {
+          const child = object as THREE.Mesh;
+          if (child.geometry) resources.add(child.geometry);
+          for (const material of Array.isArray(child.material)
+            ? child.material
+            : child.material
+              ? [child.material]
+              : []) {
+            resources.add(material);
+            const texture = (material as THREE.MeshStandardMaterial).map;
+            if (texture) resources.add(texture);
+          }
+        });
+      }
+      expect(resources.size).toBeGreaterThan(2);
+      const disposals = [...resources].map((resource) => vi.spyOn(resource, 'dispose'));
+      if (phase === 'render') {
+        vi.spyOn(local.renderer, 'render').mockImplementationOnce(() => local.dispose());
+      } else {
+        const first = root.children[0]!.children[0] as THREE.Mesh;
+        const material = first.material as THREE.Material;
+        material.addEventListener('dispose', () => local.dispose());
+      }
+      expect(() => local.applyLocalBoard(saved, [])).toThrow();
+      local.dispose();
+      for (const dispose of disposals) expect(dispose).toHaveBeenCalledExactlyOnceWith();
+      expect(local.scene.children).toHaveLength(0);
+    },
+  );
 });
