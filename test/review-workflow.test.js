@@ -1160,3 +1160,41 @@ test('CLI cancellation of required map bootstrap reaps children, records setup, 
   assert.equal(report.scratchPreserved, false);
   await assert.rejects(lstat(report.scratch), { code: 'ENOENT' });
 });
+
+for (const persistent of [false, true]) {
+  test(
+    persistent
+      ? 'persistent worker after parent exit stays an infrastructure failure'
+      : 'normal late worker completes naturally before restoration is allowed',
+    async (t) => {
+      const root = await mkdtemp(join(tmpdir(), 'hq-worker-exit-'));
+      t.after(() => rm(root, { recursive: true, force: true }));
+      const directory = join(root, 'logs');
+      await mkdir(directory);
+      const marker = join(root, 'worker-completed');
+      const pidFile = join(root, 'worker-pid');
+      const childCode = persistent
+        ? "process.on('SIGTERM',()=>{});process.send('ready');setInterval(()=>{},1000);"
+        : `const fs=require('node:fs');process.send('ready');setTimeout(()=>{fs.writeFileSync(${JSON.stringify(marker)},'completed');process.exit(0)},75);`;
+      const parentCode = `const {spawn}=require('node:child_process');const fs=require('node:fs');const child=spawn(process.execPath,['-e',${JSON.stringify(childCode)}],{stdio:['ignore','ignore','ignore','ipc']});child.once('message',()=>{fs.writeFileSync(${JSON.stringify(pidFile)},String(child.pid));process.exit(0)});`;
+      const run = await runProcess(process.execPath, ['-e', parentCode], {
+        cwd: root,
+        env: process.env,
+        directory,
+        timeoutMs: 5000,
+      });
+      assert.equal(run.code, 0);
+      assert.equal(run.reaped, true);
+      assert.equal(run.groupAbsent, true);
+      assert.equal(run.timeout, false);
+      assert.equal(run.interrupted, false);
+      const pid = Number(await readFile(pidFile, 'utf8'));
+      assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
+      if (persistent) assert.equal(run.strayChildren, true);
+      else {
+        assert.notEqual(run.strayChildren, true);
+        assert.equal(await readFile(marker, 'utf8'), 'completed');
+      }
+    },
+  );
+}
