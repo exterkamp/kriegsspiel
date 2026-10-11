@@ -35,6 +35,26 @@ function labelTexture(lines: readonly string[], ghost: boolean): THREE.CanvasTex
   return texture;
 }
 
+export type PreviewRaster = Readonly<{
+  canvas: HTMLCanvasElement;
+  sourceKey: string;
+  widthM: number;
+  heightM: number;
+  contentWidthPx: number;
+  contentHeightPx: number;
+}>;
+
+export class PreviewApplyError extends Error {
+  constructor(
+    message: string,
+    readonly display: 'retained' | 'unavailable',
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = 'PreviewApplyError';
+  }
+}
+
 interface PieceObject {
   group: THREE.Group;
   geometrySignature: string;
@@ -65,13 +85,21 @@ export class TableScene {
   private raf = 0;
   private renderGeneration = 0;
   private disposed = false;
+  private readonly mode: 'fixture' | 'public-map-preview';
+  private applyingPreview = false;
+  private previewAvailable = false;
   // Record before dispatching Three's synchronous disposal event. Terminal
   // cleanup can re-enter while a replaced resource is still being released.
   private releasedResources = new WeakSet<{ dispose(): void }>();
   private releaseResource = (resource?: { dispose(): void } | null): void => {
     if (!resource || this.releasedResources.has(resource)) return;
     this.releasedResources.add(resource);
-    resource.dispose();
+    try {
+      resource.dispose();
+    } catch (error) {
+      // User disposal listeners must not interrupt preview cleanup or publication.
+      if (this.mode !== 'public-map-preview') throw error;
+    }
   };
   private releaseTree(object: THREE.Object3D): void {
     disposeTree(object, this.releaseResource);
@@ -79,8 +107,11 @@ export class TableScene {
 
   constructor(
     readonly canvas: HTMLCanvasElement,
-    opts: { preserveDrawingBuffer?: boolean } = {},
+    opts: { preserveDrawingBuffer?: boolean; mode?: 'fixture' | 'public-map-preview' } = {},
   ) {
+    this.mode = opts.mode ?? 'fixture';
+    if (!['fixture', 'public-map-preview'].includes(this.mode))
+      throw new TypeError('Invalid table mode');
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -117,6 +148,7 @@ export class TableScene {
 
   /** The adapter loads/cancels images; this synchronous operation validates before mutation. */
   apply(state: SceneState, loadedImage?: HTMLImageElement): void {
+    if (this.mode !== 'fixture') throw new TypeError('Preview tables reject fixture state');
     if (this.disposed) return;
     this.validateState(state);
     const marks = validateSceneMarks(state.marks === undefined ? [] : state.marks, state.map);
@@ -361,6 +393,7 @@ export class TableScene {
 
   /** Standalone sampling utility; no network work or camera change. */
   setArtwork(image: HTMLImageElement): void {
+    if (this.mode !== 'fixture') throw new TypeError('Preview tables reject external artwork');
     if (this.disposed || !this.state || !this.mapMesh) return;
     this.validateArtwork(image, this.state.map);
     if (this.artworkImage === image) return;
@@ -373,21 +406,196 @@ export class TableScene {
     this.releaseResource(previous);
   }
 
-  private makeMap(map: BaseMap, image?: HTMLImageElement): THREE.Group {
-    const group = new THREE.Group();
+  private requirePreview(): void {
+    if (this.mode !== 'public-map-preview')
+      throw new TypeError('Fixture tables reject preview rasters');
+  }
+
+  previewTextureLimit(): number {
+    this.requirePreview();
+    if (this.disposed) throw new PreviewApplyError('Table is disposed', 'unavailable');
+    const limit = Math.min(MAX_ARTWORK_TEXTURE_PX, this.renderer.capabilities.maxTextureSize);
+    if (!Number.isSafeInteger(limit) || limit < 1)
+      throw new PreviewApplyError('Invalid device texture limit', 'unavailable');
+    return limit;
+  }
+
+  private contextLost(): boolean {
+    return this.renderer.getContext().isContextLost();
+  }
+
+  /** A synchronous rendered transaction. Old resources survive until the candidate frame succeeds. */
+  applyPreviewRaster(raster: PreviewRaster): void {
+    this.requirePreview();
+    const display = () =>
+      this.previewAvailable && !this.disposed && !this.contextLost()
+        ? ('retained' as const)
+        : ('unavailable' as const);
+    if (this.applyingPreview)
+      throw new PreviewApplyError('Nested preview replacement rejected', display());
+    if (this.disposed) throw new PreviewApplyError('Table is disposed', 'unavailable');
+    this.applyingPreview = true;
+    let candidate: THREE.Group | undefined;
+    let attached = false;
+    let committed = false;
+    const previous = {
+      state: this.state,
+      key: this.mapKey,
+      map: this.mapMesh,
+      board: this.tableMesh,
+      position: this.camera.position.clone(),
+      quaternion: this.camera.quaternion.clone(),
+      target: this.controls.target.clone(),
+      dressingPosition: this.dressing?.position.clone(),
+      dressingScale: this.dressing?.scale.clone(),
+    };
     try {
-      const texture = image ? this.artTexture(image) : new THREE.CanvasTexture(mapCanvas(map));
+      const limit = this.previewTextureLimit();
+      const { canvas, widthM, heightM, contentWidthPx: w, contentHeightPx: h } = raster;
+      if (
+        !(canvas instanceof HTMLCanvasElement) ||
+        typeof raster.sourceKey !== 'string' ||
+        !raster.sourceKey ||
+        ![widthM, heightM, w, h].every((v) => Number.isFinite(v) && v > 0) ||
+        ![canvas.width, canvas.height].every(
+          (v) => Number.isSafeInteger(v) && v > 0 && v <= limit,
+        ) ||
+        canvas.width * canvas.height > limit * limit ||
+        w > canvas.width ||
+        h > canvas.height ||
+        Math.abs(w / widthM - h / heightM) > Math.max(w / widthM, h / heightM) * 1e-10
+      )
+        throw new RangeError('Preview raster exceeds bounds or has nonuniform registration');
+      const state: SceneState = {
+        side: '',
+        map: { width: widthM, height: heightM, features: [] },
+        own: [],
+        ghosts: [],
+        marks: [],
+      };
+      candidate = this.makeMap(state.map, undefined, raster);
+      if (this.disposed) throw new Error('Table disposed during preparation');
+      const map = candidate.getObjectByName('map-artwork') as THREE.Mesh;
+      const board = candidate.getObjectByName('table-board') as THREE.Mesh;
+      for (const old of [previous.map, previous.board]) if (old) this.scene.remove(old);
+      this.scene.add(candidate);
+      attached = true;
+      if (this.disposed) throw new Error('Table disposed during attachment');
+      this.state = state;
+      this.updateCameraLimits();
+      if (previous.key !== raster.sourceKey) this.snapTopDown();
+      if (this.dressing) positionDressing(this.dressing, widthM, heightM);
+      if (this.disposed || this.contextLost()) throw new Error('WebGL display is unavailable');
+      this.renderer.render(this.scene, this.camera);
+      if (this.disposed || this.contextLost())
+        throw new Error('Table became unavailable during render');
+      candidate.remove(map, board);
+      this.scene.remove(candidate);
+      this.scene.add(map, board);
+      if (this.disposed) {
+        this.releaseTree(map);
+        this.releaseTree(board);
+        throw new Error('Table disposed during publication');
+      }
+      this.mapMesh = map;
+      this.tableMesh = board;
+      this.mapKey = raster.sourceKey;
+      this.previewAvailable = true;
+      committed = true;
+      for (const old of [previous.map, previous.board]) if (old) this.releaseTree(old);
+      if (this.disposed) throw new Error('Table disposed during replacement cleanup');
+    } catch (error) {
+      if (committed || this.disposed) {
+        if (candidate) this.releaseTree(candidate);
+        for (const old of [previous.map, previous.board]) if (old) this.releaseTree(old);
+        this.previewAvailable = false;
+        if (this.disposed) {
+          this.state = undefined;
+          this.mapKey = '';
+          this.mapMesh = this.tableMesh = undefined;
+        }
+        throw new PreviewApplyError('Table display is unavailable', 'unavailable', {
+          cause: error,
+        });
+      }
+      if (attached && candidate) this.scene.remove(candidate);
+      this.state = previous.state;
+      this.mapKey = previous.key;
+      this.mapMesh = previous.map;
+      this.tableMesh = previous.board;
+      for (const old of [previous.map, previous.board]) if (old) this.scene.add(old);
+      this.camera.position.copy(previous.position);
+      this.controls.target.copy(previous.target);
+      this.camera.quaternion.copy(previous.quaternion);
+      this.updateCameraLimits();
+      if (this.dressing && previous.dressingPosition && previous.dressingScale) {
+        this.dressing.position.copy(previous.dressingPosition);
+        this.dressing.scale.copy(previous.dressingScale);
+      }
+      if (candidate) this.releaseTree(candidate);
+      try {
+        if (this.disposed || this.contextLost()) throw new Error('WebGL unavailable');
+        this.renderer.render(this.scene, this.camera);
+        if (this.disposed || this.contextLost()) throw new Error('WebGL unavailable');
+      } catch {
+        this.previewAvailable = false;
+      }
+      throw new PreviewApplyError(
+        error instanceof Error ? error.message : 'Preview replacement failed',
+        display(),
+        { cause: error },
+      );
+    } finally {
+      this.applyingPreview = false;
+    }
+  }
+
+  fitPreview(): void {
+    this.requirePreview();
+    if (this.applyingPreview)
+      throw new PreviewApplyError('Preview transaction is active', 'unavailable');
+    if (!this.disposed && this.state) this.snapTopDown();
+  }
+
+  private makeMap(map: BaseMap, image?: HTMLImageElement, raster?: PreviewRaster): THREE.Group {
+    const group = new THREE.Group();
+    const allocated: { dispose(): void }[] = [];
+    const own = <T extends { dispose(): void }>(resource: T): T => {
+      allocated.push(resource);
+      return resource;
+    };
+    try {
+      const texture = own(
+        raster
+          ? new THREE.CanvasTexture(raster.canvas)
+          : image
+            ? this.artTexture(image)
+            : new THREE.CanvasTexture(mapCanvas(map)),
+      );
       texture.colorSpace = THREE.SRGBColorSpace;
-      texture.anisotropy = 8;
+      texture.anisotropy = raster ? Math.min(8, this.renderer.capabilities.getMaxAnisotropy()) : 8;
+      const geometry = own(new THREE.PlaneGeometry(map.width, map.height));
+      if (raster) {
+        const uv = geometry.getAttribute('uv');
+        for (let i = 0; i < uv.count; i++)
+          uv.setXY(
+            i,
+            (uv.getX(i) * raster.contentWidthPx) / raster.canvas.width,
+            1 - ((1 - uv.getY(i)) * raster.contentHeightPx) / raster.canvas.height,
+          );
+        uv.needsUpdate = true;
+      }
       const surface = new THREE.Mesh(
-        new THREE.PlaneGeometry(map.width, map.height),
-        new THREE.MeshStandardMaterial({
-          map: texture,
-          roughness: 0.95,
-          polygonOffset: true,
-          polygonOffsetFactor: -1,
-          polygonOffsetUnits: -1,
-        }),
+        geometry,
+        own(
+          new THREE.MeshStandardMaterial({
+            map: texture,
+            roughness: 0.95,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
+          }),
+        ),
       );
       surface.name = 'map-artwork';
       surface.rotation.x = -Math.PI / 2;
@@ -397,8 +605,8 @@ export class TableScene {
       // A tenth of the span contains the existing scaled ruler, dividers, inkwell and lamp.
       const margin = span * 0.1;
       const board = new THREE.Mesh(
-        new THREE.BoxGeometry(map.width + 2 * margin, thickness, map.height + 2 * margin),
-        new THREE.MeshStandardMaterial({ color: 0x5a3b22, roughness: 0.8 }),
+        own(new THREE.BoxGeometry(map.width + 2 * margin, thickness, map.height + 2 * margin)),
+        own(new THREE.MeshStandardMaterial({ color: 0x5a3b22, roughness: 0.8 })),
       );
       board.name = 'table-board';
       board.position.y = -thickness / 2 - span * 0.0005;
@@ -406,6 +614,7 @@ export class TableScene {
       return group;
     } catch (error) {
       this.releaseTree(group);
+      allocated.forEach(this.releaseResource);
       throw error;
     }
   }
