@@ -189,14 +189,34 @@ describe('In-tray view', () => {
     const first = get(gameState).dispatches.length;
     expect(first).toBe(3);
     click([...document.querySelectorAll('.actions button')].find((b) => b.textContent === 'File'));
+    click(
+      [...document.querySelectorAll('.actions button')].find((b) => b.textContent === 'Discard'),
+    );
     stop();
     unmount(cmp!);
     cmp = undefined;
     gameState.set(initialState);
     trayFiled.set(new Set());
+    trayDiscarded.set(new Set());
     persistTray('game-1')();
-    expect(get(gameState).read.size).toBe(1);
-    expect(get(trayFiled).size).toBe(1);
+    expect([...get(gameState).read].sort()).toEqual(['a', 'b', 'c']);
+    expect([...get(trayFiled)]).toEqual(['a']);
+    expect([...get(trayDiscarded)]).toEqual(['b']);
+  });
+  it('marks the next paper read when filing or discarding moves the viewer on', () => {
+    open([
+      disp('a', { category: 'urgent', receivedAtGame: 3000 }),
+      disp('b', { category: 'urgent', receivedAtGame: 2000 }),
+      disp('c', { category: 'urgent', receivedAtGame: 1000 }),
+    ]);
+    click(rows()[0]);
+    click([...document.querySelectorAll('.actions button')].find((b) => b.textContent === 'File'));
+    expect(document.querySelector('.viewer h3')).not.toBeNull();
+    expect([...get(gameState).read].sort()).toEqual(['a', 'b']);
+    click(
+      [...document.querySelectorAll('.actions button')].find((b) => b.textContent === 'Discard'),
+    );
+    expect([...get(gameState).read].sort()).toEqual(['a', 'b', 'c']);
   });
   it('renders 200 dispatches without lag', () => {
     const ds = Array.from({ length: 200 }, (_, i) => disp(`d${i}`, { receivedAtGame: i * 1000 }));

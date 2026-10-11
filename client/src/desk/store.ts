@@ -49,7 +49,14 @@ export function persistTray(key: string): () => void {
   gameState.update((s) => ({ ...s, read: new Set([...s.read, ...saved.read]) }));
   trayFiled.set(saved.filed);
   trayDiscarded.set(saved.discarded);
-  return trayMarks.subscribe((m) => saveMarks(key, m));
+  let last: TrayMarks | undefined;
+  return trayMarks.subscribe((m) => {
+    // gameState changes on every server message; only write when a mark set actually changed.
+    if (last && last.read === m.read && last.filed === m.filed && last.discarded === m.discarded)
+      return;
+    last = m;
+    saveMarks(key, m);
+  });
 }
 
 export const currentMarks = (): TrayMarks => get(trayMarks);

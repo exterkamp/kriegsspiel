@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { formatGameTime } from '../net/state.js';
   import { PILES, sortTray, type Pile } from './tray.js';
   import { discard, gameState, markRead, setFiled, showOnTable, trayMarks, activeView } from './store.js';
@@ -6,6 +7,7 @@
   let pile = $state<Pile>('urgent');
   let openId = $state<string | undefined>(undefined);
   let showFiled = $state(false);
+  let viewer: HTMLElement | undefined;
 
   const sorted = $derived(sortTray($gameState.dispatches, $trayMarks));
   const current = $derived(sorted.piles.find((p) => p.id === pile)!);
@@ -24,7 +26,12 @@
   /** Move the viewer on to the next paper in the pile once this one is gone. */
   function after(id: string): void {
     const i = list.findIndex((d) => d.id === id);
-    openId = list[i + 1]?.id ?? list[i - 1]?.id;
+    const next = list[i + 1]?.id ?? list[i - 1]?.id;
+    openId = next;
+    // A paper the viewer shows counts as read, however it came to be open.
+    if (next) markRead(next);
+    // The button that was clicked is about to go; keep keyboard focus on the desk.
+    void tick().then(() => viewer?.focus());
   }
   function onFile(id: string, on: boolean): void {
     after(id);
@@ -52,7 +59,7 @@
         onclick={() => pick(p.id)}
       >
         {p.label} <span class="n">{p.items.length}</span>
-        {#if p.unread > 0}<span class="unread-dot" aria-label="{p.unread} unread">●{p.unread}</span>{/if}
+        {#if p.unread > 0}<span class="unread-dot"><span aria-hidden="true">●{p.unread}</span><span class="sr-only">{p.unread} unread</span></span>{/if}
       </button>
     {/each}
     <button
@@ -87,7 +94,7 @@
       {/each}
     </ul>
 
-    <article class="viewer" aria-live="polite">
+    <article class="viewer" aria-live="polite" tabindex="-1" bind:this={viewer}>
       {#if open}
         <h3>{open.from}</h3>
         <dl>
@@ -152,6 +159,14 @@
   }
   .n {
     opacity: 0.65;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .unread-dot {
     color: #a83232;
