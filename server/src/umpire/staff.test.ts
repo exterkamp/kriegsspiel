@@ -134,7 +134,7 @@ describe('runStaff', () => {
         properties: { messages: { items: { properties: Record<string, { maxLength?: number }> } } };
       }
     ).properties.messages.items.properties;
-    expect(props.text.maxLength).toBe(STAFF_TEXT_MAX_LENGTH);
+    expect(props.text!.maxLength).toBe(STAFF_TEXT_MAX_LENGTH);
   });
 
   it('shows each officer only their role view', async () => {
