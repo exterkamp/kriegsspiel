@@ -16,6 +16,9 @@ import { SHELL_API, SHELL_WINDOW } from '../shell/shell-api';
  * The room of a game that has not started: who sits where, who is ready, the invite link, and the start button for
  * the creator. Polls the game and emits `started` once it has begun.
  */
+/** Consecutive failed polls before the room says it has lost the connection. */
+const MISSES_BEFORE_WARNING = 3;
+
 @Component({
   selector: 'ks-room',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -117,6 +120,8 @@ export class RoomComponent implements OnInit {
   protected readonly invite = () => inviteLink(this.win.location.origin, this.info().id);
   protected readonly blocker = () => startBlocker(this.info());
 
+  private misses = 0;
+
   ngOnInit(): void {
     this.info.set(this.first());
     const timer = setInterval(() => this.poll(), 2000);
@@ -128,10 +133,21 @@ export class RoomComponent implements OnInit {
     return this.api
       .fetchGame(this.info().id)
       .then((g) => {
+        this.misses = 0;
+        if (this.lost()) this.error.set(undefined);
         if (g.status === 'started') this.started.emit();
         else if (JSON.stringify(g) !== JSON.stringify(this.info())) this.info.set(g);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        // One failed poll is noise; a run of them means the room is stale.
+        if (++this.misses === MISSES_BEFORE_WARNING) {
+          this.error.set('Connection lost, retrying…');
+        }
+      });
+  }
+
+  private lost(): boolean {
+    return this.error() === 'Connection lost, retrying…';
   }
 
   private act(p: Promise<void>): void {

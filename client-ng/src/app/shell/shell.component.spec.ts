@@ -438,7 +438,40 @@ describe('lobby room', () => {
     expect(el.querySelector('canvas')).not.toBeNull();
   });
 
-  it('a seated guest can take a side and ready up', async () => {
+  it('says so after repeated poll failures and recovers on the next success', async () => {
+    let down = false;
+    await open('/?game=g1', {
+      fetchGame: async () => {
+        if (down) throw new Error('offline');
+        return info({ status: 'lobby', creator: false });
+      },
+    });
+    const room = f.debugElement.query((d) => d.name === 'ks-room').componentInstance;
+    down = true;
+    for (let i = 0; i < 3; i++) await room.poll();
+    await settle();
+    expect(el.querySelector('#lobby-msg')?.textContent).toContain('Connection lost');
+    down = false;
+    await room.poll();
+    await settle();
+    expect(el.querySelector('#lobby-msg')?.textContent).not.toContain('Connection lost');
+  });
+
+  it('a guest without a seat can take a side', async () => {
+    const joinSide = vi.fn(async () => undefined);
+    await open('/?game=g1', {
+      fetchGame: async () => info({ status: 'lobby', creator: false, you: null }),
+      joinSide,
+    });
+    const take = [...el.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('Take red'),
+    );
+    take!.click();
+    await settle();
+    expect(joinSide).toHaveBeenCalledWith('g1', 'red');
+  });
+
+  it('a seated guest can ready up', async () => {
     const setReady = vi.fn(async () => undefined);
     await open('/?game=g1', {
       fetchGame: async () => info({ status: 'lobby', creator: false, ready: false }),
@@ -501,11 +534,12 @@ describe('in-game menu', () => {
 
   it('Sign out signs out on the server and loads the home page', async () => {
     const signOut = vi.fn(async () => undefined);
-    await open('/?game=g1', { signOut });
+    const g = await open('/?game=g1', { signOut });
     await esc();
     click('Sign out');
     await settle();
     expect(signOut).toHaveBeenCalledOnce();
+    expect(g['disconnect']).toHaveBeenCalled();
     expect(assign).toHaveBeenCalledWith('/');
   });
 
