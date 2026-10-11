@@ -1,0 +1,47 @@
+.roster {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+th,
+td {
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 1px solid #c9bb94;
+}
+th[scope='row'] {
+  font-weight: normal;
+}
+.roster button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: #2a2118;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.roster button:focus-visible {
+  outline: 3px solid #ffd76a;
+  outline-offset: 2px;
+}
+.unknown {
+  font-style: italic;
+  opacity: 0.7;
+}
+.age {
+  display: block;
+}
+tr.aging {
+  opacity: 0.85;
+}
+/* Floor of 0.75 keeps the dark text readable on paper; the unknown fade does not stack on it. */
+tr.stale {
+  opacity: 0.75;
+}
+tr.stale .unknown {
+  opacity: 1;
+}
+tr.stale .age {
+  font-weight: bold;
+}

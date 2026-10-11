@@ -1,0 +1,61 @@
+@let v = view();
+@if (v.kind === 'idle') {
+  <section class="pause idle" aria-label="Pause">
+    @if (v.action === 'resume') {
+      <button type="button" data-testid="propose-resume" (click)="propose('resume')">
+        Ask to resume
+      </button>
+    } @else if (asking()) {
+      <form (submit)="submitPause($event)">
+        <label>
+          Reason (optional)
+          <input
+            data-testid="pause-reason"
+            [value]="reason()"
+            (input)="reason.set($any($event.target).value)"
+            maxlength="200"
+            placeholder="someone at the door"
+          />
+        </label>
+        <button type="submit" data-testid="propose-pause">Ask to pause</button>
+        <button type="button" (click)="asking.set(false)">Cancel</button>
+      </form>
+    } @else {
+      <button type="button" data-testid="open-pause" (click)="asking.set(true)">Pause…</button>
+    }
+    @if (problem()) {
+      <span class="problem" role="alert">{{ problem() }}</span>
+    }
+  </section>
+} @else if (v.kind === 'vote') {
+  <section class="pause vote" aria-label="Pause vote" data-testid="pause-vote">
+    <p class="headline" role="status">
+      <b>{{ v.headline }}</b>
+      @if (v.reason) {
+        <span class="reason">“{{ v.reason }}”</span>
+      }
+    </p>
+    <p class="meta">
+      <span data-testid="pause-tally">{{ v.tally }}</span>
+      · <span data-testid="pause-countdown">{{ v.secondsLeft }}s left</span>
+    </p>
+    @if (v.needsVote) {
+      <div class="buttons">
+        <button type="button" data-testid="vote-yes" (click)="cast(v.id, true)">
+          Yes, {{ v.action }}
+        </button>
+        <button type="button" data-testid="vote-no" (click)="cast(v.id, false)">No</button>
+      </div>
+    } @else {
+      <p class="meta" data-testid="pause-voted">
+        You voted {{ v.myVote ? 'yes' : 'no' }}.
+        @if (v.waitingOn > 0) {
+          Waiting on {{ v.waitingOn }} more.
+        }
+      </p>
+    }
+    @if (problem()) {
+      <span class="problem" role="alert">{{ problem() }}</span>
+    }
+  </section>
+}
