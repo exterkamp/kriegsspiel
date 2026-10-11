@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { PROTOCOL_VERSION, type Dispatch, type ServerMessage } from '@kriegsspiel/protocol';
 import { describe, expect, it } from 'vitest';
+import { noticeText } from '../desk/orders.js';
 import { fixtureView } from '../table/fixture.js';
 import { Hud, buildOrderText, gameOverText, orderPrefix } from '../hud/hud.js';
 import { parseSession, wsUrl } from '../session.js';
@@ -71,6 +72,37 @@ describe('applyServerMessage', () => {
     s = applyServerMessage(s, m, 0);
     expect(s.pending.map((p) => p.orderId)).toEqual(['o2']);
     expect(s.notices[0]?.message).toBe('o1: no such unit');
+  });
+});
+
+describe('order clarification', () => {
+  it('shows the question without the order id and drops the pending order', () => {
+    let s = withPendingOrder(initialState, { orderId: 'o-lq3-1', text: 'x', sentAtGame: 0 });
+    s = applyServerMessage(
+      s,
+      {
+        v,
+        kind: 'error',
+        code: 'order_clarification',
+        message: 'o-lq3-1: Which wood do you mean? (Northern wood)',
+      },
+      0,
+    );
+    expect(s.pending).toEqual([]);
+    // The notice keeps the id so the desk can find the order's outcome; noticeText hides it.
+    expect(noticeText(s.notices[0]!, s.outcomes)).toContain(
+      'Which wood do you mean? (Northern wood)',
+    );
+    expect(noticeText(s.notices[0]!, s.outcomes)).not.toMatch(/o-lq3-1/);
+  });
+
+  it('leaves other errors as sent', () => {
+    const s = applyServerMessage(
+      initialState,
+      { v, kind: 'error', code: 'bad_message', message: 'bad frame: not JSON' },
+      0,
+    );
+    expect(s.notices[0]?.message).toBe('bad frame: not JSON');
   });
 });
 

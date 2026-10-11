@@ -20,7 +20,8 @@ import type { GameStore } from './store.js';
 
 export interface GameHostOptions {
   store: GameStore;
-  parser: OrderParser;
+  /** One parser for every game, or a parser per game (for example one with the game's own LLM budget). */
+  parser: OrderParser | ((gameId: string) => OrderParser);
   registry: EventRegistry<GameState>;
   wallNow: WallClock;
   timers?: Timers;
@@ -77,7 +78,7 @@ export class GameHost {
       id,
       registry: o.registry,
       wallNow: o.wallNow,
-      parser: o.parser,
+      parser: typeof o.parser === 'function' ? o.parser(id) : o.parser,
       store: o.store,
       timers: o.timers,
       onUpdate: () => o.onUpdate?.(id),
