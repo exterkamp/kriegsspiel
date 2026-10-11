@@ -10,6 +10,14 @@ import type { ViewId } from './views.js';
 export const gameState = writable<ClientState>(initialState);
 export const activeView = writable<ViewId>('table');
 
+/** What the pause panel can ask of the server; each returns false when the link is down. Set once connected. */
+export interface PauseActions {
+  proposePause(reason?: string): boolean;
+  proposeResume(): boolean;
+  vote(proposal: string, yes: boolean): boolean;
+}
+export const pauseActions = writable<PauseActions | undefined>(undefined);
+
 /** Dispatches the player has filed (kept in the drawer) or discarded (gone from the desk). */
 export const trayFiled = writable<ReadonlySet<string>>(new Set());
 export const trayDiscarded = writable<ReadonlySet<string>>(new Set());
