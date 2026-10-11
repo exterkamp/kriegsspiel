@@ -4,6 +4,7 @@
   import { unreadCount } from './tray.js';
   import InTray from './InTray.svelte';
   import OrdersDesk from './OrdersDesk.svelte';
+  import Roster from './Roster.svelte';
   import { deliveryStatus } from './orders.js';
   import DeskClock from './DeskClock.svelte';
   import PausePanel from './PausePanel.svelte';
@@ -33,7 +34,6 @@
     if (sel) queueMicrotask(() => document.querySelector<HTMLElement>(sel)?.focus());
   }
 
-  const units = $derived($gameState.view?.ownUnits ?? []);
   // Delivery status is read against game time, so the journal re-reads it now and then.
   let wall = $state(Date.now());
   $effect(() => {
@@ -107,14 +107,7 @@
   </section>
 {:else if $activeView === 'roster'}
   <section id="view-roster" class="paper" tabindex="-1" aria-label="Order of battle">
-    <h2>Order of battle</h2>
-    {#if units.length === 0}
-      <p>No formations reported yet.</p>
-    {:else}
-      <ul>
-        {#each units as u (u.id)}<li>{u.name}</li>{/each}
-      </ul>
-    {/if}
+    <Roster />
   </section>
 {:else if $activeView === 'journal'}
   <section id="view-journal" class="paper" tabindex="-1" aria-label="Journal">

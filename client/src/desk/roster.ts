@@ -1,0 +1,62 @@
+import type { Coord, OwnUnit, SideView } from '@kriegsspiel/protocol';
+
+/** How old a report is, in game time, before the roster marks it as aging or stale. */
+export const AGING_MS = 30 * 60_000;
+export const STALE_MS = 2 * 60 * 60_000;
+
+export type Freshness = 'fresh' | 'aging' | 'stale';
+
+export interface RosterRow {
+  id: string;
+  name: string;
+  /** Men, as reported (not a percent), or undefined when the report gives no usable figure. */
+  strength: number | undefined;
+  supply: number | undefined;
+  morale: number | undefined;
+  /** Game time of the report these figures come from. */
+  reportedAt: number;
+  ageMs: number;
+  freshness: Freshness;
+  position: Coord;
+}
+
+export function freshness(ageMs: number): Freshness {
+  return ageMs >= STALE_MS ? 'stale' : ageMs >= AGING_MS ? 'aging' : 'fresh';
+}
+
+const known = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+
+/** A 0..1 fraction as a whole percent; anything else is unknown, never zero. */
+export const pct = (n: unknown): number | undefined => (known(n) ? Math.round(n * 100) : undefined);
+
+/** `45 min`, `3 h 10 min`, `1 d 2 h`: game time elapsed, the same at every clock rate. */
+export function formatAge(ms: number): string {
+  const min = Math.floor(Math.max(0, ms) / 60_000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return min % 60 ? `${h} h ${min % 60} min` : `${h} h`;
+  return h % 24 ? `${Math.floor(h / 24)} d ${h % 24} h` : `${Math.floor(h / 24)} d`;
+}
+
+/**
+ * One row per formation in the SideView, and nothing else. The figures are as of `view.atGame`,
+ * so they age as game time runs on past it (a lost link, a slow umpire). `nowGame` is the local
+ * game time, which is the same arithmetic at 1:1 and 12:1.
+ */
+export function rosterRows(view: SideView | undefined, nowGame: number): RosterRow[] {
+  if (!view) return [];
+  const reportedAt = view.atGame;
+  const ageMs = Math.max(0, nowGame - reportedAt);
+  return view.ownUnits.map((u: OwnUnit) => ({
+    id: u.id,
+    name: u.name,
+    strength: known(u.strength) ? Math.round(u.strength) : undefined,
+    supply: pct(u.supply),
+    morale: pct(u.morale),
+    reportedAt,
+    ageMs,
+    freshness: freshness(ageMs),
+    position: u.position,
+  }));
+}
