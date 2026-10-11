@@ -114,10 +114,8 @@ export class OrdersDeskComponent {
       this.error.set({ field: 'text', message: 'Write the order first.' });
       return;
     }
-    // Annex arrows made since the draft was saved may be gone; only the ones still on the table go.
-    const arrows = this.arrows();
-    const chosen = d.annex.filter((id) => arrows.some((a) => a.id === id));
-    const text = withAnnex(buildOrderText(view, addressee.id, d.text.trim()), state.marks, chosen);
+    // `withAnnex` leaves out annex arrows that are no longer on the table.
+    const text = withAnnex(buildOrderText(view, addressee.id, d.text.trim()), state.marks, d.annex);
     if (text.length > MAX_ORDER_CHARS) {
       this.error.set({
         field: 'text',

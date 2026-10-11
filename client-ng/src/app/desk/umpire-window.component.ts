@@ -33,6 +33,8 @@ export class UmpireWindowComponent {
   protected readonly desk = inject(DeskStore);
   /** Only the newest request may set the frame; an older one that lands late is dropped. */
   private ticket = 0;
+  /** Set on destroy so a timeline that lands late cannot start a frame load nobody will clear. */
+  private destroyed = false;
 
   protected readonly timeline = signal<WindowTimeline | undefined>(undefined);
   protected readonly at = signal(0);
@@ -58,11 +60,13 @@ export class UmpireWindowComponent {
     if (game)
       fetchWindowTimeline(game)
         .then((tl) => {
+          if (this.destroyed) return;
           this.timeline.set(tl);
           return this.load(tl.endMs);
         })
         .catch((e: unknown) => this.error.set(messageOf(e)));
     inject(DestroyRef).onDestroy(() => {
+      this.destroyed = true;
       this.ticket++;
       this.desk.windowFrame.set(undefined);
       this.desk.windowHover.set(undefined);
@@ -71,7 +75,7 @@ export class UmpireWindowComponent {
 
   protected async load(ms: number): Promise<void> {
     const game = this.game.gameId();
-    if (!game) return;
+    if (!game || this.destroyed) return;
     const mine = ++this.ticket;
     try {
       const frame = await fetchWindowAt(game, ms);

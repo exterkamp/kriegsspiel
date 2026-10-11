@@ -169,6 +169,41 @@ describe('UmpireWindowComponent', () => {
     expect(t.desk.windowHover()).toBeUndefined();
   });
 
+  it('sets no frame when the timeline lands after it is closed', async () => {
+    let land!: (r: Response) => void;
+    const f = stubFetch({ timeline: () => new Promise<Response>((r) => (land = r)) });
+    const t = await open();
+    t.fixture.destroy();
+    land(new Response(JSON.stringify(timeline)));
+    await t.settle();
+    expect(f.at).toEqual([]);
+    expect(t.desk.windowFrame()).toBeUndefined();
+  });
+
+  it('drops an older frame that lands after a newer one', async () => {
+    const waiting = new Map<number, (r: Response) => void>();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (!url.includes('/window/at'))
+          return Promise.resolve(new Response(JSON.stringify(timeline)));
+        const ms = Number(new URL(url, 'http://x').searchParams.get('at'));
+        return new Promise<Response>((r) => waiting.set(ms, r));
+      }),
+    );
+    const t = await open();
+    const reply = (ms: number) => waiting.get(ms)!(new Response(JSON.stringify(frameAt(ms))));
+    const btn = t.el.querySelector<HTMLButtonElement>('button[aria-label="Previous event"]')!;
+    // The end-of-game frame is still pending when the user steps back to the start.
+    btn.click();
+    await t.settle();
+    reply(0);
+    await t.settle();
+    reply(3_600_000);
+    await t.settle();
+    expect(t.desk.windowFrame()?.gameMs).toBe(0);
+  });
+
   it('fetches nothing without a game', async () => {
     const f = stubFetch();
     await open(null);

@@ -41,6 +41,7 @@ async function open(send: OrderSender['send'] = () => undefined, extra = {}) {
   return {
     el,
     q,
+    fixture,
     sender,
     game: g.fake,
     desk: TestBed.inject(DeskStore),
@@ -104,6 +105,18 @@ describe('OrdersDeskComponent', () => {
     vi.advanceTimersByTime(1);
     TestBed.tick();
     expect(t.el.querySelector('.stamp')).toBeNull();
+  });
+
+  it('clears the SENT stamp timer when it is closed', async () => {
+    const t = await open();
+    await t.fill();
+    vi.useFakeTimers();
+    t.q('#order-sign').click();
+    TestBed.tick();
+    expect(t.el.querySelector('.stamp')).not.toBeNull();
+    const pending = vi.getTimerCount();
+    t.fixture.destroy();
+    expect(vi.getTimerCount()).toBe(pending - 1);
   });
 
   it('signs with ctrl+enter in the order box', async () => {
