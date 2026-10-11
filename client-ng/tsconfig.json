@@ -12,6 +12,7 @@
     "isolatedModules": true,
     "paths": {
       "@kriegsspiel/protocol": ["../packages/protocol/src/index.ts"],
+      "@kriegsspiel/maps": ["../packages/maps/src/index.ts"],
       "@legacy/*": ["../client/src/*"]
     }
   },
