@@ -29,6 +29,7 @@ Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a serve
 
 ## Current state
 - Only the monorepo scaffold exists (`packages/engine`, `packages/protocol`, `server`, `client`; `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`). An earlier Phaser prototype was abandoned and removed. Do not revive it. Build the engine and client fresh from the docs.
+- AI commander: `AI_COMMANDER=llm` (with `AI_DIFFICULTY`, `AI_PERSONALITY`) swaps the scripted Red for an LLM one on the `command` umpire stage; see `docs/decisions.md`.
 - Server API: `npm run dev -w server` builds and starts it on `$PORT` (default 3000), so under `devrun` use `devrun up --name api --port-env PORT -- npm run dev -w server`. `POST /games` makes a game; `/games/:id/ws` is a side's WebSocket, authenticated by the session cookie and the user's seat (D16, D17). Sign in with `POST /auth/login`; with no `MAIL_WEBHOOK_URL` the login link is in the server log.
 - Lobby (D17a): open `/?lobby=1` for the new-game form and your games; `POST /games` with `lobby: true` waits for `/games/:id/start`. `/?game=<id>` is the invite link and shows the room until the game starts. Lobby code is in `server/src/lobby`, `client/src/lobby`.
 - Notifications (`server/src/notify`, D17b): preferences and web push subscriptions under `/notifications/*`; set `VAPID_*` to enable web push.
