@@ -16,7 +16,8 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "test:stress": "node scripts/stress.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

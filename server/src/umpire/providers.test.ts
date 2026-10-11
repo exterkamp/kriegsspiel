@@ -174,7 +174,8 @@ const wires: Wire[] = [
 function clientFor(provider: LlmProvider, extra: Partial<UmpireConfig> = {}) {
   const recorded: UmpireCallRecord[] = [];
   const sleeps: number[] = [];
-  const config: UmpireConfig = { ...DEFAULT_UMPIRE_CONFIG, timeoutMs: 300, ...extra };
+  // Never fires in a test; the timeout has its own fake-timer test.
+  const config: UmpireConfig = { ...DEFAULT_UMPIRE_CONFIG, timeoutMs: 600_000, ...extra };
   const client = new ProviderUmpireClient({
     providers: { anthropic: provider },
     config,
@@ -248,8 +249,11 @@ describe.each(wires)('provider contract: $name', (wire) => {
     replies = [{ hang: true }];
     const ctrl = new AbortController();
     const p = wire.make().generate(treq, ctrl.signal);
-    setTimeout(() => ctrl.abort(), 20);
-    await expect(p).rejects.toBeInstanceOf(Error);
+    const rejected = expect(p).rejects.toBeInstanceOf(Error);
+    // Abort only once the server holds the request, so it cannot arrive in a later test.
+    await vi.waitFor(() => expect(seen).toHaveLength(1));
+    ctrl.abort();
+    await rejected;
   });
 
   describe('wrapped by the client and decorators', () => {
@@ -263,9 +267,33 @@ describe.each(wires)('provider contract: $name', (wire) => {
     });
 
     it('times out a hung server and retries', async () => {
-      replies = [{ hang: true }, { body: wire.ok('{"verdict":"ok"}') }];
-      const { client } = clientFor(wire.make(), { timeoutMs: 50 });
-      expect((await client.call(request)).record.attempts).toBe(2);
+      replies = [{ body: wire.ok('{"verdict":"ok"}') }];
+      const real = wire.make();
+      let hung = false;
+      // The first attempt never answers and only ends when the client aborts it.
+      const provider: LlmProvider = {
+        id: real.id,
+        capabilities: real.capabilities,
+        generate: (req, signal) => {
+          if (hung) return real.generate(req, signal);
+          hung = true;
+          // Like a real transport, it rejects a tick after the abort, not inside it.
+          return new Promise((_, reject) =>
+            signal.addEventListener('abort', () =>
+              queueMicrotask(() => reject(new Error('aborted'))),
+            ),
+          );
+        },
+      };
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        const { client } = clientFor(provider, { timeoutMs: 50 });
+        const call = client.call(request);
+        await vi.advanceTimersByTimeAsync(50);
+        expect((await call).record.attempts).toBe(2);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('records a call and replays it with no network', async () => {
