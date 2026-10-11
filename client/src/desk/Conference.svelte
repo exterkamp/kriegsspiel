@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { conferenceClient, conferenceLog, gameState } from './store.js';
+  import { conferenceClient, conferenceLog, conferenceSender, gameState } from './store.js';
   import {
     CONFERENCE_ROLES,
     MAX_QUESTION_LENGTH,
@@ -34,12 +34,38 @@
   const officer = $derived(staffFor(role));
   const log = $derived($conferenceLog.filter((e) => e.role === role));
 
+  // Take the cost from the server's reply: it decides when the officer answers, not this page.
+  $effect(() => {
+    const charges = $gameState.staffCharges;
+    const waiting = $conferenceLog.filter((e) => e.answerAtGame === Infinity && !e.failed);
+    if (waiting.length === 0) return;
+    conferenceLog.update((l) =>
+      l.map((e) => {
+        if (e.answerAtGame !== Infinity || e.failed) return e;
+        const c = charges[`q-${opened}-${e.id}`];
+        if (c === undefined) return e;
+        return c === 'refused'
+          ? { ...e, failed: true }
+          : { ...e, askedAtGame: c.askedAtGame, answerAtGame: c.answerAtGame };
+      }),
+    );
+  });
+
   function ask(e: SubmitEvent): void {
     e.preventDefault();
     error = questionProblem(question, role, $conferenceLog, nowGame);
     if (error) return;
     const req = { role, question: question.trim(), askedAtGame: nowGame };
+    const sender = $conferenceSender;
     const ex = newExchange(nextId++, req);
+    if (sender) {
+      // The server charges the cost; the exchange waits for its reply (see the reconcile effect).
+      if (!sender(`q-${opened}-${ex.id}`, role, req.question)) {
+        error = 'Not connected. Try again when the link is back.';
+        return;
+      }
+      ex.answerAtGame = Infinity;
+    }
     conferenceLog.update((l) => [...l, ex]);
     question = '';
     $conferenceClient.ask(req, $gameState.view).then(

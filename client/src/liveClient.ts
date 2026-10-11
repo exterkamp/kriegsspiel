@@ -32,6 +32,7 @@ import {
   gameId,
   gameState,
   orderSender,
+  conferenceSender,
   pauseActions,
   persistDraft,
   persistJournal,
@@ -188,6 +189,7 @@ async function main(app: HTMLElement): Promise<void> {
   const hud = new Hud(app, {
     onSendOrder: (unitId, text) => sendOrder(buildOrderText(state.view, unitId, text)),
   });
+  conferenceSender.set((id, role, question) => conn?.askStaff(id, role, question) ?? false);
   orderSender.set({
     send: (o) =>
       sendOrder(

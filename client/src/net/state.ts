@@ -58,6 +58,9 @@ export interface PauseVote {
   proposal?: PauseProposal & { closesAtWall: number };
 }
 
+/** What the server said about a staff question: charged (with the answer time), or refused. */
+export type StaffCharge = { answerAtGame: number; askedAtGame: number; costMs: number } | 'refused';
+
 export interface ClientState {
   link: LinkStatus;
   view?: SideView;
@@ -70,6 +73,8 @@ export interface ClientState {
   /** Absent until the server reports it; a game without voters never does. */
   pause?: PauseVote;
   pending: PendingOrder[];
+  /** Staff questions by client question id, as the server charged them. */
+  staffCharges: Record<string, StaffCharge>;
   /** Set once the server says the game has ended. */
   gameOver?: GameOver;
   /** The side's marks on the table, as the server last sent them plus this client's own edits. */
@@ -86,6 +91,7 @@ export const initialState: ClientState = {
   read: new Set(),
   staffAtWork: false,
   pending: [],
+  staffCharges: {},
   marks: [],
   notices: [],
 };
@@ -163,6 +169,18 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       const notices = [...s.notices, { code: 'pause_result', message }].slice(-MAX_NOTICES);
       return { ...s, notices };
     }
+    case 'staffQueued':
+      return {
+        ...s,
+        staffCharges: {
+          ...s.staffCharges,
+          [m.questionId]: {
+            askedAtGame: m.askedAtGame,
+            answerAtGame: m.answerAtGame,
+            costMs: m.costMs,
+          },
+        },
+      };
     case 'marks':
       return { ...s, marks: m.marks };
     case 'drafts':
@@ -206,7 +224,11 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       const id = orderIdOf(m.message);
       const dropped = id === undefined ? s.pending : s.pending.filter((p) => p.orderId !== id);
       const notices = [...s.notices, { code: m.code, message: m.message }].slice(-MAX_NOTICES);
-      return { ...s, pending: dropped, notices };
+      const staffCharges =
+        m.code === 'staff_busy' && id !== undefined
+          ? { ...s.staffCharges, [id]: 'refused' as const }
+          : s.staffCharges;
+      return { ...s, pending: dropped, staffCharges, notices };
     }
   }
 }
