@@ -80,7 +80,7 @@ Decision **D28**: retire, do not port. Nothing in `client/src/hq` is in `client-
 
 - Deleted `client/src/hq` (12 components, 6 harnesses and their tests). Dropped tests, all because the code they test is gone and the live desk has its own: `App`, `Shell`, `Table`, `Marks`, `Plotting`, `components`, the five view tests, `accessibility`, `marksQueue`, `placementPorts`, `sessionActions`, and the `hq/data`, `interactions` and `views` logic tests, plus `main.test.ts`'s "starts the HQ fixture" case.
 - `session.ts`, `shell/screens.ts`, `shell/boot.ts` and `main.ts` lose the `fixture` mode and screen; their tests were updated (`?mode=fixture` is the menu). `table/gameTime.ts` (and its test) moved out of `hq/presentation` because table tags use it.
-- `test/review/hq-mutations.json` keeps the three game-time cases; the seven that mutated deleted files are gone and the manifest count in `test/review-workflow.test.js` is 3.
+- `test/review/hq-mutations.json` keeps the three game-time cases (the runner now accepts sources under `client/src/table` as well as `client/src/hq`); the seven that mutated deleted files are gone and the manifest count in `test/review-workflow.test.js` is 3.
 - Not done here: deleting the Svelte client (#279). The component inventory above is kept as the record of what existed.
 
 ## Decisions
