@@ -38,8 +38,8 @@ export interface GameHostOptions {
   parseRetries?: number;
   parseTimeoutMs?: number;
   parseRetryDelayMs?: number;
-  /** Play every side the scenario marks `scripted` with the built-in opponent. Default off. */
-  scriptedOpponents?: boolean;
+  /** Play every side the scenario marks `scripted` with the built-in opponent: always, never, or per game. Default off. */
+  scriptedOpponents?: boolean | ((gameId: string) => boolean);
   /** Pause voting for a game: who votes and the host's rules. Unset: players cannot vote to pause. */
   pause?: (id: string, world: GameState) => PauseConfig | undefined;
 }
@@ -85,8 +85,9 @@ export class GameHost {
     };
   }
 
-  private agentsFor(world: GameState) {
-    return this.options.scriptedOpponents ? scriptedAgents(world) : [];
+  private agentsFor(id: string, world: GameState) {
+    const on = this.options.scriptedOpponents;
+    return (typeof on === 'function' ? on(id) : on) ? scriptedAgents(world) : [];
   }
 
   /** Start a new game from a loaded scenario. The clock starts running at game time 0. */
@@ -122,7 +123,7 @@ export class GameHost {
     const actor = new GameActor({
       ...this.actorOptions(id),
       state,
-      agents: this.agentsFor(world),
+      agents: this.agentsFor(id, world),
       pause: this.options.pause?.(id, world),
       clock: new GameClock(this.options.wallNow, { rate: clock.rate }),
     });
@@ -175,7 +176,7 @@ export class GameHost {
       ...this.actorOptions(id),
       state,
       clock,
-      agents: this.agentsFor(state.world),
+      agents: this.agentsFor(id, state.world),
       pause: this.options.pause?.(id, state.world),
       restart: { downMs },
       // The log is in insertion order, which is not always seq order (see D14b).

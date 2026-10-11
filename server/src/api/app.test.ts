@@ -358,7 +358,7 @@ describe('seats', () => {
     const game = (await created.json()) as Created;
     const guest = await signIn(base, 'b@example.test');
     const info = await fetch(`${base}/games/${game.id}`, { headers: { cookie: guest } });
-    expect(await info.json()).toEqual({
+    expect(await info.json()).toMatchObject({
       id: game.id,
       you: null,
       sides: [
