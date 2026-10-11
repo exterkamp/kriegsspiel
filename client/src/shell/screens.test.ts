@@ -48,8 +48,7 @@ describe('existing URLs', () => {
       { name: 'game', create: { side: 'blue', rate: 4 } },
       { name: 'game-over', game: 'g1' },
     ];
-    for (const s of screens)
-      expect(screenFromSearch(urlFor(s).slice(1))).toEqual(s);
+    for (const s of screens) expect(screenFromSearch(urlFor(s).slice(1))).toEqual(s);
   });
 });
 
@@ -83,9 +82,9 @@ describe('transitions', () => {
     );
   });
   it('refuses to go to an account-only screen while signed out', () => {
-    expect(reduce(signedOut(menu), { type: 'go', screen: { name: 'game', game: 'g' } }).screen).toEqual(
-      { name: 'sign-in' },
-    );
+    expect(
+      reduce(signedOut(menu), { type: 'go', screen: { name: 'game', game: 'g' } }).screen,
+    ).toEqual({ name: 'sign-in' });
   });
   it('browser back and forward follow the URL, including to the same game after a reload', () => {
     let s = signedIn({ name: 'game', game: 'g' });
@@ -113,9 +112,9 @@ describe('when a page reload is needed', () => {
     expect(needsReload(game, game, true)).toBe(false);
   });
   it('knows which screens the live client serves', () => {
-    expect(['game', 'game-over', 'new-game'].every((n) => isLiveScreen({ name: n } as Screen))).toBe(
-      true,
-    );
+    expect(
+      ['game', 'game-over', 'new-game'].every((n) => isLiveScreen({ name: n } as Screen)),
+    ).toBe(true);
     expect(isLiveScreen(menu)).toBe(false);
   });
 });

@@ -44,6 +44,7 @@ import {
 } from './desk/store.js';
 import { buildWindowScene } from './window/model.js';
 import { isDeskView } from './desk/views.js';
+import { registerGame } from './shell/gameHandle.js';
 
 /** Make a game as the signed-in user and take `side` (the server picks one when unset). */
 async function createGame(side?: string, rate?: number): Promise<string> {
@@ -119,7 +120,7 @@ async function main(app: HTMLElement): Promise<void> {
 
   let params = parseSession(window.location.search);
   const out = app.querySelector('#pick');
-  if (params.mode !== 'fixture') {
+  if (params.mode !== 'fixture' && params.mode !== 'menu') {
     const me = await fetchMe();
     if (!me) {
       // The emailed link opens in this browser and lands back here with a session cookie.
@@ -391,6 +392,8 @@ async function main(app: HTMLElement): Promise<void> {
       vote: (id, yes) => conn!.vote(id, yes),
     });
     conn.start();
+    registerGame({ disconnect: () => conn?.stop() });
+    window.addEventListener('pagehide', () => conn?.stop());
   } else {
     // No server: the fixture board with an empty desk.
     state = { ...withLink(state, 'offline'), view: fixtureView };
