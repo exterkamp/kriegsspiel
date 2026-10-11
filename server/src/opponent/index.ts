@@ -1,7 +1,16 @@
-import { polygonCentroid, type GameState } from '@kriegsspiel/engine';
+import { featureAnchor, polygonCentroid, type GameState } from '@kriegsspiel/engine';
+import type { OrderParser } from '../orders/index.js';
+import type { UmpireClient } from '../umpire/umpireClient.js';
+import {
+  LlmCommander,
+  type CommanderNote,
+  type Difficulty,
+  type Personality,
+} from './llmCommander.js';
 import { ScriptedOpponent, type SideAgent } from './scriptedOpponent.js';
 
 export * from './scriptedOpponent.js';
+export * from './llmCommander.js';
 
 /**
  * A scripted agent for every side the scenario marks `scripted`. Built once at game start from
@@ -20,4 +29,41 @@ export function scriptedAgents(world: GameState): SideAgent[] {
           fallbackTo: { x: s.hq.x / 1000, y: s.hq.y / 1000 },
         }),
     );
+}
+
+export interface LlmAgentOptions {
+  /** The model client for this game: wrap the shared one in a `GameUmpireClient` to cap its spend. */
+  client: UmpireClient;
+  parser: OrderParser;
+  difficulty?: Difficulty;
+  personality?: Personality;
+  onNote?: (side: string, note: CommanderNote) => void;
+}
+
+/**
+ * An LLM commander for every side the scenario marks `scripted`, each backed by the scripted
+ * opponent for the decisions the model cannot make. Built from the same public facts.
+ */
+export function llmAgents(world: GameState, opts: LlmAgentOptions): SideAgent[] {
+  const places = world.map.features.map((f) => ({
+    id: f.id,
+    kind: f.kind,
+    ...(f.name === undefined ? {} : { name: f.name }),
+    anchor: featureAnchor(f.geometry),
+  }));
+  const objective = polygonCentroid(world.victory.objective);
+  return scriptedAgents(world).map(
+    (fallback) =>
+      new LlmCommander({
+        side: fallback.side,
+        client: opts.client,
+        parser: opts.parser,
+        objective: { x: Math.round(objective.x / 1000), y: Math.round(objective.y / 1000) },
+        places,
+        fallback,
+        difficulty: opts.difficulty,
+        personality: opts.personality,
+        onNote: (note) => opts.onNote?.(fallback.side, note),
+      }),
+  );
 }

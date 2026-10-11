@@ -21,6 +21,8 @@ export interface AgentOrder {
   unitId: string;
   text: string;
   intent: OrderIntent;
+  /** The whole sequence when the order carries more than one step (a move, then a hold). Defaults to `[intent]`. */
+  intents?: OrderIntent[];
 }
 
 /** A server-side agent playing one side. The actor calls `think` every `intervalMs` of game time. */
@@ -29,6 +31,13 @@ export interface SideAgent {
   /** Game ms between decisions. */
   readonly intervalMs: number;
   think(view: EngineSideView): AgentOrder[];
+  /**
+   * For an agent that must wait on something slow (a model). When set, the actor calls this
+   * instead of `think` and holds game time at the decision's moment until it settles (the LLM
+   * barrier). `think` is then the fallback for a decision that fails or times out, and must work
+   * on its own.
+   */
+  decide?(view: EngineSideView): Promise<AgentOrder[]>;
   /**
    * Whether the last `think` that issued no order did so because nothing needs doing, rather than
    * because it chose to wait. The actor stops asking an agent that is settled once the world is

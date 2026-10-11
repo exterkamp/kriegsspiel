@@ -35,7 +35,7 @@ import {
   type TraceSink,
 } from '../debug/trace.js';
 import type { OrderParser, ParseContext, ParseResult } from '../orders/index.js';
-import type { SideAgent } from '../opponent/index.js';
+import type { AgentOrder, SideAgent } from '../opponent/index.js';
 import { PauseVoting, type PauseConfig, type PauseTransition } from '../pause.js';
 import { RatioVoting, type RatioTransition } from '../ratioVote.js';
 import { advanceUntilOver, applyLoggedOrder } from './replay.js';
@@ -122,6 +122,8 @@ interface AgentSlot {
    * event queue the world cannot change by itself, so thinking again would only spin the clock.
    */
   idle: boolean;
+  /** An async decision is in flight (the LLM barrier holds game time meanwhile). */
+  pending: boolean;
 }
 
 interface Dependency {
@@ -208,6 +210,7 @@ export class GameActor {
       agent,
       nextAt: t === 0 ? 0 : (Math.floor(t / agent.intervalMs) + 1) * agent.intervalMs,
       idle: false,
+      pending: false,
     }));
     if (options.pause) {
       this.pauseVoting = new PauseVoting(options.pause, {
@@ -346,8 +349,9 @@ export class GameActor {
         if (!due || due.nextAt > target || this.engine.world.outcome) break;
         step(due.nextAt);
         due.nextAt += due.agent.intervalMs;
-        if (!this.engine.world.outcome)
-          due.idle = !this.think(due.agent) && (due.agent.settled?.() ?? true);
+        if (this.engine.world.outcome) continue;
+        if (due.agent.decide) this.beginDecision(due);
+        else due.idle = !this.think(due.agent) && (due.agent.settled?.() ?? true);
       }
       step(target);
     } finally {
@@ -366,7 +370,8 @@ export class GameActor {
   private nextAgent(): AgentSlot | undefined {
     const waiting = this.engine.queue.length > 0;
     return this.agents.reduce<AgentSlot | undefined>(
-      (best, a) => ((a.idle && !waiting) || (best && best.nextAt <= a.nextAt) ? best : a),
+      (best, a) =>
+        a.pending || (a.idle && !waiting) || (best && best.nextAt <= a.nextAt) ? best : a,
       undefined,
     );
   }
@@ -374,13 +379,82 @@ export class GameActor {
   /** Run one decision: the same order path as a human's, logged so replay needs no agent. */
   private think(agent: SideAgent): boolean {
     const view = viewFor(this.engine.world, agent.side as SideId, this.engine.time);
+    return this.issueAgentOrders(agent, agent.think(view));
+  }
+
+  /**
+   * Start an async decision (an LLM commander). Like an order being parsed, it holds game time at
+   * the moment it began until it settles (the LLM barrier), so the model never falls behind the
+   * game and the result is applied at a time replay reproduces from the log. A decision that fails
+   * or times out is handed to the agent's synchronous `think`, which must always be able to play.
+   */
+  private beginDecision(slot: AgentSlot): void {
+    const agent = slot.agent;
+    const view = viewFor(this.engine.world, agent.side as SideId, this.engine.time);
+    const before = this.clock.barrier;
+    const dep: Dependency = {
+      id: this.nextDependency++,
+      neededAt: this.clock.holdAtNow(),
+      settle: () => undefined,
+      abandoned: false,
+    };
+    slot.pending = true;
+    this.dependencies.set(dep.id, dep);
+    this.refreshBarrier();
+    this.announceStaff(before);
+    const decided = (async (): Promise<AgentOrder[] | undefined> => {
+      try {
+        return await this.withTimeout(agent.decide!(view));
+      } catch (e) {
+        if (this.trace.enabled) this.trace.record(this.id, 'error', { source: 'agent', error: e });
+        return undefined;
+      }
+    })();
+    void decided
+      .then((orders) => this.enqueueCompletion(() => this.completeDecision(slot, dep, orders)))
+      .catch((e) => {
+        this.dependencies.delete(dep.id);
+        slot.pending = false;
+        if (!dep.abandoned) this.onError?.(e);
+      });
+  }
+
+  private async completeDecision(
+    slot: AgentSlot,
+    dep: Dependency,
+    decided: AgentOrder[] | undefined,
+  ): Promise<void> {
+    if (dep.abandoned) return;
+    this.dependencies.delete(dep.id);
+    slot.pending = false;
+    // The clock carries on from the barrier; the world catches up to it before the orders go in.
+    this.syncBarrier();
+    try {
+      this.sync();
+      if (!this.engine.world.outcome) {
+        const agent = slot.agent;
+        const orders =
+          decided ??
+          agent.think(viewFor(this.engine.world, agent.side as SideId, this.engine.time));
+        const changed = this.issueAgentOrders(agent, orders);
+        slot.idle = !changed && (agent.settled?.() ?? true);
+      }
+      await this.persistProgress();
+    } finally {
+      this.reschedule();
+      this.notify();
+    }
+  }
+
+  /** Issue an agent's orders through the human order path, logging each for replay. */
+  private issueAgentOrders(agent: SideAgent, orders: AgentOrder[]): boolean {
     let changed = false;
-    for (const o of agent.think(view)) {
+    for (const o of orders) {
       const parsed: ParseResult = {
         kind: 'intents',
         text: o.text,
         unitId: o.unitId,
-        intents: [o.intent],
+        intents: o.intents ?? [o.intent],
       };
       const entry: InputLogEntry = {
         seq: ++this.seq,

@@ -157,6 +157,11 @@ A scripted side is a `SideAgent` run by the `GameActor`. Every `intervalMs` of g
 
 The server turns the opponent on by default: `main.ts` passes `scriptedOpponents: scriptedOpponentsFromEnv(process.env)` to `buildApp`, which hands it to `GameHost`. Set `SCRIPTED_OPPONENTS=0` (or `false`/`off`) to disable it, for tests or human-vs-human games. `GameHost` itself defaults to off.
 
+
+### LLM commander
+
+A scripted side can instead be played by `LlmCommander` (`AI_COMMANDER=llm`, see D-log "LLM opposing commander"). The actor calls its `decide(view)` and holds the clock at that moment until it settles, the same barrier a human order's parse uses; a failed, refused or slow call is played by the scripted opponent. Its orders are text that goes through the `OrderParser`.
+
 ## Debug trace
 
 `server/src/debug/` holds the debug trace store behind the admin view (Epic #119). It is read-only diagnostics: the engine never reads it and no game client ever receives it.

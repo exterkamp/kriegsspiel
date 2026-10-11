@@ -61,7 +61,7 @@ Each milestone should end in something playable.
 - [ ] Roles per side, with LLM filling empty staff roles
 - [ ] Shared order drafts: comments, tracked edits, sign and stamp, LLM staff check
 - [ ] Shared HQ and chain-of-command modes
-- [ ] AI opposing commander (fog-respecting)
+- [x] AI opposing commander (fog-respecting)
 - [ ] Scenario editor / procedural scenario generator
 
 ## Later
