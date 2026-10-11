@@ -97,9 +97,7 @@ describe('game-over screen', () => {
     gameState.update((s) => ({ ...s, gameOver: over }));
     app = mount(Desk, { target: document.body });
     flushSync();
-    const [win, journal] = [
-      ...document.querySelectorAll<HTMLButtonElement>('[role=dialog] button'),
-    ];
+    const journal = document.querySelectorAll<HTMLButtonElement>('[role=dialog] button')[1];
     journal!.click();
     flushSync();
     expect(document.querySelector('#over-h')).toBeNull();
