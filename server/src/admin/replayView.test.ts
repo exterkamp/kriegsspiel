@@ -93,6 +93,17 @@ describe('admin replay', () => {
     expect((await get('/admin/api/games/g1/replay/at')).statusCode).toBe(400);
   });
 
+  it('stops at the end of the log for a game that is no longer loaded', async () => {
+    const { game } = await recordedGame();
+    await app!.host.close('g1');
+    const at = async (t: number) => (await get(`/admin/api/games/g1/replay/at?at=${t}`)).json();
+    const end = (await get('/admin/api/games/g1/replay')).json().endMs;
+    expect(end).toBe(30 * MIN);
+    expect((await at(60 * MIN)).gameMs).toBe(end);
+    expect((await at(1e10)).gameMs).toBe(end);
+    expect(game.state.time).toBe(end);
+  });
+
   it('is absent when the admin view is off', async () => {
     app = await buildApp({ parser: new CountingParser() });
     expect((await get('/admin/api/games/g1/replay')).statusCode).toBe(404);

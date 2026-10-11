@@ -151,6 +151,8 @@ export class AdminPage {
     this.applyFilter();
     // A list built while hidden had no layout; re-render so it opens at the tail, not the top.
     this.lists.get(id)?.renderNow();
+    // Reloading also picks up the new end of a running game's timeline.
+    if (id === 'Replay') void this.replay.setGame(this.gameId, true);
   }
 
   private applyFilter(): void {

@@ -50,7 +50,7 @@ export class ReplayPanel {
     root.innerHTML = `
       <div class="scrub">
         <button type="button" data-step="-1" aria-label="Previous event">◀ event</button>
-        <input type="range" min="0" max="0" step="1000" value="0" aria-label="Game time" />
+        <input type="range" min="0" max="0" step="1" value="0" aria-label="Game time" />
         <button type="button" data-step="1" aria-label="Next event">event ▶</button>
         <output aria-live="polite"></output>
       </div>
@@ -87,9 +87,9 @@ export class ReplayPanel {
     this.status.textContent = 'No game selected.';
   }
 
-  /** Point the panel at a game (or none) and load its timeline. */
-  async setGame(id: string | undefined): Promise<void> {
-    if (id === this.gameId && this.timeline) return;
+  /** Point the panel at a game (or none) and load its timeline; `reload` refetches a loaded one. */
+  async setGame(id: string | undefined, reload = false): Promise<void> {
+    if (id === this.gameId && this.timeline && !reload) return;
     this.gameId = id;
     this.timeline = undefined;
     this.out.replaceChildren();
@@ -111,14 +111,6 @@ export class ReplayPanel {
     } catch {
       if (ticket === this.request) this.status.textContent = 'This game cannot be replayed.';
     }
-  }
-
-  /** Reload the timeline, for a running game that has moved on. */
-  refresh(): Promise<void> {
-    const id = this.gameId;
-    this.gameId = undefined;
-    this.timeline = undefined;
-    return this.setGame(id);
   }
 
   private jump(dir: number, kind?: MarkKind): void {

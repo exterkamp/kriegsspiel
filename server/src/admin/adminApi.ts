@@ -189,8 +189,9 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
       const input = await replayInput(req.params.id).catch(() => null);
       if (input === null) return reply.code(422).send({ error: 'cannot_replay' });
       if (!input) return reply.code(404).send({ error: 'no_such_game' });
-      const live = host.get(req.params.id)?.state.time;
-      return replayAt(input, live === undefined ? q.data.at : Math.min(q.data.at, live));
+      // Never past what the game knows: its live time, or else where its log ends.
+      const end = host.get(req.params.id)?.state.time ?? replayTimeline(input).endMs;
+      return replayAt(input, Math.min(q.data.at, end));
     },
   );
 
