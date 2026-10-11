@@ -9,7 +9,7 @@ export type Freshness = 'fresh' | 'aging' | 'stale';
 export interface RosterRow {
   id: string;
   name: string;
-  /** Percent, or undefined when the report gives no usable figure. */
+  /** Men, as reported (not a percent), or undefined when the report gives no usable figure. */
   strength: number | undefined;
   supply: number | undefined;
   morale: number | undefined;

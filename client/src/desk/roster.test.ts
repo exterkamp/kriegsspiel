@@ -76,4 +76,23 @@ describe('Roster view', () => {
     expect(get(showOnTable)).toEqual(u.position);
     expect(get(activeView)).toBe('table');
   });
+  it('ages a running 12:1 clock in game time', () => {
+    const u = view.ownUnits[0]!;
+    // 10 wall minutes at 12:1 is 2 game hours past the view date.
+    gameState.set({
+      ...initialState,
+      view: { ...view, ownUnits: [u] },
+      clock: {
+        gameMs: view.atGame,
+        localWallMs: Date.now() - 10 * 60_000,
+        rate: 12,
+        status: 'running',
+      },
+    });
+    cmp = mount(Roster, { target: document.body });
+    flushSync();
+    const row = document.querySelector(`tr[data-unit="${u.id}"]`)!;
+    expect(row.classList.contains('stale')).toBe(true);
+    expect(row.textContent).toContain('2 h old (stale)');
+  });
 });

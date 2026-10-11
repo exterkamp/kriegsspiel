@@ -55,8 +55,10 @@
   }
   .roster button:focus-visible { outline: 3px solid #ffd76a; outline-offset: 2px; }
   .unknown { font-style: italic; opacity: 0.7; }
-  .age { display: block; opacity: 0.75; }
-  tr.aging { opacity: 0.8; }
-  tr.stale { opacity: 0.55; }
+  .age { display: block; }
+  tr.aging { opacity: 0.85; }
+  /* Floor of 0.75 keeps the dark text readable on paper; the unknown fade does not stack on it. */
+  tr.stale { opacity: 0.75; }
+  tr.stale .unknown { opacity: 1; }
   tr.stale .age { font-weight: bold; }
 </style>
