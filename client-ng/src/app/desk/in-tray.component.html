@@ -1,0 +1,82 @@
+<div class="tray">
+  <h2>In-tray</h2>
+  <div class="piles" role="group" aria-label="Piles">
+    @for (p of sorted().piles; track p.id) {
+      <button
+        type="button"
+        class="pile"
+        [attr.aria-pressed]="!showFiled() && pile() === p.id"
+        (click)="pick(p.id)"
+      >
+        {{ p.label }} <span class="n">{{ p.items.length }}</span>
+        @if (p.unread > 0) {
+          <span class="unread-dot"
+            ><span aria-hidden="true">●{{ p.unread }}</span
+            ><span class="sr-only">{{ p.unread }} unread</span></span
+          >
+        }
+      </button>
+    }
+    <button type="button" class="pile" [attr.aria-pressed]="showFiled()" (click)="pickFiled()">
+      Filed <span class="n">{{ sorted().filed.length }}</span>
+    </button>
+  </div>
+
+  <div class="cols">
+    <ul class="list" [attr.aria-label]="listLabel()">
+      @for (d of list(); track d.id) {
+        <li>
+          <button
+            type="button"
+            class="row"
+            [class.unread]="!read().has(d.id)"
+            [attr.aria-current]="openId() === d.id"
+            (click)="openDispatch(d.id)"
+          >
+            <b>{{ read().has(d.id) ? '' : '● ' }}{{ d.from }}</b>
+            <small>received {{ formatGameTime(d.receivedAtGame) }}</small>
+          </button>
+        </li>
+      } @empty {
+        <li class="empty">Nothing here.</li>
+      }
+    </ul>
+
+    <article class="viewer" aria-live="polite" tabindex="-1" #viewer>
+      @if (open(); as o) {
+        <h3>{{ o.from }}</h3>
+        <dl>
+          <dt>Written</dt>
+          <dd>{{ formatGameTime(o.writtenAtGame) }}</dd>
+          <dt>Received</dt>
+          <dd>{{ formatGameTime(o.receivedAtGame) }}</dd>
+        </dl>
+        <p class="text">{{ o.text }}</p>
+        @if (o.location || o.unit || o.sizeEstimate) {
+          <aside class="sketch" aria-label="Attached sketch">
+            <b>Sketch</b>
+            @if (o.unit) {
+              <span>Unit: {{ o.unit }}</span>
+            }
+            @if (o.sizeEstimate) {
+              <span>Strength: {{ o.sizeEstimate }}</span>
+            }
+            @if (o.location) {
+              <button type="button" (click)="locate()">Show on table</button>
+            }
+          </aside>
+        }
+        <div class="actions">
+          @if (showFiled()) {
+            <button type="button" (click)="onFile(o.id, false)">Return to pile</button>
+          } @else {
+            <button type="button" (click)="onFile(o.id, true)">File</button>
+          }
+          <button type="button" (click)="onDiscard(o.id)">Discard</button>
+        </div>
+      } @else {
+        <p class="empty">Select a dispatch to read it.</p>
+      }
+    </article>
+  </div>
+</div>

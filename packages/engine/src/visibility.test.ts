@@ -357,10 +357,11 @@ describe('reports', () => {
       ),
     );
     s = advanceTo(s, COURIER_DELAY_MS - 1, reg).state;
-    expect(viewFor(s.world, 'blue', s.time).reports).toEqual([]);
+    // Only the opening situation report is on the desk; the sighting is still on the road.
+    expect(viewFor(s.world, 'blue', s.time).reports.map((r) => r.kind)).toEqual(['situation']);
 
     s = advanceTo(s, COURIER_DELAY_MS + 3 * MS_PER_MINUTE, reg).state;
-    const [r] = viewFor(s.world, 'blue', s.time).reports;
+    const r = viewFor(s.world, 'blue', s.time).reports.find((x) => x.kind === 'contact');
     expect(r).toMatchObject({
       kind: 'contact',
       observedAt: 0,
@@ -405,8 +406,11 @@ describe('reports', () => {
       ),
     );
     s = advanceTo(s, 60 * MS_PER_MINUTE, reg).state;
-    expect(viewFor(s.world, 'blue', s.time).reports).toEqual([]);
-    expect(viewFor(s.world, 'red', s.time).reports).toEqual([]);
+    const kinds = (side: 'blue' | 'red') =>
+      viewFor(s.world, side, s.time).reports.map((r) => r.kind);
+    // Only the opening situation report: nothing about an enemy never seen.
+    expect(kinds('blue')).toEqual(['situation']);
+    expect(kinds('red')).toEqual(['situation']);
   });
 
   it('files a second contact report when the enemy leaves sight and comes back', () => {
@@ -726,7 +730,7 @@ describe('places in reports', () => {
     });
     let s = startVisibility(createState(1, w, 0));
     s = advanceTo(s, COURIER_DELAY_MS, registry()).state;
-    const [r] = viewFor(s.world, 'blue', s.time).reports;
+    const r = viewFor(s.world, 'blue', s.time).reports.find((x) => x.kind === 'contact');
     expect(r).toMatchObject({ place: 'near the mill, east of the road', uncertaintyRadius: 60 });
     expect(r!.text).toBe(
       'Unit b sighted about a battalion near the mill, east of the road, 10 min ago (medium confidence).',

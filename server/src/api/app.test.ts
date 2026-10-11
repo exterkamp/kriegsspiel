@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
 import {
-  COURIER_DELAY_MS,
+  ACK_DELAY_MS,
   COURIER_MS_PER_METRE,
   findPath,
   holdTheBridge,
@@ -521,11 +521,11 @@ describe('orders', () => {
       m.dispatch.text.includes('received its orders'),
     );
     // The order was signed at `issuedAt`; the courier took DELIVERY_MS to reach the unit and
-    // the report took COURIER_DELAY_MS to come back.
+    // the acknowledgement took ACK_DELAY_MS to come back.
     const signed = (await store.inputLog(game.id)).find((e) => e.command.kind === 'order')!;
     expect(signed.error).toBeUndefined();
     expect(dispatch.writtenAtGame).toBe(signed.gameMs + DELIVERY_MS);
-    expect(dispatch.receivedAtGame).toBe(signed.gameMs + DELIVERY_MS + COURIER_DELAY_MS);
+    expect(dispatch.receivedAtGame).toBe(signed.gameMs + DELIVERY_MS + ACK_DELAY_MS);
     expect(dispatch.from).toBe(START.units.find((u) => u.id === 'blue-1')!.name);
 
     // The next view carries it too, and blue-1 is on the move.

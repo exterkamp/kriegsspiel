@@ -1,6 +1,6 @@
 # Angular migration plan (issue #269)
 
-Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) and step 1 (services and stores, #272) and step 2.2 (roster, journal, conference, pause panel, #273) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
+Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) and step 1 (services and stores, #272) done; step 2 in progress, with the roster, journal, conference and pause panel (#273) and the in-tray, orders desk and umpire window (#274) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
 
 ## What the spike proves
 
@@ -38,6 +38,16 @@ Not in the spike: sign-in, menus, orders, marks, any other view, the admin, map-
 - No `@angular/forms`: inputs use `[value]` and `(input)` bound to signals.
 - The components are not mounted yet; `DeskComponent` (step 3) lays them out. `desk/testing.ts` has a `stubGame()` helper that provides a `GameService` whose state a test sets directly.
 - Tests: one spec per component, covering the mount assertions of `roster.test.ts`, `journal.test.ts`, `conference.test.ts` and `pause.test.ts`, with the `PausePanel` cases of `pause.test.ts` ported and a countdown test on fake timers. The pure-logic halves of those Svelte test files stay where they are until the cutover. No test was dropped; the Svelte `Desk`-mounted cases (for example the clock vote shown beside the pause panel) belong to `DeskComponent`.
+
+## Step 2 (part): in-tray, orders desk, umpire window (#274)
+
+Components in `client-ng/src/app/desk/`, each standalone, `OnPush`, signals, with its Svelte CSS carried over unchanged. None is mounted in a route yet: the desk shell (step 3) will place them.
+
+- **`InTrayComponent`** (`in-tray.component.*`, port of `InTray.svelte`). Sorting and marks stay in `@legacy/desk/tray`. The viewer shown is published to `DeskStore.viewedDispatch` by an `effect`. After File or Discard moves the viewer on, focus returns to the viewer with `afterNextRender` (Svelte used `tick()`). **#267 included:** its engine, server and docs changes (the opening `situation` report from the chief of staff, and the order acknowledgement filed after `ACK_DELAY_MS` instead of the 10-minute sighting delay) are applied here, so the in-tray is no longer empty before contact. `ACK_DELAY_MS` is now exported from the engine. Five existing engine and server test files asserted the old behaviour and were updated (`orders.test.ts`, `visibility.test.ts` x3, `app.test.ts`). #267 is superseded by this change.
+- **`OrdersDeskComponent`** (`orders-desk.component.*`, port of `OrdersDesk.svelte`). The draft is `DeskStore.orderDraft`; sending goes through the `ORDER_SENDER` token, so a spec (or fixture mode) provides its own sender. The staff estimates are computed once per courier. The SENT stamp uses a 1.4 s `setTimeout`, cleared on destroy. Error text sits in an always-present `role="alert"` region per field, as before.
+- **`UmpireWindowComponent`** (`umpire-window.component.*`, port of `UmpireWindow.svelte`). Reads `GameService.gameId`, fetches the timeline and frames through the unchanged `@legacy/window/api`, writes `DeskStore.windowFrame`, and clears frame and hover on destroy. A ticket counter drops a frame that lands after a newer request.
+- **Plan change:** none. Specs use a small `fake-game.ts` (a `GameService` stand-in whose state is a plain signal) instead of a fake socket.
+- **Tests:** `in-tray`, `orders-desk` and `umpire-window` `.component.spec.ts`, no wall-clock timing (the one timer test uses fake timers and `TestBed.tick()`, because the zoneless scheduler itself runs on timers). The Svelte `tray.test.ts` and `orders.test.ts` mount-and-query cases are ported one for one; their pure-logic cases (`sortTray`, persistence, estimates, annex, draft autosave, delivery status, refusals) stay where they are and still run. Not ported, because they test other parts: the journal case that lists a sent order (belongs to `JournalComponent`), the `MarksBar` toggle, and the `index.html` icon check. Added: empty-pile text, the #267 situation report and acknowledgement in the right piles, focus after a paper goes, Ctrl+Enter, the stamp expiring, a game-over form, a vanished annex arrow, and every umpire-window case (the Svelte one had no component test).
 
 ## Decisions
 
