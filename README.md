@@ -35,6 +35,7 @@ Node version is in `.nvmrc` (`nvm use`). This is an npm workspaces monorepo:
 npm run setup:map-source # verify pinned engine source and build its local tarball
 npm ci
 npm test          # Vitest in every package
+npm run test:stress # whole suite repeatedly under CPU load; fails on any flake
 npm run lint      # ESLint + Prettier check
 npm run typecheck # tsc --noEmit in every package
 npm run build
@@ -42,6 +43,16 @@ npm run format    # Prettier write
 ```
 
 CI (`.github/workflows/ci.yml`) runs lint, typecheck, tests and build on pull requests.
+
+### Flaky tests
+
+A test that passes alone but fails on a busy machine depends on timing. Run `npm run test:stress` to
+run the full suite several times while one busy-loop process per core occupies the CPUs; it exits
+non-zero if any run fails and prints the failing tests. Tune it with `STRESS_RUNS` (default 5) and
+`STRESS_BURNERS` (default: one per core; `0` for no extra load), for example
+`STRESS_RUNS=20 STRESS_BURNERS=12 npm run test:stress`. Fix a flake by injecting the clock or timers
+(`FakeTime` in `server/src/game/testing.ts`, vitest fake timers) or by waiting on the event the test
+needs, not by raising a timeout.
 
 ### Server settings
 

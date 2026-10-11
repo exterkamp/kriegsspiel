@@ -23,6 +23,7 @@ import {
   replayLog,
   startingState,
 } from '../game/index.js';
+import { FakeTime } from '../game/testing.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { scriptedOpponentsFromEnv } from '../config.js';
 import { buildApp, type App } from './app.js';
@@ -893,14 +894,20 @@ async function until(cond: () => boolean, ms = 5000): Promise<void> {
 }
 
 describe('scripted opponent', () => {
+  /** Wall time the game runs on here, so nothing waits on the real clock or the machine's load. */
+  let time: FakeTime;
+
   /** Starts the app with the settings `main.ts` derives from the given environment. */
   async function startLikeMain(env: Record<string, string | undefined>) {
     store = new MemoryGameStore();
+    time = new FakeTime(Date.now());
     app = await buildApp({
       parser: new StubOrderParser(),
       store,
       scriptedOpponents: scriptedOpponentsFromEnv(env),
       auth: { mailer },
+      wallNow: time.now,
+      timers: time,
     });
     const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
     return base;
@@ -908,43 +915,32 @@ describe('scripted opponent', () => {
 
   const redUnits = (id: string) =>
     app!.host.get(id)!.state.world.units.filter((u) => u.side === 'red');
+  const agentOrders = async (id: string) => (await store.inputLog(id)).filter((e) => e.agent);
 
   it('moves Red by default with no client input', async () => {
     const base = await startLikeMain({});
     const game = (await createGame(base, { rate: 86_400 }, false)).json;
     const start = redUnits(game.id).map((u) => u.center);
-    const deadline = Date.now() + 5000;
-    while (Date.now() < deadline) {
-      const log = await store.inputLog(game.id);
-      const moved = redUnits(game.id).some(
-        (u, i) => u.center.x !== start[i]!.x || u.center.y !== start[i]!.y,
-      );
-      if (log.some((e) => e.agent) && moved) break;
-      await new Promise((r) => setTimeout(r, 25));
-    }
-    expect((await store.inputLog(game.id)).some((e) => e.agent)).toBe(true);
+    await time.advance(5000);
+    expect(await agentOrders(game.id)).not.toHaveLength(0);
     expect(
       redUnits(game.id).some((u, i) => u.center.x !== start[i]!.x || u.center.y !== start[i]!.y),
     ).toBe(true);
   });
 
   it('leaves Red idle when SCRIPTED_OPPONENTS=0', async () => {
-    // Calibrate the wait: time how long the default setting takes to produce an agent order, so
-    // the idle check below can't pass vacuously by looking for less time than that.
+    // The same span of fake time that gives the default setting an agent order, so the idle
+    // check below can't pass vacuously by looking for less time than that.
     const defaultBase = await startLikeMain({});
     const calibration = (await createGame(defaultBase, { rate: 86_400 }, false)).json;
-    const t0 = Date.now();
-    while (!(await store.inputLog(calibration.id)).some((e) => e.agent)) {
-      if (Date.now() - t0 > 5000) throw new Error('default setting never produced an agent order');
-      await new Promise((r) => setTimeout(r, 10));
-    }
-    const agentLatency = Date.now() - t0;
+    await time.advance(5000);
+    expect(await agentOrders(calibration.id)).not.toHaveLength(0);
     await app!.server.close();
 
     const base = await startLikeMain({ SCRIPTED_OPPONENTS: '0' });
     const game = (await createGame(base, { rate: 86_400 }, false)).json;
-    await new Promise((r) => setTimeout(r, Math.max(500, agentLatency * 3)));
-    expect((await store.inputLog(game.id)).some((e) => e.agent)).toBe(false);
+    await time.advance(5000);
+    expect(await agentOrders(game.id)).toHaveLength(0);
   });
 
   it.each([
