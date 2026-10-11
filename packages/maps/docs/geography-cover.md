@@ -1,6 +1,6 @@
 # Bounded land cover (#136 portion)
 
-Prerequisite: accepted terrain/contract checkpoint `27bbce4`, [map contract](../README.md), [terrain and contours](terrain.md), D15/D16 and [map implementation plan](../../../docs/map-implementation-plan.md). This packet owns only `src/geography/cover/**`, `tests/geography-cover.test.ts` and this document. Main geography implementation, shared APIs/configuration, compiled artifacts and acceptance remain with the main writer/coordinator. No #136 gate is claimed.
+Prerequisite: accepted terrain/contract checkpoint `27bbce4`, [map contract](../README.md), [terrain and contours](terrain.md), D18/D19 and [map implementation plan](../../../docs/map-implementation-plan.md). This packet owns only `src/geography/cover/**`, `tests/geography-cover.test.ts` and this document. Main geography implementation, shared APIs/configuration, compiled artifacts and acceptance remain with the main writer/coordinator. No #136 gate is claimed.
 
 ## API and version
 

@@ -4,7 +4,7 @@
 
 (Historical details to be checked against the rulebooks, see [research.md](research.md).)
 
-1. **Setup.** An umpire picks a scenario. Both sides get a *general situation* (shared) and a *special situation* (their own orders and knowledge). The umpire holds the master map. Each side has its own map in a separate room.
+1. **Setup.** An umpire picks a scenario. Both sides get a *general situation* (shared) and a *special situation* (their own orders and knowledge). The umpire holds the master map. Each side has its own map in a separate room. Space is continuous: units stand at any position and facing and may be drawn up in any shape the umpire judges realistic, with no squares or tiles (D15).
 2. **Teams.** A side is several officers, not one player. A commander-in-chief gives orders to subordinates, usually in writing.
 3. **Turns.** Rigid: fixed time slices tied to march rates. Free: the umpire sets the length of each slice, shorter in contact and longer on quiet marches.
 4. **Orders.** Written. The umpire moves the blocks as competent subordinates would, including delays and misunderstandings.
@@ -79,7 +79,7 @@ Real life happens. The game can be **paused by a vote of all human players** acr
 
 ### Changing the ratio
 
-The ratio can be changed mid-game by vote, for example to slow down a decisive battle or speed up a long march. The clock re-anchors so game time never jumps.
+The ratio can be changed mid-game by vote, for example to slow down a decisive battle or speed up a long march. The clock re-anchors so game time never jumps. Any voter proposes a ratio and the others vote under the same rules as a pause (unanimous by default, or a majority; a vote that times out is cancelled). One ratio vote is open at a time, and it works while the game is paused.
 
 ## Multiplayer collaborative mode
 

@@ -3,8 +3,25 @@ import { z } from 'zod';
 /** Wire version carried by every message. Bump on breaking changes. */
 export const PROTOCOL_VERSION = 1;
 
+/**
+ * A point on the map plane, in metres (x east, y south, origin at the north-west corner). The
+ * plane is continuous: there is no grid, so coordinates are free reals.
+ */
 export const Coord = z.object({ x: z.number().finite(), y: z.number().finite() }).strict();
 export type Coord = z.infer<typeof Coord>;
+
+/** How a unit is drawn up. `skirmish` and `loose` units may carry a `shape` of sub-positions. */
+export const Formation = z.enum(['line', 'column', 'square', 'skirmish', 'loose']);
+export type Formation = z.infer<typeof Formation>;
+
+/** The ground a unit covers: an oriented rectangle, in metres, `frontage` across and `depth` along its facing. */
+export const Footprint = z
+  .object({ frontage: z.number().finite().positive(), depth: z.number().finite().positive() })
+  .strict();
+export type Footprint = z.infer<typeof Footprint>;
+
+/** Compass bearing in radians: 0 faces north (-y), growing clockwise (east is pi/2). */
+export const Facing = z.number().finite();
 
 export const Side = z.string().min(1);
 export type Side = z.infer<typeof Side>;

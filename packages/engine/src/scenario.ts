@@ -1,16 +1,27 @@
 import {
-  FACINGS,
+  footprintCorners,
+  footprintsOverlap,
+  defaultFootprint,
+  subPositions,
+} from './formation.js';
+import { mm, pointMm, polygonCentroid } from './geometry.js';
+import { KIND_DEFAULTS, terrainAt } from './terrain.js';
+import { UNIT_TYPES, unitTypeOf } from './unitTypes.js';
+import {
+  FEATURE_KINDS,
+  FORMATIONS,
+  HEIGHTS,
   MS_PER_MINUTE,
-  TERRAINS,
   UNIT_KINDS,
-  tileAt,
-  type Facing,
+  type FeatureGeometry,
+  type Footprint,
   type GameState,
-  type MapGrid,
   type Point,
   type Side,
   type SideId,
-  type Terrain,
+  type TerrainAttrs,
+  type TerrainFeature,
+  type TerrainMap,
   type Unit,
 } from './types.js';
 
@@ -55,42 +66,115 @@ function oneOf<T extends string>(v: unknown, allowed: readonly T[], path: string
   return v as T;
 }
 
-function parseMap(raw: unknown): MapGrid {
-  const m = obj(raw, 'map');
-  const legendRaw = obj(m.legend, 'map.legend');
-  const legend = new Map<string, Terrain>();
-  for (const [ch, t] of Object.entries(legendRaw)) {
-    if (ch.length !== 1) fail(`map.legend key "${ch}" must be a single character`);
-    legend.set(ch, oneOf(t, TERRAINS, `map.legend["${ch}"]`));
-  }
-  const rows = arr(m.rows, 'map.rows');
-  if (rows.length === 0) fail('map.rows must not be empty');
-  const first = str(rows[0], 'map.rows[0]');
-  const width = first.length;
-  const tiles: Terrain[] = [];
-  rows.forEach((r, y) => {
-    const row = str(r, `map.rows[${y}]`);
-    if (row.length !== width) {
-      fail(`map.rows[${y}] has width ${row.length}, expected ${width}`);
-    }
-    for (let x = 0; x < width; x++) {
-      const t = legend.get(row[x] as string);
-      if (t === undefined) fail(`map.rows[${y}] has unknown tile "${row[x]}" at x=${x}`);
-      tiles.push(t);
-    }
-  });
-  return { width, height: rows.length, tiles };
+/** A finite number (not necessarily whole) within [min, max]. Lengths in scenario data are metres. */
+function num(v: unknown, path: string, min = -Infinity, max = Infinity): number {
+  if (typeof v !== 'number' || !Number.isFinite(v)) fail(`${path} must be a finite number`);
+  if (v < min || v > max) fail(`${path} must be between ${min} and ${max}`);
+  return v;
 }
 
-function parseHq(o: Record<string, unknown>, i: number, map: MapGrid): Point {
-  const hq = obj(o.hq, `sides[${i}].hq`);
-  const p: Point = { x: int(hq.x, `sides[${i}].hq.x`), y: int(hq.y, `sides[${i}].hq.y`) };
-  const t = tileAt(map, p);
-  if (t === undefined || t === 'river') fail(`sides[${i}].hq must be on passable ground`);
+/** A named point `{x, y}` in metres, quantised to integer mm. */
+function parsePoint(raw: unknown, path: string): Point {
+  const o = obj(raw, path);
+  return pointMm(num(o.x, `${path}.x`), num(o.y, `${path}.y`));
+}
+
+/** A vertex `[x, y]` in metres, quantised to integer mm. */
+function parseVertex(raw: unknown, path: string): Point {
+  const a = arr(raw, path);
+  if (a.length !== 2) fail(`${path} must be [x, y]`);
+  return pointMm(num(a[0], `${path}[0]`), num(a[1], `${path}[1]`));
+}
+
+function inside(map: TerrainMap, p: Point): boolean {
+  return p.x >= 0 && p.y >= 0 && p.x <= map.width && p.y <= map.height;
+}
+
+function parseGeometry(o: Obj, path: string, map: TerrainMap): FeatureGeometry {
+  const keys = ['polygon', 'polyline', 'at'].filter((k) => o[k] !== undefined);
+  if (keys.length !== 1) fail(`${path} needs exactly one of polygon, polyline or at`);
+  let g: FeatureGeometry;
+  if (o.polygon !== undefined) {
+    const points = arr(o.polygon, `${path}.polygon`).map((v, i) =>
+      parseVertex(v, `${path}.polygon[${i}]`),
+    );
+    if (points.length < 3) fail(`${path}.polygon needs at least 3 points`);
+    g = { shape: 'polygon', points };
+  } else if (o.polyline !== undefined) {
+    const points = arr(o.polyline, `${path}.polyline`).map((v, i) =>
+      parseVertex(v, `${path}.polyline[${i}]`),
+    );
+    if (points.length < 2) fail(`${path}.polyline needs at least 2 points`);
+    g = { shape: 'polyline', points, width: mm(num(o.width, `${path}.width`, 0.001)) };
+  } else {
+    g = {
+      shape: 'point',
+      at: parsePoint(o.at, `${path}.at`),
+      radius: mm(num(o.radius, `${path}.radius`, 0.001)),
+    };
+  }
+  const pts = g.shape === 'point' ? [g.at] : g.points;
+  if (!pts.every((p) => inside(map, p))) fail(`${path} lies off the map`);
+  return g;
+}
+
+function parseAttrs(o: Obj, path: string, base: TerrainAttrs): TerrainAttrs {
+  return {
+    moveCost: o.moveCost === undefined ? base.moveCost : num(o.moveCost, `${path}.moveCost`, 0.01),
+    cover: o.cover === undefined ? base.cover : num(o.cover, `${path}.cover`, 0, 1),
+    concealment:
+      o.concealment === undefined
+        ? base.concealment
+        : num(o.concealment, `${path}.concealment`, 0, 1),
+    height: o.height === undefined ? base.height : oneOf(o.height, HEIGHTS, `${path}.height`),
+    passable:
+      o.passable === undefined
+        ? base.passable
+        : typeof o.passable === 'boolean'
+          ? o.passable
+          : fail(`${path}.passable must be a boolean`),
+  };
+}
+
+function parseMap(raw: unknown): TerrainMap {
+  const m = obj(raw, 'map');
+  const map: TerrainMap = {
+    width: mm(num(m.width, 'map.width', 1)),
+    height: mm(num(m.height, 'map.height', 1)),
+    features: [],
+  };
+  const ids = new Set<string>();
+  map.features = arr(m.features, 'map.features').map((f, i): TerrainFeature => {
+    const p = `map.features[${i}]`;
+    const o = obj(f, p);
+    const id = str(o.id, `${p}.id`);
+    if (ids.has(id)) fail(`duplicate feature id "${id}"`);
+    ids.add(id);
+    const kind = oneOf(o.kind, FEATURE_KINDS, `${p}.kind`);
+    const d = KIND_DEFAULTS[kind];
+    return {
+      id,
+      kind,
+      ...(o.name === undefined ? {} : { name: str(o.name, `${p}.name`) }),
+      layer: o.layer === undefined ? d.layer : int(o.layer, `${p}.layer`),
+      geometry: parseGeometry(o, p, map),
+      attrs: parseAttrs(o, p, d.attrs),
+    };
+  });
+  return map;
+}
+
+function passableAt(map: TerrainMap, p: Point): boolean {
+  return terrainAt(map, p)?.attrs.passable === true;
+}
+
+function parseHq(o: Record<string, unknown>, i: number, map: TerrainMap): Point {
+  const p = parsePoint(o.hq, `sides[${i}].hq`);
+  if (!passableAt(map, p)) fail(`sides[${i}].hq must be on passable ground`);
   return p;
 }
 
-function parseSides(raw: unknown, map: MapGrid): Side[] {
+function parseSides(raw: unknown, map: TerrainMap): Side[] {
   const list = arr(raw, 'sides');
   if (list.length !== 2) fail('sides must contain exactly two sides');
   const sides = list.map((s, i): Side => {
@@ -100,43 +184,97 @@ function parseSides(raw: unknown, map: MapGrid): Side[] {
       name: str(o.name, `sides[${i}].name`),
       controller: oneOf(o.controller, ['human', 'scripted'] as const, `sides[${i}].controller`),
       hq: parseHq(o, i, map),
+      ...(o.depots === undefined
+        ? {}
+        : {
+            depots: arr(o.depots, `sides[${i}].depots`).map((d, k) => {
+              const at = parsePoint(d, `sides[${i}].depots[${k}]`);
+              if (!passableAt(map, at)) fail(`sides[${i}].depots[${k}] must be on passable ground`);
+              return at;
+            }),
+          }),
     };
   });
   if (sides[0]?.id === sides[1]?.id) fail('sides must have distinct ids');
   return sides;
 }
 
-function parseUnits(raw: unknown, map: MapGrid, sides: Side[]): Unit[] {
+function parseUnits(raw: unknown, map: TerrainMap, sides: Side[]): Unit[] {
   const list = arr(raw, 'units');
   const ids = new Set<string>();
-  const occupied = new Set<string>();
   const sideIds = sides.map((s) => s.id);
-  const units = list.map((u, i): Unit => {
+  const units: Unit[] = [];
+  list.forEach((u, i) => {
     const p = `units[${i}]`;
     const o = obj(u, p);
     const id = str(o.id, `${p}.id`);
     if (ids.has(id)) fail(`duplicate unit id "${id}"`);
     ids.add(id);
-    const position: Point = { x: int(o.x, `${p}.x`), y: int(o.y, `${p}.y`) };
-    const terrain = tileAt(map, position);
-    if (terrain === undefined) fail(`${p} position (${position.x},${position.y}) is off the map`);
-    if (terrain === 'river') fail(`${p} position (${position.x},${position.y}) is in the river`);
-    const key = `${position.x},${position.y}`;
-    if (occupied.has(key)) fail(`${p} shares tile (${key}) with another unit`);
-    occupied.add(key);
-    return {
+    const center = parsePoint(o.at, `${p}.at`);
+    if (o.type === undefined && o.kind === undefined) fail(`${p} needs a type (or a kind)`);
+    const type =
+      o.type === undefined
+        ? unitTypeOf(oneOf(o.kind, UNIT_KINDS, `${p}.kind`))
+        : (UNIT_TYPES[str(o.type, `${p}.type`)] ??
+          fail(`${p}.type "${String(o.type)}" is not a known unit type`));
+    if (o.kind !== undefined && o.kind !== type.kind) {
+      fail(`${p}.kind "${String(o.kind)}" does not match unit type "${type.id}" (${type.kind})`);
+    }
+    const kind = type.kind;
+    const strength = int(o.strength, `${p}.strength`, 1);
+    const formation =
+      o.formation === undefined
+        ? type.defaultFormation
+        : oneOf(o.formation, FORMATIONS, `${p}.formation`);
+    if (!type.formations.includes(formation)) {
+      fail(`${p}.formation "${formation}" is not available to ${type.name}`);
+    }
+    const def = defaultFootprint(type, formation, strength);
+    const footprint: Footprint = {
+      frontage:
+        o.frontage === undefined ? def.frontage : mm(num(o.frontage, `${p}.frontage`, 0.001)),
+      depth: o.depth === undefined ? def.depth : mm(num(o.depth, `${p}.depth`, 0.001)),
+    };
+    const unit: Unit = {
       id,
       side: oneOf(o.side, sideIds, `${p}.side`),
-      kind: oneOf(o.kind, UNIT_KINDS, `${p}.kind`),
+      kind,
+      type: type.id,
       name: str(o.name, `${p}.name`),
-      position,
-      strength: int(o.strength, `${p}.strength`, 1),
+      center,
+      facing: (num(o.facingDeg, `${p}.facingDeg`) * Math.PI) / 180,
+      formation,
+      footprint,
+      ...(o.shape === undefined
+        ? {}
+        : { shape: arr(o.shape, `${p}.shape`).map((v, k) => parseVertex(v, `${p}.shape[${k}]`)) }),
+      strength,
       morale: int(o.morale, `${p}.morale`, 0, 100),
-      facing: oneOf<Facing>(o.facing, FACINGS, `${p}.facing`),
+      fatigue: 0,
+      ammo: 100,
+      pace: 'march',
       intent: { kind: 'idle' },
       status: 'active',
-      home: { ...position },
+      home: { ...center },
     };
+    if (unit.shape && unit.shape.length === 0) {
+      fail(`${p}.shape must have at least one sub-position`);
+    }
+    const where = `(${center.x / 1000}, ${center.y / 1000})`;
+    if (!inside(map, center)) fail(`${p} center ${where} is off the map`);
+    for (const sp of subPositions(unit)) {
+      if (!inside(map, sp)) fail(`${p} has a sub-position off the map`);
+      if (!passableAt(map, sp)) fail(`${p} has a position on impassable ground`);
+    }
+    if (!footprintCorners(unit).every((c) => inside(map, c))) {
+      fail(`${p} footprint extends off the map`);
+    }
+    // Loose shapes are arcs and lines whose rectangle is only a bound, so they may nest.
+    if (!unit.shape) {
+      const hit = units.find((v) => !v.shape && footprintsOverlap(unit, v));
+      if (hit) fail(`${p} overlaps unit "${hit.id}"`);
+    }
+    units.push(unit);
   });
   for (const id of sideIds) {
     if (!units.some((u) => u.side === id)) fail(`side "${id}" has no units`);
@@ -152,12 +290,17 @@ export function loadScenario(raw: unknown): GameState {
   const units = parseUnits(o.units, map, sides);
 
   const v = obj(o.victory, 'victory');
-  const obRaw = obj(v.objective, 'victory.objective');
-  const objective: Point = {
-    x: int(obRaw.x, 'victory.objective.x'),
-    y: int(obRaw.y, 'victory.objective.y'),
-  };
-  if (tileAt(map, objective) !== 'bridge') fail('victory.objective must be on a bridge tile');
+  const objective = arr(v.objective, 'victory.objective').map((q, i) =>
+    parseVertex(q, `victory.objective[${i}]`),
+  );
+  if (objective.length < 3) fail('victory.objective needs at least 3 points');
+  for (const [i, q] of objective.entries()) {
+    if (!inside(map, q)) fail(`victory.objective[${i}] is off the map`);
+  }
+  const onBridge = terrainAt(map, polygonCentroid(objective))?.featureIds.some(
+    (fid) => map.features.find((f) => f.id === fid)?.kind === 'bridge',
+  );
+  if (!onBridge) fail('victory.objective must be centred on a bridge');
   const sideIds: SideId[] = sides.map((s) => s.id);
   const defender = oneOf(v.defender, sideIds, 'victory.defender');
   const attacker = oneOf(v.attacker, sideIds, 'victory.attacker');
@@ -171,7 +314,7 @@ export function loadScenario(raw: unknown): GameState {
     sides,
     units,
     intel: Object.fromEntries(
-      sideIds.map((id) => [id, { contacts: [], inSight: [], reports: [] }]),
+      sideIds.map((id) => [id, { contacts: [], inSight: [], reports: [], documents: [] }]),
     ) as unknown as GameState['intel'],
     victory: {
       objective,
@@ -181,5 +324,7 @@ export function loadScenario(raw: unknown): GameState {
     },
     combatActive: false,
     outcome: null,
+    couriers: [],
+    rulings: [],
   };
 }

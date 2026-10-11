@@ -23,32 +23,32 @@ The game is played from a general's headquarters. There is no HUD and no minimap
 | **Journal / war diary** | A chronological record of orders sent and reports received, plus your own notes. | Reconstructing what happened, and the after-action reveal |
 | **Umpire's window** (post-game) | The same map with the true positions and every ruling revealed. | Learning from the game |
 
-Navigation is by clicking desk objects, plus hotkeys. A small clock on the desk and a "new papers" indicator avoid a constant need to check every view.
+Navigation is by clicking desk objects, plus hotkeys (T table, I in-tray, O orders, R order of battle, J journal, C conference, Esc back to the table). The desk shell is built; moving to a desk view dollies the camera down to the desk and fades the canvas, and the canvas keeps rendering and keeps its state. A small clock on the desk and a "new papers" indicator avoid a constant need to check every view.
 
 ## The map layers
 
 Layers are what let one historical map serve both sides and the engine.
 
 1. **Base map**: a scanned or redrawn period map (hachured hills, roads, woods, villages). Both players see the same base. It is slightly *wrong* in places, as period maps were.
-2. **Truth layer** (server only): the engine's terrain grid, elevation, roads, obstacles and cover, derived from the base map and corrected where needed.
-3. **Player marks layer**: pins and counters the player places, plus marks the staff add automatically when a report arrives. Each mark records its source report and time, and fades or greys with age.
+2. **Truth layer** (server only): the engine's vector terrain features (woods, rivers, roads, bridges, buildings, with cover, concealment and height tags), derived from the base map and corrected where needed. It is continuous: there is no grid or tile.
+3. **Player marks layer**: pins and counters the player places, plus marks the staff add automatically when a report arrives. Each mark records its source report and time, and fades or greys with age. Built as D16b: pins, pencil lines, arrows and range rings, stored per side on the server and never corrected.
 4. **Report sketches**: scouts' sketches attached to a location, for example "bridge at Hohenau, intact, 2 companies".
 5. **Overlays** (toggle): order arrows, planned routes, estimated march times, and a "last known" fog shading showing how old your knowledge is per area.
 
 ## Using historical maps: the hard part
 
-The engine needs a terrain grid, but players should see the original map. Options:
+The engine needs vector terrain features, but players should see the original map. Options:
 
 | Approach | Pros | Cons |
 |----------|------|------|
-| **A. Hand-annotate** each scenario: trace roads, woods, rivers, slope onto the scan as vector layers, and generate the grid from them. | Accurate, controllable, great quality | Labour per map |
+| **A. Hand-annotate** each scenario: trace roads, woods, rivers, slope onto the scan as vector layers; they are the engine's features directly. | Accurate, controllable, great quality | Labour per map |
 | **B. Semi-automatic**: use a vision model plus colour segmentation to propose features, then a human cleans up in an editor. | Faster once the tool exists | Needs an annotation editor, and maps vary |
 | **C. Real elevation data** (DEM) georeferenced to the historical map. *Deferred; outside procedural map milestone M3c.* | Real slopes and viewsheds | Terrain has changed, and georeferencing takes work |
 | **D. Procedural** (generated terrain) restyled to look like a period map | Infinite scenarios | Not "historical" |
 
 Suggested path: **D now, A for the first historical scenario, build a small annotation editor (B) when we want a second one.** C is worth a spike for line of sight.
 
-Procedural map authoring is now planned as **M3c / [Epic 9](https://github.com/exterkamp/kriegsspiel/issues/132)**, with a terrain-aware SettleMaker fork for settlement layouts. It produces numerical elevation, terrain and infrastructure geometry, contours and a standalone top-down preview with validated export. Roads through woods retain both layers. Simple building footprints are sufficient. Map generation and preview are separate from scenario assembly, in-game table rendering and elevation-based movement/visibility; see [roadmap.md](roadmap.md) and decision **D15: Procedural battlefield maps are a standalone milestone**.
+Procedural map authoring is now planned as **M3c / [Epic 9](https://github.com/exterkamp/kriegsspiel/issues/132)**, with a terrain-aware SettleMaker fork for settlement layouts. It produces numerical elevation, terrain and infrastructure geometry, contours and a standalone top-down preview with validated export. Roads through woods retain both layers. Simple building footprints are sufficient. Map generation and preview are separate from scenario assembly, in-game table rendering and elevation-based movement/visibility; see [roadmap.md](roadmap.md) and decision **D18: Procedural battlefield maps are a standalone milestone**.
 
 Candidate map sources to check licences for (all need verification before use): David Rumsey Map Collection, Library of Congress, Gallica (BnF), Wikimedia Commons, and national survey archives. Prefer public-domain scans of pre-1900 maps. Pick battlefields with good period maps and lots of documentation, so the scenarios have historical notes the umpire can draw on.
 
@@ -77,13 +77,13 @@ Period style, not a fantasy skin: aged paper, ink, sealing wax, pencil, brass in
 - **Camera.** Orbit and zoom within limits, with a "top-down" snap for precise plotting. Tilts away from the table to the desk.
 - **Desk (HTML/CSS over the canvas).** In-tray, orders desk, order of battle, journal and staff conference are 2D Papers Please-style screens. Papers can be dragged, stamped and filed, and text stays crisp and selectable. A transition (camera dolly plus fade) moves between table and desk. Dragging a report from the desk onto the table to place a marker is a core interaction, so the two layers share a drag-and-drop system.
 - **UI framework for the desk:** Svelte (preferred) or React. Vanilla Three.js for the scene, with no react-three-fiber unless the scene gets complicated.
-- **Picking.** Raycast against the flat map plane to convert pointer position to map coordinates. Pieces are picked by raycasting their meshes. Because the map is flat, coordinates are plain (x, y) with no height, which the engine's grid already uses.
+- **Picking.** Raycast against the flat map plane to convert pointer position to map coordinates. Pieces are picked by raycasting their meshes. Because the map is flat, coordinates are plain (x, y) in metres with no height, which is what the engine's continuous plane uses (D13). Pieces stand at any position and facing and are drawn at their footprint; there are no cells to snap to.
 
 The map remains flat, with no elevation mesh. Numerical elevation is planned in M3c for contour rendering, terrain-aware generation and future height/slope queries. Connecting it to gameplay line of sight and movement is separate work; existing annotated terrain and per-feature height tags remain relevant. A flat display does not remove the need for numerical topography.
 
 ## Implications for the build
 
-- The engine's terrain grid is the **truth layer** and a debug view only. The player never sees it.
+- The engine's vector terrain is the **truth layer** and a debug view only. The player never sees it.
 - The player-facing client is the Three.js table and the Svelte desk, built fresh.
 - Info panels are diegetic: terrain notes and sketches for places, the journal and roster for units.
 

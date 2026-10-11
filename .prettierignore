@@ -5,3 +5,5 @@ package-lock.json
 vendor/settlemaker/src
 vendor/settlemaker/upstream-package-lock.json
 vendor/settlemaker/upstream-package.json
+# Preserve the original measured evidence bytes.
+docs/map-verification/*.json

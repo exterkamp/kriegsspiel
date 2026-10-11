@@ -1,21 +1,38 @@
 import {
+  ASPECT_FACTOR,
   ATTACK_INTENT_EVENT,
   COMBAT_CHECK_EVENT,
   COMBAT_TICK_EVENT,
+  MELEE_FACTOR,
   VICTORY_DEADLINE_EVENT,
+  aspectOf,
+  bearingTo,
   canReach,
-  distanceSq,
+  distanceMm,
+  inMelee,
+  onObjective,
+  rangeFactor,
+  type Aspect,
 } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { rejectOrder, startMarch } from './movement.js';
+import { FATIGUE_PER_FIGHT_TICK } from './fatigue.js';
 import { schedule } from './queue.js';
 import {
+  AMMO_PER_FIRE_TICK,
+  OUT_OF_AMMO_FACTOR,
+  SUPPLY_TICK_EVENT,
+  SUPPLY_TICK_MS,
+  registerSupply,
+  noteWear,
+} from './supply.js';
+import { terrainAt } from './terrain.js';
+import { FORMATION_RULES, unitTypeOf } from './unitTypes.js';
+import {
   MS_PER_MINUTE,
-  tileAt,
   type GameState,
   type Outcome,
   type SideId,
-  type Terrain,
   type Unit,
   type UnitKind,
 } from './types.js';
@@ -24,29 +41,27 @@ import {
 export const COMBAT_TICK_MS = 2 * MS_PER_MINUTE;
 
 /**
- * Placeholder numbers; the rules tables arrive with Epic #2. A unit's casualties
- * per tick are `strength * FIRE_RATE * (die / 3.5) * moraleFactor * cover`, so a
- * 600-man battalion on a fair roll costs a target about 18 men every 2 minutes.
+ * Casualties per tick are `strength * fireRate * (die / 3.5) * moraleFactor * cover`, times
+ * a range factor (or the melee factor), a flank or rear factor, the shooter's formation
+ * `fireFactor` and the target's formation vulnerability, so a 600-man line battalion on a
+ * fair roll costs a target about 18 men every 2 minutes. `fireRate` and the rest come from
+ * each unit's type and formation (`unitTypes.ts`); this table lists the default types' rates.
  */
 export const FIRE_RATE: Record<UnitKind, number> = {
-  infantry: 0.03,
-  cavalry: 0.06,
-  artillery: 0.04,
+  infantry: unitTypeOf('infantry').fireRate,
+  cavalry: unitTypeOf('cavalry').fireRate,
+  artillery: unitTypeOf('artillery').fireRate,
 };
 
-/** Multiplier on casualties taken, by the terrain the target stands on. */
-export const COVER: Record<Terrain, number> = {
-  open: 1,
-  road: 1,
-  bridge: 1,
-  river: 1,
-  wood: 0.6,
-};
+/** Multiplier on casualties taken by a target on ground with the given `cover` (0..1). */
+export function coverFactor(cover: number): number {
+  return 1 - cover;
+}
 
 /** Morale lost per percent of strength lost in one tick. */
 export const MORALE_PER_LOSS_PERCENT = 2;
-/** A unit whose morale falls below this breaks and withdraws. */
-export const BREAK_MORALE = 25;
+/** The morale below which a default-type unit breaks and withdraws; each type has its own. */
+export const BREAK_MORALE = unitTypeOf('infantry').breakMorale;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -71,6 +86,7 @@ export function startGame(state: EngineState<GameState>): EngineState<GameState>
   return schedule(state, [
     { time: state.time, type: COMBAT_CHECK_EVENT },
     { time: Math.max(state.time, state.world.victory.holdMs), type: VICTORY_DEADLINE_EVENT },
+    { time: state.time + SUPPLY_TICK_MS, type: SUPPLY_TICK_EVENT },
   ]);
 }
 
@@ -115,10 +131,8 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
       return { winner: world.sides.find((o) => o.id !== s.id)!.id, reason, time };
     }
   }
-  const onObjective = activeUnits(world).filter(
-    (u) => u.position.x === objective.x && u.position.y === objective.y,
-  );
-  if (onObjective.length > 0 && onObjective.every((u) => u.side === attacker)) {
+  const holders = activeUnits(world).filter((u) => onObjective(u, objective));
+  if (holders.length > 0 && holders.every((u) => u.side === attacker)) {
     return { winner: attacker, reason: 'objective-taken', time };
   }
   return null;
@@ -141,6 +155,8 @@ interface Shot {
   target: Unit;
   distance: number;
   cover: number;
+  aspect: Aspect;
+  melee: boolean;
   die: number;
   casualties: number;
 }
@@ -157,8 +173,8 @@ function chooseTarget(shooter: Unit, enemies: Unit[]): Unit | undefined {
   for (const e of reachable) {
     if (
       !best ||
-      distanceSq(shooter.position, e.position) < distanceSq(shooter.position, best.position) ||
-      (distanceSq(shooter.position, e.position) === distanceSq(shooter.position, best.position) &&
+      distanceMm(shooter.center, e.center) < distanceMm(shooter.center, best.center) ||
+      (distanceMm(shooter.center, e.center) === distanceMm(shooter.center, best.center) &&
         e.id < best.id)
     ) {
       best = e;
@@ -171,7 +187,7 @@ function chooseTarget(shooter: Unit, enemies: Unit[]): Unit | undefined {
  * Register the combat and victory handlers.
  *
  * Contact: whenever a step changes the picture, `combat.check` looks for opposing
- * active units within reach of each other (`RANGE_TILES`). The first contact starts a
+ * active units within reach of each other (`RANGE_M`). The first contact starts a
  * chain of `combat.tick` events every 2 game minutes; the chain stops at the first
  * tick that finds no contact. A tick lets every active unit fire once at its
  * target, all hits being worked out from the strengths at the start of the tick
@@ -179,6 +195,7 @@ function chooseTarget(shooter: Unit, enemies: Unit[]): Unit | undefined {
  * and checks for victory. Dice come only from the seeded game RNG, rolled in unit order.
  */
 export function registerCombat(registry: EventRegistry<GameState>): void {
+  registerSupply(registry);
   registry.register(ATTACK_INTENT_EVENT, (world, ev) => {
     const { unitId, target: targetId } = ev.payload as unknown as {
       unitId: string;
@@ -212,7 +229,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
                   intent: {
                     kind: 'attack' as const,
                     target: targetId,
-                    to: { ...u.position },
+                    to: { ...u.center },
                     startedAt: ev.time,
                   },
                 }
@@ -222,7 +239,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
         schedule: [check],
       };
     }
-    const res = startMarch(world, unit, target.position, ev.time, targetId);
+    const res = startMarch(world, unit, target.center, ev.time, targetId);
     if (res.emit?.some((e) => e.type === 'unit.moveBlocked')) {
       // No way to the target. A unit that was already attacking it gives up, or
       // `combat.check` would ask for the same chase again at this very instant.
@@ -249,7 +266,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     const chase: NewEvent[] = [];
     for (const u of activeUnits(world)) {
       if (u.intent.kind !== 'attack') continue;
-      if (u.intent.to.x !== u.position.x || u.intent.to.y !== u.position.y) continue;
+      if (u.intent.to.x !== u.center.x || u.intent.to.y !== u.center.y) continue;
       const foe = world.units.find((x) => x.id === (u.intent as { target: string }).target);
       if (foe && foe.status === 'active' && !canReach(u, foe)) {
         chase.push({
@@ -295,16 +312,34 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       );
       if (!target) continue;
       const die = rng.die(6);
-      const cover = COVER[tileAt(world.map, target.position) ?? 'open'];
+      const cover = coverFactor(terrainAt(world.map, target.center)?.attrs.cover ?? 0);
       const moraleFactor = 0.5 + shooter.morale / 200;
+      const aspect = aspectOf(shooter, target);
+      const melee = inMelee(shooter, target);
+      // Melee is a blow at arm's length: no range falloff, but a heavier one than fire.
+      const reach = melee ? MELEE_FACTOR : rangeFactor(shooter, target);
       const casualties = round2(
-        shooter.strength * FIRE_RATE[shooter.kind] * (die / 3.5) * moraleFactor * cover,
+        shooter.strength *
+          unitTypeOf(shooter).fireRate *
+          FORMATION_RULES[shooter.formation].fireFactor *
+          (melee
+            ? FORMATION_RULES[target.formation].meleeVulnerability
+            : FORMATION_RULES[target.formation].fireVulnerability) *
+          (die / 3.5) *
+          moraleFactor *
+          cover *
+          reach *
+          // A shooter with no cartridges left is nearly harmless; steel in melee is not fired.
+          (!melee && shooter.ammo <= 0 ? OUT_OF_AMMO_FACTOR : 1) *
+          ASPECT_FACTOR[aspect],
       );
       shots.push({
         shooter,
         target,
-        distance: Math.sqrt(distanceSq(shooter.position, target.position)),
+        distance: distanceMm(shooter.center, target.center),
         cover,
+        aspect,
+        melee,
         die,
         casualties,
       });
@@ -345,8 +380,10 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
         payload: {
           attacker: s.shooter.id,
           target: s.target.id,
-          distance: round2(s.distance),
+          distance: round2(s.distance / 1000),
           cover: s.cover,
+          aspect: s.aspect,
+          melee: s.melee,
           die: s.die,
           casualties: s.casualties,
           targetStrength: after.strength,
@@ -355,6 +392,34 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       });
     }
     w = { ...w, units: w.units.map((u) => fate.get(u.id) ?? u) };
+    // Fighting tires everyone in an exchange, and firing spends the shooters' ammunition.
+    const engaged = new Set(shots.flatMap((s) => [s.shooter.id, s.target.id]));
+    const fired = new Set(
+      shots.filter((s) => !s.melee && s.shooter.ammo > 0).map((s) => s.shooter.id),
+    );
+    const worn: Array<[Unit, Unit]> = [];
+    w = {
+      ...w,
+      units: w.units.map((u) => {
+        if (!engaged.has(u.id)) return u;
+        const w2: Unit = {
+          ...u,
+          fatigue: Math.min(100, round2(u.fatigue + FATIGUE_PER_FIGHT_TICK)),
+          ammo: fired.has(u.id) ? Math.max(0, u.ammo - AMMO_PER_FIRE_TICK[u.kind]) : u.ammo,
+        };
+        worn.push([u, w2]);
+        return w2;
+      }),
+    };
+    for (const [before, after] of worn) w = noteWear(w, before, after, ev.time);
+    // A unit that fired turns to face its target, so it shows its front to whom it fights.
+    const faced = new Map(
+      shots.map((s) => [s.shooter.id, bearingTo(s.shooter.center, s.target.center)]),
+    );
+    w = {
+      ...w,
+      units: w.units.map((u) => (faced.has(u.id) ? { ...u, facing: faced.get(u.id)! } : u)),
+    };
 
     for (const u of w.units) {
       if (!fate.has(u.id)) continue;
@@ -364,7 +429,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
           ...w,
           units: w.units.map((x) => (x.id === u.id ? { ...x, intent: { kind: 'idle' } } : x)),
         };
-      } else if (u.status === 'active' && u.morale < BREAK_MORALE) {
+      } else if (u.status === 'active' && u.morale < unitTypeOf(u).breakMorale) {
         const broken: Unit = { ...u, status: 'withdrawn', intent: { kind: 'idle' } };
         w = { ...w, units: w.units.map((x) => (x.id === u.id ? broken : x)) };
         const res = startMarch(w, broken, u.home, ev.time);

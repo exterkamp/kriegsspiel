@@ -1,19 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
-import Anthropic from '@anthropic-ai/sdk';
 import {
-  AnthropicTransport,
-  AnthropicUmpireClient,
   DEFAULT_UMPIRE_CONFIG,
   PlaybackUmpireClient,
+  ProviderUmpireClient,
   TransportError,
   UmpireError,
   umpireConfigFromEnv,
 } from './index.js';
 import type {
-  TransportResponse,
+  LlmProvider,
+  ProviderRequest,
+  ProviderResponse,
+  StructuredOutputSupport,
   UmpireCallRecord,
+  UmpireConfig,
   UmpireRequest,
-  UmpireTransport,
 } from './index.js';
 
 const schema = {
@@ -30,28 +31,39 @@ const request: UmpireRequest = {
   schema,
 };
 const usage = { inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0, cacheWriteTokens: 0 };
-const good = (text = '{"verdict":"ok"}'): TransportResponse => ({ text, usage });
+const good = (text = '{"verdict":"ok"}'): ProviderResponse => ({ text, usage });
 
 const config = { ...DEFAULT_UMPIRE_CONFIG, timeoutMs: 20, maxAttempts: 3 };
 
-/** A transport that plays back a script of results/errors, one per send. */
-function scripted(...steps: (TransportResponse | Error | 'hang')[]) {
-  const send = vi.fn(async (_r: unknown, signal: AbortSignal) => {
+/** A provider that plays back a script of results/errors, one per call. */
+function scripted(...steps: (ProviderResponse | Error | 'hang')[]) {
+  return scriptedWith('native', ...steps);
+}
+
+function scriptedWith(
+  structuredOutput: StructuredOutputSupport,
+  ...steps: (ProviderResponse | Error | 'hang')[]
+) {
+  const generate = vi.fn(async (_r: ProviderRequest, signal: AbortSignal) => {
     const step = steps.shift();
-    if (step === 'hang') return new Promise<TransportResponse>(() => {}); // ignores the signal
+    if (step === 'hang') return new Promise<ProviderResponse>(() => {}); // ignores the signal
     if (!step) throw new Error('script exhausted');
     if (step instanceof Error) throw step;
     void signal;
     return step;
   });
-  return { send } satisfies UmpireTransport & { send: unknown };
+  return { id: 'anthropic', capabilities: { structuredOutput, toolUse: true }, generate };
 }
 
-function client(transport: UmpireTransport, recorded: UmpireCallRecord[] = []) {
+function client(
+  provider: LlmProvider,
+  recorded: UmpireCallRecord[] = [],
+  cfg: UmpireConfig = config,
+) {
   const sleeps: number[] = [];
-  const c = new AnthropicUmpireClient({
-    transport,
-    config,
+  const c = new ProviderUmpireClient({
+    providers: { anthropic: provider, other: provider },
+    config: cfg,
     recorder: { record: (r) => recorded.push(r) },
     sleep: async (ms) => void sleeps.push(ms),
     random: () => 1,
@@ -59,7 +71,7 @@ function client(transport: UmpireTransport, recorded: UmpireCallRecord[] = []) {
   return { c, sleeps, recorded };
 }
 
-describe('AnthropicUmpireClient', () => {
+describe('ProviderUmpireClient', () => {
   it('returns validated output, records the call and accounts cost', async () => {
     const { c, recorded } = client(scripted(good()));
     const res = await c.call<{ verdict: string }>(request);
@@ -79,7 +91,7 @@ describe('AnthropicUmpireClient', () => {
   it('uses the per-stage model', async () => {
     const t = scripted(good());
     await client(t).c.call({ ...request, stage: 'parse' });
-    expect(t.send.mock.calls[0]![0]).toMatchObject({ model: 'claude-sonnet-5-5' });
+    expect(t.generate.mock.calls[0]![0]).toMatchObject({ model: 'claude-haiku-5-5' });
   });
 
   it('retries retryable transport errors with exponential backoff, then succeeds', async () => {
@@ -89,7 +101,7 @@ describe('AnthropicUmpireClient', () => {
     expect(res.record.attempts).toBe(3);
     expect(sleeps).toEqual([500, 1000]);
     // Cost covers the one successful attempt only: failed sends returned no usage.
-    expect(t.send).toHaveBeenCalledTimes(3);
+    expect(t.generate).toHaveBeenCalledTimes(3);
   });
 
   it('honors a longer Retry-After over the computed backoff', async () => {
@@ -104,7 +116,7 @@ describe('AnthropicUmpireClient', () => {
       kind: 'transport',
       attempts: 3,
     });
-    expect(t.send).toHaveBeenCalledTimes(3);
+    expect(t.generate).toHaveBeenCalledTimes(3);
   });
 
   it('does not retry a non-retryable error', async () => {
@@ -113,7 +125,7 @@ describe('AnthropicUmpireClient', () => {
       kind: 'transport',
       attempts: 1,
     });
-    expect(t.send).toHaveBeenCalledTimes(1);
+    expect(t.generate).toHaveBeenCalledTimes(1);
   });
 
   it('times out a hung transport (even one that ignores the abort signal) and retries', async () => {
@@ -129,11 +141,17 @@ describe('AnthropicUmpireClient', () => {
 
   it('fires the abort signal when an attempt times out', async () => {
     let seen: AbortSignal | undefined;
-    const send = vi.fn(async (_r: unknown, signal: AbortSignal) => {
+    const generate = vi.fn(async (_r: unknown, signal: AbortSignal) => {
       seen = signal;
-      return new Promise<TransportResponse>(() => {});
+      return new Promise<ProviderResponse>(() => {});
     });
-    await expect(client({ send }).c.call(request)).rejects.toMatchObject({ kind: 'timeout' });
+    await expect(
+      client({
+        id: 'anthropic',
+        capabilities: { structuredOutput: 'native', toolUse: true },
+        generate,
+      }).c.call(request),
+    ).rejects.toMatchObject({ kind: 'timeout' });
     expect(seen?.aborted).toBe(true);
   });
 
@@ -142,7 +160,7 @@ describe('AnthropicUmpireClient', () => {
     const { c, sleeps } = client(t);
     await expect(c.call(request)).rejects.toMatchObject({ kind: 'transport', attempts: 1 });
     expect(sleeps).toEqual([]);
-    expect(t.send).toHaveBeenCalledTimes(1);
+    expect(t.generate).toHaveBeenCalledTimes(1);
   });
 
   it('does not retry output truncated at max_tokens, and reports the spend', async () => {
@@ -153,7 +171,7 @@ describe('AnthropicUmpireClient', () => {
     expect(err).toBeInstanceOf(UmpireError);
     expect(err).toMatchObject({ kind: 'schema', attempts: 1, usage });
     expect((err as UmpireError).costUsd).toBeCloseTo((1000 * 4 + 100 * 20) / 1e6);
-    expect(t.send).toHaveBeenCalledTimes(1);
+    expect(t.generate).toHaveBeenCalledTimes(1);
   });
 
   it('attaches the summed spend of every attempt to a call that exhausts its retries', async () => {
@@ -186,16 +204,82 @@ describe('AnthropicUmpireClient', () => {
   it('does not retry a refusal', async () => {
     const t = scripted({ ...good(''), refusal: true }, good());
     await expect(client(t).c.call(request)).rejects.toMatchObject({ kind: 'refusal' });
-    expect(t.send).toHaveBeenCalledTimes(1);
+    expect(t.generate).toHaveBeenCalledTimes(1);
   });
 
   it('reports null cost for a model with no known price', async () => {
     const t = scripted(good());
-    const c = new AnthropicUmpireClient({
-      transport: t,
-      config: { ...config, models: { ...config.models, judge: 'mystery-model' } },
+    const c = new ProviderUmpireClient({
+      providers: { anthropic: t },
+      config: {
+        ...config,
+        stages: { ...config.stages, judge: { provider: 'anthropic', model: 'mystery-model' } },
+      },
     });
     expect((await c.call(request)).record.costUsd).toBeNull();
+  });
+});
+
+describe('ProviderUmpireClient routing and repair', () => {
+  it('swapping a stage to another provider and model is a config change only', async () => {
+    const a = scripted(good());
+    const b = scripted(good('{"verdict":"no"}'));
+    const mk = (cfg: UmpireConfig) =>
+      new ProviderUmpireClient({ providers: { anthropic: a, other: b }, config: cfg });
+    await mk(config).call(request);
+    expect(a.generate).toHaveBeenCalledTimes(1);
+
+    const swapped: UmpireConfig = {
+      ...config,
+      stages: {
+        ...config.stages,
+        judge: { provider: 'other', model: 'gemma-x', params: { temperature: 0.2, maxTokens: 99 } },
+      },
+    };
+    const res = await mk(swapped).call(request);
+    expect(res.output).toEqual({ verdict: 'no' });
+    expect(res.record).toMatchObject({ provider: 'other', model: 'gemma-x' });
+    expect(a.generate).toHaveBeenCalledTimes(1);
+    expect(b.generate.mock.calls[0]![0]).toMatchObject({
+      model: 'gemma-x',
+      temperature: 0.2,
+      maxTokens: 99,
+    });
+  });
+
+  it('fails at construction when a stage names a provider that was not built', () => {
+    expect(() => new ProviderUmpireClient({ providers: {}, config })).toThrow(/anthropic/);
+  });
+
+  it('validates and repairs output from a model without native structured output', async () => {
+    const t = scriptedWith(
+      'json-mode',
+      good('Sure! {"verdict":"maybe"}'),
+      good('```json\n{"verdict":"ok"}\n```'),
+    );
+    const { c } = client(t);
+    const res = await c.call<{ verdict: string }>(request);
+    expect(res.output).toEqual({ verdict: 'ok' });
+    expect(res.record.attempts).toBe(2);
+    expect(res.record.rawOutput).toBe('{"verdict":"ok"}'); // fence stripped, replayable
+    const [first, second] = t.generate.mock.calls.map((c) => c[0]);
+    expect(first!.structured).toBe('json-mode');
+    expect(first!.system).toContain('JSON Schema');
+    expect(first!.messages).toHaveLength(1);
+    expect(second!.messages.map((m) => m.role)).toEqual(['user', 'assistant', 'user']);
+    expect(second!.messages[2]!.content).toContain('rejected');
+  });
+
+  it('gives up after the bounded number of repairs so the caller can fall back', async () => {
+    const t = scriptedWith('none', good('x'), good('y'), good('z'));
+    await expect(client(t).c.call(request)).rejects.toMatchObject({ kind: 'schema', attempts: 3 });
+    expect(t.generate).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not send repair messages to a native provider', async () => {
+    const t = scripted(good('nope'), good());
+    await client(t).c.call(request);
+    expect(t.generate.mock.calls[1]![0].messages).toHaveLength(1);
   });
 });
 
@@ -205,71 +289,34 @@ describe('umpireConfigFromEnv', () => {
       UMPIRE_MODEL_PARSE: 'claude-haiku-5-5',
       UMPIRE_MAX_ATTEMPTS: '5',
     });
-    expect(cfg.models).toEqual({ ...DEFAULT_UMPIRE_CONFIG.models, parse: 'claude-haiku-5-5' });
+    expect(cfg.stages).toEqual({
+      ...DEFAULT_UMPIRE_CONFIG.stages,
+      parse: { provider: 'anthropic', model: 'claude-haiku-5-5' },
+    });
     expect(cfg.maxAttempts).toBe(5);
     expect(cfg.timeoutMs).toBe(DEFAULT_UMPIRE_CONFIG.timeoutMs);
   });
 
+  it('merges a file, then lets env override it', () => {
+    const file = {
+      providers: { local: { type: 'ollama', baseUrl: 'http://localhost:11434' } },
+      stages: { parse: { provider: 'local', model: 'gemma-from-file' } },
+      timeoutMs: 5000,
+    };
+    const cfg = umpireConfigFromEnv({ UMPIRE_MODEL_PARSE: 'gemma-from-env' }, file);
+    expect(cfg.stages.parse).toEqual({ provider: 'local', model: 'gemma-from-env' });
+    expect(cfg.stages.judge.provider).toBe('anthropic');
+    expect(cfg.timeoutMs).toBe(5000);
+  });
+
+  it('rejects API keys in a file and stages that name an unknown provider', () => {
+    const withKey = { providers: { x: { type: 'openai-compatible', apiKey: 'sk-1' } } };
+    expect(() => umpireConfigFromEnv({}, withKey as never)).toThrow(/environment/);
+    expect(() => umpireConfigFromEnv({ UMPIRE_PROVIDER_JUDGE: 'nope' })).toThrow(/not configured/);
+  });
+
   it('rejects a bad number', () => {
     expect(() => umpireConfigFromEnv({ UMPIRE_TIMEOUT_MS: 'soon' })).toThrow(/UMPIRE_TIMEOUT_MS/);
-  });
-});
-
-describe('AnthropicTransport', () => {
-  function sdk(fetch: typeof globalThis.fetch) {
-    return new AnthropicTransport(new Anthropic({ apiKey: 'test', maxRetries: 0, fetch }));
-  }
-  const treq = { model: 'claude-opus-5-5', system: 's', user: 'u', schema, maxTokens: 100 };
-
-  it('sends a structured-output request and maps the response', async () => {
-    const fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
-      const body = JSON.parse(init!.body as string);
-      expect(body.output_config.format).toEqual({ type: 'json_schema', schema });
-      expect(body.tool_choice).toBeUndefined();
-      return Response.json({
-        id: 'msg_1',
-        type: 'message',
-        role: 'assistant',
-        model: body.model,
-        stop_reason: 'end_turn',
-        content: [{ type: 'text', text: '{"verdict":"ok"}' }],
-        usage: {
-          input_tokens: 7,
-          output_tokens: 3,
-          cache_read_input_tokens: 2,
-          cache_creation_input_tokens: 1,
-        },
-      });
-    });
-    const res = await sdk(fetch as never).send(treq, new AbortController().signal);
-    expect(res.text).toBe('{"verdict":"ok"}');
-    expect(res.usage).toEqual({
-      inputTokens: 7,
-      outputTokens: 3,
-      cacheReadTokens: 2,
-      cacheWriteTokens: 1,
-    });
-  });
-
-  it('marks 429 and 5xx retryable (with Retry-After) and 400 not', async () => {
-    const respond = (status: number, headers: Record<string, string> = {}) =>
-      sdk((async () =>
-        Response.json(
-          { type: 'error', error: { type: 'x', message: 'nope' } },
-          { status, headers },
-        )) as never);
-    const signal = new AbortController().signal;
-    await expect(respond(429, { 'retry-after': '3' }).send(treq, signal)).rejects.toMatchObject({
-      retryable: true,
-      retryAfterMs: 3000,
-    });
-    await expect(
-      respond(429, { 'retry-after-ms': '250' }).send(treq, signal),
-    ).rejects.toMatchObject({
-      retryAfterMs: 250,
-    });
-    await expect(respond(503).send(treq, signal)).rejects.toMatchObject({ retryable: true });
-    await expect(respond(400).send(treq, signal)).rejects.toMatchObject({ retryable: false });
   });
 });
 
@@ -286,48 +333,6 @@ describe('PlaybackUmpireClient', () => {
     await expect(new PlaybackUmpireClient([rec]).call(request)).rejects.toMatchObject({
       kind: 'schema',
     });
-  });
-
-  it('replays a recorded game without touching the network', async () => {
-    // Record through the real SDK transport, backed by a fake fetch.
-    const fetchLive = vi.fn(async () =>
-      Response.json({
-        id: 'm',
-        type: 'message',
-        role: 'assistant',
-        model: 'claude-opus-5-5',
-        stop_reason: 'end_turn',
-        content: [{ type: 'text', text: '{"verdict":"no"}' }],
-        usage: { input_tokens: 5, output_tokens: 5 },
-      }),
-    );
-    const recorded: UmpireCallRecord[] = [];
-    const live = new AnthropicUmpireClient({
-      transport: new AnthropicTransport(
-        new Anthropic({ apiKey: 'k', maxRetries: 0, fetch: fetchLive as never }),
-      ),
-      recorder: { record: (r) => recorded.push(r) },
-    });
-    await live.call(request);
-    expect(fetchLive).toHaveBeenCalledTimes(1);
-
-    // Now forbid all network access and replay. Any fetch or socket use fails the test.
-    const forbidden = vi.fn(() => {
-      throw new Error('network touched during playback');
-    });
-    const realFetch = globalThis.fetch;
-    globalThis.fetch = forbidden as never;
-    try {
-      const playback = new PlaybackUmpireClient(JSON.parse(JSON.stringify(recorded)));
-      // Key order in the input must not matter.
-      const res = await playback.call({ ...request, input: { a: 1, b: 2 } });
-      expect(res.output).toEqual({ verdict: 'no' });
-      expect(res.record.model).toBe('claude-opus-5-5');
-    } finally {
-      globalThis.fetch = realFetch;
-    }
-    expect(forbidden).not.toHaveBeenCalled();
-    expect(fetchLive).toHaveBeenCalledTimes(1);
   });
 
   it('serves repeated identical calls in recorded order', async () => {

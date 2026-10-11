@@ -22,7 +22,7 @@ Gameplay milestones should end in something playable. The standalone map-authori
 ## M2: LLM umpire v1 (order parsing + narration)
 - [ ] Umpire service with structured output schemas
 - [ ] `parseOrders`: free text → intents, with clarification/rejection for impossible orders
-- [ ] `narrate`: fog-filtered field reports per side from the validated event list
+- [x] `narrate`: fog-filtered field reports per side from the validated event list (`narrateReports`; not yet run by the scheduler, see D14 Open (narrate))
 - [ ] Prompt-injection and leak test suites
 - [ ] Record all LLM calls for audit
 
@@ -38,7 +38,7 @@ Gameplay milestones should end in something playable. The standalone map-authori
 - [ ] Map table: flat historical base map + 3D pieces + player marks layer (Three.js)
 - [ ] In-tray, orders desk, order of battle, journal as Svelte views over the canvas; table ↔ desk transition
 - [ ] Reports carry structured data (location, size, confidence, time) beside the prose
-- [ ] First historical scenario: hand-annotated map feeding the engine's terrain grid
+- [ ] First historical scenario: hand-annotated map feeding the engine's vector terrain features
 - [ ] Decide on an annotation editor for future maps
 
 ## M3c: Procedural battlefield maps
@@ -93,6 +93,7 @@ Keep battlefield generation, settlement planning and rendering/export separate. 
 Historical annotation remains #85/#88. Detailed erosion, elaborate cities, a full terrain-painting editor, seasonal hydrology and multiplayer authoring are excluded. Epics/stories remain open until their acceptance criteria hold; the epic requires end-to-end validation even if all component PRs have merged.
 
 ## M4: Judgment and personality
+- [x] `judge` placement: arbitrary unit configurations validated by the engine (#117)
 - [ ] `judge` stage with capped modifiers for unruled situations; case-law file
 - [ ] Subordinate commander traits
 - [ ] Rigid ↔ free dial; umpire personas
@@ -103,8 +104,9 @@ Historical annotation remains #85/#88. Detailed erosion, elaborate cities, a ful
 - [ ] Post-game critique generation
 
 ## M5: Remote async play and collaboration
-- [ ] Accounts, lobbies, clock ratio chosen in the lobby (1:1, 4:1, 12:1, custom), mid-game ratio change by vote
-- [ ] Pause voting (unanimous by default), emergency hold, resume rules, safe restart after downtime
+- [x] Accounts (magic-link login, sessions, seats; D17)
+- [ ] Lobbies, clock ratio chosen in the lobby (1:1, 4:1, 12:1, custom), mid-game ratio change by vote
+- [ ] Pause voting (server state machine done in #63; WebSocket wiring and client pending), emergency hold, resume rules, safe restart after downtime
 - [ ] Notifications (WebSocket, web push, email) with per-player thresholds
 - [ ] Deputy mode: LLM staff officer acting within standing orders
 - [ ] Roles per side, with LLM filling empty staff roles

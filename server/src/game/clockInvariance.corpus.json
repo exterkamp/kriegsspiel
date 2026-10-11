@@ -1,0 +1,24 @@
+{
+  "comment": "Seeds that once exposed (or are chosen to stress) clock invariance. Add a seed here when a schedule finds a bug, so it is replayed forever.",
+  "seeds": [1, 2, 3, 7, 42, 99, 1234, 20240601, 4294967295],
+  "schedules": [
+    {
+      "name": "pause before every order, resume after",
+      "steps": [
+        { "rate": 12, "wallMs": 5000 },
+        { "pause": 7000 },
+        { "rate": 1000, "wallMs": 30 },
+        { "pause": 1 }
+      ]
+    },
+    {
+      "name": "rate flips every wall millisecond",
+      "steps": [
+        { "rate": 1, "wallMs": 1 },
+        { "rate": 1000, "wallMs": 1 },
+        { "rate": 4, "wallMs": 1 },
+        { "rate": 12, "wallMs": 1 }
+      ]
+    }
+  ]
+}

@@ -17,12 +17,12 @@ Free Kriegsspiel with a pure LLM is inconsistent and unauditable. Pure rigid Kri
 
 | Layer | Owner | Examples |
 |-------|-------|----------|
-| State and physics | Deterministic engine | positions, pathfinding, march rates, line of sight, supply, ammo, fatigue, combat odds, dice |
+| State and physics | Deterministic engine | positions in continuous space (no grid), pathfinding, march rates, line of sight, supply, ammo, fatigue, combat odds, dice |
 | Interpretation | LLM | parse free-text orders into structured intents, resolve ambiguity, flag impossible orders |
 | Judgment | LLM, bounded | assign modifiers and odds for situations the engine has no rule for (the "umpire's call"), within caps |
 | Narration | LLM | field reports, courier dispatches, after-action text, per-side fog-filtered |
 
-The LLM never edits state directly. It returns structured proposals (intents, modifiers, event requests) that the engine validates and applies. Dice are rolled by the server with a seeded RNG, never by the model.
+The LLM may propose any arrangement of units it judges realistic, subject only to the engine's physical-plausibility checks (D15). It never edits state directly. It returns structured proposals (intents, modifiers, event requests) that the engine validates and applies. Dice are rolled by the server with a seeded RNG, never by the model.
 
 ## Feature ideas
 
@@ -39,7 +39,7 @@ The LLM never edits state directly. It returns structured proposals (intents, mo
 - **Subordinate personalities.** Each commander has traits (aggressive, cautious, literal, initiative-taking) which colour how orders are interpreted. A cautious general may halt short; an aggressive one may exceed his orders. Trait reputations are learned by the player over a campaign.
 - **Commander's intent matters.** Orders that explain *why* are executed more sensibly when circumstances change (Auftragstaktik vs literal obedience). The umpire grades this.
 - **Written reports as the only sensor.** Player maps are reconstructed from reports, with the player free to annotate. No omniscient minimap.
-- **Courier and signal layer.** Couriers can be intercepted by enemy cavalry, and captured dispatches can be read by the other side (the umpire hands them over in-fiction).
+- **Courier and signal layer.** Couriers can be intercepted by enemy cavalry, and captured dispatches can be read by the other side (the umpire hands them over in-fiction). Implemented as courier model v2 (see "Courier model v2" in [decisions.md](decisions.md)).
 - **Rigid / Free dial.** Lobby setting from "rigid" (engine-heavy, tables visible) to "free" (LLM judgment dominant). Same server, different caps.
 - **Umpire personas.** Tone and temperament: dry Prussian staff officer, a pedantic one, a dramatic war-correspondent mode.
 - **Umpire consultation.** Players may submit questions ("Can I see the ford from the ridge?"). The umpire answers in character, and the question costs game time.

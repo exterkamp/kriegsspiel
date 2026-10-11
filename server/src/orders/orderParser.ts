@@ -6,6 +6,7 @@
  * `ParseResult`, and the engine validates and applies any intents.
  */
 
+/** A point on the continuous map plane, as in the engine's master state: integer millimetres. */
 export type Coord = { x: number; y: number };
 
 /** Intents a parser can propose for one order. A subset of the architecture doc's `Intent`. */
@@ -15,12 +16,26 @@ export type OrderIntent =
   | { kind: 'attack'; target: Coord }
   | { kind: 'withdraw'; toward: Coord };
 
-/** What a parser may read about the world. `GameState` from the engine satisfies it. */
+/**
+ * A named place a parser may send units to: a terrain feature reduced to one representative
+ * point. Build it from the engine's `GameState.map.features` with `featureAnchor`; the
+ * parser does no geometry of its own.
+ */
+export interface ParseFeature {
+  id: string;
+  /** Engine feature kind, for example `bridge`, `wood` or `road`. */
+  kind: string;
+  name?: string;
+  anchor: Coord;
+}
+
+/** What a parser may read about the world. */
 export interface ParseContext {
   /** The side that issued the order. Only its own units can be addressed. */
   side: string;
-  map: { width: number; height: number; tiles: readonly string[] };
-  units: readonly { id: string; side: string; name: string; position: Coord }[];
+  map: { features: readonly ParseFeature[] };
+  /** `center` is the middle of the unit's footprint, as in the engine's `Unit`. */
+  units: readonly { id: string; side: string; name: string; center: Coord }[];
 }
 
 interface ParseResultBase {

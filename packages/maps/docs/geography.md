@@ -1,6 +1,6 @@
 # Geography, drainage and water (#136)
 
-This module follows D15/D16, the [accepted contract](../README.md), [terrain policy](terrain.md), and the [implementation plan](../../../docs/map-implementation-plan.md). Prerequisites are `28a611c` (contract) and `27bbce4` (terrain). Coordinates remain local metres, x east/y south/z up. There is no gameplay, clock, renderer, LLM or external-source dependency. Component evidence is recorded here; the coordinator owns gate acceptance and the execution log.
+This module follows D18/D19, the [accepted contract](../README.md), [terrain policy](terrain.md), and the [implementation plan](../../../docs/map-implementation-plan.md). Prerequisites are `28a611c` (contract) and `27bbce4` (terrain). Coordinates remain local metres, x east/y south/z up. There is no gameplay, clock, renderer, LLM or external-source dependency. Component evidence is recorded here; the coordinator owns gate acceptance and the execution log.
 
 ## Public seam
 

@@ -1,6 +1,6 @@
 # M3c implementation and agent execution plan
 
-This is the execution guide for [Epic 9 #132](https://github.com/exterkamp/kriegsspiel/issues/132), subordinate to its story acceptance criteria, `AGENTS.md`, and D15. The project plan defines what must ship; this document defines how to build and verify it. The owner resumed implementation on 2026-10-10. [The execution log](map-execution-log.md) records active work and accepted gates. This document does not install a background scheduler.
+This is the execution guide for [Epic 9 #132](https://github.com/exterkamp/kriegsspiel/issues/132), subordinate to its story acceptance criteria, `AGENTS.md`, and D18. The project plan defines what must ship; this document defines how to build and verify it. The owner resumed implementation on 2026-10-10. [The execution log](map-execution-log.md) records active work and accepted gates. This document does not install a background scheduler.
 
 ## Execution objective
 

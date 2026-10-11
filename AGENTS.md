@@ -9,12 +9,15 @@ Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a serve
 - `docs/hq-interface.md`: the desk and map table, rendering decision
 - `docs/design.md`: pillars, features, trust risks
 - `docs/research.md`: history and sources
+- `docs/llm-providers.md`: configuring, adding and locally running LLM providers
 - `docs/roadmap.md`: milestones
 - `docs/map-implementation-plan.md`: M3c implementation sequence, Herdr agent ownership, validation and recovery
 - `docs/map-architecture.md`: pinned planner assessment, coordinate adapter and fork constraints
 - `docs/map-execution-log.md`: active assignments, accepted checkpoints and recovery state
 - `packages/maps/README.md`: frozen map contract, numerical policies and validation boundaries
 - `docs/order-eval.md`: golden order corpus and parser evaluation harness
+- `docs/umpire-fixtures.md`: mock umpire and how to add fixtures
+- `docs/deployment.md`: container, compose, backups and restore
 
 ## Rules of the design
 - The engine is pure and deterministic. It never reads the wall clock. It only advances to a given game time.
@@ -26,6 +29,9 @@ Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a serve
 
 ## Current state
 - Only the monorepo scaffold exists (`packages/engine`, `packages/protocol`, `server`, `client`; `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`). An earlier Phaser prototype was abandoned and removed. Do not revive it. Build the engine and client fresh from the docs.
+- Server API: `npm run dev -w server` builds and starts it on `$PORT` (default 3000), so under `devrun` use `devrun up --name api --port-env PORT -- npm run dev -w server`. `POST /games` makes a game; `/games/:id/ws` is a side's WebSocket, authenticated by the session cookie and the user's seat (D16, D17). Sign in with `POST /auth/login`; with no `MAIL_WEBHOOK_URL` the login link is in the server log.
+- Client HUD (`client/src/hud`, `client/src/net`): sign in with the emailed link, then open `/?new=1&side=blue&rate=12` to create a game and take a side, or `/?game=<id>` to join one; with neither the page shows the offline fixture. Vite proxies `/games` (REST and WebSocket) and `/auth` to `$API_URL` (default `http://localhost:3000`). The server does not yet send pending orders or a delivery estimate, so the HUD lists orders it sent itself. The marks toolbar (`client/src/hud/marksBar.ts`) draws pins, pencil lines, arrows and range rings on the table (D16b); they are stored per side on the server and survive a reload.
+- Desk shell (`client/src/desk`): a Svelte layer over the Three.js canvas with one button per view (map table, in-tray, orders, order of battle, journal, staff conference), hotkeys T/I/O/R/J/C and Escape for the table. `activeView` and `gameState` stores in `desk/store.ts` are shared by both layers. Leaving the table dollies the camera to the desk (`TableScene.setDesk`) and fades the canvas; the canvas keeps rendering and the table pose is restored on return. Roster, journal and conference are placeholders. Typecheck is `svelte-check`.
 - Node version is in `.nvmrc`. Start dev servers with `devrun` (see `~/CLAUDE.md`), not bare `npm run dev`.
 
 ## Keep docs current

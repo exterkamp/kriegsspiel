@@ -1,4 +1,5 @@
 // Server code depends on the interface and types; the composition root picks an implementation.
+// Nothing here re-exports an SDK type. Only `providers/anthropic.ts` imports one.
 export type {
   CallRecorder,
   JsonSchema,
@@ -10,10 +11,65 @@ export type {
   UmpireStage,
 } from './umpireClient.js';
 export { UmpireError } from './umpireClient.js';
-export { DEFAULT_UMPIRE_CONFIG, umpireConfigFromEnv } from './config.js';
-export type { UmpireConfig } from './config.js';
-export { AnthropicUmpireClient } from './anthropicUmpireClient.js';
-export { AnthropicTransport } from './anthropicTransport.js';
+export {
+  DEFAULT_UMPIRE_CONFIG,
+  UMPIRE_STAGES,
+  loadUmpireConfig,
+  umpireConfigFromEnv,
+} from './config.js';
+export type { ProviderSpec, StageRoute, UmpireConfig, UmpireConfigFile } from './config.js';
+export { TransportError } from './provider.js';
+export type {
+  ChatMessage,
+  LlmProvider,
+  ProviderCapabilities,
+  ProviderRequest,
+  ProviderResponse,
+  StructuredOutputSupport,
+} from './provider.js';
+export { ProviderRegistry } from './registry.js';
+export type { ProviderContext, ProviderFactory } from './registry.js';
+export { ProviderUmpireClient } from './providerUmpireClient.js';
+export type { ProviderUmpireClientOptions } from './providerUmpireClient.js';
+export { BudgetedUmpireClient, RateLimitedUmpireClient } from './decorators.js';
+export type { BudgetOptions, RateLimitOptions } from './decorators.js';
+export { GameUmpireClient, createGameUmpire } from './gameLimits.js';
+export type {
+  GameLimits,
+  GameUmpireMetric,
+  GameUmpireOptions,
+  GameUmpireReport,
+} from './gameLimits.js';
 export { PlaybackUmpireClient } from './playbackUmpireClient.js';
-export { TransportError } from './transport.js';
-export type { UmpireTransport, TransportRequest, TransportResponse } from './transport.js';
+export { createUmpireClient } from './createUmpireClient.js';
+export type { CreateUmpireClientOptions } from './createUmpireClient.js';
+export {
+  AnthropicProvider,
+  OllamaProvider,
+  OpenAiCompatibleProvider,
+  defaultProviderRegistry,
+} from './providers/index.js';
+export { MockUmpireClient, loadFixtures, loadFixtureFile } from './mockUmpireClient.js';
+export type { FixtureFailure, MockUmpireClientOptions, UmpireFixture } from './mockUmpireClient.js';
+export {
+  JUDGE_PLACEMENT_PROMPT_VERSION,
+  JUDGE_PLACEMENT_SCHEMA,
+  JUDGE_PLACEMENT_SYSTEM,
+  judgePlacementInput,
+  judgePlacements,
+} from './judgePlacement.js';
+export type { JudgePlacementOutput } from './judgePlacement.js';
+export {
+  NARRATE_PROMPT_VERSION,
+  NARRATE_SCHEMA,
+  NARRATE_SYSTEM,
+  NARRATE_WINDOW_BASE_MS,
+  STAFF_OVERLOADED_NOTICE,
+  checkNarration,
+  checkProse,
+  narrateInput,
+  narrateReports,
+  narrateWindowMs,
+  reportsDueForNarration,
+} from './narrate.js';
+export type { NarrateOptions, NarrateOutput, NarrateResult, NarratedDispatch } from './narrate.js';

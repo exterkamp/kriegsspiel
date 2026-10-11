@@ -1,11 +1,5 @@
 import type { SideView } from '@kriegsspiel/protocol';
-import type { Facing, GhostPiece, MapGrid, OwnPiece, SceneState } from './types.js';
-
-/**
- * Facing is not on the wire yet, so the client takes it as a side input
- * (units not listed face north).
- */
-export type FacingById = Readonly<Record<string, Facing>>;
+import type { BaseMap, GhostPiece, OwnPiece, SceneState } from './types.js';
 
 export function formatAge(ageMs: number): string {
   const totalMin = Math.max(0, Math.floor(ageMs / 60_000));
@@ -19,37 +13,43 @@ export function formatAge(ageMs: number): string {
 /**
  * Pure function from a SideView to scene state. No clock, no randomness, no hidden state:
  * the same input always yields the same output, so applying it twice is a no-op.
- * Visible enemies are drawn as fresh contacts only through `lastKnownContacts`; the view's
- * live `visibleEnemies` are shown as ghosts with age 0.
+ * Positions stay in the wire's metres. The view's live `visibleEnemies` are shown as ghosts
+ * with age 0 and no uncertainty; `lastKnownContacts` carry their growing uncertainty radius.
  */
-export function buildSceneState(
-  view: SideView,
-  map: MapGrid,
-  facings: FacingById = {},
-): SceneState {
+export function buildSceneState(view: SideView, map: BaseMap): SceneState {
   const own: OwnPiece[] = view.ownUnits.map((u) => ({
     kind: 'own',
     id: u.id,
     label: u.name,
     side: view.side,
-    position: { x: u.position.x, y: u.position.y },
-    facing: facings[u.id] ?? 'N',
+    position: u.position,
+    facing: u.facing,
+    formation: u.formation,
+    footprint: u.footprint,
+    ...(u.shape ? { shape: u.shape } : {}),
   }));
   const live: GhostPiece[] = view.visibleEnemies.map((e) => ({
     kind: 'ghost',
     id: e.id,
-    position: { x: e.position.x, y: e.position.y },
+    position: e.position,
+    facing: e.facing,
     ageMs: 0,
     ageTag: formatAge(0),
+    uncertaintyRadius: 0,
+    formation: e.formation,
+    footprint: e.footprint,
+    ...(e.shape ? { shape: e.shape } : {}),
     ...(e.sizeEstimate !== undefined ? { sizeEstimate: e.sizeEstimate } : {}),
   }));
   const stale: GhostPiece[] = view.lastKnownContacts.map((c) => ({
     kind: 'ghost',
     id: c.id,
-    position: { x: c.position.x, y: c.position.y },
+    position: c.position,
+    facing: 0,
     ageMs: c.ageMs,
     ageTag: formatAge(c.ageMs),
+    uncertaintyRadius: c.uncertaintyRadius,
     ...(c.sizeEstimate !== undefined ? { sizeEstimate: c.sizeEstimate } : {}),
   }));
-  return { side: view.side, map, own, ghosts: [...live, ...stale] };
+  return { side: view.side, map, own, ghosts: [...live, ...stale], orderRoutes: [] };
 }

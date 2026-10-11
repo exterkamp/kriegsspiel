@@ -13,16 +13,23 @@ vi.mock('three', async (importOriginal) => {
   return { ...actual, WebGLRenderer: FakeRenderer };
 });
 
-import { fixtureFacings, fixtureMap, fixtureView } from './fixture.js';
-import { FACING_ANGLE, fitDistance } from './framing.js';
-import { tilePx } from './mapTexture.js';
+import * as THREE from 'three';
+import type { Mark } from '@kriegsspiel/protocol';
+import { fixtureMap, fixtureView } from './fixture.js';
+import { facingToRotationY, fitDistance } from './framing.js';
+import { MAX_TEXTURE_PX, mapCanvas, paintOrder, pxPerMetre } from './mapTexture.js';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { buildSceneState } from './sceneState.js';
 import { TableScene } from './TableScene.js';
-import { FACINGS, TERRAINS } from './types.js';
+import { mapToWorld } from './picking.js';
+import { FEATURE_KINDS } from './types.js';
 
-const state = buildSceneState(fixtureView, fixtureMap, fixtureFacings);
+const state = buildSceneState(fixtureView, fixtureMap);
 const make = (): TableScene => new TableScene(document.createElement('canvas'));
 const count = (t: TableScene): number => t.pieceCount;
+const piecesOf = (t: TableScene): THREE.Object3D =>
+  t.scene.children.find((c) => c.children.some((k) => k.userData.id !== undefined))!;
 const resources = (t: TableScene): string =>
   JSON.stringify([
     t.scene.children.length,
@@ -53,11 +60,11 @@ describe('TableScene.apply', () => {
     expect(count(t)).toBe(state.own.length + state.ghosts.length);
   });
 
-  it('rebuilds the map when the grid changes', () => {
+  it('rebuilds the map when the features change', () => {
     const t = make();
     t.apply(state);
     const mesh = t.scene.children.find((c) => (c as { isMesh?: boolean }).isMesh);
-    t.apply({ ...state, map: { ...state.map, tiles: state.map.tiles.map(() => 'wood' as const) } });
+    t.apply({ ...state, map: { ...state.map, features: state.map.features.slice(1) } });
     expect(t.scene.children.find((c) => (c as { isMesh?: boolean }).isMesh)).not.toBe(mesh);
   });
 
@@ -75,32 +82,296 @@ describe('TableScene.apply', () => {
   });
 });
 
+describe('piece geometry', () => {
+  it('draws the footprint at its true size, rotated by the compass facing', () => {
+    const t = make();
+    t.apply(state);
+    const group = piecesOf(t);
+    const blue1 = group.children.find((c) => c.userData.id === 'blue-1')!;
+    const pos = blue1.position;
+    expect(pos.x).toBeCloseTo(1850 - 2000);
+    expect(pos.z).toBeCloseTo(2450 - 1500);
+    const body = blue1.getObjectByName('body')!;
+    const block = body.children[0] as THREE.Mesh;
+    const box = new THREE.Box3().setFromObject(block);
+    expect(box.max.x - box.min.x).toBeCloseTo(85);
+  });
+
+  it('draws an uncertainty circle of the wire radius for stale contacts only', () => {
+    const t = make();
+    t.apply(state);
+    const group = piecesOf(t);
+    const ghost = group.children.find((c) => c.userData.id === 'contact-1')!;
+    const circle = ghost.getObjectByName('uncertainty') as THREE.Group;
+    const box = new THREE.Box3().setFromObject(circle);
+    expect(box.max.x - box.min.x).toBeCloseTo(6000);
+    const own = group.children.find((c) => c.userData.id === 'blue-1')!;
+    expect(own.getObjectByName('uncertainty')).toBeUndefined();
+  });
+
+  it('draws no uncertainty circle for a live sighting', () => {
+    const t = make();
+    t.apply({
+      ...state,
+      ghosts: [
+        {
+          kind: 'ghost',
+          id: 'red-1',
+          position: { x: 1950, y: 450 },
+          facing: Math.PI,
+          ageMs: 0,
+          ageTag: 'just now',
+          uncertaintyRadius: 0,
+          footprint: { frontage: 80, depth: 10 },
+        },
+      ],
+    });
+    const live = piecesOf(t).children.find((c) => c.userData.id === 'red-1')!;
+    expect(live.getObjectByName('uncertainty')).toBeUndefined();
+  });
+
+  it('applies the compass facing to the body in world space', () => {
+    const t = make();
+    t.apply(state);
+    const group = piecesOf(t);
+    group.updateMatrixWorld(true);
+    const body = group.children.find((c) => c.userData.id === 'blue-2')!.getObjectByName('body')!;
+    // Facing pi/4 is north-east: front is (sin, -cos) on the (x, z) plane.
+    const front = new THREE.Vector3(0, 0, -1).transformDirection(body.matrixWorld);
+    expect(front.x).toBeCloseTo(Math.SQRT1_2);
+    expect(front.z).toBeCloseTo(-Math.SQRT1_2);
+  });
+
+  it('places skirmish markers where picking finds them', () => {
+    const t = make();
+    t.apply(state);
+    const group = piecesOf(t);
+    group.updateMatrixWorld(true);
+    const u = state.own.find((p) => p.id === 'blue-4')!;
+    const body = group.children.find((c) => c.userData.id === 'blue-4')!.getObjectByName('body')!;
+    // body children: the bound, then a (marker, pick) pair per sub-position, then the footprint pick.
+    const markers = u.shape!.map((_, i) => body.children[1 + 2 * i]!);
+    u.shape!.forEach((s, i) => {
+      const want = mapToWorld(fixtureMap, {
+        x: u.position.x + s.x * Math.cos(u.facing) + s.y * Math.sin(u.facing),
+        y: u.position.y + s.x * Math.sin(u.facing) - s.y * Math.cos(u.facing),
+      });
+      const got = markers[i]!.getWorldPosition(new THREE.Vector3());
+      expect(got.x).toBeCloseTo(want.x, 3);
+      expect(got.z).toBeCloseTo(want.z, 3);
+    });
+  });
+
+  it('reports the map-plane point for a piece picked obliquely, not the mesh hit', () => {
+    const t = make();
+    t.apply(state);
+    const w = mapToWorld(fixtureMap, { x: 1850, y: 2450 });
+    t.camera.position.set(w.x, 600, w.z + 900);
+    t.controls.target.set(w.x, 0, w.z);
+    t.controls.update();
+    const hit = t.pickNdc(new THREE.Vector2(0, 0));
+    expect(hit).toMatchObject({ type: 'piece', id: 'blue-1' });
+    if (hit.type === 'piece') {
+      expect(hit.coord.x).toBeCloseTo(1850, 0);
+      expect(hit.coord.y).toBeCloseTo(2450, 0);
+    }
+  });
+
+  it('picks a piece through the scene with continuous metre coordinates', () => {
+    const t = make();
+    t.apply(state);
+    t.snapTopDown();
+    const hit = t.pickNdc(new THREE.Vector2(0, 0));
+    expect(hit.type).toBe('point');
+    if (hit.type === 'point') {
+      expect(hit.coord.x).toBeCloseTo(2000, 0);
+      expect(hit.coord.y).toBeCloseTo(1500, 0);
+    }
+    // Top-down on blue-1's centre picks it, via the piece mesh, at metre coordinates.
+    const w = mapToWorld(fixtureMap, { x: 1850, y: 2450 });
+    t.camera.position.set(w.x, 3000, w.z + 0.001);
+    t.controls.target.set(w.x, 0, w.z);
+    t.controls.update();
+    expect(t.pickNdc(new THREE.Vector2(0, 0))).toMatchObject({
+      type: 'piece',
+      pieceKind: 'own',
+      id: 'blue-1',
+      coord: { x: expect.closeTo(1850, 0), y: expect.closeTo(2450, 0) },
+    });
+  });
+});
+
 describe('framing', () => {
-  it('pins the facing table', () => {
-    expect(Object.keys(FACING_ANGLE)).toEqual([...FACINGS]);
-    expect(FACING_ANGLE.N).toBe(0);
-    expect(FACING_ANGLE.E).toBeCloseTo(-Math.PI / 2);
-    expect(FACING_ANGLE.S).toBeCloseTo(Math.PI);
-    expect(FACING_ANGLE.W).toBeCloseTo(Math.PI / 2);
+  it('turns a compass bearing into a rotation about Y', () => {
+    expect(facingToRotationY(0)).toBeCloseTo(0);
+    // East (pi/2) takes the nose from -Z to +X.
+    const nose = new THREE.Vector3(0, 0, -1).applyAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      facingToRotationY(Math.PI / 2),
+    );
+    expect(nose.x).toBeCloseTo(1);
+    expect(nose.z).toBeCloseTo(0);
   });
 
   it('fits the width on portrait screens and the height on landscape ones', () => {
-    const landscape = fitDistance(40, 16, 45, 16 / 9);
-    const portrait = fitDistance(40, 16, 45, 0.5);
+    const landscape = fitDistance(4000, 1600, 45, 16 / 9);
+    const portrait = fitDistance(4000, 1600, 45, 0.5);
     expect(portrait).toBeGreaterThan(landscape * 2);
     const halfV = Math.tan((45 * Math.PI) / 360);
-    expect(portrait * halfV * 0.5).toBeGreaterThanOrEqual(20);
+    expect(portrait * halfV * 0.5).toBeGreaterThanOrEqual(2000);
   });
 });
 
 describe('map texture and types', () => {
-  it('caps texture size for large maps', () => {
-    expect(tilePx({ width: 40, height: 16, tiles: [] })).toBe(24);
-    const px = tilePx({ width: 200, height: 200, tiles: [] });
-    expect(px * 200).toBeLessThanOrEqual(4096);
+  it('scales the texture so the larger side fits, whatever the map size in metres', () => {
+    expect(MAX_TEXTURE_PX).toBe(2048);
+    expect(pxPerMetre(fixtureMap) * 4000).toBeCloseTo(2048);
+    expect(pxPerMetre({ width: 40_000, height: 100, features: [] }) * 40_000).toBeCloseTo(2048);
+    const canvas = mapCanvas(fixtureMap);
+    expect(Math.max(canvas.width, canvas.height)).toBe(2048);
   });
 
-  it('pins the terrain list', () => {
-    expect([...TERRAINS]).toEqual(['open', 'wood', 'river', 'bridge', 'road']);
+  it('paints areas under lines under crossings', () => {
+    const order = paintOrder(fixtureMap.features).map((f) => f.kind);
+    expect(order.indexOf('wood')).toBeLessThan(order.indexOf('river'));
+    // A river cuts a road; a bridge carries it across (the engine's layer order).
+    expect(order.indexOf('road')).toBeLessThan(order.indexOf('river'));
+    expect(order.indexOf('river')).toBeLessThan(order.indexOf('bridge'));
+  });
+
+  it('paints a river over a road that crosses it with no bridge', () => {
+    const line = (id: string, kind: 'road' | 'river') => ({
+      id,
+      kind,
+      geometry: {
+        shape: 'line' as const,
+        points: [
+          { x: 0, y: 0 },
+          { x: 100, y: 100 },
+        ],
+        width: 10,
+      },
+    });
+    // River listed first so only the layer table (not input order) puts it on top.
+    const kinds = paintOrder([line('r', 'river'), line('d', 'road')] as never).map((f) => f.kind);
+    expect(kinds).toEqual(['road', 'river']);
+  });
+
+  it("matches the engine's feature list", () => {
+    const src = readFileSync(resolve(process.cwd(), '../packages/engine/src/types.ts'), 'utf8');
+    const body = /export const FEATURE_KINDS = \[([^\]]*)\]/.exec(src)![1]!;
+    const engine = [...body.matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
+    expect([...FEATURE_KINDS]).toEqual(engine);
+  });
+});
+
+describe('TableScene marks and overlays', () => {
+  const pin: Mark = {
+    id: 'a',
+    kind: 'pin',
+    at: { x: 400, y: 300 },
+    madeAtGame: 0,
+    label: 'cav',
+  };
+  const arrow: Mark = {
+    id: 'b',
+    kind: 'arrow',
+    from: { x: 0, y: 0 },
+    to: { x: 500, y: 500 },
+    madeAtGame: 0,
+  };
+  const ring: Mark = {
+    id: 'c',
+    kind: 'ring',
+    at: { x: 900, y: 900 },
+    radius: 300,
+    madeAtGame: 0,
+  };
+  const line: Mark = {
+    id: 'd',
+    kind: 'line',
+    points: [
+      { x: 0, y: 0 },
+      { x: 50, y: 80 },
+    ],
+    madeAtGame: 0,
+  };
+
+  it('draws each kind of mark, and redraws only when something visible changed', () => {
+    const t = make();
+    t.apply(state);
+    t.setMarks([pin, arrow, ring, line], 0);
+    expect(t.markCount).toBe(4);
+    const first = t.scene.children.find((c) => c.children.some((k) => k.userData.markId))!;
+    const before = first.children[0];
+    t.setMarks([pin, arrow, ring, line], 60_000); // a minute: no visible step
+    expect(first.children[0]).toBe(before);
+    t.setMarks([pin, arrow, ring, line], 12 * 3_600_000); // fully aged
+    expect(first.children[0]).not.toBe(before);
+    t.setMarks([pin], 0);
+    expect(t.markCount).toBe(1);
+  });
+
+  it('greys and fades an old mark', () => {
+    const t = make();
+    t.apply(state);
+    const opacityAt = (now: number): number => {
+      t.setMarks([arrow], now);
+      let o = -1;
+      t.scene.traverse((x) => {
+        const m = (x as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
+        if (x.parent?.userData.markId === 'b' && m?.transparent && o < 0) o = m.opacity;
+      });
+      return o;
+    };
+    expect(opacityAt(0)).toBe(1);
+    expect(opacityAt(12 * 3_600_000)).toBeCloseTo(0.4);
+  });
+
+  it('shows order arrows, routes and last-known shading only while their overlay is on', () => {
+    const t = make();
+    const withRoutes = {
+      ...state,
+      orderRoutes: [
+        {
+          id: 'o1',
+          kind: 'order' as const,
+          points: [
+            { x: 0, y: 0 },
+            { x: 100, y: 100 },
+          ],
+        },
+        {
+          id: 'r1',
+          kind: 'route' as const,
+          points: [
+            { x: 0, y: 0 },
+            { x: 50, y: 20 },
+            { x: 100, y: 100 },
+          ],
+        },
+      ],
+    };
+    t.apply(withRoutes);
+    const overlay = (): number =>
+      t.scene.children
+        .filter((c) => c.name === '' && c.children.some((k) => k.name.startsWith('overlay:')))
+        .reduce((n, c) => n + c.children.length, 0);
+    expect(overlay()).toBe(2);
+    t.setOverlays({ orders: false, routes: true, lastKnown: true });
+    expect(overlay()).toBe(1);
+    t.setOverlays({ orders: false, routes: false, lastKnown: true });
+    expect(overlay()).toBe(0);
+    const shading = (): boolean[] => {
+      const out: boolean[] = [];
+      t.scene.traverse((o) => {
+        if (o.name === 'uncertainty') out.push(o.visible);
+      });
+      return out;
+    };
+    expect(shading().length).toBeGreaterThan(0);
+    expect(shading().every(Boolean)).toBe(true);
+    t.setOverlays({ orders: true, routes: true, lastKnown: false });
+    expect(shading().some(Boolean)).toBe(false);
   });
 });
