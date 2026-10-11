@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { activeView, gameState, trayMarks } from './store.js';
+  import { activeView, gameId, gameState, trayMarks, windowOpen } from './store.js';
+  import UmpireWindow from './UmpireWindow.svelte';
   import { unreadCount } from './tray.js';
   import InTray from './InTray.svelte';
   import OrdersDesk from './OrdersDesk.svelte';
+  import Roster from './Roster.svelte';
   import { deliveryStatus } from './orders.js';
   import DeskClock from './DeskClock.svelte';
   import PausePanel from './PausePanel.svelte';
@@ -32,7 +34,6 @@
     if (sel) queueMicrotask(() => document.querySelector<HTMLElement>(sel)?.focus());
   }
 
-  const units = $derived($gameState.view?.ownUnits ?? []);
   // Delivery status is read against game time, so the journal re-reads it now and then.
   let wall = $state(Date.now());
   $effect(() => {
@@ -82,8 +83,17 @@
       {#if v.id === 'inTray' && unread > 0}<span class="badge" aria-label="{unread} unread">{unread}</span>{/if}
     </button>
   {/each}
+  {#if $gameState.gameOver && $gameId}
+    <button type="button" aria-pressed={$windowOpen} onclick={() => windowOpen.update((o) => !o)}>
+      Umpire's window
+    </button>
+  {/if}
 </nav>
 </div>
+
+{#if $windowOpen && $gameState.gameOver}
+  <UmpireWindow />
+{/if}
 
 <div class="fade" class:on={isDeskView($activeView)} aria-hidden="true"></div>
 
@@ -97,14 +107,7 @@
   </section>
 {:else if $activeView === 'roster'}
   <section id="view-roster" class="paper" tabindex="-1" aria-label="Order of battle">
-    <h2>Order of battle</h2>
-    {#if units.length === 0}
-      <p>No formations reported yet.</p>
-    {:else}
-      <ul>
-        {#each units as u (u.id)}<li>{u.name}</li>{/each}
-      </ul>
-    {/if}
+    <Roster />
   </section>
 {:else if $activeView === 'journal'}
   <section id="view-journal" class="paper" tabindex="-1" aria-label="Journal">

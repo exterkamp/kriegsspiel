@@ -2,6 +2,8 @@
 
 export interface Mailer {
   sendLoginLink(to: string, link: string): Promise<void>;
+  /** A game notification. The text is fixed per event and holds no game content. */
+  sendNotification?(to: string, subject: string, text: string): Promise<void>;
 }
 
 /** Dev mailer: writes the link to the log instead of sending it. The link is a credential, so never use it where logs are shared. */
@@ -10,6 +12,10 @@ export class LogMailer implements Mailer {
 
   async sendLoginLink(to: string, link: string): Promise<void> {
     this.log(`login link for ${to}: ${link}`);
+  }
+
+  async sendNotification(to: string, subject: string): Promise<void> {
+    this.log(`notification for ${to}: ${subject}`);
   }
 }
 
@@ -25,17 +31,25 @@ export class WebhookMailer implements Mailer {
   ) {}
 
   async sendLoginLink(to: string, link: string): Promise<void> {
+    await this.post(
+      to,
+      'Your Kriegsspiel login link',
+      `Open this link to sign in to Kriegsspiel. It works once and expires in 15 minutes.\n\n${link}\n\nIf you did not ask for it, ignore this message.`,
+    );
+  }
+
+  async sendNotification(to: string, subject: string, text: string): Promise<void> {
+    await this.post(to, `Kriegsspiel: ${subject}`, text);
+  }
+
+  private async post(to: string, subject: string, text: string): Promise<void> {
     const res = await this.fetchFn(this.url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         ...(this.token ? { authorization: `Bearer ${this.token}` } : {}),
       },
-      body: JSON.stringify({
-        to,
-        subject: 'Your Kriegsspiel login link',
-        text: `Open this link to sign in to Kriegsspiel. It works once and expires in 15 minutes.\n\n${link}\n\nIf you did not ask for it, ignore this message.`,
-      }),
+      body: JSON.stringify({ to, subject, text }),
     });
     if (!res.ok) throw new Error(`mail gateway answered ${res.status}`);
   }
