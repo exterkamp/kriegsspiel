@@ -13,7 +13,10 @@ class FakeSocket {
   constructor(readonly url: string) {
     FakeSocket.all.push(this);
   }
-  send(): void {}
+  sent: string[] = [];
+  send(d: string): void {
+    this.sent.push(d);
+  }
   close(): void {
     this.closed = true;
   }
@@ -26,7 +29,10 @@ describe('GameService', () => {
     FakeSocket.all = [];
     vi.stubGlobal('WebSocket', FakeSocket);
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    TestBed.inject(GameService).disconnect();
+    vi.unstubAllGlobals();
+  });
 
   it('shows the offline fixture without a game id and opens no socket', () => {
     const svc = TestBed.inject(GameService);
@@ -53,5 +59,83 @@ describe('GameService', () => {
     svc.connect(loc('?game=b'));
     expect(FakeSocket.all[0]!.closed).toBe(true);
     expect(FakeSocket.all).toHaveLength(2);
+  });
+});
+
+describe('GameService commands and page cache', () => {
+  beforeEach(() => {
+    FakeSocket.all = [];
+    vi.stubGlobal('WebSocket', FakeSocket);
+  });
+  afterEach(() => {
+    TestBed.inject(GameService).disconnect();
+    vi.unstubAllGlobals();
+  });
+
+  const open = (svc: GameService, search = '?game=g1'): FakeSocket => {
+    svc.connect(loc(search));
+    const sock = FakeSocket.all.at(-1)!;
+    sock.readyState = 1;
+    sock.onopen?.({});
+    return sock;
+  };
+
+  it('exposes the game id and clears it offline', () => {
+    const svc = TestBed.inject(GameService);
+    svc.connect(loc('?game=g1'));
+    expect(svc.gameId()).toBe('g1');
+    svc.connect(loc(''));
+    expect(svc.gameId()).toBeUndefined();
+  });
+
+  it('refuses an order with no connection', () => {
+    const svc = TestBed.inject(GameService);
+    expect(svc.sendOrder('advance')).toMatch(/Not connected to a game/);
+    expect(svc.proposeResume()).toBe(false);
+    expect(svc.askStaff('q', 'chiefOfStaff', 'hi')).toBe(false);
+  });
+
+  it('sends an order and records it as pending with its extras', () => {
+    const svc = TestBed.inject(GameService);
+    const sock = open(svc);
+    expect(svc.sendOrder('advance', { toName: 'Ney' }, 'fast')).toBeUndefined();
+    expect(sock.sent).toHaveLength(1);
+    expect(sock.sent[0]).toContain('advance');
+    const p = svc.state().pending;
+    expect(p).toHaveLength(1);
+    expect(p[0]).toMatchObject({ text: 'advance', toName: 'Ney' });
+  });
+
+  it('reports a down link and records nothing when the socket is not open', () => {
+    const svc = TestBed.inject(GameService);
+    svc.connect(loc('?game=g1'));
+    expect(svc.sendOrder('advance')).toMatch(/Not connected\. Try again/);
+    expect(svc.state().pending).toHaveLength(0);
+  });
+
+  it('marks dispatches read and merges saved ones', () => {
+    const svc = TestBed.inject(GameService);
+    svc.markRead('a');
+    svc.mergeRead(['b', 'c']);
+    expect([...svc.state().read].sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('stops on pagehide and restarts only on a persisted pageshow', () => {
+    const svc = TestBed.inject(GameService);
+    open(svc);
+    window.dispatchEvent(new Event('pagehide'));
+    expect(FakeSocket.all[0]!.closed).toBe(true);
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false }));
+    expect(FakeSocket.all).toHaveLength(1);
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+    expect(FakeSocket.all).toHaveLength(2);
+  });
+
+  it('removes the page listeners on disconnect', () => {
+    const svc = TestBed.inject(GameService);
+    open(svc);
+    svc.disconnect();
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+    expect(FakeSocket.all).toHaveLength(1);
   });
 });

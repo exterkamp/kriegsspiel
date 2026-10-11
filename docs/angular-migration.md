@@ -1,6 +1,6 @@
 # Angular migration plan (issue #269)
 
-Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
+Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) and step 1 (services and stores, #272) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
 
 ## What the spike proves
 
@@ -20,6 +20,15 @@ Not in the spike: sign-in, menus, orders, marks, any other view, the admin, map-
 - **Review harness.** Vitest 4 removed the `onFinished` reporter hook, so `scripts/review/capture-reporter.mjs` records only `onTestRunEnd` and `results.mjs` no longer cross-checks the two channels (the JSON reporter is still cross-checked against it). The runner's version guard now accepts any 4.x. The negative control that corrupted `onFinished` now removes `onTestRunEnd`.
 - **SPA fallback.** `server/src/api/spaFallback.ts`, enabled by `SPA_FALLBACK=1` (option `spaFallback`, needs `STATIC_DIR`). Off by default, because the Svelte build has real `admin/index.html` and `*.html` files.
 - **Docker.** `--build-arg CLIENT=ng` copies `client-ng/dist/browser` instead of `client/dist`. Default unchanged. See `docs/deployment.md`.
+
+## Step 1: services and stores (#272)
+
+- **`GameService`** (`game/game.service.ts`) now also holds `gameId`, sends commands (`sendOrder` records the pending order as `liveClient.ts` did; `askStaff`, `proposePause`, `proposeResume`, `vote` return false with no link), marks dispatches read (`markRead`, `mergeRead`), and owns the `pagehide` (stop) / `pageshow` with `persisted` (start) listeners, added on `connect` and removed on `disconnect`.
+- **`DeskStore`** (`desk/desk.store.ts`) holds the signals of `desk/store.ts`: `activeView`, `trayFiled`, `trayDiscarded`, `trayMarks` (computed from the game's read set), `viewedDispatch`, `showOnTable`, the window signals, `orderDraft`, conference client and log, and `journal`. `persistTray`, `persistDraft` and `persistJournal(key)` load from localStorage through the unchanged `@legacy/desk/*` helpers and then save from an `effect`; each returns a stop function. `addNote` is a method.
+- **Injection tokens** (`game/ports.ts`): `ORDER_SENDER`, `CONFERENCE_SENDER`, `PAUSE_ACTIONS`. They default to `GameService` (root factories), so the Svelte "set once connected" stores are not needed; tests and fixture mode provide their own.
+- **Plan change:** the `gameState` store is not duplicated in `DeskStore`; it is `GameService.state`. `gameId` lives on `GameService`, not the desk store. Marks, hot-seat switching and canvas pointer handling stay for step 3 (`MarksService`, `GameComponent`).
+- **Behaviour difference.** A Svelte `subscribe` saw every state; an Angular `effect` runs once per tick, so game states applied within one tick are folded into one. `persistJournal` compares only the previous *seen* state, so a pause then resume (or an order added then refused) inside a single tick leaves no diary entry. Each WebSocket message is its own task, so this should be rare.
+- Tests: `game.service.spec.ts`, `ports.spec.ts`, `desk/desk.store.spec.ts` (no timers; `TestBed.tick()` flushes effects). No Svelte tests were dropped: the Svelte store has no tests of its own.
 
 ## Decisions
 
