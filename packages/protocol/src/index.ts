@@ -3,3 +3,4 @@ export * from './common.js';
 export * from './view.js';
 export * from './messages.js';
 export * from './marks.js';
+export * from './drafts.js';

@@ -66,7 +66,7 @@ describe('Command', () => {
     { v, kind: 'proposePause', reason: 'door' },
     { v, kind: 'proposeResume' },
     { v, kind: 'vote', proposal: 'p1', yes: false },
-    { v, kind: 'draftEdit', draft: 'd1', ops: [] },
+    { v, kind: 'draftEdit', draft: 'd1', baseRev: 0, op: [3, 'x', -1] },
   ];
   it.each(good)('round-trips $kind', (c) => {
     const r = parseCommand(serializeCommand(c));

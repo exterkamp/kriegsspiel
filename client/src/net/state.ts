@@ -165,6 +165,12 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
     }
     case 'marks':
       return { ...s, marks: m.marks };
+    case 'drafts':
+    case 'draftState':
+    case 'draftEntry':
+    case 'draftReceipt':
+      // The drafting desk is not built yet (a follow-up story); the server sends these to the side.
+      return s;
     case 'staffAtWork':
       return { ...s, staffAtWork: m.working };
     case 'serverRestarted': {

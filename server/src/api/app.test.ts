@@ -664,6 +664,78 @@ describe('catch-up on reconnect', () => {
   });
 });
 
+describe('shared order drafts', () => {
+  const cmd = (c: Record<string, unknown>) => JSON.stringify({ v, ...c });
+
+  it('puts two clients’ concurrent edits and comments in one order, and keeps the other side out', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const a = await join(ws, game, 'blue');
+    const b = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    expect((await a.waitFor('drafts')).drafts).toEqual([]);
+    a.send(cmd({ kind: 'createDraft', draft: 'd1', text: 'Hold the bridge', title: 'Order 1' }));
+    await b.waitFor('draftState', (m) => m.draft.id === 'd1');
+    // Both edit the same rev before hearing from each other.
+    a.send(cmd({ kind: 'draftEdit', draft: 'd1', baseRev: 0, op: ['Colonel: ', 15], opId: 'a1' }));
+    b.send(
+      cmd({ kind: 'draftEdit', draft: 'd1', baseRev: 0, op: [15, ' at all costs'], opId: 'b1' }),
+    );
+    for (const c of [a, b]) {
+      await c.waitFor('draftEntry', (m) => m.entry.rev === 2);
+    }
+    const last = b.messages.filter((m) => m.kind === 'draftEntry');
+    expect(last.map((m) => m.entry.rev)).toEqual([1, 2]);
+    a.send(
+      cmd({
+        kind: 'draftComment',
+        draft: 'd1',
+        baseRev: 2,
+        comment: { id: 'c1', from: 9, to: 13, body: 'Which hold?' },
+      }),
+    );
+    await b.waitFor('draftEntry', (m) => m.entry.kind === 'comment');
+    b.send(cmd({ kind: 'readDraft', draft: 'd1', rev: 3 }));
+    const receipt = await a.waitFor('draftReceipt');
+    expect(receipt.rev).toBe(3);
+    // A fresh connection (a player coming back later) gets the whole draft.
+    a.socket.close();
+    const again = await join(ws, game, 'blue');
+    const [d] = (await again.waitFor('drafts')).drafts;
+    expect(d!.text).toBe('Colonel: Hold the bridge at all costs');
+    expect(d!.history.map((e) => e.rev)).toEqual([1, 2, 3]);
+    expect(d!.comments).toHaveLength(1);
+    expect(Object.values(d!.receipts)).toEqual([3]);
+    expect(red.messages.filter((m) => m.kind.startsWith('draft') && m.kind !== 'drafts')).toEqual(
+      [],
+    );
+    expect((await red.waitFor('drafts')).drafts).toEqual([]);
+  });
+
+  it('forks and merges, saves to the store, and answers a bad edit with an error', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const a = await join(ws, game, 'blue');
+    await a.waitFor('drafts');
+    a.send(cmd({ kind: 'createDraft', draft: 'd1', text: 'abc' }));
+    a.send(cmd({ kind: 'forkDraft', draft: 'd1', newDraft: 'd2' }));
+    await a.waitFor('draftState', (m) => m.draft.id === 'd2');
+    a.send(cmd({ kind: 'draftEdit', draft: 'd2', baseRev: 0, op: [3, 'd'] }));
+    a.send(cmd({ kind: 'draftEdit', draft: 'd1', baseRev: 0, op: ['<', 3] }));
+    a.send(cmd({ kind: 'mergeDraft', draft: 'd2' }));
+    const closed = await a.waitFor('draftState', (m) => m.draft.mergedInto === 'd1');
+    expect(closed.draft.id).toBe('d2');
+    a.send(cmd({ kind: 'draftEdit', draft: 'd1', baseRev: 0, op: [99] }));
+    expect((await a.waitFor('error', (m) => m.code === 'bad_op')).code).toBe('bad_op');
+    a.send(cmd({ kind: 'draftEdit', draft: 'd2', baseRev: 1, op: [4] }));
+    await a.waitFor('error', (m) => m.code === 'draft_closed');
+    await vi.waitFor(async () => {
+      const saved = await store.loadDrafts(game.id, 'blue');
+      expect(saved.find((d) => d.id === 'd1')?.text).toBe('<abcd');
+    });
+  });
+});
+
 describe('seen time on shutdown', () => {
   it('flushSeen saves the seen time of a side that is still connected', async () => {
     const { base, ws } = await start();
@@ -785,7 +857,7 @@ describe('malformed messages', () => {
       JSON.stringify({ v, kind: 'issueOrder', orderId: 'o' }),
       JSON.stringify({ v, kind: 'issueOrder', orderId: 'o', text: 'go', side: 'red' }),
       JSON.stringify({ v, kind: 'vote', proposal: 'p', yes: 'maybe' }),
-      '{"v":1,"kind":"draftEdit","draft":"d","ops":' + '['.repeat(10_000),
+      '{"v":1,"kind":"draftEdit","draft":"d","baseRev":0,"op":' + '['.repeat(10_000),
     ];
     for (const m of bad) blue.send(m);
     blue.send(new Uint8Array([1, 2, 3]));

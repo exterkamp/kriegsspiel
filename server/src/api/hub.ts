@@ -12,12 +12,14 @@ import {
   MAX_MARKS,
   type ClockState,
   type Command,
+  type DraftSnapshot,
   type Mark,
   type PauseProposal,
   type ServerMessage,
 } from '@kriegsspiel/protocol';
 import type { GameActor, GameStore } from '../game/index.js';
 import type { PauseTransition } from '../pause.js';
+import { DraftBook, DraftError } from '../drafts/book.js';
 import { sideViewOf } from './sideView.js';
 import type { SideId } from '@kriegsspiel/engine';
 
@@ -77,6 +79,8 @@ export class Hub {
 
   /** Each side's marks, loaded from the store on first use and kept here (the hub is their only writer). */
   private readonly marks = new Map<string, Promise<Mark[]>>();
+  /** Each side's shared order drafts, loaded on first use; the hub is their only writer (D6b). */
+  private readonly drafts = new Map<string, Promise<DraftBook>>();
   /** Game time each side was last pushed a view at; written to the store when its last connection closes. */
   private readonly seen = new Map<string, number>();
   /** Saves run one after another per side, so the last write is the newest list. */
@@ -85,7 +89,10 @@ export class Hub {
   constructor(
     private readonly lookup: (gameId: string) => GameActor | undefined,
     private readonly onError: (gameId: string, e: unknown) => void,
-    private readonly store?: Pick<GameStore, 'saveMarks' | 'loadMarks' | 'saveSeen' | 'loadSeen'>,
+    private readonly store?: Pick<
+      GameStore,
+      'saveMarks' | 'loadMarks' | 'saveDrafts' | 'loadDrafts' | 'saveSeen' | 'loadSeen'
+    >,
     /** The side a signed-in user sits on in a game, to name who asked for a pause. */
     private readonly sideOf: (gameId: string, userId: string) => SideId | undefined = () =>
       undefined,
@@ -115,6 +122,135 @@ export class Hub {
     void tail.then(() => {
       if (this.saves.get(key) === tail) this.saves.delete(key);
     });
+  }
+
+  private draftsOf(gameId: string, side: SideId): Promise<DraftBook> {
+    const key = `${gameId}\0${side}`;
+    let p = this.drafts.get(key);
+    if (!p) {
+      p = (this.store ? this.store.loadDrafts(gameId, side) : Promise.resolve([])).then((list) =>
+        DraftBook.from(list),
+      );
+      this.drafts.set(key, p);
+      p.catch(() => this.drafts.delete(key));
+    }
+    return p;
+  }
+
+  private saveDrafts(gameId: string, side: SideId, book: DraftBook): void {
+    if (!this.store) return;
+    const key = `drafts\0${gameId}\0${side}`;
+    const snapshot = structuredClone(book.toJSON());
+    const run = (this.saves.get(key) ?? Promise.resolve()).then(() =>
+      this.store!.saveDrafts(gameId, side, snapshot),
+    );
+    const tail = run.catch((e) => this.onError(gameId, e));
+    this.saves.set(key, tail);
+    void tail.then(() => {
+      if (this.saves.get(key) === tail) this.saves.delete(key);
+    });
+  }
+
+  /** Tell every connection of a side something about its drafts. */
+  private broadcastSide(gameId: string, side: SideId, message: ServerMessage): void {
+    for (const c of this.conns.get(gameId) ?? []) if (c.side === side) this.send(c, message);
+  }
+
+  /** Run one draft command against the side's book, tell the side what changed, and keep the book. */
+  private async handleDraftCommand(
+    gameId: string,
+    conn: Connection,
+    command: Extract<
+      Command,
+      {
+        kind:
+          | 'createDraft'
+          | 'draftEdit'
+          | 'draftComment'
+          | 'resolveComment'
+          | 'readDraft'
+          | 'forkDraft'
+          | 'mergeDraft';
+      }
+    >,
+  ): Promise<void> {
+    const book = await this.draftsOf(gameId, conn.side);
+    const by = conn.userId ?? conn.side;
+    const now = Date.now();
+    const side = conn.side;
+    const state = (draft: DraftSnapshot): ServerMessage => ({
+      v: PROTOCOL_VERSION,
+      kind: 'draftState',
+      draft: structuredClone(draft),
+    });
+    try {
+      switch (command.kind) {
+        case 'createDraft': {
+          const d = book.create(command.draft, by, {
+            ...(command.text === undefined ? {} : { text: command.text }),
+            ...(command.title === undefined ? {} : { title: command.title }),
+          });
+          this.broadcastSide(gameId, side, state(d));
+          break;
+        }
+        case 'forkDraft':
+          this.broadcastSide(gameId, side, state(book.fork(command.draft, command.newDraft, by)));
+          break;
+        case 'draftEdit':
+        case 'draftComment':
+        case 'resolveComment': {
+          const entry =
+            command.kind === 'draftEdit'
+              ? book.edit(command.draft, by, now, {
+                  baseRev: command.baseRev,
+                  op: command.op,
+                  ...(command.opId === undefined ? {} : { opId: command.opId }),
+                })
+              : command.kind === 'draftComment'
+                ? book.comment(command.draft, by, now, {
+                    baseRev: command.baseRev,
+                    ...command.comment,
+                  })
+                : book.resolve(command.draft, by, now, command.commentId, command.resolved);
+          this.broadcastSide(gameId, side, {
+            v: PROTOCOL_VERSION,
+            kind: 'draftEntry',
+            draft: command.draft,
+            entry,
+          });
+          break;
+        }
+        case 'readDraft': {
+          const rev = book.read(command.draft, by, command.rev);
+          if (rev === undefined) return;
+          this.broadcastSide(gameId, side, {
+            v: PROTOCOL_VERSION,
+            kind: 'draftReceipt',
+            draft: command.draft,
+            reader: by,
+            rev,
+          });
+          break;
+        }
+        case 'mergeDraft': {
+          const { parent, entries } = book.merge(command.draft, now);
+          for (const entry of entries)
+            this.broadcastSide(gameId, side, {
+              v: PROTOCOL_VERSION,
+              kind: 'draftEntry',
+              draft: parent,
+              entry,
+            });
+          this.broadcastSide(gameId, side, state(book.get(command.draft)!));
+          break;
+        }
+      }
+    } catch (e) {
+      if (!(e instanceof DraftError)) throw e;
+      this.send(conn, error(e.code, e.message));
+      return;
+    }
+    this.saveDrafts(gameId, side, book);
   }
 
   /** Tell every connection of a side its marks. */
@@ -182,6 +318,15 @@ export class Hub {
     this.push(gameId, conn);
     void sinceP
       .then((since) => this.sendCatchUp(gameId, conn, since))
+      .catch((e) => this.onError(gameId, e));
+    void this.draftsOf(gameId, side)
+      .then((book) =>
+        this.send(conn, {
+          v: PROTOCOL_VERSION,
+          kind: 'drafts',
+          drafts: structuredClone(book.toJSON()),
+        }),
+      )
       .catch((e) => this.onError(gameId, e));
     void this.marksOf(gameId, side)
       .then((marks) => this.send(conn, { v: PROTOCOL_VERSION, kind: 'marks', marks: [...marks] }))
@@ -420,6 +565,18 @@ export class Hub {
       }
       this.saveMarks(gameId, conn.side, list);
       this.broadcastMarks(gameId, conn.side, list);
+      return;
+    }
+    if (
+      command.kind === 'createDraft' ||
+      command.kind === 'draftEdit' ||
+      command.kind === 'draftComment' ||
+      command.kind === 'resolveComment' ||
+      command.kind === 'readDraft' ||
+      command.kind === 'forkDraft' ||
+      command.kind === 'mergeDraft'
+    ) {
+      await this.handleDraftCommand(gameId, conn, command);
       return;
     }
     if (
