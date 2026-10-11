@@ -243,3 +243,5 @@ Headless tests and runtime review cannot establish physical touch, browser layou
 ### Accepted live composition reconciliation — 2026-10-10
 
 The fixture router remains in `main.ts`; `liveClient.ts` now consumes accepted main `1e2f847` authentication, session cookies, seat creation/joining, live desk/in-tray and side-shared server marks. Incoming `TableScene.ts` / `marks.ts` and their tests stay at canonical live paths. The HQ transactional renderer/helpers/tests moved to `FixtureTableScene.ts` / `fixtureMarks.ts` / `fixtureScene.test.ts`; `ContinuousSurface` selects that renderer. Both paths use continuous metres, but their mark authority, lifetime and persistence contracts remain distinct. This integration does not implement a live HQ adapter or erase its capability gates.
+
+The subsequent accepted-main refresh to `6343c2b` preserves the same composition boundary. Root remains the HQ fixture; `?lobby=1`, `?new=1` and `?game=<id>[&side=…]` select accepted live composition, including lobby/hot-seat behavior and live DeskClock. Admin replay stays behind its separate admin entry. The fixture clock/source formatter does not replace accepted live clock authority.

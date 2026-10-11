@@ -20,6 +20,8 @@ import { newMarkId } from './table/marks.js';
 import { pickMinSize } from './table/picking.js';
 import type { Dispatch, Mark } from '@kriegsspiel/protocol';
 import { parseSession, wsUrl } from './session.js';
+import { fetchGame } from './lobby/api.js';
+import { showGameList, showRoom } from './lobby/lobby.js';
 import { fetchMe, showAccountBar, showLogin } from './auth.js';
 import { mount } from 'svelte';
 import Desk from './desk/Desk.svelte';
@@ -60,6 +62,22 @@ async function takeSeat(game: string, side?: string): Promise<void> {
     );
 }
 
+/** Hot-seat: a button per side to hand the desk over; each reloads the page seated at that side. */
+function showSideSwitch(app: HTMLElement, game: string, sides: string[], current?: string): void {
+  const bar = document.createElement('div');
+  bar.id = 'sides';
+  for (const side of sides) {
+    const b = document.createElement('button');
+    b.textContent = side === current ? `Playing ${side}` : `Switch to ${side}`;
+    b.disabled = side === current;
+    b.addEventListener('click', () =>
+      window.location.assign(`/?game=${encodeURIComponent(game)}&side=${encodeURIComponent(side)}`),
+    );
+    bar.append(b);
+  }
+  app.append(bar);
+}
+
 async function main(app: HTMLElement): Promise<void> {
   app.innerHTML = `
     <canvas id="table"></canvas>
@@ -93,12 +111,26 @@ async function main(app: HTMLElement): Promise<void> {
     }
     showAccountBar(app, me, () => window.location.assign('/'));
     try {
+      if (params.mode === 'lobby') {
+        await showGameList(app);
+        return;
+      }
       if (params.mode === 'create') {
         const game = await createGame(params.side, params.rate);
         history.replaceState(null, '', `?game=${game}`);
         params = { mode: 'join', game };
       } else {
         await takeSeat(params.game, params.side);
+        const info = await fetchGame(params.game);
+        if (info.status === 'lobby') await showRoom(app, info);
+        // Hot-seat: the one account plays both sides, so offer the other side's desk.
+        if (info.sessionType === 'hot_seat')
+          showSideSwitch(
+            app,
+            params.game,
+            info.sides.map((s) => s.side),
+            params.side ?? info.sides[0]?.side,
+          );
       }
     } catch (e) {
       if (out) out.textContent = e instanceof Error ? e.message : String(e);
@@ -126,7 +158,7 @@ async function main(app: HTMLElement): Promise<void> {
       const now = state.clock ? gameNowMs(state.clock, Date.now()) : 0;
       state = withPendingOrder(state, { orderId, text: full, sentAtGame: now });
       gameState.set(state);
-      hud.render(state, Date.now());
+      hud.render(state);
       return undefined;
     },
   });
@@ -209,7 +241,7 @@ async function main(app: HTMLElement): Promise<void> {
 
   const rerender = () => {
     gameState.set(state);
-    hud.render(state, Date.now());
+    hud.render(state);
     if (state.view) table.apply(buildSceneState(state.view, fixtureMap));
     redrawMarks();
   };
@@ -279,7 +311,7 @@ async function main(app: HTMLElement): Promise<void> {
 
   if (params.mode === 'join') {
     conn = new GameConnection({
-      url: wsUrl(window.location, params.game),
+      url: wsUrl(window.location, params.game, params.side),
       onStatus: (s) => {
         state = withLink(state, s);
         rerender();
@@ -290,12 +322,11 @@ async function main(app: HTMLElement): Promise<void> {
       },
     });
     conn.start();
-    setInterval(() => hud.tick(Date.now()), 250);
   } else {
     // No server: the fixture board with an empty desk.
     state = { ...withLink(state, 'offline'), view: fixtureView };
     gameState.set(state);
-    hud.render(state, Date.now());
+    hud.render(state);
   }
 }
 

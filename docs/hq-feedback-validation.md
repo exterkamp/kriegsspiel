@@ -32,6 +32,8 @@ The before/after roster captures use matched CSS viewport dimensions. Full-page 
 
 Full integrated lint, typecheck, tests and production build pass. Svelte reports zero errors/warnings. Tests: 328 engine, 55 protocol, 432 server, 852 client and 13 root — **1,680 passed**, one optional server test skipped. Build retains the main-chunk warning (832.35 kB, 229.62 kB gzip) and dependency annotation warnings. No forced dependency upgrades were made.
 
+After the second accepted-main refresh to `6343c2b` (lobby/hot-seat, live DeskClock and admin replay), independent review accepted the resolved composition boundary. Full lint, typecheck, tests and build pass again: **1,723 passed** (328 engine, 55 protocol, 452 server, 875 client, 13 root), one optional server skip and zero Svelte diagnostics. Main bundle is 832.47 kB / 229.67 kB gzip. A browser reload reconfirmed the same HQ timestamps, seven-column desktop table and plain heading; incoming live features retain their separate routes.
+
 ## Remaining owner/epic validation
 
 Use [the getting-started guide](hq-getting-started.md) to check actual 200% browser zoom and physical touch input. Live HQ projection/commands, shared mark authority, signing/couriers, conference/replay services, accepted generated-map handoff and measured 60-piece FPS remain separate epic gates. This pass did not merge a GitHub PR, deploy, close issues or modify the map-generation checkout.

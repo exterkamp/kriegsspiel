@@ -2,6 +2,7 @@
   import { activeView, gameState, trayMarks } from './store.js';
   import { unreadCount } from './tray.js';
   import InTray from './InTray.svelte';
+  import DeskClock from './DeskClock.svelte';
   import { VIEWS, isDeskView, isTypingTarget, viewForKey, type ViewId } from './views.js';
   import { formatGameTime } from '../net/state.js';
 
@@ -46,22 +47,25 @@
 
 <svelte:window onkeydown={onKey} />
 
-<nav class="desk-bar" aria-label="Desk">
-  {#each VIEWS as v (v.id)}
-    <button
-      type="button"
-      aria-pressed={$activeView === v.id}
-      aria-keyshortcuts={v.key.toUpperCase()}
-      onclick={() => go(v.id)}
-    >
-      {v.label}
-      <kbd>{v.key.toUpperCase()}</kbd>
-      {#if v.id === 'inTray' && unread > 0}<span class="badge" aria-label="{unread} unread"
-          >{unread}</span
-        >{/if}
-    </button>
-  {/each}
-</nav>
+<div class="dock">
+  <DeskClock />
+  <nav class="desk-bar" aria-label="Desk">
+    {#each VIEWS as v (v.id)}
+      <button
+        type="button"
+        aria-pressed={$activeView === v.id}
+        aria-keyshortcuts={v.key.toUpperCase()}
+        onclick={() => go(v.id)}
+      >
+        {v.label}
+        <kbd>{v.key.toUpperCase()}</kbd>
+        {#if v.id === 'inTray' && unread > 0}<span class="badge" aria-label="{unread} unread"
+            >{unread}</span
+          >{/if}
+      </button>
+    {/each}
+  </nav>
+</div>
 
 <div class="fade" class:on={isDeskView($activeView)} aria-hidden="true"></div>
 
@@ -99,17 +103,24 @@
 {/if}
 
 <style>
-  .desk-bar {
+  .dock {
     position: fixed;
     left: 50%;
     bottom: 8px;
     transform: translateX(-50%);
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: max-content;
+    max-width: calc(100% - 16px);
+    z-index: 5;
+  }
+  .desk-bar {
+    display: flex;
     gap: 6px;
     flex-wrap: wrap;
     justify-content: center;
-    max-width: calc(100% - 16px);
-    z-index: 5;
   }
   button {
     background: #efe6c8;

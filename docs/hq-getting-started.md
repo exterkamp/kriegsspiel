@@ -8,7 +8,7 @@ The default page is a **demonstration with fixed battle data**. You can read pap
 
 Use the HQ checkout, `/Users/dominic/code/kriegsspiel-hq`, on `feat/hq-interface`. The separate map-generation checkout is not this build.
 
-If the HQ client is already running, open its root URL **without** `new`, `game` or `token` query parameters. Otherwise, once your `devrun` setup is ready:
+If the HQ client is already running, open its root URL **without** `new`, `game`, `lobby` or `token` query parameters. Otherwise, once your `devrun` setup is ready:
 
 ```sh
 cd /Users/dominic/code/kriegsspiel-hq
@@ -211,7 +211,7 @@ Use a disposable browser profile after exporting any edits you want to keep.
 
 Open **Conference**, **Terrain studies** and **Replay**. They should say the service is unavailable. Expect no staff response, terrain sketch or hidden-truth reveal. **Orders** must keep **Sign and send** disabled. There is no HQ clock-rate/pause control, shared annotation service, courier workflow, order-status timeline or replay scrubber in this delivery.
 
-The existing live client remains reachable separately with `/?new=1&side=blue&rate=12` to create a game, or `/?game=<id>` to join one. Sign in with the emailed magic link first; session cookies authenticate the WebSocket and game seat. Those URLs need the game server and open the accepted live client, desk, in-tray and shared marks; they do not connect this HQ desk to a live game. The accepted `/admin/` entry is also separate. Treat live-client/admin regression checks separately from HQ fixture acceptance.
+The existing live client remains reachable separately with `/?new=1&side=blue&rate=12` to create a game, or `/?game=<id>` to join one. `/?lobby=1` opens the accepted new-game form and game list; hot-seat games choose a side with `&side=blue` or `&side=red`. Sign in with the emailed magic link first; session cookies authenticate the WebSocket and game seat. Those URLs need the game server and open the accepted live client, desk, in-tray and shared marks; they do not connect this HQ desk to a live game. The accepted `/admin/` entry is also separate. Treat live-client/admin regression checks separately from HQ fixture acceptance.
 
 Still required before full Epic 4 acceptance: accepted live projection/clock/provenance and commands, server/shared marks, signing/couriers/delivery, conference service, authorized arbitrary-time replay, generated-map integration, physical pointer/touch evidence, browser visuals/contrast and a recorded 60-piece performance run. The two-paper page cannot validate the 200-dispatch browser benchmark; that scenario currently has headless test evidence only.
 

@@ -36,12 +36,15 @@ it('mounts the scoped HQ fixture without importing the live client for the root 
   expect(liveLoaded).not.toHaveBeenCalled();
 });
 
-it.each(['/?new=1&side=blue&rate=12', '/?game=accepted-game'])(
-  'selects the accepted live composition for %s without mounting HQ',
-  async (url) => {
-    window.history.replaceState(null, '', url);
-    await import('./main.js');
-    await vi.waitFor(() => expect(liveLoaded).toHaveBeenCalledOnce());
-    expect(mount).not.toHaveBeenCalled();
-  },
-);
+it.each([
+  '/?new=1&side=blue&rate=12',
+  '/?game=accepted-game',
+  '/?lobby=1',
+  '/?game=hot-seat-game&side=blue',
+  '/?game=hot-seat-game&side=red',
+])('selects the accepted live composition for %s without mounting HQ', async (url) => {
+  window.history.replaceState(null, '', url);
+  await import('./main.js');
+  await vi.waitFor(() => expect(liveLoaded).toHaveBeenCalledOnce());
+  expect(mount).not.toHaveBeenCalled();
+});

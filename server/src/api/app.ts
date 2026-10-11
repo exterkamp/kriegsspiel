@@ -2,10 +2,17 @@
  * The HTTP and WebSocket API. See docs/architecture.md (Components).
  *
  *   /auth/*                        magic-link login, sessions, account deletion (see ../auth/routes)
- *   POST /games                    signed in: create "Hold the Bridge", body `{ "rate"?: number, "side"?: string }`; the creator takes `side` (default: the first human side)
- *   GET  /games/:id                signed in: which sides are taken and which one is yours
- *   POST /games/:id/join           signed in: take a free side, body `{ "side": string }`
- *   GET  /games/:id/ws             WebSocket for the side the signed-in user holds (`@kriegsspiel/protocol` messages)
+ *   GET  /scenarios                the scenarios a game can be made from
+ *   POST /games                    signed in: make a game, body `{ scenario?, rate?, side?, sessionType?, pause?, lobby? }`;
+ *                                  the creator takes `side` (default: the first human side). It starts at once unless
+ *                                  `lobby` is true: then it waits in the lobby for `start`
+ *   GET  /games                    signed in: the games you made or hold a seat in
+ *   GET  /games/:id                signed in: the game's settings, status, which sides are taken and ready, and which are yours
+ *   POST /games/:id/join           signed in: take a free side, body `{ "side": string }` (the invite link is `/?game=<id>`)
+ *   POST /games/:id/ready          signed in, seated: body `{ "ready": boolean }`
+ *   POST /games/:id/start          the creator: start a lobby game once every side is taken and every player is ready
+ *   GET  /games/:id/ws             WebSocket for the side the signed-in user holds (`@kriegsspiel/protocol` messages);
+ *                                  in hot-seat, `?side=` picks which of the creator's sides
  *   GET  /healthz                  liveness, `{ ok: true }`
  *   /admin/api/*                   read-only debug API, only when `admin.enabled` (see ../admin)
  *   GET  /*                        the built client, when `staticDir` is set
@@ -25,6 +32,8 @@ import {
   GameHost,
   MemoryGameStore,
   createRegistry,
+  loadScenarioById,
+  scenarioList,
   startingState,
   type GameStore,
   type Timers,
@@ -34,6 +43,14 @@ import { LogMailer, type Mailer } from '../auth/mailer.js';
 import { authRoutes, type Auth } from '../auth/routes.js';
 import { MemoryAuthStore, type AuthStore } from '../auth/store.js';
 import { TraceStore } from '../debug/trace.js';
+import {
+  MemoryLobbyStore,
+  SESSION_TYPES,
+  type LobbyGame,
+  type LobbyStore,
+  type SessionType,
+} from '../lobby/store.js';
+import type { PauseConfig } from '../pause.js';
 import type { OrderParser } from '../orders/index.js';
 import { Hub, type Socket } from './hub.js';
 
@@ -45,14 +62,35 @@ export const MIN_RATE = 0.01;
 
 const SideName = z.enum(['blue', 'red']);
 
+const PauseSettings = z
+  .object({
+    rule: z.enum(['unanimous', 'majority']),
+    voteTimeoutMs: z.number().int().min(1000).max(3_600_000).optional(),
+    maxPauseMs: z
+      .number()
+      .int()
+      .min(1000)
+      .max(7 * 86_400_000)
+      .optional(),
+  })
+  .strict();
+
 const CreateGame = z
   .object({
+    scenario: z.string().optional(),
     rate: z.number().finite().min(MIN_RATE).max(MAX_RATE).optional(),
     side: SideName.optional(),
+    sessionType: z.enum(SESSION_TYPES as [SessionType, ...SessionType[]]).optional(),
+    pause: PauseSettings.optional(),
+    lobby: z.boolean().optional(),
   })
   .strict();
 
 const JoinGame = z.object({ side: SideName }).strict();
+
+const Ready = z.object({ ready: z.boolean() }).strict();
+
+const WsQuery = z.object({ side: SideName.optional() });
 
 /** Largest message a client may send. Orders are a few lines of prose. */
 const MAX_PAYLOAD_BYTES = 16 * 1024;
@@ -60,6 +98,8 @@ const MAX_PAYLOAD_BYTES = 16 * 1024;
 export interface AppOptions {
   parser: OrderParser;
   store?: GameStore;
+  /** Lobby records. Defaults to memory; `main.ts` supplies the SQLite store. */
+  lobby?: LobbyStore;
   wallNow?: WallClock;
   timers?: Timers;
   /** Log lines from Fastify; off by default so tests stay quiet. */
@@ -99,6 +139,7 @@ export interface App {
   hub: Hub;
   auth: Auth;
   authStore: AuthStore;
+  lobby: LobbyStore;
 }
 
 export async function buildApp(options: AppOptions): Promise<App> {
@@ -121,6 +162,31 @@ export async function buildApp(options: AppOptions): Promise<App> {
   // The hub and host refer to each other: the host notifies the hub, the hub looks games up.
   const store = options.store ?? new MemoryGameStore();
   const hub: Hub = new Hub((id) => host.get(id), onError, store);
+  const lobby = options.lobby ?? new MemoryLobbyStore();
+  const authStore = options.auth?.store ?? new MemoryAuthStore();
+  /**
+   * The lobby record for a game. A game made before lobby records existed has seats and a stored
+   * game but no record: it is a started team game on the one scenario of that time, and the record
+   * is written back so it is only synthesised once.
+   */
+  const recordOf = (id: string): LobbyGame | undefined => {
+    const rec = lobby.get(id);
+    if (rec) return rec;
+    const seats = authStore.seatsOf(id);
+    if (seats.length === 0) return undefined;
+    const legacy: LobbyGame = {
+      id,
+      scenario: loadScenario(holdTheBridge).scenarioId,
+      rate: 1,
+      sessionType: 'team_vs_team',
+      creator: seats[0]!.userId,
+      status: 'started',
+      ready: [],
+      createdAtMs: 0,
+    };
+    lobby.put(legacy);
+    return legacy;
+  };
   const host: GameHost = new GameHost({
     store,
     parser: options.parser,
@@ -128,19 +194,27 @@ export async function buildApp(options: AppOptions): Promise<App> {
     wallNow: options.wallNow ?? Date.now,
     timers: options.timers,
     init: startingState,
-    scriptedOpponents: options.scriptedOpponents,
+    pause: (id): PauseConfig | undefined => {
+      const rec = recordOf(id);
+      if (!rec?.pause) return undefined;
+      const voters =
+        rec.sessionType === 'hot_seat' ? [rec.creator] : authStore.seatsOf(id).map((s) => s.userId);
+      return { voters, ...rec.pause };
+    },
+    // Only a co-op game has the built-in opponent; the other shapes leave every side to people.
+    scriptedOpponents: (id) =>
+      options.scriptedOpponents === true && recordOf(id)?.sessionType === 'co_op_vs_ai',
     trace,
     onUpdate: (id) => hub.notify(id),
     onError,
   });
-  const authStore = options.auth?.store ?? new MemoryAuthStore();
 
   await server.register(websocket, { options: { maxPayload: MAX_PAYLOAD_BYTES } });
 
   // Liveness for the container health check. Does not touch a game or the store.
   server.get('/healthz', async () => ({ ok: true }));
 
-  if (trace) await adminApi(server, { host, trace, token: options.admin?.token });
+  if (trace) await adminApi(server, { host, trace, store, token: options.admin?.token });
 
   if (options.staticDir) {
     await server.register(fastifyStatic, { root: resolve(options.staticDir), redirect: true });
@@ -153,15 +227,55 @@ export async function buildApp(options: AppOptions): Promise<App> {
     wallNow: options.wallNow,
     loginPerEmail: options.auth?.loginPerEmail,
     loginPerIp: options.auth?.loginPerIp,
-    onAccountDeleted: (userId) => hub.disconnectUser(userId, 'account deleted'),
+    onAccountDeleted: (userId) => {
+      lobby.forgetUser(userId);
+      hub.disconnectUser(userId, 'account deleted');
+    },
     onLogout: (userId) => hub.disconnectUser(userId),
   });
 
-  /** A side a player may take: scenario sides run by the built-in opponent are not open. */
-  const openSides = (gameId: string): SideId[] =>
-    (host.get(gameId)?.state.world.sides ?? [])
-      .filter((s) => !(options.scriptedOpponents && s.controller === 'scripted'))
+  const aiPlays = options.scriptedOpponents === true;
+
+  /** Sides people play in a game of this shape: all of them, unless the scenario hands a side to the AI. */
+  const humanSides = (rec: LobbyGame): SideId[] =>
+    loadScenarioById(rec.scenario)
+      .sides.filter((s) => rec.sessionType !== 'co_op_vs_ai' || s.controller !== 'scripted')
       .map((s) => s.id);
+
+  /** The side a user plays in a game; in hot-seat the creator plays any, `want` or the first. */
+  const sideFor = (rec: LobbyGame, userId: string, want?: SideId): SideId | undefined => {
+    if (rec.sessionType === 'hot_seat') {
+      if (rec.creator !== userId) return undefined;
+      const sides = humanSides(rec);
+      return want ? sides.find((s) => s === want) : sides[0];
+    }
+    return authStore.seatOf(rec.id, userId);
+  };
+
+  /** A started game is reopened (paused) if the server restarted since it was last used. */
+  const running = async (rec: LobbyGame): Promise<boolean> => {
+    if (rec.status !== 'started') return false;
+    if (host.get(rec.id)) return true;
+    try {
+      await host.open(rec.id);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const summary = (rec: LobbyGame, userId: string) => ({
+    id: rec.id,
+    scenario: rec.scenario,
+    status: rec.status,
+    sessionType: rec.sessionType,
+    rate: rec.rate,
+    side: sideFor(rec, userId) ?? null,
+    creator: rec.creator === userId,
+    createdAtMs: rec.createdAtMs,
+  });
+
+  server.get('/scenarios', async () => ({ scenarios: scenarioList() }));
 
   server.post('/games', async (req, reply) => {
     const user = auth.userOf(req);
@@ -170,40 +284,106 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (!body.success) {
       return reply.code(400).send({ error: 'bad_request', message: body.error.message });
     }
-    const world = loadScenario(holdTheBridge);
-    const playable = world.sides
-      .filter((s) => !(options.scriptedOpponents && s.controller === 'scripted'))
-      .map((s) => s.id);
+    const scenario = body.data.scenario ?? scenarioList()[0]!.id;
+    if (!scenarioList().some((s) => s.id === scenario)) {
+      return reply.code(400).send({ error: 'bad_scenario', message: `no scenario "${scenario}"` });
+    }
+    const sessionType = body.data.sessionType ?? (aiPlays ? 'co_op_vs_ai' : 'team_vs_team');
+    if (sessionType === 'co_op_vs_ai' && !aiPlays) {
+      return reply
+        .code(400)
+        .send({ error: 'no_ai_opponent', message: 'this server has no AI opponent' });
+    }
+    const rec: LobbyGame = {
+      id: randomUUID(),
+      scenario,
+      rate: body.data.rate ?? 1,
+      sessionType,
+      ...(body.data.pause ? { pause: body.data.pause } : {}),
+      creator: user.id,
+      status: 'lobby',
+      ready: [],
+      createdAtMs: (options.wallNow ?? Date.now)(),
+    };
+    const playable = humanSides(rec);
+    if (playable.length === 0) {
+      return reply.code(400).send({ error: 'bad_session', message: 'no side for people to play' });
+    }
     const side = body.data.side ?? playable[0];
     if (!side || !playable.includes(side)) {
       return reply.code(400).send({ error: 'bad_side', message: `no playable side "${side}"` });
     }
-    const id = randomUUID();
-    await host.create(id, world, { rate: body.data.rate });
-    // The game is already created and the host cannot delete it; log a lost seat so it is not silent.
-    if (!authStore.claimSeat(id, side, user.id)) {
-      server.log.error({ gameId: id, userId: user.id }, 'new game left without a seat');
+    if (sessionType !== 'hot_seat' && !authStore.claimSeat(rec.id, side, user.id)) {
       return reply.code(500).send({ error: 'seat_failed' });
     }
-    return reply.code(201).send({
-      id,
-      scenario: world.scenarioId,
-      rate: body.data.rate ?? 1,
-      side,
-      ws: `/games/${id}/ws`,
-    });
+    lobby.put(rec);
+    const result = {
+      id: rec.id,
+      scenario,
+      rate: rec.rate,
+      sessionType,
+      side: sessionType === 'hot_seat' ? playable[0]! : side,
+      ws: `/games/${rec.id}/ws`,
+    };
+    if (body.data.lobby) return reply.code(201).send({ ...result, status: 'lobby' });
+    const startError = await startGame(rec);
+    if (startError) return reply.code(500).send({ error: startError });
+    return reply.code(201).send({ ...result, status: 'started' });
+  });
+
+  /** Ids of games whose `/start` is in flight, so a second request gets 409 rather than a failed create. */
+  const starting = new Set<string>();
+
+  /** Create the game's actor and mark the record started. Returns an error code on failure. */
+  const startGame = async (rec: LobbyGame): Promise<string | undefined> => {
+    try {
+      await host.create(rec.id, loadScenarioById(rec.scenario), { rate: rec.rate });
+    } catch (e) {
+      server.log.error({ err: e, gameId: rec.id }, 'could not start game');
+      return 'start_failed';
+    }
+    // Re-read: a /ready that landed during the await must not be overwritten.
+    lobby.put({ ...(lobby.get(rec.id) ?? rec), status: 'started' });
+    return undefined;
+  };
+
+  server.get('/games', async (req, reply) => {
+    const user = auth.userOf(req);
+    if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+    const mine = new Set(authStore.gamesOf(user.id));
+    const recs = [
+      ...[...mine].map(recordOf).filter((r): r is LobbyGame => r !== undefined),
+      ...lobby.byCreator(user.id).filter((r) => !mine.has(r.id)),
+    ];
+    recs.sort((a, b) => b.createdAtMs - a.createdAtMs);
+    return { games: recs.map((r) => summary(r, user.id)) };
   });
 
   server.get<{ Params: { id: string } }>('/games/:id', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const { id } = req.params;
-    if (!host.get(id)) return reply.code(404).send({ error: 'no_such_game' });
+    const rec = recordOf(id);
+    if (!rec) return reply.code(404).send({ error: 'no_such_game' });
     const seats = authStore.seatsOf(id);
+    const hotSeat = rec.sessionType === 'hot_seat';
     return {
-      id,
-      you: authStore.seatOf(id, user.id) ?? null,
-      sides: openSides(id).map((side) => ({ side, taken: seats.some((s) => s.side === side) })),
+      ...summary(rec, user.id),
+      you: sideFor(rec, user.id) ?? null,
+      ready: rec.ready.includes(user.id) || (rec.creator === user.id && !hotSeat),
+      pause: rec.pause ?? null,
+      sides: humanSides(rec).map((side) => {
+        const seat = seats.find((s) => s.side === side);
+        return {
+          side,
+          taken: hotSeat || seat !== undefined,
+          // The creator starts the game, so they count as ready.
+          ready:
+            hotSeat ||
+            (seat !== undefined &&
+              (seat.userId === rec.creator || rec.ready.includes(seat.userId))),
+        };
+      }),
     };
   });
 
@@ -211,17 +391,61 @@ export async function buildApp(options: AppOptions): Promise<App> {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const { id } = req.params;
-    if (!host.get(id)) return reply.code(404).send({ error: 'no_such_game' });
+    const rec = recordOf(id);
+    if (!rec) return reply.code(404).send({ error: 'no_such_game' });
     const body = JoinGame.safeParse(req.body);
     if (!body.success) {
       return reply.code(400).send({ error: 'bad_request', message: body.error.message });
     }
     const { side } = body.data;
-    if (!openSides(id).includes(side)) return reply.code(400).send({ error: 'bad_side' });
+    if (rec.sessionType === 'hot_seat') return reply.code(400).send({ error: 'hot_seat_game' });
+    if (!humanSides(rec).includes(side)) return reply.code(400).send({ error: 'bad_side' });
     if (!authStore.claimSeat(id, side, user.id)) {
       return reply.code(409).send({ error: 'seat_unavailable' });
     }
     return { id, side, ws: `/games/${id}/ws` };
+  });
+
+  server.post<{ Params: { id: string } }>('/games/:id/ready', async (req, reply) => {
+    const user = auth.userOf(req);
+    if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+    const rec = recordOf(req.params.id);
+    if (!rec) return reply.code(404).send({ error: 'no_such_game' });
+    const body = Ready.safeParse(req.body);
+    if (!body.success) {
+      return reply.code(400).send({ error: 'bad_request', message: body.error.message });
+    }
+    if (rec.status !== 'lobby') return reply.code(409).send({ error: 'already_started' });
+    if (!authStore.seatOf(rec.id, user.id)) return reply.code(403).send({ error: 'no_seat' });
+    const others = rec.ready.filter((u) => u !== user.id);
+    lobby.put({ ...rec, ready: body.data.ready ? [...others, user.id] : others });
+    return { ready: body.data.ready };
+  });
+
+  server.post<{ Params: { id: string } }>('/games/:id/start', async (req, reply) => {
+    const user = auth.userOf(req);
+    if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+    const rec = recordOf(req.params.id);
+    if (!rec) return reply.code(404).send({ error: 'no_such_game' });
+    if (rec.creator !== user.id) return reply.code(403).send({ error: 'not_creator' });
+    if (rec.status !== 'lobby' || starting.has(rec.id)) {
+      return reply.code(409).send({ error: 'already_started' });
+    }
+    if (rec.sessionType !== 'hot_seat') {
+      const seats = authStore.seatsOf(rec.id);
+      const open = humanSides(rec).filter((side) => !seats.some((s) => s.side === side));
+      if (open.length > 0) return reply.code(409).send({ error: 'sides_open', sides: open });
+      const waiting = seats.filter(
+        (s) => s.userId !== rec.creator && !rec.ready.includes(s.userId),
+      );
+      if (waiting.length > 0) {
+        return reply.code(409).send({ error: 'not_ready', sides: waiting.map((s) => s.side) });
+      }
+    }
+    starting.add(rec.id);
+    const startError = await startGame(rec).finally(() => starting.delete(rec.id));
+    if (startError) return reply.code(500).send({ error: startError });
+    return { id: rec.id, status: 'started', ws: `/games/${rec.id}/ws` };
   });
 
   server.get<{ Params: { id: string } }>(
@@ -233,13 +457,22 @@ export async function buildApp(options: AppOptions): Promise<App> {
         const { id } = req.params;
         const user = auth.userOf(req);
         if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-        if (!host.get(id)) return reply.code(404).send({ error: 'no_such_game' });
-        if (!authStore.seatOf(id, user.id)) return reply.code(403).send({ error: 'no_seat' });
+        const rec = recordOf(id);
+        if (!rec) return reply.code(404).send({ error: 'no_such_game' });
+        const query = WsQuery.safeParse(req.query);
+        if (!query.success) return reply.code(400).send({ error: 'bad_side' });
+        if (!sideFor(rec, user.id, query.data.side)) {
+          return reply.code(403).send({ error: 'no_seat' });
+        }
+        if (rec.status === 'lobby') return reply.code(409).send({ error: 'not_started' });
+        if (!(await running(rec))) return reply.code(404).send({ error: 'no_such_game' });
       },
     },
     (socket, req) => {
       const user = auth.userOf(req);
-      const side = user && authStore.seatOf(req.params.id, user.id);
+      const rec = recordOf(req.params.id);
+      const want = WsQuery.safeParse(req.query);
+      const side = user && rec && want.success && sideFor(rec, user.id, want.data.side);
       if (!user || !side) return socket.close(1008, 'no seat');
       hub.attach(req.params.id, side, socket as unknown as Socket, user.id);
     },
@@ -250,7 +483,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
     await trace?.close();
     await host.shutdown();
     if (!options.auth?.store) authStore.close();
+    if (!options.lobby) lobby.close();
   });
 
-  return { server, host, hub, auth, authStore };
+  return { server, host, hub, auth, authStore, lobby };
 }

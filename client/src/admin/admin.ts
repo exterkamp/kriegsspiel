@@ -2,6 +2,7 @@
  * Admin page shell: game picker, live indicator and empty tabbed panels with a shared filter bar.
  * Read-only: it only issues GETs to `/admin/api` and shares nothing with the game client.
  */
+import { ReplayPanel } from './replay.js';
 import { LlmPanel } from './llm.js';
 import { EntryStore, type TraceEntry } from './entries.js';
 import { ListPanel } from './listPanel.js';
@@ -45,6 +46,7 @@ export class AdminPage {
   private readonly tabs = new Map<PanelId, HTMLButtonElement>();
   private readonly panels = new Map<PanelId, HTMLElement>();
   private readonly note: HTMLElement;
+  private replay!: ReplayPanel;
   private readonly llm: LlmPanel;
   private readonly entries = new EntryStore();
   private readonly lists = new Map<PanelId, ListPanel>();
@@ -90,8 +92,10 @@ export class AdminPage {
       const config =
         id === 'Events' ? EVENTS_PANEL : id === 'Requests' ? REQUESTS_PANEL : undefined;
       if (config) this.lists.set(id, new ListPanel(sec, this.entries, config));
-      else sec.innerHTML = `<p class="empty">${id} panel — not implemented yet.</p>`;
+      else if (id !== 'Replay')
+        sec.innerHTML = `<p class="empty">${id} panel — not implemented yet.</p>`;
       this.panels.set(id, sec);
+      if (id === 'Replay') this.replay = new ReplayPanel(sec, this.token, this.fetchFn);
     }
     this.statePanel = new StatePanel(this.panels.get('State')!);
     this.llm = new LlmPanel(this.panels.get('LLM')!);
@@ -147,6 +151,8 @@ export class AdminPage {
     this.applyFilter();
     // A list built while hidden had no layout; re-render so it opens at the tail, not the top.
     this.lists.get(id)?.renderNow();
+    // Reloading also picks up the new end of a running game's timeline.
+    if (id === 'Replay') void this.replay.setGame(this.gameId, true);
   }
 
   private applyFilter(): void {
@@ -201,6 +207,7 @@ export class AdminPage {
     this.entries.clear();
     for (const list of this.lists.values()) list.reset();
     this.status = id ? 'connecting' : 'live';
+    if (this.panel === 'Replay') void this.replay.setGame(id);
     this.statePanel.showMessage(id ? 'Loading state…' : 'No game selected.');
     if (id) {
       this.openStream(id);
