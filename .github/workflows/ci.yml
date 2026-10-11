@@ -5,15 +5,41 @@ on:
   push:
     branches: [main]
 
+env:
+  HQ_REVIEW_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  HQ_REVIEW_BASE: ${{ github.event.pull_request.base.sha || github.sha }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.HQ_REVIEW_HEAD }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
+      - name: Record exact source
+        env:
+          EVIDENCE_FILE: ${{ runner.temp }}/hq-ordinary/checkout.json
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { mkdirSync, writeFileSync } from 'node:fs';
+          import { dirname } from 'node:path';
+          const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+          const head = process.env.HQ_REVIEW_HEAD;
+          const base = process.env.HQ_REVIEW_BASE;
+          const actualHead = git('rev-parse', 'HEAD');
+          const tree = git('rev-parse', 'HEAD^{tree}');
+          if (actualHead !== head || tree !== git('rev-parse', `${head}^{tree}`)) throw new Error('Checkout does not match candidate source');
+          const mergeBase = git('merge-base', head, base);
+          const record = { head, base, mergeBase, headTree: tree, baseTree: git('rev-parse', `${base}^{tree}`), mergeBaseTree: git('rev-parse', `${mergeBase}^{tree}`), actualHead, tree, node: process.version };
+          mkdirSync(dirname(process.env.EVIDENCE_FILE), { recursive: true });
+          writeFileSync(process.env.EVIDENCE_FILE, JSON.stringify(record, null, 2) + '\n');
+          JS
       - run: npm install --global npm@10.9.7
       - run: npm run setup:map-source
       - run: npm ci
@@ -21,3 +47,55 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: hq-ordinary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/hq-ordinary
+          retention-days: 30
+          if-no-files-found: warn
+
+  test-effectiveness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.HQ_REVIEW_HEAD }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Record exact source
+        env:
+          EVIDENCE_FILE: ${{ runner.temp }}/hq-effectiveness-checkout.json
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { writeFileSync } from 'node:fs';
+          const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+          const head = process.env.HQ_REVIEW_HEAD;
+          const base = process.env.HQ_REVIEW_BASE;
+          const actualHead = git('rev-parse', 'HEAD');
+          const tree = git('rev-parse', 'HEAD^{tree}');
+          if (actualHead !== head || tree !== git('rev-parse', `${head}^{tree}`)) throw new Error('Checkout does not match candidate source');
+          const mergeBase = git('merge-base', head, base);
+          writeFileSync(process.env.EVIDENCE_FILE, JSON.stringify({ head, base, mergeBase, headTree: tree, baseTree: git('rev-parse', `${base}^{tree}`), mergeBaseTree: git('rev-parse', `${mergeBase}^{tree}`), actualHead, tree, node: process.version }, null, 2) + '\n');
+          JS
+      - run: npm install --global npm@10.9.7
+      - name: Selected effectiveness probes in isolated source
+        run: >-
+          npm run review:mutations --
+          --head "$HQ_REVIEW_HEAD"
+          --base "$HQ_REVIEW_BASE"
+          --manifest test/review/hq-mutations.json
+          --output "$RUNNER_TEMP/hq-effectiveness"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: hq-effectiveness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/hq-effectiveness
+            ${{ runner.temp }}/hq-effectiveness-checkout.json
+          retention-days: 30
+          if-no-files-found: warn
