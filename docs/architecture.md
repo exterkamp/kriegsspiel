@@ -216,7 +216,8 @@ type Command =                          // everything a player can send; all are
   | { kind: 'vote'; proposal: ProposalId; yes: boolean }
   | { kind: 'proposePause'; reason?: string }
   | { kind: 'setReady'; ready: boolean }
-  | { kind: 'draftEdit'; draft: DraftId; ops: EditOp[] };
+  | { kind: 'draftEdit'; draft: DraftId; baseRev: number; op: TextOp; opId?: string }
+  // Draft commands (also createDraft, draftComment, resolveComment, readDraft, forkDraft, mergeDraft) are not game input: kept in the draft store, not logged (D6c)
 
 type Order = {
   id: string; side: Side; to: UnitId;

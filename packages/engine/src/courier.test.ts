@@ -72,6 +72,14 @@ function seedsWhere(n: number, make: (seed: number) => EngineState<GameState>, h
   );
 }
 
+/** The first seed in 1..n in which `pick` finds the outcome; stops there instead of sweeping all n. */
+function firstSeedWhere(n: number, make: (seed: number) => EngineState<GameState>, has: string) {
+  for (let seed = 1; seed <= n; seed++) {
+    if (types(run(make(seed)).emitted).includes(has)) return seed;
+  }
+  return undefined;
+}
+
 describe('courier interception', () => {
   const taken = seedsWhere(60, (s) => game(s), 'courier_intercepted');
 
@@ -171,9 +179,9 @@ describe('courier loss and garbling', () => {
       ],
     };
     const mixed = (seed: number) => game(seed, { lurk: false, sightFactor: 0.25, order });
-    const seeds = seedsWhere(500, mixed, 'order_garbled');
-    expect(seeds.length).toBeGreaterThan(0);
-    const r = run(mixed(seeds[0]!));
+    const seed = firstSeedWhere(500, mixed, 'order_garbled');
+    expect(seed).toBeDefined();
+    const r = run(mixed(seed!));
     const u = unit(r.state, 'blue-1');
     // The unit marched to the garbled destination, not DEST.
     expect(u.center).not.toEqual(DEST);

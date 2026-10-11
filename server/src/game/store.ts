@@ -7,7 +7,7 @@
  */
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Mark } from '@kriegsspiel/protocol';
+import type { DraftSnapshot, Mark } from '@kriegsspiel/protocol';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
 import type { PauseTransition } from '../pause.js';
@@ -116,6 +116,9 @@ export interface GameStore {
   /** A side's marks (player drawings). Not game input: they are not logged or replayed. */
   saveMarks(gameId: string, side: string, marks: readonly Mark[]): Promise<void>;
   loadMarks(gameId: string, side: string): Promise<Mark[]>;
+  /** A side's shared order drafts, with their full history. Not game input: not logged or replayed. */
+  saveDrafts(gameId: string, side: string, drafts: readonly DraftSnapshot[]): Promise<void>;
+  loadDrafts(gameId: string, side: string): Promise<DraftSnapshot[]>;
   /** Game time a side last saw the game at, set when its last connection closes. Never goes backwards. */
   saveSeen(gameId: string, side: string, gameMs: number): Promise<void>;
   loadSeen(gameId: string, side: string): Promise<number | undefined>;
@@ -130,6 +133,7 @@ export class MemoryGameStore implements GameStore {
   private readonly clockLogs = new Map<string, ClockChange[]>();
   private readonly views = new Map<string, SideViews>();
   private readonly marks = new Map<string, Mark[]>();
+  private readonly drafts = new Map<string, DraftSnapshot[]>();
 
   private readonly seen = new Map<string, number>();
 
@@ -144,6 +148,14 @@ export class MemoryGameStore implements GameStore {
 
   async saveMarks(gameId: string, side: string, marks: readonly Mark[]): Promise<void> {
     this.marks.set(`${gameId}\0${side}`, structuredClone([...marks]));
+  }
+
+  async saveDrafts(gameId: string, side: string, drafts: readonly DraftSnapshot[]): Promise<void> {
+    this.drafts.set(`${gameId}\0${side}`, structuredClone([...drafts]));
+  }
+
+  async loadDrafts(gameId: string, side: string): Promise<DraftSnapshot[]> {
+    return structuredClone(this.drafts.get(`${gameId}\0${side}`) ?? []);
   }
 
   async loadMarks(gameId: string, side: string): Promise<Mark[]> {
