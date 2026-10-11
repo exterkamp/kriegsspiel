@@ -1,6 +1,6 @@
 # Angular migration plan (issue #269)
 
-Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) and step 1 (services and stores, #272) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
+Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271), step 1 (services and stores, #272) and step 5 (admin, map authoring and benchmarks, #277) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
 
 ## What the spike proves
 
@@ -29,6 +29,19 @@ Not in the spike: sign-in, menus, orders, marks, any other view, the admin, map-
 - **Plan change:** the `gameState` store is not duplicated in `DeskStore`; it is `GameService.state`. `gameId` lives on `GameService`, not the desk store. Marks, hot-seat switching and canvas pointer handling stay for step 3 (`MarksService`, `GameComponent`).
 - **Behaviour difference.** A Svelte `subscribe` saw every state; an Angular `effect` runs once per tick, so game states applied within one tick are folded into one. `persistJournal` compares only the previous *seen* state, so a pause then resume (or an order added then refused) inside a single tick leaves no diary entry. Each WebSocket message is its own task, so this should be rare.
 - Tests: `game.service.spec.ts`, `ports.spec.ts`, `desk/desk.store.spec.ts` (no timers; `TestBed.tick()` flushes effects). No Svelte tests were dropped: the Svelte store has no tests of its own.
+
+## Step 5: admin, map authoring and benchmarks (#277)
+
+Lazy routes in `client-ng/src/app/app.routes.ts`, each a standalone `OnPush` component that creates the existing imperative app after the first render and tears it down in `ngOnDestroy`:
+
+- `/admin` (`admin/admin.component.ts`): creates the unchanged `AdminPage` in `#app`, calls `start()`, and `stop()` on destroy. Its page CSS moved out of `admin/index.html` into `admin.component.css`, nested under `ks-admin` so it does not restyle other routes. A rewrite stays later work.
+- `/map-authoring` (`map-authoring/`): the markup of `map-authoring.html` as the template, `mountAuthoringApp` with the same presets and replay-support check as `map-authoring/main.ts`, `dispose()` on destroy. `style.css` is copied and nested under `ks-map-authoring`. The generate and validate workers are referenced from `client/src/map-authoring` (`webWorkerTsConfig`: `tsconfig.worker.json`).
+- `/map-benchmark`: `mountBenchmark`. The template deliberately has no `#benchmark` id, since the legacy module mounts itself on that id when imported.
+- `/table-benchmark`: imports `table/benchmark.ts`, which is a script that starts on import and reads `#table`/`#result`; it runs once per page load, so reopening the route needs a reload. `hq-preview.svg` was copied to `client-ng/public`.
+- `/admin` and `/admin/` both resolve: `TrailingSlashUrlSerializer` drops a trailing slash before parsing (Angular otherwise finds no route for `/admin/`). The old `/map-authoring.html`, `/map-benchmark.html` and `/table-benchmark.html` redirect to the new routes. `proxy.conf.cjs` now proxies `/admin/api`.
+- `@kriegsspiel/maps` resolves to `packages/maps/src` through `tsconfig.json` paths.
+- Tests: `admin/admin.component.spec.ts` (both URLs mount the page, leaving stops it), `app.routes.spec.ts` (redirects, serializer). The Svelte-side admin and map-authoring tests are framework-free and unchanged. Not covered: mounting map authoring and the benchmarks in jsdom (workers and canvas are unavailable), so those were not exercised in a browser here.
+- Not done: `map-table.html` (dev map catalog page, not named by the issue) and the server fallback for the cutover.
 
 ## Decisions
 
