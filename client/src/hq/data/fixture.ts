@@ -80,6 +80,9 @@ export function normalizeFixture(raw: unknown, scope: Scope, now: number, ordina
     ids.add(id);
   };
   const known = <T>(value: T): Knowledge<T> => ({ kind: 'snapshot', value, atGame: view.atGame });
+  // A role that may not know a unit's condition gets none on the wire.
+  const condition = (value: number | undefined): Knowledge<number> =>
+    value === undefined ? { kind: 'unknown', reason: 'Not in this role’s view' } : known(value);
   const validShape = (unit: {
     position: { x: number; y: number };
     facing: number;
@@ -217,9 +220,9 @@ export function normalizeFixture(raw: unknown, scope: Scope, now: number, ordina
       name: u.name,
       commander: { kind: 'unknown', reason: 'Not supplied by this wire version' },
       position: known(u.position),
-      strength: known(u.strength),
-      morale: known(u.morale),
-      supply: known(u.supply),
+      strength: condition(u.strength),
+      morale: condition(u.morale),
+      supply: condition(u.supply),
     })),
     papers: [...papers.values()].sort(
       (a, b) => a.receivedAtGame - b.receivedAtGame || a.id.localeCompare(b.id),

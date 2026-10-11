@@ -65,13 +65,15 @@ const SUPPLY_REPORTS: Array<ViewReport['kind']> = ['lowAmmo', 'exhausted'];
  *   dispatches), and where our units stand, but not their strength, morale, fatigue or ammunition;
  * - quartermaster: our units in full and the supply reports, but nothing about the enemy;
  * - subordinate: only their own units, the enemy those units can see themselves, and the
- *   reports their own units filed. What HQ forwards to them is not built yet.
+ *   reports their own units filed, plus any paper (report or captured dispatch) HQ forwarded to
+ *   them. `forwarded` is the ids HQ passed to this seat; an id not in the side's own view is ignored.
  */
 export function viewForRole(
   world: GameState,
   side: SideId,
   seat: Seat,
   now: GameTime = world.time,
+  forwarded: readonly string[] = [],
 ): EngineRoleView {
   const full = viewFor(world, side, now);
   const { role } = seat;
@@ -106,6 +108,7 @@ export function viewForRole(
           )
           .map((u) => u.id),
       );
+      const passed = new Set(forwarded);
       const names = new Set(state.units.filter((u) => ids.has(u.id)).map((u) => u.name));
       return {
         ...full,
@@ -113,8 +116,8 @@ export function viewForRole(
         ownUnits: full.ownUnits.filter((u) => ids.has(u.id)),
         visibleEnemies: full.visibleEnemies.filter((e: ViewEnemy) => seenIds.has(e.id)),
         lastKnownContacts: [],
-        documents: [],
-        reports: full.reports.filter((r) => names.has(r.from)),
+        documents: full.documents.filter((d) => passed.has(d.id)),
+        reports: full.reports.filter((r) => names.has(r.from) || passed.has(r.id)),
       };
     }
   }
@@ -142,4 +145,9 @@ export function mayDraft(world: GameState, side: SideId, seat: Seat, unitId: str
   if (!unit || unit.side !== side || unit.strength <= 0) return false;
   if (seat.role === 'subordinate') return commanded(world, side, seat).has(unitId);
   return true;
+}
+
+/** Whether `seat` may pass a paper from the HQ picture on to a subordinate: the commander and chief of staff. */
+export function mayForward(seat: Seat): boolean {
+  return seat.role === 'commander' || seat.role === 'chiefOfStaff';
 }

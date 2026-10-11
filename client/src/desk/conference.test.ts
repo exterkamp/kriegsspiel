@@ -34,7 +34,7 @@ describe('fixtureAnswer', () => {
   it('quartermaster reports each unit supply and never invents one', () => {
     const a = fixtureAnswer(req('quartermaster'), fixtureView);
     for (const u of fixtureView.ownUnits)
-      expect(a.text).toContain(`${u.name}: supply ${Math.round(u.supply * 100)}%`);
+      expect(a.text).toContain(`${u.name}: supply ${Math.round((u.supply ?? 0) * 100)}%`);
   });
   it('admits ignorance with no view or no contacts', () => {
     expect(fixtureAnswer(req('intelligence'), undefined).text).toContain('no reports');

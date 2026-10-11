@@ -18,6 +18,7 @@
 import {
   deserialize,
   featureAnchor,
+  maySign,
   serialize,
   viewFor,
   type EmittedEvent,
@@ -957,7 +958,8 @@ export class GameActor {
     this.dependencies.delete(dep.id);
     // The clock re-anchors here: game time carries on from the barrier, it does not jump.
     this.syncBarrier();
-    const { parsed, fallback } = outcome;
+    const { fallback } = outcome;
+    const parsed = this.checkSigner(command, outcome.parsed);
     entry.parse = parsed;
     if (fallback) {
       entry.fallback = fallback;
@@ -986,6 +988,26 @@ export class GameActor {
       throw e;
     }
     dep.settle(result);
+  }
+
+  /**
+   * A signer who may not sign for the addressee gets a refusal in place of the parse, so the log
+   * (and replay) holds the refusal, not an order that was never sent. The parse only names the
+   * addressee here, so this is the first place the check can be made.
+   */
+  private checkSigner(
+    command: Extract<GameCommand, { kind: 'order' }>,
+    parsed: ParseResult,
+  ): ParseResult {
+    if (!command.signer || parsed.kind !== 'intents') return parsed;
+    if (maySign(this.engine.world, command.side as SideId, command.signer, parsed.unitId))
+      return parsed;
+    const unit = this.engine.world.units.find((u) => u.id === parsed.unitId);
+    return {
+      kind: 'rejection',
+      text: parsed.text,
+      reason: `You may not sign orders to ${unit?.name ?? parsed.unitId}.`,
+    };
   }
 
   private applyParsed(

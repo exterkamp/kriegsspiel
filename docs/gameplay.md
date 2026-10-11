@@ -95,7 +95,7 @@ Real play was already a team game. Each side is a group of **roles**:
 | Quartermaster | Supply, fatigue, road capacity | Warns about shortages and march limits |
 | Wing/division commanders | Their sector plus what HQ sends | Issue their own orders to subordinates |
 
-Unfilled roles are played by the LLM (a staff officer with personality traits), so a game with two humans per side still has a full staff.
+In the lobby the commander's table fills as players join the side with a role; a subordinate picks the formations they command. A side nobody joins in a role is shared HQ. Unfilled roles are played by the LLM (a staff officer with personality traits), so a game with two humans per side still has a full staff.
 
 ### Drafting orders together
 

@@ -151,6 +151,8 @@ export const Command = z.discriminatedUnion('kind', [
   z.object({ ...Envelope, kind: z.literal('forkDraft'), draft: Id, newDraft: Id.max(64) }).strict(),
   // Fold a fork's edits back into the draft it came from.
   z.object({ ...Envelope, kind: z.literal('mergeDraft'), draft: Id }).strict(),
+  // HQ (commander, chief of staff) passes a paper in its own view on to the subordinate commanding `unit`.
+  z.object({ ...Envelope, kind: z.literal('forwardDispatch'), dispatchId: Id, unit: Id }).strict(),
 ]);
 export type Command = z.infer<typeof Command>;
 
