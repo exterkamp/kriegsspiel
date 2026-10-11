@@ -4,7 +4,7 @@ Open `/map-authoring.html` in the local client, choose a preset, and generate it
 
 Open `/map-table.html` on the same local client. Select the exported JSON and wait for validation and preparation to finish. The displayed map information identifies the accepted map and its metre extent. The page validates saved composition independently; it does not regenerate the map.
 
-Use **Fit map**, **Top-down** and **Oblique** to inspect the paper. Scroll to zoom, drag to orbit and right-drag to pan. On touch devices, one finger orbits and two fingers pan and zoom. Compare settlements, terrain, roads and crossings with the authoring preview. Loading another valid JSON replaces the paper and fits the new map. A failed or cancelled load retains the previous display when it remains usable; its information continues to identify that previous map.
+Use **Fit map**, **Top-down** and **Oblique** to inspect the paper. Scroll to zoom, drag to orbit and right-drag to pan. For keyboard panning, focus the map and use plain arrow keys. On touch devices, one finger orbits and two fingers pan and zoom. Compare settlements, terrain, roads and crossings with the authoring preview. Loading another valid JSON replaces the paper and fits the new map. A failed or cancelled load retains the previous display when it remains usable; its information continues to identify that previous map.
 
 The table is flat and shows public static geography. It has no armies, orders, marks, objectives or live game connection. Reload starts empty. Keep the exported JSON to load it again.
 

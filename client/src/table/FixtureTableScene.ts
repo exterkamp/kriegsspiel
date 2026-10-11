@@ -142,6 +142,7 @@ export class TableScene {
       this.scene.background = new THREE.Color(0x2a2118);
       controls = new OrbitControls(this.camera, canvas);
       this.controls = controls;
+      if (this.mode === 'public-map-preview') controls.listenToKeyEvents(canvas);
       controls.addEventListener('change', this.clipPaperLabels);
       controls.enablePan = true;
       controls.enableDamping = false;

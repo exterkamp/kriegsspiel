@@ -36,16 +36,17 @@
       <div class="viewport">
         <canvas
           id="map-canvas"
-          aria-label="Flat map table; use mouse to pan, zoom and orbit"
+          tabindex="0"
+          aria-label="Flat map table; focus the map and use plain arrow keys to pan; use mouse to zoom and orbit"
         ></canvas>
         <p id="empty-table">
           Start in map authoring, generate and export JSON, then load the saved file here.
         </p>
       </div>
       <p class="help">
-        Drag to orbit · right-drag to pan · scroll to zoom. Touch: one finger orbits, two fingers
-        pan and zoom. The flat paper uses metres. Whole-map raster detail is limited by the device
-        texture cap.
+        Drag to orbit · right-drag to pan · scroll to zoom. Focus the map, then use plain arrow keys
+        to pan. Touch: one finger orbits, two fingers pan and zoom. The flat paper uses metres.
+        Whole-map raster detail is limited by the device texture cap.
       </p>
     </main>
     <script type="module" src="/src/map-table/main.ts"></script>

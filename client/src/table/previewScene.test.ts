@@ -29,6 +29,7 @@ vi.mock('three', async (importOriginal) => {
   return { ...actual, WebGLRenderer: FakeRenderer, PlaneGeometry };
 });
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TableScene, PreviewApplyError, type PreviewRaster } from './FixtureTableScene.js';
 import { mapToWorld } from './picking.js';
 import { buildSceneState } from './sceneState.js';
@@ -101,6 +102,162 @@ describe('fixed preview authority', () => {
     expect(() => table.fitPreview()).toThrow('Fixture tables');
     const state = buildSceneState(fixtureView, fixtureMap);
     expect(() => table.apply(state, raster().canvas as unknown as HTMLImageElement)).toThrow();
+  });
+});
+
+describe('preview canvas keyboard pan with actual OrbitControls', () => {
+  const connected: HTMLElement[] = [];
+  afterEach(() => {
+    // OrbitControls removes its existing root interceptor while the canvas is connected.
+    tables.splice(0).forEach((table) => table.dispose());
+    connected.splice(0).forEach((element) => element.remove());
+  });
+  function canvas() {
+    const canvas = document.createElement('canvas');
+    canvas.tabIndex = 0;
+    Object.defineProperties(canvas, {
+      clientWidth: { value: 900 },
+      clientHeight: { value: 600 },
+    });
+    document.body.append(canvas);
+    connected.push(canvas);
+    return canvas;
+  }
+  function arrow(target: EventTarget, code = 'ArrowRight') {
+    const event = new KeyboardEvent('keydown', {
+      key: code,
+      code,
+      bubbles: true,
+      cancelable: true,
+    });
+    target.dispatchEvent(event);
+    return event;
+  }
+  function preview() {
+    const surface = canvas();
+    const add = vi.spyOn(surface, 'addEventListener');
+    const remove = vi.spyOn(surface, 'removeEventListener');
+    const listen = vi.spyOn(OrbitControls.prototype, 'listenToKeyEvents');
+    const table = new TableScene(surface, { mode: 'public-map-preview' });
+    tables.push(table);
+    table.applyPreviewRaster(raster());
+    expect(table.controls).toBeInstanceOf(OrbitControls);
+    expect(listen).toHaveBeenCalledExactlyOnceWith(surface);
+    const registrations = add.mock.calls.filter(([type]) => type === 'keydown');
+    expect(registrations).toHaveLength(1);
+    return { table, surface, remove, listener: registrations[0]![1] };
+  }
+  it.each(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])(
+    'plain %s translates camera and target equally, preserving relative vector and orientation',
+    (code) => {
+      const { table, surface } = preview();
+      surface.focus();
+      expect(document.activeElement).toBe(surface);
+      for (const pose of ['top-down', 'oblique']) {
+        if (pose === 'top-down') table.snapTopDown();
+        else table.snapOblique();
+        table.controls.update();
+        const position = table.camera.position.clone();
+        const target = table.controls.target.clone();
+        const relative = position.clone().sub(target);
+        const orientation = table.camera.quaternion.clone();
+        const event = arrow(document.activeElement!, code);
+        const translation = table.camera.position.clone().sub(position);
+        expect(translation.length()).toBeGreaterThan(1);
+        // Allow submicrometre spherical-coordinate roundoff at kilometre-scale poses.
+        expect(translation.distanceTo(table.controls.target.clone().sub(target))).toBeLessThan(
+          1e-6,
+        );
+        expect(
+          table.camera.position.clone().sub(table.controls.target).distanceTo(relative),
+        ).toBeLessThan(1e-6);
+        expect(table.camera.quaternion.angleTo(orientation)).toBeLessThan(1e-7);
+        expect(event.defaultPrevented).toBe(true);
+      }
+    },
+  );
+  it('does not pan when arrows target another focused button or the document', () => {
+    const { table, surface } = preview();
+    const button = document.createElement('button');
+    document.body.append(button);
+    connected.push(button);
+    surface.focus();
+    arrow(document.activeElement!);
+    const position = table.camera.position.clone();
+    const target = table.controls.target.clone();
+    button.focus();
+    expect(document.activeElement).toBe(button);
+    for (const destination of [button, document]) {
+      expect(arrow(destination).defaultPrevented).toBe(false);
+      expect(table.camera.position).toEqual(position);
+      expect(table.controls.target).toEqual(target);
+    }
+  });
+  it('leaves fixture arrow behavior unchanged without registering canvas key panning', () => {
+    const surface = canvas();
+    const add = vi.spyOn(surface, 'addEventListener');
+    const listen = vi.spyOn(OrbitControls.prototype, 'listenToKeyEvents');
+    const table = new TableScene(surface);
+    tables.push(table);
+    table.camera.position.set(0, 10000, 10000);
+    table.controls.update();
+    surface.focus();
+    expect(document.activeElement).toBe(surface);
+    const position = table.camera.position.clone();
+    const target = table.controls.target.clone();
+    for (const code of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']) {
+      expect(arrow(document.activeElement!, code).defaultPrevented).toBe(false);
+      expect(table.camera.position).toEqual(position);
+      expect(table.controls.target).toEqual(target);
+    }
+    expect(listen).not.toHaveBeenCalled();
+    expect(add.mock.calls.filter(([type]) => type === 'keydown')).toHaveLength(0);
+  });
+  it('terminal disposal removes the exact registered key listener and prevents further movement', () => {
+    const { table, surface, remove, listener } = preview();
+    surface.focus();
+    arrow(document.activeElement!);
+    const position = table.camera.position.clone();
+    const target = table.controls.target.clone();
+    table.dispose();
+    table.dispose();
+    expect(remove.mock.calls.filter(([type]) => type === 'keydown')).toEqual([
+      ['keydown', listener],
+    ]);
+    expect(arrow(document.activeElement!).defaultPrevented).toBe(false);
+    expect(table.camera.position).toEqual(position);
+    expect(table.controls.target).toEqual(target);
+  });
+  it('constructor failure after key registration removes that exact listener and prevents further movement', () => {
+    const surface = canvas();
+    const add = vi.spyOn(surface, 'addEventListener');
+    const remove = vi.spyOn(surface, 'removeEventListener');
+    const disposed = vi.spyOn(OrbitControls.prototype, 'dispose');
+    vi.spyOn(TableScene.prototype, 'resize').mockImplementationOnce(() => {
+      throw new Error('initial resize failed');
+    });
+    expect(() => new TableScene(surface, { mode: 'public-map-preview' })).toThrow(
+      'initial resize failed',
+    );
+    const registrations = add.mock.calls.filter(([type]) => type === 'keydown');
+    expect(registrations).toHaveLength(1);
+    expect(remove.mock.calls.filter(([type]) => type === 'keydown')).toEqual([
+      ['keydown', registrations[0]![1]],
+    ]);
+    expect(disposed).toHaveBeenCalledOnce();
+    const controls = disposed.mock.contexts[0]! as OrbitControls;
+    expect(controls).toBeInstanceOf(OrbitControls);
+    // A nonzero pose would move if the disposed controls still had a live key listener.
+    controls.object.position.set(0, 10000, 10000);
+    controls.target.set(0, 0, 0);
+    controls.update();
+    const position = controls.object.position.clone();
+    const target = controls.target.clone();
+    surface.focus();
+    expect(document.activeElement).toBe(surface);
+    expect(arrow(document.activeElement!).defaultPrevented).toBe(false);
+    expect(controls.object.position).toEqual(position);
+    expect(controls.target).toEqual(target);
   });
 });
 
