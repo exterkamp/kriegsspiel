@@ -4,3 +4,4 @@ export * from './view.js';
 export * from './messages.js';
 export * from './marks.js';
 export * from './drafts.js';
+export * from './window.js';

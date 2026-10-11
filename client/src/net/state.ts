@@ -194,6 +194,14 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
     }
     case 'gameOver':
       return { ...s, gameOver: { winner: m.winner, reason: m.reason, atGame: m.atGame } };
+    case 'notification': {
+      // What would reach an away player by push or email, shown to one who has the game open.
+      const notices = [
+        ...s.notices,
+        { code: `notify_${m.event}`, message: `${m.title}. ${m.text}` },
+      ].slice(-MAX_NOTICES);
+      return { ...s, notices };
+    }
     case 'error': {
       const id = orderIdOf(m.message);
       const dropped = id === undefined ? s.pending : s.pending.filter((p) => p.orderId !== id);

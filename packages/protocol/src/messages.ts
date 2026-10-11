@@ -133,6 +133,19 @@ export const Command = z.discriminatedUnion('kind', [
 ]);
 export type Command = z.infer<typeof Command>;
 
+/** What a notification is about. Players pick which of these reach them (see the server's notifier). */
+export const NotifyEvent = z.enum([
+  'dispatch',
+  'contact',
+  'unitLost',
+  'pauseProposed',
+  'decision',
+  'paused',
+  'resumed',
+  'gameOver',
+]);
+export type NotifyEvent = z.infer<typeof NotifyEvent>;
+
 /** Server-to-player. Only fog-filtered data appears here. */
 export const ServerMessage = z.discriminatedUnion('kind', [
   z.object({ ...Envelope, kind: z.literal('viewUpdate'), view: SideView }).strict(),
@@ -219,6 +232,16 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       winner: Side.nullable(),
       reason: z.enum(['objective-taken', 'objective-held', 'eliminated', 'withdrawn']),
       atGame: GameMs,
+    })
+    .strict(),
+  // A heads-up for a player who has the game open: only a fixed title and line, never game content.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('notification'),
+      event: NotifyEvent,
+      title: z.string().min(1),
+      text: z.string().min(1),
     })
     .strict(),
   z
