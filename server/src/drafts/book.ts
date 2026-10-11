@@ -22,6 +22,7 @@ import {
 } from '@kriegsspiel/protocol';
 import {
   apply,
+  baseLength,
   fits,
   normalize,
   targetLength,
@@ -159,13 +160,26 @@ export class DraftBook {
     d.authors = reattribute(d.authors, op, author);
   }
 
-  /** Apply an edit made on `baseRev`. Returns the entry as applied (its op moved past later edits). */
+  /**
+   * The edit `by` already sent with `opId`, if the draft has it. A client that resends an edit it
+   * never saw acknowledged (after a reconnect) gets this back instead of a second application.
+   */
+  sentOp(id: string, by: string, opId: string | undefined): EditEntry | undefined {
+    if (opId === undefined) return undefined;
+    return this.need(id)
+      .history.filter(isEdit)
+      .find((e) => e.opId === opId && e.author === by && e.viaFork === undefined);
+  }
+
+  /** Apply an edit made on `baseRev`; a repeat of an `opId` `by` already sent returns the first result. Returns the entry as applied (its op moved past later edits). */
   edit(
     id: string,
     by: string,
     now: number,
     input: { baseRev: number; op: TextOp; opId?: string },
   ): EditEntry {
+    const done = this.sentOp(id, by, input.opId);
+    if (done) return done;
     const d = this.open(id);
     const later = this.since(d, input.baseRev);
     let moved: TextOp;
@@ -232,8 +246,14 @@ export class DraftBook {
       throw new DraftError('bad_comment', `no comment ${input.replyTo} to reply to`);
     if (input.from > input.to)
       throw new DraftError('bad_comment', 'a comment range runs from low to high');
+    // The anchor must fit the text the commenter saw, not the text as it is now.
+    const later = this.since(d, input.baseRev);
+    let lengthThen = d.text.length;
+    for (const e of later) lengthThen -= targetLength(e.op) - baseLength(e.op);
+    if (input.to > lengthThen)
+      throw new DraftError('bad_comment', 'the comment range is past the end of the text');
     let range = { from: input.from, to: input.to };
-    for (const e of this.since(d, input.baseRev)) range = transformRange(range, e.op);
+    for (const e of later) range = transformRange(range, e.op);
     if (range.to > d.text.length)
       throw new DraftError('bad_comment', 'the comment range is past the end of the text');
     const comment: DraftComment = {

@@ -9,7 +9,7 @@ import {
   type GameState,
 } from '@kriegsspiel/engine';
 import { GameClock, type WallClock } from '../clock.js';
-import { scriptedAgents } from '../opponent/index.js';
+import { scriptedAgents, type SideAgent } from '../opponent/index.js';
 import type { PauseConfig } from '../pause.js';
 import type { OrderParser } from '../orders/index.js';
 import { GameActor, type GameActorOptions, type StaffAtWork, type Timers } from './actor.js';
@@ -42,6 +42,8 @@ export interface GameHostOptions {
   parseRetryDelayMs?: number;
   /** Play every side the scenario marks `scripted` with the built-in opponent: always, never, or per game. Default off. */
   scriptedOpponents?: boolean | ((gameId: string) => boolean);
+  /** Swap the agents a game gets for another set, such as LLM commanders wrapping the scripted ones. Called only for games that have scripted agents. */
+  aiAgents?: (gameId: string, world: GameState, scripted: SideAgent[]) => SideAgent[];
   /** Pause voting for a game: who votes and the host's rules. Unset: players cannot vote to pause. */
   pause?: (id: string, world: GameState) => PauseConfig | undefined;
 }
@@ -89,7 +91,11 @@ export class GameHost {
 
   private agentsFor(id: string, world: GameState) {
     const on = this.options.scriptedOpponents;
-    return (typeof on === 'function' ? on(id) : on) ? scriptedAgents(world) : [];
+    if (!(typeof on === 'function' ? on(id) : on)) return [];
+    const scripted = scriptedAgents(world);
+    return scripted.length > 0 && this.options.aiAgents
+      ? this.options.aiAgents(id, world, scripted)
+      : scripted;
   }
 
   /** Start a new game from a loaded scenario. The clock starts running at game time 0. */

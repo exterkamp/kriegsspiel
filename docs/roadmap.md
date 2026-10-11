@@ -115,7 +115,7 @@ Historical annotation remains #85/#88. Detailed erosion, elaborate cities, a ful
 - [ ] Roles per side, with LLM filling empty staff roles
 - [ ] Shared order drafts: comments, tracked edits, sign and stamp, LLM staff check
 - [ ] Shared HQ and chain-of-command modes
-- [ ] AI opposing commander (fog-respecting)
+- [x] AI opposing commander (fog-respecting)
 - [ ] Full procedural scenario assembly (objectives, orders of battle, balance); consume generated maps from M3c
 
 ## Later

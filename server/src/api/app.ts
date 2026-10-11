@@ -33,6 +33,7 @@ import { z } from 'zod';
 import type { WallClock } from '../clock.js';
 import {
   GameHost,
+  type GameHostOptions,
   MemoryGameStore,
   createRegistry,
   loadScenarioById,
@@ -120,6 +121,8 @@ export interface AppOptions {
   logger?: boolean;
   /** Play sides the scenario marks `scripted` with the built-in opponent. Off unless set; `main.ts` sets it from the environment. */
   scriptedOpponents?: boolean;
+  /** Replaces the built-in opponent's agents for a game, for example with LLM commanders. See `GameHostOptions.aiAgents`. */
+  aiAgents?: GameHostOptions['aiAgents'];
   /** Directory of the built client to serve at `/`. Unset: API only (dev uses the Vite server). */
   staticDir?: string;
   /**
@@ -227,6 +230,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     // Only a co-op game has the built-in opponent; the other shapes leave every side to people.
     scriptedOpponents: (id) =>
       options.scriptedOpponents === true && recordOf(id)?.sessionType === 'co_op_vs_ai',
+    aiAgents: options.aiAgents,
     trace,
     onUpdate: (id) => {
       hub.notify(id);
