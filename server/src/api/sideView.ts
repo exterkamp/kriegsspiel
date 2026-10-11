@@ -136,7 +136,11 @@ export function sideViewOf(
 ): SideView {
   // `world.time` only moves when an event fires; the engine's own time is the real "now".
   if (seat) {
-    return toSideView(viewForRole(state.world, side, seat, state.time, forwarded), clock, narration);
+    return toSideView(
+      viewForRole(state.world, side, seat, state.time, forwarded),
+      clock,
+      narration,
+    );
   }
   return toSideView(viewFor(state.world, side, state.time), clock, narration);
 }
