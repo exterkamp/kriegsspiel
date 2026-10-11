@@ -31,6 +31,8 @@ export interface AuthStore {
   claimSeat(gameId: string, side: SideId, userId: string): boolean;
   seatOf(gameId: string, userId: string): SideId | undefined;
   seatsOf(gameId: string): Array<{ side: SideId; userId: string }>;
+  /** Ids of the games this user holds a seat in. */
+  gamesOf(userId: string): string[];
   /** Drops expired tokens and sessions. */
   prune(nowMs: number): void;
   close(): void;
@@ -118,6 +120,12 @@ export class MemoryAuthStore implements AuthStore {
 
   seatsOf(gameId: string): Array<{ side: SideId; userId: string }> {
     return [...(this.seats.get(gameId) ?? [])].map(([side, userId]) => ({ side, userId }));
+  }
+
+  gamesOf(userId: string): string[] {
+    return [...this.seats]
+      .filter(([, bySide]) => [...bySide.values()].includes(userId))
+      .map(([gameId]) => gameId);
   }
 
   prune(nowMs: number): void {
@@ -263,6 +271,12 @@ export class SqliteAuthStore implements AuthStore {
     return (
       this.db.prepare('SELECT side, user_id FROM auth_seats WHERE game_id = ?').all(gameId) as Row[]
     ).map((r) => ({ side: String(r.side) as SideId, userId: String(r.user_id) }));
+  }
+
+  gamesOf(userId: string): string[] {
+    return (
+      this.db.prepare('SELECT game_id FROM auth_seats WHERE user_id = ?').all(userId) as Row[]
+    ).map((r) => String(r.game_id));
   }
 
   prune(nowMs: number): void {

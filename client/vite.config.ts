@@ -26,12 +26,13 @@ export default defineConfig({
       },
     },
   },
-  // `/games` (REST and WebSocket) and `/auth` go to the game server, so the page needs no CORS or host
+  // `/games` (REST and WebSocket), `/scenarios` and `/auth` go to the game server, so the page needs no CORS or host
   // config and the session cookie stays on the page's origin.
   server: {
     allowedHosts: true,
     proxy: {
       '/games': { target: process.env.API_URL ?? 'http://localhost:3000', ws: true },
+      '/scenarios': { target: process.env.API_URL ?? 'http://localhost:3000' },
       '/admin/api': { target: process.env.API_URL ?? 'http://localhost:3000' },
       '/auth': { target: process.env.API_URL ?? 'http://localhost:3000' },
     },

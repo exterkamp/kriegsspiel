@@ -14,6 +14,7 @@
 import { buildApp } from './api/app.js';
 import { adminFromEnv } from './admin/adminApi.js';
 import { SqliteAuthStore } from './auth/store.js';
+import { SqliteLobbyStore } from './lobby/store.js';
 import { authFromEnv, scriptedOpponentsFromEnv, trustProxyFromEnv } from './config.js';
 import { SqliteGameStore } from './game/index.js';
 import { StubOrderParser } from './orders/stubParser.js';
@@ -24,9 +25,12 @@ const store = process.env.DB_PATH ? new SqliteGameStore(process.env.DB_PATH) : u
 
 const authStore = process.env.DB_PATH ? new SqliteAuthStore(process.env.DB_PATH) : undefined;
 
+const lobby = process.env.DB_PATH ? new SqliteLobbyStore(process.env.DB_PATH) : undefined;
+
 const { server } = await buildApp({
   parser: new StubOrderParser(),
   store,
+  lobby,
   staticDir: process.env.STATIC_DIR,
   logger: true,
   scriptedOpponents: scriptedOpponentsFromEnv(process.env),
@@ -42,6 +46,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
       void server.close().then(() => {
         store?.close();
         authStore?.close();
+        lobby?.close();
         process.exit(0);
       }),
   );
