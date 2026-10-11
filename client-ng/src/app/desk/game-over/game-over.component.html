@@ -1,0 +1,29 @@
+<div
+  class="over"
+  [class.victory]="result() === 'victory'"
+  aria-labelledby="over-h"
+  aria-modal="true"
+  role="dialog"
+>
+  <h2 id="over-h">{{ headline() }}</h2>
+  <p class="reason">{{ reason() }}</p>
+  <ul>
+    @for (line of lines(); track line) {
+      <li>{{ line }}</li>
+    }
+  </ul>
+  <div class="row">
+    <button #first type="button" (click)="desk.windowOpen.set(true)">
+      View the umpire's window
+    </button>
+    <button type="button" (click)="desk.activeView.set('journal')">Read the journal</button>
+  </div>
+  <div class="row">
+    <button type="button" [disabled]="busy()" (click)="playAgain()">Play again</button>
+    <button type="button" (click)="newGame.emit()">New game</button>
+    <button type="button" (click)="menu.emit()">Main menu</button>
+  </div>
+  @if (error()) {
+    <p role="alert" class="err">{{ error() }}</p>
+  }
+</div>

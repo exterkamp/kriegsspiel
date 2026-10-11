@@ -5,11 +5,14 @@ import {
   gameNowMs,
   initialState,
   withLink,
+  withMarkDeleted,
+  withMarkPut,
   withPendingOrder,
   withRead,
   type ClientState,
   type PendingOrder,
 } from '@legacy/net/state';
+import type { Mark } from '@kriegsspiel/protocol';
 import { fixtureView } from '@legacy/table/fixture';
 import { parseSession, wsUrl } from '@legacy/session';
 
@@ -96,6 +99,17 @@ export class GameService {
     const sentAtGame = s.clock ? gameNowMs(s.clock, Date.now()) : 0;
     this._state.set(withPendingOrder(s, { orderId, text, sentAtGame, ...extra }));
     return undefined;
+  }
+
+  /** Keep a mark on the table at once and send it to the server. False when the link is down: the mark is not saved. */
+  putMark(mark: Mark): boolean {
+    this._state.update((s) => withMarkPut(s, mark));
+    return this.conn?.putMark(mark) ?? false;
+  }
+
+  deleteMark(id: string): void {
+    this._state.update((s) => withMarkDeleted(s, id));
+    this.conn?.deleteMark(id);
   }
 
   askStaff(...args: Parameters<GameConnection['askStaff']>): boolean {
