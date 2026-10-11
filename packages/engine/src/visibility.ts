@@ -221,6 +221,8 @@ export interface EngineSideView {
   /** Map size in metres. */
   mapWidth: number;
   mapHeight: number;
+  /** This side's own headquarters, where its couriers set out. */
+  hq?: Point;
   ownUnits: ViewUnit[];
   visibleEnemies: ViewEnemy[];
   lastKnownContacts: ViewContact[];
@@ -269,11 +271,13 @@ export function viewFor(
   const intel = state.intel[side];
   const seen = visibleTo(state, side);
   const seenIds = new Set(seen.map((u) => u.id));
+  const hq = state.sides.find((s) => s.id === side)?.hq;
   return {
     side,
     time: state.time,
     mapWidth: metres(state.map.width),
     mapHeight: metres(state.map.height),
+    ...(hq ? { hq: viewPoint(hq) } : {}),
     ownUnits: state.units
       .filter((u) => u.side === side)
       .map((u) => ({

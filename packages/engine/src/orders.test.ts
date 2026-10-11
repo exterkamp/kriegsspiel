@@ -311,3 +311,26 @@ describe('failed orders', () => {
     expect(unit(end, 'blue-1').center).toEqual(P(1850, 2050));
   });
 });
+
+describe('courier choice', () => {
+  const arrival = (courier?: 'fast' | 'safe') => {
+    const o = order('blue-1', { kind: 'move', to: P(2050, 2050) });
+    const s = advanceTo(issueOrder(game(), courier ? { ...o, courier } : o), 0, registry());
+    return s.state.world.couriers[0]!.legs.at(-1)!.arriveAt;
+  };
+
+  it('a fast courier arrives sooner than the ordinary ride, a safe one later', () => {
+    const [fast, plain, safe] = [arrival('fast'), arrival(), arrival('safe')];
+    expect(plain).toBe(DELIVERY_MS);
+    expect(fast).toBe(Math.round(DELIVERY_MS / 1.5));
+    expect(safe).toBe(Math.round(DELIVERY_MS / 0.75));
+    expect(fast).toBeLessThan(plain);
+    expect(plain).toBeLessThan(safe);
+  });
+
+  it('shows a side its own HQ and not the enemy’s', () => {
+    const s = game();
+    const hq = (side: 'blue' | 'red') => s.world.sides.find((x) => x.id === side)!.hq;
+    expect(viewFor(s.world, 'blue').hq).toEqual({ x: hq('blue').x / 1000, y: hq('blue').y / 1000 });
+  });
+});

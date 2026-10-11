@@ -104,6 +104,7 @@ export {
 } from './contact.js';
 export type { Aspect } from './contact.js';
 export {
+  COURIER_CHOICES,
   COURIER_LOST_EVENT,
   COURIER_MS_PER_METRE,
   COURIER_STEP_EVENT,
@@ -119,7 +120,7 @@ export {
   interceptChance,
   rideRisk,
 } from './courier.js';
-export type { Order, OrderIntent } from './orders.js';
+export type { CourierChoice, Order, OrderIntent } from './orders.js';
 export {
   STANDING_EVENT,
   applyIntents,

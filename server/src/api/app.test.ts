@@ -408,6 +408,9 @@ describe('views', () => {
     expect(bv.ownUnits.length).toBeGreaterThan(0);
     expect(bv.ownUnits.every((u) => u.id.startsWith('blue-'))).toBe(true);
     expect(rv.ownUnits.every((u) => u.id.startsWith('red-'))).toBe(true);
+    // Each side is told where its own HQ is, and only that.
+    expect(bv.hq).toEqual({ x: 2050, y: 2950 });
+    expect(rv.hq).toEqual({ x: 2050, y: 50 });
 
     // Armies start out of sight of each other: nothing hidden rides along.
     expect(bv.visibleEnemies).toEqual([]);
