@@ -101,6 +101,7 @@ running ──request──► pause_proposed ──all humans yes──► paus
 - **Emergency hold** (suggested): any single player can call a short hold of a few wall-clock minutes, a limited number of times per game, which ends on its own unless ratified by a vote. This avoids a stuck game when a real emergency comes up and others are away.
 - **Server downtime**: if the server was down, the game resumes **paused** and asks the players to confirm. We never silently skip game time. The downtime is recorded in the journal as a `restart` entry and players get a notice when they connect.
 - A **ratio change** is voted on the same way (`proposeRate`, `rateVote`): the same voters and rules, one open proposal, and on a pass the clock re-anchors at the current game time before the new rate applies.
+- **On the wire**: `proposePause`, `proposeResume` and `vote` commands; `pauseState` and `pauseResult` server messages (see D14). A voter who is offline does not block forever: the proposal times out and cancels.
 - All pauses and votes are recorded in the journal, and the post-game critique can mention them.
 
 ## Components

@@ -172,6 +172,8 @@ export class GameActor {
   private readonly pauseVoting: PauseVoting | undefined;
   /** The ratio vote; present when the game has voters. */
   private readonly ratioVoting: RatioVoting | undefined;
+  private readonly pauseLog: { n: number; step: PauseTransition }[] = [];
+  private pauseStepCount = 0;
   private pauseTimer: unknown;
   private pauseTimerSet = false;
   private readonly restartInfo: { downMs: number } | undefined;
@@ -234,8 +236,25 @@ export class GameActor {
   }
 
   /** The pause vote: its phase and the open proposal, for the views. Undefined without voters. */
-  get pauseState(): { phase: PauseVoting['phase']; proposal: PauseVoting['open'] } | undefined {
-    return this.pauseVoting && { phase: this.pauseVoting.phase, proposal: this.pauseVoting.open };
+  get pauseState():
+    | { phase: PauseVoting['phase']; proposal: PauseVoting['open']; voters: number; nowMs: number }
+    | undefined {
+    return (
+      this.pauseVoting && {
+        phase: this.pauseVoting.phase,
+        proposal: this.pauseVoting.open,
+        voters: this.pauseVoting.voterCount,
+        nowMs: this.wallNow(),
+      }
+    );
+  }
+
+  /**
+   * The newest pause transitions since this actor started, numbered from 1 and capped, so a
+   * connection can tell the players what was settled since it last looked.
+   */
+  get pauseSteps(): readonly { n: number; step: PauseTransition }[] {
+    return this.pauseLog;
   }
 
   /** Set when this game was reopened after downtime: the players are told it came back paused. */
@@ -582,6 +601,8 @@ export class GameActor {
     for (const t of steps) {
       if (!t) continue;
       (entry.pause ??= []).push(t);
+      this.pauseLog.push({ n: ++this.pauseStepCount, step: t });
+      if (this.pauseLog.length > 20) this.pauseLog.shift();
       if (t.to === 'paused' && t.from !== 'resume_proposed') this.clock.pause();
       else if (t.to === 'running' && t.from !== 'pause_proposed') this.clock.resume();
     }

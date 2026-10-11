@@ -25,7 +25,14 @@ import { showGameList, showRoom } from './lobby/lobby.js';
 import { fetchMe, showAccountBar, showLogin } from './auth.js';
 import { mount } from 'svelte';
 import Desk from './desk/Desk.svelte';
-import { activeView, gameState, persistTray, showOnTable, viewedDispatch } from './desk/store.js';
+import {
+  activeView,
+  gameState,
+  pauseActions,
+  persistTray,
+  showOnTable,
+  viewedDispatch,
+} from './desk/store.js';
 import { isDeskView } from './desk/views.js';
 
 /** Make a game as the signed-in user and take `side` (the server picks one when unset). */
@@ -320,6 +327,11 @@ async function main(app: HTMLElement): Promise<void> {
         state = applyServerMessage(state, m, Date.now());
         rerender();
       },
+    });
+    pauseActions.set({
+      proposePause: (r) => conn!.proposePause(r),
+      proposeResume: () => conn!.proposeResume(),
+      vote: (id, yes) => conn!.vote(id, yes),
     });
     conn.start();
   } else {

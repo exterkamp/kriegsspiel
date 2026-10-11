@@ -3,6 +3,8 @@ import type {
   ClockState,
   Dispatch,
   Mark,
+  PausePhase,
+  PauseProposal,
   ServerMessage,
   Side,
   SideView,
@@ -37,6 +39,12 @@ export interface ClockAnchor {
   status: ClockState['status'];
 }
 
+/** The pause vote as last reported, with its countdown pinned to this client's wall clock. */
+export interface PauseVote {
+  phase: PausePhase;
+  proposal?: PauseProposal & { closesAtWall: number };
+}
+
 export interface ClientState {
   link: LinkStatus;
   view?: SideView;
@@ -46,6 +54,8 @@ export interface ClientState {
   read: ReadonlySet<string>;
   clock?: ClockAnchor;
   staffAtWork: boolean;
+  /** Absent until the server reports it; a game without voters never does. */
+  pause?: PauseVote;
   pending: PendingOrder[];
   /** Set once the server says the game has ended. */
   gameOver?: GameOver;
@@ -77,6 +87,28 @@ function withDispatches(have: Dispatch[], incoming: readonly Dispatch[]): Dispat
   return fresh.length === 0 ? have : [...fresh, ...have];
 }
 
+const sideName = (side: string | undefined): string =>
+  side === undefined ? 'a player' : `${side[0]!.toUpperCase()}${side.slice(1)}`;
+
+/** The line for the notices when a pause or resume vote is settled. */
+export function pauseResultText(m: Extract<ServerMessage, { kind: 'pauseResult' }>): string {
+  const what = m.proposalKind === 'resume' ? 'resume' : 'pause';
+  switch (m.outcome) {
+    case 'paused':
+      return m.cause === 'forced'
+        ? 'The game was paused by the host.'
+        : 'The game is paused. Game time has stopped.';
+    case 'resumed':
+      if (m.cause === 'max-pause') return 'The pause reached its time limit. The game resumes.';
+      return m.cause === 'forced'
+        ? 'The game was resumed by the host.'
+        : 'The game resumes. Game time is running.';
+    case 'cancelled':
+      if (m.cause === 'timeout') return `The vote to ${what} ran out of time and was cancelled.`;
+      return `The vote to ${what} was cancelled: ${sideName(m.bySide)} voted no.`;
+  }
+}
+
 /** The order id a rejection or clarification refers to; the server prefixes its message with `<orderId>: `. */
 export function orderIdOf(message: string): string | undefined {
   const i = message.indexOf(': ');
@@ -101,6 +133,21 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
     case 'clockState':
       // Sent when the clock changes, so its anchor is (about) now.
       return { ...s, clock: anchorOf(m.clock.gameMsAtAnchor, m.clock, nowWall) };
+    case 'pauseState':
+      return {
+        ...s,
+        pause: {
+          phase: m.phase,
+          ...(m.proposal
+            ? { proposal: { ...m.proposal, closesAtWall: nowWall + m.proposal.msLeft } }
+            : {}),
+        },
+      };
+    case 'pauseResult': {
+      const message = pauseResultText(m);
+      const notices = [...s.notices, { code: 'pause_result', message }].slice(-MAX_NOTICES);
+      return { ...s, notices };
+    }
     case 'marks':
       return { ...s, marks: m.marks };
     case 'staffAtWork':
