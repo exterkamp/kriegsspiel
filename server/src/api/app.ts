@@ -140,7 +140,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   // Liveness for the container health check. Does not touch a game or the store.
   server.get('/healthz', async () => ({ ok: true }));
 
-  if (trace) await adminApi(server, { host, trace, token: options.admin?.token });
+  if (trace) await adminApi(server, { host, trace, store, token: options.admin?.token });
 
   if (options.staticDir) {
     await server.register(fastifyStatic, { root: resolve(options.staticDir), redirect: true });
