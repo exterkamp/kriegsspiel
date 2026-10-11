@@ -94,8 +94,8 @@
     stamping = true;
     clearTimeout(stampTimer);
     stampTimer = setTimeout(() => (stamping = false), 1400);
-    // The addressee, courier and annex arrows stay for the next order; only the words are cleared.
-    patch({ text: '' });
+    // The addressee and courier stay for the next order; the words and annex are cleared.
+    patch({ text: '', annex: [] });
   }
 
   function onKey(e: KeyboardEvent): void {
@@ -180,9 +180,7 @@
         <span>
           <b>{c.label}</b>
           <span class="est"
-            >{est === undefined
-              ? 'choose a commander for an estimate'
-              : formatEstimate(est)}</span
+            >{est === undefined ? 'choose a commander for an estimate' : formatEstimate(est)}</span
           >
           <small>{c.blurb}</small>
         </span>

@@ -171,7 +171,10 @@ export function noticeText(
  * Word that an order arrived: the first dispatch from its addressee written after it was sent.
  * The addressee answering is the only proof of delivery the client has.
  */
-export function deliveredBy(p: PendingOrder, dispatches: readonly Dispatch[]): Dispatch | undefined {
+export function deliveredBy(
+  p: PendingOrder,
+  dispatches: readonly Dispatch[],
+): Dispatch | undefined {
   if (!p.toName) return undefined;
   return [...dispatches]
     .sort((a, b) => a.receivedAtGame - b.receivedAtGame)

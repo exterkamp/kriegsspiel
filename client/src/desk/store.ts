@@ -2,7 +2,14 @@ import { derived, get, writable } from 'svelte/store';
 import type { ClockState, Coord, Dispatch, WindowAt } from '@kriegsspiel/protocol';
 import type { BeliefChoice } from '../window/model.js';
 import { gameNowMs, initialState, withRead, type ClientState } from '../net/state.js';
-import { deliveredBy, emptyDraft, loadDraft, saveDraft, type Courier, type OrderDraft } from './orders.js';
+import {
+  deliveredBy,
+  emptyDraft,
+  loadDraft,
+  saveDraft,
+  type Courier,
+  type OrderDraft,
+} from './orders.js';
 import {
   addEntries,
   clockEntry,
