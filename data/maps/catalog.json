@@ -1,0 +1,5 @@
+[
+  { "id": "countryside-rectangle", "name": "Countryside — 5 × 3 km", "filename": "countryside-rectangle.json" },
+  { "id": "wooded-hills", "name": "Wooded hills — 5 × 5 km", "filename": "wooded-hills.json" },
+  { "id": "river-valley", "name": "River valley — 5 × 5 km", "filename": "river-valley.json" }
+]

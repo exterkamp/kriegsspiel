@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import type { Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { mapCatalogPlugin } from './dev/mapCatalog.js';
 
 /** `/admin` (no slash) is the admin page; Vite would otherwise fall back to the game page. */
 const adminRedirect: Plugin = {
@@ -18,7 +19,7 @@ const adminRedirect: Plugin = {
 };
 
 export default defineConfig({
-  plugins: [svelte(), adminRedirect],
+  plugins: [svelte(), adminRedirect, mapCatalogPlugin()],
   build: {
     rollupOptions: {
       input: {
