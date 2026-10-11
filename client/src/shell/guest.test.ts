@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushSync, tick } from 'svelte';
 import { startShell, type Shell, type ShellDeps } from './boot.js';
+import type { ScenarioOptions } from './newGame.js';
 
 let app: HTMLElement;
 let shell: Shell | undefined;
@@ -31,6 +32,8 @@ async function open(url: string, over: Partial<ShellDeps> = {}): Promise<void> {
     fetchMe: async () => undefined,
     fetchGames: async () => [],
     fetchScenarios: async () => [],
+    fetchScenarioOptions: async () => ({}) as ScenarioOptions,
+    createGame: async () => 'new1',
     requestLink: async () => undefined,
     signOut: async () => undefined,
     startLive: async () => undefined,

@@ -5,6 +5,7 @@ import { BrowserRepository } from './hq/data/repository.js';
 import { ContinuousSurface } from './hq/data/continuousSurface.js';
 import { fetchMe, guestEnabled, requestLink, signOut, startGuest } from './auth.js';
 import { fetchGames, fetchScenarios } from './lobby/api.js';
+import { createGame, fetchScenarioOptions } from './shell/newGameApi.js';
 import { startShell } from './shell/boot.js';
 
 function startFixture(target: HTMLElement): void {
@@ -30,6 +31,8 @@ if (app) {
     fetchMe,
     fetchGames,
     fetchScenarios,
+    fetchScenarioOptions,
+    createGame,
     requestLink,
     signOut,
     guestEnabled,

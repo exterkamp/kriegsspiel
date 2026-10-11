@@ -5,6 +5,7 @@ import {
   type Difficulty,
   type Personality,
 } from './opponent/llmCommander.js';
+import type { UmpireConfig } from './umpire/index.js';
 import { COMMANDER_BUDGET_SHARE, type GameLimits } from './umpire/gameLimits.js';
 import { LogMailer, WebhookMailer, type Mailer } from './auth/mailer.js';
 
@@ -90,4 +91,21 @@ export function guestPlayFromEnv(env: Record<string, string | undefined>): boole
 export function guestIdleMsFromEnv(env: Record<string, string | undefined>): number {
   const h = Number(env.GUEST_IDLE_HOURS);
   return (Number.isFinite(h) && h > 0 ? h : 168) * 3_600_000;
+}
+
+/**
+ * Whether orders are parsed by the LLM: the `parse` stage's provider is usable (Anthropic needs its
+ * API key; any other configured provider counts) and `ORDER_PARSER` is not `stub`. Otherwise the
+ * rule-based stub parses orders, as in tests and with no key. A non-Anthropic provider is not
+ * checked for credentials here: if it is misconfigured, each order fails over to the fallback and
+ * logs an `order parser fallback` warning. That trade-off keeps the game playable and the problem visible.
+ */
+export function llmOrderParserEnabled(
+  env: Record<string, string | undefined>,
+  config: UmpireConfig,
+): boolean {
+  if (env.ORDER_PARSER?.trim().toLowerCase() === 'stub') return false;
+  const spec = config.providers[config.stages.parse.provider];
+  if (!spec) return false;
+  return spec.type === 'anthropic' ? Boolean(env[spec.apiKeyEnv ?? 'ANTHROPIC_API_KEY']) : true;
 }

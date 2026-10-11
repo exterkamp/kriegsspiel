@@ -89,6 +89,11 @@ export type ParserFallback = { orderText: string; reason: string };
 export interface LlmOrderParserOptions {
   /** Called whenever the parser falls back to "hold and await clarification". */
   onFallback?: (fallback: ParserFallback) => void;
+  /**
+   * Tried when the model cannot be used (a failed call, a spent budget, output the checks refuse).
+   * Its answer is used only if it understood the order; otherwise the player is asked to restate.
+   */
+  fallbackParser?: OrderParser;
 }
 
 export type ParserUsage = { inputTokens: number; outputTokens: number; usd: number };
@@ -126,10 +131,10 @@ export class LlmOrderParser implements OrderParser {
       output = res.output;
     } catch (err) {
       if (err instanceof UmpireError) this.add(err.usage, err.costUsd);
-      return this.fallback(orderText, err instanceof Error ? err.message : String(err));
+      return this.fallback(orderText, ctx, err instanceof Error ? err.message : String(err));
     }
     const result = this.check(orderText, output, ctx);
-    return typeof result === 'string' ? this.fallback(orderText, result) : result;
+    return typeof result === 'string' ? this.fallback(orderText, ctx, result) : result;
   }
 
   private add(usage: TokenUsage | undefined, usd: number | null | undefined): void {
@@ -141,11 +146,23 @@ export class LlmOrderParser implements OrderParser {
     };
   }
 
-  private fallback(orderText: string, reason: string): ParseResult {
+  private async fallback(
+    orderText: string,
+    ctx: ParseContext,
+    reason: string,
+  ): Promise<ParseResult> {
     try {
       this.opts.onFallback?.({ orderText, reason });
     } catch {
       // a failing logger must not turn the safe fallback into an error
+    }
+    if (this.opts.fallbackParser) {
+      try {
+        const stub = await this.opts.fallbackParser.parse(orderText, ctx);
+        if (stub.kind === 'intents') return stub;
+      } catch {
+        // fall through to asking the player to restate
+      }
     }
     return { kind: 'clarification', text: orderText, question: FALLBACK_QUESTION };
   }

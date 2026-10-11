@@ -61,7 +61,6 @@ import {
   type SessionType,
 } from '../lobby/store.js';
 import type { PauseConfig } from '../pause.js';
-import type { OrderParser } from '../orders/index.js';
 import {
   Notifier,
   MemoryNotifyStore,
@@ -122,7 +121,8 @@ const WsQuery = z.object({ side: SideName.optional() });
 const MAX_PAYLOAD_BYTES = 16 * 1024;
 
 export interface AppOptions {
-  parser: OrderParser;
+  /** One parser for every game, or one per game. See `GameHostOptions.parser`. */
+  parser: GameHostOptions['parser'];
   store?: GameStore;
   /** Lobby records. Defaults to memory; `main.ts` supplies the SQLite store. */
   lobby?: LobbyStore;
@@ -387,7 +387,13 @@ export async function buildApp(options: AppOptions): Promise<App> {
     createdAtMs: rec.createdAtMs,
   });
 
-  server.get('/scenarios', async () => ({ scenarios: scenarioList() }));
+  server.get('/scenarios', async () => ({
+    scenarios: scenarioList(),
+    // Who plays a side nobody sits at: absent when this server has no computer opponent.
+    ...(options.scriptedOpponents === true
+      ? { opponent: options.aiAgents ? 'ai_commander' : 'scripted' }
+      : {}),
+  }));
 
   server.post('/games', async (req, reply) => {
     const user = auth.userOf(req);

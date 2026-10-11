@@ -16,6 +16,7 @@ Compose reads the shell environment and a git-ignored `.env` next to `docker-com
 |---|---|---|
 | `KRIEGSSPIEL_PORT` | `3000` | Host port for the web UI and API |
 | `ANTHROPIC_API_KEY` | empty | Passed to the server for the Anthropic provider (see [llm-providers.md](llm-providers.md)) |
+| `ORDER_PARSER` | unset | With a provider key the LLM parses orders; `stub` forces the rule-based parser |
 | `BACKUP_DIR` | `./backups` | Host directory that receives backups |
 | `BACKUP_KEEP` | `14` | Number of newest backups kept |
 | `BACKUP_HOUR_UTC` | `3` | Hour of the nightly backup |
