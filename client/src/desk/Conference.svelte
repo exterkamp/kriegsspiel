@@ -7,6 +7,8 @@
     formatCost,
     isPending,
     newExchange,
+    nextExchangeId,
+    reconcileExchanges,
     questionProblem,
     staffFor,
     type ConferenceRole,
@@ -16,7 +18,6 @@
   let role = $state<ConferenceRole>('chiefOfStaff');
   let question = $state('');
   let error = $state<string | undefined>(undefined);
-  let nextId = 1;
 
   // Answers arrive in game time, so the log re-reads the clock now and then.
   const opened = Date.now();
@@ -35,20 +36,11 @@
   const log = $derived($conferenceLog.filter((e) => e.role === role));
 
   // Take the cost from the server's reply: it decides when the officer answers, not this page.
+  // The exchange carries its own question id, so this works across remounts of the view.
   $effect(() => {
-    const charges = $gameState.staffCharges;
-    const waiting = $conferenceLog.filter((e) => e.answerAtGame === Infinity && !e.failed);
-    if (waiting.length === 0) return;
-    conferenceLog.update((l) =>
-      l.map((e) => {
-        if (e.answerAtGame !== Infinity || e.failed) return e;
-        const c = charges[`q-${opened}-${e.id}`];
-        if (c === undefined) return e;
-        return c === 'refused'
-          ? { ...e, failed: true }
-          : { ...e, askedAtGame: c.askedAtGame, answerAtGame: c.answerAtGame };
-      }),
-    );
+    const { staffCharges: charges, link, staffFaultAtWall: faultAtWall } = $gameState;
+    const nowWall = wall;
+    conferenceLog.update((l) => reconcileExchanges(l, { charges, link, faultAtWall, nowWall }));
   });
 
   function ask(e: SubmitEvent): void {
@@ -57,14 +49,17 @@
     if (error) return;
     const req = { role, question: question.trim(), askedAtGame: nowGame };
     const sender = $conferenceSender;
-    const ex = newExchange(nextId++, req);
+    const ex = newExchange(nextExchangeId($conferenceLog), req);
     if (sender) {
       // The server charges the cost; the exchange waits for its reply (see the reconcile effect).
-      if (!sender(`q-${opened}-${ex.id}`, role, req.question)) {
+      const questionId = `q-${Date.now()}-${ex.id}`;
+      if (!sender(questionId, role, req.question)) {
         error = 'Not connected. Try again when the link is back.';
         return;
       }
       ex.answerAtGame = Infinity;
+      ex.questionId = questionId;
+      ex.sentAtWall = Date.now();
     }
     conferenceLog.update((l) => [...l, ex]);
     question = '';

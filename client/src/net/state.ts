@@ -75,6 +75,8 @@ export interface ClientState {
   pending: PendingOrder[];
   /** Staff questions by client question id, as the server charged them. */
   staffCharges: Record<string, StaffCharge>;
+  /** Wall time of the last error that names no question (`game_closed`, `bad_message`), which may have eaten a staff question. */
+  staffFaultAtWall?: number;
   /** Set once the server says the game has ended. */
   gameOver?: GameOver;
   /** The side's marks on the table, as the server last sent them plus this client's own edits. */
@@ -225,10 +227,17 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       const dropped = id === undefined ? s.pending : s.pending.filter((p) => p.orderId !== id);
       const notices = [...s.notices, { code: m.code, message: m.message }].slice(-MAX_NOTICES);
       const staffCharges =
-        m.code === 'staff_busy' && id !== undefined
+        (m.code === 'staff_busy' || m.code === 'game_over') && id !== undefined
           ? { ...s.staffCharges, [id]: 'refused' as const }
           : s.staffCharges;
-      return { ...s, pending: dropped, staffCharges, notices };
+      const unnamed = id === undefined && (m.code === 'game_closed' || m.code === 'bad_message');
+      return {
+        ...s,
+        pending: dropped,
+        staffCharges,
+        notices,
+        ...(unnamed ? { staffFaultAtWall: nowWall } : {}),
+      };
     }
   }
 }

@@ -625,6 +625,10 @@ export class Hub {
       return;
     }
     if (command.kind === 'askStaff') {
+      if (game.state.world.outcome) {
+        this.send(conn, error('game_over', `${command.questionId}: the game has ended`));
+        return;
+      }
       const charge = this.staffDesk.ask(gameId, conn.side, command.role, game.gameClock.now());
       if (charge.ok) {
         this.send(conn, {
