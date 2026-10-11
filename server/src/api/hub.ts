@@ -92,11 +92,12 @@ export class Hub {
       if (c.side === side) this.send(c, { v: PROTOCOL_VERSION, kind: 'marks', marks: [...marks] });
   }
 
-  /** Send to every open socket a user has in a game; returns how many were open. */
-  sendToUser(gameId: string, userId: string, message: ServerMessage): number {
+  /** Send to every open socket a user has in a game (on `side`, if given); returns how many were open. */
+  sendToUser(gameId: string, userId: string, message: ServerMessage, side?: SideId): number {
     let n = 0;
     for (const c of this.conns.get(gameId) ?? []) {
       if (c.userId !== userId || c.socket.readyState !== OPEN) continue;
+      if (side !== undefined && c.side !== side) continue;
       this.send(c, message);
       n++;
     }

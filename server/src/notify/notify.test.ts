@@ -5,6 +5,7 @@ import { buildApp, type App } from '../api/app.js';
 import { MemoryGameStore } from '../game/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import type { PushSender } from './push.js';
+import { isPushEndpoint } from './routes.js';
 import type { PushSubscriptionRecord } from './store.js';
 
 const RATE = 3600;
@@ -289,13 +290,31 @@ describe('delivery', () => {
     const g = await game(base);
     await send(g.blue, 'PUT', '/notifications/prefs', prefs(), base);
     const actor = app!.host.get(g.id)!;
-    await actor.submit({ kind: 'order', side: 'blue', text: 'blue-1 march to the bridge' });
-    await waitUntil(() => notices.length > 0);
-    // The update hook sets the baseline on its first call, so the first events are not news.
-    const first = notices.length;
+    // The order is sent before the notifier has looked at the game, so its dispatch is old news.
     app!.notifier.forget(g.id);
+    await actor.submit({ kind: 'order', side: 'blue', text: 'blue-1 march to the bridge' });
     app!.notifier.observe(g.id);
     await settle();
-    expect(notices).toHaveLength(first);
+    expect(notices).toHaveLength(0);
+    // A later one is news.
+    await actor.submit({ kind: 'order', side: 'blue', text: 'blue-1 halt' });
+    await waitUntil(() => notices.length > 0);
+    expect(notices.length).toBeGreaterThan(0);
+  });
+
+  it('refuses push endpoints that point at hosts a browser would not use', () => {
+    for (const bad of [
+      'http://push.example.test/a',
+      'https://169.254.169.254/latest',
+      'https://127.0.0.1:8443/',
+      'https://[::1]/',
+      'https://localhost/a',
+      'https://internal-service:8443/',
+      'https://user:pw@push.example.test/a',
+      'not a url',
+    ]) {
+      expect(isPushEndpoint(bad), bad).toBe(false);
+    }
+    expect(isPushEndpoint('https://fcm.googleapis.com/fcm/send/abc')).toBe(true);
   });
 });

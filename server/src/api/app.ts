@@ -221,6 +221,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
       hub.notify(id);
       notifier.observe(id);
     },
+    onClose: (id) => notifier.forget(id),
     onError,
   });
   const notifyStore = options.notify?.store ?? new MemoryNotifyStore();
@@ -234,7 +235,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     push: options.notify?.push,
     publicUrl,
     lookup: (id) => host.get(id),
-    sendToUser: (id, userId, message) => hub.sendToUser(id, userId, message),
+    sendToUser: (id, userId, message, side) => hub.sendToUser(id, userId, message, side),
     wallNow,
     emailEveryMs: options.notify?.emailEveryMs,
     onError,

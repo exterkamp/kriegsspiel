@@ -37,7 +37,7 @@ function look(game: GameActor): Seen {
     status: game.gameClock.snapshot().status,
     pauseProposal: game.pauseState?.proposal?.id,
     ratioProposal: game.ratioState?.proposal?.id,
-    over: state.world.outcome !== undefined,
+    over: Boolean(state.world.outcome),
   };
 }
 

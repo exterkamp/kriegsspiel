@@ -25,8 +25,8 @@ export interface NotifierOptions {
   /** Origin used in links back to the game. */
   publicUrl: string;
   lookup: (gameId: string) => GameActor | undefined;
-  /** Sends to the user's open sockets in the game; returns how many received it. */
-  sendToUser: (gameId: string, userId: string, message: ServerMessage) => number;
+  /** Sends to the user's open sockets on `side` in the game; returns how many received it. */
+  sendToUser: (gameId: string, userId: string, message: ServerMessage, side: SideId) => number;
   wallNow: () => number;
   /** Least wall time between routine emails to one player about one game. Urgent ones always go. */
   emailEveryMs?: number;
@@ -58,7 +58,11 @@ export class Notifier {
       this.o.onError(gameId, e);
       return;
     }
+    // One delivery per side and kind per look: five contact reports in a tick are one notice.
+    const once = new Set<string>();
     for (const { side, event } of events) {
+      if (once.has(`${side}\0${event}`)) continue;
+      once.add(`${side}\0${event}`);
       const p = this.deliver(gameId, side, event).catch((e) => this.o.onError(gameId, e));
       this.inFlight.add(p);
       void p.finally(() => this.inFlight.delete(p));
@@ -68,6 +72,9 @@ export class Notifier {
   /** Forget a game that has closed. */
   forget(gameId: string): void {
     this.seen.delete(gameId);
+    for (const key of this.lastEmail.keys()) {
+      if (key.endsWith(`\0${gameId}`)) this.lastEmail.delete(key);
+    }
   }
 
   /** Resolves when every delivery started so far has finished. */
@@ -81,13 +88,18 @@ export class Notifier {
     const prefs = this.o.store.getPrefs(seat.userId);
     if (!wanted(prefs, event)) return;
     const { title, text } = NOTICE[event];
-    const here = this.o.sendToUser(gameId, seat.userId, {
-      v: PROTOCOL_VERSION,
-      kind: 'notification',
-      event,
-      title,
-      text,
-    });
+    const here = this.o.sendToUser(
+      gameId,
+      seat.userId,
+      {
+        v: PROTOCOL_VERSION,
+        kind: 'notification',
+        event,
+        title,
+        text,
+      },
+      side,
+    );
     if (here > 0) return;
     const now = this.o.wallNow();
     if (isQuiet(prefs.quietHours, now)) return;

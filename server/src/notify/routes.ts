@@ -34,13 +34,28 @@ const Prefs = z
   })
   .strict();
 
+/**
+ * Browsers hand out https endpoints on public push-service hosts. Refuse anything else a user could use to
+ * aim the server at itself or its network: non-https, IP literals, `localhost` and single-label names. This
+ * is not a full SSRF defence: a public name can still resolve to a private address (`web-push` resolves it
+ * at send time), so a deployment that cares should also block egress to private ranges.
+ */
+export function isPushEndpoint(endpoint: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  const host = url.hostname;
+  if (url.protocol !== 'https:' || url.username || url.password) return false;
+  if (host.startsWith('[') || /^[\d.]+$/.test(host)) return false;
+  return host.includes('.') && host !== 'localhost' && !host.endsWith('.localhost');
+}
+
 const Subscription = z
   .object({
-    // Browsers only hand out https endpoints; refusing the rest keeps the server from being pointed at internal hosts.
-    endpoint: z
-      .string()
-      .max(2048)
-      .refine((u) => u.startsWith('https://'), 'endpoint must be https'),
+    endpoint: z.string().max(2048).refine(isPushEndpoint, 'endpoint must be an https push service'),
     keys: z.object({ p256dh: z.string().min(1).max(256), auth: z.string().min(1).max(256) }),
   })
   .strict();
