@@ -19,7 +19,8 @@ import { MarksBar } from './hud/marksBar.js';
 import { Gesture, type MarkTool } from './table/markTools.js';
 import { newMarkId } from './table/marks.js';
 import { pickMinSize } from './table/picking.js';
-import type { Dispatch, Mark } from '@kriegsspiel/protocol';
+import type { Dispatch, Mark, WindowAt } from '@kriegsspiel/protocol';
+import type { BeliefChoice } from './window/model.js';
 import { parseSession, wsUrl } from './session.js';
 import { fetchGame } from './lobby/api.js';
 import { showGameList, showRoom } from './lobby/lobby.js';
@@ -28,13 +29,19 @@ import { mount } from 'svelte';
 import Desk from './desk/Desk.svelte';
 import {
   activeView,
+  gameId,
   gameState,
   orderSender,
+  pauseActions,
   persistDraft,
   persistTray,
   showOnTable,
   viewedDispatch,
+  windowBelief,
+  windowFrame,
+  windowHover,
 } from './desk/store.js';
+import { buildWindowScene } from './window/model.js';
 import { isDeskView } from './desk/views.js';
 
 /** Make a game as the signed-in user and take `side` (the server picks one when unset). */
@@ -268,10 +275,25 @@ async function main(app: HTMLElement): Promise<void> {
     redrawMarks();
   });
 
+  // After the game, the umpire's window replaces the player's picture with the truth at the scrubbed time.
+  let windowShown = false;
+  const showWindow = (): void => {
+    let frame: WindowAt | undefined;
+    windowFrame.subscribe((f) => (frame = f))();
+    let belief: BeliefChoice = 'none';
+    windowBelief.subscribe((b) => (belief = b))();
+    windowShown = frame !== undefined;
+    if (frame) table.apply(buildWindowScene(frame, belief, fixtureMap));
+    else if (state.view) table.apply(buildSceneState(state.view, fixtureMap));
+    if (marksEl) marksEl.hidden = windowShown || deskOpen;
+  };
+  windowFrame.subscribe(showWindow);
+  windowBelief.subscribe(showWindow);
+
   const rerender = () => {
     gameState.set(state);
     hud.render(state);
-    if (state.view) table.apply(buildSceneState(state.view, fixtureMap));
+    if (!windowShown && state.view) table.apply(buildSceneState(state.view, fixtureMap));
     redrawMarks();
   };
 
@@ -282,7 +304,7 @@ async function main(app: HTMLElement): Promise<void> {
   let down: { x: number; y: number } | undefined;
   canvas.addEventListener('pointerdown', (e) => {
     down = { x: e.clientX, y: e.clientY };
-    if (deskOpen || tool === 'view' || e.button !== 0) return;
+    if (deskOpen || windowShown || tool === 'view' || e.button !== 0) return;
     const c = mapPoint(e);
     if (!c) return;
     const span = pickMinSize(fixtureMap);
@@ -300,6 +322,11 @@ async function main(app: HTMLElement): Promise<void> {
     redrawMarks();
   });
   canvas.addEventListener('pointermove', (e) => {
+    if (windowShown) {
+      const r = table.pickAt(e.clientX, e.clientY);
+      windowHover.set(r.type === 'piece' && r.pieceKind === 'own' ? r.id : undefined);
+      return;
+    }
     if (!gesture) return;
     const c = mapPoint(e);
     if (!c) return;
@@ -322,6 +349,11 @@ async function main(app: HTMLElement): Promise<void> {
     if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
     const r = table.pickAt(e.clientX, e.clientY);
     if (out) out.textContent = JSON.stringify(r);
+    if (windowShown) {
+      // A click pins the unit's notes, so touch and keyboard-less users can read them too.
+      windowHover.set(r.type === 'piece' && r.pieceKind === 'own' ? r.id : undefined);
+      return;
+    }
     if (r.type === 'piece' && r.pieceKind === 'own') hud.selectUnit(r.id);
   });
   canvas.addEventListener('pointercancel', () => {
@@ -339,6 +371,7 @@ async function main(app: HTMLElement): Promise<void> {
   });
 
   if (params.mode === 'join') {
+    gameId.set(params.game);
     conn = new GameConnection({
       url: wsUrl(window.location, params.game, params.side),
       onStatus: (s) => {
@@ -349,6 +382,11 @@ async function main(app: HTMLElement): Promise<void> {
         state = applyServerMessage(state, m, Date.now());
         rerender();
       },
+    });
+    pauseActions.set({
+      proposePause: (r) => conn!.proposePause(r),
+      proposeResume: () => conn!.proposeResume(),
+      vote: (id, yes) => conn!.vote(id, yes),
     });
     conn.start();
   } else {

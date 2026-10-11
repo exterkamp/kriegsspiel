@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { activeView, gameState, trayMarks } from './store.js';
+  import { activeView, gameId, gameState, trayMarks, windowOpen } from './store.js';
+  import UmpireWindow from './UmpireWindow.svelte';
   import { unreadCount } from './tray.js';
   import InTray from './InTray.svelte';
   import OrdersDesk from './OrdersDesk.svelte';
   import { deliveryStatus } from './orders.js';
   import DeskClock from './DeskClock.svelte';
+  import PausePanel from './PausePanel.svelte';
   import { VIEWS, isDeskView, isTypingTarget, viewForKey, type ViewId } from './views.js';
   import { formatGameTime, gameNowMs } from '../net/state.js';
 
@@ -68,6 +70,7 @@
 <svelte:window onkeydown={onKey} />
 
 <div class="dock">
+  <PausePanel />
   <DeskClock />
   <nav class="desk-bar" aria-label="Desk">
     {#each VIEWS as v (v.id)}
@@ -84,8 +87,17 @@
           >{/if}
       </button>
     {/each}
+    {#if $gameState.gameOver && $gameId}
+      <button type="button" aria-pressed={$windowOpen} onclick={() => windowOpen.update((o) => !o)}>
+        Umpire's window
+      </button>
+    {/if}
   </nav>
 </div>
+
+{#if $windowOpen && $gameState.gameOver}
+  <UmpireWindow />
+{/if}
 
 <div class="fade" class:on={isDeskView($activeView)} aria-hidden="true"></div>
 

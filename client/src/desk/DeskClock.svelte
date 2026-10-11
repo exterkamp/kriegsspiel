@@ -31,6 +31,11 @@
     >
     <span class:sr-only={compact && v.status === 'running'}>{v.label}</span>
   </span>
+  {#if v.vote}
+    <span class="vote" data-testid="clock-vote" role="status"
+      >{v.vote === 'pause' ? 'Pause' : 'Resume'} proposed</span
+    >
+  {/if}
   {#if v.staffAtWork}
     <span class="staff" data-testid="clock-staff" role="status">Staff at work…</span>
   {/if}
@@ -68,6 +73,10 @@
     border-radius: 3px;
     padding: 0 5px;
     font-weight: bold;
+  }
+  .vote {
+    font-weight: bold;
+    color: #ffd76a;
   }
   .staff {
     font-style: italic;

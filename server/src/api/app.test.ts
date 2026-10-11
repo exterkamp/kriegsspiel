@@ -937,3 +937,117 @@ describe('deployment endpoints', () => {
     }
   });
 });
+
+describe('pause voting over the WebSocket', () => {
+  const cmd = (body: object) => JSON.stringify({ v, ...body });
+  /** Blue and red players in a started lobby game with pause voting (voters are the seats taken at the start). */
+  async function votingGame(pause: object = { rule: 'unanimous' }) {
+    const { base, ws } = await start();
+    const bluePlayer = await signIn(base, 'vote-blue@example.test');
+    const redPlayer = await signIn(base, 'vote-red@example.test');
+    const res = await fetch(
+      `${base}/games`,
+      json(bluePlayer, { lobby: true, rate: RATE, side: 'blue', pause }),
+    );
+    const game = (await res.json()) as Created;
+    game.cookies = { blue: bluePlayer, red: redPlayer };
+    await fetch(`${base}/games/${game.id}/join`, json(redPlayer, { side: 'red' }));
+    await fetch(`${base}/games/${game.id}/ready`, json(redPlayer, { ready: true }));
+    const started = await fetch(`${base}/games/${game.id}/start`, json(bluePlayer, {}));
+    expect(started.status).toBe(200);
+    const blue = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    return { game, blue, red, ws };
+  }
+
+  it('tells both players about a proposal, lets them vote, and pauses on all yes', async () => {
+    const { game, blue, red } = await votingGame();
+    await blue.waitFor('pauseState', (m) => m.phase === 'running' && !m.proposal);
+
+    blue.send(cmd({ kind: 'proposePause', reason: 'door' }));
+    const mine = await blue.waitFor('pauseState', (m) => m.phase === 'pause_proposed');
+    expect(mine.proposal).toMatchObject({
+      kind: 'pause',
+      bySide: 'blue',
+      byYou: true,
+      reason: 'door',
+      yes: 1,
+      no: 0,
+      voters: 2,
+      myVote: true,
+    });
+    const theirs = await red.waitFor('pauseState', (m) => m.phase === 'pause_proposed');
+    expect(theirs.proposal).toMatchObject({ byYou: false, bySide: 'blue', yes: 1 });
+    expect(theirs.proposal!.myVote).toBeUndefined();
+    expect(theirs.proposal!.msLeft).toBeGreaterThan(0);
+
+    red.send(cmd({ kind: 'vote', proposal: theirs.proposal!.id, yes: true }));
+    await blue.waitFor('pauseResult', (m) => m.outcome === 'paused');
+    await red.waitFor('pauseState', (m) => m.phase === 'paused' && !m.proposal);
+    await blue.waitFor('clockState', (c) => c.clock.status === 'paused');
+    expect(app!.host.get(game.id)!.gameClock.status).toBe('paused');
+
+    // And back again.
+    red.send(cmd({ kind: 'proposeResume' }));
+    const ask = await blue.waitFor('pauseState', (m) => m.phase === 'resume_proposed');
+    blue.send(cmd({ kind: 'vote', proposal: ask.proposal!.id, yes: true }));
+    await red.waitFor('pauseResult', (m) => m.outcome === 'resumed');
+    await blue.waitFor('clockState', (c) => c.clock.status === 'running');
+  });
+
+  it('cancels on a no and says so to both players', async () => {
+    const { blue, red } = await votingGame();
+    blue.send(cmd({ kind: 'proposePause' }));
+    const open = await red.waitFor('pauseState', (m) => m.phase === 'pause_proposed');
+    red.send(cmd({ kind: 'vote', proposal: open.proposal!.id, yes: false }));
+    for (const c of [blue, red]) {
+      const r = await c.waitFor('pauseResult');
+      expect(r).toMatchObject({
+        outcome: 'cancelled',
+        cause: 'no-vote',
+        proposalKind: 'pause',
+        bySide: 'red',
+      });
+    }
+    await blue.waitFor('pauseState', (m) => m.phase === 'running' && !m.proposal);
+  });
+
+  it('cancels when a voter never answers, and shows an open vote to one who reconnects', async () => {
+    const {
+      game,
+      blue,
+      red: first,
+      ws,
+    } = await votingGame({
+      rule: 'unanimous',
+      voteTimeoutMs: 1000,
+    });
+    first.socket.close();
+    blue.send(cmd({ kind: 'proposePause' }));
+    await blue.waitFor('pauseState', (m) => m.phase === 'pause_proposed');
+
+    const red = await join(ws, game, 'red');
+    const seen = await red.waitFor('pauseState');
+    expect(seen.phase).toBe('pause_proposed');
+    expect(seen.proposal!.myVote).toBeUndefined();
+
+    const r = await red.waitFor('pauseResult', () => true, 8000);
+    expect(r).toMatchObject({ outcome: 'cancelled', cause: 'timeout' });
+    expect(app!.host.get(game.id)!.gameClock.status).toBe('running');
+  });
+
+  it('refuses a pause request in a game without voting', async () => {
+    const { base, ws } = await start();
+    const plain = (await createGame(base)).json;
+    const c = await join(ws, plain, 'blue');
+    c.send(cmd({ kind: 'proposePause' }));
+    expect((await c.waitFor('error')).code).toBe('pause_unavailable');
+    expect(c.messages.some((m) => m.kind === 'pauseState')).toBe(false);
+  });
+
+  it('refuses a vote on a proposal that is not open', async () => {
+    const { blue } = await votingGame();
+    blue.send(cmd({ kind: 'vote', proposal: 'nope', yes: true }));
+    expect((await blue.waitFor('error')).code).toBe('pause_refused');
+  });
+});

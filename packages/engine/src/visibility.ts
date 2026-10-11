@@ -32,7 +32,8 @@ const viewFootprint = (u: Unit) => ({
  * What a watcher can judge of an enemy's footprint: to the nearest 10 m. A footprint follows
  * from the formation and strength, so an exact one would give the strength away.
  */
-const coarse = (mmLen: number) => Math.max(10, Math.round(metres(mmLen) / 10) * 10);
+export const coarseMetres = (m: number) => Math.max(10, Math.round(m / 10) * 10);
+const coarse = (mmLen: number) => coarseMetres(metres(mmLen));
 const viewEnemyFootprint = (u: Unit) => ({
   frontage: coarse(u.footprint.frontage),
   depth: coarse(u.footprint.depth),

@@ -167,3 +167,5 @@ export {
   registerSupply,
   wagonsReach,
 } from './supply.js';
+export { ROLES, maySign, mayDraft, viewForRole } from './roles.js';
+export type { EngineRoleView, Role, Seat, ViewUnitOutline } from './roles.js';

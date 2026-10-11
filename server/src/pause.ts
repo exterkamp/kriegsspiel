@@ -94,6 +94,11 @@ export class PauseVoting {
     return this.current;
   }
 
+  /** How many players vote. */
+  get voterCount(): number {
+    return this.voters.length;
+  }
+
   /** The open proposal, if any: who asked, why, and the votes so far. */
   get open():
     | {

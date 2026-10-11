@@ -1,5 +1,6 @@
 import { derived, get, writable } from 'svelte/store';
-import type { Coord, Dispatch } from '@kriegsspiel/protocol';
+import type { Coord, Dispatch, WindowAt } from '@kriegsspiel/protocol';
+import type { BeliefChoice } from '../window/model.js';
 import { initialState, withRead, type ClientState } from '../net/state.js';
 import { emptyDraft, loadDraft, saveDraft, type Courier, type OrderDraft } from './orders.js';
 import { loadMarks, saveMarks, type TrayMarks } from './tray.js';
@@ -8,6 +9,14 @@ import type { ViewId } from './views.js';
 /** The shared app store: both the Three.js table and the Svelte desk read from and write to these. */
 export const gameState = writable<ClientState>(initialState);
 export const activeView = writable<ViewId>('table');
+
+/** What the pause panel can ask of the server; each returns false when the link is down. Set once connected. */
+export interface PauseActions {
+  proposePause(reason?: string): boolean;
+  proposeResume(): boolean;
+  vote(proposal: string, yes: boolean): boolean;
+}
+export const pauseActions = writable<PauseActions | undefined>(undefined);
 
 /** Dispatches the player has filed (kept in the drawer) or discarded (gone from the desk). */
 export const trayFiled = writable<ReadonlySet<string>>(new Set());
@@ -64,6 +73,15 @@ export function persistTray(key: string): () => void {
 }
 
 export const currentMarks = (): TrayMarks => get(trayMarks);
+
+/** The game this page is playing, once joined; the umpire's window reads its log. */
+export const gameId = writable<string | undefined>(undefined);
+
+/** Umpire's window (after the game): open, the replayed moment shown on the table, whose belief is overlaid, and the unit under the pointer. */
+export const windowOpen = writable(false);
+export const windowFrame = writable<WindowAt | undefined>(undefined);
+export const windowBelief = writable<BeliefChoice>('none');
+export const windowHover = writable<string | undefined>(undefined);
 
 /** The order form on the orders desk. Saved per game as it is written. */
 export const orderDraft = writable<OrderDraft>(emptyDraft());
