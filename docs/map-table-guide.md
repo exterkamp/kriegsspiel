@@ -26,3 +26,9 @@ npm run maps:cli -- --preset river-valley --seed 97 --output /tmp/river-valley.j
 Load `/tmp/river-valley.json` using the table's file control. Browser authoring and this CLI use the same map contract and certification pipeline. Unsupported generator provenance or invalid composition produces a load error; repairing the saved JSON by hand can invalidate it.
 
 The [implementation plan](map-table-implementation-plan.md) records the boundaries and PR strategy; the [execution log](map-table-execution-log.md) records verification and review checkpoints. [Map gameplay handoff](map-gameplay-handoff.md) describes the separate future path to playable scenarios.
+
+## Fixed local boards with personal marks
+
+`TableScene` supports an immutable `local-hq-board` mode for a certified, fixed raster with render-only personal marks. It rejects fixture/game state, external artwork and public preview replacement. `localBoardTextureLimit()` uses the same device/local cap as the saved-map preview. The first successful raster binding cannot change; mark updates reuse that paper and texture. Failed mark frames retain the previous marks for retry, and disposal releases owned resources.
+
+`applyLocalBoard(raster, marks)` and `renderLocalBoardFrame()` acknowledge an actual synchronous rendered frame, including after camera framing. They do not acknowledge GPU completion or add simulation. This renderer capability is separate from HQ adapters and the later development New game interface. Existing fixture and standalone preview modes keep their original boundaries.
