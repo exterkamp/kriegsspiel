@@ -1,6 +1,6 @@
 # Game initialization landing log
 
-## Continuation checkpoint — 2026-10-11
+## Historical blocked continuation checkpoint — 2026-10-11
 
 Authorized: implementation, isolated landing worktree, local commits, managed previews, tests, independent Herdr review, and planned GitHub PR publication. Merge and deployment remain prohibited. The approved landing plan governs packets P0–P5 and limits dependent drafts to one.
 
@@ -65,3 +65,11 @@ P0 source accepted by independent init-landing-review Sol/high at d429a93 agains
 Coordinator settled all writers and reviewer source inspection before branch switch. P1 branch landing/dev-map-catalog starts directly from current main63528b3, not from P0. Extracted eleven reference paths at da9dd0b, with narrowly scoped Vite plugin registration preserving all five upstream inputs, canonical-byte Prettier exclusion and service documentation. P1 depends on accepted map-authoring runtime already on main; no #241 dependency. No default-game startup config, renderer, Setup component or navigation changes included. Coordinator owns all P1 edits; independent reviewer has no authorship. Tests and final source review pending.
 
 P1 preliminary checks:16 focused tests pass with actual HTTP sockets and three independently certified/default recipe/hash checks. Root lint and typecheck pass with existing Desk CSS warning. In actual Chrome, a disposable service harness certified all three committed defaults through real browser workers and confirmed detached cloneability and canonical byte equality. Real complete wooded-hills seed31 generation succeeded, saved through /__local/maps to task-owned .local/generated-maps/d117e88f-ac03-41df-a366-91b978b086ee.json, and read back exact canonical bytes/full hash ecce44a083ff6f5a616d9ffc6946b5ffa53023092396ba5230836f221c59f4ed. A second real generation was aborted and reported Preparation cancelled. Harness removed before source freeze; JSON results and harness text retained under .local/game-initialization-landing-evidence. No shipped UI/browser layout is added by P1.
+
+## Merge authorization and P1 main integration
+
+Owner explicitly authorized merging each ready PR on 2026-10-11. Deployment remains prohibited. P0 PR241 merged as 346fd92196bd35d4d1ac7f8f003060a42b494272 after exact-head green CI and final independent acceptance; original head d429a93 and reference work remain preserved.
+
+P1 source candidate 85a9c78cd1001b67e721bb6531b7f03c9b2b7be0 (tree3480dc0d74c9244aab42c37a492184019d693676, base63528b3) received independent source acceptance from init-landing-review, verified Sol/high, covering all15 paths with no blocking source findings. Full repository lint/typecheck/test/build passed, with2,564 tests passing and one existing optional skip. Actual browser worker evidence remains source-identical and separate under .local; asynchronous hashing completion guard was source-reviewed, not a directly delayed-hash browser test. Browser cancellation was observed without a separate result artifact.
+
+Merged fresh main346fd92 into P1 with no conflicts; integration adds the accepted mapTable build input alongside all other inputs and preserves Angular tooling. Final candidate integration review and required checks/CI remain gates before P1 merge. Coordinator w3:pF owns all mutable source/Git/contracts/configuration; reviewer w3:pG is read-only. Protected previews retained; task preview http://127.0.0.1:41930 remains managed and running. Next packet is P2 fixed raster/personal marks after P1 acceptance; Svelte UI scope question prompted by upstream D26 remains pending.
