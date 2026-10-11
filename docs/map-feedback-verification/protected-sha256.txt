@@ -1,0 +1,5 @@
+6d0601daec630e6876f19079cf0f59660b9d8628f5ebf6b76a2a94861b8a9f31  docs/feedback.md
+93067bc6345780e4b4ff1fa905c3e5575e84fbf4040272d050240c878924b23c  docs/map-feedback-implementation-plan.md
+a9abde2bb6b3119ba5f1ef8bf259edfc8283dcf0d86e95edeb5f8cee2e6cea34  docs/feedback-assets/FB-001-empty-map-original.png
+79f84c1b613bb61ea20fdb633af0dceca64b912b77238ce1c3dedefb8188c1ee  docs/feedback-assets/FB-002-simplified-controls-original.png
+2ec3680cf1dfe9ab4ec11e279416f8bac19798e316ad20376aa0b2f6057d84af  docs/feedback-assets/FB-003-site-selector-spacing-original.png

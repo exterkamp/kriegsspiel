@@ -113,9 +113,13 @@ running ──request──► pause_proposed ──all humans yes──► paus
 - **Visibility service**: from master state and a side, produces that side's knowledge: seen units, stale contact reports, received messages. The *only* path from master state to a client. See D12.
 - **Clock and scheduler** (server): the `ClockState`, the scheduler, and pause voting.
 - **API** (server, `server/src/api`): Fastify. `POST /games` creates a game; `GET /games/:id/ws` is the WebSocket of the side the signed-in user holds a seat on (D17), speaking the `packages/protocol` messages. Inbound frames are validated with the protocol schemas, and the hub sends only `SideView` data built by the visibility filter. See D16.
-- **Notifier** (server, `server/src/notify`): after each tick or command it spots what is new for each seated player (a dispatch, contact, a lost unit, a proposed pause or ratio vote, pause/resume, game over) and sends a `notification` over WebSocket to a player with the game open, or web push (VAPID) and email to one who is away. Players set a threshold (all, urgent only, contact only, off), quiet hours and which channels to use. Text is fixed per event kind and holds no game content. See D18.
+- **Notifier** (server, `server/src/notify`): after each tick or command it spots what is new for each seated player (a dispatch, contact, a lost unit, a proposed pause or ratio vote, pause/resume, game over) and sends a `notification` over WebSocket to a player with the game open, or web push (VAPID) and email to one who is away. Players set a threshold (all, urgent only, contact only, off), quiet hours and which channels to use. Text is fixed per event kind and holds no game content. See D17b.
 - **Persistence**: an append-only event log of *inputs* (commands, clock changes, votes, LLM outputs, seeds), plus periodic snapshots for quick recovery. Implemented as `SqliteGameStore` (D14b): recovery is the latest snapshot plus replay of the later inputs, and the game resumes paused. Stores the model, prompt version and raw output of each LLM call.
 - **Client**: a Three.js map table (flat map, 3D pieces) and a Svelte desk, showing a desk clock with the rate and any pause. It renders only what the server sends. See [hq-interface.md](hq-interface.md).
+
+### Standalone map authoring
+
+`packages/maps` defines a portable, versioned local-metre map asset and numerical/geometry queries independently of the game engine and protocol (D19). Original/carved ground, filled drainage, land cover and infrastructure are separate layers. Strict imports and canonical replay establish contract validity; complete geography/placement certification remains an independent composition gate. This public authoring data does not read or deliver live game state. See [the map contract](../packages/maps/README.md) and [map architecture](map-architecture.md).
 
 ### SideView contents
 

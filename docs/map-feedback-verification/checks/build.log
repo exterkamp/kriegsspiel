@@ -1,0 +1,115 @@
+
+> build
+> npm run verify:map-source && npm run build --workspaces --if-present
+
+
+> verify:map-source
+> node scripts/verify-map-source.mjs
+
+{"revision":"e08ec2e09f9a15f9110a3048123a31a58d08c341","files":163,"bytes":3842340}
+
+> @kriegsspiel/engine@0.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> @kriegsspiel/protocol@0.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> @kriegsspiel/maps@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @kriegsspiel/server@0.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> @kriegsspiel/client@0.0.0 build
+> vite build
+
+vite v6.4.4 building for production...
+transforming...
+../node_modules/zod/v4/core/regexes.js (74:0): A comment
+
+"/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+ * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+ * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+
+in "../node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../node_modules/zod/v4/core/util.js (400:0): A comment
+
+"// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle."
+
+in "../node_modules/zod/v4/core/util.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../node_modules/zod/v4/core/util.js (400:0): A comment
+
+"// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle."
+
+in "../node_modules/zod/v4/core/util.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../node_modules/zod/v4/core/regexes.js (74:0): A comment
+
+"/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+ * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+ * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+
+in "../node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../node_modules/zod/v4/core/regexes.js (74:0): A comment
+
+"/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+ * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+ * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+
+in "../node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../node_modules/zod/v4/core/util.js (400:0): A comment
+
+"// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle."
+
+in "../node_modules/zod/v4/core/util.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../node_modules/zod/v4/core/regexes.js (74:0): A comment
+
+"/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+ * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+ * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+
+in "../node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../node_modules/zod/v4/core/util.js (400:0): A comment
+
+"// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle."
+
+in "../node_modules/zod/v4/core/util.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../node_modules/zod/v4/core/util.js (400:0): A comment
+
+"// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle."
+
+in "../node_modules/zod/v4/core/util.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../node_modules/zod/v4/core/regexes.js (74:0): A comment
+
+"/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+ * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+ * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+
+in "../node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 488 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/map-benchmark.html                             0.61 kB │ gzip:   0.33 kB
+dist/map-authoring.html                             2.57 kB │ gzip:   1.08 kB
+dist/index.html                                     5.04 kB │ gzip:   1.37 kB
+dist/admin/index.html                               7.99 kB │ gzip:   1.93 kB
+dist/assets/validate.worker-BUS7GWiO.js         2,203.88 kB
+dist/assets/generate.worker-BnK7XzE4.js         2,374.97 kB
+dist/assets/main-CzFJoiF4.css                       1.58 kB │ gzip:   0.68 kB
+dist/assets/mapAuthoring-C6SSuENz.css               5.84 kB │ gzip:   1.92 kB
+dist/assets/modulepreload-polyfill-B5Qt9EMX.js      0.71 kB │ gzip:   0.40 kB
+dist/assets/mapBenchmark-B2ghczKZ.js               10.33 kB │ gzip:   4.45 kB
+dist/assets/mapAuthoring-Bj8w7PyR.js               25.13 kB │ gzip:   9.57 kB
+dist/assets/admin-zv1IQwrK.js                      27.74 kB │ gzip:   9.36 kB
+dist/assets/schemas-BEeekIwG.js                    95.03 kB │ gzip:  26.97 kB
+dist/assets/main-Dt45yMVu.js                      582.18 kB │ gzip: 155.20 kB
+dist/assets/preview-CAwoJm9a.js                 2,056.52 kB │ gzip: 221.31 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 13.74s
