@@ -34,9 +34,62 @@
         flex-wrap: wrap;
         max-width: calc(100% - 16px);
       }
+      #marks[hidden] {
+        display: none;
+      }
+      #marks {
+        position: fixed;
+        left: 8px;
+        top: 44px;
+        width: min(300px, calc(100% - 16px));
+        background: rgba(42, 33, 24, 0.88);
+        color: #efe6c8;
+        font-size: 13px;
+        padding: 8px;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      #marks-tools,
+      #marks-row,
+      #overlays {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 4px;
+      }
+      #marks button[aria-pressed='true'] {
+        background: #e8b923;
+      }
+      #mark-label {
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 4px;
+      }
+      #login,
+      #account {
+        position: fixed;
+        background: rgba(42, 33, 24, 0.92);
+        color: #efe6c8;
+        font-size: 13px;
+        padding: 8px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      #login {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        max-width: calc(100% - 32px);
+        padding: 16px;
+      }
+      #account {
+        top: 8px;
+        right: 8px;
+      }
       #clock,
-      #orders,
-      #tray {
+      #orders {
         position: fixed;
         background: rgba(42, 33, 24, 0.88);
         color: #efe6c8;
@@ -56,15 +109,7 @@
         max-height: 45%;
         overflow: auto;
       }
-      #tray {
-        right: 8px;
-        top: 44px;
-        bottom: 8px;
-        width: min(320px, 45%);
-        overflow: auto;
-      }
-      #orders h2,
-      #tray h2 {
+      #orders h2 {
         margin: 0 0 4px;
         font-size: 14px;
       }
@@ -74,27 +119,36 @@
         box-sizing: border-box;
         margin-bottom: 4px;
       }
-      #orders ul,
-      #tray ul {
+      #orders ul {
         list-style: none;
         margin: 4px 0 0;
         padding: 0;
       }
-      #tray li {
-        border-top: 1px solid #5a4a36;
-        padding: 4px 0;
-        cursor: pointer;
-      }
-      #tray li.unread {
-        font-weight: bold;
-      }
-      #tray small {
-        display: block;
-        opacity: 0.75;
-        font-weight: normal;
-      }
       #order-err {
         color: #ff9a8a;
+      }
+      /* Orders and in-tray are desk objects: shown as papers over the dollied-in desk, hidden at the table. */
+      #app:not([data-view='orders']) #orders {
+        display: none;
+      }
+      #app[data-view='orders'] #orders {
+        left: 50%;
+        right: auto;
+        top: 8%;
+        bottom: auto;
+        transform: translateX(-50%);
+        width: min(560px, calc(100% - 16px));
+        max-height: 70%;
+        background: #f4eedb;
+        color: #2a2014;
+        padding: 16px 20px;
+        z-index: 3;
+      }
+      #app[data-view='orders'] #orders:focus-visible {
+        outline: 3px solid #ffd76a;
+      }
+      #app[data-view='orders'] #order-err {
+        color: #a83232;
       }
       @media (max-width: 600px) {
         #clock {
@@ -102,16 +156,14 @@
           left: 8px;
           right: auto;
         }
-        #tray {
-          top: auto;
-          bottom: 8px;
-          right: 8px;
-          width: calc(100% - 16px);
-          max-height: 22%;
-        }
         #orders {
           bottom: calc(22% + 16px);
           max-height: 30%;
+        }
+        #app[data-view='orders'] #orders {
+          top: 8%;
+          bottom: auto;
+          max-height: 70%;
         }
       }
     </style>

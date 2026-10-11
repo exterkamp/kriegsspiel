@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TableScene } from '../../table/TableScene.js';
+import { TableScene } from '../../table/FixtureTableScene.js';
 import type { BaseMap, SceneMark, SceneState } from '../../table/types.js';
 import type {
   CameraBookmark,

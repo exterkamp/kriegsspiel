@@ -6,7 +6,7 @@ import { fixtureView } from '../../table/fixture.js';
 import { ContinuousSurface, inArtwork } from './continuousSurface.js';
 
 const harness = vi.hoisted(() => ({ scenes: [] as unknown[] }));
-vi.mock('../../table/TableScene.js', async () => {
+vi.mock('../../table/FixtureTableScene.js', async () => {
   const THREE = await import('three');
   const { rayToMap } = await import('../../table/picking.js');
   class TableScene {

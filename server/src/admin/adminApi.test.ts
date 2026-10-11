@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { serialize } from '@kriegsspiel/engine';
+import { sideViewOf } from '../api/sideView.js';
 import { buildApp, type App } from '../api/app.js';
+import { hashToken } from '../auth/store.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { adminFromEnv, isLoopback } from './adminApi.js';
+import { TraceStore, traceUmpire } from '../debug/index.js';
+import { MockUmpireClient } from '../umpire/index.js';
 
 const RATE = 3600;
 const TOKEN = 'admin-secret-token';
@@ -16,9 +20,11 @@ afterEach(async () => {
 async function start(admin?: { enabled: boolean; token?: string }) {
   app = await buildApp({ parser: new StubOrderParser(), admin });
   const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+  const user = app.authStore.upsertUser('admin-test@example.test', Date.now());
+  app.authStore.putSession(hashToken('test-session'), user.id, Date.now() + 3_600_000);
   const res = await fetch(`${base}/games`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', cookie: 'ks_session=test-session' },
     body: JSON.stringify({ rate: RATE }),
   });
   const game = (await res.json()) as { id: string };
@@ -125,6 +131,18 @@ describe('reads', () => {
     const state = (await get(`/admin/api/games/${id}/state`, '127.0.0.1')).json();
     expect(state.id).toBe(id);
     expect(state.engine.world.units.length).toBeGreaterThan(0);
+    // Each side's view comes with the master state, and holds no more than the filter lets through.
+    expect(Object.keys(state.sideViews).sort()).toEqual(['blue', 'red']);
+    expect(state.sideViews.blue.side).toBe('blue');
+    expect(state.sideViews.blue.ownUnits.length).toBeGreaterThan(0);
+    expect(JSON.stringify(state.sideViews.blue)).not.toContain('"intent"');
+    // Exactly what the hub sends: same builder, same side, same clock.
+    for (const side of ['blue', 'red'] as const) {
+      expect(state.sideViews[side]).toEqual(
+        JSON.parse(JSON.stringify(sideViewOf(app!.host.get(id)!.state, side, state.clock))),
+      );
+    }
+    expect(state.engine.world.units[0]).toHaveProperty('intent');
 
     const all = (await get(`/admin/api/games/${id}/entries?limit=1000`, '127.0.0.1')).json();
     expect(all.entries.length).toBeGreaterThan(1);
@@ -277,5 +295,52 @@ describe('read-only', () => {
         .filter((l) => /admin/.test(l) || /stream|state|entries/.test(l));
       expect(adminSection.join('\n')).not.toMatch(/POST|PUT|PATCH|DELETE/);
     });
+  });
+});
+
+describe('LLM log through the admin API', () => {
+  const KEY = 'sk-ant-api03-FAKEKEYFORTESTING1234567890';
+
+  it('serves mock umpire calls with full prompts and responses, never the API key', async () => {
+    const trace = new TraceStore({ secrets: [KEY] });
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      admin: { enabled: true, trace },
+    });
+    const schema = { type: 'object' };
+    const mock = new MockUmpireClient([
+      { stage: 'judge', output: { verdict: `ok ${KEY}` } },
+      { stage: 'parse', failure: { kind: 'timeout', message: `timed out using ${KEY}` } },
+    ]);
+    const umpire = traceUmpire(mock, { trace, gameId: 'g1', mode: 'playback' });
+    await umpire.call({
+      stage: 'judge',
+      promptVersion: 'j1',
+      system: `You are the umpire. key=${KEY}`,
+      input: { question: 'can they cross?', apiKey: KEY },
+      schema,
+    });
+    await umpire
+      .call({ stage: 'parse', promptVersion: 'p1', system: 's', input: {}, schema })
+      .catch(() => undefined);
+
+    const res = await get('/admin/api/games/g1/entries?kind=llm', '127.0.0.1');
+    expect(res.statusCode).toBe(200);
+    expect(res.body).not.toContain(KEY);
+    expect(res.body).not.toContain('FAKEKEYFORTESTING');
+    const { entries } = res.json() as { entries: { data: Record<string, unknown> }[] };
+    expect(entries).toHaveLength(2);
+    expect(entries[0]!.data).toMatchObject({
+      stage: 'judge',
+      mode: 'playback',
+      model: 'mock',
+      promptVersion: 'j1',
+      system: 'You are the umpire. key=[REDACTED]',
+      schema,
+      response: expect.stringContaining('[REDACTED]'),
+      output: { verdict: 'ok [REDACTED]' },
+      ok: true,
+    });
+    expect(entries[1]!.data).toMatchObject({ stage: 'parse', ok: false, errorKind: 'timeout' });
   });
 });

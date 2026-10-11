@@ -11,7 +11,6 @@ import {
   gameNowMs,
   initialState,
   withPendingOrder,
-  withRead,
 } from './state.js';
 
 const v = PROTOCOL_VERSION;
@@ -75,6 +74,15 @@ describe('applyServerMessage', () => {
   });
 });
 
+describe('server restart', () => {
+  it('keeps a notice that the game came back paused', () => {
+    const s = applyServerMessage(initialState, { v, kind: 'serverRestarted', downMs: 600_000 }, 0);
+    expect(s.notices[0]?.code).toBe('server_restart');
+    expect(s.notices[0]?.message).toContain('at least 10 min');
+    expect(s.notices[0]?.message).toContain('paused');
+  });
+});
+
 describe('game over', () => {
   const over: ServerMessage = {
     v,
@@ -121,12 +129,12 @@ describe('clock', () => {
 
 describe('session params', () => {
   it('picks join, create or fixture', () => {
-    expect(parseSession('?game=g&token=t')).toEqual({ mode: 'join', game: 'g', token: 't' });
-    expect(parseSession('?new=1&rate=12')).toEqual({ mode: 'create', side: 'blue', rate: 12 });
+    expect(parseSession('?game=g')).toEqual({ mode: 'join', game: 'g' });
+    expect(parseSession('?game=g&side=red')).toEqual({ mode: 'join', game: 'g', side: 'red' });
+    expect(parseSession('?new=1&rate=12')).toEqual({ mode: 'create', rate: 12 });
+    expect(parseSession('?new=1&side=red')).toEqual({ mode: 'create', side: 'red' });
     expect(parseSession('')).toEqual({ mode: 'fixture' });
-    expect(wsUrl({ protocol: 'https:', host: 'a.b' }, 'g', 't')).toBe(
-      'wss://a.b/games/g/ws?token=t',
-    );
+    expect(wsUrl({ protocol: 'https:', host: 'a.b' }, 'g')).toBe('wss://a.b/games/g/ws');
   });
 });
 
@@ -216,36 +224,11 @@ describe('Hud', () => {
   function mount() {
     document.body.innerHTML = '<div id="root"></div>';
     const sent: Array<[string | undefined, string]> = [];
-    const opened: Dispatch[] = [];
     const hud = new Hud(document.getElementById('root')!, {
       onSendOrder: (u, t) => (sent.push([u, t]), undefined),
-      onOpenDispatch: (d) => opened.push(d),
     });
-    return { hud, sent, opened };
+    return { hud, sent };
   }
-
-  it('lists dispatches with written and received times and read state, and opens on click', () => {
-    const { hud, opened } = mount();
-    let s = applyServerMessage(
-      initialState,
-      {
-        v,
-        kind: 'viewUpdate',
-        view: { ...fixtureView, dispatches: [disp('d1', { location: { x: 5, y: 6 } })] },
-      },
-      0,
-    );
-    hud.render(s, 0);
-    const li = document.querySelector<HTMLElement>('#tray-list li')!;
-    expect(li.className).toBe('unread');
-    expect(li.textContent).toContain('written Day 1 00:01');
-    expect(li.textContent).toContain('received Day 1 00:02');
-    li.click();
-    expect(opened.map((d) => d.id)).toEqual(['d1']);
-    s = withRead(s, 'd1');
-    hud.render(s, 0);
-    expect(document.querySelector('#tray-list li')!.className).toBe('read');
-  });
 
   it('escapes dispatch text and shows pending orders and the clock', () => {
     const { hud } = mount();
@@ -263,7 +246,6 @@ describe('Hud', () => {
     );
     s = withPendingOrder(s, { orderId: 'o1', text: '1st Battalion, advance', sentAtGame: 60_000 });
     hud.render(s, 0);
-    expect(document.querySelector('#tray-list img')).toBeNull();
     expect(document.querySelector('#pending')!.textContent).toContain('1st Battalion, advance');
     expect(document.querySelector('#clock-text')!.textContent).toBe('Day 1 01:00 · 1:1 · paused');
   });

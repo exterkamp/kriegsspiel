@@ -2,6 +2,10 @@
  * Admin page shell: game picker, live indicator and empty tabbed panels with a shared filter bar.
  * Read-only: it only issues GETs to `/admin/api` and shares nothing with the game client.
  */
+import { LlmPanel } from './llm.js';
+import { EntryStore, type TraceEntry } from './entries.js';
+import { ListPanel } from './listPanel.js';
+import { EVENTS_PANEL, REQUESTS_PANEL } from './panels.js';
 import {
   PANELS,
   adminToken,
@@ -16,8 +20,10 @@ import {
   type LinkStatus,
   type PanelId,
 } from './model.js';
+import { StatePanel, type AdminState } from './state.js';
 
 const POLL_MS = 3000;
+const STATE_DEBOUNCE_MS = 250;
 
 export class AdminPage {
   private status: LinkStatus = 'connecting';
@@ -28,6 +34,9 @@ export class AdminPage {
   private failures = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private streamCount = 0;
+  private statePanel!: StatePanel;
+  private stateReq = 0;
+  private stateTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly token: string | undefined;
 
   private readonly picker: HTMLSelectElement;
@@ -36,6 +45,9 @@ export class AdminPage {
   private readonly tabs = new Map<PanelId, HTMLButtonElement>();
   private readonly panels = new Map<PanelId, HTMLElement>();
   private readonly note: HTMLElement;
+  private readonly llm: LlmPanel;
+  private readonly entries = new EntryStore();
+  private readonly lists = new Map<PanelId, ListPanel>();
 
   constructor(
     private readonly root: HTMLElement,
@@ -74,10 +86,15 @@ export class AdminPage {
       const sec = document.createElement('section');
       sec.setAttribute('role', 'tabpanel');
       sec.dataset.panel = id;
-      sec.innerHTML = `<p class="empty">${id} panel — not implemented yet.</p>`;
       main.append(sec);
+      const config =
+        id === 'Events' ? EVENTS_PANEL : id === 'Requests' ? REQUESTS_PANEL : undefined;
+      if (config) this.lists.set(id, new ListPanel(sec, this.entries, config));
+      else sec.innerHTML = `<p class="empty">${id} panel — not implemented yet.</p>`;
       this.panels.set(id, sec);
     }
+    this.statePanel = new StatePanel(this.panels.get('State')!);
+    this.llm = new LlmPanel(this.panels.get('LLM')!);
     nav.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         this.show(stepPanel(this.panel, e.key === 'ArrowRight' ? 1 : -1), true);
@@ -109,7 +126,9 @@ export class AdminPage {
   }
 
   stop(): void {
+    for (const list of this.lists.values()) list.destroy();
     clearTimeout(this.timer);
+    clearTimeout(this.stateTimer);
     this.closeStream();
   }
 
@@ -126,11 +145,15 @@ export class AdminPage {
     }
     for (const [pid, sec] of this.panels) sec.hidden = pid !== id;
     this.applyFilter();
+    // A list built while hidden had no layout; re-render so it opens at the tail, not the top.
+    this.lists.get(id)?.renderNow();
   }
 
   private applyFilter(): void {
-    // Shell only: later stories hook each panel's rows into this shared filter text.
     this.panels.get(this.panel)!.dataset.filter = this.filter.value;
+    this.statePanel.setFilter(this.filter.value);
+    this.llm.setFilter(this.filter.value);
+    for (const list of this.lists.values()) list.setText(this.filter.value);
   }
 
   private async poll(): Promise<void> {
@@ -151,6 +174,7 @@ export class AdminPage {
         this.openStream(this.gameId);
       }
       this.render();
+      void this.refreshState();
       this.timer = setTimeout(() => void this.poll(), POLL_MS);
     } catch {
       this.failures++;
@@ -173,21 +197,50 @@ export class AdminPage {
     this.gameId = id;
     this.closeStream();
     this.streamCount = 0;
+    this.llm.reset();
+    this.entries.clear();
+    for (const list of this.lists.values()) list.reset();
     this.status = id ? 'connecting' : 'live';
-    if (id) this.openStream(id);
+    this.statePanel.showMessage(id ? 'Loading state…' : 'No game selected.');
+    if (id) {
+      this.openStream(id);
+      void this.refreshState();
+    }
     this.render();
   }
 
   private openStream(id: string): void {
     // EventSource reconnects by itself after network errors; we mirror its state and reopen it if it gives up.
-    const es = new EventSource(apiUrl(`games/${encodeURIComponent(id)}/stream`, this.token));
+    // Resume after what we already hold; the server replays the backlog from there, then goes live.
+    const after = this.entries.lastSeq;
+    const es = new EventSource(
+      apiUrl(
+        `games/${encodeURIComponent(id)}/stream`,
+        this.token,
+        after ? { after: String(after) } : {},
+      ),
+    );
     this.stream = es;
     es.onopen = () => {
       this.status = 'live';
       this.render();
     };
-    es.onmessage = () => {
+    es.onmessage = (e: MessageEvent<string>) => {
       this.streamCount++;
+      // A trace entry means something changed; refetch the state, at most a few times a second.
+      if (!this.stateTimer) {
+        this.stateTimer = setTimeout(() => {
+          this.stateTimer = undefined;
+          void this.refreshState();
+        }, STATE_DEBOUNCE_MS);
+      }
+      try {
+        const entry = JSON.parse(e.data) as TraceEntry;
+        this.llm.add(entry);
+        if (this.entries.add(entry)) for (const list of this.lists.values()) list.refresh();
+      } catch {
+        // A malformed frame is skipped; the stream carries on.
+      }
       this.render();
     };
     es.onerror = () => {
@@ -196,6 +249,27 @@ export class AdminPage {
       if (es.readyState === EventSource.CLOSED) this.closeStream();
       this.render();
     };
+  }
+
+  /** Fetches the master state and both side views of the selected game into the State panel. */
+  private async refreshState(): Promise<void> {
+    const id = this.gameId;
+    if (!id) return;
+    // Poll- and stream-driven refreshes can overlap; only the latest request may write.
+    const req = ++this.stateReq;
+    const current = () => id === this.gameId && req === this.stateReq;
+    try {
+      const res = await this.fetchFn(apiUrl(`games/${encodeURIComponent(id)}/state`, this.token));
+      if (!current()) return;
+      if (res.status === 404)
+        return this.statePanel.showMessage('This game is not open; no live state.');
+      if (!res.ok) throw new Error(String(res.status));
+      const body = (await res.json()) as AdminState;
+      if (current()) this.statePanel.update(body);
+    } catch {
+      // Keep the last good state but dim it, so old data never passes for current; the next refresh retries.
+      if (current()) this.statePanel.markStale();
+    }
   }
 
   private closeStream(): void {

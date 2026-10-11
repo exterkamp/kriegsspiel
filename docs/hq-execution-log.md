@@ -269,3 +269,30 @@ Full post-resolution lint, types, tests and build exited zero: 1,363 passed (290
 ### User validation guide — 16:18 PDT
 
 Added `docs/hq-getting-started.md` at the owner's request: delivered feature inventory, managed-launcher setup instructions, exact navigation/button labels, known fixture data, a 15-minute first pass and extended browser/device/persistence validation with expected results. Includes five shape examples, all three report-plotting paths, cancellation/recovery, explicit Save versus autosave, unavailable services and a copyable result table. Instructions were cross-checked against source; no browser/server was started and manual acceptance remains pending. Linked from README and HQ interface docs. Documentation formatting and local links verified; no design or code changed.
+
+
+## Feedback fix kickoff — 2026-10-10
+
+Owner authorized the four feedback fix packets and requested Herdr panes with fresh context to reduce token costs. Preserved HQ HEAD `f6b4b5959dee781083b141955e02a102d25b7527`, original feedback wording/images and fix plan under `/private/tmp/hq-feedback-pass-20261010/`. Initial untracked files: `docs/hq-feedback.md`, `docs/hq-feedback-fix-plan.md`, `docs/hq-feedback-assets/`; no product edits. The inbox retains its capture owner.
+
+Refreshed accepted main to `1e2f84706a8218f6c421452874afa66069fc0e4b`. Open external PR owners: #209 parse-orders and #207 admin replay are exterkamp; #151 procedural maps is dfezzie on its separate active checkout. HQ #193 remains assigned dfezzie and open. Consume committed main only; no control or edits of map checkout/panes/devrun session.
+
+Fresh native `/clear` chats verified in each idle implementation/review pane before dispatch; saved files/history are preserved. Effective settings verified from native footers:
+
+| Agent / pane | Model / effort | Owned work |
+| --- | --- | --- |
+| hq-continuous / w3:p2 | GPT-6.1-Sol high | Shared timestamp presentation and named adoption files; awaiting baseline |
+| hq-shell / w3:p4 | GPT-6.1-Sol medium | Table/roster, then serialized shell settings/focus; awaiting baseline |
+| hq-review / w3:p3 | GPT-6.1-Sol high | Read-only baseline/contracts and independent correctness review |
+| hq-feedback / w5:p1 | GPT-6.1-Sol medium | Feedback inbox and original assets; capture context retained |
+
+No owner spending ceiling supplied. Measured per-packet tokens/cost unavailable (unknown, not zero). Bound work by exclusive file packets, two HQ writers maximum and focused review.
+
+Browser baseline: Chrome preview `http://127.0.0.1:41161/`, observed CSS viewport 1456×846, zoom not independently established. Before images stored under the preservation directory's `browser/`: `before-clock.jpg`, `before-roster.jpg`. Mouse activation of Roster reproduced focus on semantic `h2[tabindex=-1]` with full-width blue outline. Roster wrapper client width 768 px, table/scroll width about 930 px; Commander broke inside the word and the seventh action column required scrolling. Raw clock/source/roster millisecond displays and exposed footer preferences reproduced. Browser also displayed an existing preferences revision conflict; preserve that recoverable state during Settings work. Original owner's screenshot viewport/zoom remains unknown.
+
+Baseline integration is in progress: preserve main's accepted cookie auth/live desk/side-shared marks at their canonical table paths, and retain the HQ fixture renderer and strict private mark helper under `FixtureTableScene.ts` and `fixtureMarks.ts` with their original tests. HQ ContinuousSurface selects the fixture renderer. Full incoming main composition replaces the obsolete token-based `liveClient.ts`; the fixture router stays in `main.ts`. Independent review is required before accepting this integration. No merge/deployment of PRs authorized.
+
+
+Baseline gate: independent reviewer accepted the renderer split and confirmed live composition/canonical renderer matches incoming main. Repaired missed fixture spy import; preserved all cleanup assertions. Added three bootstrap checks for default fixture versus authenticated create/join routing; corrected a test-only mock cache issue, then all three passed. Updated accepted cookie-auth URLs and renderer contract naming. Incoming Svelte desk had an unused PILES import and formatting mismatch; fixed those bounded lint failures.
+
+Clean npm ci passed. Baseline full engine/protocol/server suites passed (328/55/432 plus one optional skip); client rerun passed all 724 tests after the import repair, followed by three bootstrap tests. Typecheck passed with zero Svelte errors/warnings; lint and production build passed. Build retains a large client-chunk warning (~830 kB) and dependency annotation warnings. Installation reports three dependency audit findings; no unrelated breaking dependency upgrade applied. Formatter signature and table presentation rules are frozen in the feedback fix plan; no writer overlap.

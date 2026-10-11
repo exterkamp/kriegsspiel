@@ -7,6 +7,7 @@
  */
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { Mark } from '@kriegsspiel/protocol';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
 import type { PauseTransition } from '../pause.js';
@@ -40,7 +41,12 @@ export type GameCommand =
   | { kind: 'proposeRate'; by: string; rate: number }
   | { kind: 'rateVote'; by: string; proposal: string; yes: boolean }
   /** A ratio vote ran out of time. Issued by the actor's own timer. */
-  | { kind: 'rateExpire' };
+  | { kind: 'rateExpire' }
+  /**
+   * The server came back after being down for `downMs` of wall time (an estimate, from the last
+   * heartbeat). Journal only: the game was reopened paused, so no game time passed.
+   */
+  | { kind: 'restart'; downMs: number };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {
@@ -98,12 +104,18 @@ export interface GameStore {
    */
   saveProgress(gameId: string, gameMs: number): Promise<void>;
   loadProgress(gameId: string): Promise<number | undefined>;
+  /** Remember the last wall time the server was seen alive for this game, so a restart can measure downtime. */
+  saveHeartbeat(gameId: string, wallMs: number): Promise<void>;
+  loadHeartbeat(gameId: string): Promise<number | undefined>;
   /** Append clock changes (rate, pause, mode) to the game's clock history. */
   appendClockHistory(gameId: string, changes: readonly ClockChange[]): Promise<void>;
   clockHistory(gameId: string): Promise<readonly ClockChange[]>;
   /** Keep the latest per-side views, as of a snapshot. */
   saveViews(gameId: string, views: SideViews): Promise<void>;
   loadViews(gameId: string): Promise<SideViews | undefined>;
+  /** A side's marks (player drawings). Not game input: they are not logged or replayed. */
+  saveMarks(gameId: string, side: string, marks: readonly Mark[]): Promise<void>;
+  loadMarks(gameId: string, side: string): Promise<Mark[]>;
   listGames(): Promise<string[]>;
 }
 
@@ -114,6 +126,15 @@ export class MemoryGameStore implements GameStore {
   private readonly progress = new Map<string, number>();
   private readonly clockLogs = new Map<string, ClockChange[]>();
   private readonly views = new Map<string, SideViews>();
+  private readonly marks = new Map<string, Mark[]>();
+
+  async saveMarks(gameId: string, side: string, marks: readonly Mark[]): Promise<void> {
+    this.marks.set(`${gameId}\0${side}`, structuredClone([...marks]));
+  }
+
+  async loadMarks(gameId: string, side: string): Promise<Mark[]> {
+    return structuredClone(this.marks.get(`${gameId}\0${side}`) ?? []);
+  }
 
   async saveProgress(gameId: string, gameMs: number): Promise<void> {
     this.progress.set(gameId, Math.max(gameMs, this.progress.get(gameId) ?? gameMs));
@@ -121,6 +142,16 @@ export class MemoryGameStore implements GameStore {
 
   async loadProgress(gameId: string): Promise<number | undefined> {
     return this.progress.get(gameId);
+  }
+
+  private readonly heartbeats = new Map<string, number>();
+
+  async saveHeartbeat(gameId: string, wallMs: number): Promise<void> {
+    this.heartbeats.set(gameId, Math.max(wallMs, this.heartbeats.get(gameId) ?? wallMs));
+  }
+
+  async loadHeartbeat(gameId: string): Promise<number | undefined> {
+    return this.heartbeats.get(gameId);
   }
 
   async appendClockHistory(gameId: string, changes: readonly ClockChange[]): Promise<void> {

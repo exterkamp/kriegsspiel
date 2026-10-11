@@ -8,8 +8,14 @@ import {
   holdTheBridge,
   loadScenario,
 } from '@kriegsspiel/engine';
-import { PROTOCOL_VERSION, parseServerMessage, type ServerMessage } from '@kriegsspiel/protocol';
-import { afterEach, describe, expect, it } from 'vitest';
+import {
+  MAX_LINE_POINTS,
+  MAX_MARKS,
+  PROTOCOL_VERSION,
+  parseServerMessage,
+  type ServerMessage,
+} from '@kriegsspiel/protocol';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   MemoryGameStore,
   createRegistry,
@@ -56,8 +62,14 @@ class Client {
     });
   }
 
-  static async connect(url: string): Promise<Client> {
-    const socket = new WebSocket(url);
+  static async connect(url: string, cookie?: string): Promise<Client> {
+    // Node's WebSocket (undici) takes request headers as a second argument.
+    const socket = new (
+      WebSocket as unknown as new (
+        url: string,
+        init?: { headers: Record<string, string> },
+      ) => WebSocket
+    )(url, cookie ? { headers: { cookie } } : undefined);
     const client = new Client(socket);
     await new Promise<void>((resolve, reject) => {
       socket.addEventListener('open', () => resolve());
@@ -107,9 +119,19 @@ class Client {
 interface Created {
   id: string;
   rate: number;
-  tokens: Record<string, string>;
-  ws: Record<string, string>;
+  side: 'blue' | 'red';
+  ws: string;
+  /** Session cookie of the user sitting on each side. */
+  cookies: Partial<Record<'blue' | 'red', string>>;
 }
+
+/** Login links the app "mailed", newest last. */
+const mailbox: Array<{ to: string; link: string }> = [];
+const mailer = {
+  async sendLoginLink(to: string, link: string) {
+    mailbox.push({ to, link });
+  },
+};
 
 let app: App | undefined;
 let store: MemoryGameStore;
@@ -119,26 +141,53 @@ afterEach(async () => {
   clients.splice(0).forEach((c) => c.socket.close());
   await app?.server.close();
   app = undefined;
+  mailbox.length = 0;
 });
 
 async function start() {
   store = new MemoryGameStore();
-  app = await buildApp({ parser: new StubOrderParser(), store });
+  app = await buildApp({ parser: new StubOrderParser(), store, auth: { mailer } });
   const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
   return { base, ws: base.replace('http', 'ws') };
 }
 
-async function createGame(base: string, body: unknown = { rate: RATE }) {
-  const res = await fetch(`${base}/games`, {
+/** Log in through the magic link and return the session cookie to send back. */
+async function signIn(base: string, email: string): Promise<string> {
+  const asked = await fetch(`${base}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ email }),
   });
-  return { status: res.status, json: (await res.json()) as Created };
+  expect(asked.status).toBe(202);
+  const mail = mailbox.filter((m) => m.to === email).at(-1)!;
+  const link = new URL(mail.link);
+  const res = await fetch(`${base}${link.pathname}${link.search}`, { redirect: 'manual' });
+  expect(res.status).toBe(302);
+  return res.headers.get('set-cookie')!.split(';')[0]!;
+}
+
+const json = (cookie: string | undefined, body: unknown): RequestInit => ({
+  method: 'POST',
+  headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+  body: JSON.stringify(body),
+});
+
+/** A blue player creates a game; a red player joins it unless `joinRed` is off (a scripted Red, or a test that times the game from creation). */
+async function createGame(base: string, body: unknown = { rate: RATE }, joinRed = true) {
+  const blue = await signIn(base, `blue-${mailbox.length}@example.test`);
+  const res = await fetch(`${base}/games`, json(blue, body));
+  const created = (await res.json()) as Created;
+  if (res.status !== 201) return { status: res.status, json: created };
+  created.cookies = { [created.side]: blue };
+  if (!joinRed) return { status: res.status, json: created };
+  const red = await signIn(base, `red-${mailbox.length}@example.test`);
+  const joined = await fetch(`${base}/games/${created.id}/join`, json(red, { side: 'red' }));
+  if (joined.status === 200) created.cookies.red = red;
+  return { status: res.status, json: created };
 }
 
 async function join(ws: string, game: Created, side: 'blue' | 'red') {
-  const c = await Client.connect(`${ws}${game.ws[side]}`);
+  const c = await Client.connect(`${ws}${game.ws}`, game.cookies[side]);
   clients.push(c);
   return c;
 }
@@ -152,8 +201,8 @@ describe('POST /games', () => {
     const { status, json } = await createGame(base, { rate: 12 });
     expect(status).toBe(201);
     expect(json.rate).toBe(12);
-    expect(Object.keys(json.tokens).sort()).toEqual(['blue', 'red']);
-    expect(json.tokens.blue).not.toBe(json.tokens.red);
+    expect(json.side).toBe('blue');
+    expect(Object.keys(json.cookies).sort()).toEqual(['blue', 'red']);
     expect(app!.host.get(json.id)).toBeDefined();
   });
 
@@ -175,22 +224,172 @@ describe('POST /games', () => {
   });
 });
 
+describe('restart notice', () => {
+  it('tells a player who joins a reopened game that it came back paused', async () => {
+    const { base, ws } = await start();
+    const { json: game } = await createGame(base);
+    const fresh = await join(ws, game, 'blue');
+    await fresh.waitFor('viewUpdate');
+    expect(fresh.messages.some((m) => m.kind === 'serverRestarted')).toBe(false);
+
+    await app!.host.close(game.id);
+    await app!.host.open(game.id);
+    const c = await join(ws, game, 'blue');
+    const note = await c.waitFor('serverRestarted');
+    expect(note.downMs).toBeGreaterThanOrEqual(0);
+    const view = await c.waitFor('viewUpdate');
+    expect(view.view.clock.status).toBe('paused');
+  });
+
+  it('does not tell a later joiner once the game has been resumed', async () => {
+    const { base, ws } = await start();
+    const { json: game } = await createGame(base);
+    await app!.host.close(game.id);
+    const reopened = await app!.host.open(game.id);
+    await reopened.submit({ kind: 'resume' });
+    expect(reopened.gameClock.status).toBe('running');
+    const c = await join(ws, game, 'blue');
+    const view = await c.waitFor('viewUpdate');
+    expect(view.view.clock.status).toBe('running');
+    expect(c.messages.some((m) => m.kind === 'serverRestarted')).toBe(false);
+  });
+});
+
 describe('WebSocket auth', () => {
-  it('refuses a missing or wrong token and an unknown game', async () => {
+  it('refuses no session, a bad session and an unknown game', async () => {
     const { base, ws } = await start();
     const { json } = await createGame(base);
     await expect(Client.connect(`${ws}/games/${json.id}/ws`)).rejects.toThrow();
-    await expect(Client.connect(`${ws}/games/${json.id}/ws?token=nope`)).rejects.toThrow();
-    await expect(
-      Client.connect(`${ws}/games/missing/ws?token=${json.tokens.blue}`),
-    ).rejects.toThrow();
+    await expect(Client.connect(`${ws}/games/${json.id}/ws`, 'ks_session=nope')).rejects.toThrow();
+    await expect(Client.connect(`${ws}/games/missing/ws`, json.cookies.blue)).rejects.toThrow();
   });
 
-  it('does not let one game’s token into another', async () => {
+  it('lets a signed-in user without a seat in that game stay out', async () => {
     const { base, ws } = await start();
     const a = (await createGame(base)).json;
     const b = (await createGame(base)).json;
-    await expect(Client.connect(`${ws}/games/${b.id}/ws?token=${a.tokens.blue}`)).rejects.toThrow();
+    await expect(Client.connect(`${ws}/games/${b.id}/ws`, a.cookies.blue)).rejects.toThrow();
+    const stranger = await signIn(base, 'stranger@example.test');
+    await expect(Client.connect(`${ws}/games/${b.id}/ws`, stranger)).rejects.toThrow();
+  });
+
+  it('puts each user on their own side', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    expect((await blue.waitFor('viewUpdate')).view.side).toBe('blue');
+    expect((await red.waitFor('viewUpdate')).view.side).toBe('red');
+  });
+
+  it('does not accept the old ?token= parameter', async () => {
+    const { base, ws } = await start();
+    const { json } = await createGame(base);
+    await expect(Client.connect(`${ws}/games/${json.id}/ws?token=abc`)).rejects.toThrow();
+  });
+});
+
+describe('sign-out and deletion', () => {
+  async function waitClosed(c: Client) {
+    const deadline = Date.now() + 3000;
+    while (!c.closed && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10));
+    return c.closed;
+  }
+
+  it('closes the player’s sockets on logout, then refuses a new connection', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    await blue.waitFor('viewUpdate');
+    await fetch(`${base}/auth/logout`, { method: 'POST', headers: { cookie: game.cookies.blue! } });
+    expect(await waitClosed(blue)).toBe(true);
+    expect(red.closed).toBe(false);
+    await expect(Client.connect(`${ws}${game.ws}`, game.cookies.blue)).rejects.toThrow();
+  });
+
+  it('closes the sockets and frees the seat when the account is deleted', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const red = await join(ws, game, 'red');
+    await red.waitFor('viewUpdate');
+    const res = await fetch(`${base}/auth/account`, {
+      method: 'DELETE',
+      headers: { cookie: game.cookies.red! },
+    });
+    expect(res.status).toBe(204);
+    expect(await waitClosed(red)).toBe(true);
+    expect(app!.authStore.seatsOf(game.id).map((s) => s.side)).toEqual(['blue']);
+  });
+});
+
+describe('seats', () => {
+  it('needs a session to create or join', async () => {
+    const { base } = await start();
+    expect((await fetch(`${base}/games`, json(undefined, {}))).status).toBe(401);
+    const { json: game } = await createGame(base);
+    expect(
+      (await fetch(`${base}/games/${game.id}/join`, json(undefined, { side: 'red' }))).status,
+    ).toBe(401);
+    expect((await fetch(`${base}/games/${game.id}`)).status).toBe(401);
+  });
+
+  it('gives a side to one user only, and one side to a user', async () => {
+    const { base } = await start();
+    const { json: game } = await createGame(base);
+    const third = await signIn(base, 'third@example.test');
+    expect(
+      (await fetch(`${base}/games/${game.id}/join`, json(third, { side: 'red' }))).status,
+    ).toBe(409);
+    expect(
+      (await fetch(`${base}/games/${game.id}/join`, json(game.cookies.blue, { side: 'red' })))
+        .status,
+    ).toBe(409);
+    // Joining the seat you already hold is a no-op.
+    expect(
+      (await fetch(`${base}/games/${game.id}/join`, json(game.cookies.blue, { side: 'blue' })))
+        .status,
+    ).toBe(200);
+    expect((await fetch(`${base}/games/missing/join`, json(third, { side: 'red' }))).status).toBe(
+      404,
+    );
+  });
+
+  it('lists the sides and which is yours', async () => {
+    const { base } = await start();
+    const created = await fetch(
+      `${base}/games`,
+      json(await signIn(base, 'a@example.test'), { side: 'red' }),
+    );
+    const game = (await created.json()) as Created;
+    const guest = await signIn(base, 'b@example.test');
+    const info = await fetch(`${base}/games/${game.id}`, { headers: { cookie: guest } });
+    expect(await info.json()).toEqual({
+      id: game.id,
+      you: null,
+      sides: [
+        { side: 'blue', taken: false },
+        { side: 'red', taken: true },
+      ],
+    });
+  });
+
+  it('refuses a scripted side when the built-in opponent plays it', async () => {
+    store = new MemoryGameStore();
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      store,
+      scriptedOpponents: true,
+      auth: { mailer },
+    });
+    const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+    const cookie = await signIn(base, 'a@example.test');
+    expect((await fetch(`${base}/games`, json(cookie, { side: 'red' }))).status).toBe(400);
+    const made = (await (await fetch(`${base}/games`, json(cookie, {}))).json()) as Created;
+    const other = await signIn(base, 'b@example.test');
+    expect(
+      (await fetch(`${base}/games/${made.id}/join`, json(other, { side: 'red' }))).status,
+    ).toBe(400);
   });
 });
 
@@ -376,6 +575,98 @@ describe('orders', () => {
   });
 });
 
+describe('marks', () => {
+  const pin = (id: string, x = 100) => ({
+    id,
+    kind: 'pin',
+    at: { x, y: 200 },
+    label: 'enemy cav',
+    madeAtGame: 60_000,
+    sourceReport: 'd1',
+  });
+  const put = (mark: unknown) => JSON.stringify({ v, kind: 'putMark', mark });
+
+  it('starts empty, shares a side’s marks between its connections, and keeps them from the other side', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const a = await join(ws, game, 'blue');
+    const b = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    expect((await a.waitFor('marks')).marks).toEqual([]);
+    a.send(put(pin('m1')));
+    const seen = await b.waitFor('marks', (m) => m.marks.length === 1);
+    expect(seen.marks[0]).toEqual(pin('m1'));
+    // Not corrected: the mark comes back exactly as sent, wherever the truth is.
+    a.send(put({ ...pin('m1'), at: { x: 5, y: 6 } }));
+    await b.waitFor(
+      'marks',
+      (m) => m.marks.length === 1 && 'at' in m.marks[0]! && m.marks[0].at.x === 5,
+    );
+    expect((await red.waitFor('marks')).marks).toEqual([]);
+    expect(red.messages.filter((m) => m.kind === 'marks')).toHaveLength(1);
+  });
+
+  it('persists across a reload (a new connection) and survives delete', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const a = await join(ws, game, 'blue');
+    a.send(put(pin('m1')));
+    a.send(put(pin('m2', 300)));
+    await a.waitFor('marks', (m) => m.marks.length === 2);
+    a.socket.close();
+    const again = await join(ws, game, 'blue');
+    expect((await again.waitFor('marks')).marks.map((m) => m.id)).toEqual(['m1', 'm2']);
+    again.send(JSON.stringify({ v, kind: 'deleteMark', markId: 'm1' }));
+    await again.waitFor('marks', (m) => m.marks.length === 1);
+    await vi.waitFor(async () =>
+      expect((await store.loadMarks(game.id, 'blue')).map((m) => m.id)).toEqual(['m2']),
+    );
+  });
+
+  it('carries a maximum-size pencil line of full-precision points without dropping the connection', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const a = await join(ws, game, 'blue');
+    await a.waitFor('marks');
+    const points = Array.from({ length: MAX_LINE_POINTS }, (_, i) => ({
+      x: 1234.5678901234567 + i * 1.0000000000001,
+      y: 2345.678901234567 + i * 1.0000000000001,
+    }));
+    const line = { id: 'big', kind: 'line', points, madeAtGame: 60_000, label: 'x'.repeat(80) };
+    const frame = put(line);
+    expect(Buffer.byteLength(frame)).toBeLessThan(16 * 1024);
+    a.send(frame);
+    const seen = await a.waitFor('marks', (m) => m.marks.length === 1);
+    expect(seen.marks[0]).toEqual(line);
+    await vi.waitFor(async () =>
+      expect((await store.loadMarks(game.id, 'blue')).map((m) => m.id)).toEqual(['big']),
+    );
+  });
+
+  it('refuses an invalid mark and a side’s 501st mark', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    // A side already at the cap (written straight to the store, so the test is not 500 round trips).
+    await store.saveMarks(
+      game.id,
+      'blue',
+      Array.from({ length: MAX_MARKS }, (_, i) => pin(`p${i}`, i)) as never,
+    );
+    const a = await join(ws, game, 'blue');
+    await a.waitFor('marks', (m) => m.marks.length === MAX_MARKS);
+    a.send(put({ id: 'bad', kind: 'ring', at: { x: 1, y: 1 }, radius: -5, madeAtGame: 0 }));
+    await a.waitFor('error', (m) => m.code === 'bad_message');
+    a.send(put(pin('one-too-many')));
+    await a.waitFor('error', (m) => m.code === 'too_many_marks');
+    // Replacing a mark that exists is still allowed at the cap.
+    a.send(put(pin('p0', 9)));
+    await a.waitFor('marks', (m) => {
+      const first = m.marks[0];
+      return m.marks.length === MAX_MARKS && first?.kind === 'pin' && first.at.x === 9;
+    });
+  });
+});
+
 describe('malformed messages', () => {
   it('rejects each without crashing, and the connection still works', async () => {
     const { base, ws } = await start();
@@ -437,6 +728,7 @@ describe('scripted opponent', () => {
       parser: new StubOrderParser(),
       store,
       scriptedOpponents: scriptedOpponentsFromEnv(env),
+      auth: { mailer },
     });
     const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
     return base;
@@ -447,7 +739,7 @@ describe('scripted opponent', () => {
 
   it('moves Red by default with no client input', async () => {
     const base = await startLikeMain({});
-    const game = (await createGame(base, { rate: 86_400 })).json;
+    const game = (await createGame(base, { rate: 86_400 }, false)).json;
     const start = redUnits(game.id).map((u) => u.center);
     const deadline = Date.now() + 5000;
     while (Date.now() < deadline) {
@@ -468,7 +760,7 @@ describe('scripted opponent', () => {
     // Calibrate the wait: time how long the default setting takes to produce an agent order, so
     // the idle check below can't pass vacuously by looking for less time than that.
     const defaultBase = await startLikeMain({});
-    const calibration = (await createGame(defaultBase, { rate: 86_400 })).json;
+    const calibration = (await createGame(defaultBase, { rate: 86_400 }, false)).json;
     const t0 = Date.now();
     while (!(await store.inputLog(calibration.id)).some((e) => e.agent)) {
       if (Date.now() - t0 > 5000) throw new Error('default setting never produced an agent order');
@@ -478,7 +770,7 @@ describe('scripted opponent', () => {
     await app!.server.close();
 
     const base = await startLikeMain({ SCRIPTED_OPPONENTS: '0' });
-    const game = (await createGame(base, { rate: 86_400 })).json;
+    const game = (await createGame(base, { rate: 86_400 }, false)).json;
     await new Promise((r) => setTimeout(r, Math.max(500, agentLatency * 3)));
     expect((await store.inputLog(game.id)).some((e) => e.agent)).toBe(false);
   });
@@ -503,7 +795,11 @@ describe('deployment endpoints', () => {
   it('answers /healthz and serves the built client from staticDir', async () => {
     const dir = mkdtempSync(joinPath(tmpdir(), 'ks-static-'));
     writeFileSync(joinPath(dir, 'index.html'), '<title>ks</title>');
-    const { server } = await buildApp({ parser: new StubOrderParser(), staticDir: dir });
+    const { server } = await buildApp({
+      parser: new StubOrderParser(),
+      staticDir: dir,
+      auth: { mailer },
+    });
     try {
       const health = await server.inject('/healthz');
       expect(health.statusCode).toBe(200);
@@ -512,7 +808,7 @@ describe('deployment endpoints', () => {
       expect(page.statusCode).toBe(200);
       expect(page.body).toContain('<title>ks</title>');
       expect((await server.inject({ method: 'POST', url: '/games', payload: {} })).statusCode).toBe(
-        201,
+        401,
       );
     } finally {
       await server.close();

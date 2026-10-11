@@ -44,6 +44,7 @@ export class TracedUmpireClient implements UmpireClient {
         provider: r.provider ?? this.o.provider ?? 'unknown',
         model: r.model,
         response: r.rawOutput,
+        output: res.output,
         latencyMs: this.now() - start,
         usage: r.usage,
         costUsd: r.costUsd,

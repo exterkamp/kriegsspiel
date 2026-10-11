@@ -14,7 +14,7 @@ class FakeES {
   readyState = 1;
   onopen?: () => void;
   onerror?: () => void;
-  onmessage?: () => void;
+  onmessage?: (e: { data: string }) => void;
   closed = false;
   constructor(public url: string) {
     FakeES.last = this;
@@ -55,6 +55,9 @@ describe('model', () => {
   });
 });
 
+/** A trace frame that only signals "something changed"; the State panel refetches on any entry. */
+const frame = () => ({ data: JSON.stringify({ seq: 1, ts: 1, kind: 'engine', data: {} }) });
+
 describe('AdminPage', () => {
   function mount(fetchFn: typeof fetch) {
     vi.stubGlobal('EventSource', FakeES);
@@ -91,6 +94,25 @@ describe('AdminPage', () => {
     expect(document.querySelector<HTMLElement>('#live')!.dataset.status).toBe('live');
     FakeES.last!.onerror!();
     expect(page.linkStatus).toBe('reconnecting');
+    page.stop();
+  });
+
+  it('fills the LLM panel from streamed entries and clears it on a game switch', async () => {
+    const page = mount(vi.fn(() => ok({ games })));
+    page.start();
+    await flush();
+    const msg = (seq: number, kind: string) => ({
+      data: JSON.stringify({ seq, ts: 1, kind, data: { stage: 'judge', ok: true } }),
+    });
+    FakeES.last!.onmessage!(msg(1, 'llm'));
+    FakeES.last!.onmessage!(msg(2, 'engine'));
+    FakeES.last!.onmessage!({ data: 'not json' });
+    const rows = () => document.querySelectorAll('section[data-panel="LLM"] tbody tr[data-seq]');
+    expect(rows()).toHaveLength(1);
+    const picker = document.querySelector<HTMLSelectElement>('#game')!;
+    picker.value = 'bbbbbbbb-2';
+    picker.dispatchEvent(new Event('change'));
+    expect(rows()).toHaveLength(0);
     page.stop();
   });
 
@@ -198,5 +220,103 @@ describe('AdminPage', () => {
     expect(page.linkStatus).toBe('connecting');
     expect(FakeES.last!.url).toBe('/admin/api/games/bbbbbbbb-2/stream');
     page.stop();
+  });
+
+  it('loads the state of the selected game and refreshes it on stream entries', async () => {
+    const stateBody = {
+      id: 'aaaaaaaa-1',
+      engine: { time: 1000, rng: 1, nextSeq: 1, queue: [], world: { seed: 5, units: [] } },
+      sideViews: {},
+    };
+    const fetchFn = vi.fn((url: string) => ok(url.includes('/state') ? stateBody : { games }));
+    const page = mount(fetchFn as never);
+    page.start();
+    await flush();
+    expect(fetchFn).toHaveBeenCalledWith('/admin/api/games/aaaaaaaa-1/state');
+    expect(document.querySelector('section[data-panel="State"]')!.textContent).toContain('1000 ms');
+    stateBody.engine.time = 2000;
+    FakeES.last!.onmessage!(frame());
+    await vi.advanceTimersByTimeAsync(300);
+    expect(document.querySelector('section[data-panel="State"]')!.textContent).toContain('2000 ms');
+    page.stop();
+  });
+
+  describe('state refresh races', () => {
+    const body = (game: string, time: number) => ({
+      id: game,
+      engine: { time, rng: 1, nextSeq: 1, queue: [], world: { seed: 5, units: [] } },
+      sideViews: {},
+    });
+    const panel = () => document.querySelector('section[data-panel="State"]')!;
+
+    it('drops a slow response for a game that is no longer selected', async () => {
+      let release!: (v: never) => void;
+      const slow = new Promise<never>((r) => (release = r));
+      const fetchFn = vi.fn((url: string) => {
+        if (!url.includes('/state')) return ok({ games: [games[0], { ...games[1], open: true }] });
+        return url.includes('aaaaaaaa-1') ? slow : ok(body('bbbbbbbb-2', 2222));
+      });
+      const page = mount(fetchFn as never);
+      page.start();
+      await flush();
+      const picker = document.querySelector<HTMLSelectElement>('#game')!;
+      picker.value = 'bbbbbbbb-2';
+      picker.dispatchEvent(new Event('change'));
+      await flush();
+      expect(panel().textContent).toContain('2222 ms');
+      release({ ok: true, status: 200, json: async () => body('aaaaaaaa-1', 1111) } as never);
+      await flush();
+      expect(panel().textContent).toContain('2222 ms');
+      expect(panel().textContent).not.toContain('1111 ms');
+      page.stop();
+    });
+
+    it('drops an older response that resolves after a newer one', async () => {
+      const pending: Array<(v: never) => void> = [];
+      let first = true;
+      const fetchFn = vi.fn((url: string) => {
+        if (!url.includes('/state')) return ok({ games });
+        if (first) {
+          first = false;
+          return new Promise<never>((r) => pending.push(r));
+        }
+        return ok(body('aaaaaaaa-1', 3000));
+      });
+      const page = mount(fetchFn as never);
+      page.start();
+      await flush();
+      FakeES.last!.onmessage!(frame());
+      await vi.advanceTimersByTimeAsync(300);
+      expect(panel().textContent).toContain('3000 ms');
+      pending[0]!({ ok: true, status: 200, json: async () => body('aaaaaaaa-1', 1000) } as never);
+      await flush();
+      expect(panel().textContent).toContain('3000 ms');
+      page.stop();
+    });
+
+    it('dims the last good state when a refresh fails, and clears it on recovery', async () => {
+      let fail = false;
+      const fetchFn = vi.fn((url: string) => {
+        if (!url.includes('/state')) return ok({ games });
+        return fail
+          ? (Promise.resolve({ ok: false, status: 500 }) as never)
+          : ok(body('aaaaaaaa-1', 1000));
+      });
+      const page = mount(fetchFn as never);
+      page.start();
+      await flush();
+      const root = panel().querySelector('[data-stale]') ?? panel();
+      expect(document.querySelector('[data-stale="true"]')).toBeNull();
+      fail = true;
+      FakeES.last!.onmessage!(frame());
+      await vi.advanceTimersByTimeAsync(300);
+      expect(document.querySelector('[data-stale="true"]')).not.toBeNull();
+      expect(root.textContent).toContain('1000 ms');
+      fail = false;
+      FakeES.last!.onmessage!(frame());
+      await vi.advanceTimersByTimeAsync(300);
+      expect(document.querySelector('[data-stale="true"]')).toBeNull();
+      page.stop();
+    });
   });
 });

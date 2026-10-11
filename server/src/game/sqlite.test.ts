@@ -12,6 +12,7 @@ import {
   serialize,
   type GameState,
 } from '@kriegsspiel/engine';
+import type { Mark } from '@kriegsspiel/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser, ParseResult } from '../orders/index.js';
 import { GameHost, MemoryGameStore, SqliteGameStore, replayLog } from './index.js';
@@ -97,6 +98,10 @@ describe('SqliteGameStore', () => {
     await store.saveProgress('g', 50);
     await store.saveProgress('g', 40);
     expect(await store.loadProgress('g')).toBe(50);
+    expect(await store.loadHeartbeat('g')).toBeUndefined();
+    await store.saveHeartbeat('g', 900);
+    await store.saveHeartbeat('g', 800);
+    expect(await store.loadHeartbeat('g')).toBe(900);
     const change = {
       wallMs: 1,
       gameMs: 2,
@@ -110,6 +115,41 @@ describe('SqliteGameStore', () => {
     expect(await store.clockHistory('g')).toHaveLength(3);
     await store.saveViews('g', { seq: 3, gameMs: 9, views: { blue: { a: 1 } } });
     expect(await store.loadViews('g')).toEqual({ seq: 3, gameMs: 9, views: { blue: { a: 1 } } });
+  });
+
+  it('stores marks per game and side, replaces a list, and keeps them across a reopen', async () => {
+    const path = tmpDb();
+    const pin = (id: string, x: number): Mark => ({
+      id,
+      kind: 'pin',
+      at: { x, y: 2 },
+      label: 'cav',
+      madeAtGame: 5,
+    });
+    const line: Mark = {
+      id: 'l',
+      kind: 'line',
+      points: [
+        { x: 1.5, y: 2.5 },
+        { x: 3.5, y: 4.5 },
+      ],
+      madeAtGame: 9,
+    };
+    const first = open(path);
+    expect(await first.loadMarks('g1', 'blue')).toEqual([]);
+    await first.saveMarks('g1', 'blue', [pin('a', 1), pin('b', 2), line]);
+    await first.saveMarks('g1', 'red', [pin('r', 3)]);
+    await first.saveMarks('g2', 'blue', [pin('other', 4)]);
+    await first.saveMarks('g1', 'blue', [pin('b', 7)]);
+    first.close();
+
+    const again = open(path);
+    expect(await again.loadMarks('g1', 'blue')).toEqual([pin('b', 7)]);
+    expect(await again.loadMarks('g1', 'red')).toEqual([pin('r', 3)]);
+    expect(await again.loadMarks('g2', 'blue')).toEqual([pin('other', 4)]);
+    expect(await again.loadMarks('g2', 'red')).toEqual([]);
+    await again.saveMarks('g1', 'blue', []);
+    expect(await again.loadMarks('g1', 'blue')).toEqual([]);
   });
 
   it('keeps the newest snapshots and loads the latest', async () => {
@@ -157,6 +197,9 @@ describe('crash recovery', () => {
       const reopened = await hostFor(open(path), time2, snapshotEvery).open('g1');
 
       expect(reopened.gameClock.status).toBe('paused');
+      // The downtime is told to the players and journaled; the heartbeat is the last wall time
+      // before the crash, so it is at least the hour the second process waited less the run.
+      expect(reopened.restart?.downMs).toBeGreaterThanOrEqual(3_600_000);
       expect(reopened.gameClock.rate).toBe(4);
       expect(reopened.state.time).toBe(timeBefore);
       expect(serialize(reopened.state)).toBe(before);
@@ -167,7 +210,11 @@ describe('crash recovery', () => {
       expect(reopened.gameClock.now()).toBeGreaterThan(timeBefore);
       // Input numbering carries on from the log.
       const log = await open(path).inputLog('g1');
-      expect(log.map((e) => e.seq)).toEqual([1, 2, 3, 4, 5]);
+      expect(log.map((e) => e.seq)).toEqual([1, 2, 3, 4, 5, 6]);
+      const restart = log[4]!;
+      expect(restart.command.kind).toBe('restart');
+      expect(restart.gameMs).toBe(timeBefore);
+      expect(restart.endGameMs).toBe(timeBefore);
     });
   }
 
@@ -233,7 +280,7 @@ describe('crash recovery', () => {
     const time2 = new FakeTime(time.now() + 1_000);
     const reopened = await hostFor(open(path), time2, 100).open('g1');
     await reopened.submit({ kind: 'pause' });
-    expect((await open(path).inputLog('g1')).map((e) => e.seq)).toEqual([2, 1, 3]);
+    expect((await open(path).inputLog('g1')).map((e) => e.seq)).toEqual([2, 1, 3, 4]);
   });
 
   it('replay from the database equals the in-memory run', async () => {

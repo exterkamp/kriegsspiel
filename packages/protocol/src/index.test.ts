@@ -279,3 +279,38 @@ describe('Intent', () => {
     );
   });
 });
+
+describe('marks', () => {
+  const base = { id: 'm1', madeAtGame: 1000 };
+  const at = { x: 10, y: 20 };
+  it.each([
+    { ...base, kind: 'pin', at, label: 'bridge', sourceReport: 'd1' },
+    { ...base, kind: 'line', points: [at, { x: 30, y: 40 }] },
+    { ...base, kind: 'arrow', from: at, to: { x: 30, y: 40 } },
+    { ...base, kind: 'ring', at, radius: 500 },
+  ])('round-trips %j', (mark) => {
+    const cmd = { v: PROTOCOL_VERSION, kind: 'putMark', mark } as const;
+    expect(parseCommand(serializeCommand(cmd as never))).toEqual({ ok: true, value: cmd });
+  });
+
+  it.each([
+    { ...base, kind: 'ring', at, radius: 0 },
+    { ...base, kind: 'line', points: [at] },
+    { ...base, kind: 'pin', at, extra: 1 },
+    { ...base, kind: 'pin', at: { x: NaN, y: 1 } },
+    { id: '', kind: 'pin', at, madeAtGame: 0 },
+  ])('rejects %j', (mark) => {
+    expect(parseCommand(JSON.stringify({ v: PROTOCOL_VERSION, kind: 'putMark', mark })).ok).toBe(
+      false,
+    );
+  });
+
+  it('carries marks to the client', () => {
+    const m: ServerMessage = {
+      v: PROTOCOL_VERSION,
+      kind: 'marks',
+      marks: [{ ...base, kind: 'pin', at }],
+    };
+    expect(parseServerMessage(serializeServerMessage(m))).toEqual({ ok: true, value: m });
+  });
+});

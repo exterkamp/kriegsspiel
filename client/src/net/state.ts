@@ -1,4 +1,12 @@
-import type { ClockState, Dispatch, ServerMessage, Side, SideView } from '@kriegsspiel/protocol';
+import { withMark } from '../table/marks.js';
+import type {
+  ClockState,
+  Dispatch,
+  Mark,
+  ServerMessage,
+  Side,
+  SideView,
+} from '@kriegsspiel/protocol';
 
 /** An order this client sent that the server has not rejected. The server reports no delivery estimate yet. */
 export interface PendingOrder {
@@ -41,6 +49,8 @@ export interface ClientState {
   pending: PendingOrder[];
   /** Set once the server says the game has ended. */
   gameOver?: GameOver;
+  /** The side's marks on the table, as the server last sent them plus this client's own edits. */
+  marks: Mark[];
   /** Newest last; the HUD shows the latest few. */
   notices: Notice[];
 }
@@ -51,6 +61,7 @@ export const initialState: ClientState = {
   read: new Set(),
   staffAtWork: false,
   pending: [],
+  marks: [],
   notices: [],
 };
 
@@ -90,8 +101,17 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
     case 'clockState':
       // Sent when the clock changes, so its anchor is (about) now.
       return { ...s, clock: anchorOf(m.clock.gameMsAtAnchor, m.clock, nowWall) };
+    case 'marks':
+      return { ...s, marks: m.marks };
     case 'staffAtWork':
       return { ...s, staffAtWork: m.working };
+    case 'serverRestarted': {
+      const mins = Math.round(m.downMs / 60_000);
+      const away = mins >= 1 ? `at least ${mins} min` : 'a short while';
+      const message = `The server was down for ${away}. The game came back paused; no game time passed. Confirm to resume.`;
+      const notices = [...s.notices, { code: 'server_restart', message }].slice(-MAX_NOTICES);
+      return { ...s, notices };
+    }
     case 'gameOver':
       return { ...s, gameOver: { winner: m.winner, reason: m.reason, atGame: m.atGame } };
     case 'error': {
@@ -132,4 +152,13 @@ export function formatGameTime(ms: number): string {
 
 export function formatRate(rate: number): string {
   return `${Number.isInteger(rate) ? rate : rate.toFixed(2)}:1`;
+}
+
+/** Local edit: put a mark in place (or add it) before the server echoes the list. */
+export function withMarkPut(s: ClientState, mark: Mark): ClientState {
+  return { ...s, marks: withMark(s.marks, mark) };
+}
+
+export function withMarkDeleted(s: ClientState, markId: string): ClientState {
+  return { ...s, marks: s.marks.filter((m) => m.id !== markId) };
 }

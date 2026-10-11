@@ -110,11 +110,34 @@ export interface SceneMark {
   readonly geometry: SceneMarkGeometry;
 }
 
+/**
+ * An order of ours in flight, for the overlays: `order` is drawn as an arrow from the unit to where it
+ * was told to go, `route` as the path it will take. The server does not send these yet (see AGENTS.md),
+ * so `buildSceneState` leaves the list empty.
+ */
+export interface OrderRoute {
+  id: string;
+  kind: 'order' | 'route';
+  /** Start first; an `order` arrow runs from the first to the last point. */
+  points: Coord[];
+}
+
+export interface Overlays {
+  orders: boolean;
+  routes: boolean;
+  /** The shading around stale enemy sightings that shows how old the knowledge is. */
+  lastKnown: boolean;
+}
+
+export const ALL_OVERLAYS: Overlays = { orders: true, routes: true, lastKnown: true };
+
 export interface SceneState {
   side: string;
   map: BaseMap;
   own: OwnPiece[];
   ghosts: GhostPiece[];
+  /** Accepted live overlays; absent in the HQ fixture port. */
+  orderRoutes?: OrderRoute[];
   /** Omission preserves the standalone client and renders no annotations. */
   marks?: readonly SceneMark[];
 }
