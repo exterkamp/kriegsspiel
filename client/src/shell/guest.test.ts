@@ -37,7 +37,6 @@ async function open(url: string, over: Partial<ShellDeps> = {}): Promise<void> {
     requestLink: async () => undefined,
     signOut: async () => undefined,
     startLive: async () => undefined,
-    startFixture: vi.fn(),
     now: () => 0,
     ...over,
   });

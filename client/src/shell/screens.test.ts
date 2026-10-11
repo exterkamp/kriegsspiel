@@ -15,7 +15,7 @@ const signedIn = (screen: Screen): ShellState => ({ screen, signedIn: true });
 const signedOut = (screen: Screen): ShellState => ({ screen, signedIn: false });
 
 describe('opening the site', () => {
-  it('shows sign-in when signed out and the menu when signed in, never the fixture or a game', () => {
+  it('shows sign-in when signed out and the menu when signed in, never a game', () => {
     expect(initialShell('', false).screen).toEqual({ name: 'sign-in' });
     expect(initialShell('', true).screen).toEqual(menu);
   });
@@ -23,9 +23,9 @@ describe('opening the site', () => {
     for (const q of ['?new=1', '?game=g', '?lobby=1', '?game=g&over=1'])
       expect(initialShell(q, false).screen).toEqual({ name: 'sign-in' });
   });
-  it('keeps the fixture reachable, only by mode=fixture, without an account', () => {
-    expect(initialShell('?mode=fixture', false).screen).toEqual({ name: 'fixture' });
-    expect(initialShell('?fixture', true).screen).toEqual(menu);
+  it('no longer has a fixture screen: mode=fixture is the menu, or sign-in when signed out', () => {
+    expect(initialShell('?mode=fixture', false).screen).toEqual({ name: 'sign-in' });
+    expect(initialShell('?mode=fixture', true).screen).toEqual(menu);
   });
 });
 
@@ -36,14 +36,13 @@ describe('existing URLs', () => {
     ['?game=abc&side=red', { name: 'game', game: 'abc', side: 'red' }],
     ['?game=abc&over=1', { name: 'game-over', game: 'abc' }],
     ['?lobby=1', { name: 'new-game' }],
-    ['?mode=fixture', { name: 'fixture' }],
+    ['?mode=fixture', menu],
     ['', menu],
   ])('%s', (q, screen) => expect(screenFromSearch(q)).toEqual(screen));
   it('round-trips every screen through its URL, so a reload returns to the same one', () => {
     const screens: Screen[] = [
       menu,
       { name: 'new-game' },
-      { name: 'fixture' },
       { name: 'game', game: 'a b', side: 'red' },
       { name: 'game', create: { side: 'blue', rate: 4 } },
       { name: 'game-over', game: 'g1' },
@@ -72,14 +71,11 @@ describe('transitions', () => {
       reduce(signedIn({ name: 'game', game: 'g' }), { type: 'auth', signedIn: true }).screen,
     ).toEqual({ name: 'game', game: 'g' });
   });
-  it('signing out from any screen lands on sign-in, except the fixture', () => {
+  it('signing out from any screen lands on sign-in', () => {
     for (const screen of [menu, { name: 'new-game' }, { name: 'game', game: 'g' }] as Screen[])
       expect(reduce(signedIn(screen), { type: 'auth', signedIn: false })).toEqual(
         signedOut({ name: 'sign-in' }),
       );
-    expect(reduce(signedIn({ name: 'fixture' }), { type: 'auth', signedIn: false }).screen).toEqual(
-      { name: 'fixture' },
-    );
   });
   it('refuses to go to an account-only screen while signed out', () => {
     expect(

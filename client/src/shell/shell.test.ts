@@ -62,7 +62,6 @@ function deps(over: Partial<ShellDeps> = {}): ShellDeps {
     requestLink: async () => undefined,
     signOut: async () => undefined,
     startLive: async () => undefined,
-    startFixture: vi.fn(),
     now: () => 2 * 3_600_000,
     ...over,
   };
@@ -248,15 +247,12 @@ describe('moving between screens', () => {
     expect(window.location.search).toBe('?game=g1');
     expect(startLive).toHaveBeenCalledOnce();
   });
-  it('existing URLs open their screens: ?game, ?new, ?lobby and mode=fixture', async () => {
+  it('existing URLs open their screens: ?game, ?new, ?lobby', async () => {
     for (const url of ['/?game=abc', '/?new=1&rate=12']) {
       const startLive = vi.fn(async () => undefined);
       await open(url, { startLive });
       expect(startLive).toHaveBeenCalledOnce();
     }
-    const startFixture = vi.fn();
-    await open('/?mode=fixture', { fetchMe: async () => undefined, startFixture });
-    expect(startFixture).toHaveBeenCalledOnce();
   });
   it('Sign out from the menu returns to sign-in and signs out on the server', async () => {
     const signOut = vi.fn(async () => undefined);

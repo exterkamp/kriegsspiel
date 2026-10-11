@@ -426,3 +426,20 @@ Accepted main `6343c2b` adds lobby/hot-seat, live desk clock and admin replay. P
 ## D26: Move the web client from Svelte to Angular (issue #269, stage 1 spike)
 
 The owner chose to convert the whole client to Angular, replacing Svelte in place on `main`; everything else is paused until it lands. Stage 1 (this entry) adds `client-ng/`, an Angular 22 workspace (standalone components, signals, zoneless, `@angular/build`, Vitest), that renders a live desk clock and the unchanged Three.js table against the real server; `client/` still ships. The plan, component inventory, port order and risks are in `docs/angular-migration.md`. Side effects of the spike: TypeScript 6 and Node 22.23.3 repo-wide (Angular 22 requires both). D3 and D16 keep naming Svelte until stage 2 completes the port; that PR supersedes them where they name the framework.
+
+## D28: Retire the HQ fixture UI instead of porting it (issue #278, Angular step 6)
+
+`client/src/hq/` (the Svelte HQ fixture demonstration, reachable only at `/?mode=fixture`) is deleted rather than ported to Angular. Its views duplicate the live desk, and the live Angular desk (`client-ng/src/app/desk`) already has each of them, bound to real game state:
+
+| HQ fixture feature | Live Angular equivalent |
+| --- | --- |
+| Clock | `ClockComponent` |
+| Order of battle roster | `RosterComponent` |
+| In-tray with dispositions | `InTrayComponent` (read, filed, discarded; "Show on table") |
+| Journal with notes, search and export | `JournalComponent` |
+| Orders with local drafts (signing unavailable) | `OrdersDeskComponent` (autosaved draft, annex, courier, real send) |
+| Marks (pins, lines, arrows) | `MarksBarComponent`, `MarksService`, stored per side on the server |
+| Continuous-metre fixture table | not a feature of the HQ UI: `table/FixtureTableScene.ts` stays, it serves map-table and the table benchmark |
+| Report placement (plotting a report to a pin with frozen provenance), the Settings dialog, `hq/data` repository | **Not ported.** The live desk has no equivalent. They were fixture previews, never connected to a live game, and `hq-plotting-proposal.md` states they set no live policy. A live version would be a new feature with its own story. |
+
+Removed with it: all `.svelte` and test files under `client/src/hq`, the `fixture` screen, `startFixture` and `mode: 'fixture'` in the shell and `parseSession` (`?mode=fixture` now opens the menu like any unknown query), and the seven HQ cases of `test/review/hq-mutations.json` that mutated deleted files (the three elapsed-game-time cases remain). `formatGameTime`, `formatGameAge` and `formatGameDuration` still serve table tags and moved to `client/src/table/gameTime.ts`. The offline fixture *board* shown by the live route when there is no `?game=` is separate and stays. The `docs/hq-*.md` files are historical records of the retired UI. The Svelte client itself is deleted in #279.

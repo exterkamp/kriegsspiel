@@ -302,7 +302,7 @@ test('timeout escalates to KILL for a TERM-resistant owned process', async (t) =
 test('path, digest and replacement validation refuses unsafe, unmatched or ambiguous source before test execution', async (t) => {
   const f = await fixture(t);
   const manifest = JSON.parse(await readFile(join(repoRoot, 'test/review/hq-mutations.json')));
-  assert.equal(validateManifest(manifest).cases.length, 10);
+  assert.equal(validateManifest(manifest).cases.length, 3);
   await assert.rejects(
     executeRecipe({ ...f, root: repoRoot, directory: join(f.root, 'canonical-refusal') }),
     /isolated source/,

@@ -1,5 +1,7 @@
 # HQ getting started and validation guide
 
+> **Retired (D28, #278):** the HQ fixture UI this guide validates was removed; `/?mode=fixture` now opens the menu. Kept as a historical record.
+
 Use this guide to validate the HQ interface delivered in [PR #193](https://github.com/exterkamp/kriegsspiel/pull/193). It describes the fixture/local features implemented on the HQ branch, with expected results for hands-on checks. Feedback fixes and recorded browser checks are documented in the execution log. Physical-device and full live-game acceptance remain separate gates.
 
 The default page is a **demonstration with fixed battle data**. You can read papers, plot private beliefs, write local drafts and keep notes. The HQ cannot yet run a live battle, sign/send orders, consult staff or reveal the battlefield after a game. A running display clock does not move units; the supplied default fixture is paused.

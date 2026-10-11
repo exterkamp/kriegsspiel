@@ -24,7 +24,7 @@ afterEach(() => {
 });
 
 it(
-  'hands the page to the shell, loading neither the live client nor the fixture itself',
+  'hands the page to the shell, without loading the live client',
   { timeout: 30_000 },
   async () => {
     await import('./main.js');
@@ -39,11 +39,4 @@ it('loads the live client only when the shell asks for it', async () => {
   await import('./main.js');
   await startShell.mock.calls[0]![0].startLive();
   expect(liveLoaded).toHaveBeenCalledOnce();
-});
-
-it('starts the HQ fixture only when the shell asks for it', async () => {
-  await import('./main.js');
-  startShell.mock.calls[0]![0].startFixture(document.getElementById('app'));
-  expect(mount).toHaveBeenCalledOnce();
-  expect(mount.mock.calls[0]![1].props.source.scope).toBeDefined();
 });

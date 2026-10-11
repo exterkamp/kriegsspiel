@@ -1,6 +1,6 @@
 # Angular migration plan (issue #269)
 
-Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) and step 1 (services and stores, #272) done; step 2 in progress, with the roster, journal, conference and pause panel (#273), the in-tray, orders desk and umpire window (#274), and the desk shell, game over screen, HUD and marks (#275) done; step 5 (admin, map authoring and benchmarks, #277) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
+Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) and step 1 (services and stores, #272) done; step 2 in progress, with the roster, journal, conference and pause panel (#273), the in-tray, orders desk and umpire window (#274), and the desk shell, game over screen, HUD and marks (#275) done; step 5 (admin, map authoring and benchmarks, #277) and step 6 (HQ fixture UI retired, #278) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
 
 ## What the spike proves
 
@@ -73,6 +73,15 @@ Lazy routes in `client-ng/src/app/app.routes.ts`, each a standalone `OnPush` com
 - `@kriegsspiel/maps` resolves to `packages/maps/src` through `tsconfig.json` paths.
 - Tests: `admin/admin.component.spec.ts` (both URLs mount the page, leaving stops it), `app.routes.spec.ts` (redirects, serializer). The Svelte-side admin and map-authoring tests are framework-free and unchanged. Not covered: mounting map authoring and the benchmarks in jsdom (workers and canvas are unavailable), so those were not exercised in a browser here.
 - Not done: `map-table.html` (dev map catalog page, not named by the issue) and the server fallback for the cutover.
+
+## Step 6: HQ fixture UI retired (#278)
+
+Decision **D28**: retire, do not port. Nothing in `client/src/hq` is in `client-ng`, and each of its views (clock, roster, in-tray, journal, orders, marks) already exists as a live component bound to real state; the table of features and what was not carried over (report placement, Settings dialog, local-only repository) is in `docs/decisions.md`. The fixture is not reachable in `client-ng` either.
+
+- Deleted `client/src/hq` (12 components, 6 harnesses and their tests). Dropped tests, all because the code they test is gone and the live desk has its own: `App`, `Shell`, `Table`, `Marks`, `Plotting`, `components`, the five view tests, `accessibility`, `marksQueue`, `placementPorts`, `sessionActions`, and the `hq/data`, `interactions` and `views` logic tests, plus `main.test.ts`'s "starts the HQ fixture" case.
+- `session.ts`, `shell/screens.ts`, `shell/boot.ts` and `main.ts` lose the `fixture` mode and screen; their tests were updated (`?mode=fixture` is the menu). `table/gameTime.ts` (and its test) moved out of `hq/presentation` because table tags use it.
+- `test/review/hq-mutations.json` keeps the three game-time cases; the seven that mutated deleted files are gone and the manifest count in `test/review-workflow.test.js` is 3.
+- Not done here: deleting the Svelte client (#279). The component inventory above is kept as the record of what existed.
 
 ## Decisions
 

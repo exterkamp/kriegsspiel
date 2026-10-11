@@ -121,7 +121,7 @@ async function main(app: HTMLElement): Promise<void> {
 
   let params = parseSession(window.location.search);
   const out = app.querySelector('#pick');
-  if (params.mode !== 'fixture' && params.mode !== 'menu') {
+  if (params.mode !== 'menu') {
     const me = await fetchMe();
     if (!me) {
       // The emailed link opens in this browser and lands back here with a session cookie.
