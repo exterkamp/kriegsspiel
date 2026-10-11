@@ -41,6 +41,7 @@ export function applyLoggedOrder(
   seq: number,
   side: string,
   parsed: ParseResult,
+  courier?: Order['courier'],
 ): { state: EngineState<GameState>; orderId: string } | { reason: string } {
   if (parsed.kind === 'clarification') return { reason: parsed.question };
   if (parsed.kind === 'rejection') return { reason: parsed.reason };
@@ -54,6 +55,7 @@ export function applyLoggedOrder(
     issuedAt: state.time,
     text: parsed.text,
     intents,
+    ...(courier ? { courier } : {}),
   };
   return { state: issueOrder(state, order, state.time), orderId: order.id };
 }
@@ -146,7 +148,14 @@ export function replayFrom(
       // they come, and the settle at the end covers the rest.
       if (command.kind === 'advanceTo') settled = Math.max(settled, command.gameMs);
       else if (command.kind === 'order' && entry.parse) {
-        const res = applyLoggedOrder(state, gameId, entry.seq, command.side, entry.parse);
+        const res = applyLoggedOrder(
+          state,
+          gameId,
+          entry.seq,
+          command.side,
+          entry.parse,
+          command.courier,
+        );
         if ('state' in res) state = res.state;
       }
     }

@@ -53,6 +53,7 @@ export function toSideView(view: EngineSideView, clock: ClockState): SideView {
   return {
     side: view.side,
     atGame: view.time,
+    ...(view.hq ? { hq: view.hq } : {}),
     ownUnits: view.ownUnits.map((u) => ({
       id: u.id,
       name: u.name,

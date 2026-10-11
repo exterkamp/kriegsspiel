@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COURIER_CHOICES,
   COURIER_DELAY_MS,
   COURIER_MS_PER_METRE,
   EventRegistry,
   MS_PER_METRE,
+  MAX_GARBLE,
+  MAX_LOSS,
   MS_PER_MINUTE,
   advanceTo,
+  choiceRisk,
   createState,
   findPath,
   holdTheBridge,
@@ -309,5 +313,49 @@ describe('failed orders', () => {
     s = issueOrder(s, order('ghost', { kind: 'hold', at: P(150, 150) }, 'b'), 100_000);
     const end = advanceTo(s, 120 * MS_PER_MINUTE, registry()).state;
     expect(unit(end, 'blue-1').center).toEqual(P(1850, 2050));
+  });
+});
+
+describe('courier choice', () => {
+  const arrival = (courier?: 'fast' | 'safe') => {
+    const o = order('blue-1', { kind: 'move', to: P(2050, 2050) });
+    const s = advanceTo(issueOrder(game(), courier ? { ...o, courier } : o), 0, registry());
+    return s.state.world.couriers[0]!.legs.at(-1)!.arriveAt;
+  };
+
+  it('a fast courier arrives sooner than the ordinary ride, a safe one later', () => {
+    const [fast, plain, safe] = [arrival('fast'), arrival(), arrival('safe')];
+    expect(plain).toBe(DELIVERY_MS);
+    expect(fast).toBe(Math.round(DELIVERY_MS / 1.5));
+    expect(safe).toBe(Math.round(DELIVERY_MS / 0.75));
+    expect(fast).toBeLessThan(plain);
+    expect(plain).toBeLessThan(safe);
+  });
+
+  it('a fast courier is twice as likely to be lost or garbled, a safe one half as likely', () => {
+    const base = { loss: 0.1, garble: 0.2 };
+    const [fast, plain, safe] = (['fast', undefined, 'safe'] as const).map((c) =>
+      choiceRisk(base, c ? COURIER_CHOICES[c].risk : 1),
+    );
+    expect(plain).toEqual(base);
+    expect(fast!.loss).toBeCloseTo(0.2);
+    expect(fast!.garble).toBeCloseTo(0.4);
+    expect(safe!.loss).toBeCloseTo(0.05);
+    expect(safe!.garble).toBeCloseTo(0.1);
+    expect(fast!.loss).toBeGreaterThan(plain!.loss);
+    expect(plain!.loss).toBeGreaterThan(safe!.loss);
+  });
+
+  it('holds the doubled risk under the loss and garble caps', () => {
+    expect(choiceRisk({ loss: 0.4, garble: 0.5 }, 2)).toEqual({
+      loss: MAX_LOSS,
+      garble: MAX_GARBLE,
+    });
+  });
+
+  it('shows a side its own HQ and not the enemy’s', () => {
+    const s = game();
+    const hq = (side: 'blue' | 'red') => s.world.sides.find((x) => x.id === side)!.hq;
+    expect(viewFor(s.world, 'blue').hq).toEqual({ x: hq('blue').x / 1000, y: hq('blue').y / 1000 });
   });
 });
