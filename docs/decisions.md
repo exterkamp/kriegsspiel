@@ -14,9 +14,9 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Why.** It makes fog of war, stale information and delegation the game, and it matches the original Kriegsspiel.
 **See.** [hq-interface.md](hq-interface.md)
 
-## D3: Hybrid rendering: Three.js table + Svelte desk
+## D3: Hybrid rendering: Three.js table + Angular desk (Svelte superseded by D29)
 
-**Decision.** A Three.js scene with a **flat** historical map on a table and 3D wooden-block pieces, plus a Papers Please-style 2D desk built in HTML/Svelte. Phaser is dropped.
+**Decision.** A Three.js scene with a **flat** historical map on a table and 3D wooden-block pieces, plus a Papers Please-style 2D desk built in HTML. The framework was Svelte; D29 replaced it with Angular. Phaser is dropped.
 **Why.** The game is mostly documents plus one map. A DOM UI is much better for text and drag-and-drop, and a 3D table gives the physical Kriegsspiel feel. A flat map avoids needing elevation data.
 **Alternatives considered.** Phaser, PixiJS, Babylon.js, Godot web export, full 3D room, fully 2D desk.
 **Consequence.** The earlier Phaser prototype is abandoned and removed from the repo. The new engine and client are written fresh against the continuous-clock design. (The old code is kept outside the repo as a reference only.)
@@ -443,3 +443,10 @@ The owner chose to convert the whole client to Angular, replacing Svelte in plac
 | Report placement (plotting a report to a pin with frozen provenance), the Settings dialog, `hq/data` repository | **Not ported.** The live desk has no equivalent. They were fixture previews, never connected to a live game, and `hq-plotting-proposal.md` states they set no live policy. A live version would be a new feature with its own story. |
 
 Removed with it: all `.svelte` and test files under `client/src/hq`, the `fixture` screen, `startFixture` and `mode: 'fixture'` in the shell and `parseSession` (`?mode=fixture` now opens the menu like any unknown query), and the seven HQ cases of `test/review/hq-mutations.json` that mutated deleted files (the three elapsed-game-time cases remain). `formatGameTime`, `formatGameAge` and `formatGameDuration` still serve table tags and moved to `client/src/table/gameTime.ts`. The offline fixture *board* shown by the live route when there is no `?game=` is separate and stays. The `docs/hq-*.md` files are historical records of the retired UI. The Svelte client itself is deleted in #279.
+
+## D29: Angular replaces Svelte; the Svelte client is deleted (issue #279, cutover of #269)
+
+**Decision.** The web client is Angular 22 (standalone `OnPush` components, signals, zoneless, `@angular/build`, Vitest). `client/` (Svelte, Vite) is deleted with every `.svelte` file, `svelte`, `@sveltejs/vite-plugin-svelte`, `svelte-check`, `eslint-plugin-svelte`, `prettier-plugin-svelte` and `svelte.config.js`; `client-ng/` is renamed `client/`. This supersedes D3 where it names Svelte for the desk, and D16 where its note that a browser client must be served from the same origin or proxied was met by Vite (now the Angular dev server's `proxy.conf.cjs`; the wire API is unchanged).
+**Why.** The owner chose to convert the whole client (D26). Nothing in the protocol, engine, visibility filter or server changed.
+**Consequence.** The framework-free modules (`net`, `table`, `window`, `desk/*.ts` logic, `shell/*Api.ts`, `map-authoring`, `admin`) now live in `client/src/legacy/` and are imported as `@legacy/*`; their `*.test.ts` run under plain Vitest (`client/vitest.config.ts`), the components' `*.spec.ts` under `ng test`. Dropped with Svelte: the mount-and-query cases of the old desk tests (ported to the `*.spec.ts` of each component, see `docs/angular-migration.md`), the Svelte store persistence tests (covered by `desk.store.spec.ts`), the `/map-table.html` dev page and its dev catalog plugin, `game-setup/` and `lobby/lobby.ts` (only the old imperative shell used them). The image always serves the Angular build and `SPA_FALLBACK` is on by default; the old `*.html` URLs redirect. The `hq-mutations.json` effectiveness probes now point at `client/src/legacy/table`.
+**See.** [angular-migration.md](angular-migration.md), [deployment.md](deployment.md)

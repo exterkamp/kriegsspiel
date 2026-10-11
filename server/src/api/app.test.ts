@@ -1127,6 +1127,7 @@ describe('SPA fallback for the Angular client', () => {
       expect(map.statusCode).toBe(301);
       expect(map.headers.location).toBe('/map-authoring?a=1');
       expect((await server.inject('/map-benchmark.html')).headers.location).toBe('/map-benchmark');
+      expect((await server.inject('/admin/index.html?x=1')).headers.location).toBe('/admin?x=1');
       expect((await server.inject('/table-benchmark.html')).headers.location).toBe(
         '/map-benchmark',
       );

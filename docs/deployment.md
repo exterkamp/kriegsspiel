@@ -36,9 +36,9 @@ Login needs two more settings (see D17 in [decisions.md](decisions.md)); add the
 
 Inside the container the server uses `HOST`, `PORT`, `DB_PATH` (`/data/games.db`) and `STATIC_DIR` (the built client); see `server/src/main.ts`. Without `DB_PATH` the server keeps games in memory. `GET /healthz` returns `{"ok":true}` and backs the container health check.
 
-### Angular client (#269, not the default)
+### Client build
 
-The image serves the Svelte client unless built with `--build-arg CLIENT=ng`, which serves the Angular `client-ng` build instead. Run that image with `SPA_FALLBACK=1`: the server then answers `/admin`, `/map-authoring`, `/map-benchmark` and anything below them (except `/admin/api`) with `index.html`, and redirects the old `/map-authoring.html`, `/map-benchmark.html` and `/table-benchmark.html` to the new routes. `/games`, `/scenarios`, `/auth` and `/admin/api` stay API routes. With `SPA_FALLBACK` unset (the default) nothing changes for the Svelte client. Both builds are always compiled; `CLIENT` only picks which one is copied into the image.
+The image serves the Angular client (`client/dist/browser`, since the Svelte client was removed in #279). `SPA_FALLBACK` is on by default whenever `STATIC_DIR` is set: the server answers `/admin`, `/map-authoring`, `/map-benchmark` and anything below them (except `/admin/api`) with `index.html`, and redirects the old `/map-authoring.html`, `/map-benchmark.html`, `/table-benchmark.html`, `/admin/index.html` and `/map-table.html` to the new routes, keeping the query. Set `SPA_FALLBACK=0` to turn it off. `/games`, `/scenarios`, `/auth` and `/admin/api` stay API routes.
 
 ## Data and logs
 

@@ -43,15 +43,13 @@ export class MapAuthoringComponent implements OnDestroy {
     afterNextRender(() => {
       const runtime = createAuthoringRuntime({
         generationWorkerFactory: () =>
-          new Worker(
-            new URL('../../legacy/map-authoring/generate.worker.ts', import.meta.url),
-            { type: 'module' },
-          ),
+          new Worker(new URL('../../legacy/map-authoring/generate.worker.ts', import.meta.url), {
+            type: 'module',
+          }),
         validationWorkerFactory: () =>
-          new Worker(
-            new URL('../../legacy/map-authoring/validate.worker.ts', import.meta.url),
-            { type: 'module' },
-          ),
+          new Worker(new URL('../../legacy/map-authoring/validate.worker.ts', import.meta.url), {
+            type: 'module',
+          }),
       });
       try {
         this.app = mountAuthoringApp(this.root().nativeElement.ownerDocument, runtime, {
