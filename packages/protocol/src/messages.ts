@@ -158,6 +158,8 @@ export const ServerMessage = z.discriminatedUnion('kind', [
   z.object({ ...Envelope, kind: z.literal('draftState'), draft: DraftSnapshot }).strict(),
   // The next step in a draft's history, to every connection of the side, the sender's included.
   // Entries arrive in rev order with no gaps; `entry.op` is already moved past anything that landed first.
+  // A `drafts` snapshot sent on connect can already contain an entry that follows it, so a client
+  // ignores any entry with `rev` at or below the rev of the draft it holds.
   z.object({ ...Envelope, kind: z.literal('draftEntry'), draft: Id, entry: DraftEntry }).strict(),
   z
     .object({

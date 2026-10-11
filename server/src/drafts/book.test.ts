@@ -53,6 +53,13 @@ describe('concurrent edits', () => {
     expect(run('a')).toBe(run('b'));
   });
 
+  it('puts text that reached the server first ahead of text inserted at the same spot', () => {
+    const b = bookWith('abc');
+    b.edit('d1', 'ann', 1, { baseRev: 0, op: insertAt(3, 1, 'AA') });
+    b.edit('d1', 'bob', 2, { baseRev: 0, op: insertAt(3, 1, 'BB') });
+    expect(b.get('d1')!.text).toBe('aAABBbc');
+  });
+
   it('takes an edit from a player who was away for many revs', () => {
     const b = bookWith('abc');
     for (let i = 0; i < 5; i++) {
@@ -180,6 +187,15 @@ describe('forks and merge', () => {
     expect(code(() => b.edit('d2', 'bob', 1, { baseRev: 2, op: [] }))).toBe('draft_closed');
     expect(code(() => b.merge('d2', 1))).toBe('draft_closed');
     expect(code(() => b.fork('d2', 'd3', 'bob'))).toBe('draft_closed');
+  });
+
+  it('puts the parent text ahead of fork text inserted at the same spot on merge', () => {
+    const b = bookWith('abc');
+    b.fork('d1', 'd2', 'bob');
+    b.edit('d2', 'bob', 1, { baseRev: 0, op: insertAt(3, 1, 'FF') });
+    b.edit('d1', 'ann', 2, { baseRev: 0, op: insertAt(3, 1, 'PP') });
+    b.merge('d2', 3);
+    expect(b.get('d1')!.text).toBe('aPPFFbc');
   });
 
   it('keeps parent and fork independent until merged, and a fork may be forked again', () => {
