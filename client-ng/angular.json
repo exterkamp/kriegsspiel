@@ -17,7 +17,9 @@
             "index": "src/index.html",
             "tsConfig": "tsconfig.app.json",
             "outputPath": "dist",
-            "styles": ["src/styles.css"]
+            "styles": ["src/styles.css"],
+            "webWorkerTsConfig": "tsconfig.worker.json",
+            "assets": [{ "glob": "**/*", "input": "public" }]
           },
           "configurations": {
             "production": { "outputHashing": "all" },
