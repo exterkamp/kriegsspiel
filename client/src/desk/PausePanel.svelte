@@ -17,6 +17,9 @@
   const baseTitle = typeof document === 'undefined' ? '' : document.title.replace(/^\(vote\) /, '');
   $effect(() => {
     document.title = pageTitle(baseTitle, $gameState);
+    return () => {
+      document.title = baseTitle;
+    };
   });
 
   function send(ok: boolean | undefined): boolean {

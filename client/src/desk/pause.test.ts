@@ -224,6 +224,17 @@ describe('PausePanel', () => {
     expect(document.title.startsWith('(vote)')).toBe(false);
   });
 
+  it('restores the page title when the desk goes away mid-vote', () => {
+    pauseActions.set(actions());
+    document.title = 'Kriegsspiel';
+    gameState.set(proposed({}, Date.now()));
+    open();
+    expect(document.title.startsWith('(vote)')).toBe(true);
+    unmount(cmp!);
+    cmp = undefined;
+    expect(document.title).toBe('Kriegsspiel');
+  });
+
   it('says so when the link is down', () => {
     const a = actions();
     a.vote.mockReturnValue(false);
