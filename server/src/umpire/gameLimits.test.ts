@@ -151,6 +151,45 @@ describe('GameUmpireClient', () => {
   });
 });
 
+describe('staff sub-cap', () => {
+  const staff: UmpireRequest = { ...request, stage: 'staff' };
+  const parse: UmpireRequest = { ...request, stage: 'parse' };
+
+  it('a saturated staff token share never blocks an order parse', async () => {
+    const { client } = inner();
+    const g = new GameUmpireClient(client, { gameId: 'g', limits: { maxTotalTokens: 1000 } });
+    await g.call(staff);
+    await g.call(staff);
+    await g.call(staff); // 300 >= 250, the staff share
+    await expect(g.call(staff)).rejects.toMatchObject({ kind: 'budget', attempts: 0 });
+    await expect(g.call(parse)).resolves.toBeDefined();
+    expect(g.report().budgetSpent).toBe(false);
+  });
+
+  it('a saturated staff dollar share never blocks an order parse', async () => {
+    const g = new GameUmpireClient(inner().client, { gameId: 'g', limits: { maxCostUsd: 0.04 } });
+    await g.call(staff); // 0.01 >= 0.01, the staff share
+    await expect(g.call(staff)).rejects.toMatchObject({ kind: 'budget' });
+    await expect(g.call(parse)).resolves.toBeDefined();
+  });
+
+  it('staff calls per minute stop at their share, leaving the rest for parsing', async () => {
+    let t = 0;
+    const g = new GameUmpireClient(inner().client, {
+      gameId: 'g',
+      limits: { maxCallsPerMinute: 8 },
+      now: () => t,
+    });
+    await g.call(staff);
+    await g.call(staff);
+    await expect(g.call(staff)).rejects.toMatchObject({ kind: 'rate-limit' });
+    for (let i = 0; i < 6; i++) await g.call(parse);
+    await expect(g.call(parse)).rejects.toMatchObject({ kind: 'rate-limit' });
+    t = 61_000;
+    await expect(g.call(staff)).resolves.toBeDefined();
+  });
+});
+
 describe('a capped game degrades', () => {
   const reports: ViewReport[] = [
     {
