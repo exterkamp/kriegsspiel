@@ -19,6 +19,7 @@ export class GameService {
   connect(loc: { protocol: string; host: string; search: string }): void {
     const params = parseSession(loc.search);
     if (params.mode !== 'join') {
+      // Spike only: `?new=1` and `?lobby` also land here and show the offline fixture board; stage 2 routes them properly.
       this._state.set({ ...withLink(initialState, 'offline'), view: fixtureView });
       return;
     }

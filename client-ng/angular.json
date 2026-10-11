@@ -27,7 +27,7 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
-          "options": { "proxyConfig": "proxy.conf.cjs", "allowedHosts": ["all"] },
+          "options": { "proxyConfig": "proxy.conf.cjs", "allowedHosts": true },
           "configurations": {
             "production": { "buildTarget": "client-ng:build:production" },
             "development": { "buildTarget": "client-ng:build:development" }
