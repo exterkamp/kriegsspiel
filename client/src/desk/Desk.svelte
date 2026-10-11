@@ -6,6 +6,7 @@
   import OrdersDesk from './OrdersDesk.svelte';
   import Journal from './Journal.svelte';
   import Roster from './Roster.svelte';
+  import Conference from './Conference.svelte';
   import DeskClock from './DeskClock.svelte';
   import PausePanel from './PausePanel.svelte';
   import { VIEWS, isDeskView, isTypingTarget, viewForKey, type ViewId } from './views.js';
@@ -88,8 +89,7 @@
   </section>
 {:else if $activeView === 'conference'}
   <section id="view-conference" class="paper" tabindex="-1" aria-label="Staff conference">
-    <h2>Staff conference</h2>
-    <p>The staff are not yet assembled.</p>
+    <Conference />
   </section>
 {/if}
 
