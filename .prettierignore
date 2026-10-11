@@ -9,3 +9,6 @@ vendor/settlemaker/upstream-package.json
 docs/map-verification/*.json
 server/baselines/*.recording.json
 .angular
+
+# Preserve certified canonical map bytes.
+data/maps/*.json
