@@ -109,6 +109,8 @@ describe('narrate stage in the actor', () => {
       game.state,
       side as 'blue',
       game.gameClock.snapshot(),
+      undefined,
+      [],
       game.narrationFor(side),
     );
     const narrated = view.dispatches.filter((d) => d.text.startsWith('Sir, '));

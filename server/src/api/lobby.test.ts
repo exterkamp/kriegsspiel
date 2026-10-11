@@ -54,7 +54,7 @@ interface Info {
   ready: boolean;
   sessionType: string;
   rate: number;
-  sides: Array<{ side: string; taken: boolean; ready: boolean }>;
+  sides: Array<{ side: string; taken: boolean; ready: boolean; roles: unknown[] }>;
 }
 
 describe('lobby', () => {
@@ -96,8 +96,8 @@ describe('lobby', () => {
 
     const info = (await (await fetch(`${base}/games/${game.id}`, get(a))).json()) as Info;
     expect(info.sides).toEqual([
-      { side: 'blue', taken: true, ready: true },
-      { side: 'red', taken: true, ready: true },
+      { side: 'blue', taken: true, ready: true, roles: [] },
+      { side: 'red', taken: true, ready: true, roles: [] },
     ]);
     expect(info.rate).toBe(12);
 

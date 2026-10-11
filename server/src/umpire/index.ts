@@ -33,7 +33,7 @@ export { ProviderUmpireClient } from './providerUmpireClient.js';
 export type { ProviderUmpireClientOptions } from './providerUmpireClient.js';
 export { BudgetedUmpireClient, RateLimitedUmpireClient } from './decorators.js';
 export type { BudgetOptions, RateLimitOptions } from './decorators.js';
-export { GameUmpireClient, createGameUmpire } from './gameLimits.js';
+export { COMMANDER_BUDGET_SHARE, GameUmpireClient, createGameUmpire } from './gameLimits.js';
 export type {
   GameLimits,
   GameUmpireMetric,

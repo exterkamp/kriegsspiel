@@ -465,6 +465,48 @@ describe('game over', () => {
   });
 });
 
+describe('staff questions', () => {
+  const ask = (questionId: string, role = 'chiefOfStaff') =>
+    JSON.stringify({ v, kind: 'askStaff', questionId, role, question: 'Status?' });
+
+  it('charges the cost on the server: queued once, then busy, per side', async () => {
+    const { base, ws } = await start();
+    // Rate 1 keeps game time near the start, so the officer is still busy on the second ask.
+    const game = (await createGame(base, { rate: 1 })).json;
+    const blue = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    await blue.waitFor('viewUpdate');
+
+    blue.send(ask('qa'));
+    const queued = await blue.waitFor('staffQueued', (m) => m.questionId === 'qa');
+    expect(queued.answerAtGame).toBe(queued.askedAtGame + queued.costMs);
+    expect(queued.costMs).toBeGreaterThan(0);
+
+    blue.send(ask('qb'));
+    const busy = await blue.waitFor('error', (m) => m.code === 'staff_busy');
+    expect(busy.message.startsWith('qb: ')).toBe(true);
+    expect(blue.messages.some((m) => m.kind === 'staffQueued' && m.questionId === 'qb')).toBe(
+      false,
+    );
+
+    // Another officer, and the other side, are unaffected.
+    blue.send(ask('qc', 'engineer'));
+    await blue.waitFor('staffQueued', (m) => m.questionId === 'qc');
+    red.send(ask('qd'));
+    await red.waitFor('staffQueued', (m) => m.questionId === 'qd');
+  });
+
+  it('refuses a question once the game is over', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    await blue.waitFor('gameOver');
+    blue.send(ask('qz'));
+    const err = await blue.waitFor('error', (m) => m.code === 'game_over');
+    expect(err.message.startsWith('qz: ')).toBe(true);
+  });
+});
+
 describe('orders', () => {
   it('delivers the order after the courier ride, then sends the dispatch', async () => {
     const { base, ws } = await start();

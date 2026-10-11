@@ -19,6 +19,7 @@ import { SqliteNotifyStore, pushFromEnv } from './notify/index.js';
 import { SqliteAuthStore } from './auth/store.js';
 import { SqliteLobbyStore } from './lobby/store.js';
 import {
+  aiCommanderBudgetWarning,
   aiCommanderFromEnv,
   authFromEnv,
   scriptedOpponentsFromEnv,
@@ -42,6 +43,10 @@ const lobby = process.env.DB_PATH ? new SqliteLobbyStore(process.env.DB_PATH) : 
 // The LLM commander, when asked for: one capped client per game over the shared one.
 const ai = aiCommanderFromEnv(process.env);
 const umpireConfig = ai ? loadUmpireConfig(process.env) : undefined;
+if (ai && umpireConfig) {
+  const warning = aiCommanderBudgetWarning(umpireConfig.gameBudget);
+  if (warning) console.warn(warning);
+}
 const umpire = umpireConfig ? createUmpireClient({ config: umpireConfig }) : undefined;
 
 const { server } = await buildApp({
@@ -59,10 +64,11 @@ const { server } = await buildApp({
             limits: umpireConfig?.gameBudget,
             onMetric: (m) => server.log.info({ umpire: m }, 'umpire call'),
           });
+          const commanderClient = client.commanderClient();
           const llm = llmAgents(world, {
             ...ai,
-            client,
-            parser: new LlmOrderParser(client),
+            client: commanderClient,
+            parser: new LlmOrderParser(commanderClient),
             onNote: (side, note) => server.log.warn({ gameId, side, note }, 'ai commander'),
           });
           return llm.length > 0 ? llm : scripted;

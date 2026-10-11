@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { conferenceClient, conferenceLog, gameState } from './store.js';
+  import { conferenceClient, conferenceLog, conferenceSender, gameState } from './store.js';
   import {
     CONFERENCE_ROLES,
     MAX_QUESTION_LENGTH,
@@ -7,6 +7,8 @@
     formatCost,
     isPending,
     newExchange,
+    nextExchangeId,
+    reconcileExchanges,
     questionProblem,
     staffFor,
     type ConferenceRole,
@@ -16,7 +18,6 @@
   let role = $state<ConferenceRole>('chiefOfStaff');
   let question = $state('');
   let error = $state<string | undefined>(undefined);
-  let nextId = 1;
 
   // Answers arrive in game time, so the log re-reads the clock now and then.
   const opened = Date.now();
@@ -34,12 +35,32 @@
   const officer = $derived(staffFor(role));
   const log = $derived($conferenceLog.filter((e) => e.role === role));
 
+  // Take the cost from the server's reply: it decides when the officer answers, not this page.
+  // The exchange carries its own question id, so this works across remounts of the view.
+  $effect(() => {
+    const { staffCharges: charges, link, staffFaultAtWall: faultAtWall } = $gameState;
+    const nowWall = wall;
+    conferenceLog.update((l) => reconcileExchanges(l, { charges, link, faultAtWall, nowWall }));
+  });
+
   function ask(e: SubmitEvent): void {
     e.preventDefault();
     error = questionProblem(question, role, $conferenceLog, nowGame);
     if (error) return;
     const req = { role, question: question.trim(), askedAtGame: nowGame };
-    const ex = newExchange(nextId++, req);
+    const sender = $conferenceSender;
+    const ex = newExchange(nextExchangeId($conferenceLog), req);
+    if (sender) {
+      // The server charges the cost; the exchange waits for its reply (see the reconcile effect).
+      const questionId = `q-${Date.now()}-${ex.id}`;
+      if (!sender(questionId, role, req.question)) {
+        error = 'Not connected. Try again when the link is back.';
+        return;
+      }
+      ex.answerAtGame = Infinity;
+      ex.questionId = questionId;
+      ex.sentAtWall = Date.now();
+    }
     conferenceLog.update((l) => [...l, ex]);
     question = '';
     $conferenceClient.ask(req, $gameState.view).then(

@@ -5,13 +5,14 @@ import {
   subPositions,
 } from './formation.js';
 import { mm, pointMm, polygonCentroid } from './geometry.js';
-import { KIND_DEFAULTS, terrainAt } from './terrain.js';
+import { KIND_DEFAULTS, ROAD_CLASS_COST, terrainAt } from './terrain.js';
 import { UNIT_TYPES, unitTypeOf } from './unitTypes.js';
 import {
   FEATURE_KINDS,
   FORMATIONS,
   HEIGHTS,
   MS_PER_MINUTE,
+  ROAD_CLASSES,
   UNIT_KINDS,
   type FeatureGeometry,
   type Footprint,
@@ -136,7 +137,7 @@ function parseAttrs(o: Obj, path: string, base: TerrainAttrs): TerrainAttrs {
   };
 }
 
-function parseMap(raw: unknown): TerrainMap {
+export function parseTerrain(raw: unknown): TerrainMap {
   const m = obj(raw, 'map');
   const map: TerrainMap = {
     width: mm(num(m.width, 'map.width', 1)),
@@ -152,13 +153,29 @@ function parseMap(raw: unknown): TerrainMap {
     ids.add(id);
     const kind = oneOf(o.kind, FEATURE_KINDS, `${p}.kind`);
     const d = KIND_DEFAULTS[kind];
+    const only = (key: string, kinds: string[]) => {
+      if (o[key] !== undefined && !kinds.includes(kind)) {
+        fail(`${p}.${key} only applies to ${kinds.join(' and ')}`);
+      }
+    };
+    only('roadClass', ['road']);
+    only('capacity', ['bridge', 'ford']);
+    only('risk', ['ford']);
+    const roadClass =
+      o.roadClass === undefined ? undefined : oneOf(o.roadClass, ROAD_CLASSES, `${p}.roadClass`);
+    const base = roadClass ? { ...d.attrs, moveCost: ROAD_CLASS_COST[roadClass] } : d.attrs;
     return {
       id,
       kind,
       ...(o.name === undefined ? {} : { name: str(o.name, `${p}.name`) }),
       layer: o.layer === undefined ? d.layer : int(o.layer, `${p}.layer`),
       geometry: parseGeometry(o, p, map),
-      attrs: parseAttrs(o, p, d.attrs),
+      attrs: parseAttrs(o, p, base),
+      ...(roadClass ? { roadClass } : {}),
+      ...(o.capacity === undefined
+        ? {}
+        : { capacity: mm(num(o.capacity, `${p}.capacity`, 0.001)) }),
+      ...(o.risk === undefined ? {} : { risk: num(o.risk, `${p}.risk`, 0, 1) }),
     };
   });
   return map;
@@ -291,7 +308,7 @@ function parseUnits(raw: unknown, map: TerrainMap, sides: Side[]): Unit[] {
 /** Validate raw scenario data (e.g. parsed JSON) and build the initial `GameState` at t=0. */
 export function loadScenario(raw: unknown): GameState {
   const o = obj(raw, 'scenario');
-  const map = parseMap(o.map);
+  const map = parseTerrain(o.map);
   const sides = parseSides(o.sides, map);
   const units = parseUnits(o.units, map, sides);
 

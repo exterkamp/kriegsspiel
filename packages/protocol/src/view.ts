@@ -24,6 +24,16 @@ export type Dispatch = z.infer<typeof Dispatch>;
  */
 export const Shape = z.array(Coord).min(1);
 
+/** The jobs on a side's staff; see the engine's `ROLES`. */
+export const Role = z.enum([
+  'commander',
+  'chiefOfStaff',
+  'intelligence',
+  'quartermaster',
+  'subordinate',
+]);
+export type Role = z.infer<typeof Role>;
+
 export const OwnUnit = z
   .object({
     id: UnitId,
@@ -34,9 +44,10 @@ export const OwnUnit = z
     formation: Formation,
     footprint: Footprint,
     shape: Shape.optional(),
-    strength: z.number().nonnegative(),
-    morale: z.number().min(0).max(1),
-    supply: z.number().min(0).max(1),
+    // Left out when the viewer's role may not know a unit's condition (the intelligence officer).
+    strength: z.number().nonnegative().optional(),
+    morale: z.number().min(0).max(1).optional(),
+    supply: z.number().min(0).max(1).optional(),
   })
   .strict();
 export type OwnUnit = z.infer<typeof OwnUnit>;
@@ -78,6 +89,8 @@ export type LastKnownContact = z.infer<typeof LastKnownContact>;
 export const SideView = z
   .object({
     side: Side,
+    /** The staff role this view was cut for. Absent in shared-HQ play, where everyone sees the whole side view. */
+    role: Role.optional(),
     atGame: GameMs,
     /** Where this side's couriers set out from. */
     hq: Coord.optional(),

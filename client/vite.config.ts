@@ -26,6 +26,7 @@ export default defineConfig({
         admin: fileURLToPath(new URL('admin/index.html', import.meta.url)),
         mapAuthoring: fileURLToPath(new URL('./map-authoring.html', import.meta.url)),
         mapBenchmark: fileURLToPath(new URL('./map-benchmark.html', import.meta.url)),
+        tableBenchmark: fileURLToPath(new URL('./table-benchmark.html', import.meta.url)),
       },
     },
   },

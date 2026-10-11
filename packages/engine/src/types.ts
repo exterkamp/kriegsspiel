@@ -53,6 +53,10 @@ export const FEATURE_KINDS = [
 ] as const;
 export type FeatureKind = (typeof FEATURE_KINDS)[number];
 
+/** Road classes, best first. A road's class sets its march-cost multiplier. */
+export const ROAD_CLASSES = ['highway', 'road', 'track'] as const;
+export type RoadClass = (typeof ROAD_CLASSES)[number];
+
 /** A closed area (woods, marsh, water, fields). */
 export interface PolygonGeometry {
   shape: 'polygon';
@@ -83,6 +87,12 @@ export interface TerrainFeature {
   layer: number;
   geometry: FeatureGeometry;
   attrs: TerrainAttrs;
+  /** Roads only: the class that set `attrs.moveCost`. */
+  roadClass?: RoadClass;
+  /** Bridges and fords: the widest marching column (frontage, mm) the crossing carries. */
+  capacity?: number;
+  /** Fords: 0..1 hazard of the crossing (data for the umpire; the planner only prices it). */
+  risk?: number;
 }
 
 /** The ground: a rectangle `width` x `height` mm from the origin, and the features on it. */

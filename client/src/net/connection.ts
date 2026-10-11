@@ -4,6 +4,7 @@ import {
   serializeCommand,
   type Command,
   type Mark,
+  type StaffRole,
   type ServerMessage,
 } from '@kriegsspiel/protocol';
 
@@ -72,6 +73,10 @@ export class GameConnection {
       text,
       ...(courier ? { courier } : {}),
     });
+  }
+
+  askStaff(questionId: string, role: StaffRole, question: string): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'askStaff', questionId, role, question });
   }
 
   putMark(mark: Mark): boolean {
