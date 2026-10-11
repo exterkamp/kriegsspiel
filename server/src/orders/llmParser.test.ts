@@ -152,6 +152,19 @@ describe('failed calls', () => {
     },
   );
 
+  it('still falls back when the onFallback logger throws', async () => {
+    const client = new MockUmpireClient([{ stage: 'parse', failure: { kind: 'timeout' } }]);
+    const parser = new LlmOrderParser(client, {
+      onFallback: () => {
+        throw new Error('logger down');
+      },
+    });
+    expect(await parser.parse('march', CORPUS_CONTEXT)).toMatchObject({
+      kind: 'clarification',
+      question: FALLBACK_QUESTION,
+    });
+  });
+
   it('counts the usage of successful and failed calls', async () => {
     const usage = { inputTokens: 100, outputTokens: 10, cacheReadTokens: 0, cacheWriteTokens: 0 };
     const ok = {

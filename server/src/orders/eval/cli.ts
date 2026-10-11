@@ -42,6 +42,9 @@ async function main(): Promise<number> {
   const baselineUrl = dir(llm ? 'llm-parser.json' : 'stub-parser.json');
   const report = await runEval(name, parser, GOLDEN_ORDERS, CORPUS_CONTEXT);
   console.log(args.has('--json') ? JSON.stringify(report, null, 2) : formatReport(report));
+  if (args.has('--record') && !args.has('--live')) {
+    console.error('--record has no effect without --live; nothing was recorded');
+  }
   if (args.has('--record') && args.has('--live')) {
     writeFileSync(dir('llm-parser.recording.json'), `${JSON.stringify(recorded, null, 1)}\n`);
     console.log(`\nrecording written to ${fileURLToPath(dir('llm-parser.recording.json'))}`);

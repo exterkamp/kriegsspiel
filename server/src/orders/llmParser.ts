@@ -142,7 +142,11 @@ export class LlmOrderParser implements OrderParser {
   }
 
   private fallback(orderText: string, reason: string): ParseResult {
-    this.opts.onFallback?.({ orderText, reason });
+    try {
+      this.opts.onFallback?.({ orderText, reason });
+    } catch {
+      // a failing logger must not turn the safe fallback into an error
+    }
     return { kind: 'clarification', text: orderText, question: FALLBACK_QUESTION };
   }
 
