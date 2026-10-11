@@ -5,6 +5,7 @@ COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages ./packages
 COPY server ./server
 COPY client ./client
+COPY client-ng ./client-ng
 COPY scripts ./scripts
 COPY vendor/settlemaker ./vendor/settlemaker
 COPY vendor/settlemaker.snapshot.json ./vendor/settlemaker.snapshot.json

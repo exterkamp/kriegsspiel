@@ -9,6 +9,7 @@
     "noImplicitOverride": true,
     "isolatedModules": true,
     "esModuleInterop": true,
+    "types": ["node"],
     "skipLibCheck": true,
     "declaration": true,
     "sourceMap": true

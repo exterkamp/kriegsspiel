@@ -25,7 +25,6 @@
     "@angular/cli": "^22.2.2",
     "@angular/compiler-cli": "^22.2.2",
     "@types/three": "^0.170.0",
-    "jsdom": "^30.1.2",
-    "vitest": "^4.0.8"
+    "jsdom": "^30.1.2"
   }
 }

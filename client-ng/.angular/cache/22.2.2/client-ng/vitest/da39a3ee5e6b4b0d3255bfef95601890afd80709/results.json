@@ -1,9 +1,0 @@
-{
-  "version": "4.1.11",
-  "results": [
-    [
-      "client-ng:src/app/game/clock.component.spec.ts",
-      { "duration": 99.33300699999995, "failed": false }
-    ]
-  ]
-}
