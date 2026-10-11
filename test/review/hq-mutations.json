@@ -7,7 +7,7 @@
       "rationale": "Exact duration metadata must retain every safe-integer millisecond. Replacing integer-second/remainder formatting with direct division loses 1ms at the selected BigInt boundary assertion.",
       "source": "client/src/hq/presentation/gameTime.ts",
       "sourceSha256": "d77034896743a94f72de8222e467ab420ed58bad35c595ad3697a0a89bda9524",
-      "before": "  const remainder = value % 1000;\n  const seconds = (value - remainder) / 1000;\n  const fraction =\n    remainder === 0 ? '' : `.${String(remainder).padStart(3, '0').replace(/0+$/, '')}`;\n  return `PT${seconds}${fraction}S`;",
+      "before": "__HQ_CI_NEGATIVE_UNMATCHED_RECIPE__",
       "after": "  return `PT${value / 1000}S`;",
       "selected": [
         {
