@@ -21,7 +21,7 @@ Gameplay milestones should end in something playable. The standalone map-authori
 
 ## M2: LLM umpire v1 (order parsing + narration)
 - [ ] Umpire service with structured output schemas
-- [ ] `parseOrders`: free text → intents, with clarification/rejection for impossible orders
+- [x] `parseOrders`: free text → intents, with clarification/rejection for impossible orders (`LlmOrderParser`; not yet wired into the order route, and its recorded corpus outputs are a hand-authored seed until a live run replaces them, see decisions.md, parseOrders stage)
 - [x] `narrate`: fog-filtered field reports per side from the validated event list (`narrateReports`; not yet run by the scheduler, see D14 Open (narrate))
 - [ ] Prompt-injection and leak test suites
 - [ ] Record all LLM calls for audit

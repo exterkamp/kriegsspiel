@@ -82,6 +82,19 @@ export class GameConnection {
     return this.send({ v: PROTOCOL_VERSION, kind: 'deleteMark', markId });
   }
 
+  proposePause(reason?: string): boolean {
+    const r = reason?.trim();
+    return this.send({ v: PROTOCOL_VERSION, kind: 'proposePause', ...(r ? { reason: r } : {}) });
+  }
+
+  proposeResume(): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'proposeResume' });
+  }
+
+  vote(proposal: string, yes: boolean): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'vote', proposal, yes });
+  }
+
   private open(): void {
     this.o.onStatus('connecting');
     const make: (url: string) => WebSocketLike =
