@@ -120,6 +120,13 @@ describe('ServerMessage', () => {
     { v, kind: 'staffAtWork', working: false },
     { v, kind: 'gameOver', winner: 'blue', reason: 'objective-held', atGame: 9000 },
     { v, kind: 'gameOver', winner: null, reason: 'eliminated', atGame: 9000 },
+    {
+      v,
+      kind: 'notification',
+      event: 'contact',
+      title: 'Contact',
+      text: 'A report of contact has arrived.',
+    },
     { v, kind: 'error', code: 'bad_command', message: 'nope' },
   ];
   it.each(good)('round-trips $kind', (m) => {

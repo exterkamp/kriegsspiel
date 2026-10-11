@@ -83,6 +83,23 @@ describe('server restart', () => {
   });
 });
 
+describe('notification', () => {
+  it('shows what an away player would be sent', () => {
+    const m: ServerMessage = {
+      v,
+      kind: 'notification',
+      event: 'contact',
+      title: 'Contact reported',
+      text: 'Look to your desk.',
+    };
+    const s = applyServerMessage(initialState, m, 0);
+    expect(s.notices[0]).toEqual({
+      code: 'notify_contact',
+      message: 'Contact reported. Look to your desk.',
+    });
+  });
+});
+
 describe('game over', () => {
   const over: ServerMessage = {
     v,

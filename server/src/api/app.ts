@@ -6,6 +6,7 @@
  *   GET  /games/:id                signed in: which sides are taken and which one is yours
  *   POST /games/:id/join           signed in: take a free side, body `{ "side": string }`
  *   GET  /games/:id/ws             WebSocket for the side the signed-in user holds (`@kriegsspiel/protocol` messages)
+ *   /notifications/*               signed in: notification preferences and web push subscriptions (see ../notify)
  *   GET  /healthz                  liveness, `{ ok: true }`
  *   /admin/api/*                   read-only debug API, only when `admin.enabled` (see ../admin)
  *   GET  /*                        the built client, when `staticDir` is set
@@ -35,6 +36,13 @@ import { authRoutes, type Auth } from '../auth/routes.js';
 import { MemoryAuthStore, type AuthStore } from '../auth/store.js';
 import { TraceStore } from '../debug/trace.js';
 import type { OrderParser } from '../orders/index.js';
+import {
+  Notifier,
+  MemoryNotifyStore,
+  notifyRoutes,
+  type NotifyStore,
+  type PushSender,
+} from '../notify/index.js';
 import { Hub, type Socket } from './hub.js';
 
 /** Fastest clock a client may ask for: 1 game day per wall second. */
@@ -90,6 +98,8 @@ export interface AppOptions {
    * so each player has their own bucket; off when the port is reachable directly, where the header can be forged.
    */
   trustProxy?: boolean;
+  /** Notifications (epic #5): preferences and push subscriptions (default in memory), and the web push sender (unset: no web push). */
+  notify?: { store?: NotifyStore; push?: PushSender; emailEveryMs?: number };
   onError?: (gameId: string, error: unknown) => void;
 }
 
@@ -97,6 +107,8 @@ export interface App {
   server: FastifyInstance;
   host: GameHost;
   hub: Hub;
+  notifier: Notifier;
+  notifyStore: NotifyStore;
   auth: Auth;
   authStore: AuthStore;
 }
@@ -130,10 +142,29 @@ export async function buildApp(options: AppOptions): Promise<App> {
     init: startingState,
     scriptedOpponents: options.scriptedOpponents,
     trace,
-    onUpdate: (id) => hub.notify(id),
+    onUpdate: (id) => {
+      hub.notify(id);
+      notifier.observe(id);
+    },
     onError,
   });
   const authStore = options.auth?.store ?? new MemoryAuthStore();
+  const notifyStore = options.notify?.store ?? new MemoryNotifyStore();
+  const mailer = options.auth?.mailer ?? new LogMailer((line) => server.log.info(line));
+  const publicUrl = options.auth?.publicUrl ?? 'http://localhost:3000';
+  const wallNow = options.wallNow ?? Date.now;
+  const notifier = new Notifier({
+    auth: authStore,
+    store: notifyStore,
+    mailer,
+    push: options.notify?.push,
+    publicUrl,
+    lookup: (id) => host.get(id),
+    sendToUser: (id, userId, message) => hub.sendToUser(id, userId, message),
+    wallNow,
+    emailEveryMs: options.notify?.emailEveryMs,
+    onError,
+  });
 
   await server.register(websocket, { options: { maxPayload: MAX_PAYLOAD_BYTES } });
 
@@ -148,14 +179,19 @@ export async function buildApp(options: AppOptions): Promise<App> {
 
   const auth = await authRoutes(server, {
     store: authStore,
-    mailer: options.auth?.mailer ?? new LogMailer((line) => server.log.info(line)),
-    publicUrl: options.auth?.publicUrl ?? 'http://localhost:3000',
+    mailer,
+    publicUrl,
     wallNow: options.wallNow,
     loginPerEmail: options.auth?.loginPerEmail,
     loginPerIp: options.auth?.loginPerIp,
-    onAccountDeleted: (userId) => hub.disconnectUser(userId, 'account deleted'),
+    onAccountDeleted: (userId) => {
+      notifyStore.deleteUser(userId);
+      hub.disconnectUser(userId, 'account deleted');
+    },
     onLogout: (userId) => hub.disconnectUser(userId),
   });
+
+  notifyRoutes(server, { auth, store: notifyStore, push: options.notify?.push });
 
   /** A side a player may take: scenario sides run by the built-in opponent are not open. */
   const openSides = (gameId: string): SideId[] =>
@@ -249,8 +285,10 @@ export async function buildApp(options: AppOptions): Promise<App> {
     hub.closeAll();
     await trace?.close();
     await host.shutdown();
+    await notifier.flush();
     if (!options.auth?.store) authStore.close();
+    if (!options.notify?.store) notifyStore.close();
   });
 
-  return { server, host, hub, auth, authStore };
+  return { server, host, hub, notifier, notifyStore, auth, authStore };
 }

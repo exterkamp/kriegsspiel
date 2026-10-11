@@ -28,6 +28,8 @@ Login needs two more settings (see D17 in [decisions.md](decisions.md)); add the
 | `TRUST_PROXY` | off | Set to `1` behind a reverse proxy so the login rate limits use the caller's `X-Forwarded-For` address. Without it every request shares the proxy's address and the per-address limits become global (20 login mails an hour for everyone). Leave it off when the port is reachable directly, because the header can then be forged to dodge the limits |
 | `MAIL_WEBHOOK_URL` | unset | The server POSTs `{to, subject, text}` JSON here to send the login link. Unset, the link is written to the server log (development only: anyone who can read the log can sign in) |
 | `MAIL_WEBHOOK_TOKEN` | unset | Optional bearer token sent to the webhook |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | unset | Enable web push. Generate a pair with `npx web-push generate-vapid-keys`. Unset, notifications go by WebSocket and email only |
+| `VAPID_SUBJECT` | `mailto:admin@localhost` | A `mailto:` or `https:` contact sent to push services |
 
 Inside the container the server uses `HOST`, `PORT`, `DB_PATH` (`/data/games.db`) and `STATIC_DIR` (the built client); see `server/src/main.ts`. Without `DB_PATH` the server keeps games in memory. `GET /healthz` returns `{"ok":true}` and backs the container health check.
 

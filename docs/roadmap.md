@@ -56,7 +56,7 @@ Each milestone should end in something playable.
 - [x] Accounts (magic-link login, sessions, seats; D17)
 - [ ] Lobbies, clock ratio chosen in the lobby (1:1, 4:1, 12:1, custom), mid-game ratio change by vote
 - [ ] Pause voting (server state machine done in #63; WebSocket wiring and client pending), emergency hold, resume rules, safe restart after downtime
-- [ ] Notifications (WebSocket, web push, email) with per-player thresholds
+- [x] Notifications (WebSocket, web push, email) with per-player thresholds (D18)
 - [ ] Deputy mode: LLM staff officer acting within standing orders
 - [ ] Roles per side, with LLM filling empty staff roles
 - [ ] Shared order drafts: comments, tracked edits, sign and stamp, LLM staff check
