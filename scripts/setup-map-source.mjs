@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { gunzipSync } from 'node:zlib';
 import {
   copyFileSync,
   cpSync,
@@ -60,7 +61,22 @@ try {
     identity.packageSha256 !== manifest.artifact.packageSha256 ||
     identity.packageIntegrity !== manifest.artifact.packageIntegrity
   )
-    throw new Error('Rebuilt SettleMaker runtime package differs from its recorded integrity');
+    throw new Error(
+      `Rebuilt SettleMaker runtime package differs from its recorded integrity: ${JSON.stringify({
+        ...identity,
+        tarSha256: createHash('sha256').update(gunzipSync(bytes)).digest('hex'),
+        node: process.version,
+        zlib: process.versions.zlib,
+        files: packed.files.map(({ path, mode, size }) => ({
+          path,
+          mode,
+          size,
+          sha256: createHash('sha256')
+            .update(readFileSync(join(temporary, path)))
+            .digest('hex'),
+        })),
+      })}`,
+    );
   const destination = join(root, 'vendor/settlemaker-runtime.tgz');
   copyFileSync(tarball, `${destination}.tmp`);
   renameSync(`${destination}.tmp`, destination);
