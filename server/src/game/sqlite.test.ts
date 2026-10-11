@@ -141,9 +141,14 @@ describe('SqliteGameStore', () => {
     await first.saveMarks('g1', 'red', [pin('r', 3)]);
     await first.saveMarks('g2', 'blue', [pin('other', 4)]);
     await first.saveMarks('g1', 'blue', [pin('b', 7)]);
+    expect(await first.loadSeen('g1', 'blue')).toBeUndefined();
+    await first.saveSeen('g1', 'blue', 5000);
+    await first.saveSeen('g1', 'blue', 3000);
     first.close();
 
     const again = open(path);
+    expect(await again.loadSeen('g1', 'blue')).toBe(5000);
+    expect(await again.loadSeen('g1', 'red')).toBeUndefined();
     expect(await again.loadMarks('g1', 'blue')).toEqual([pin('b', 7)]);
     expect(await again.loadMarks('g1', 'red')).toEqual([pin('r', 3)]);
     expect(await again.loadMarks('g2', 'blue')).toEqual([pin('other', 4)]);

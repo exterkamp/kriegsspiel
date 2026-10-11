@@ -64,6 +64,18 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       downMs: z.number().finite().nonnegative(),
     })
     .strict(),
+  // Sent once when a side returns after being away (no connection open): game time of its last
+  // visit, game time now, and the ids of dispatches that arrived in between (all of them also in
+  // the view). Nothing is sent to a side that has never visited or that is still connected.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('catchUp'),
+      sinceGame: GameMs,
+      atGame: GameMs,
+      dispatchIds: z.array(z.string().min(1)),
+    })
+    .strict(),
   // The game has ended. Public to both sides and sent once per connection, also to a late joiner.
   // `winner` is null when both sides were put out of the fight together.
   z
