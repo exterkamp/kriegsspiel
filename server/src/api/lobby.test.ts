@@ -223,9 +223,19 @@ describe('lobby', () => {
   it('lists the scenarios', async () => {
     const base = await start();
     const res = await fetch(`${base}/scenarios`);
-    expect(await res.json()).toEqual({
-      scenarios: [{ id: 'hold-the-bridge', name: 'Hold the Bridge' }],
+    const body = (await res.json()) as { scenarios: Array<Record<string, unknown>> };
+    expect(body.scenarios).toHaveLength(1);
+    expect(body.scenarios[0]).toMatchObject({
+      id: 'hold-the-bridge',
+      name: 'Hold the Bridge',
+      sides: [
+        { id: 'blue', name: 'Blue', controller: 'human' },
+        { id: 'red', name: 'Red', controller: 'scripted' },
+      ],
+      defaults: { side: 'blue', rate: 12 },
     });
+    expect(typeof body.scenarios[0]!.briefing).toBe('string');
+    expect(body.scenarios[0]!.lengthMinutes).toBeGreaterThan(0);
   });
 
   it('gives a started game the pause rules chosen at creation', async () => {
