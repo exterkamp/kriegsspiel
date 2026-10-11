@@ -6,6 +6,7 @@ import {
   EventRegistry,
   maySign,
   mayDraft,
+  mayForward,
   registerCombat,
   registerMovement,
   registerVisibility,
@@ -122,6 +123,24 @@ describe('viewForRole', () => {
     expect(sighted.reports.every((r) => r.from === 'Unit b1')).toBe(true);
   });
 
+  it('adds the papers HQ forwarded to a subordinate, and only those', () => {
+    const w = played();
+    const full = viewFor(w, 'blue');
+    const contact = full.reports.find((r) => r.kind === 'contact')!;
+    const before = viewForRole(w, 'blue', seats.subordinate!);
+    expect(before.reports.map((r) => r.id)).not.toContain(contact.id);
+    const after = viewForRole(w, 'blue', seats.subordinate!, w.time, [contact.id, 'not-in-view']);
+    expect(after.reports.map((r) => r.id)).toContain(contact.id);
+    expect(after.reports).toHaveLength(before.reports.length + 1);
+    // Forwarding passes a paper, not the picture: no sightings or contacts come with it.
+    expect(after.visibleEnemies).toEqual(before.visibleEnemies);
+    expect(after.lastKnownContacts).toEqual([]);
+    // Staff and commanders are not given more by an id list.
+    expect(
+      viewForRole(w, 'blue', seats.quartermaster!, w.time, [contact.id]).reports.map((r) => r.kind),
+    ).toEqual(['lowAmmo']);
+  });
+
   it('ignores units a subordinate names that are not on their side', () => {
     const w = played();
     const v = viewForRole(w, 'blue', { role: 'subordinate', units: ['r-near', 'nobody'] });
@@ -214,5 +233,11 @@ describe('permissions', () => {
     const dead = { ...w, units: w.units.map((u) => (u.id === 'b1' ? { ...u, strength: 0 } : u)) };
     expect(mayDraft(dead, 'blue', seats.chiefOfStaff!, 'b1')).toBe(false);
     expect(mayDraft(dead, 'blue', { role: 'subordinate', units: ['b1'] }, 'b1')).toBe(false);
+  });
+});
+
+describe('mayForward', () => {
+  it('lets only HQ pass papers on', () => {
+    expect(ROLES.filter((role) => mayForward({ role }))).toEqual(['commander', 'chiefOfStaff']);
   });
 });

@@ -5,14 +5,17 @@
 import {
   renderDocument,
   viewFor,
+  viewForRole,
+  type EngineRoleView,
   type EngineSideView,
   type EngineState,
   type GameState,
+  type Seat,
   type SideId,
   type ViewDocument,
   type ViewReport,
 } from '@kriegsspiel/engine';
-import type { ClockState, Dispatch, SideView } from '@kriegsspiel/protocol';
+import type { ClockState, Dispatch, OwnUnit, SideView } from '@kriegsspiel/protocol';
 
 const CATEGORY: Record<ViewReport['kind'], Dispatch['category']> = {
   contact: 'scouts',
@@ -49,9 +52,24 @@ export function documentToDispatch(d: ViewDocument): Dispatch {
   };
 }
 
-export function toSideView(view: EngineSideView, clock: ClockState): SideView {
+/** A unit's condition on the wire; a role that may not know it (an outline) leaves the fields out. */
+function condition(
+  u: EngineRoleView['ownUnits'][number],
+): Pick<OwnUnit, 'strength' | 'morale' | 'supply'> {
+  if (!('strength' in u)) return {};
+  return {
+    strength: u.strength,
+    // The engine scores morale 0..100; the wire uses 0..1.
+    morale: Math.min(1, Math.max(0, u.morale / 100)),
+    // The wire's supply is the share of ammunition left (engine 0..100).
+    supply: Math.min(1, Math.max(0, u.ammo / 100)),
+  };
+}
+
+export function toSideView(view: EngineSideView | EngineRoleView, clock: ClockState): SideView {
   return {
     side: view.side,
+    ...('role' in view ? { role: view.role } : {}),
     atGame: view.time,
     ...(view.hq ? { hq: view.hq } : {}),
     ownUnits: view.ownUnits.map((u) => ({
@@ -61,12 +79,8 @@ export function toSideView(view: EngineSideView, clock: ClockState): SideView {
       facing: u.facing,
       formation: u.formation,
       footprint: u.footprint,
-      ...(u.shape ? { shape: u.shape } : {}),
-      strength: u.strength,
-      // The engine scores morale 0..100; the wire uses 0..1.
-      morale: Math.min(1, Math.max(0, u.morale / 100)),
-      // The wire's supply is the share of ammunition left (engine 0..100).
-      supply: Math.min(1, Math.max(0, u.ammo / 100)),
+      ...('shape' in u && u.shape ? { shape: u.shape } : {}),
+      ...condition(u),
     })),
     visibleEnemies: view.visibleEnemies.map((e) => ({
       id: e.id,
@@ -90,12 +104,19 @@ export function toSideView(view: EngineSideView, clock: ClockState): SideView {
   };
 }
 
-/** What `side` may know at the engine's current time, as a wire view. */
+/**
+ * What `side` may know at the engine's current time, as a wire view. With a `seat` it is the view
+ * cut down for that role (`viewForRole`), including the papers HQ `forwarded` to it; without one,
+ * the whole side view of shared-HQ play.
+ */
 export function sideViewOf(
   state: EngineState<GameState>,
   side: SideId,
   clock: ClockState,
+  seat?: Seat,
+  forwarded: readonly string[] = [],
 ): SideView {
   // `world.time` only moves when an event fires; the engine's own time is the real "now".
+  if (seat) return toSideView(viewForRole(state.world, side, seat, state.time, forwarded), clock);
   return toSideView(viewFor(state.world, side, state.time), clock);
 }

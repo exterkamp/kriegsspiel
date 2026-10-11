@@ -163,8 +163,14 @@ export function fixtureAnswer(
       break;
     }
     case 'quartermaster': {
-      const low = own.filter((u) => u.supply < 0.4);
-      for (const u of own) lines.push(`${u.name}: supply ${pct(u.supply)}%.`);
+      const low = own.filter((u) => u.supply !== undefined && u.supply < 0.4);
+      for (const u of own) {
+        lines.push(
+          u.supply === undefined
+            ? `${u.name}: supply unknown.`
+            : `${u.name}: supply ${pct(u.supply)}%.`,
+        );
+      }
       lines.push(
         low.length
           ? `${list(low.map((u) => u.name))} ${low.length === 1 ? 'is' : 'are'} running short.`
