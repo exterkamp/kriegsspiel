@@ -1,5 +1,5 @@
-import type { Coord, Mark } from '@kriegsspiel/protocol';
-import { formatGameTime, type PendingOrder } from '../net/state.js';
+import type { Coord, Dispatch, Mark } from '@kriegsspiel/protocol';
+import { formatGameTime, orderIdOf, type PendingOrder } from '../net/state.js';
 
 export type Courier = 'fast' | 'safe';
 
@@ -139,4 +139,50 @@ export function deliveryStatus(p: PendingOrder, nowGame: number): Delivery {
     fraction,
     label: `Courier riding, expected ${formatGameTime(p.etaGame)}`,
   };
+}
+
+/** Two orders the staff understands, shown with every refusal or request for clarification. */
+export const ORDER_EXAMPLES: readonly string[] = [
+  '1st Battalion march to the bridge',
+  'Hold the wood',
+];
+
+/**
+ * What the desk tells the player when the staff could not carry out an order: their own words, the
+ * staff's reason without the internal order id, and a hint with two example orders.
+ */
+export function refusalText(o: { text: string; reason: string; code?: string }): string {
+  const bare = o.reason.replace(/^\s*o-[\w-]+:\s*/, '').trim();
+  const reason = /[.?!)]$/.test(bare) ? bare : `${bare}.`;
+  const examples = ORDER_EXAMPLES.map((e) => `"${e}"`).join(' or ');
+  const lead =
+    o.code === 'order_clarification'
+      ? `The staff need more to act on your order "${o.text.trim()}". ${reason}`
+      : `Your order "${o.text.trim()}" could not be carried out. ${reason}`;
+  return `${lead} The staff understand orders such as ${examples}.`;
+}
+
+/** A notice for the desk: a refusal shows the player's own words and a hint; others lose any order id prefix. */
+export function noticeText(
+  n: { message: string },
+  outcomes: Readonly<Record<string, { text: string; reason: string; code?: string }>>,
+): string {
+  const id = orderIdOf(n.message);
+  const o = id === undefined ? undefined : outcomes[id];
+  return o ? refusalText(o) : n.message.replace(/^o-[\w-]+:\s*/, '');
+}
+
+/**
+ * Word that an order arrived: the first dispatch from its addressee written after it was sent (written, not received:
+ * a report already riding when the order went out says nothing about the order).
+ * The addressee answering is the only proof of delivery the client has.
+ */
+export function deliveredBy(
+  p: PendingOrder,
+  dispatches: readonly Dispatch[],
+): Dispatch | undefined {
+  if (!p.toName) return undefined;
+  return [...dispatches]
+    .sort((a, b) => a.writtenAtGame - b.writtenAtGame)
+    .find((d) => d.from === p.toName && d.writtenAtGame >= p.sentAtGame);
 }

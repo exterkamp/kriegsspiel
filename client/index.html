@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kriegsspiel</title>
+    <!-- No favicon file ships; an empty one stops the browser asking for /favicon.ico (a 404 on every load). -->
+    <link rel="icon" href="data:," />
     <style>
       html,
       body,
@@ -48,6 +50,16 @@
         padding: 8px;
         border-radius: 4px;
         box-sizing: border-box;
+      }
+      #marks-body[hidden] {
+        display: none;
+      }
+      #marks:has(#marks-body[hidden]) {
+        width: auto;
+        display: inline-block;
+      }
+      #marks-toggle {
+        margin-bottom: 4px;
       }
       #marks-tools,
       #marks-row,
