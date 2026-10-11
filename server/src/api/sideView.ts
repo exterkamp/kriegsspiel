@@ -18,6 +18,7 @@ import {
 import type { ClockState, Dispatch, OwnUnit, SideView } from '@kriegsspiel/protocol';
 
 const CATEGORY: Record<ViewReport['kind'], Dispatch['category']> = {
+  situation: 'staff',
   contact: 'scouts',
   unitLost: 'subordinates',
   orderDelivered: 'subordinates',

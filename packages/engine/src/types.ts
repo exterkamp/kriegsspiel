@@ -241,7 +241,7 @@ export interface Outcome {
 /** A report waiting for, or already past, its courier delay. Belongs to one side's intel. */
 export interface Report {
   id: string;
-  kind: 'contact' | 'unitLost' | 'orderDelivered' | 'lowAmmo' | 'exhausted';
+  kind: 'situation' | 'contact' | 'unitLost' | 'orderDelivered' | 'lowAmmo' | 'exhausted';
   /** Game time of the thing reported. */
   observedAt: GameTime;
   /** Game time the report reaches HQ (observedAt plus courier delay). */
