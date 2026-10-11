@@ -2,7 +2,6 @@
   import { conferenceClient, conferenceLog, gameState } from './store.js';
   import {
     CONFERENCE_ROLES,
-    FIXTURE_STAFF,
     MAX_QUESTION_LENGTH,
     busy,
     formatCost,
@@ -28,7 +27,9 @@
   });
   // With no server clock (the offline fixture) game time runs 1:1 from the view's time.
   const nowGame = $derived(
-    $gameState.clock ? gameNowMs($gameState.clock, wall) : ($gameState.view?.atGame ?? 0) + (wall - opened),
+    $gameState.clock
+      ? gameNowMs($gameState.clock, wall)
+      : ($gameState.view?.atGame ?? 0) + (wall - opened),
   );
   const officer = $derived(staffFor(role));
   const log = $derived($conferenceLog.filter((e) => e.role === role));
@@ -42,8 +43,10 @@
     conferenceLog.update((l) => [...l, ex]);
     question = '';
     $conferenceClient.ask(req, $gameState.view).then(
-      (answer) => conferenceLog.update((l) => l.map((x) => (x.id === ex.id ? { ...x, answer } : x))),
-      () => conferenceLog.update((l) => l.map((x) => (x.id === ex.id ? { ...x, failed: true } : x))),
+      (answer) =>
+        conferenceLog.update((l) => l.map((x) => (x.id === ex.id ? { ...x, answer } : x))),
+      () =>
+        conferenceLog.update((l) => l.map((x) => (x.id === ex.id ? { ...x, failed: true } : x))),
     );
   }
 </script>
@@ -51,7 +54,11 @@
 <h2>Staff conference</h2>
 <div class="tabs" role="group" aria-label="Staff officer">
   {#each CONFERENCE_ROLES as r (r)}
-    <button type="button" aria-pressed={role === r} onclick={() => ((role = r), (error = undefined))}>
+    <button
+      type="button"
+      aria-pressed={role === r}
+      onclick={() => ((role = r), (error = undefined))}
+    >
       {staffFor(r).title}
       {#if busy($conferenceLog, r, nowGame)}<span class="busy" aria-label="busy">…</span>{/if}
     </button>
@@ -75,7 +82,9 @@
         {#if e.failed}
           <p class="a failed">{officer.name} could not be reached. Ask again.</p>
         {:else if isPending(e, nowGame)}
-          <p class="a pending">{officer.name} is consulting the papers… answer due {formatGameTime(e.answerAtGame)}.</p>
+          <p class="a pending">
+            {officer.name} is consulting the papers… answer due {formatGameTime(e.answerAtGame)}.
+          </p>
         {:else if e.answer}
           <p class="a">{e.answer.text}</p>
           <small>Based on reports as of {formatGameTime(e.answer.basedOnGame)}.</small>
@@ -87,27 +96,75 @@
 
 <form onsubmit={ask}>
   <label for="conference-question">Ask {officer.name}</label>
-  <textarea id="conference-question" rows="2" maxlength={MAX_QUESTION_LENGTH} bind:value={question}></textarea>
+  <textarea id="conference-question" rows="2" maxlength={MAX_QUESTION_LENGTH} bind:value={question}
+  ></textarea>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   <button type="submit">Ask (costs {formatCost(officer.costMs)})</button>
 </form>
 
 <style>
-  .tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
-  button {
-    background: #efe6c8; color: #2a2118; border: 1px solid #5a4a36; border-radius: 3px;
-    padding: 4px 8px; font: inherit; font-size: 13px; cursor: pointer;
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
   }
-  button[aria-pressed='true'] { background: #c9a95c; font-weight: bold; }
-  button:focus-visible, textarea:focus-visible { outline: 3px solid #ffd76a; outline-offset: 2px; }
-  .who { margin: 4px 0 8px; }
-  .log { list-style: none; padding: 0; margin: 0 0 8px; }
-  .log li { border-bottom: 1px solid #c9bb94; padding: 4px 0; }
-  .q { margin: 2px 0; font-style: italic; }
-  .a { margin: 2px 0; }
-  .pending { opacity: 0.7; }
-  .error { color: #a83232; margin: 4px 0; }
-  form { display: flex; flex-direction: column; gap: 4px; }
-  textarea { font: inherit; width: 100%; box-sizing: border-box; }
-  form button { align-self: flex-start; }
+  button {
+    background: #efe6c8;
+    color: #2a2118;
+    border: 1px solid #5a4a36;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button[aria-pressed='true'] {
+    background: #c9a95c;
+    font-weight: bold;
+  }
+  button:focus-visible,
+  textarea:focus-visible {
+    outline: 3px solid #ffd76a;
+    outline-offset: 2px;
+  }
+  .who {
+    margin: 4px 0 8px;
+  }
+  .log {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 8px;
+  }
+  .log li {
+    border-bottom: 1px solid #c9bb94;
+    padding: 4px 0;
+  }
+  .q {
+    margin: 2px 0;
+    font-style: italic;
+  }
+  .a {
+    margin: 2px 0;
+  }
+  .pending {
+    opacity: 0.7;
+  }
+  .error {
+    color: #a83232;
+    margin: 4px 0;
+  }
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  textarea {
+    font: inherit;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  form button {
+    align-self: flex-start;
+  }
 </style>
