@@ -23,7 +23,7 @@ The game is played from a general's headquarters. There is no HUD and no minimap
 | **Journal / war diary** | A chronological record of orders sent and reports received, plus your own notes. | Reconstructing what happened, and the after-action reveal |
 | **Umpire's window** (post-game) | The same map with the true positions and every ruling revealed. | Learning from the game |
 
-Navigation is by clicking desk objects, plus hotkeys (T table, I in-tray, O orders, R order of battle, J journal, C conference, Esc back to the table). The desk shell is built; moving to a desk view dollies the camera down to the desk and fades the canvas, and the canvas keeps rendering and keeps its state. A small clock on the desk and a "new papers" indicator avoid a constant need to check every view.
+Navigation is by clicking desk objects, plus hotkeys (T table, I in-tray, O orders, R order of battle, J journal, C conference, Esc back to the table). The in-tray is built: six piles (newest arrival first, with unread counts), a dispatch viewer with sender, written and received times and the attached facts (unit, strength, a "Show on table" button for the place), a filed drawer, and discard. Read, filed and discarded marks are local and persist per game in the browser; reliability and sender confidence are never shown. The desk shell is built; moving to a desk view dollies the camera down to the desk and fades the canvas, and the canvas keeps rendering and keeps its state. A small clock on the desk and a "new papers" indicator avoid a constant need to check every view.
 
 ## The map layers
 
@@ -31,7 +31,7 @@ Layers are what let one historical map serve both sides and the engine.
 
 1. **Base map**: a scanned or redrawn period map (hachured hills, roads, woods, villages). Both players see the same base. It is slightly *wrong* in places, as period maps were.
 2. **Truth layer** (server only): the engine's vector terrain features (woods, rivers, roads, bridges, buildings, with cover, concealment and height tags), derived from the base map and corrected where needed. It is continuous: there is no grid or tile.
-3. **Player marks layer**: pins and counters the player places, plus marks the staff add automatically when a report arrives. Each mark records its source report and time, and fades or greys with age.
+3. **Player marks layer**: pins and counters the player places, plus marks the staff add automatically when a report arrives. Each mark records its source report and time, and fades or greys with age. Built as D16b: pins, pencil lines, arrows and range rings, stored per side on the server and never corrected.
 4. **Report sketches**: scouts' sketches attached to a location, for example "bridge at Hohenau, intact, 2 companies".
 5. **Overlays** (toggle): order arrows, planned routes, estimated march times, and a "last known" fog shading showing how old your knowledge is per area.
 

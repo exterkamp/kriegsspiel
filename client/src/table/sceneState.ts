@@ -51,5 +51,5 @@ export function buildSceneState(view: SideView, map: BaseMap): SceneState {
     uncertaintyRadius: c.uncertaintyRadius,
     ...(c.sizeEstimate !== undefined ? { sizeEstimate: c.sizeEstimate } : {}),
   }));
-  return { side: view.side, map, own, ghosts: [...live, ...stale] };
+  return { side: view.side, map, own, ghosts: [...live, ...stale], orderRoutes: [] };
 }

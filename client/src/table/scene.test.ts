@@ -14,6 +14,7 @@ vi.mock('three', async (importOriginal) => {
 });
 
 import * as THREE from 'three';
+import type { Mark } from '@kriegsspiel/protocol';
 import { fixtureMap, fixtureView } from './fixture.js';
 import { facingToRotationY, fitDistance } from './framing.js';
 import { MAX_TEXTURE_PX, mapCanvas, paintOrder, pxPerMetre } from './mapTexture.js';
@@ -261,5 +262,116 @@ describe('map texture and types', () => {
     const body = /export const FEATURE_KINDS = \[([^\]]*)\]/.exec(src)![1]!;
     const engine = [...body.matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
     expect([...FEATURE_KINDS]).toEqual(engine);
+  });
+});
+
+describe('TableScene marks and overlays', () => {
+  const pin: Mark = {
+    id: 'a',
+    kind: 'pin',
+    at: { x: 400, y: 300 },
+    madeAtGame: 0,
+    label: 'cav',
+  };
+  const arrow: Mark = {
+    id: 'b',
+    kind: 'arrow',
+    from: { x: 0, y: 0 },
+    to: { x: 500, y: 500 },
+    madeAtGame: 0,
+  };
+  const ring: Mark = {
+    id: 'c',
+    kind: 'ring',
+    at: { x: 900, y: 900 },
+    radius: 300,
+    madeAtGame: 0,
+  };
+  const line: Mark = {
+    id: 'd',
+    kind: 'line',
+    points: [
+      { x: 0, y: 0 },
+      { x: 50, y: 80 },
+    ],
+    madeAtGame: 0,
+  };
+
+  it('draws each kind of mark, and redraws only when something visible changed', () => {
+    const t = make();
+    t.apply(state);
+    t.setMarks([pin, arrow, ring, line], 0);
+    expect(t.markCount).toBe(4);
+    const first = t.scene.children.find((c) => c.children.some((k) => k.userData.markId))!;
+    const before = first.children[0];
+    t.setMarks([pin, arrow, ring, line], 60_000); // a minute: no visible step
+    expect(first.children[0]).toBe(before);
+    t.setMarks([pin, arrow, ring, line], 12 * 3_600_000); // fully aged
+    expect(first.children[0]).not.toBe(before);
+    t.setMarks([pin], 0);
+    expect(t.markCount).toBe(1);
+  });
+
+  it('greys and fades an old mark', () => {
+    const t = make();
+    t.apply(state);
+    const opacityAt = (now: number): number => {
+      t.setMarks([arrow], now);
+      let o = -1;
+      t.scene.traverse((x) => {
+        const m = (x as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
+        if (x.parent?.userData.markId === 'b' && m?.transparent && o < 0) o = m.opacity;
+      });
+      return o;
+    };
+    expect(opacityAt(0)).toBe(1);
+    expect(opacityAt(12 * 3_600_000)).toBeCloseTo(0.4);
+  });
+
+  it('shows order arrows, routes and last-known shading only while their overlay is on', () => {
+    const t = make();
+    const withRoutes = {
+      ...state,
+      orderRoutes: [
+        {
+          id: 'o1',
+          kind: 'order' as const,
+          points: [
+            { x: 0, y: 0 },
+            { x: 100, y: 100 },
+          ],
+        },
+        {
+          id: 'r1',
+          kind: 'route' as const,
+          points: [
+            { x: 0, y: 0 },
+            { x: 50, y: 20 },
+            { x: 100, y: 100 },
+          ],
+        },
+      ],
+    };
+    t.apply(withRoutes);
+    const overlay = (): number =>
+      t.scene.children
+        .filter((c) => c.name === '' && c.children.some((k) => k.name.startsWith('overlay:')))
+        .reduce((n, c) => n + c.children.length, 0);
+    expect(overlay()).toBe(2);
+    t.setOverlays({ orders: false, routes: true, lastKnown: true });
+    expect(overlay()).toBe(1);
+    t.setOverlays({ orders: false, routes: false, lastKnown: true });
+    expect(overlay()).toBe(0);
+    const shading = (): boolean[] => {
+      const out: boolean[] = [];
+      t.scene.traverse((o) => {
+        if (o.name === 'uncertainty') out.push(o.visible);
+      });
+      return out;
+    };
+    expect(shading().length).toBeGreaterThan(0);
+    expect(shading().every(Boolean)).toBe(true);
+    t.setOverlays({ orders: true, routes: true, lastKnown: false });
+    expect(shading().some(Boolean)).toBe(false);
   });
 });

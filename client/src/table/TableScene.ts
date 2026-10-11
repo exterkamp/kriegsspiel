@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Coord } from '@kriegsspiel/protocol';
+import type { Coord, Mark } from '@kriegsspiel/protocol';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mapCanvas } from './mapTexture.js';
 import {
@@ -11,8 +11,17 @@ import {
   type PickResult,
 } from './picking.js';
 import { facingToRotationY, fitDistance } from './framing.js';
+import { formatAge } from './sceneState.js';
+import { markAgeFactor } from './marks.js';
+import {
+  ALL_OVERLAYS,
+  type GhostPiece,
+  type OrderRoute,
+  type OwnPiece,
+  type Overlays,
+  type SceneState,
+} from './types.js';
 import { deskPose, easeInOut, lerpPose, type CameraPose } from './transition.js';
-import type { GhostPiece, OwnPiece, SceneState } from './types.js';
 
 const SIDE_COLOURS: Record<string, number> = { blue: 0x2f55a4, red: 0xa83232 };
 
@@ -58,6 +67,11 @@ export class TableScene {
   private tableMesh: THREE.Mesh | undefined;
   private pieces = new Map<string, PieceObject>();
   private piecesRoot = new THREE.Group();
+  private marksRoot = new THREE.Group();
+  private marksKey = '';
+  private overlayRoot = new THREE.Group();
+  private overlayKey = '';
+  private overlays: Overlays = ALL_OVERLAYS;
   private raf = 0;
   private atDesk = false;
   /** Camera pose to return to when leaving the desk, so the table looks the same as it was left. */
@@ -87,6 +101,8 @@ export class TableScene {
     lamp.position.set(-12, 25, 10);
     this.scene.add(lamp);
     this.scene.add(this.piecesRoot);
+    this.scene.add(this.marksRoot);
+    this.scene.add(this.overlayRoot);
     this.resize();
   }
 
@@ -113,6 +129,244 @@ export class TableScene {
         this.pieces.delete(k);
       }
     }
+    this.syncOverlays();
+  }
+
+  /** Show or hide the overlay layers; the shading follows the stale sightings already in the scene. */
+  setOverlays(overlays: Overlays): void {
+    this.overlays = overlays;
+    this.syncOverlays();
+  }
+
+  private syncOverlays(): void {
+    for (const p of this.pieces.values()) {
+      const u = p.group.getObjectByName('uncertainty');
+      if (u) u.visible = this.overlays.lastKnown;
+    }
+    const routes = (this.state?.orderRoutes ?? []).filter((r) =>
+      r.kind === 'order' ? this.overlays.orders : this.overlays.routes,
+    );
+    const key = JSON.stringify([routes, this.mapKey]);
+    if (key === this.overlayKey) return;
+    this.overlayKey = key;
+    clearGroup(this.overlayRoot);
+    for (const r of routes) this.overlayRoot.add(this.routeObject(r));
+  }
+
+  private routeObject(r: OrderRoute): THREE.Group {
+    const map = this.state!.map;
+    const g = new THREE.Group();
+    const colour = r.kind === 'order' ? 0x1f1a12 : 0x6b5a3a;
+    const pts = r.points;
+    g.add(
+      this.ribbon(
+        pts,
+        this.span / (r.kind === 'order' ? 450 : 700),
+        colour,
+        r.kind === 'order' ? 0.8 : 0.5,
+        0.0015,
+      ),
+    );
+    if (r.kind === 'order' && pts.length >= 2) {
+      const a = pts[pts.length - 2]!;
+      const b = pts[pts.length - 1]!;
+      g.add(this.arrowHead(map, a, b, colour, 0.8));
+    }
+    g.name = `overlay:${r.id}`;
+    return g;
+  }
+
+  /**
+   * The player's marks, drawn flat on the table above the map. `nowGame` ages them: older marks go
+   * grey and fade. Safe to call every frame; it rebuilds only when a mark or a visible age step changes.
+   */
+  setMarks(marks: readonly Mark[], nowGame: number, selectedId?: string): void {
+    if (!this.state) return;
+    const aged = marks.map((m) => markAgeFactor(m.madeAtGame, nowGame));
+    const key = JSON.stringify([marks, aged, selectedId, this.mapKey]);
+    if (key === this.marksKey) return;
+    this.marksKey = key;
+    clearGroup(this.marksRoot);
+    marks.forEach((m, i) => {
+      const obj = this.markObject(
+        m,
+        aged[i]!,
+        Math.max(0, nowGame - m.madeAtGame),
+        m.id === selectedId,
+      );
+      obj.userData = { markId: m.id };
+      this.marksRoot.add(obj);
+    });
+  }
+
+  /** Number of marks drawn (for tests and debugging). */
+  get markCount(): number {
+    return this.marksRoot.children.length;
+  }
+
+  private markObject(m: Mark, age: number, ageMs: number, selected: boolean): THREE.Group {
+    const map = this.state!.map;
+    const span = this.span;
+    const g = new THREE.Group();
+    // Fresh ink is the side's colour; old ink greys and thins out.
+    const fresh = new THREE.Color(SIDE_COLOURS[this.state!.side] ?? 0x333333);
+    const ink = fresh.clone().lerp(new THREE.Color(0x8a8678), age).getHex();
+    const opacity = 1 - 0.6 * age;
+    const width = span / 450;
+    const note = [m.label, formatAge(ageMs)].filter((x) => x).join(' · ');
+    let labelAt: Coord;
+    switch (m.kind) {
+      case 'pin': {
+        const h = span / 50;
+        const cone = new THREE.Mesh(
+          new THREE.ConeGeometry(h / 4, h, 12),
+          new THREE.MeshBasicMaterial({ color: ink, transparent: true, opacity }),
+        );
+        cone.rotation.x = Math.PI;
+        const w = mapToWorld(map, m.at, h / 2);
+        cone.position.copy(w);
+        g.add(cone);
+        labelAt = m.at;
+        break;
+      }
+      case 'line':
+        g.add(this.ribbon(m.points, width, ink, opacity, 0.003));
+        labelAt = m.points[m.points.length - 1]!;
+        break;
+      case 'arrow':
+        g.add(this.ribbon([m.from, m.to], width, ink, opacity, 0.003));
+        g.add(this.arrowHead(map, m.from, m.to, ink, opacity));
+        labelAt = m.to;
+        break;
+      case 'ring': {
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(Math.max(m.radius - width, 0), m.radius, 96),
+          new THREE.MeshBasicMaterial({
+            color: ink,
+            transparent: true,
+            opacity,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+          }),
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.copy(mapToWorld(map, m.at, span * 0.003));
+        g.add(ring);
+        labelAt = { x: m.at.x, y: m.at.y - m.radius };
+        break;
+      }
+    }
+    if (selected) g.add(this.selectionHalo(m));
+    // The note sits just south of the mark (north of a ring), clear of the pin head and arrow tip.
+    const labelW = span * 0.07;
+    const clear = span * 0.02 + labelW / 8;
+    const noteAt =
+      m.kind === 'ring'
+        ? { x: labelAt.x, y: labelAt.y - clear }
+        : { x: labelAt.x, y: labelAt.y + clear };
+    const tag = labelSprite(note, true, labelW);
+    tag.position.copy(mapToWorld(map, noteAt, span * 0.004));
+    g.add(tag);
+    return g;
+  }
+
+  private selectionHalo(m: Mark): THREE.Object3D {
+    const span = this.span;
+    const pts: Coord[] =
+      m.kind === 'pin' || m.kind === 'ring'
+        ? [m.at]
+        : m.kind === 'arrow'
+          ? [m.from, m.to]
+          : m.points;
+    const halo = new THREE.Group();
+    const r = m.kind === 'ring' ? span / 80 : span / 60;
+    for (const p of m.kind === 'line' ? [pts[0]!, pts[pts.length - 1]!] : pts) {
+      const c = new THREE.Mesh(
+        new THREE.RingGeometry(r * 0.8, r, 32),
+        new THREE.MeshBasicMaterial({ color: 0xe8b923, depthWrite: false, side: THREE.DoubleSide }),
+      );
+      c.rotation.x = -Math.PI / 2;
+      c.position.copy(
+        mapToWorld(
+          this.state!.map,
+          m.kind === 'ring' ? { x: m.at.x, y: m.at.y - m.radius } : p,
+          span * 0.004,
+        ),
+      );
+      halo.add(c);
+    }
+    return halo;
+  }
+
+  /** A flat strip of `width` metres along the points, just above the map. */
+  private ribbon(
+    points: readonly Coord[],
+    width: number,
+    colour: number,
+    opacity: number,
+    lift: number,
+  ): THREE.Mesh {
+    const map = this.state!.map;
+    const y = this.span * lift;
+    const pos: number[] = [];
+    const idx: number[] = [];
+    for (let i = 1; i < points.length; i++) {
+      const a = mapToWorld(map, points[i - 1]!, y);
+      const b = mapToWorld(map, points[i]!, y);
+      const dx = b.x - a.x;
+      const dz = b.z - a.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const nx = (-dz / len) * (width / 2);
+      const nz = (dx / len) * (width / 2);
+      const base = pos.length / 3;
+      pos.push(
+        a.x + nx,
+        y,
+        a.z + nz,
+        a.x - nx,
+        y,
+        a.z - nz,
+        b.x - nx,
+        y,
+        b.z - nz,
+        b.x + nx,
+        y,
+        b.z + nz,
+      );
+      idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setIndex(idx);
+    return new THREE.Mesh(
+      geo,
+      new THREE.MeshBasicMaterial({
+        color: colour,
+        transparent: true,
+        opacity,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+  }
+
+  private arrowHead(
+    map: SceneState['map'],
+    from: Coord,
+    to: Coord,
+    colour: number,
+    opacity: number,
+  ): THREE.Mesh {
+    const size = this.span / 100;
+    const head = new THREE.Mesh(
+      new THREE.ConeGeometry(size / 2, size, 12),
+      new THREE.MeshBasicMaterial({ color: colour, transparent: true, opacity }),
+    );
+    const dir = new THREE.Vector3(to.x - from.x, 0, to.y - from.y).normalize();
+    if (dir.lengthSq() === 0) dir.set(0, 0, -1);
+    head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    head.position.copy(mapToWorld(map, to, this.span * 0.003)).addScaledVector(dir, -size / 2);
+    return head;
   }
 
   /** The larger side of the map in metres: every size in the scene is scaled from it. */
@@ -469,9 +723,18 @@ export class TableScene {
     this.controls.dispose();
     for (const p of this.pieces.values()) disposeTree(p.group);
     this.pieces.clear();
+    clearGroup(this.marksRoot);
+    clearGroup(this.overlayRoot);
     if (this.mapMesh) disposeTree(this.mapMesh);
     if (this.tableMesh) disposeTree(this.tableMesh);
     this.renderer.dispose();
+  }
+}
+
+function clearGroup(g: THREE.Group): void {
+  for (const c of [...g.children]) {
+    g.remove(c);
+    disposeTree(c);
   }
 }
 
