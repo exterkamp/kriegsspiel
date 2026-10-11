@@ -3,7 +3,7 @@ import type { StructuredOutputSupport } from './provider.js';
 import type { GameLimits } from './gameLimits.js';
 import type { UmpireStage } from './umpireClient.js';
 
-export const UMPIRE_STAGES: readonly UmpireStage[] = ['parse', 'judge', 'narrate'];
+export const UMPIRE_STAGES: readonly UmpireStage[] = ['parse', 'judge', 'narrate', 'staff'];
 
 /** One configured model server. `type` names a factory in the `ProviderRegistry`. */
 export interface ProviderSpec {
@@ -54,6 +54,7 @@ export const DEFAULT_UMPIRE_CONFIG: UmpireConfig = {
     parse: { provider: 'anthropic', model: 'claude-haiku-5-5' },
     judge: { provider: 'anthropic', model: 'claude-opus-5-5' },
     narrate: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
+    staff: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
   },
   timeoutMs: 60_000,
   maxAttempts: 3,
