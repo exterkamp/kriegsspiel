@@ -1,5 +1,5 @@
 # One image: the game server and the built client it serves. See docs/deployment.md.
-FROM node:22-slim AS build
+FROM node:22.22.2-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages ./packages
@@ -12,7 +12,7 @@ COPY vendor/settlemaker.snapshot.json ./vendor/settlemaker.snapshot.json
 RUN npm run setup:map-source && npm ci && npm run build \
  && npm prune --omit=dev
 
-FROM node:22-slim
+FROM node:22.22.2-slim
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=3000 \
