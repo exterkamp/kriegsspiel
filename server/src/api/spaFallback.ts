@@ -30,10 +30,10 @@ export function spaFallback(server: FastifyInstance): void {
     const at = url.indexOf('?');
     const path = at < 0 ? url : url.slice(0, at);
     const query = at < 0 ? '' : url.slice(at);
-    const moved = request.method === 'GET' ? OLD_PAGES[path] : undefined;
+    const readOnly = request.method === 'GET' || request.method === 'HEAD';
+    const moved = readOnly ? OLD_PAGES[path] : undefined;
     if (moved) return reply.redirect(moved + query, 301);
-    if ((request.method === 'GET' || request.method === 'HEAD') && isRoute(path))
-      return reply.sendFile('index.html');
+    if (readOnly && isRoute(path)) return reply.sendFile('index.html');
     return reply.code(404).send(notFound(request.method, path));
   });
 }

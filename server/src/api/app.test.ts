@@ -1090,6 +1090,7 @@ describe('SPA fallback for the Angular client', () => {
         '/admin',
         '/admin/',
         '/admin/games/3',
+        '/admin/apix',
         '/map-authoring',
         '/map-benchmark?x=1',
       ]) {
@@ -1104,6 +1105,7 @@ describe('SPA fallback for the Angular client', () => {
         '/scenarios/nope/x',
         '/auth/nope',
         '/other',
+        '/administrator',
       ]) {
         const res = await server.inject(url);
         expect(res.statusCode, url).toBe(404);
@@ -1128,6 +1130,12 @@ describe('SPA fallback for the Angular client', () => {
       expect((await server.inject('/table-benchmark.html')).headers.location).toBe(
         '/map-benchmark',
       );
+      expect((await server.inject({ method: 'HEAD', url: '/map-authoring.html' })).statusCode).toBe(
+        301,
+      );
+      const post = await server.inject({ method: 'POST', url: '/map-authoring.html', payload: {} });
+      expect(post.statusCode).toBe(404);
+      expect(post.json().error).toBe('Not Found');
     } finally {
       await server.close();
       done();
