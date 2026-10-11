@@ -40,6 +40,7 @@ const CROSSING_KINDS: ReadonlySet<string> = new Set(['bridge', 'ford']);
  * nobody.
  */
 function carries(map: TerrainMap, f: TerrainFeature): number {
+  if (f.capacity !== undefined) return f.capacity;
   const g = f.geometry;
   const centres = g.shape === 'point' ? [g.at] : g.shape === 'polyline' ? g.points : [];
   const radius = g.shape === 'point' ? g.radius : g.shape === 'polyline' ? g.width / 2 : 0;
