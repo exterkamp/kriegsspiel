@@ -1,8 +1,19 @@
 import { derived, get, writable } from 'svelte/store';
-import type { Coord, Dispatch, WindowAt } from '@kriegsspiel/protocol';
+import type { ClockState, Coord, Dispatch, WindowAt } from '@kriegsspiel/protocol';
 import type { BeliefChoice } from '../window/model.js';
-import { initialState, withRead, type ClientState } from '../net/state.js';
+import { gameNowMs, initialState, withRead, type ClientState } from '../net/state.js';
 import { emptyDraft, loadDraft, saveDraft, type Courier, type OrderDraft } from './orders.js';
+import {
+  addEntries,
+  clockEntry,
+  dispatchEntry,
+  loadJournal,
+  noteEntry,
+  orderEntry,
+  removeEntry,
+  saveJournal,
+  type JournalEntry,
+} from './journal.js';
 import { loadMarks, saveMarks, type TrayMarks } from './tray.js';
 import type { ViewId } from './views.js';
 import { fixtureClient, type ConferenceClient, type Exchange } from './conference.js';
@@ -111,3 +122,55 @@ export function persistDraft(key: string): () => void {
 /** The staff conference: where answers come from (the fixture until the server endpoint exists) and what has been asked. */
 export const conferenceClient = writable<ConferenceClient>(fixtureClient);
 export const conferenceLog = writable<readonly Exchange[]>([]);
+
+/** The war diary: orders sent, dispatches received, pauses and the player's notes, kept per game. */
+export const journal = writable<JournalEntry[]>([]);
+
+/** Write a note into the diary at the current game time. */
+export function addNote(text: string, wallMs = Date.now()): void {
+  const t = text.trim();
+  if (t === '') return;
+  const s = get(gameState);
+  const at = s.clock ? gameNowMs(s.clock, wallMs) : 0;
+  journal.update((j) => addEntries(j, [noteEntry(`${wallMs}:${j.length}`, at, t)]));
+}
+
+/**
+ * Load this game's diary, then record what happens in the game from now on and save on every change.
+ * Returns a function that stops.
+ */
+export function persistJournal(key: string): () => void {
+  journal.set(loadJournal(key));
+  let prevStatus: ClockState['status'] | undefined;
+  let prevOrders: ReadonlySet<string> = new Set();
+  const stopGame = gameState.subscribe((s) => {
+    const found: JournalEntry[] = [
+      ...s.pending.map(orderEntry),
+      ...s.dispatches.map(dispatchEntry),
+    ];
+    if (s.clock) {
+      const c = clockEntry(prevStatus, s.clock.status, s.clock.gameMs);
+      if (c) found.push(c);
+      prevStatus = s.clock.status;
+    }
+    // An order the server turned down was never sent, so it leaves the diary.
+    const now = new Set(s.pending.map((p) => p.orderId));
+    const dropped = [...prevOrders].filter((id) => !now.has(id));
+    prevOrders = now;
+    journal.update((j) =>
+      dropped.reduce((acc, id) => removeEntry(acc, `order:${id}`), addEntries(j, found)),
+    );
+  });
+  let first = true;
+  const stopSave = journal.subscribe((j) => {
+    if (first) {
+      first = false;
+      return;
+    }
+    saveJournal(key, j);
+  });
+  return () => {
+    stopGame();
+    stopSave();
+  };
+}

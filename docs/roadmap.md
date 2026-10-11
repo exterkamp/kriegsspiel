@@ -34,6 +34,9 @@ Gameplay milestones should end in something playable. The standalone map-authori
 - [ ] One handcrafted scenario, playable start to finish
 
 ## M3b: HQ interface (see [hq-interface.md](hq-interface.md))
+
+[HQ implementation plan](hq-implementation-plan.md) defines dependency gates, agent ownership, Herdr orchestration, model selection and end-to-end acceptance for Epic 4.
+
 - [ ] **Spike:** Three.js table with a flat map plane, a few block pieces, camera orbit/zoom and picking; plus one Svelte desk screen with a draggable report that places a pin on the table
 - [ ] Map table: flat historical base map + 3D pieces + player marks layer (Three.js)
 - [ ] In-tray, orders desk, order of battle, journal as Svelte views over the canvas; table ↔ desk transition
@@ -112,7 +115,7 @@ Historical annotation remains #85/#88. Detailed erosion, elaborate cities, a ful
 - [ ] Roles per side, with LLM filling empty staff roles
 - [ ] Shared order drafts: comments, tracked edits, sign and stamp, LLM staff check
 - [ ] Shared HQ and chain-of-command modes
-- [ ] AI opposing commander (fog-respecting)
+- [x] AI opposing commander (fog-respecting)
 - [ ] Full procedural scenario assembly (objectives, orders of battle, balance); consume generated maps from M3c
 
 ## Later

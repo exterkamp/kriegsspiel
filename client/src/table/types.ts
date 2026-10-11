@@ -60,6 +60,8 @@ interface Placed {
 
 export interface OwnPiece extends Placed {
   kind: 'own';
+  /** Player-visible snapshot strength; absence remains unknown. */
+  strength?: number;
   id: string;
   label: string;
   side: string;
@@ -67,6 +69,10 @@ export interface OwnPiece extends Placed {
   footprint: Footprint;
   /** Loose sub-positions, as offsets in metres in the unit's own frame (x right, y front). */
   shape?: Coord[];
+  /** Source snapshot time, never a report date. */
+  snapshotAtGame?: number;
+  /** Supplied observation time; never inferred from age. */
+  observedAtGame?: number;
 }
 
 export interface GhostPiece extends Placed {
@@ -82,6 +88,26 @@ export interface GhostPiece extends Placed {
   formation?: Formation;
   footprint?: Footprint;
   shape?: Coord[];
+  snapshotAtGame?: number;
+  observedAtGame?: number;
+}
+
+/** Render-only annotation geometry in metres; no knowledge or authorization metadata. */
+export type SceneMarkGeometry =
+  | { readonly kind: 'pin'; readonly at: Readonly<Coord> }
+  | { readonly kind: 'polyline'; readonly points: readonly Readonly<Coord>[] }
+  | { readonly kind: 'arrow'; readonly points: readonly Readonly<Coord>[] }
+  | { readonly kind: 'ring'; readonly centre: Readonly<Coord>; readonly radiusM: number }
+  | {
+      readonly kind: 'symbol';
+      readonly at: Readonly<Coord>;
+      readonly symbol: 'cross' | 'dot' | 'flag';
+    };
+
+export interface SceneMark {
+  readonly id: string;
+  readonly label: string;
+  readonly geometry: SceneMarkGeometry;
 }
 
 /**
@@ -110,5 +136,8 @@ export interface SceneState {
   map: BaseMap;
   own: OwnPiece[];
   ghosts: GhostPiece[];
-  orderRoutes: OrderRoute[];
+  /** Accepted live overlays; absent in the HQ fixture port. */
+  orderRoutes?: OrderRoute[];
+  /** Omission preserves the standalone client and renders no annotations. */
+  marks?: readonly SceneMark[];
 }

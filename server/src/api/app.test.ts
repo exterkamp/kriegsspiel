@@ -713,6 +713,27 @@ describe('shared order drafts', () => {
     expect((await red.waitFor('drafts')).drafts).toEqual([]);
   });
 
+  it('applies a resent opId once after a reconnect, and syncDrafts resends the snapshot', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const a = await join(ws, game, 'blue');
+    await a.waitFor('drafts');
+    a.send(cmd({ kind: 'createDraft', draft: 'd1', text: 'abc' }));
+    await a.waitFor('draftState');
+    a.send(cmd({ kind: 'draftEdit', draft: 'd1', baseRev: 0, op: [3, 'd'], opId: 'o1' }));
+    await a.waitFor('draftEntry');
+    a.socket.close();
+    const again = await join(ws, game, 'blue');
+    await again.waitFor('drafts');
+    again.send(cmd({ kind: 'draftEdit', draft: 'd1', baseRev: 0, op: [3, 'd'], opId: 'o1' }));
+    await again.waitFor('draftEntry', (m) => m.entry.kind === 'edit' && m.entry.opId === 'o1');
+    again.send(cmd({ kind: 'syncDrafts' }));
+    await again.waitFor('drafts', (m) => m.drafts.length === 1 && m.drafts[0]!.text === 'abcd');
+    expect(again.messages.filter((m) => m.kind === 'drafts').pop()).toMatchObject({
+      drafts: [{ rev: 1, text: 'abcd' }],
+    });
+  });
+
   it('forks and merges, saves to the store, and answers a bad edit with an error', async () => {
     const { base, ws } = await start();
     const game = (await createGame(base)).json;

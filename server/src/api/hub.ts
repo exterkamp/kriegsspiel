@@ -169,6 +169,7 @@ export class Hub {
           | 'draftComment'
           | 'resolveComment'
           | 'readDraft'
+          | 'syncDrafts'
           | 'forkDraft'
           | 'mergeDraft';
       }
@@ -196,9 +197,29 @@ export class Hub {
         case 'forkDraft':
           this.broadcastSide(gameId, side, state(book.fork(command.draft, command.newDraft, by)));
           break;
+        case 'syncDrafts':
+          this.send(conn, {
+            v: PROTOCOL_VERSION,
+            kind: 'drafts',
+            drafts: structuredClone(book.toJSON()),
+          });
+          return;
         case 'draftEdit':
         case 'draftComment':
         case 'resolveComment': {
+          if (command.kind === 'draftEdit') {
+            // A resend of an edit already applied: answer the sender with the original entry only.
+            const done = book.sentOp(command.draft, by, command.opId);
+            if (done) {
+              this.send(conn, {
+                v: PROTOCOL_VERSION,
+                kind: 'draftEntry',
+                draft: command.draft,
+                entry: done,
+              });
+              return;
+            }
+          }
           const entry =
             command.kind === 'draftEdit'
               ? book.edit(command.draft, by, now, {
@@ -585,6 +606,7 @@ export class Hub {
       command.kind === 'draftComment' ||
       command.kind === 'resolveComment' ||
       command.kind === 'readDraft' ||
+      command.kind === 'syncDrafts' ||
       command.kind === 'forkDraft' ||
       command.kind === 'mergeDraft'
     ) {

@@ -1,0 +1,17 @@
+# HQ review browser observations
+
+These are bounded fixture observations from the coordinated review on 2026-10-10, using native Chrome 154 on macOS at desktop viewports. Per-capture CSS viewport metadata was not retained uniformly. Raster dimensions are 1456×846 for the label views, 1441×893 for Settings/numeric placement, and 1441×2661 for the full-page notebook capture; raster size alone does not prove CSS viewport size. The managed `devrun` validation origin was separate from the owner's preview; only validation-origin notes/preferences were edited. They are historical evidence, not final-head CI or full Epic 4 acceptance.
+
+| Flow | Observed result | Screenshot |
+| --- | --- | --- |
+| Settings and Escape | Saved preference status stays inside Settings; Escape closes the dialog and returns focus to Settings. The healthy page has no status footer. | [Settings focus and no bar](assets/settings-no-status-bar.jpg) |
+| Unsaved notebook → map → notebook | Text remains editable after navigation and appears in the prepared text export. Inactive desk wrappers have `hidden` and native `inert` attributes and are absent from the accessible page controls. The map heading receives focus. | [Retained notebook and export](assets/notebook-retained-export.jpg) |
+| Report coordinates | Choosing report placement focuses East. The numeric form and its ancestors have computed `touch-action: auto`; cancellation ends placement. | [Numeric placement](assets/numeric-placement.jpg) |
+| Edge labels, top-down | A temporary valid fixture places eight generic enemy labels at all four map corners and four edge midpoints. Actual WebGL fragments stay within the projected paper. | [Top-down](assets/edge-labels-top.jpg) |
+| Edge labels, oblique | The same fixture stays bounded by the slanted paper edges, with cropped fragments visible. No warning/error console entries were observed on this diagnostic page. | [Oblique](assets/edge-labels-oblique.jpg) |
+
+The label harness imported the actual `FixtureTableScene`, applied the project-owned `/hq-preview.svg`, and rendered with its actual WebGL renderer. It was removed after capture and never shipped or served from mutation scratch. The inspected renderer SHA-256 is `8c4e379a9b0236f92fea6ff57767c9dd978ad29e765576afe072f0b17d9dcba1`, unchanged from candidate `3e038818dbb96ebbfcfc71dc43db77e58edce5dc`. Independent high-effort source/visual review accepted bounded clipping in these two views, while qualifying the limits below.
+
+The retained-view composition and input guards match that same candidate's App/Shell/InTray blobs. The later working-tree renderer activation/rollback repair was present during the refreshed notebook capture; its independent source review and ordinary checks are separate evidence. A dependency refresh remounted the diagnostic page, so navigation retention was exercised again after an explicit reload. These observations do not claim RAM survives a page reload, nor do screenshots alone prove navigation history, computed styles or console results.
+
+Keyboard/modal isolation, native inactive-view attributes, export contents and computed styles are coordinator runtime observations; an independent reviewer inspected source and screenshots without replaying those browser actions. Physical touch, 200% zoom, all-camera label readability, measured FPS, live HQ services and complete multi-player/device playthrough remain pending under the implementation plan. Cropping an edge label can reduce readability; this evidence establishes bounded rendering in the two captured views only.

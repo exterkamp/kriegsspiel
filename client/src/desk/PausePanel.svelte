@@ -67,9 +67,7 @@
         <button type="button" onclick={() => (asking = false)}>Cancel</button>
       </form>
     {:else}
-      <button type="button" data-testid="open-pause" onclick={() => (asking = true)}
-        >Pause…</button
-      >
+      <button type="button" data-testid="open-pause" onclick={() => (asking = true)}>Pause…</button>
     {/if}
     {#if problem}<span class="problem" role="alert">{problem}</span>{/if}
   </section>
@@ -88,9 +86,7 @@
         <button type="button" data-testid="vote-yes" onclick={() => cast(view.id, true)}
           >Yes, {view.action}</button
         >
-        <button type="button" data-testid="vote-no" onclick={() => cast(view.id, false)}
-          >No</button
-        >
+        <button type="button" data-testid="vote-no" onclick={() => cast(view.id, false)}>No</button>
       </div>
     {:else}
       <p class="meta" data-testid="pause-voted">

@@ -64,7 +64,11 @@
     }
     // Annex arrows made since the draft was saved may be gone; only the ones still on the table go.
     const chosen = d.annex.filter((id) => arrows.some((a) => a.id === id));
-    const text = withAnnex(buildOrderText(view, addressee.id, d.text.trim()), $gameState.marks, chosen);
+    const text = withAnnex(
+      buildOrderText(view, addressee.id, d.text.trim()),
+      $gameState.marks,
+      chosen,
+    );
     if (text.length > MAX_ORDER_CHARS) {
       error = `With the annex the order runs to ${text.length} characters; the most a courier can carry is ${MAX_ORDER_CHARS}. Shorten it or drop an arrow.`;
       return;
@@ -161,7 +165,8 @@
       </label>
     {/each}
     <p class="hint">
-      The staff reckon the ride on the straight line; a road shortens it and rough ground lengthens it.
+      The staff reckon the ride on the straight line; a road shortens it and rough ground lengthens
+      it.
     </p>
   </fieldset>
 
@@ -288,7 +293,9 @@
     border: 4px solid #a83232;
     color: #a83232;
     padding: 2px 14px;
-    font: bold 36px/1.2 'Courier New', monospace;
+    font:
+      bold 36px/1.2 'Courier New',
+      monospace;
     letter-spacing: 4px;
     border-radius: 4px;
     transform: rotate(-12deg);

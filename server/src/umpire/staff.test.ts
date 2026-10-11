@@ -5,6 +5,8 @@ import { MockUmpireClient } from './mockUmpireClient.js';
 import type { UmpireFixture } from './mockUmpireClient.js';
 import {
   STAFF_PROMPT_VERSION,
+  STAFF_SCHEMA,
+  STAFF_TEXT_MAX_LENGTH,
   StaffRoster,
   checkStaffOutput,
   runStaff,
@@ -103,6 +105,36 @@ describe('runStaff', () => {
       expect(t.messages.every((m) => m.from === t.officer.name && m.role === t.role)).toBe(true);
     }
     expect(client.calls.every((c) => c.stage === 'staff')).toBe(true);
+  });
+
+  it('returns the call record of every attempt, and a replay of them needs no model', async () => {
+    const roster = new StaffRoster('blue', [{ role: 'intelligence' }]);
+    const client = new MockUmpireClient([fixture({ messages: [note('report', 'See blue-99.')] })]);
+    const [turn] = await runStaff(client, world(), roster);
+    expect(turn!.calls).toBe(2);
+    expect(turn!.records).toHaveLength(2);
+    expect(turn!.records.every((r) => r.stage === 'staff')).toBe(true);
+    expect(turn!.records[0]!.rawOutput).toContain('blue-99');
+  });
+
+  it('rejects text over the length bound, and the schema states it', () => {
+    const w = world();
+    const seat: Seat = { role: 'intelligence' };
+    const input = staffInput(
+      staffOfficer(w.seed, 'blue', 'intelligence'),
+      viewForRole(w, 'blue', seat),
+      0,
+    );
+    const long = 'x'.repeat(STAFF_TEXT_MAX_LENGTH + 1);
+    expect(
+      checkStaffOutput({ messages: [{ kind: 'report', text: long }] }, w, 'blue', seat, input),
+    ).toEqual([`message over ${STAFF_TEXT_MAX_LENGTH} characters`]);
+    const props = (
+      STAFF_SCHEMA as {
+        properties: { messages: { items: { properties: Record<string, { maxLength?: number }> } } };
+      }
+    ).properties.messages.items.properties;
+    expect(props.text!.maxLength).toBe(STAFF_TEXT_MAX_LENGTH);
   });
 
   it('shows each officer only their role view', async () => {

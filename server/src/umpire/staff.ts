@@ -10,7 +10,7 @@
  */
 import { MS_PER_MINUTE, ROLES, mayDraft, viewForRole } from '@kriegsspiel/engine';
 import type { EngineRoleView, GameState, Role, Seat, SideId } from '@kriegsspiel/engine';
-import type { JsonSchema, UmpireClient } from './umpireClient.js';
+import type { JsonSchema, UmpireCallRecord, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
 import { narrateWindowMs } from './narrate.js';
 
@@ -29,6 +29,9 @@ Reply with the JSON object only.`;
 export const STAFF_MESSAGE_KINDS = ['report', 'suggestion', 'advice'] as const;
 export type StaffMessageKind = (typeof STAFF_MESSAGE_KINDS)[number];
 
+/** Longest staff message, in characters. Bounds advisory text, and so any injected enemy-authored text echoed in it. */
+export const STAFF_TEXT_MAX_LENGTH = 600;
+
 export const STAFF_SCHEMA: JsonSchema = {
   type: 'object',
   properties: {
@@ -40,7 +43,7 @@ export const STAFF_SCHEMA: JsonSchema = {
         properties: {
           kind: { type: 'string', enum: [...STAFF_MESSAGE_KINDS] },
           unitId: { type: 'string' },
-          text: { type: 'string' },
+          text: { type: 'string', maxLength: STAFF_TEXT_MAX_LENGTH },
         },
         required: ['kind', 'text'],
         additionalProperties: false,
@@ -184,6 +187,8 @@ export interface StaffTurn {
   silent: boolean;
   calls: number;
   rejections: string[][];
+  /** Every model call made for this turn, for the input log. Replay reads these and calls no model. */
+  records: UmpireCallRecord[];
 }
 
 /** What the model sees: the officer, and the seat's own view. Nothing more. */
@@ -215,6 +220,9 @@ export function checkStaffOutput(
   const problems: string[] = [];
   for (const m of output.messages) {
     if (m.text.trim() === '') problems.push('empty message');
+    if (m.text.length > STAFF_TEXT_MAX_LENGTH) {
+      problems.push(`message over ${STAFF_TEXT_MAX_LENGTH} characters`);
+    }
     for (const id of m.text.match(ID_PATTERN) ?? []) {
       if (!known.has(id.toLowerCase())) problems.push(`unknown entity "${id}"`);
     }
@@ -275,6 +283,7 @@ export async function runStaff(
         silent: true,
         calls: 0,
         rejections: [],
+        records: [],
       };
       // Marked before the first call on purpose: a failing provider or a twice-rejected reply costs the seat
       // one quiet window rather than a retry every tick, and game time never waits on staff.
@@ -284,13 +293,15 @@ export async function runStaff(
         const retry = turn.rejections.at(-1);
         let output: StaffOutput;
         try {
-          ({ output } = await client.call<StaffOutput>({
+          const res = await client.call<StaffOutput>({
             stage: 'staff',
             promptVersion: STAFF_PROMPT_VERSION,
             system: STAFF_SYSTEM,
             input: retry ? { ...input, rejected: retry } : input,
             schema: STAFF_SCHEMA,
-          }));
+          });
+          output = res.output;
+          turn.records.push(res.record);
         } catch (e) {
           if (e instanceof UmpireError) return turn;
           throw e;

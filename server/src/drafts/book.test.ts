@@ -247,3 +247,27 @@ describe('persistence', () => {
     expect(again.get('d1')!.text).toBe('>aXbc');
   });
 });
+
+describe('idempotent ops and comment anchors', () => {
+  it('applies a resent (author, opId) once and returns the first result', () => {
+    const b = bookWith('abc');
+    const first = b.edit('d1', 'bob', 1, { baseRev: 0, op: insertAt(3, 3, 'd'), opId: 'x1' });
+    const again = b.edit('d1', 'bob', 2, { baseRev: 0, op: insertAt(3, 3, 'd'), opId: 'x1' });
+    expect(again).toEqual(first);
+    expect(b.get('d1')!.text).toBe('abcd');
+    expect(b.get('d1')!.rev).toBe(1);
+    // Another author's edit with the same opId is a different edit.
+    b.edit('d1', 'ann', 3, { baseRev: 1, op: insertAt(4, 0, '>'), opId: 'x1' });
+    expect(b.get('d1')!.text).toBe('>abcd');
+  });
+
+  it('rejects an anchor past the text as it was at baseRev, even if later inserts would cover it', () => {
+    const b = bookWith('abc');
+    b.edit('d1', 'bob', 1, { baseRev: 0, op: insertAt(3, 3, 'defgh') });
+    expect(
+      code(() => b.comment('d1', 'ann', 2, { baseRev: 0, id: 'c1', from: 0, to: 6, body: 'x' })),
+    ).toBe('bad_comment');
+    b.comment('d1', 'ann', 2, { baseRev: 0, id: 'c2', from: 0, to: 3, body: 'x' });
+    expect(b.get('d1')!.comments).toHaveLength(1);
+  });
+});

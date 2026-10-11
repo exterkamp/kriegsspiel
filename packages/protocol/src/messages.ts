@@ -126,6 +126,8 @@ export const Command = z.discriminatedUnion('kind', [
       rev: z.number().int().nonnegative(),
     })
     .strict(),
+  // Ask for the side's drafts again (the `drafts` snapshot), for a client that fell out of step.
+  z.object({ ...Envelope, kind: z.literal('syncDrafts') }).strict(),
   // Copy a draft into a new one, to write an alternative plan.
   z.object({ ...Envelope, kind: z.literal('forkDraft'), draft: Id, newDraft: Id.max(64) }).strict(),
   // Fold a fork's edits back into the draft it came from.

@@ -4,13 +4,12 @@
   import { unreadCount } from './tray.js';
   import InTray from './InTray.svelte';
   import OrdersDesk from './OrdersDesk.svelte';
+  import Journal from './Journal.svelte';
   import Roster from './Roster.svelte';
   import Conference from './Conference.svelte';
-  import { deliveryStatus } from './orders.js';
   import DeskClock from './DeskClock.svelte';
   import PausePanel from './PausePanel.svelte';
   import { VIEWS, isDeskView, isTypingTarget, viewForKey, type ViewId } from './views.js';
-  import { formatGameTime, gameNowMs } from '../net/state.js';
 
   /** What to focus when a view opens, so keyboard users land inside it. */
   const FOCUS: Record<string, string> = {
@@ -35,61 +34,35 @@
     if (sel) queueMicrotask(() => document.querySelector<HTMLElement>(sel)?.focus());
   }
 
-  // Delivery status is read against game time, so the journal re-reads it now and then.
-  let wall = $state(Date.now());
-  $effect(() => {
-    const t = setInterval(() => (wall = Date.now()), 1000);
-    return () => clearInterval(t);
-  });
-  const nowGame = $derived($gameState.clock ? gameNowMs($gameState.clock, wall) : 0);
-  const journal = $derived(
-    [
-      ...$gameState.pending.map((p) => {
-        const to = p.toName ? ` to ${p.toName}` : '';
-        const how = p.courier ? ` by ${p.courier === 'fast' ? 'fast rider' : 'steady courier'}` : '';
-        const status = deliveryStatus(p, nowGame);
-        return {
-          at: p.sentAtGame,
-          text: `Order sent${to}${how}: ${p.text}`,
-          progress: p.etaGame === undefined ? undefined : status.fraction,
-          status: status.label,
-        };
-      }),
-      ...$gameState.dispatches.map((d) => ({
-        at: d.receivedAtGame,
-        text: `${d.from}: ${d.text}`,
-        progress: undefined as number | undefined,
-        status: '',
-      })),
-    ].sort((a, b) => b.at - a.at),
-  );
   const unread = $derived(unreadCount($gameState.dispatches, $trayMarks));
 </script>
 
 <svelte:window onkeydown={onKey} />
 
 <div class="dock">
-<PausePanel />
-<DeskClock />
-<nav class="desk-bar" aria-label="Desk">
-  {#each VIEWS as v (v.id)}
-    <button
-      type="button"
-      aria-pressed={$activeView === v.id}
-      aria-keyshortcuts={v.key.toUpperCase()}
-      onclick={() => go(v.id)}
-    >
-      {v.label}
-      <kbd>{v.key.toUpperCase()}</kbd>
-      {#if v.id === 'inTray' && unread > 0}<span class="badge" aria-label="{unread} unread">{unread}</span>{/if}
-    </button>
-  {/each}
-  {#if $gameState.gameOver && $gameId}
-    <button type="button" aria-pressed={$windowOpen} onclick={() => windowOpen.update((o) => !o)}>
-      Umpire's window
-    </button>
-  {/if}
-</nav>
+  <PausePanel />
+  <DeskClock />
+  <nav class="desk-bar" aria-label="Desk">
+    {#each VIEWS as v (v.id)}
+      <button
+        type="button"
+        aria-pressed={$activeView === v.id}
+        aria-keyshortcuts={v.key.toUpperCase()}
+        onclick={() => go(v.id)}
+      >
+        {v.label}
+        <kbd>{v.key.toUpperCase()}</kbd>
+        {#if v.id === 'inTray' && unread > 0}<span class="badge" aria-label="{unread} unread"
+            >{unread}</span
+          >{/if}
+      </button>
+    {/each}
+    {#if $gameState.gameOver && $gameId}
+      <button type="button" aria-pressed={$windowOpen} onclick={() => windowOpen.update((o) => !o)}>
+        Umpire's window
+      </button>
+    {/if}
+  </nav>
 </div>
 
 {#if $windowOpen && $gameState.gameOver}
@@ -112,25 +85,7 @@
   </section>
 {:else if $activeView === 'journal'}
   <section id="view-journal" class="paper" tabindex="-1" aria-label="Journal">
-    <h2>Journal</h2>
-    {#if journal.length === 0}
-      <p>Nothing recorded yet.</p>
-    {:else}
-      <ul>
-        {#each journal as j, i (i)}
-          <li>
-            <small>{formatGameTime(j.at)}</small>
-            {j.text}
-            {#if j.status}
-              <div class="delivery">
-                {#if j.progress !== undefined}<progress max="1" value={j.progress} aria-label="Delivery progress"></progress>{/if}
-                <small>{j.status}</small>
-              </div>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
+    <Journal />
   </section>
 {:else if $activeView === 'conference'}
   <section id="view-conference" class="paper" tabindex="-1" aria-label="Staff conference">
@@ -225,19 +180,6 @@
   }
   .paper h2 {
     margin: 0 0 8px;
-  }
-  .delivery {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 2px 0 6px;
-  }
-  .delivery progress {
-    width: 8em;
-  }
-  .paper ul {
-    margin: 0;
-    padding-left: 18px;
   }
   @keyframes slide-in {
     from {

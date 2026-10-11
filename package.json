@@ -21,6 +21,7 @@
     "verify:map-source": "node scripts/verify-map-source.mjs",
     "setup:map-source": "node scripts/setup-map-source.mjs",
     "maps:cli": "node --max-old-space-size=256 packages/maps/dist/composition/headless-cli.js",
+    "review:mutations": "node scripts/review/run-mutations.mjs",
     "test:stress": "node scripts/stress.mjs"
   },
   "devDependencies": {
@@ -28,8 +29,10 @@
     "ajv": "^8.17.1",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.0.0",
+    "eslint-plugin-svelte": "^3.23.1",
     "globals": "^15.0.0",
     "prettier": "^3.3.0",
+    "prettier-plugin-svelte": "^3.5.2",
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.0.0",
     "vite": "^6.0.0",
