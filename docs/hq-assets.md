@@ -13,3 +13,7 @@ The fixture uses original project artwork and geometry. No historical scan, exte
 Code review has checked token inheritance, focus indicators, text wrapping, native form semantics and reduced-motion branches. Camera transitions follow the player's and system's reduced-motion setting. Courier and signing animations remain unavailable because those services are not accepted into HQ.
 
 Visual design approval is pending. When the user-supplied launcher is ready, capture the table overview/detail, every desk view, high contrast, reduced motion and narrow viewport. Review maximum-length paper IDs and mark labels, focus visibility, map alignment at corners and asymmetric landmarks, and readable dispatch prose. Record the browser, hardware, viewport and DPR with the 60-piece frame-time measurement. Headless checks do not establish visual quality or 60 fps.
+
+## Table benchmark harness (#49)
+
+`client/table-benchmark.html` (dev server, `/table-benchmark.html?seconds=10&orbit=1`) renders the 60-piece performance fixture (30 own, 15 fresh contacts, 15 stale ghosts) on the public artwork and samples `requestAnimationFrame` intervals after a 2 s warmup. The result is in the page and on `window.__tableBenchmark` (frame percentiles, draw calls, textures, DPR, viewport). It must be run on a real GPU: a software-rendered headless run (SwiftShader, 4-core i3) measured about 4 fps and is not evidence for the 60 fps criterion. Draw calls measured there: 194 for 60 pieces.
