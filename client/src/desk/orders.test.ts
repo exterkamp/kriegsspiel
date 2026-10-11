@@ -24,6 +24,7 @@ import {
   noticeText,
   ORDER_EXAMPLES,
   deliveredBy,
+  refusalText,
   saveDraft,
   withAnnex,
 } from './orders.js';
@@ -306,16 +307,32 @@ describe('refusals and outcomes', () => {
 
   it('only counts a reply from the addressee written after the order', () => {
     const p = { orderId: 'o', text: 't', sentAtGame: 100, toName: 'Guards' };
-    const d = (from: string, at: number) => ({
-      id: from + at,
+    const d = (from: string, written: number, received = written) => ({
+      id: from + written,
       from,
-      writtenAtGame: at,
-      receivedAtGame: at,
+      writtenAtGame: written,
+      receivedAtGame: received,
       category: 'staff' as const,
       text: '',
     });
     expect(deliveredBy(p, [d('Guards', 50), d('Hussars', 200)])).toBeUndefined();
-    expect(deliveredBy(p, [d('Guards', 300), d('Guards', 150)])?.receivedAtGame).toBe(150);
+    expect(deliveredBy(p, [d('Guards', 300), d('Guards', 150)])?.writtenAtGame).toBe(150);
+    // Written before the order was signed, received after: says nothing about delivery.
+    expect(deliveredBy(p, [d('Guards', 100 - 50, 200)])).toBeUndefined();
+    // Written after, received later still.
+    expect(deliveredBy(p, [d('Guards', 120, 200)])?.receivedAtGame).toBe(200);
+  });
+
+  it('ends a refusal reason with a full stop and phrases a clarification as a need', () => {
+    expect(refusalText({ text: 'x', reason: 'Which bridge? (A, B)' })).toContain(
+      '(A, B) The staff',
+    );
+    expect(refusalText({ text: 'x', reason: 'No such action' })).toContain(
+      'No such action. The staff',
+    );
+    const c = refusalText({ text: 'x', reason: 'Which bridge?', code: 'order_clarification' });
+    expect(c).toContain('need more');
+    expect(c).not.toContain('could not be carried out');
   });
 });
 

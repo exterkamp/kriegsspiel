@@ -39,6 +39,9 @@
   let stampTimer: ReturnType<typeof setTimeout> | undefined;
 
   function patch(p: Partial<OrderDraft>): void {
+    // Editing the control an error names settles it.
+    if (error && (('to' in p && error.field === 'to') || ('text' in p && error.field === 'text')))
+      error = undefined;
     orderDraft.update((d) => ({ ...d, ...p }));
   }
   function toggleArrow(id: string, on: boolean): void {

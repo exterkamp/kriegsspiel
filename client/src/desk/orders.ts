@@ -151,16 +151,21 @@ export const ORDER_EXAMPLES: readonly string[] = [
  * What the desk tells the player when the staff could not carry out an order: their own words, the
  * staff's reason without the internal order id, and a hint with two example orders.
  */
-export function refusalText(o: { text: string; reason: string }): string {
-  const reason = o.reason.replace(/^\s*o-[\w-]+:\s*/, '').trim();
+export function refusalText(o: { text: string; reason: string; code?: string }): string {
+  const bare = o.reason.replace(/^\s*o-[\w-]+:\s*/, '').trim();
+  const reason = /[.?!)]$/.test(bare) ? bare : `${bare}.`;
   const examples = ORDER_EXAMPLES.map((e) => `"${e}"`).join(' or ');
-  return `Your order "${o.text.trim()}" could not be carried out. ${reason} The staff understand orders such as ${examples}.`;
+  const lead =
+    o.code === 'order_clarification'
+      ? `The staff need more to act on your order "${o.text.trim()}". ${reason}`
+      : `Your order "${o.text.trim()}" could not be carried out. ${reason}`;
+  return `${lead} The staff understand orders such as ${examples}.`;
 }
 
 /** A notice for the desk: a refusal shows the player's own words and a hint; others lose any order id prefix. */
 export function noticeText(
   n: { message: string },
-  outcomes: Readonly<Record<string, { text: string; reason: string }>>,
+  outcomes: Readonly<Record<string, { text: string; reason: string; code?: string }>>,
 ): string {
   const id = orderIdOf(n.message);
   const o = id === undefined ? undefined : outcomes[id];
@@ -168,7 +173,8 @@ export function noticeText(
 }
 
 /**
- * Word that an order arrived: the first dispatch from its addressee written after it was sent.
+ * Word that an order arrived: the first dispatch from its addressee written after it was sent (written, not received:
+ * a report already riding when the order went out says nothing about the order).
  * The addressee answering is the only proof of delivery the client has.
  */
 export function deliveredBy(
@@ -177,6 +183,6 @@ export function deliveredBy(
 ): Dispatch | undefined {
   if (!p.toName) return undefined;
   return [...dispatches]
-    .sort((a, b) => a.receivedAtGame - b.receivedAtGame)
-    .find((d) => d.from === p.toName && d.receivedAtGame >= p.sentAtGame);
+    .sort((a, b) => a.writtenAtGame - b.writtenAtGame)
+    .find((d) => d.from === p.toName && d.writtenAtGame >= p.sentAtGame);
 }

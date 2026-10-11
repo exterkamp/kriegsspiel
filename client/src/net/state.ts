@@ -32,6 +32,8 @@ export interface OrderOutcome {
   sentAtGame: number;
   /** The staff's reply with the internal order id removed. */
   reason: string;
+  /** The server's error code, such as `order_clarification`. */
+  code?: string;
 }
 
 export interface Notice {
@@ -249,6 +251,7 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
               ...(refused.toName ? { toName: refused.toName } : {}),
               sentAtGame: refused.sentAtGame,
               reason: m.message.slice(m.message.indexOf(': ') + 2),
+              code: m.code,
             },
           }
         : s.outcomes;
