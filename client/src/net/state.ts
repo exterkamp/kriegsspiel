@@ -31,7 +31,7 @@ export interface GameOver {
 export interface CatchUp {
   sinceGame: number;
   atGame: number;
-  /** Ids of dispatches delivered since `sinceGame`; the in-tray marks these as new. */
+  /** Ids of dispatches delivered since `sinceGame`. Stored for the in-tray to mark as new; nothing reads it yet. */
   dispatchIds: readonly string[];
 }
 

@@ -184,6 +184,19 @@ export class Hub {
     this.conns.delete(gameId);
   }
 
+  /** Save the seen time of every side that still has a connection, so a restart does not lose it. */
+  async flushSeen(): Promise<void> {
+    const saves: Promise<void>[] = [];
+    for (const [gameId, set] of this.conns) {
+      for (const side of new Set([...set].map((c) => c.side))) {
+        const at = this.seen.get(`${gameId}\0${side}`);
+        if (at !== undefined && this.store)
+          saves.push(this.store.saveSeen(gameId, side, at).catch((e) => this.onError(gameId, e)));
+      }
+    }
+    await Promise.all(saves);
+  }
+
   closeAll(): void {
     for (const id of [...this.conns.keys()]) this.closeGame(id, 1001, 'server shutting down');
   }
