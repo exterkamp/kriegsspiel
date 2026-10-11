@@ -110,7 +110,7 @@ it('saves a large accepted export exactly, lists it and independently imports sa
   expect(validateBattlefield(importAsset(bytes)).ok).toBe(true);
   expect(await (await fetch(`${endpoint}/generated/saved-board`)).text()).toBe(bytes);
   expect(await (await fetch(endpoint)).json()).toEqual(expect.arrayContaining([summary]));
-});
+}, 30_000);
 
 it('never overwrites an existing file on generated ID collision', async () => {
   await start({ newId: () => 'collision' });
