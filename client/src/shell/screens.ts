@@ -6,8 +6,7 @@ export type Screen =
   | { name: 'menu' }
   | { name: 'new-game' }
   | { name: 'game'; game?: string; side?: string; create?: { side?: string; rate?: number } }
-  | { name: 'game-over'; game: string }
-  | { name: 'fixture' };
+  | { name: 'game-over'; game: string };
 
 export type ScreenName = Screen['name'];
 
@@ -23,19 +22,14 @@ export type ShellEvent =
   /** The browser moved through history, or the page just opened: the URL decides. */
   | { type: 'location'; search: string };
 
-/** Screens that need no account. */
-const open = (s: Screen): boolean => s.name === 'fixture';
-
 /** Where a signed-out visitor is held, and where a signed-in one is sent from there. */
 const guard = (screen: Screen, signedIn: boolean): Screen =>
-  signedIn || open(screen) ? screen : { name: 'sign-in' };
+  signedIn ? screen : { name: 'sign-in' };
 
-/** The screen a URL asks for. Existing URLs keep their meaning: `?new`, `?game=`, `?lobby=1`, `mode=fixture`. */
+/** The screen a URL asks for. Existing URLs keep their meaning: `?new`, `?game=`, `?lobby=1`. */
 export function screenFromSearch(search: string): Screen {
   const p = parseSession(search);
   switch (p.mode) {
-    case 'fixture':
-      return { name: 'fixture' };
     case 'lobby':
       return { name: 'new-game' };
     case 'create':
@@ -60,8 +54,6 @@ export function urlFor(screen: Screen): string {
       return '/';
     case 'new-game':
       return '/?lobby=1';
-    case 'fixture':
-      return '/?mode=fixture';
     case 'game-over':
       return `/?game=${encodeURIComponent(screen.game)}&over=1`;
     case 'game': {

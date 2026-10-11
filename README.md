@@ -21,7 +21,7 @@ A deterministic engine owns the world: terrain, movement, line of sight, combat,
 
 ## Current state
 
-The engine, filtered game API and live client are implemented. The default client page now opens a fixture-driven Three.js map table and Svelte HQ desk with scoped browser notes, personal marks, paper dispositions and autosaved order drafts. It is an interface demonstration; live HQ integration and browser acceptance remain pending. [HQ contracts](docs/hq-contracts.md) and the [execution log](docs/hq-execution-log.md) record the gates.
+The engine, filtered game API and live client are implemented. The client page opens the main menu, sign-in, new-game form and the live Three.js map table with its desk (in-tray, orders, order of battle, journal, staff conference). The earlier fixture-only HQ demonstration was retired in D28.
 
 The accepted live client remains available at `/?new=1&side=blue&rate=12` to create a game, or `/?game=<id>` to join. `/?lobby=1` opens the accepted lobby/game list. Sign in using the emailed magic link; the session cookie and game seat authenticate access. Vite proxies `/auth`, `/scenarios` and `/games` HTTP and WebSocket requests to `API_URL` (default `http://localhost:3000`).
 

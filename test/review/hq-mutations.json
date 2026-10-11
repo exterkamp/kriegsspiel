@@ -5,25 +5,25 @@
       "id": "game-time",
       "invariant": "BigInt reconstructed milliseconds differs by 1ms at largest safe-second boundary",
       "rationale": "Exact duration metadata must retain every safe-integer millisecond. Replacing integer-second/remainder formatting with direct division loses 1ms at the selected BigInt boundary assertion.",
-      "source": "client/src/hq/presentation/gameTime.ts",
+      "source": "client/src/table/gameTime.ts",
       "sourceSha256": "d77034896743a94f72de8222e467ab420ed58bad35c595ad3697a0a89bda9524",
       "before": "  const remainder = value % 1000;\n  const seconds = (value - remainder) / 1000;\n  const fraction =\n    remainder === 0 ? '' : `.${String(remainder).padStart(3, '0').replace(/0+$/, '')}`;\n  return `PT${seconds}${fraction}S`;",
       "after": "  return `PT${value / 1000}S`;",
       "selected": [
         {
-          "file": "client/src/hq/presentation/gameTime.test.ts",
+          "file": "client/src/table/gameTime.test.ts",
           "name": "elapsed game-time presentation retains each millisecond around the largest safe-integer second boundary"
         }
       ],
       "testSha256": [
         {
-          "file": "client/src/hq/presentation/gameTime.test.ts",
+          "file": "client/src/table/gameTime.test.ts",
           "sha256": "ab23a74681fa50f5f8f2d3a149640b97353bc71f753b9f408181a365c22cef4c"
         }
       ],
       "expected": [
         {
-          "file": "client/src/hq/presentation/gameTime.test.ts",
+          "file": "client/src/table/gameTime.test.ts",
           "name": "elapsed game-time presentation retains each millisecond around the largest safe-integer second boundary",
           "line": 67,
           "column": 28,
@@ -33,90 +33,28 @@
       "timeoutMs": 30000
     },
     {
-      "id": "closed-settings",
-      "invariant": "header .preference-notice text must contain Preferences not saved: quota-exceeded after closing Settings",
-      "rationale": "A failed preference save must remain visible in the header after Settings closes. Restricting the notice to an open dialog removes the failure text required by the selected DOM assertion.",
-      "source": "client/src/hq/shell/Shell.svelte",
-      "sourceSha256": "19cb9066dd27493b37fcc3d44aaff760cd8b8a94a3fd330b20bdd12db42ebb11",
-      "before": "    {#if preferenceFailure}",
-      "after": "    {#if preferenceFailure && settingsOpen}",
-      "selected": [
-        {
-          "file": "client/src/hq/shell/Shell.test.ts",
-          "name": "fixture desk DOM retains a closed-dialog save error and retries against the preserved revision"
-        }
-      ],
-      "testSha256": [
-        {
-          "file": "client/src/hq/shell/Shell.test.ts",
-          "sha256": "ada2ec06e7c9c580546be64409c7c09132c04ea8e1016a93aa1a1c9400a88b56"
-        }
-      ],
-      "expected": [
-        {
-          "file": "client/src/hq/shell/Shell.test.ts",
-          "name": "fixture desk DOM retains a closed-dialog save error and retries against the preserved revision",
-          "line": 241,
-          "column": 76,
-          "message": "the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string"
-        }
-      ],
-      "timeoutMs": 30000
-    },
-    {
-      "id": "modal-escape",
-      "invariant": "firstEscape.defaultPrevented must be false while Settings is open",
-      "rationale": "Settings must receive native Escape before background coordinate placement can consume it. Removing plotting's open-dialog guard makes the first Escape prevented at the selected integrated assertion.",
-      "source": "client/src/hq/interactions/plotting/Plotting.svelte",
-      "sourceSha256": "ec21df940ad2820898aa78314876d436a0341c05a2a87b0ec1cf1a984e03cac8",
-      "before": "        hub.ownerDocument.querySelector('dialog[open]') ||\n",
-      "after": "",
-      "selected": [
-        {
-          "file": "client/src/hq/App.test.ts",
-          "name": "lets Settings consume native Escape before a second Escape cancels coordinate placement"
-        }
-      ],
-      "testSha256": [
-        {
-          "file": "client/src/hq/App.test.ts",
-          "sha256": "4fa5c0fe6630c868d20545153b5ad2809f45520cf2af04de7d55dc7472a57467"
-        }
-      ],
-      "expected": [
-        {
-          "file": "client/src/hq/App.test.ts",
-          "name": "lets Settings consume native Escape before a second Escape cancels coordinate placement",
-          "line": 492,
-          "column": 40,
-          "message": "expected true to be false // Object.is equality"
-        }
-      ],
-      "timeoutMs": 30000
-    },
-    {
       "id": "invalid-time",
       "invariant": "Negative game milliseconds remain explicitly unavailable.",
       "rationale": "Remove only the nonnegative validation guard; selected parameterized assertion checks the visible value.",
-      "source": "client/src/hq/presentation/gameTime.ts",
+      "source": "client/src/table/gameTime.ts",
       "sourceSha256": "d77034896743a94f72de8222e467ab420ed58bad35c595ad3697a0a89bda9524",
       "before": " && value >= 0",
       "after": "",
       "selected": [
         {
-          "file": "client/src/hq/presentation/gameTime.test.ts",
+          "file": "client/src/table/gameTime.test.ts",
           "name": "elapsed game-time presentation keeps invalid input -1 explicitly unavailable"
         }
       ],
       "testSha256": [
         {
-          "file": "client/src/hq/presentation/gameTime.test.ts",
+          "file": "client/src/table/gameTime.test.ts",
           "sha256": "ab23a74681fa50f5f8f2d3a149640b97353bc71f753b9f408181a365c22cef4c"
         }
       ],
       "expected": [
         {
-          "file": "client/src/hq/presentation/gameTime.test.ts",
+          "file": "client/src/table/gameTime.test.ts",
           "name": "elapsed game-time presentation keeps invalid input -1 explicitly unavailable",
           "line": 74,
           "column": 37,
@@ -129,184 +67,29 @@
       "id": "hours-beyond-24",
       "invariant": "Elapsed hours never wrap at midnight.",
       "rationale": "Plausible calendar-time formatter regression at a 25-hour game timestamp.",
-      "source": "client/src/hq/presentation/gameTime.ts",
+      "source": "client/src/table/gameTime.ts",
       "sourceSha256": "d77034896743a94f72de8222e467ab420ed58bad35c595ad3697a0a89bda9524",
       "before": "  const hours = Math.floor(seconds / 3600);",
       "after": "  const hours = Math.floor(seconds / 3600) % 24;",
       "selected": [
         {
-          "file": "client/src/hq/presentation/gameTime.test.ts",
+          "file": "client/src/table/gameTime.test.ts",
           "name": "elapsed game-time presentation formats 90061007 milliseconds as 25:01:01"
         }
       ],
       "testSha256": [
         {
-          "file": "client/src/hq/presentation/gameTime.test.ts",
+          "file": "client/src/table/gameTime.test.ts",
           "sha256": "ab23a74681fa50f5f8f2d3a149640b97353bc71f753b9f408181a365c22cef4c"
         }
       ],
       "expected": [
         {
-          "file": "client/src/hq/presentation/gameTime.test.ts",
+          "file": "client/src/table/gameTime.test.ts",
           "name": "elapsed game-time presentation formats 90061007 milliseconds as 25:01:01",
           "line": 19,
           "column": 35,
           "message": "expected '01:01:01' to be '25:01:01' // Object.is equality"
-        }
-      ],
-      "timeoutMs": 30000
-    },
-    {
-      "id": "repository-revision",
-      "invariant": "A real BrowserRepository rejects an old revision instead of overwriting current preferences.",
-      "rationale": "Remove the complete stale-save conflict guard (loaded baseline, observed raw, submitted/current/stored revisions). Keep validation, revision-history uniqueness and final observed-storage check. The real BrowserRepository stale-save assertion must fail; no mocked repository or save result.",
-      "source": "client/src/hq/data/repository.ts",
-      "sourceSha256": "09070921e118d0e44461a9a29d1c63d667321e48995ce5870bf4aeaece7441ac",
-      "before": "      if (\n        baseline === undefined ||\n        stored.value.raw !== baseline ||\n        document.revision !== expectedRevision ||\n        this.current?.revision !== expectedRevision ||\n        stored.value.document.revision !== expectedRevision\n      )\n        return failure('conflict', 'Preferences changed elsewhere. Reload before saving.');",
-      "after": "",
-      "selected": [
-        {
-          "file": "client/src/hq/data/data.test.ts",
-          "name": "scoped preference repository reloads saved preferences, rejects stale writes and isolates player scope"
-        }
-      ],
-      "testSha256": [
-        {
-          "file": "client/src/hq/data/data.test.ts",
-          "sha256": "5ac33f5f5c2fbafa1bc6b42ef683f82d6ddc3b753270901ab2d680864c43621d"
-        }
-      ],
-      "expected": [
-        {
-          "file": "client/src/hq/data/data.test.ts",
-          "name": "scoped preference repository reloads saved preferences, rejects stale writes and isolates player scope",
-          "line": 201,
-          "column": 68,
-          "message": "expected true to be false // Object.is equality"
-        }
-      ],
-      "timeoutMs": 30000
-    },
-    {
-      "id": "preference-recovery",
-      "invariant": "Successful preference recovery clears the persistent failure notice.",
-      "rationale": "Retain the prior failure notice after a real successful result in Shell; the selected DOM assertion requires clearance.",
-      "source": "client/src/hq/shell/Shell.svelte",
-      "sourceSha256": "19cb9066dd27493b37fcc3d44aaff760cd8b8a94a3fd330b20bdd12db42ebb11",
-      "before": "          storageStatus = `Preferences saved (${result.value.durability}).`;\n          preferenceFailure = null;",
-      "after": "          storageStatus = `Preferences saved (${result.value.durability}).`;",
-      "selected": [
-        {
-          "file": "client/src/hq/shell/Shell.test.ts",
-          "name": "fixture desk DOM retains a closed-dialog save error and retries against the preserved revision"
-        }
-      ],
-      "testSha256": [
-        {
-          "file": "client/src/hq/shell/Shell.test.ts",
-          "sha256": "ada2ec06e7c9c580546be64409c7c09132c04ea8e1016a93aa1a1c9400a88b56"
-        }
-      ],
-      "expected": [
-        {
-          "file": "client/src/hq/shell/Shell.test.ts",
-          "name": "fixture desk DOM retains a closed-dialog save error and retries against the preserved revision",
-          "line": 253,
-          "column": 63,
-          "message": "expected <p \u2026(3)></p> to be null"
-        }
-      ],
-      "timeoutMs": 30000
-    },
-    {
-      "id": "modal-shortcuts",
-      "invariant": "An open modal suppresses background letter shortcuts even when a key is dispatched outside it.",
-      "rationale": "The independent global dialog guard protects native modality and synthetic events; preserves the typing target guard.",
-      "source": "client/src/hq/shell/Shell.svelte",
-      "sourceSha256": "19cb9066dd27493b37fcc3d44aaff760cd8b8a94a3fd330b20bdd12db42ebb11",
-      "before": "      ) ||\n      root.ownerDocument.querySelector('dialog[open], [role=\"dialog\"][aria-modal=\"true\"]')",
-      "after": "      )",
-      "selected": [
-        {
-          "file": "client/src/hq/shell/Shell.test.ts",
-          "name": "fixture desk DOM suppresses typing and modal shortcuts, and routes ordinary keys"
-        }
-      ],
-      "testSha256": [
-        {
-          "file": "client/src/hq/shell/Shell.test.ts",
-          "sha256": "ada2ec06e7c9c580546be64409c7c09132c04ea8e1016a93aa1a1c9400a88b56"
-        }
-      ],
-      "expected": [
-        {
-          "file": "client/src/hq/shell/Shell.test.ts",
-          "name": "fixture desk DOM suppresses typing and modal shortcuts, and routes ordinary keys",
-          "line": 134,
-          "column": 23,
-          "message": "expected 'Orders' to be 'Map table' // Object.is equality"
-        }
-      ],
-      "timeoutMs": 30000
-    },
-    {
-      "id": "stale-publication",
-      "invariant": "A superseded application must never publish its desk snapshot or freshness.",
-      "rationale": "Remove the post-await abort/generation checks. The selected test holds the newer renderer apply pending and requires PT0.01S after the old completion; the mutant transiently publishes superseded PT0.02S. This checks the publication window, not only the final PT0.03S state.",
-      "source": "client/src/hq/shell/Shell.svelte",
-      "sourceSha256": "19cb9066dd27493b37fcc3d44aaff760cd8b8a94a3fd330b20bdd12db42ebb11",
-      "before": "        if (!alive || controller.signal.aborted || health !== healthGeneration) return;",
-      "after": "        if (!alive) return;",
-      "selected": [
-        {
-          "file": "client/src/hq/shell/Shell.test.ts",
-          "name": "fixture desk DOM ignores late application completion when a newer source observation is queued"
-        }
-      ],
-      "testSha256": [
-        {
-          "file": "client/src/hq/shell/Shell.test.ts",
-          "sha256": "ada2ec06e7c9c580546be64409c7c09132c04ea8e1016a93aa1a1c9400a88b56"
-        }
-      ],
-      "expected": [
-        {
-          "file": "client/src/hq/shell/Shell.test.ts",
-          "name": "fixture desk DOM ignores late application completion when a newer source observation is queued",
-          "line": 683,
-          "column": 75,
-          "message": "expected 'PT0.02S' to be 'PT0.01S' // Object.is equality"
-        }
-      ],
-      "timeoutMs": 30000
-    },
-    {
-      "id": "renderer-disposal",
-      "invariant": "Disposal during scene commit is terminal and cannot publish successful presentation.",
-      "rationale": "Scene-commit callbacks can dispose the surface; that terminal lifetime must return disposed without caching presentation. Bypass the direct disposal check, activation Result guard and post-activation disposal check in the bounded commit block while still attempting activation. The selected callback then reaches the success/cache path; accepted becomes true, so the failed-update rollback cannot rescue this fault. Keep pre-commit checks, abort handling, rollback/final-frame repair, disposal implementation, renderer resources and the designated assertion unchanged.",
-      "source": "client/src/hq/data/continuousSurface.ts",
-      "sourceSha256": "f910c7f87712b29f4a3c6b9921c3df27c5b3c52de2517383cc29c636b222b13a",
-      "before": "      this.table.apply(state, image ?? undefined);\n      if (this.disposed) return failure('disposed', 'The table is closed.');\n      if (this.settled === 'table' && !this.transitioning) {\n        const activated = this.activate(true);\n        if (!activated.ok) return activated;\n      }\n      if (this.disposed) return this.unavailable();",
-      "after": "      this.table.apply(state, image ?? undefined);\n      if (this.settled === 'table' && !this.transitioning) {\n        this.activate(true);\n      }",
-      "selected": [
-        {
-          "file": "client/src/hq/data/continuousSurface.test.ts",
-          "name": "continuous surface lifecycle does not publish success or restore presentation when disposal occurs during the scene commit"
-        }
-      ],
-      "testSha256": [
-        {
-          "file": "client/src/hq/data/continuousSurface.test.ts",
-          "sha256": "80dd828b8f489624a54e1575c65b8870161501bee2af4768467ef18ab3e6c695"
-        }
-      ],
-      "expected": [
-        {
-          "file": "client/src/hq/data/continuousSurface.test.ts",
-          "name": "continuous surface lifecycle does not publish success or restore presentation when disposal occurs during the scene commit",
-          "line": 459,
-          "column": 45,
-          "message": "expected false to be 'disposed' // Object.is equality"
         }
       ],
       "timeoutMs": 30000

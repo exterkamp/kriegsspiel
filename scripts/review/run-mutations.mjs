@@ -78,8 +78,11 @@ export function validateManifest(manifest) {
       throw new Error('Invalid or duplicate case ID');
     ids.add(c.id);
     safePath(c.source);
-    if (!/^client\/src\/hq\/.*\.(ts|svelte)$/.test(c.source) || /\.(test|spec)\./.test(c.source))
-      throw new Error('Only HQ production sources may be mutated');
+    if (
+      !/^client\/src\/(hq|table)\/.*\.(ts|svelte)$/.test(c.source) ||
+      /\.(test|spec)\./.test(c.source)
+    )
+      throw new Error('Only HQ or table production sources may be mutated');
     if (
       ![c.invariant, c.rationale, c.before].every((v) => typeof v === 'string' && v.length) ||
       typeof c.after !== 'string' ||
@@ -102,7 +105,7 @@ export function validateManifest(manifest) {
       keys(t, ['file', 'name']);
       safePath(t.file);
       if (
-        !/^client\/src\/hq\/.*\.test\.ts$/.test(t.file) ||
+        !/^client\/src\/(hq|table)\/.*\.test\.ts$/.test(t.file) ||
         typeof t.name !== 'string' ||
         !t.name.length ||
         selected.has(`${t.file}\0${t.name}`)

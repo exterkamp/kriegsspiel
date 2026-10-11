@@ -220,7 +220,7 @@ describe('session params', () => {
     expect(parseSession('?new=1&rate=12')).toEqual({ mode: 'create', rate: 12 });
     expect(parseSession('?new=1&side=red')).toEqual({ mode: 'create', side: 'red' });
     expect(parseSession('')).toEqual({ mode: 'menu' });
-    expect(parseSession('?mode=fixture')).toEqual({ mode: 'fixture' });
+    expect(parseSession('?mode=fixture')).toEqual({ mode: 'menu' });
     expect(wsUrl({ protocol: 'https:', host: 'a.b' }, 'g')).toBe('wss://a.b/games/g/ws');
   });
 });

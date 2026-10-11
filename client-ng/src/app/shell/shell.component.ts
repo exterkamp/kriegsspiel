@@ -37,7 +37,7 @@ type Prep =
   | { step: 'ready' };
 
 /**
- * The entry page at `/`. The query string decides the first screen (`?game`, `?new`, `?lobby`, `?mode=fixture`, none
+ * The entry page at `/`. The query string decides the first screen (`?game`, `?new`, `?lobby`, none
  * for the menu), through the same pure rules as the Svelte shell (`@legacy/shell/screens`). Moving between the shell's
  * own screens is a history push; moving into or out of the game is a fresh page load, because the live screen owns the
  * canvas and the page's listeners.
@@ -88,11 +88,9 @@ type Prep =
           @switch (prep().step) {
             @case ('ready') {
               <ks-game />
-              @if (st.screen.name !== 'fixture') {
-                <ks-game-menu (leave)="go({ name: 'menu' })" (signOut)="signedOut()" />
-                @if (me(); as m) {
-                  <ks-account-bar [me]="m" (gone)="goHome()" />
-                }
+              <ks-game-menu (leave)="go({ name: 'menu' })" (signOut)="signedOut()" />
+              @if (me(); as m) {
+                <ks-account-bar [me]="m" (gone)="goHome()" />
               }
             }
             @case ('room') {
@@ -221,7 +219,7 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   private show(next: ShellState): void {
     this.state.set(next);
-    if (isLiveScreen(next.screen) || next.screen.name === 'fixture') {
+    if (isLiveScreen(next.screen)) {
       this.liveLoaded = true;
       void this.prepare(next.screen);
     }
@@ -230,7 +228,6 @@ export class ShellComponent implements OnInit, OnDestroy {
   /** Gets the player a seat before the table opens: makes the game for `?new`, joins, waits in the room. */
   private async prepare(screen: Screen): Promise<void> {
     this.prep.set({ step: 'working' });
-    if (screen.name === 'fixture') return this.enter();
     try {
       let id =
         screen.name === 'game'

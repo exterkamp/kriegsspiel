@@ -412,11 +412,10 @@ describe('query-parameter routing', () => {
     expect(el.querySelector('[role=alert]')?.textContent).toContain('no such game');
   });
 
-  it('?mode=fixture opens the offline board without an account', async () => {
-    await open('/?mode=fixture', { fetchMe: async () => undefined });
-    expect(el.querySelector('canvas')).not.toBeNull();
-    expect(el.querySelector('#account')).toBeNull();
-    expect(el.textContent).not.toContain('Menu (Esc)');
+  it('?mode=fixture is gone (D28): signed in, it is the menu', async () => {
+    await open('/?mode=fixture');
+    expect(el.querySelector('canvas')).toBeNull();
+    expect(el.querySelector('h1')?.textContent).toBe('Kriegsspiel');
   });
 });
 

@@ -1,5 +1,7 @@
 # The HQ interface
 
+> **Note (D28, #278):** the HQ fixture demonstration described in the status paragraphs below was retired. `client/src/hq/` and `/?mode=fixture` no longer exist; the live desk is the interface. Statements about the fixture are historical.
+
 For current user instructions and a hands-on validation checklist, see [HQ getting started](hq-getting-started.md).
 
 Implementation ports and capability gates are recorded in [HQ contracts](hq-contracts.md), with packet evidence in [HQ execution log](hq-execution-log.md). The current HQ composition is an explicitly identified fixture demonstration; its continuous-metre table consumes accepted #118. Local order drafts autosave in this browser; signing and delivery are unavailable in HQ. Explicit report placement supports a chosen pin location with frozen provenance; its contract and review status are recorded in [report placement](hq-plotting-proposal.md). Browser rendering/performance and live-server acceptance remain pending. Opening the client without session parameters shows the HQ fixture. Existing `/?new=1&side=blue&rate=12` and `/?game=<id>` URLs select the accepted live desk, shared marks and transport with cookie authentication and a game seat; live HQ composition awaits its contract gate.
@@ -31,7 +33,7 @@ The orders desk is built: a form addressed to a named commander, free text, an o
 
 ## App shell and main menu
 
-`client/src/main.ts` starts the shell (`client/src/shell`), which decides what the page shows. The shell has explicit screens, a small typed state machine in `shell/screens.ts` (pure functions, unit tested): `sign-in`, `menu`, `new-game`, `game`, `game-over`, plus `fixture`.
+`client/src/main.ts` starts the shell (`client/src/shell`), which decides what the page shows. The shell has explicit screens, a small typed state machine in `shell/screens.ts` (pure functions, unit tested): `sign-in`, `menu`, `new-game`, `game`, `game-over`.
 
 | URL | Screen |
 |-----|--------|
@@ -40,9 +42,8 @@ The orders desk is built: a form addressed to a named commander, free text, an o
 | `/?new=1&side=&rate=` | `game`, creating a game first |
 | `/?game=<id>[&side=]` | `game`; a reload returns to the same game |
 | `/?game=<id>&over=1` | `game-over` (served by the live client until the game over screen task) |
-| `/?mode=fixture` | The offline HQ fixture. Reached only by this URL, with no account. |
 
-Signed-out visitors are held at `sign-in` for every screen but `fixture`. Browser back and forward follow the URL. The live client (`liveClient.ts`, the 3D table and desk) is the game screen and cannot be unloaded, so a move to or from a live screen after it has loaded is a fresh page load.
+Signed-out visitors are held at `sign-in` for every screen. Browser back and forward follow the URL. The live client (`liveClient.ts`, the 3D table and desk) is the game screen and cannot be unloaded, so a move to or from a live screen after it has loaded is a fresh page load.
 
 **Main menu** (`shell/Menu.svelte`, aged paper and serif to match the desk): New game; Continue, the player's unfinished games with scenario, side, game time and last played (hidden when there are none); the signed-in email with Sign out; and About, a paragraph on how the game works with a link to `docs/gameplay.md`. `GET /games` supplies `finished`, `gameTimeMs` and `lastPlayedMs` for each game, and Continue lists only started games that are not finished (`shell/continueList.ts`). Multiplayer entry points are not on the menu.
 

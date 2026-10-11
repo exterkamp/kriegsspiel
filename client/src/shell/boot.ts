@@ -34,7 +34,6 @@ export interface ShellDeps {
   startGuest?: () => Promise<string | undefined>;
   /** Loads the 3D table and desk into `app` (it reads the URL itself). Called at most once per page. */
   startLive: () => Promise<void>;
-  startFixture: (app: HTMLElement) => void;
   now: () => number;
 }
 
@@ -133,8 +132,6 @@ export async function startShell(deps: ShellDeps): Promise<Shell> {
           onBack: () => shell.go({ name: 'menu' }),
         },
       });
-    } else if (screen.name === 'fixture') {
-      deps.startFixture(app);
     } else if (isLiveScreen(screen)) {
       liveLoaded = true;
       void deps.startLive().then(() => {

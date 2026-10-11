@@ -1,6 +1,5 @@
-/** How the page was asked to run: against a server game, or on the built-in fixture. */
+/** How the page was asked to run: against a server game, or the menu. */
 export type SessionParams =
-  | { mode: 'fixture' }
   | { mode: 'join'; game: string; side?: string }
   | { mode: 'create'; side?: string; rate?: number }
   | { mode: 'lobby' }
@@ -9,12 +8,11 @@ export type SessionParams =
 /**
  * `?game=<id>[&side=red]` joins (taking a free side if you have none; `side` also picks a hot-seat side);
  * `?new=1[&side=blue][&rate=12]` makes and starts a game at once; `?lobby=1` shows the new-game form and
- * your games; `?mode=fixture` is the offline fixture desk; anything else is the main menu. Who you are
+ * your games; anything else is the main menu. Who you are
  * comes from the session cookie, not the URL.
  */
 export function parseSession(search: string): SessionParams {
   const q = new URLSearchParams(search);
-  if (q.get('mode') === 'fixture') return { mode: 'fixture' };
   const game = q.get('game');
   const side = q.get('side') || undefined;
   if (game) return { mode: 'join', game, ...(side ? { side } : {}) };

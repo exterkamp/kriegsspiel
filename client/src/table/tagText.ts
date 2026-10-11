@@ -1,5 +1,5 @@
 import type { GhostPiece, OwnPiece } from './types.js';
-import { formatGameAge, formatGameTime } from '../hq/presentation/gameTime.js';
+import { formatGameAge, formatGameTime } from './gameTime.js';
 
 const shortLabel = (value: string): string => {
   const text = value.replace(/\s+/gu, ' ').trim();

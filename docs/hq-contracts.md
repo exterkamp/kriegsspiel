@@ -1,5 +1,7 @@
 # HQ contracts: bounded first gate
 
+> **Retired (D28, #278):** `client/src/hq` was removed. These contracts are a historical record.
+
 **Status: accepted bounded fixture contract, 2026-10-10.** Independent high-reasoning review accepted the repaired artifacts; the coordinator integrated signatures in `client/src/hq/contracts/index.ts`. This freezes UI ports for fixture portions of #48/#49. It introduces no wire schemas, server endpoints or engine changes. The subsequent continuous-table reconciliation consumes accepted upstream #118. Later service shapes deliberately remain unfrozen; runtime implementation still requires focused tests and review.
 
 ## Evidence and ownership
