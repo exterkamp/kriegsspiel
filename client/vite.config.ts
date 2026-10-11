@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
+import type { Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 /** `/admin` (no slash) is the admin page; Vite would otherwise fall back to the game page. */
@@ -40,8 +41,7 @@ export default defineConfig({
     },
   },
   resolve: {
-    // Svelte's client build, not its server build, when vitest runs under jsdom.
-    ...(process.env.VITEST ? { conditions: ['browser'] } : {}),
+    conditions: ['browser'],
     alias: {
       '@kriegsspiel/maps': fileURLToPath(new URL('../packages/maps/src/index.ts', import.meta.url)),
       '@kriegsspiel/protocol': fileURLToPath(

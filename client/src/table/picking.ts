@@ -28,11 +28,28 @@ export type PickResult =
 
 const MAP_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-/** Intersect a ray with the flat map plane and return map coordinates in metres, if on the map. */
+/**
+ * Project/unproject and ray/plane arithmetic can put an exact edge a few ulps outside.
+ * Stabilize only those outside results within 64 machine epsilons of the map span
+ * (about 5.7e-11 m on the 4000 m fixture). This is numerical roundoff handling, not
+ * a gameplay/pointer tolerance: interior coordinates and strict `onMap` stay unchanged.
+ */
+function stabilizeRayEdge(value: number, extent: number, tolerance: number): number {
+  if (value < 0 && value >= -tolerance) return 0;
+  if (value > extent && value <= extent + tolerance) return extent;
+  return value;
+}
+
+/** Intersect a ray with the map plane; stabilize edge roundoff before strict bounds. */
 export function rayToMap(map: BaseMap, ray: THREE.Ray): Coord | undefined {
   const hit = ray.intersectPlane(MAP_PLANE, new THREE.Vector3());
   if (!hit) return undefined;
-  const c = worldToMap(map, hit);
+  const raw = worldToMap(map, hit);
+  const tolerance = 64 * Number.EPSILON * Math.max(map.width, map.height);
+  const c = {
+    x: stabilizeRayEdge(raw.x, map.width, tolerance),
+    y: stabilizeRayEdge(raw.y, map.height, tolerance),
+  };
   return onMap(map, c) ? c : undefined;
 }
 

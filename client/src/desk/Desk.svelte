@@ -39,27 +39,29 @@
 <svelte:window onkeydown={onKey} />
 
 <div class="dock">
-<PausePanel />
-<DeskClock />
-<nav class="desk-bar" aria-label="Desk">
-  {#each VIEWS as v (v.id)}
-    <button
-      type="button"
-      aria-pressed={$activeView === v.id}
-      aria-keyshortcuts={v.key.toUpperCase()}
-      onclick={() => go(v.id)}
-    >
-      {v.label}
-      <kbd>{v.key.toUpperCase()}</kbd>
-      {#if v.id === 'inTray' && unread > 0}<span class="badge" aria-label="{unread} unread">{unread}</span>{/if}
-    </button>
-  {/each}
-  {#if $gameState.gameOver && $gameId}
-    <button type="button" aria-pressed={$windowOpen} onclick={() => windowOpen.update((o) => !o)}>
-      Umpire's window
-    </button>
-  {/if}
-</nav>
+  <PausePanel />
+  <DeskClock />
+  <nav class="desk-bar" aria-label="Desk">
+    {#each VIEWS as v (v.id)}
+      <button
+        type="button"
+        aria-pressed={$activeView === v.id}
+        aria-keyshortcuts={v.key.toUpperCase()}
+        onclick={() => go(v.id)}
+      >
+        {v.label}
+        <kbd>{v.key.toUpperCase()}</kbd>
+        {#if v.id === 'inTray' && unread > 0}<span class="badge" aria-label="{unread} unread"
+            >{unread}</span
+          >{/if}
+      </button>
+    {/each}
+    {#if $gameState.gameOver && $gameId}
+      <button type="button" aria-pressed={$windowOpen} onclick={() => windowOpen.update((o) => !o)}>
+        Umpire's window
+      </button>
+    {/if}
+  </nav>
 </div>
 
 {#if $windowOpen && $gameState.gameOver}
@@ -178,10 +180,6 @@
   }
   .paper h2 {
     margin: 0 0 8px;
-  }
-  .paper ul {
-    margin: 0;
-    padding-left: 18px;
   }
   @keyframes slide-in {
     from {
