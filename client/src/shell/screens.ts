@@ -101,8 +101,7 @@ export function reduce(state: ShellState, e: ShellEvent): ShellState {
 }
 
 /** Screens served by the live client (the 3D table and its desk), as opposed to the shell's own pages. */
-export const isLiveScreen = (s: Screen): boolean =>
-  s.name === 'game' || s.name === 'game-over' || s.name === 'new-game';
+export const isLiveScreen = (s: Screen): boolean => s.name === 'game' || s.name === 'game-over';
 
 /** Whether moving between two screens needs a fresh page: the live client cannot be unloaded or re-aimed. */
 export const needsReload = (from: Screen, to: Screen, liveLoaded: boolean): boolean =>

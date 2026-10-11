@@ -112,9 +112,8 @@ describe('when a page reload is needed', () => {
     expect(needsReload(game, game, true)).toBe(false);
   });
   it('knows which screens the live client serves', () => {
-    expect(
-      ['game', 'game-over', 'new-game'].every((n) => isLiveScreen({ name: n } as Screen)),
-    ).toBe(true);
+    expect(['game', 'game-over'].every((n) => isLiveScreen({ name: n } as Screen))).toBe(true);
+    expect(isLiveScreen({ name: 'new-game' })).toBe(false);
     expect(isLiveScreen(menu)).toBe(false);
   });
 });

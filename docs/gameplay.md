@@ -46,7 +46,7 @@ The window is the same map table with a scrubber over the whole game. It shows e
 
 ## Pace: the clock ratio
 
-The ratio is the pace setting. It is chosen per game in the lobby and can be changed mid-game by agreement.
+The ratio is the pace setting. It is chosen per game on the New game screen (1:1, 4:1, 12:1 or a custom ratio; 12:1 by default) and can be changed mid-game by agreement.
 
 | Ratio | A 12-hour battle takes | Feel |
 |---|---|---|

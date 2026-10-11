@@ -5,6 +5,7 @@ import axe from 'axe-core';
 import { startShell, type ShellDeps } from './boot.js';
 import { activeView } from '../desk/store.js';
 import { registerGame } from './gameHandle.js';
+import type { ScenarioOptions } from './newGame.js';
 import type { PlayedGame } from './continueList.js';
 
 const game = (over: Partial<PlayedGame>): PlayedGame => ({
@@ -21,6 +22,23 @@ const game = (over: Partial<PlayedGame>): PlayedGame => ({
   lastPlayedMs: 0,
   ...over,
 });
+
+const options: ScenarioOptions = {
+  opponent: 'scripted',
+  scenarios: [
+    {
+      id: 'hold-the-bridge',
+      name: 'Hold the Bridge',
+      briefing: 'Hold the crossing.',
+      lengthMinutes: 240,
+      sides: [
+        { id: 'blue', name: 'Blue', controller: 'human' },
+        { id: 'red', name: 'Red', controller: 'scripted' },
+      ],
+      defaults: { side: 'blue', rate: 12 },
+    },
+  ],
+};
 
 let app: HTMLElement;
 let running: Array<{ stop(): void }> = [];
@@ -39,6 +57,8 @@ function deps(over: Partial<ShellDeps> = {}): ShellDeps {
       game({ id: 'lobby', status: 'lobby' }),
     ],
     fetchScenarios: async () => [{ id: 'hold-the-bridge', name: 'Hold the Bridge' }],
+    fetchScenarioOptions: async () => options,
+    createGame: async () => 'new1',
     requestLink: async () => undefined,
     signOut: async () => undefined,
     startLive: async () => undefined,
@@ -148,14 +168,77 @@ describe('moving between screens', () => {
       .find((b) => b.textContent === label || b.getAttribute('aria-label')?.startsWith(label))!
       .click();
   };
-  it('New game loads the live client on the new-game URL', async () => {
+  it('New game opens the new-game form on its URL, without the live client', async () => {
     const startLive = vi.fn(async () => undefined);
     const shell = await open('/', { startLive });
     click('New game');
     await settle();
     expect(shell.state.screen.name).toBe('new-game');
     expect(window.location.search).toBe('?lobby=1');
+    expect(app.querySelector('form[aria-label="New game"]')).not.toBeNull();
+    expect(startLive).not.toHaveBeenCalled();
+    click('Back');
+    await settle();
+    expect(shell.state.screen.name).toBe('menu');
+  });
+  it('Start creates the game with the chosen options and opens it', async () => {
+    const startLive = vi.fn(async () => undefined);
+    const createGame = vi.fn(async () => 'new1');
+    await open('/?lobby=1', { startLive, createGame });
+    app.querySelector<HTMLInputElement>('input[name=rate][value="4"]')!.click();
+    await settle();
+    click('Start');
+    await settle();
+    expect(createGame).toHaveBeenCalledWith({
+      scenario: 'hold-the-bridge',
+      side: 'blue',
+      rate: 4,
+      sessionType: 'co_op_vs_ai',
+    });
+    expect(window.location.search).toBe('?game=new1');
     expect(startLive).toHaveBeenCalledOnce();
+  });
+  it('Start shows a server error and keeps the form; a double click makes one game', async () => {
+    let calls = 0;
+    const createGame = vi.fn(async () => {
+      calls++;
+      await Promise.resolve();
+      throw new Error('You have reached the limit on games.');
+    });
+    await open('/?lobby=1', { createGame });
+    app.querySelector<HTMLInputElement>('input[name=rate][value="1"]')!.click();
+    await settle();
+    const start = [...app.querySelectorAll('button')].find((b) => b.textContent === 'Start')!;
+    start.click();
+    start.click();
+    await settle();
+    expect(calls).toBe(1);
+    expect(app.querySelector('[role=alert]')?.textContent).toContain('limit');
+    expect(app.querySelector<HTMLInputElement>('input[name=rate][value="1"]')!.checked).toBe(true);
+    click('Start');
+    await settle();
+    expect(calls).toBe(2);
+  });
+  it('a bad custom rate is explained and nothing is sent', async () => {
+    const createGame = vi.fn(async () => 'x');
+    await open('/?lobby=1', { createGame });
+    app.querySelector<HTMLInputElement>('input[name=rate][value=custom]')!.click();
+    await settle();
+    const box = app.querySelector<HTMLInputElement>('input[aria-label="Custom clock rate"]')!;
+    box.value = 'fast';
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    click('Start');
+    await settle();
+    expect(createGame).not.toHaveBeenCalled();
+    expect(app.querySelector('[role=alert]')?.textContent).toContain('Clock rate');
+  });
+  it('defaults to the first scenario, Blue and 12:1, and explains the rate', async () => {
+    await open('/?lobby=1');
+    expect(app.querySelector<HTMLInputElement>('input[name=side][value=blue]')!.checked).toBe(true);
+    expect(app.querySelector<HTMLInputElement>('input[name=rate][value="12"]')!.checked).toBe(true);
+    expect(app.textContent).toContain('one hour of battle passes in five minutes');
+    expect(app.querySelector('input[name=side][value=red]')).toBeNull();
   });
   it('Continue opens that game at its own URL', async () => {
     const startLive = vi.fn(async () => undefined);
@@ -166,7 +249,7 @@ describe('moving between screens', () => {
     expect(startLive).toHaveBeenCalledOnce();
   });
   it('existing URLs open their screens: ?game, ?new, ?lobby and mode=fixture', async () => {
-    for (const url of ['/?game=abc', '/?new=1&rate=12', '/?lobby=1']) {
+    for (const url of ['/?game=abc', '/?new=1&rate=12']) {
       const startLive = vi.fn(async () => undefined);
       await open(url, { startLive });
       expect(startLive).toHaveBeenCalledOnce();
@@ -272,5 +355,7 @@ describe('in-game menu', () => {
   it('is not offered on the new-game screen', async () => {
     await open('/?lobby=1');
     expect(document.body.textContent).not.toContain('Menu (Esc)');
+    const a = await axe.run(document.body, { rules: { 'color-contrast': { enabled: false } } });
+    expect(a.violations).toEqual([]);
   });
 });
