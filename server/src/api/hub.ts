@@ -307,7 +307,12 @@ export class Hub {
     }
     let result;
     try {
-      result = await game.submit({ kind: 'order', side: conn.side, text: command.text });
+      result = await game.submit({
+        kind: 'order',
+        side: conn.side,
+        text: command.text,
+        ...(command.courier ? { courier: command.courier } : {}),
+      });
     } catch (e) {
       this.send(conn, error('game_closed', e instanceof Error ? e.message : 'game is closed'));
       return;

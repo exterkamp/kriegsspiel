@@ -69,6 +69,7 @@ const VIEW_KEYS = [
   'time',
   'mapWidth',
   'mapHeight',
+  'hq',
   'ownUnits',
   'visibleEnemies',
   'lastKnownContacts',
