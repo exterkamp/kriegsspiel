@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
@@ -11,53 +10,52 @@ function value<T>(r: GenerationResult<T>): T {
   return r.value;
 }
 const seeds = [1, 2, 3, 7, 17, 31, 97, 55337];
-it('records unchanged fixed24 diagnostic recipes and never substitutes seeds', () => {
-  const records: { preset: string; seed: number; ok: boolean; hash: string }[] = [];
-  for (const preset of ['flat-countryside', 'wooded-hills', 'river-valley'] as const)
-    for (const seed of seeds) {
-      const s = geographyPreset(preset);
-      s.widthM = s.heightM = 1000;
-      s.terrain.featureScaleM = 400;
-      s.settlements.minSpacingM = 150;
-      s.roads.extraLinks = 0;
-      if (preset === 'river-valley') s.hydrology.riverThresholdSamples = 10;
-      const b = { minX: 0 as const, minY: 0 as const, maxX: 1000, maxY: 1000 },
-        ground = value(generateElevation(s, seed)),
-        geo = generateGeography(ground, b, s, seed);
-      const plan = geo.ok
-        ? generatePlanning({
-            settings: s,
-            seed,
-            bounds: b,
-            elevation: geo.value.elevation,
-            water: geo.value.water,
-            crossingCandidates: geo.value.crossingCandidates,
-            requireBridge: preset === 'river-valley',
-          })
-        : geo;
-      const again = geo.ok
-        ? generatePlanning({
-            settings: s,
-            seed,
-            bounds: b,
-            elevation: geo.value.elevation,
-            water: geo.value.water,
-            crossingCandidates: geo.value.crossingCandidates,
-            requireBridge: preset === 'river-valley',
-          })
-        : geo;
-      expect(again).toEqual(plan);
-      if (!plan.ok)
-        expect(plan.diagnostics[0]!.code).toMatch(/REGION|SITE|CONNECTIVITY|BRIDGE|RESOURCE/);
-      records.push({
-        preset,
-        seed,
-        ok: plan.ok,
-        hash: createHash('sha256').update(JSON.stringify(plan)).digest('hex'),
-      });
-    }
-  expect(records).toHaveLength(24);
-}, 20000);
+const recipes = (['flat-countryside', 'wooded-hills', 'river-valley'] as const).flatMap((preset) =>
+  seeds.map((seed) => ({ preset, seed })),
+);
+// Each recipe has its own timeout; the complete corpus is not a wall-time benchmark.
+it.each(recipes)(
+  'replays unchanged diagnostic recipe $preset seed $seed',
+  async ({ preset, seed }) => {
+    // Let pending worker RPC messages flush between CPU-bound recipes.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const s = geographyPreset(preset);
+    s.widthM = s.heightM = 1000;
+    s.terrain.featureScaleM = 400;
+    s.settlements.minSpacingM = 150;
+    s.roads.extraLinks = 0;
+    if (preset === 'river-valley') s.hydrology.riverThresholdSamples = 10;
+    const b = { minX: 0 as const, minY: 0 as const, maxX: 1000, maxY: 1000 },
+      ground = value(generateElevation(s, seed)),
+      geo = generateGeography(ground, b, s, seed);
+    const plan = geo.ok
+      ? generatePlanning({
+          settings: s,
+          seed,
+          bounds: b,
+          elevation: geo.value.elevation,
+          water: geo.value.water,
+          crossingCandidates: geo.value.crossingCandidates,
+          requireBridge: preset === 'river-valley',
+        })
+      : geo;
+    const again = geo.ok
+      ? generatePlanning({
+          settings: s,
+          seed,
+          bounds: b,
+          elevation: geo.value.elevation,
+          water: geo.value.water,
+          crossingCandidates: geo.value.crossingCandidates,
+          requireBridge: preset === 'river-valley',
+        })
+      : geo;
+    expect(again).toEqual(plan);
+    if (!plan.ok)
+      expect(plan.diagnostics[0]!.code).toMatch(/REGION|SITE|CONNECTIVITY|BRIDGE|RESOURCE/);
+  },
+  20000,
+);
 it('supports unchanged default10km17 and maximum601x601 flat17 with configured sites', () => {
   for (const max of [false, true]) {
     const s = max ? geographyPreset('flat-countryside') : structuredClone(DEFAULT_SETTINGS);
