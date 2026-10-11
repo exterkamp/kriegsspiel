@@ -64,8 +64,14 @@ export class GameConnection {
     return true;
   }
 
-  sendOrder(orderId: string, text: string): boolean {
-    return this.send({ v: PROTOCOL_VERSION, kind: 'issueOrder', orderId, text });
+  sendOrder(orderId: string, text: string, courier?: 'fast' | 'safe'): boolean {
+    return this.send({
+      v: PROTOCOL_VERSION,
+      kind: 'issueOrder',
+      orderId,
+      text,
+      ...(courier ? { courier } : {}),
+    });
   }
 
   putMark(mark: Mark): boolean {

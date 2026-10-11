@@ -16,6 +16,11 @@ export interface PendingOrder {
   text: string;
   /** Game time when it was sent, as best the client knows. */
   sentAtGame: number;
+  /** Who it was addressed to, when sent from the orders desk. */
+  toName?: string;
+  courier?: 'fast' | 'safe';
+  /** The staff's estimate of when it arrives, in game ms. */
+  etaGame?: number;
 }
 
 export interface Notice {
@@ -27,6 +32,14 @@ export interface GameOver {
   winner: Side | null;
   reason: Extract<ServerMessage, { kind: 'gameOver' }>['reason'];
   atGame: number;
+}
+
+/** What came in while the player was away, from the server's `catchUp`. */
+export interface CatchUp {
+  sinceGame: number;
+  atGame: number;
+  /** Ids of dispatches delivered since `sinceGame`. Stored for the in-tray to mark as new; nothing reads it yet. */
+  dispatchIds: readonly string[];
 }
 
 export type LinkStatus = 'connecting' | 'open' | 'closed' | 'offline';
@@ -61,6 +74,8 @@ export interface ClientState {
   gameOver?: GameOver;
   /** The side's marks on the table, as the server last sent them plus this client's own edits. */
   marks: Mark[];
+  /** Set when the server reports a return after an absence. */
+  catchUp?: CatchUp;
   /** Newest last; the HUD shows the latest few. */
   notices: Notice[];
 }
@@ -158,6 +173,18 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       const message = `The server was down for ${away}. The game came back paused; no game time passed. Confirm to resume.`;
       const notices = [...s.notices, { code: 'server_restart', message }].slice(-MAX_NOTICES);
       return { ...s, notices };
+    }
+    case 'catchUp': {
+      const n = m.dispatchIds.length;
+      const what =
+        n === 0 ? 'no new dispatches' : n === 1 ? '1 new dispatch' : `${n} new dispatches`;
+      const message = `Since you were last here (${formatGameTime(m.sinceGame)}): ${what}. It is now ${formatGameTime(m.atGame)}.`;
+      const notices = [...s.notices, { code: 'catch_up', message }].slice(-MAX_NOTICES);
+      return {
+        ...s,
+        catchUp: { sinceGame: m.sinceGame, atGame: m.atGame, dispatchIds: m.dispatchIds },
+        notices,
+      };
     }
     case 'gameOver':
       return { ...s, gameOver: { winner: m.winner, reason: m.reason, atGame: m.atGame } };

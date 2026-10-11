@@ -60,6 +60,12 @@ export const MIGRATIONS: readonly string[] = [
      marks TEXT NOT NULL,
      PRIMARY KEY (game_id, side)
    ) WITHOUT ROWID;`,
+  `CREATE TABLE side_seen (
+     game_id TEXT NOT NULL,
+     side TEXT NOT NULL,
+     game_ms REAL NOT NULL,
+     PRIMARY KEY (game_id, side)
+   ) WITHOUT ROWID;`,
 ];
 
 /** Older snapshots kept besides the newest (not yet used as a fallback: recovery reads the newest). */
@@ -243,6 +249,22 @@ export class SqliteGameStore implements GameStore {
       .prepare('SELECT marks FROM side_marks WHERE game_id = ? AND side = ?')
       .get(gameId, side) as { marks: string } | undefined;
     return r ? (JSON.parse(r.marks) as Mark[]) : [];
+  }
+
+  async saveSeen(gameId: string, side: string, gameMs: number): Promise<void> {
+    this.db
+      .prepare(
+        `INSERT INTO side_seen (game_id, side, game_ms) VALUES (?, ?, ?)
+         ON CONFLICT (game_id, side) DO UPDATE SET game_ms = MAX(game_ms, excluded.game_ms)`,
+      )
+      .run(gameId, side, gameMs);
+  }
+
+  async loadSeen(gameId: string, side: string): Promise<number | undefined> {
+    const r = this.db
+      .prepare('SELECT game_ms FROM side_seen WHERE game_id = ? AND side = ?')
+      .get(gameId, side) as { game_ms: number } | undefined;
+    return r?.game_ms;
   }
 
   async listGames(): Promise<string[]> {

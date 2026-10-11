@@ -921,7 +921,14 @@ export class GameActor {
   ): CommandResult {
     // The barrier held the engine at the signing time, so the order is queued at it, never in the
     // past, exactly as replay builds it.
-    const applied = applyLoggedOrder(this.engine, this.id, seq, command.side, parsed);
+    const applied = applyLoggedOrder(
+      this.engine,
+      this.id,
+      seq,
+      command.side,
+      parsed,
+      command.courier,
+    );
     if ('reason' in applied) {
       if (parsed.kind === 'clarification') {
         return {

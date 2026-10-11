@@ -484,6 +484,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   );
 
   server.addHook('onClose', async () => {
+    await hub.flushSeen();
     hub.closeAll();
     await trace?.close();
     await host.shutdown();

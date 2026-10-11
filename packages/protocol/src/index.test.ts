@@ -336,3 +336,12 @@ describe('marks', () => {
     expect(parseServerMessage(serializeServerMessage(m))).toEqual({ ok: true, value: m });
   });
 });
+
+describe('issueOrder courier', () => {
+  const base = { v, kind: 'issueOrder', orderId: 'o1', text: 'advance' };
+  it('accepts a fast or safe courier, or none, and refuses any other', () => {
+    for (const courier of ['fast', 'safe', undefined])
+      expect(parseCommand(JSON.stringify({ ...base, courier })).ok).toBe(true);
+    expect(parseCommand(JSON.stringify({ ...base, courier: 'pigeon' })).ok).toBe(false);
+  });
+});
