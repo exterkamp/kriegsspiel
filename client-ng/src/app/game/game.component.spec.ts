@@ -110,6 +110,13 @@ describe('GameComponent', () => {
     expect(scene.controls.mouseButtons.LEFT).not.toBeNull();
   });
 
+  it('cancels the mark gesture when the canvas gets a pointercancel', async () => {
+    const { el } = await open();
+    const cancel = vi.spyOn(TestBed.inject(MarksService), 'pointerCancel');
+    el.querySelector('canvas')!.dispatchEvent(new Event('pointercancel'));
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
   it('offers the hot-seat switch for a hot-seat game', async () => {
     window.history.replaceState(null, '', '/?game=g1&side=red');
     vi.stubGlobal(
