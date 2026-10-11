@@ -2,7 +2,7 @@ import { derived, get, writable } from 'svelte/store';
 import type { ClockState, Coord, Dispatch, WindowAt } from '@kriegsspiel/protocol';
 import type { BeliefChoice } from '../window/model.js';
 import { gameNowMs, initialState, withRead, type ClientState } from '../net/state.js';
-import { emptyDraft, loadDraft, saveDraft, type Courier, type OrderDraft } from './orders.js';
+import { deliveredBy, emptyDraft, loadDraft, saveDraft, type Courier, type OrderDraft } from './orders.js';
 import {
   addEntries,
   clockEntry,
@@ -12,6 +12,8 @@ import {
   orderEntry,
   removeEntry,
   saveJournal,
+  refusedEntry,
+  arrivedEntry,
   type JournalEntry,
 } from './journal.js';
 import { loadMarks, saveMarks, type TrayMarks } from './tray.js';
@@ -156,6 +158,13 @@ export function persistJournal(key: string): () => void {
     const found: JournalEntry[] = [
       ...s.pending.map(orderEntry),
       ...s.dispatches.map(dispatchEntry),
+      ...Object.entries(s.outcomes).map(([id, o]) =>
+        refusedEntry(id, o, s.clock ? s.clock.gameMs : o.sentAtGame),
+      ),
+      ...s.pending.flatMap((p) => {
+        const d = deliveredBy(p, s.dispatches);
+        return d ? [arrivedEntry(p, d)] : [];
+      }),
     ];
     if (s.clock) {
       const c = clockEntry(prevStatus, s.clock.status, s.clock.gameMs);

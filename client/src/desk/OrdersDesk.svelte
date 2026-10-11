@@ -7,13 +7,15 @@
     estimateRideMs,
     formatEstimate,
     withAnnex,
-    emptyDraft,
+    noticeText,
+    ORDER_EXAMPLES,
     type Courier,
     type OrderDraft,
   } from './orders.js';
   import { buildOrderText } from '../hud/hud.js';
   import { gameNowMs } from '../net/state.js';
 
+  const examples = ORDER_EXAMPLES.map((e) => `"${e}"`).join(' or ');
   const view = $derived($gameState.view);
   const units = $derived(view?.ownUnits ?? []);
   const addressee = $derived(units.find((u) => u.id === $orderDraft.to));
@@ -31,7 +33,8 @@
   /** The longest order text the server accepts, once the addressee and annex are added. */
   const MAX_ORDER_CHARS = 2000;
 
-  let error = $state('');
+  /** Which control the message belongs to, so it sits beside it and is tied to it for assistive technology. */
+  let error = $state<{ field: 'to' | 'text' | 'send'; message: string } | undefined>();
   let stamping = $state(false);
   let stampTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -47,19 +50,19 @@
 
   function sign(): void {
     const d = $orderDraft;
-    error = '';
+    error = undefined;
     if (over) return;
     if (!addressee) {
-      error = 'Address the order to one of your commanders.';
+      error = { field: 'to', message: 'Address the order to one of your commanders.' };
       return;
     }
     if (d.text.trim() === '') {
-      error = 'Write the order first.';
+      error = { field: 'text', message: 'Write the order first.' };
       return;
     }
     const sender = $orderSender;
     if (!sender) {
-      error = 'Not connected to a game (open with ?new=1 or ?game=…).';
+      error = { field: 'send', message: 'Not connected to a game (open with ?new=1 or ?game=…).' };
       return;
     }
     // Annex arrows made since the draft was saved may be gone; only the ones still on the table go.
@@ -70,7 +73,10 @@
       chosen,
     );
     if (text.length > MAX_ORDER_CHARS) {
-      error = `With the annex the order runs to ${text.length} characters; the most a courier can carry is ${MAX_ORDER_CHARS}. Shorten it or drop an arrow.`;
+      error = {
+        field: 'text',
+        message: `With the annex the order runs to ${text.length} characters; the most a courier can carry is ${MAX_ORDER_CHARS}. Shorten it or drop an arrow.`,
+      };
       return;
     }
     const eta = estimateFor(d.courier);
@@ -82,19 +88,26 @@
       eta: eta === undefined ? undefined : sentAt + eta,
     });
     if (err) {
-      error = err;
+      error = { field: 'send', message: err };
       return;
     }
     stamping = true;
     clearTimeout(stampTimer);
     stampTimer = setTimeout(() => (stamping = false), 1400);
-    orderDraft.set({ ...emptyDraft(), courier: d.courier });
+    // The addressee, courier and annex arrows stay for the next order; only the words are cleared.
+    patch({ text: '' });
   }
 
   function onKey(e: KeyboardEvent): void {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sign();
   }
 </script>
+
+{#snippet fieldError(field: 'to' | 'text' | 'send')}
+  <div class="err" id={`order-err-${field}`} role="alert">
+    {error?.field === field ? error.message : ''}
+  </div>
+{/snippet}
 
 <div class="form" class:stamping>
   <h2>Orders</h2>
@@ -105,11 +118,14 @@
       value={$orderDraft.to}
       onchange={(e) => patch({ to: e.currentTarget.value })}
       disabled={over}
+      aria-invalid={error?.field === 'to'}
+      aria-describedby={error?.field === 'to' ? 'order-err-to' : undefined}
     >
       <option value="">(choose a commander)</option>
       {#each units as u (u.id)}<option value={u.id}>{u.name}</option>{/each}
     </select>
   </div>
+  {@render fieldError('to')}
 
   <div class="field">
     <label for="desk-order-text">Order</label>
@@ -122,8 +138,12 @@
       oninput={(e) => patch({ text: e.currentTarget.value })}
       onkeydown={onKey}
       disabled={over}
+      aria-invalid={error?.field === 'text'}
+      aria-describedby={error?.field === 'text' ? 'order-err-text' : undefined}
     ></textarea>
   </div>
+  {@render fieldError('text')}
+  <p class="hint">The staff understand orders such as {examples}.</p>
 
   <fieldset class="annex">
     <legend>Marked-map annex</legend>
@@ -159,7 +179,11 @@
         />
         <span>
           <b>{c.label}</b>
-          <span class="est">{est === undefined ? 'no estimate yet' : formatEstimate(est)}</span>
+          <span class="est"
+            >{est === undefined
+              ? 'choose a commander for an estimate'
+              : formatEstimate(est)}</span
+          >
           <small>{c.blurb}</small>
         </span>
       </label>
@@ -174,10 +198,10 @@
     <span class="signature" aria-hidden="true">{stamping ? 'Signed, the Commander' : ''}</span>
     <button type="button" id="order-sign" onclick={sign} disabled={over}>Sign and send</button>
   </div>
-  <div class="err" role="alert">{error}</div>
+  {@render fieldError('send')}
   {#if notices.length > 0}
     <ul class="notices">
-      {#each notices as n, i (i)}<li>{n.message}</li>{/each}
+      {#each notices as n, i (i)}<li role="status">{noticeText(n, $gameState.outcomes)}</li>{/each}
     </ul>
   {/if}
 
