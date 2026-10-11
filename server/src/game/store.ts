@@ -24,7 +24,7 @@ export interface GameSnapshot {
 
 /** Commands a player or the host can send to a game. Plain JSON so they can be logged. */
 export type GameCommand =
-  | { kind: 'order'; side: string; text: string }
+  | { kind: 'order'; side: string; text: string; courier?: 'fast' | 'safe' }
   | { kind: 'setRate'; rate: number }
   | { kind: 'pause' }
   | { kind: 'resume' }
@@ -116,6 +116,9 @@ export interface GameStore {
   /** A side's marks (player drawings). Not game input: they are not logged or replayed. */
   saveMarks(gameId: string, side: string, marks: readonly Mark[]): Promise<void>;
   loadMarks(gameId: string, side: string): Promise<Mark[]>;
+  /** Game time a side last saw the game at, set when its last connection closes. Never goes backwards. */
+  saveSeen(gameId: string, side: string, gameMs: number): Promise<void>;
+  loadSeen(gameId: string, side: string): Promise<number | undefined>;
   listGames(): Promise<string[]>;
 }
 
@@ -127,6 +130,17 @@ export class MemoryGameStore implements GameStore {
   private readonly clockLogs = new Map<string, ClockChange[]>();
   private readonly views = new Map<string, SideViews>();
   private readonly marks = new Map<string, Mark[]>();
+
+  private readonly seen = new Map<string, number>();
+
+  async saveSeen(gameId: string, side: string, gameMs: number): Promise<void> {
+    const key = `${gameId}\0${side}`;
+    this.seen.set(key, Math.max(gameMs, this.seen.get(key) ?? gameMs));
+  }
+
+  async loadSeen(gameId: string, side: string): Promise<number | undefined> {
+    return this.seen.get(`${gameId}\0${side}`);
+  }
 
   async saveMarks(gameId: string, side: string, marks: readonly Mark[]): Promise<void> {
     this.marks.set(`${gameId}\0${side}`, structuredClone([...marks]));

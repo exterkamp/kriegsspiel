@@ -17,6 +17,8 @@ export const Command = z.discriminatedUnion('kind', [
       orderId: Id,
       draft: Id.optional(),
       text: z.string().trim().min(1).max(2000).optional(),
+      // Fast rides sooner and is likelier lost or garbled; safe the reverse. Absent: the ordinary ride.
+      courier: z.enum(['fast', 'safe']).optional(),
     })
     .strict()
     .refine((c) => (c.draft === undefined) !== (c.text === undefined), {
@@ -62,6 +64,18 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       ...Envelope,
       kind: z.literal('serverRestarted'),
       downMs: z.number().finite().nonnegative(),
+    })
+    .strict(),
+  // Sent once when a side returns after being away (no connection open): game time of its last
+  // visit, game time now, and the ids of dispatches that arrived in between (all of them also in
+  // the view). Nothing is sent to a side that has never visited or that is still connected.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('catchUp'),
+      sinceGame: GameMs,
+      atGame: GameMs,
+      dispatchIds: z.array(z.string().min(1)),
     })
     .strict(),
   // The game has ended. Public to both sides and sent once per connection, also to a late joiner.

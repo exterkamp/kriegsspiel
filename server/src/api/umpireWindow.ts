@@ -9,7 +9,6 @@
 import { viewFor, type GameState, type SideId } from '@kriegsspiel/engine';
 import type { Belief, TrueUnit, WindowAt, WindowTimeline } from '@kriegsspiel/protocol';
 import { replayAt, replayTimeline, type ReplayInput } from '../admin/replayView.js';
-import { toSideView } from './sideView.js';
 
 /** The timeline of a game, or undefined while its replay has no outcome yet. */
 export function windowTimeline(input: ReplayInput, untilMs?: number): WindowTimeline | undefined {
@@ -45,12 +44,7 @@ export function windowAt(input: ReplayInput, gameMs: number): WindowAt {
         ammo: u.ammo,
       });
     }
-    const wire = toSideView(view, {
-      gameMsAtAnchor: r.gameMs,
-      wallMsAtAnchor: 0,
-      rate: 1,
-      status: 'stopped',
-    });
+    const wire = r.views[side.id]!;
     beliefs[side.id] = {
       visibleEnemies: wire.visibleEnemies,
       lastKnownContacts: wire.lastKnownContacts,

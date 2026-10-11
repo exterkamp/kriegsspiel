@@ -2,6 +2,7 @@ import { derived, get, writable } from 'svelte/store';
 import type { Coord, Dispatch, WindowAt } from '@kriegsspiel/protocol';
 import type { BeliefChoice } from '../window/model.js';
 import { initialState, withRead, type ClientState } from '../net/state.js';
+import { emptyDraft, loadDraft, saveDraft, type Courier, type OrderDraft } from './orders.js';
 import { loadMarks, saveMarks, type TrayMarks } from './tray.js';
 import type { ViewId } from './views.js';
 
@@ -73,3 +74,27 @@ export const windowOpen = writable(false);
 export const windowFrame = writable<WindowAt | undefined>(undefined);
 export const windowBelief = writable<BeliefChoice>('none');
 export const windowHover = writable<string | undefined>(undefined);
+
+/** The order form on the orders desk. Saved per game as it is written. */
+export const orderDraft = writable<OrderDraft>(emptyDraft());
+
+/**
+ * What the orders desk needs to sign an order: set by the page once it has a connection.
+ * `text` is the finished wording (addressee and annex included); `eta` is the staff's estimate in game ms.
+ * Returns an error to show on the form, or undefined when the order has gone.
+ */
+export interface OrderSender {
+  send(o: {
+    text: string;
+    toName: string;
+    courier: Courier;
+    eta: number | undefined;
+  }): string | undefined;
+}
+export const orderSender = writable<OrderSender | undefined>(undefined);
+
+/** Load this game's saved draft and save it on every change after that. Returns a function that stops. */
+export function persistDraft(key: string): () => void {
+  orderDraft.set(loadDraft(key));
+  return orderDraft.subscribe((d) => saveDraft(key, d));
+}

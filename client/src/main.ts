@@ -12,6 +12,7 @@ import {
   withMarkPut,
   withPendingOrder,
   type ClientState,
+  type PendingOrder,
 } from './net/state.js';
 import { Hud, buildOrderText } from './hud/hud.js';
 import { MarksBar } from './hud/marksBar.js';
@@ -30,6 +31,8 @@ import {
   activeView,
   gameId,
   gameState,
+  orderSender,
+  persistDraft,
   persistTray,
   showOnTable,
   viewedDispatch,
@@ -153,7 +156,9 @@ async function main(app: HTMLElement): Promise<void> {
   let state: ClientState = initialState;
   // The desk marks dispatches read through the store, so keep this copy in step with it.
   gameState.subscribe((s) => (state = s));
-  persistTray(params.mode === 'join' ? params.game : 'fixture');
+  const gameKey = params.mode === 'join' ? params.game : 'fixture';
+  persistTray(gameKey);
+  persistDraft(gameKey);
   showOnTable.subscribe((at) => {
     if (!at) return;
     table.panTo(at);
@@ -161,18 +166,36 @@ async function main(app: HTMLElement): Promise<void> {
   });
   let conn: GameConnection | undefined;
   let orderSeq = 0;
+  /** Send finished order wording and remember it as pending. Returns an error for the form, or undefined. */
+  const sendOrder = (
+    full: string,
+    extra: Partial<PendingOrder> = {},
+    courier?: 'fast' | 'safe',
+  ): string | undefined => {
+    if (!conn) return 'Not connected to a game (open with ?new=1 or ?game=…).';
+    const orderId = `o-${Date.now().toString(36)}-${++orderSeq}`;
+    if (!conn.sendOrder(orderId, full, courier))
+      return 'Not connected. Try again when the link is back.';
+    const now = state.clock ? gameNowMs(state.clock, Date.now()) : 0;
+    state = withPendingOrder(state, { orderId, text: full, sentAtGame: now, ...extra });
+    gameState.set(state);
+    hud.render(state);
+    return undefined;
+  };
   const hud = new Hud(app, {
-    onSendOrder(unitId, text) {
-      if (!conn) return 'Not connected to a game (open with ?new=1 or ?game=…).';
-      const orderId = `o-${Date.now().toString(36)}-${++orderSeq}`;
-      const full = buildOrderText(state.view, unitId, text);
-      if (!conn.sendOrder(orderId, full)) return 'Not connected. Try again when the link is back.';
-      const now = state.clock ? gameNowMs(state.clock, Date.now()) : 0;
-      state = withPendingOrder(state, { orderId, text: full, sentAtGame: now });
-      gameState.set(state);
-      hud.render(state);
-      return undefined;
-    },
+    onSendOrder: (unitId, text) => sendOrder(buildOrderText(state.view, unitId, text)),
+  });
+  orderSender.set({
+    send: (o) =>
+      sendOrder(
+        o.text,
+        {
+          toName: o.toName,
+          courier: o.courier,
+          ...(o.eta === undefined ? {} : { etaGame: o.eta }),
+        },
+        o.courier,
+      ),
   });
 
   // Marks: the player's own picture of the table. Edits show at once and go to the server, which stores them as sent.
@@ -280,7 +303,7 @@ async function main(app: HTMLElement): Promise<void> {
   let down: { x: number; y: number } | undefined;
   canvas.addEventListener('pointerdown', (e) => {
     down = { x: e.clientX, y: e.clientY };
-    if (deskOpen || tool === 'view' || e.button !== 0) return;
+    if (deskOpen || windowShown || tool === 'view' || e.button !== 0) return;
     const c = mapPoint(e);
     if (!c) return;
     const span = pickMinSize(fixtureMap);
@@ -325,6 +348,11 @@ async function main(app: HTMLElement): Promise<void> {
     if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
     const r = table.pickAt(e.clientX, e.clientY);
     if (out) out.textContent = JSON.stringify(r);
+    if (windowShown) {
+      // A click pins the unit's notes, so touch and keyboard-less users can read them too.
+      windowHover.set(r.type === 'piece' && r.pieceKind === 'own' ? r.id : undefined);
+      return;
+    }
     if (r.type === 'piece' && r.pieceKind === 'own') hud.selectUnit(r.id);
   });
   canvas.addEventListener('pointercancel', () => {

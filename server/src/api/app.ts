@@ -502,7 +502,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
         return reply.code(400).send({ error: 'bad_request', message: q.error.message });
       const w = await windowFor(req.params.id, user.id, q.data.side);
       if ('error' in w) return reply.code(w.status).send({ error: w.error });
-      return windowAt(w.input, Math.min(q.data.at, w.timeline.endMs));
+      return windowAt(w.input, q.data.at);
     },
   );
 
@@ -537,6 +537,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   );
 
   server.addHook('onClose', async () => {
+    await hub.flushSeen();
     hub.closeAll();
     await trace?.close();
     await host.shutdown();
