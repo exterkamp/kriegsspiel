@@ -736,8 +736,8 @@ export async function main(args) {
       await readFile(join(sourceRoot, 'node_modules/vite/package.json')),
     ).version;
     report.versions = { ...report.versions, vitest, vite };
-    if (vitest !== '3.2.7')
-      throw new Error('Reporter capture is verified only against Vitest 3.2.7');
+    if (!vitest.startsWith('4.'))
+      throw new Error('Reporter capture is verified only against Vitest 4');
     if (!(await inventoryMatches(sourceRoot, inventory)))
       throw new Error('Install changed pinned source');
     report.isolation = await verifyLinks(sourceRoot);

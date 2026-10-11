@@ -184,7 +184,7 @@ test('real Vitest value fault reaches only the expected assertion; restoration f
       delete x.errors.onTestRunEnd.unhandledErrors;
     },
     (x) => {
-      x.errors.onFinished.files = [];
+      delete x.errors.onTestRunEnd;
     },
     (x) => {
       x.json.testResults[0].assertionResults = [];

@@ -1,6 +1,6 @@
 # Angular migration plan (issue #269)
 
-Status: **stage 1, the spike.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
+Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
 
 ## What the spike proves
 
@@ -14,6 +14,13 @@ Status: **stage 1, the spike.** The Angular app lives in `client-ng/`, beside th
 
 Not in the spike: sign-in, menus, orders, marks, any other view, the admin, map-authoring and benchmark pages (routes exist as placeholders), serving `client-ng` from the server, and the Docker image serving it (it only builds it).
 
+## Step 0: tooling (#271)
+
+- **Vitest 4.1.11** root-wide (`vitest` `^4.0.0` in the root `package.json`). `@angular/build` now shares the single hoisted copy; the nested Vitest 3 under `client-ng` is gone. Plain `npm install` still crashes on this tree with the arborist error from risk 3, so the lockfile was regenerated from the committed one with `npm install --legacy-peer-deps`; `npm ci` then installs it cleanly with no nested `@vitest/*`.
+- **Review harness.** Vitest 4 removed the `onFinished` reporter hook, so `scripts/review/capture-reporter.mjs` records only `onTestRunEnd` and `results.mjs` no longer cross-checks the two channels (the JSON reporter is still cross-checked against it). The runner's version guard now accepts any 4.x. The negative control that corrupted `onFinished` now removes `onTestRunEnd`.
+- **SPA fallback.** `server/src/api/spaFallback.ts`, enabled by `SPA_FALLBACK=1` (option `spaFallback`, needs `STATIC_DIR`). Off by default, because the Svelte build has real `admin/index.html` and `*.html` files.
+- **Docker.** `--build-arg CLIENT=ng` copies `client-ng/dist/browser` instead of `client/dist`. Default unchanged. See `docs/deployment.md`.
+
 ## Decisions
 
 | Topic | Choice | Why |
@@ -21,14 +28,14 @@ Not in the spike: sign-in, menus, orders, marks, any other view, the admin, map-
 | Angular | **22.2.2**, current stable. Standalone components only, signals, `OnPush`, **zoneless** (`provideZonelessChangeDetection`, no `zone.js`). | Zoneless works: state is signals, and the Three.js loop must not trigger change detection anyway. |
 | Build | `@angular/build:application` (esbuild/Vite based), `ng build` / `ng serve`. | The default; no webpack. It replaces the Vite config in `client/vite.config.ts`. |
 | Dev server | `ng serve` with `proxy.conf.cjs` proxying `/games` (REST and WebSocket), `/scenarios`, `/auth` to `$API_URL`, same as the Vite proxy today. `/admin/api` is added in stage 2. | Keeps the session cookie on the page's origin. |
-| Unit tests | **Keep Vitest.** `@angular/build:unit-test` with `runner: vitest`, jsdom, `TestBed`. | Angular supports it natively, so the 41 framework-free test files keep their runner. |
+| Unit tests | **Keep Vitest** (4.x since step 0). `@angular/build:unit-test` with `runner: vitest`, jsdom, `TestBed`. | Angular supports it natively, so the 41 framework-free test files keep their runner. |
 | TypeScript | **6.0**, root-wide. | Angular 22 requires `>=6.0 <6.1`. TS 6 no longer auto-includes `@types/*`, so `tsconfig.base.json` now sets `"types": ["node"]`. |
 | Node | **22.23.3** (`.nvmrc`, `Dockerfile`). | Angular 22's CLI needs at least 22.22.3. Older pins in `docs/` are historical logs. |
 | Layout | A new npm workspace `client-ng` during the spike and the port. Renamed over `client/` at the end of stage 2. | Keeps `main` green and the demo build untouched. |
 
 ### Risks that showed up in the spike
 
-1. **Vitest version split.** `@angular/build` peers on Vitest 4 but the root pins Vitest 3. Vitest 4 breaks the review-mutation harness (`scripts/review`, `test/review-workflow.test.js`, which parse Vitest 3 reporter output). The spike runs Angular's runner on Vitest 3.2.7 and it works (2 tests pass), with a peer warning. Stage 2 must move the repo to Vitest 4 and update that harness in its own PR, ahead of the bulk port.
+1. **Vitest version split (resolved in step 0).** `@angular/build` peers on Vitest 4 but the root pins Vitest 3. Vitest 4 breaks the review-mutation harness (`scripts/review`, `test/review-workflow.test.js`, which parse Vitest 3 reporter output). The spike runs Angular's runner on Vitest 3.2.7 and it works (2 tests pass), with a peer warning. Stage 2 must move the repo to Vitest 4 and update that harness in its own PR, ahead of the bulk port.
 2. **Lockfile hoisting.** Do not regenerate `package-lock.json` from scratch with a Vitest 4 in the tree: npm then nests `@vitest/*` under `vitest` and the same harness fails. Regenerate from the committed lock.
 3. **Mixed `npm install` peers.** With Vitest 4 declared in `client-ng` and Vitest 3 at the root, npm 10.9.7 crashes (`Cannot read properties of null (reading 'edgesOut')`). Do not declare a second Vitest.
 4. **Imperative DOM is also UI.** The issue counts Svelte components, but `liveClient.ts`, `hud/`, `lobby/lobby.ts`, `auth.ts` (login form and account bar), `shell/boot.ts` and the whole of `admin/` and `map-authoring/` build DOM by hand. Parity means porting these too (see the inventory and order below).

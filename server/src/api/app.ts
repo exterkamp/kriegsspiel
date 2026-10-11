@@ -32,6 +32,7 @@ import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import { holdTheBridge, loadScenario, type Seat, type SideId } from '@kriegsspiel/engine';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
+import { spaFallback } from './spaFallback.js';
 import { z } from 'zod';
 import type { WallClock } from '../clock.js';
 import {
@@ -138,6 +139,12 @@ export interface AppOptions {
   narrator?: GameHostOptions['narrator'];
   /** Directory of the built client to serve at `/`. Unset: API only (dev uses the Vite server). */
   staticDir?: string;
+  /**
+   * Serve `index.html` for the Angular client's routes (`/admin`, `/map-authoring`, `/map-benchmark`
+   * and below) and redirect the old `*.html` pages. Needs `staticDir`; off by default, which is what
+   * the Svelte client expects (it has real `admin/index.html` and `*.html` files).
+   */
+  spaFallback?: boolean;
   /**
    * Debug/admin view (Epic #119). Off unless `enabled`: then no `/admin` route exists and the
    * trace is a no-op. When on, requests must be loopback or carry `token`.
@@ -303,6 +310,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
 
   if (options.staticDir) {
     await server.register(fastifyStatic, { root: resolve(options.staticDir), redirect: true });
+    if (options.spaFallback) spaFallback(server);
   }
 
   const auth = await authRoutes(server, {

@@ -22,16 +22,7 @@ export function inspectPhase({ process: run, errors, json, runId, root }) {
   )
     return outcome('inconclusive', 'Missing, stale or foreign reports');
   const end = errors.onTestRunEnd;
-  const finished = errors.onFinished;
-  if (
-    !end ||
-    !finished ||
-    !Array.isArray(end.unhandledErrors) ||
-    !Array.isArray(finished.unhandledErrors) ||
-    !Array.isArray(end.files) ||
-    !same(end.files, finished.files) ||
-    !same(end.unhandledErrors, finished.unhandledErrors)
-  )
+  if (!end || !Array.isArray(end.unhandledErrors) || !Array.isArray(end.files))
     return outcome('inconclusive', 'Incomplete or inconsistent error channels');
   if (end.unhandledErrors.length)
     return outcome('inconclusive', 'Unhandled errors (including mixed assertion failures)');
