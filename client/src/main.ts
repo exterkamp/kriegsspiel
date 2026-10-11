@@ -30,6 +30,7 @@ import {
   activeView,
   gameState,
   orderSender,
+  pauseActions,
   persistDraft,
   persistTray,
   showOnTable,
@@ -349,6 +350,11 @@ async function main(app: HTMLElement): Promise<void> {
         state = applyServerMessage(state, m, Date.now());
         rerender();
       },
+    });
+    pauseActions.set({
+      proposePause: (r) => conn!.proposePause(r),
+      proposeResume: () => conn!.proposeResume(),
+      vote: (id, yes) => conn!.vote(id, yes),
     });
     conn.start();
   } else {

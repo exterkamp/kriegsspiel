@@ -8,6 +8,8 @@ export interface ClockView {
   status: 'running' | 'paused' | 'stopped' | 'none';
   /** The umpire is still working on something game time depends on. */
   staffAtWork: boolean;
+  /** A vote to pause or resume is open. */
+  vote?: 'pause' | 'resume';
   /** The label for the status badge. */
   label: string;
 }
@@ -18,7 +20,9 @@ const LABEL = { running: 'Running', paused: 'Paused', stopped: 'Stopped', none: 
 export function clockView(state: ClientState, nowWall: number): ClockView {
   const c = state.clock;
   if (!c) return { time: '--', rate: '', status: 'none', staffAtWork: false, label: LABEL.none };
+  const open = state.pause?.proposal;
   return {
+    ...(open && !state.gameOver ? { vote: open.kind } : {}),
     time: formatGameTime(gameNowMs(c, nowWall)),
     rate: formatRate(c.rate),
     status: c.status,
@@ -31,6 +35,7 @@ export function clockView(state: ClientState, nowWall: number): ClockView {
 export function clockSummary(v: ClockView): string {
   if (v.status === 'none') return 'No clock yet';
   const parts = [v.time, v.label.toLowerCase(), `rate ${v.rate}`];
+  if (v.vote) parts.push(`${v.vote} proposed`);
   if (v.staffAtWork) parts.push('staff at work');
   return parts.join(', ');
 }
