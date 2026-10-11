@@ -3,15 +3,13 @@ import App from './hq/App.svelte';
 import { demoArtwork, demoScope, FixtureSource } from './hq/data/fixture.js';
 import { BrowserRepository } from './hq/data/repository.js';
 import { ContinuousSurface } from './hq/data/continuousSurface.js';
-import { parseSession } from './session.js';
+import { fetchMe, requestLink, signOut } from './auth.js';
+import { fetchGames, fetchScenarios } from './lobby/api.js';
+import { startShell } from './shell/boot.js';
 
-const app = document.getElementById('app');
-if (app && parseSession(window.location.search).mode !== 'fixture') {
-  // Preserve the accepted live client while the HQ live adapter remains contract-gated.
-  void import('./liveClient.js');
-} else if (app) {
+function startFixture(target: HTMLElement): void {
   const component = mount(App, {
-    target: app,
+    target,
     props: {
       source: new FixtureSource(demoScope),
       surface: new ContinuousSurface(demoScope),
@@ -21,5 +19,22 @@ if (app && parseSession(window.location.search).mode !== 'fixture') {
   });
   import.meta.hot?.dispose(() => {
     void unmount(component);
+  });
+}
+
+const app = document.getElementById('app');
+if (app) {
+  void startShell({
+    app,
+    win: window,
+    fetchMe,
+    fetchGames,
+    fetchScenarios,
+    requestLink,
+    signOut,
+    // The accepted live client (3D table and desk) is the game screen; it reads its game from the URL.
+    startLive: () => import('./liveClient.js').then(() => undefined),
+    startFixture,
+    now: Date.now,
   });
 }

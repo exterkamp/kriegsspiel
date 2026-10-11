@@ -3,15 +3,18 @@ export type SessionParams =
   | { mode: 'fixture' }
   | { mode: 'join'; game: string; side?: string }
   | { mode: 'create'; side?: string; rate?: number }
-  | { mode: 'lobby' };
+  | { mode: 'lobby' }
+  | { mode: 'menu' };
 
 /**
  * `?game=<id>[&side=red]` joins (taking a free side if you have none; `side` also picks a hot-seat side);
  * `?new=1[&side=blue][&rate=12]` makes and starts a game at once; `?lobby=1` shows the new-game form and
- * your games; otherwise the fixture. Who you are comes from the session cookie, not the URL.
+ * your games; `?mode=fixture` is the offline fixture desk; anything else is the main menu. Who you are
+ * comes from the session cookie, not the URL.
  */
 export function parseSession(search: string): SessionParams {
   const q = new URLSearchParams(search);
+  if (q.get('mode') === 'fixture') return { mode: 'fixture' };
   const game = q.get('game');
   const side = q.get('side') || undefined;
   if (game) return { mode: 'join', game, ...(side ? { side } : {}) };
@@ -24,7 +27,7 @@ export function parseSession(search: string): SessionParams {
       ...(Number.isFinite(rate) && rate > 0 ? { rate } : {}),
     };
   }
-  return { mode: 'fixture' };
+  return { mode: 'menu' };
 }
 
 /** WebSocket URL on the page's own origin; the dev server proxies `/games` to the API. The cookie authenticates it. */

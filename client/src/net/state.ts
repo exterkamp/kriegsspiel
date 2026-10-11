@@ -23,6 +23,19 @@ export interface PendingOrder {
   etaGame?: number;
 }
 
+/** What became of an order the player sent, when the client knows. */
+export interface OrderOutcome {
+  kind: 'refused';
+  /** The player's own words, as sent. */
+  text: string;
+  toName?: string;
+  sentAtGame: number;
+  /** The staff's reply with the internal order id removed. */
+  reason: string;
+  /** The server's error code, such as `order_clarification`. */
+  code?: string;
+}
+
 export interface Notice {
   code: string;
   message: string;
@@ -73,6 +86,8 @@ export interface ClientState {
   /** Absent until the server reports it; a game without voters never does. */
   pause?: PauseVote;
   pending: PendingOrder[];
+  /** Orders the staff could not carry out, by order id; the order itself leaves `pending`. */
+  outcomes: Record<string, OrderOutcome>;
   /** Staff questions by client question id, as the server charged them. */
   staffCharges: Record<string, StaffCharge>;
   /** Wall time of the last error that names no question (`game_closed`, `bad_message`), which may have eaten a staff question. */
@@ -93,6 +108,7 @@ export const initialState: ClientState = {
   read: new Set(),
   staffAtWork: false,
   pending: [],
+  outcomes: {},
   staffCharges: {},
   marks: [],
   notices: [],
@@ -223,12 +239,23 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       return { ...s, notices };
     }
     case 'error': {
-      const aboutOrder = m.code === 'order_rejected' || m.code === 'order_clarification';
       const id = orderIdOf(m.message);
       const dropped = id === undefined ? s.pending : s.pending.filter((p) => p.orderId !== id);
-      // The prefix is for matching the pending order; the player reads only the staff's words.
-      const message = aboutOrder && id !== undefined ? m.message.slice(id.length + 2) : m.message;
-      const notices = [...s.notices, { code: m.code, message }].slice(-MAX_NOTICES);
+      const refused = id === undefined ? undefined : s.pending.find((p) => p.orderId === id);
+      const outcomes: Record<string, OrderOutcome> = refused
+        ? {
+            ...s.outcomes,
+            [refused.orderId]: {
+              kind: 'refused',
+              text: refused.text,
+              ...(refused.toName ? { toName: refused.toName } : {}),
+              sentAtGame: refused.sentAtGame,
+              reason: m.message.slice(m.message.indexOf(': ') + 2),
+              code: m.code,
+            },
+          }
+        : s.outcomes;
+      const notices = [...s.notices, { code: m.code, message: m.message }].slice(-MAX_NOTICES);
       const staffCharges =
         (m.code === 'staff_busy' || m.code === 'game_over') && id !== undefined
           ? { ...s.staffCharges, [id]: 'refused' as const }
@@ -237,6 +264,7 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       return {
         ...s,
         pending: dropped,
+        outcomes,
         staffCharges,
         notices,
         ...(unnamed ? { staffFaultAtWall: nowWall } : {}),

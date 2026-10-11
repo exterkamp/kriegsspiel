@@ -1,16 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ContinuousSurface } from './hq/data/continuousSurface.js';
-import { demoScope, FixtureSource } from './hq/data/fixture.js';
-import { BrowserRepository } from './hq/data/repository.js';
 
-const { mount, liveLoaded } = vi.hoisted(() => ({ mount: vi.fn(), liveLoaded: vi.fn() }));
+const { mount, liveLoaded, startShell } = vi.hoisted(() => ({
+  mount: vi.fn(),
+  liveLoaded: vi.fn(),
+  startShell: vi.fn(),
+}));
 vi.mock('svelte', async (original) => ({ ...(await original<object>()), mount }));
+vi.mock('./shell/boot.js', () => ({ startShell }));
 
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  vi.doUnmock('./liveClient.js');
   vi.doMock('./liveClient.js', () => {
     liveLoaded();
     return {};
@@ -22,29 +23,27 @@ afterEach(() => {
   window.history.replaceState(null, '', '/');
 });
 
-it('mounts the scoped HQ fixture without importing the live client for the root URL', async () => {
-  window.history.replaceState(null, '', '/');
+it(
+  'hands the page to the shell, loading neither the live client nor the fixture itself',
+  { timeout: 30_000 },
+  async () => {
+    await import('./main.js');
+    expect(startShell).toHaveBeenCalledOnce();
+    expect(startShell.mock.calls[0]![0].app).toBe(document.getElementById('app'));
+    expect(liveLoaded).not.toHaveBeenCalled();
+    expect(mount).not.toHaveBeenCalled();
+  },
+);
+
+it('loads the live client only when the shell asks for it', async () => {
   await import('./main.js');
-  expect(mount).toHaveBeenCalledOnce();
-  const options = mount.mock.calls[0]![1];
-  expect(options.target).toBe(document.getElementById('app'));
-  // Module resets give these constructors fresh identities; check their public contract as well.
-  expect(options.props.source.constructor.name).toBe(FixtureSource.name);
-  expect(options.props.surface.constructor.name).toBe(ContinuousSurface.name);
-  expect(options.props.repository.constructor.name).toBe(BrowserRepository.name);
-  expect(options.props.source.scope).toEqual(demoScope);
-  expect(liveLoaded).not.toHaveBeenCalled();
+  await startShell.mock.calls[0]![0].startLive();
+  expect(liveLoaded).toHaveBeenCalledOnce();
 });
 
-it.each([
-  '/?new=1&side=blue&rate=12',
-  '/?game=accepted-game',
-  '/?lobby=1',
-  '/?game=hot-seat-game&side=blue',
-  '/?game=hot-seat-game&side=red',
-])('selects the accepted live composition for %s without mounting HQ', async (url) => {
-  window.history.replaceState(null, '', url);
+it('starts the HQ fixture only when the shell asks for it', async () => {
   await import('./main.js');
-  await vi.waitFor(() => expect(liveLoaded).toHaveBeenCalledOnce());
-  expect(mount).not.toHaveBeenCalled();
+  startShell.mock.calls[0]![0].startFixture(document.getElementById('app'));
+  expect(mount).toHaveBeenCalledOnce();
+  expect(mount.mock.calls[0]![1].props.source.scope).toBeDefined();
 });

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { PROTOCOL_VERSION, type Dispatch, type ServerMessage } from '@kriegsspiel/protocol';
 import { describe, expect, it } from 'vitest';
+import { noticeText } from '../desk/orders.js';
 import { fixtureView } from '../table/fixture.js';
 import { Hud, buildOrderText, gameOverText, orderPrefix } from '../hud/hud.js';
 import { parseSession, wsUrl } from '../session.js';
@@ -70,7 +71,7 @@ describe('applyServerMessage', () => {
     };
     s = applyServerMessage(s, m, 0);
     expect(s.pending.map((p) => p.orderId)).toEqual(['o2']);
-    expect(s.notices[0]?.message).toBe('no such unit');
+    expect(s.notices[0]?.message).toBe('o1: no such unit');
   });
 });
 
@@ -88,7 +89,11 @@ describe('order clarification', () => {
       0,
     );
     expect(s.pending).toEqual([]);
-    expect(s.notices[0]?.message).toBe('Which wood do you mean? (Northern wood)');
+    // The notice keeps the id so the desk can find the order's outcome; noticeText hides it.
+    expect(noticeText(s.notices[0]!, s.outcomes)).toContain(
+      'Which wood do you mean? (Northern wood)',
+    );
+    expect(noticeText(s.notices[0]!, s.outcomes)).not.toMatch(/o-lq3-1/);
   });
 
   it('leaves other errors as sent', () => {
@@ -214,7 +219,8 @@ describe('session params', () => {
     expect(parseSession('?game=g&side=red')).toEqual({ mode: 'join', game: 'g', side: 'red' });
     expect(parseSession('?new=1&rate=12')).toEqual({ mode: 'create', rate: 12 });
     expect(parseSession('?new=1&side=red')).toEqual({ mode: 'create', side: 'red' });
-    expect(parseSession('')).toEqual({ mode: 'fixture' });
+    expect(parseSession('')).toEqual({ mode: 'menu' });
+    expect(parseSession('?mode=fixture')).toEqual({ mode: 'fixture' });
     expect(wsUrl({ protocol: 'https:', host: 'a.b' }, 'g')).toBe('wss://a.b/games/g/ws');
   });
 });

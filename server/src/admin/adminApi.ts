@@ -128,7 +128,10 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
       engine: actor.state,
       // What each side's client is sent right now, so the page can show it beside `engine`.
       sideViews: Object.fromEntries(
-        actor.state.world.sides.map((s) => [s.id, sideViewOf(actor.state, s.id, clock)]),
+        actor.state.world.sides.map((s) => [
+          s.id,
+          sideViewOf(actor.state, s.id, clock, undefined, [], actor.narrationFor(s.id)),
+        ]),
       ),
     };
   });

@@ -296,4 +296,73 @@ describe('lobby', () => {
     ]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
   });
+
+  it('lists a started game as unfinished with its game time and last played time', async () => {
+    const base = await start();
+    const a = await signIn(base, 'a@example.test');
+    const made = (await (
+      await fetch(`${base}/games`, post(a, { sessionType: 'team_vs_team' }))
+    ).json()) as { id: string };
+    const list = (await (await fetch(`${base}/games`, get(a))).json()) as {
+      games: Array<{ id: string; finished: boolean; gameTimeMs: number; lastPlayedMs: number }>;
+    };
+    const row = list.games.find((g) => g.id === made.id)!;
+    expect(row.finished).toBe(false);
+    expect(row.gameTimeMs).toBeGreaterThanOrEqual(0);
+    expect(row.lastPlayedMs).toBeGreaterThan(0);
+    app!.hub.closeAll();
+  });
+
+  type Row = { id: string; finished: boolean; gameTimeMs: number; lastPlayedMs: number };
+  const rowOf = async (base: string, cookie: string, id: string): Promise<Row> => {
+    const list = (await (await fetch(`${base}/games`, get(cookie))).json()) as { games: Row[] };
+    return list.games.find((g) => g.id === id)!;
+  };
+
+  it('reports a game whose actor is closed from its replayed log', async () => {
+    const base = await start();
+    const a = await signIn(base, 'a@example.test');
+    const made = (await (
+      await fetch(`${base}/games`, post(a, { sessionType: 'team_vs_team' }))
+    ).json()) as { id: string };
+    await app!.host.get(made.id)!.submit({ kind: 'setMode', mode: 'fast-forward' });
+    await app!.host.get(made.id)!.submit({ kind: 'advanceTo', gameMs: 10 * 60_000 });
+    await app!.host.close(made.id);
+    expect(app!.host.get(made.id)).toBeUndefined();
+    const row = await rowOf(base, a, made.id);
+    expect(row.finished).toBe(false);
+    expect(row.gameTimeMs).toBe(10 * 60_000);
+    expect(row.lastPlayedMs).toBeGreaterThan(0);
+  });
+
+  it('reports finished: true once the game has an outcome, live or replayed', async () => {
+    const base = await start();
+    const a = await signIn(base, 'a@example.test');
+    const made = (await (
+      await fetch(`${base}/games`, post(a, { sessionType: 'team_vs_team' }))
+    ).json()) as { id: string };
+    const actor = app!.host.get(made.id)!;
+    await actor.submit({ kind: 'setMode', mode: 'fast-forward' });
+    await actor.submit({ kind: 'advanceTo', gameMs: 4 * 60 * 60_000 });
+    expect(actor.state.world.outcome).toBeTruthy();
+    expect((await rowOf(base, a, made.id)).finished).toBe(true);
+    await app!.host.close(made.id);
+    const replayed = await rowOf(base, a, made.id);
+    expect(replayed.finished).toBe(true);
+    expect(replayed.gameTimeMs).toBe(actor.state.time);
+  }, 60_000);
+
+  it('lists a lobby game as unfinished, last played at its creation', async () => {
+    const base = await start();
+    const a = await signIn(base, 'a@example.test');
+    const made = (await (
+      await fetch(`${base}/games`, post(a, { lobby: true, sessionType: 'hot_seat' }))
+    ).json()) as { id: string; createdAtMs?: number };
+    const list = (await (await fetch(`${base}/games`, get(a))).json()) as {
+      games: Array<Row & { createdAtMs: number; status: string }>;
+    };
+    const row = list.games.find((g) => g.id === made.id)!;
+    expect(row).toMatchObject({ status: 'lobby', finished: false, gameTimeMs: 0 });
+    expect(row.lastPlayedMs).toBe(row.createdAtMs);
+  });
 });

@@ -46,7 +46,7 @@ import {
   type Timers,
 } from '../game/index.js';
 import { adminApi } from '../admin/adminApi.js';
-import { loadReplayInput } from '../admin/replayView.js';
+import { loadReplayInput, replayTimeline } from '../admin/replayView.js';
 import { LogMailer, type Mailer } from '../auth/mailer.js';
 import { authRoutes, type Auth } from '../auth/routes.js';
 import { MemoryAuthStore, type AuthStore } from '../auth/store.js';
@@ -134,6 +134,8 @@ export interface AppOptions {
   scriptedOpponents?: boolean;
   /** Replaces the built-in opponent's agents for a game, for example with LLM commanders. See `GameHostOptions.aiAgents`. */
   aiAgents?: GameHostOptions['aiAgents'];
+  /** Narrates each side's dispatches per window. See `GameHostOptions.narrator`. */
+  narrator?: GameHostOptions['narrator'];
   /** Directory of the built client to serve at `/`. Unset: API only (dev uses the Vite server). */
   staticDir?: string;
   /**
@@ -260,6 +262,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     scriptedOpponents: (id) =>
       options.scriptedOpponents === true && recordOf(id)?.sessionType === 'co_op_vs_ai',
     aiAgents: options.aiAgents,
+    narrator: options.narrator,
     trace,
     onUpdate: (id) => {
       hub.notify(id);
@@ -442,6 +445,35 @@ export async function buildApp(options: AppOptions): Promise<App> {
     return undefined;
   };
 
+  /** Where a started game stands: over or not, its game time and when it was last played (wall time). */
+  const progressOf = async (
+    rec: LobbyGame,
+  ): Promise<{ finished: boolean; gameTimeMs: number; lastPlayedMs: number }> => {
+    const none = { finished: false, gameTimeMs: 0, lastPlayedMs: rec.createdAtMs };
+    if (rec.status !== 'started') return none;
+    const input = await loadReplayInput(store, rec.id).catch(() => undefined);
+    const lastPlayedMs = input?.entries.reduce((m, e) => Math.max(m, e.wallMs), rec.createdAtMs);
+    const live = host.get(rec.id);
+    if (live) {
+      return {
+        finished: Boolean(live.state.world.outcome),
+        gameTimeMs: live.state.time,
+        lastPlayedMs: lastPlayedMs ?? rec.createdAtMs,
+      };
+    }
+    if (!input) return none;
+    try {
+      const tl = replayTimeline(input);
+      return {
+        finished: Boolean(tl.outcome),
+        gameTimeMs: tl.endMs,
+        lastPlayedMs: lastPlayedMs ?? rec.createdAtMs,
+      };
+    } catch {
+      return { ...none, lastPlayedMs: lastPlayedMs ?? rec.createdAtMs };
+    }
+  };
+
   server.get('/games', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
@@ -452,7 +484,10 @@ export async function buildApp(options: AppOptions): Promise<App> {
       ...lobby.byRoleHolder(user.id).filter((r) => !mine.has(r.id) && r.creator !== user.id),
     ];
     recs.sort((a, b) => b.createdAtMs - a.createdAtMs);
-    return { games: recs.map((r) => summary(r, user.id)) };
+    const games = await Promise.all(
+      recs.map(async (r) => ({ ...summary(r, user.id), ...(await progressOf(r)) })),
+    );
+    return { games };
   });
 
   server.get<{ Params: { id: string } }>('/games/:id', async (req, reply) => {

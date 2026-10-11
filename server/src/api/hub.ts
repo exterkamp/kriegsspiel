@@ -136,6 +136,7 @@ export class Hub {
       game.gameClock.snapshot(),
       conn.seat,
       conn.seat ? this.forwardedTo(gameId, conn) : [],
+      game.narrationFor(conn.side),
     );
   }
 
