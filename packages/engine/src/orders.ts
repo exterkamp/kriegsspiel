@@ -69,6 +69,17 @@ export const COURIER_CHOICES: Record<CourierChoice, { speed: number; risk: numbe
   safe: { speed: 0.75, risk: 0.5 },
 };
 
+/** The ride's loss and garble chances scaled by the courier's hazard, still held under the caps. */
+export function choiceRisk(
+  base: { loss: number; garble: number },
+  hazard: number,
+): { loss: number; garble: number } {
+  return {
+    loss: Math.min(MAX_LOSS, base.loss * hazard),
+    garble: Math.min(MAX_GARBLE, base.garble * hazard),
+  };
+}
+
 /**
  * Game ms for a courier to ride one metre of cost-1 ground: 400 m a minute, about 24 km/h.
  * Roads cost half, so a courier on a road does 800 m a minute.
@@ -172,10 +183,7 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       .slice(1)
       .reduce((a, p, i) => a + distance(route.waypoints[i]!, p), 0);
     const base = rideRisk(world, unit, length, route.cost);
-    const risk = {
-      loss: Math.min(MAX_LOSS, base.loss * choice.risk),
-      garble: Math.min(MAX_GARBLE, base.garble * choice.risk),
-    };
+    const risk = choiceRisk(base, choice.risk);
     const courier: Courier = {
       id: `courier-${order.id}`,
       side: order.side,

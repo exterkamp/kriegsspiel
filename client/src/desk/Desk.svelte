@@ -10,7 +10,7 @@
   /** What to focus when a view opens, so keyboard users land inside it. */
   const FOCUS: Record<string, string> = {
     inTray: '#tray',
-    orders: '#view-orders #order-text',
+    orders: '#desk-order-text',
     roster: '#view-roster',
     journal: '#view-journal',
     conference: '#view-conference',

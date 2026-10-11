@@ -496,6 +496,30 @@ describe('orders', () => {
     expect(red.messages.some((m) => m.kind === 'dispatch')).toBe(false);
   });
 
+  it('carries the courier chosen on the wire to the signed order, and none when none was chosen', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    await blue.waitFor('viewUpdate');
+    blue.send(
+      JSON.stringify({
+        v,
+        kind: 'issueOrder',
+        orderId: 'f',
+        text: 'blue-1 hold the bridge',
+        courier: 'fast',
+      }),
+    );
+    blue.send(order('blue-1 hold the bridge', 'p'));
+    await vi.waitFor(async () => {
+      const orders = (await store.inputLog(game.id)).filter((e) => e.command.kind === 'order');
+      expect(orders).toHaveLength(2);
+    });
+    const [fast, plain] = (await store.inputLog(game.id)).filter((e) => e.command.kind === 'order');
+    expect(fast!.command).toMatchObject({ courier: 'fast' });
+    expect(plain!.command).not.toHaveProperty('courier');
+  });
+
   it('reports a dispatch once, not again in later pushes', async () => {
     const { base, ws } = await start();
     const game = (await createGame(base)).json;

@@ -132,7 +132,7 @@ describe('Orders desk', () => {
     const sel = q<HTMLSelectElement>('#order-to');
     sel.value = unit.id;
     sel.dispatchEvent(new Event('change', { bubbles: true }));
-    const ta = q<HTMLTextAreaElement>('#order-text');
+    const ta = q<HTMLTextAreaElement>('#desk-order-text');
     ta.value = 'Advance to the ford.';
     ta.dispatchEvent(new Event('input', { bubbles: true }));
     flushSync();
@@ -178,6 +178,33 @@ describe('Orders desk', () => {
     expect(q('.err').textContent).toBe('Not connected.');
     expect(get(orderDraft).text).toBe('Advance to the ford.');
     expect(document.querySelector('.stamp')).toBeNull();
+  });
+
+  it('keeps the draft and sends nothing when the annex pushes the text past the limit', () => {
+    open();
+    const send = vi.fn(() => undefined);
+    orderSender.set({ send });
+    fill();
+    const long = 'x'.repeat(1990);
+    orderDraft.update((d) => ({ ...d, text: long }));
+    q<HTMLInputElement>('.annex input[type=checkbox]').click();
+    flushSync();
+    q('#order-sign').click();
+    flushSync();
+    expect(send).not.toHaveBeenCalled();
+    expect(q('.err').textContent).toContain('2000');
+    expect(get(orderDraft).text).toBe(long);
+    expect(document.querySelector('.stamp')).toBeNull();
+  });
+
+  it('labels the desk textarea even with the HUD panel’s own order box in the page', () => {
+    const hud = document.createElement('textarea');
+    hud.id = 'order-text';
+    document.body.prepend(hud);
+    open();
+    const label = q<HTMLLabelElement>('label[for="desk-order-text"]');
+    expect(label.control).toBe(q('#desk-order-text'));
+    expect(document.querySelectorAll('[id="order-text"]')).toHaveLength(1);
   });
 
   it('asks for an addressee and wording before signing', () => {

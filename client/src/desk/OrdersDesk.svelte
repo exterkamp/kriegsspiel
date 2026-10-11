@@ -28,6 +28,9 @@
     return estimateRideMs(view.hq, addressee.position, c);
   }
 
+  /** The longest order text the server accepts, once the addressee and annex are added. */
+  const MAX_ORDER_CHARS = 2000;
+
   let error = $state('');
   let stamping = $state(false);
   let stampTimer: ReturnType<typeof setTimeout> | undefined;
@@ -62,6 +65,10 @@
     // Annex arrows made since the draft was saved may be gone; only the ones still on the table go.
     const chosen = d.annex.filter((id) => arrows.some((a) => a.id === id));
     const text = withAnnex(buildOrderText(view, addressee.id, d.text.trim()), $gameState.marks, chosen);
+    if (text.length > MAX_ORDER_CHARS) {
+      error = `With the annex the order runs to ${text.length} characters; the most a courier can carry is ${MAX_ORDER_CHARS}. Shorten it or drop an arrow.`;
+      return;
+    }
     const eta = estimateFor(d.courier);
     const sentAt = $gameState.clock ? gameNowMs($gameState.clock, Date.now()) : (view?.atGame ?? 0);
     const err = sender.send({
@@ -101,9 +108,9 @@
   </div>
 
   <div class="field">
-    <label for="order-text">Order</label>
+    <label for="desk-order-text">Order</label>
     <textarea
-      id="order-text"
+      id="desk-order-text"
       rows="5"
       maxlength="2000"
       placeholder="Write the order…"

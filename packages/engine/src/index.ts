@@ -108,6 +108,7 @@ export {
   COURIER_LOST_EVENT,
   COURIER_MS_PER_METRE,
   COURIER_STEP_EVENT,
+  choiceRisk,
   issueOrder,
   registerOrders,
 } from './orders.js';
@@ -116,6 +117,8 @@ export {
   GARBLE_MIN_M,
   INTERCEPT_BY_KIND,
   INTERCEPT_CHECK_MS,
+  MAX_GARBLE,
+  MAX_LOSS,
   courierPosition,
   interceptChance,
   rideRisk,

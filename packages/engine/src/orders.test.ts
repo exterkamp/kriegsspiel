@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COURIER_CHOICES,
   COURIER_DELAY_MS,
   COURIER_MS_PER_METRE,
   EventRegistry,
   MS_PER_METRE,
+  MAX_GARBLE,
+  MAX_LOSS,
   MS_PER_MINUTE,
   advanceTo,
+  choiceRisk,
   createState,
   findPath,
   holdTheBridge,
@@ -326,6 +330,27 @@ describe('courier choice', () => {
     expect(safe).toBe(Math.round(DELIVERY_MS / 0.75));
     expect(fast).toBeLessThan(plain);
     expect(plain).toBeLessThan(safe);
+  });
+
+  it('a fast courier is twice as likely to be lost or garbled, a safe one half as likely', () => {
+    const base = { loss: 0.1, garble: 0.2 };
+    const [fast, plain, safe] = (['fast', undefined, 'safe'] as const).map((c) =>
+      choiceRisk(base, c ? COURIER_CHOICES[c].risk : 1),
+    );
+    expect(plain).toEqual(base);
+    expect(fast!.loss).toBeCloseTo(0.2);
+    expect(fast!.garble).toBeCloseTo(0.4);
+    expect(safe!.loss).toBeCloseTo(0.05);
+    expect(safe!.garble).toBeCloseTo(0.1);
+    expect(fast!.loss).toBeGreaterThan(plain!.loss);
+    expect(plain!.loss).toBeGreaterThan(safe!.loss);
+  });
+
+  it('holds the doubled risk under the loss and garble caps', () => {
+    expect(choiceRisk({ loss: 0.4, garble: 0.5 }, 2)).toEqual({
+      loss: MAX_LOSS,
+      garble: MAX_GARBLE,
+    });
   });
 
   it('shows a side its own HQ and not the enemy’s', () => {
