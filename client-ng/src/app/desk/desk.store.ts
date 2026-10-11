@@ -124,6 +124,9 @@ export class DeskStore {
   /** Load this game's diary, then record what happens in the game from now on and save on every change. */
   persistJournal(key: string): () => void {
     this.journal.set(loadJournal(key));
+    // An effect runs once per tick, so game states applied within one tick are folded into one: a pause then resume
+    // (or an order added then refused) inside a single tick leaves no entry. Each server message is its own task, so
+    // this is rare; the Svelte `subscribe` saw every state.
     let prevStatus: ClockState['status'] | undefined;
     let prevOrders: ReadonlySet<string> = new Set();
     const stopGame = this.run(() => {

@@ -125,4 +125,39 @@ describe('DeskStore', () => {
     TestBed.tick();
     expect(storage.length).toBe(0);
   });
+
+  it('writes tray marks only when a mark set changed, not on unrelated game state', () => {
+    const d = TestBed.inject(DeskStore);
+    const game = TestBed.inject(GameService);
+    d.persistTray('g');
+    TestBed.tick();
+    const set = vi.spyOn(storage, 'setItem');
+    (game as unknown as { _state: { update(f: (s: never) => unknown): void } })._state.update(((
+      s: object,
+    ) => ({ ...s, link: 'closed' })) as never);
+    TestBed.tick();
+    expect(set).not.toHaveBeenCalled();
+    d.setFiled('f', true);
+    TestBed.tick();
+    expect(set).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not rewrite a freshly loaded diary until it changes', () => {
+    const d = TestBed.inject(DeskStore);
+    d.persistJournal('g');
+    TestBed.tick();
+    d.addNote('kept', 1);
+    TestBed.tick();
+
+    TestBed.resetTestingModule();
+    const d2 = TestBed.inject(DeskStore);
+    const set = vi.spyOn(storage, 'setItem');
+    d2.persistJournal('g');
+    TestBed.tick();
+    expect(d2.journal().map((e) => e.text)).toEqual(['kept']);
+    expect(set).not.toHaveBeenCalled();
+    d2.addNote('next', 2);
+    TestBed.tick();
+    expect(set).toHaveBeenCalled();
+  });
 });
