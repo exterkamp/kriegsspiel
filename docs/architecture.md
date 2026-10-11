@@ -130,6 +130,10 @@ An `EngineSideView` (engine type, `viewFor`; not the protocol `SideView`, see D1
 
 Adding a field means updating this list and the leak tests in `visibility.test.ts`.
 
+#### Role views
+
+`viewForRole(world, side, seat, now)` (`packages/engine/src/roles.ts`) cuts the side view down for one seat; every role gets a subset of `viewFor`, never more. Commander and chief of staff see the whole HQ picture. Intelligence sees all enemy information and where our units stand, but not their strength, morale, fatigue or ammunition (footprints are coarsened to 10 m like an enemy's, and loose shapes are left out, since both follow from strength). The quartermaster sees our units in full and the `lowAmmo`/`exhausted` reports, and nothing about the enemy. A subordinate commander (a seat naming the unit ids they command) sees only those units, the enemy those units can see themselves, and the reports those units filed. Shared-HQ mode needs no role: every player uses `viewFor`. `maySign` (commander for any unit; a subordinate for their own formations; staff never) and `mayDraft` (any staff for any unit; a subordinate for their own) are the permission checks. Leak and permission tests are in `roles.test.ts`.
+
 ### Reconnect and catch-up
 
 The hub remembers the game time of the last view pushed to each side and saves it (`GameStore.saveSeen`, table `side_seen`) when the side's last connection closes. When a connection opens and the side has none open, the hub sends the full view as always (so nothing is missed, and papers in it are not pushed again) and then one `catchUp` message: `sinceGame`, `atGame` and the ids of dispatches delivered after `sinceGame`. A side that has never visited, or opens a second tab, gets none. After a hard crash the saved time may be older than the true last visit, so the catch-up can over-report but never under-report. The HUD shows it as a notice. It carries only ids already in the filtered view.
