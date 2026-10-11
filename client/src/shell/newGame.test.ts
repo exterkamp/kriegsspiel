@@ -89,7 +89,7 @@ describe('new game form', () => {
     expect(rateExplanation(1)).toMatch(/real time/);
     expect(rateExplanation(120)).toContain('30 seconds');
     expect(rateExplanation(0.5)).toContain('2 hours');
-    expect(lengthLine(240, 12)).toBe('about 4 hours of battle, 20 minutes at this rate');
+    expect(lengthLine(240, 12)).toBe('About 4 hours of battle, 20 minutes at this rate.');
     expect(lengthLine(0, 12)).toBe('');
   });
   it('turns server errors into readable messages', () => {

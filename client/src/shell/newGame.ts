@@ -92,8 +92,8 @@ export function rateExplanation(rate: number): string {
 /** Plain-language length: "about 4 hours of battle, 20 minutes at this rate". */
 export function lengthLine(lengthMinutes: number, rate: number | undefined): string {
   if (lengthMinutes <= 0) return '';
-  const battle = `about ${span(lengthMinutes)} of battle`;
-  return rate ? `${battle}, ${span(lengthMinutes / rate)} at this rate` : battle;
+  const battle = `About ${span(lengthMinutes)} of battle`;
+  return rate ? `${battle}, ${span(lengthMinutes / rate)} at this rate.` : `${battle}.`;
 }
 
 /** Why the form cannot be sent, or undefined when it can. */
