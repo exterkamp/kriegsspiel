@@ -9,7 +9,7 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    loadComponent: () => import('./game/game.component').then((m) => m.GameComponent),
+    loadComponent: () => import('./shell/shell.component').then((m) => m.ShellComponent),
   },
   {
     path: 'admin',
