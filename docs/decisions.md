@@ -360,6 +360,16 @@ Keyboard users can disable letter shortcuts for the session, while Tab/Enter and
 
 **See.** [Authoring guide](map-authoring-guide.md), [verification report](map-verification-report.md), [execution log](map-execution-log.md).
 
+## D27: Saved public maps can be inspected on a separate flat table
+
+**Decision.** `/map-table.html` loads supported saved map JSON through D25's independent complete certification worker, without generation. Accepted immutable geography is drawn by the authoring cartographic renderer into a device-bounded whole-map raster and registered to a flat metre-based Three.js paper. Fractional content dimensions preserve rectangular bounds without a fit margin or tile scaling. This is an inspection path, not a playable scenario or live HQ adapter.
+
+**Authority and lifetime.** A fixed construction-time public-preview mode accepts only a local bounded canvas, full asset identity, extent and registration. Default fixture image restrictions remain intact; preview instances reject fixture pieces/marks/state. Replacement acknowledges a synchronous candidate frame before retiring prior resources. Failed rendering attempts a prior-scene/camera restoration and reports retained or unavailable display honestly. Nested replacement is rejected; terminal disposal aborts publication. Current request identity guards file reads, certification and preparation.
+
+**Limits.** The page starts empty, keeps no browser persistence and uses no game/API/WebSocket connection. Whole-map raster detail is finite; zoom does not recover lost subpixel features. Armies, objectives, scenario assembly, simulation/visibility conversion and general table polish remain separate work. The separately authorized direct authoring handoff is a later small PR. Distribution remains gated by D23; no deployment follows this decision.
+
+**See.** [Table inspection guide](map-table-guide.md), [implementation plan](map-table-implementation-plan.md), [execution log](map-table-execution-log.md), [gameplay handoff](map-gameplay-handoff.md).
+
 ## HQ feedback presentation refinements — 2026-10-10
 
 **Decision.** User feedback on the introduced HQ fixture uses one elapsed-game-time display formatter: `HH:MM:SS`, hours beyond 24, nonnegative safe-integer milliseconds, explicit unavailable values and readable snapshot ages. Millisecond data/calculations/export precision stay unchanged; no calendar/wall-clock date is inferred. Identical roster snapshot provenance can be stated in the shared semantic table caption; differing and unknown fields retain explicit annotation. Header Settings contains existing preferences in a native modal dialog with focus return and global shortcut isolation. Destination headings stay semantic focus targets with a treatment distinct from action focus. The bounded fixes and browser/review evidence are recorded in [hq-execution-log.md](hq-execution-log.md).
