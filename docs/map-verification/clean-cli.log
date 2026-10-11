@@ -1,0 +1,3 @@
+
+> maps:cli
+> node --max-old-space-size=256 packages/maps/dist/composition/headless-cli.js --preset river-valley --seed 97 --settings /Users/dominic/code/kriegsspiel/.local/map-browser-adjusted-settings.json --overrides /Users/dominic/code/kriegsspiel/.local/map-browser-adjusted-overrides.json --output /Users/dominic/code/kriegsspiel/.local/map-clean-final-adjusted.json

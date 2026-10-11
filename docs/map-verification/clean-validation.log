@@ -1,0 +1,5 @@
+
+> maps:cli
+> node --max-old-space-size=256 packages/maps/dist/composition/headless-cli.js --validate /Users/dominic/code/kriegsspiel/.local/map-clean-final-adjusted.json
+
+{"ok":true,"value":{"version":"complete-map-v1","connected":true,"sites":10,"buildings":318,"assignedPopulation":1272,"validationWork":55841546},"diagnostics":[]}

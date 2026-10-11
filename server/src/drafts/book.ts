@@ -1,8 +1,8 @@
 /**
- * A side's shared order drafts (D6b): the document model behind "drafting orders together".
+ * A side's shared order drafts (D6c): the document model behind "drafting orders together".
  *
  * The server is the one place edits are put in order, so sync is operational transform with a
- * central sequencer (see `ot.ts` and docs/decisions.md D6b). A client sends an edit with the `rev`
+ * central sequencer (see `ot.ts` and docs/decisions.md D6c). A client sends an edit with the `rev`
  * it was made on; the book moves it past everything that landed since, applies it, and gives it the
  * next rev. A player who was away comes back with an old `rev` and is handled the same way.
  *

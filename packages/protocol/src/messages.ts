@@ -68,7 +68,7 @@ export const Command = z.discriminatedUnion('kind', [
   // Create or replace one of the side's marks (by `mark.id`). Not game input: it never reaches the engine.
   z.object({ ...Envelope, kind: z.literal('putMark'), mark: Mark }).strict(),
   z.object({ ...Envelope, kind: z.literal('deleteMark'), markId: Id }).strict(),
-  // Shared order drafts (D6b). None of these reach the engine or the input log. Drafts belong to the
+  // Shared order drafts (D6c). None of these reach the engine or the input log. Drafts belong to the
   // sender's side; ids are chosen by the client and unique within a side.
   z
     .object({

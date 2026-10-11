@@ -1,0 +1,2658 @@
+{
+  "records": [
+    {
+      "preset": "flat-countryside",
+      "seed": 0,
+      "extent": 5000,
+      "recipe": {
+        "seed": 0,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 0,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 2000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.15,
+            "fieldFraction": 0.6,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 1881.293166,
+      "generationPeakRssMiB": 170.171875,
+      "ok": true,
+      "validationMs": 357.0537079999999,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 55341346
+      },
+      "geometryIdentity": "da13f68a0dbdff59f866a1eeea0881551b4d817171ac80da98b4a1845aaf3cdf",
+      "assetIdentity": "ca6d144e4fa1b3d05db1522e6493697755979d65593a8ba14e8ad287c217b592",
+      "features": {
+        "cover": 751,
+        "water": 0,
+        "roadNodes": 1607,
+        "roads": 1623,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 0
+      },
+      "peakRssMiB": 194.421875,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "flat-countryside",
+      "seed": 1,
+      "extent": 5000,
+      "recipe": {
+        "seed": 1,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 0,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 2000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.15,
+            "fieldFraction": 0.6,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 1824.469208,
+      "generationPeakRssMiB": 163.375,
+      "ok": true,
+      "validationMs": 350.3457910000002,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 55327526
+      },
+      "geometryIdentity": "00b829e8fdc881ff90ec7dd56793af34aed4d5b288c757beb7d85d40017c3ccf",
+      "assetIdentity": "5f436738a692dbe184d5cea93b0873bacaa3f411e52b7948f2908bfc1b6ccc89",
+      "features": {
+        "cover": 722,
+        "water": 0,
+        "roadNodes": 1583,
+        "roads": 1601,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 0
+      },
+      "peakRssMiB": 188.75,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "flat-countryside",
+      "seed": 2,
+      "extent": 5000,
+      "recipe": {
+        "seed": 2,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 0,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 2000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.15,
+            "fieldFraction": 0.6,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 2002.741917,
+      "generationPeakRssMiB": 162.921875,
+      "ok": true,
+      "validationMs": 362.9790839999996,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 55483791
+      },
+      "geometryIdentity": "f60b71a14594417d993c7ebdd31d47bba6ab48c3ee65e710f26c7f8be0ca8382",
+      "assetIdentity": "48edc8c9058cd1ffb584fea42151b20df32a74ae7ea2097ada4902a8f6d4c4c4",
+      "features": {
+        "cover": 736,
+        "water": 0,
+        "roadNodes": 1764,
+        "roads": 1781,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 0
+      },
+      "peakRssMiB": 191.0625,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "flat-countryside",
+      "seed": 7,
+      "extent": 5000,
+      "recipe": {
+        "seed": 7,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 0,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 2000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.15,
+            "fieldFraction": 0.6,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 2081.965041,
+      "generationPeakRssMiB": 164.453125,
+      "ok": true,
+      "validationMs": 335.12516600000026,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 55273180
+      },
+      "geometryIdentity": "ea7c751b83642ee38e0572fbedf21b4c6903dde1c4c92309b2c5d8ffa827d727",
+      "assetIdentity": "fb3ddf538f39d3a72881e8ac0877399dd55f30f5a14473e0071756b3b6f15795",
+      "features": {
+        "cover": 683,
+        "water": 0,
+        "roadNodes": 1501,
+        "roads": 1519,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 0
+      },
+      "peakRssMiB": 180.03125,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "flat-countryside",
+      "seed": 17,
+      "extent": 5000,
+      "recipe": {
+        "seed": 17,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 0,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 2000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.15,
+            "fieldFraction": 0.6,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 1841.368708,
+      "generationPeakRssMiB": 171,
+      "ok": true,
+      "validationMs": 337.47062500000015,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 55408180
+      },
+      "geometryIdentity": "5a55576634e55d110c664ed6aa1b4e253051b02a7f8e2e1b7e09bab45b42c8ce",
+      "assetIdentity": "6305b91faa19915eeea48e0bb473d900415ff00584fce318866d4e79e883926a",
+      "features": {
+        "cover": 665,
+        "water": 0,
+        "roadNodes": 1669,
+        "roads": 1686,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 0
+      },
+      "peakRssMiB": 183.78125,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "flat-countryside",
+      "seed": 23,
+      "extent": 5000,
+      "recipe": {
+        "seed": 23,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 0,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 2000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.15,
+            "fieldFraction": 0.6,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 1862.162583,
+      "generationPeakRssMiB": 172.640625,
+      "ok": true,
+      "validationMs": 332.8353749999999,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 55473032
+      },
+      "geometryIdentity": "7e46267fe9633ac21620d4356ac765b1cb18573b1eee08199a85eb425da016cf",
+      "assetIdentity": "af551c396f5fa5c026315f8b24befb17bd3151ddf4c84481918b25df1262c2fc",
+      "features": {
+        "cover": 709,
+        "water": 0,
+        "roadNodes": 1722,
+        "roads": 1739,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 0
+      },
+      "peakRssMiB": 190.234375,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "flat-countryside",
+      "seed": 41,
+      "extent": 5000,
+      "recipe": {
+        "seed": 41,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 0,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 2000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.15,
+            "fieldFraction": 0.6,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 1791.5973749999998,
+      "generationPeakRssMiB": 171.234375,
+      "ok": true,
+      "validationMs": 328.07829100000004,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 55361376
+      },
+      "geometryIdentity": "ec9b88fa39ab32421e6e1db33b2791cea52687970bf3e81774d8c7b07ee055b3",
+      "assetIdentity": "91950437ef42d6df0aef19992824b82bade78190bb0c91f4a275eaeafdc24177",
+      "features": {
+        "cover": 743,
+        "water": 0,
+        "roadNodes": 1641,
+        "roads": 1658,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 0
+      },
+      "peakRssMiB": 189.765625,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "wooded-hills",
+      "seed": 3,
+      "extent": 5000,
+      "recipe": {
+        "seed": 3,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 120,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.65,
+            "fieldFraction": 0.1,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 2839.49025,
+      "generationPeakRssMiB": 210.453125,
+      "ok": true,
+      "validationMs": 524.4765830000001,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 56416689
+      },
+      "geometryIdentity": "2d5504895c9f7e36f4e2d6da6b478a43d156fcc141628eaea8362cf891e75ee2",
+      "assetIdentity": "225a2828c781cb629d9702dfb03a5c9fa4222015e365d395f9ccf516390284ab",
+      "features": {
+        "cover": 1033,
+        "water": 72,
+        "roadNodes": 1706,
+        "roads": 1718,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 142
+      },
+      "peakRssMiB": 219.140625,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "wooded-hills",
+      "seed": 5,
+      "extent": 5000,
+      "recipe": {
+        "seed": 5,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 120,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.65,
+            "fieldFraction": 0.1,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 572.539167,
+      "generationPeakRssMiB": 138.3125,
+      "ok": false,
+      "diagnostics": [
+        {
+          "severity": "error",
+          "stage": "validation",
+          "code": "REGIONAL_CONNECTIVITY",
+          "message": "Required sites and boundary exits cannot all connect through certified ground/deck edges.",
+          "constraint": "required terminals"
+        }
+      ],
+      "peakRssMiB": 138.3125,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "wooded-hills",
+      "seed": 11,
+      "extent": 5000,
+      "recipe": {
+        "seed": 11,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 120,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.65,
+            "fieldFraction": 0.1,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 3174.010084,
+      "generationPeakRssMiB": 206.171875,
+      "ok": true,
+      "validationMs": 542.7110830000001,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 56560824
+      },
+      "geometryIdentity": "83b6a469353e2315263f02235b3ab9cbf98772c8fc7a2f79e8d05dc49f19bd52",
+      "assetIdentity": "fc070bf607a71612d938f9e039d55d66d21dcd1fdcf8b03ce58549834c5cc31f",
+      "features": {
+        "cover": 1123,
+        "water": 94,
+        "roadNodes": 1626,
+        "roads": 1639,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 130
+      },
+      "peakRssMiB": 215.015625,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "wooded-hills",
+      "seed": 19,
+      "extent": 5000,
+      "recipe": {
+        "seed": 19,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 120,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.65,
+            "fieldFraction": 0.1,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 2719.6867089999996,
+      "generationPeakRssMiB": 201.484375,
+      "ok": true,
+      "validationMs": 547.369666,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 56159203
+      },
+      "geometryIdentity": "dc8dc5f1b81319e24d213ffac52297fc809efb5d32bd33dab30529ac0408d97b",
+      "assetIdentity": "b63ec9707add6a0acf40f5b4b2e761aadba287949b0698429016d554d1ceae06",
+      "features": {
+        "cover": 1158,
+        "water": 79,
+        "roadNodes": 1826,
+        "roads": 1843,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 124
+      },
+      "peakRssMiB": 221.21875,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "wooded-hills",
+      "seed": 31,
+      "extent": 5000,
+      "recipe": {
+        "seed": 31,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 120,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.65,
+            "fieldFraction": 0.1,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 2997.0533750000004,
+      "generationPeakRssMiB": 218.625,
+      "ok": true,
+      "validationMs": 685.9374589999998,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 56357309
+      },
+      "geometryIdentity": "85c62f1eed03f4a784b81906a67e18c8e94efb38c959853399adceb9991207e4",
+      "assetIdentity": "ecce44a083ff6f5a616d9ffc6946b5ffa53023092396ba5230836f221c59f4ed",
+      "features": {
+        "cover": 1189,
+        "water": 157,
+        "roadNodes": 1554,
+        "roads": 1570,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 133
+      },
+      "peakRssMiB": 218.625,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "wooded-hills",
+      "seed": 43,
+      "extent": 5000,
+      "recipe": {
+        "seed": 43,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 120,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.65,
+            "fieldFraction": 0.1,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 2909.1635,
+      "generationPeakRssMiB": 204.125,
+      "ok": true,
+      "validationMs": 547.5248750000001,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 56221672
+      },
+      "geometryIdentity": "19109bd5c9e22264964cfb3619c6c39ba461fc10b6fe1059957a1264de7c6214",
+      "assetIdentity": "a3e22633892a1314c5b1d101d500526bc0423f0db1128589f7abf3efaadb9259",
+      "features": {
+        "cover": 1059,
+        "water": 95,
+        "roadNodes": 1721,
+        "roads": 1731,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 126
+      },
+      "peakRssMiB": 213.28125,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "wooded-hills",
+      "seed": 59,
+      "extent": 5000,
+      "recipe": {
+        "seed": 59,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 120,
+            "roughness": 0.5,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 1000,
+            "minRiverWidthM": 4,
+            "maxRiverWidthM": 40,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": false
+          },
+          "cover": {
+            "woodFraction": 0.65,
+            "fieldFraction": 0.1,
+            "coherenceM": 300
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 12,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 100,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 3263.460334,
+      "generationPeakRssMiB": 191.359375,
+      "ok": true,
+      "validationMs": 631.3247500000002,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 56688500
+      },
+      "geometryIdentity": "2af04ea2561f7bd605769b9bedbb89c69fbd705d25fbf01b776c0236bc8a9379",
+      "assetIdentity": "b5fcafe7dd774f98c22c3c0f13ab113026ebf149b1967718fc8602a24c413f8c",
+      "features": {
+        "cover": 1016,
+        "water": 64,
+        "roadNodes": 1759,
+        "roads": 1773,
+        "crossings": 0,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 117
+      },
+      "peakRssMiB": 203.46875,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "river-valley",
+      "seed": 13,
+      "extent": 5000,
+      "recipe": {
+        "seed": 13,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 60,
+            "roughness": 0.35,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 100,
+            "minRiverWidthM": 20,
+            "maxRiverWidthM": 100,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": true
+          },
+          "cover": {
+            "woodFraction": 0.3,
+            "fieldFraction": 0.4,
+            "coherenceM": 1000
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 8,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 150,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 3533.987208,
+      "generationPeakRssMiB": 201.5625,
+      "ok": true,
+      "validationMs": 533.2872500000003,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 56716626
+      },
+      "geometryIdentity": "3e22f614ce438ae98412b89dfc9dd76635b53d2d6401b9037d6c06d854759228",
+      "assetIdentity": "e073315d9629b6be768f5e68f50f6e5a464b4a94ab141765c2fe9c2c4b6e9eda",
+      "features": {
+        "cover": 291,
+        "water": 34,
+        "roadNodes": 1612,
+        "roads": 1627,
+        "crossings": 1,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 30
+      },
+      "peakRssMiB": 221.640625,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "river-valley",
+      "seed": 29,
+      "extent": 5000,
+      "recipe": {
+        "seed": 29,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 60,
+            "roughness": 0.35,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 100,
+            "minRiverWidthM": 20,
+            "maxRiverWidthM": 100,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": true
+          },
+          "cover": {
+            "woodFraction": 0.3,
+            "fieldFraction": 0.4,
+            "coherenceM": 1000
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 8,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 150,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 3415.013375,
+      "generationPeakRssMiB": 201.125,
+      "ok": true,
+      "validationMs": 440.32495800000015,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 56172592
+      },
+      "geometryIdentity": "985966f99cef9e1e848145eece966fb7ef7e7c40daf0d254e82694354b5f7b99",
+      "assetIdentity": "e828aa3527186c1941627a2046097be37928b0cd96cefdb27ca307cadb0fcd93",
+      "features": {
+        "cover": 261,
+        "water": 23,
+        "roadNodes": 1709,
+        "roads": 1724,
+        "crossings": 1,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 25
+      },
+      "peakRssMiB": 214.234375,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "river-valley",
+      "seed": 47,
+      "extent": 5000,
+      "recipe": {
+        "seed": 47,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 60,
+            "roughness": 0.35,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 100,
+            "minRiverWidthM": 20,
+            "maxRiverWidthM": 100,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": true
+          },
+          "cover": {
+            "woodFraction": 0.3,
+            "fieldFraction": 0.4,
+            "coherenceM": 1000
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 8,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 150,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 3410.679667,
+      "generationPeakRssMiB": 197.75,
+      "ok": true,
+      "validationMs": 491.8101660000002,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 55811781
+      },
+      "geometryIdentity": "881620b7dd3979d1a042bf69bd3baaf7d3b8d0b8f7da841b50e68df8ccf79b80",
+      "assetIdentity": "b627e0ae40b39beda6fcbae724b08e3e32ad4dd8ff6449ee614243e98005c78b",
+      "features": {
+        "cover": 293,
+        "water": 29,
+        "roadNodes": 1666,
+        "roads": 1682,
+        "crossings": 2,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 34
+      },
+      "peakRssMiB": 222.515625,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "river-valley",
+      "seed": 61,
+      "extent": 5000,
+      "recipe": {
+        "seed": 61,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 60,
+            "roughness": 0.35,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 100,
+            "minRiverWidthM": 20,
+            "maxRiverWidthM": 100,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": true
+          },
+          "cover": {
+            "woodFraction": 0.3,
+            "fieldFraction": 0.4,
+            "coherenceM": 1000
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 8,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 150,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 3698.29425,
+      "generationPeakRssMiB": 198.875,
+      "ok": true,
+      "validationMs": 549.5538750000001,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 55925463
+      },
+      "geometryIdentity": "9a3dbdfe67b3a17cb845b26b8e1301676fe8e2ca09caa4b31f5fdde29944a831",
+      "assetIdentity": "ec81b20e35a9301e252c51685ff522af271e221892fdc50ba0c910e75db38363",
+      "features": {
+        "cover": 244,
+        "water": 20,
+        "roadNodes": 1643,
+        "roads": 1653,
+        "crossings": 1,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 37
+      },
+      "peakRssMiB": 225.078125,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "river-valley",
+      "seed": 73,
+      "extent": 5000,
+      "recipe": {
+        "seed": 73,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 60,
+            "roughness": 0.35,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 100,
+            "minRiverWidthM": 20,
+            "maxRiverWidthM": 100,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": true
+          },
+          "cover": {
+            "woodFraction": 0.3,
+            "fieldFraction": 0.4,
+            "coherenceM": 1000
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 8,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 150,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 5137.897291,
+      "generationPeakRssMiB": 195.65625,
+      "ok": true,
+      "validationMs": 541.547125,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 57268531
+      },
+      "geometryIdentity": "2d026bba1839666acf364f28f5311b5497062a2dfd51f7d51ea706eff0df6d4b",
+      "assetIdentity": "dc8f2839290aabd3a306d65b5b7fbb990de05574c14db780223ec92ec1279909",
+      "features": {
+        "cover": 245,
+        "water": 14,
+        "roadNodes": 1592,
+        "roads": 1605,
+        "crossings": 1,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 34
+      },
+      "peakRssMiB": 216.328125,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "river-valley",
+      "seed": 89,
+      "extent": 5000,
+      "recipe": {
+        "seed": 89,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 60,
+            "roughness": 0.35,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 100,
+            "minRiverWidthM": 20,
+            "maxRiverWidthM": 100,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": true
+          },
+          "cover": {
+            "woodFraction": 0.3,
+            "fieldFraction": 0.4,
+            "coherenceM": 1000
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 8,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 150,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 3556.339375,
+      "generationPeakRssMiB": 208.0625,
+      "ok": true,
+      "validationMs": 506.20933300000024,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 55691353
+      },
+      "geometryIdentity": "7908ca7962d7bb8972d85630c3ac8a0d1a641bf08f7671bc1adfa8c9ee22c424",
+      "assetIdentity": "9790403ff41455c11c01869f1632f2dd3ad6dbd920e85ed37eb4c2650a34f16d",
+      "features": {
+        "cover": 273,
+        "water": 25,
+        "roadNodes": 1580,
+        "roads": 1588,
+        "crossings": 1,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 36
+      },
+      "peakRssMiB": 222.328125,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    },
+    {
+      "preset": "river-valley",
+      "seed": 97,
+      "extent": 5000,
+      "recipe": {
+        "seed": 97,
+        "settings": {
+          "widthM": 5000,
+          "heightM": 5000,
+          "sampleSpacingM": 25,
+          "geometry": {
+            "coordinateToleranceM": 0.001,
+            "joinToleranceM": 0.01,
+            "corridorPolicy": "round-caps-joins-clipped-exits-v1"
+          },
+          "terrain": {
+            "baseHeightM": 100,
+            "reliefM": 60,
+            "roughness": 0.35,
+            "octaves": 4,
+            "featureScaleM": 1000,
+            "ridgeStrength": 0.3,
+            "valleyStrength": 0.3
+          },
+          "contours": {
+            "minorIntervalM": 10,
+            "indexIntervalM": 50,
+            "verticalToleranceM": 0.05,
+            "saddlePolicy": "bilinear-asymptotic-v1",
+            "exactLevelPolicy": "symbolic-positive-v1",
+            "maxLevels": 256,
+            "maxCellLevelWork": 10000000,
+            "maxRefinementWork": 200000,
+            "maxVertices": 200000
+          },
+          "hydrology": {
+            "riverThresholdSamples": 100,
+            "minRiverWidthM": 20,
+            "maxRiverWidthM": 100,
+            "lakePolicy": "outlet-or-lake-v1",
+            "requireRiver": true
+          },
+          "cover": {
+            "woodFraction": 0.3,
+            "fieldFraction": 0.4,
+            "coherenceM": 1000
+          },
+          "roads": {
+            "maxGrade": 0.1,
+            "maxReservedWidthM": 8,
+            "planningSpacingM": 25,
+            "maxPlanningCells": 400000,
+            "maxExpansionsPerRoute": 1000000,
+            "maxGlobalExpansions": 5000000,
+            "extraLinks": 4,
+            "maxCrossingSpanM": 150,
+            "minimumAbutmentM": 3
+          },
+          "settlements": {
+            "villageCount": 4,
+            "farmCount": 6,
+            "villagePopulation": 300,
+            "farmPopulation": 12,
+            "maxPopulation": 100000,
+            "maxSites": 96,
+            "minSpacingM": 750,
+            "maxBuildingGradient": 0.08,
+            "maxAttemptsPerSite": 8,
+            "maxGlobalPlacementAttempts": 256,
+            "maxReconciliationPasses": 4,
+            "maxGlobalReconciliationWork": 500000,
+            "villageSite": {
+              "minAreaM2": 10000,
+              "maxAreaM2": 250000,
+              "minExtentM": 100,
+              "maxExtentM": 800
+            },
+            "farmSite": {
+              "minAreaM2": 400,
+              "maxAreaM2": 10000,
+              "minExtentM": 20,
+              "maxExtentM": 200
+            }
+          },
+          "limits": {
+            "maxSamples": 400000,
+            "maxFeatures": 50000,
+            "maxVertices": 1000000,
+            "maxTopologyChecks": 5000000
+          }
+        },
+        "overrides": []
+      },
+      "generationMs": 3371.595875,
+      "generationPeakRssMiB": 224.203125,
+      "ok": true,
+      "validationMs": 433.2975419999998,
+      "validation": {
+        "version": "complete-map-v1",
+        "connected": true,
+        "sites": 10,
+        "buildings": 318,
+        "assignedPopulation": 1272,
+        "validationWork": 55845728
+      },
+      "geometryIdentity": "d052dd59c25f6815c9489ce6f4d656ea69659ecf8ddb8c0b0f5b024dad943b2e",
+      "assetIdentity": "bf704cc07170dcf9b7587c11bee7db54139220ef9b8a69384c01f4de68b7aba2",
+      "features": {
+        "cover": 288,
+        "water": 25,
+        "roadNodes": 1827,
+        "roads": 1845,
+        "crossings": 1,
+        "sites": 10,
+        "buildings": 318,
+        "landmarks": 10,
+        "contours": 38
+      },
+      "peakRssMiB": 225.296875,
+      "node": "v22.22.2",
+      "nodeExecArgv": [
+        "--max-old-space-size=256"
+      ],
+      "nodeOptionsUsed": false,
+      "oldSpaceProfileMiB": 256,
+      "v8HeapLimitMiB": 304
+    }
+  ]
+}

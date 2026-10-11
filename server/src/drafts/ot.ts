@@ -1,5 +1,5 @@
 /**
- * Operational transform over plain text, for shared order drafts (D6b).
+ * Operational transform over plain text, for shared order drafts (D6c).
  *
  * An op is a list of components: a positive number keeps that many characters, a negative number
  * deletes that many, a string inserts. It covers the whole text it is made against. Two ops made on

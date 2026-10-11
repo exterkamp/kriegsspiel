@@ -79,7 +79,7 @@ export class Hub {
 
   /** Each side's marks, loaded from the store on first use and kept here (the hub is their only writer). */
   private readonly marks = new Map<string, Promise<Mark[]>>();
-  /** Each side's shared order drafts, loaded on first use; the hub is their only writer (D6b). */
+  /** Each side's shared order drafts, loaded on first use; the hub is their only writer (D6c). */
   private readonly drafts = new Map<string, Promise<DraftBook>>();
   /** Game time each side was last pushed a view at; written to the store when its last connection closes. */
   private readonly seen = new Map<string, number>();

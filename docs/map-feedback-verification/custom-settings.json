@@ -1,0 +1,71 @@
+{
+  "contours": {
+    "exactLevelPolicy": "symbolic-positive-v1",
+    "indexIntervalM": 50,
+    "maxCellLevelWork": 10000000,
+    "maxLevels": 256,
+    "maxRefinementWork": 200000,
+    "maxVertices": 200000,
+    "minorIntervalM": 10,
+    "saddlePolicy": "bilinear-asymptotic-v1",
+    "verticalToleranceM": 0.05
+  },
+  "cover": { "coherenceM": 300, "fieldFraction": 0.6, "woodFraction": 0.123456 },
+  "geometry": {
+    "coordinateToleranceM": 0.001,
+    "corridorPolicy": "round-caps-joins-clipped-exits-v1",
+    "joinToleranceM": 0.01
+  },
+  "heightM": 6000,
+  "hydrology": {
+    "lakePolicy": "outlet-or-lake-v1",
+    "maxRiverWidthM": 40,
+    "minRiverWidthM": 4,
+    "requireRiver": false,
+    "riverThresholdSamples": 1000
+  },
+  "limits": {
+    "maxFeatures": 50000,
+    "maxSamples": 400000,
+    "maxTopologyChecks": 5000000,
+    "maxVertices": 1000000
+  },
+  "roads": {
+    "extraLinks": 4,
+    "maxCrossingSpanM": 100,
+    "maxExpansionsPerRoute": 1000000,
+    "maxGlobalExpansions": 5000000,
+    "maxGrade": 0.1,
+    "maxPlanningCells": 400000,
+    "maxReservedWidthM": 12,
+    "minimumAbutmentM": 3,
+    "planningSpacingM": 25
+  },
+  "sampleSpacingM": 25,
+  "settlements": {
+    "farmCount": 6,
+    "farmPopulation": 12,
+    "farmSite": { "maxAreaM2": 10000, "maxExtentM": 200, "minAreaM2": 400, "minExtentM": 20 },
+    "maxAttemptsPerSite": 8,
+    "maxBuildingGradient": 0.08,
+    "maxGlobalPlacementAttempts": 256,
+    "maxGlobalReconciliationWork": 500000,
+    "maxPopulation": 100000,
+    "maxReconciliationPasses": 4,
+    "maxSites": 96,
+    "minSpacingM": 750,
+    "villageCount": 4,
+    "villagePopulation": 300,
+    "villageSite": { "maxAreaM2": 250000, "maxExtentM": 800, "minAreaM2": 10000, "minExtentM": 100 }
+  },
+  "terrain": {
+    "baseHeightM": 100,
+    "featureScaleM": 2000,
+    "octaves": 4,
+    "reliefM": 0,
+    "ridgeStrength": 0.3,
+    "roughness": 0.123456,
+    "valleyStrength": 0.3
+  },
+  "widthM": 5000
+}
