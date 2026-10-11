@@ -74,6 +74,15 @@ const { server } = await buildApp({
           return llm.length > 0 ? llm : scripted;
         }
       : undefined,
+  narrator:
+    umpire && umpireConfig
+      ? (gameId) =>
+          createGameUmpire(umpire, {
+            gameId,
+            limits: umpireConfig.gameBudget,
+            onMetric: (m) => server.log.info({ umpire: m }, 'umpire call'),
+          })
+      : undefined,
   admin: adminFromEnv(process.env),
   trustProxy: trustProxyFromEnv(process.env),
   notify: { store: notifyStore, push: pushFromEnv(process.env) },

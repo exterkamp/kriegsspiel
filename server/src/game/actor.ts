@@ -40,6 +40,14 @@ import type { AgentOrder, SideAgent } from '../opponent/index.js';
 import { PauseVoting, type PauseConfig, type PauseTransition } from '../pause.js';
 import { RatioVoting, type RatioTransition } from '../ratioVote.js';
 import { advanceUntilOver, applyLoggedOrder } from './replay.js';
+import {
+  narrateReports,
+  narrateWindowMs,
+  reportsDueForNarration,
+  type UmpireCallRecord,
+  type UmpireRequest,
+  type UmpireClient,
+} from '../umpire/index.js';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
 /** Timer functions, injectable so tests can run on a fake clock. */
@@ -106,6 +114,12 @@ export interface GameActorOptions {
   seq?: number;
   /** Take a snapshot after this many logged inputs (default 1: after every input). */
   snapshotEvery?: number;
+  /**
+   * The umpire client for the narrate stage. Set: once per side per window the side's due reports
+   * are narrated (holding game time, like an order parse) and the text replaces the template text
+   * in its view. Unset: players see the template text.
+   */
+  umpire?: UmpireClient;
   /** Server-side agents that play scripted sides (see `opponent/`). */
   agents?: SideAgent[];
   /** Pause voting: who votes and the host's rules. Unset: the vote commands are refused. */
@@ -134,6 +148,9 @@ interface Dependency {
   settle: (result: CommandResult) => void;
   abandoned: boolean;
 }
+
+/** Narrated text by report id for one side; `null` marks a report folded into another's dispatch. */
+type SideNarration = Map<string, string | null>;
 
 interface ParseOutcome {
   parsed: ParseResult;
@@ -170,6 +187,11 @@ export class GameActor {
   /** Pending LLM dependencies: the game time each is needed and how to answer its caller. */
   private readonly dependencies = new Map<number, Dependency>();
   private nextDependency = 1;
+  private readonly umpire: UmpireClient | undefined;
+  /** Game time up to which each side's reports have been handed to the narrate stage. */
+  private readonly narratedUntil = new Map<string, number>();
+  private readonly narrations = new Map<string, SideNarration>();
+  private readonly narrating = new Set<string>();
 
   /** The pause state machine; absent when the game has no voters configured. */
   private readonly pauseVoting: PauseVoting | undefined;
@@ -204,6 +226,9 @@ export class GameActor {
     this.parseTimeoutMs = options.parseTimeoutMs ?? DEFAULT_PARSE_TIMEOUT_MS;
     this.parseRetryDelayMs = options.parseRetryDelayMs ?? DEFAULT_PARSE_RETRY_DELAY_MS;
     this.seq = options.seq ?? 0;
+    this.umpire = options.umpire;
+    // Reports from before this actor started (a reopened game) keep their template text.
+    for (const side of this.engine.world.sides) this.narratedUntil.set(side.id, this.engine.time);
     this.restartInfo = options.restart;
     // Decisions fall on multiples of the interval; a resumed game picks up at the next one.
     const t = this.engine.time;
@@ -222,6 +247,11 @@ export class GameActor {
     }
     this.snapshotSeq = -1;
     this.snapshotEvery = Math.max(1, Math.floor(options.snapshotEvery ?? 1));
+  }
+
+  /** What `side` is shown in place of template text: pass to `sideViewOf`. */
+  narrationFor(side: string): ReadonlyMap<string, string | null> | undefined {
+    return this.narrations.get(side);
   }
 
   /** Whether the game is waiting on the umpire. */
@@ -299,6 +329,7 @@ export class GameActor {
       this.clearPauseTimer();
       for (const handle of [...this.parseTimers]) this.clearParseTimer(handle);
       // Abandon work still with the umpire: its callers are told, and a late result is ignored.
+      this.narrating.clear();
       for (const dep of [...this.dependencies.values()]) {
         dep.abandoned = true;
         this.dependencies.delete(dep.id);
@@ -328,6 +359,109 @@ export class GameActor {
     if (target < this.engine.time) return;
     // Equal is not a no-op: an order signed "now" is queued at the current time and is due.
     this.advanceEngine(target);
+    this.beginNarrations();
+  }
+
+  /**
+   * Start the narrate stage for each side whose window has closed with reports due. Like a parse,
+   * it holds game time at this instant until it settles (the LLM barrier), so the text a player
+   * sees does not depend on how fast the model answered.
+   */
+  private beginNarrations(): void {
+    const umpire = this.umpire;
+    if (!umpire || this.closed || this.engine.world.outcome) return;
+    const now = this.engine.time;
+    for (const side of this.engine.world.sides) {
+      if (this.narrating.has(side.id)) continue;
+      const since = this.narratedUntil.get(side.id) ?? now;
+      if (now < since + narrateWindowMs(this.clock.rate)) continue;
+      // The window is closed: reports delivered later belong to the next one, whether or not any are due.
+      this.narratedUntil.set(side.id, now);
+      const due = reportsDueForNarration(
+        viewFor(this.engine.world, side.id, now).reports,
+        since,
+        now,
+        this.clock.rate,
+      );
+      if (due.length === 0) continue;
+      this.narrating.add(side.id);
+      const before = this.clock.barrier;
+      const dep: Dependency = {
+        id: this.nextDependency++,
+        neededAt: this.clock.holdAtNow(),
+        settle: () => undefined,
+        abandoned: false,
+      };
+      this.dependencies.set(dep.id, dep);
+      this.refreshBarrier();
+      this.announceStaff(before);
+      const calls: UmpireCallRecord[] = [];
+      // Every call the stage makes is kept for the log, whatever the wrapped client is.
+      const client: UmpireClient = {
+        call: async <T>(request: UmpireRequest) => {
+          const res = await umpire.call<T>(request);
+          calls.push(res.record);
+          return res;
+        },
+      };
+      const work = this.withTimeout(narrateReports(client, side.id as SideId, due)).then(
+        (result) => result,
+        (e) => {
+          if (this.trace.enabled) {
+            this.trace.record(this.id, 'error', { source: 'narrate', error: e });
+          }
+          return undefined;
+        },
+      );
+      void work
+        .then((result) =>
+          this.enqueueCompletion(() => this.completeNarration(side.id, dep, now, result, calls)),
+        )
+        .catch((e) => {
+          this.dependencies.delete(dep.id);
+          this.narrating.delete(side.id);
+          if (!dep.abandoned) this.onError?.(e);
+        });
+    }
+  }
+
+  private async completeNarration(
+    side: string,
+    dep: Dependency,
+    windowEndMs: number,
+    result: Awaited<ReturnType<typeof narrateReports>> | undefined,
+    calls: UmpireCallRecord[],
+  ): Promise<void> {
+    if (dep.abandoned) return;
+    this.dependencies.delete(dep.id);
+    this.narrating.delete(side);
+    this.syncBarrier();
+    try {
+      // A failed or timed-out stage leaves the template text, which is what the view shows already.
+      if (result && !result.fellBack) {
+        const text = this.narrations.get(side) ?? new Map<string, string | null>();
+        for (const d of result.dispatches) {
+          d.reportIds.forEach((id, i) => text.set(id, i === 0 ? d.text : null));
+        }
+        this.narrations.set(side, text);
+      }
+      this.sync();
+      const entry: InputLogEntry = {
+        seq: ++this.seq,
+        wallMs: this.wallNow(),
+        gameMs: this.engine.time,
+        endGameMs: this.engine.time,
+        command: { kind: 'narrate', side, windowEndMs },
+        calls,
+        ...(result?.fellBack ? { error: 'narration fell back to template text' } : {}),
+        ...(result === undefined ? { error: 'narration failed' } : {}),
+      };
+      if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+      await this.commit(entry);
+    } finally {
+      this.reschedule();
+      this.notify();
+    }
   }
 
   /**
@@ -365,6 +499,19 @@ export class GameActor {
         this.onEmitted?.(emitted);
       }
     }
+  }
+
+  /** Game time the soonest narration window closes, when the narrate stage is on. */
+  private nextNarrationAt(): number | undefined {
+    if (!this.umpire || this.engine.world.outcome) return undefined;
+    let next: number | undefined;
+    for (const side of this.engine.world.sides) {
+      if (this.narrating.has(side.id)) continue;
+      const at =
+        (this.narratedUntil.get(side.id) ?? this.engine.time) + narrateWindowMs(this.clock.rate);
+      if (next === undefined || at < next) next = at;
+    }
+    return next;
   }
 
   /** The agent due to think soonest, leaving out idle ones when no event is queued to wake them. */
@@ -528,10 +675,10 @@ export class GameActor {
     if (this.closed) return;
     const nextEvent = this.engine.queue[0];
     const nextThink = this.engine.world.outcome ? undefined : this.nextAgent()?.nextAt;
-    const nextTime =
-      nextEvent && nextThink !== undefined
-        ? Math.min(nextEvent.time, nextThink)
-        : (nextEvent?.time ?? nextThink);
+    const woken = [nextEvent?.time, nextThink, this.nextNarrationAt()].filter(
+      (t) => t !== undefined,
+    );
+    const nextTime = woken.length > 0 ? Math.min(...woken) : undefined;
     if (nextTime === undefined || this.clock.status !== 'running' || this.clock.mode === 'manual') {
       return;
     }
@@ -766,6 +913,8 @@ export class GameActor {
         return { ok: true };
       case 'order':
         throw new Error('orders go through submitOrder');
+      case 'narrate':
+        throw new Error('narration is logged by the scheduler');
     }
   }
 

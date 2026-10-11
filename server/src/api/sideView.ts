@@ -52,6 +52,12 @@ export function documentToDispatch(d: ViewDocument): Dispatch {
   };
 }
 
+/**
+ * Narrated text by report id. An id mapped to a string shows that text in place of the template
+ * text; one mapped to `null` was folded into another report's dispatch and is left out.
+ */
+export type Narration = ReadonlyMap<string, string | null>;
+
 /** A unit's condition on the wire; a role that may not know it (an outline) leaves the fields out. */
 function condition(
   u: EngineRoleView['ownUnits'][number],
@@ -66,7 +72,11 @@ function condition(
   };
 }
 
-export function toSideView(view: EngineSideView | EngineRoleView, clock: ClockState): SideView {
+export function toSideView(
+  view: EngineSideView | EngineRoleView,
+  clock: ClockState,
+  narration?: Narration,
+): SideView {
   return {
     side: view.side,
     ...('role' in view ? { role: view.role } : {}),
@@ -99,7 +109,14 @@ export function toSideView(view: EngineSideView | EngineRoleView, clock: ClockSt
       uncertaintyRadius: c.uncertaintyRadius,
       sizeEstimate: c.sizeEstimate,
     })),
-    dispatches: [...view.reports.map(toDispatch), ...view.documents.map(documentToDispatch)],
+    dispatches: [
+      ...view.reports.flatMap((r) => {
+        const text = narration?.get(r.id);
+        if (text === null) return [];
+        return [text === undefined ? toDispatch(r) : { ...toDispatch(r), text }];
+      }),
+      ...view.documents.map(documentToDispatch),
+    ],
     clock,
   };
 }
@@ -115,8 +132,15 @@ export function sideViewOf(
   clock: ClockState,
   seat?: Seat,
   forwarded: readonly string[] = [],
+  narration?: Narration,
 ): SideView {
   // `world.time` only moves when an event fires; the engine's own time is the real "now".
-  if (seat) return toSideView(viewForRole(state.world, side, seat, state.time, forwarded), clock);
-  return toSideView(viewFor(state.world, side, state.time), clock);
+  if (seat) {
+    return toSideView(
+      viewForRole(state.world, side, seat, state.time, forwarded),
+      clock,
+      narration,
+    );
+  }
+  return toSideView(viewFor(state.world, side, state.time), clock, narration);
 }
