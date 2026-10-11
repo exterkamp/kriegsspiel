@@ -9,6 +9,8 @@
   import Conference from './Conference.svelte';
   import DeskClock from './DeskClock.svelte';
   import PausePanel from './PausePanel.svelte';
+  import GameOver from './GameOver.svelte';
+  import { disconnectGame } from '../shell/gameHandle.js';
   import { VIEWS, isDeskView, isTypingTarget, viewForKey, type ViewId } from './views.js';
 
   /** What to focus when a view opens, so keyboard users land inside it. */
@@ -32,6 +34,17 @@
     go(v);
     const sel = FOCUS[v];
     if (sel) queueMicrotask(() => document.querySelector<HTMLElement>(sel)?.focus());
+  }
+
+  // The game ending brings up the result whatever view was open.
+  const ended = $derived($gameState.gameOver !== undefined);
+  $effect(() => {
+    if (ended) activeView.set('table');
+  });
+
+  function goTo(url: string): void {
+    disconnectGame();
+    window.location.assign(url);
   }
 
   const unread = $derived(unreadCount($gameState.dispatches, $trayMarks));
@@ -67,6 +80,13 @@
 
 {#if $windowOpen && $gameState.gameOver}
   <UmpireWindow />
+{:else if ended && $activeView === 'table'}
+  <GameOver
+    onMenu={() => goTo('/')}
+    onNewGame={() => goTo('/?lobby=1')}
+    onPlayAgain={(id, side) =>
+      goTo(`/?game=${encodeURIComponent(id)}${side ? `&side=${encodeURIComponent(side)}` : ''}`)}
+  />
 {/if}
 
 <div class="fade" class:on={isDeskView($activeView)} aria-hidden="true"></div>

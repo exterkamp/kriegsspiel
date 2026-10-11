@@ -48,6 +48,16 @@ Signed-out visitors are held at `sign-in` for every screen but `fixture`. Browse
 
 **In-game menu** (`shell/GameMenu.svelte`): a Menu button, and Esc when the table is showing (in a desk view Esc still returns to the table). It offers Resume, Leave to main menu and Sign out. Leaving closes the WebSocket, then loads the menu; the game keeps running on the server. It is a modal dialog: focus starts on Resume and Esc closes it.
 
+## Game over screen
+
+When the server sends `gameOver` (on the spot, or again when a finished game is opened by URL, since the server resends it on connect) the desk drops back to the table and shows a paper over it (`client/src/desk/GameOver.svelte`, logic in `gameOver.ts`):
+
+- A headline for the player's side: Victory, Defeat or Draw (no winner), from the payload's `winner` and the side of the SideView.
+- The reason in words, from the payload's `reason` code and `atGame` ("Red held the objective at ..."), and the game time elapsed.
+- **View the umpire's window** (closing it returns to the screen), **Read the journal** (Escape returns to the screen), **Play again** (a new game with the same scenario, rate, session type and side, then enters it), **New game** (`/?lobby=1`) and **Main menu**.
+
+The orders desk is already closed once the game is over (#175). Not yet shown: objectives held and losses (the `gameOver` payload carries neither; the umpire's window has the true picture), and the scenario's own wording of the reason.
+
 ## The map layers
 
 Layers are what let one historical map serve both sides and the engine.
