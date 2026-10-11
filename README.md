@@ -27,10 +27,11 @@ The accepted live client remains available at `/?new=1&side=blue&rate=12` to cre
 
 ## Development
 
-Node version is in `.nvmrc` (`nvm use`). This is an npm workspaces monorepo:
+Node version is in `.nvmrc` (`nvm use`); use npm 10.9.7 for the pinned map source build. This is an npm workspaces monorepo:
 
 - `packages/engine`: pure, deterministic game engine
 - `packages/protocol`: shared types between server and client
+- `packages/maps`: standalone battlefield generation and validated export
 - `server`: Node.js server
 - `client`: Vite + TypeScript client
 

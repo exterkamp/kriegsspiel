@@ -43,7 +43,7 @@ export interface MockUmpireClientOptions {
 }
 
 const FAILURE_KINDS = ['transport', 'timeout', 'schema', 'refusal', 'missing-recording'];
-const STAGES = ['parse', 'judge', 'narrate'];
+const STAGES = ['parse', 'judge', 'narrate', 'staff'];
 
 /** Throws a clear error for a fixture that could never be served. */
 function validateFixture(f: UmpireFixture, where: string): void {
