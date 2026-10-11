@@ -1,0 +1,61 @@
+.window {
+  position: fixed;
+  left: 8px;
+  top: 8px;
+  width: min(360px, calc(100% - 16px));
+  max-height: 60%;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  background: #f4eedb;
+  color: #2a2014;
+  border-radius: 2px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  z-index: 6;
+  font-size: 13px;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.scrub {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.scrub input {
+  flex: 1;
+  min-width: 0;
+}
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 8px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+legend {
+  font-weight: bold;
+}
+ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}
+button {
+  background: #efe6c8;
+  color: #2a2118;
+  border: 1px solid #5a4a36;
+  border-radius: 3px;
+  padding: 4px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+button:focus-visible {
+  outline: 3px solid #ffd76a;
+}

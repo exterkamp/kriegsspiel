@@ -6,12 +6,14 @@
 import {
   holdTheBridge,
   loadScenario,
+  viewFor,
   type EmittedEvent,
   type EngineState,
   type GameState,
 } from '@kriegsspiel/engine';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser, ParseResult } from '../orders/index.js';
+import { toDispatch } from '../api/sideView.js';
 import { GameHost, MemoryGameStore, replayLog, type GameStore } from './index.js';
 import { createRegistry, startingState } from './registry.js';
 import { FakeTime } from './testing.js';
@@ -160,6 +162,29 @@ async function replayOf(run: Run, untilGameMs: number) {
     startingState,
   );
 }
+
+describe('the in-tray of a live game', () => {
+  it.each([1, 4, 12] as const)(
+    'holds an opening report and an order-delivered note after 10 game minutes at rate %i',
+    async (rate) => {
+      const run = await play(rate, 10 * MIN);
+      const blue = viewFor(run.state.world, 'blue', run.state.time).reports.map(toDispatch);
+      const opening = blue.find((d) => d.text.includes('no enemy yet in sight'));
+      expect(opening).toMatchObject({
+        from: 'Chief of staff',
+        category: 'staff',
+        receivedAtGame: 0,
+      });
+      expect(opening!.location).toBeDefined();
+      const ack = blue.find((d) => d.text.includes('received its orders'));
+      expect(ack).toMatchObject({ category: 'subordinates', confidence: 'high' });
+      expect(ack!.receivedAtGame).toBeLessThanOrEqual(10 * MIN);
+      // Red's own opening report never reaches Blue.
+      expect(blue.filter((d) => d.text.includes('no enemy yet in sight'))).toHaveLength(1);
+    },
+    60_000,
+  );
+});
 
 describe('end-to-end headless game', () => {
   it('plays Hold the Bridge to the end in fast-forward, and replay matches', async () => {

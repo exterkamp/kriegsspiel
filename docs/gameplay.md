@@ -38,6 +38,19 @@ Subordinates keep acting while you are away, so a good order covers contingencie
 
 This is the main skill the game tests, and it is what the umpire grades. Commander's intent in an order gives a subordinate better behaviour when plans meet reality.
 
+### What paper reaches the in-tray
+
+Everything is filtered through the visibility filter, so only your own side's knowledge and what your units have seen ever arrives.
+
+| Paper | Pile | When |
+|-------|------|------|
+| Opening situation report from the chief of staff (own formations, no enemy information) | staff | At once, at game start |
+| Courier acknowledgement that an order reached its unit | subordinates | About 2 game minutes after the unit receives the order |
+| Enemy contact (scouts and pickets) | scouts | About 10 game minutes after the sighting |
+| Unit lost, low ammunition, exhausted | subordinates | About 10 game minutes after the event |
+
+A report on an objective changing hands is not yet produced.
+
 ### After the game
 
 The umpire's window reveals true positions, dice and rulings. The umpire then writes a critique: what each side knew and when, decisions that mattered, and misreadings. This is built properly, not left as an afterthought.

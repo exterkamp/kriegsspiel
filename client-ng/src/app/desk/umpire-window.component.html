@@ -1,0 +1,65 @@
+<section id="umpire-window" class="window" aria-label="Umpire's window">
+  <header>
+    <h2>Umpire's window</h2>
+    <button type="button" (click)="desk.windowOpen.set(false)">Close</button>
+  </header>
+  @if (error()) {
+    <p role="alert">{{ errorText() }}</p>
+  } @else if (timeline(); as tl) {
+    <p class="outcome">
+      {{ tl.outcome.winner ? tl.outcome.winner + ' won' : 'No winner' }}: {{ tl.outcome.reason }},
+      at
+      {{ formatGameTime(tl.outcome.time) }}
+    </p>
+    <div class="scrub">
+      <button type="button" aria-label="Previous event" (click)="step(-1)">◀</button>
+      <input
+        type="range"
+        min="0"
+        [max]="tl.endMs"
+        step="60000"
+        [value]="at()"
+        aria-label="Game time"
+        [attr.aria-valuetext]="formatGameTime(at())"
+        (input)="at.set(+$any($event.target).value)"
+        (change)="load(+$any($event.target).value)"
+      />
+      <button type="button" aria-label="Next event" (click)="step(1)">▶</button>
+      <output>{{ formatGameTime(at()) }}</output>
+    </div>
+    <fieldset>
+      <legend>Overlay</legend>
+      @for (b of beliefs; track b.id) {
+        <label
+          ><input
+            type="radio"
+            name="belief"
+            [value]="b.id"
+            [checked]="desk.windowBelief() === b.id"
+            (change)="desk.windowBelief.set(b.id)"
+          />
+          {{ b.label }}</label
+        >
+      }
+    </fieldset>
+    <div class="hover" aria-live="polite">
+      @if (hovered(); as h) {
+        <b>{{ h.name }}</b>
+        ({{ h.side }}) strength {{ Math.round(h.strength) }}, morale {{ Math.round(h.morale) }}
+        @if (notes().length === 0) {
+          <p>No fire or rulings in the last 30 minutes.</p>
+        } @else {
+          <ul>
+            @for (n of notes(); track $index) {
+              <li>{{ n }}</li>
+            }
+          </ul>
+        }
+      } @else {
+        <p>Point at a unit on the table for its dice, modifiers and rulings.</p>
+      }
+    </div>
+  } @else {
+    <p role="status">Rebuilding the game from its log…</p>
+  }
+</section>
