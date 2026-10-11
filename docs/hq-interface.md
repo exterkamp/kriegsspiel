@@ -38,18 +38,18 @@ The orders desk is built: a form addressed to a named commander, free text, an o
 | URL | Screen |
 |-----|--------|
 | `/` (no parameters) | `sign-in` when signed out, otherwise `menu`. Never a half-loaded game. The emailed `/auth/verify` link redirects to `/`, so it lands on the menu. |
-| `/?lobby=1` | `new-game` (the New game form, `shell/NewGame.svelte`) |
+| `/?lobby=1` | `new-game` (the New game form, `NewGameComponent`) |
 | `/?new=1&side=&rate=` | `game`, creating a game first |
 | `/?game=<id>[&side=]` | `game`; a reload returns to the same game |
 | `/?game=<id>&over=1` | `game-over` (served by the live client until the game over screen task) |
 
 Signed-out visitors are held at `sign-in` for every screen. Browser back and forward follow the URL. The live client (`liveClient.ts`, the 3D table and desk) is the game screen and cannot be unloaded, so a move to or from a live screen after it has loaded is a fresh page load.
 
-**Main menu** (`shell/Menu.svelte`, aged paper and serif to match the desk): New game; Continue, the player's unfinished games with scenario, side, game time and last played (hidden when there are none); the signed-in email with Sign out; and About, a paragraph on how the game works with a link to `docs/gameplay.md`. `GET /games` supplies `finished`, `gameTimeMs` and `lastPlayedMs` for each game, and Continue lists only started games that are not finished (`shell/continueList.ts`). Multiplayer entry points are not on the menu.
+**Main menu** (`MenuComponent`, aged paper and serif to match the desk): New game; Continue, the player's unfinished games with scenario, side, game time and last played (hidden when there are none); the signed-in email with Sign out; and About, a paragraph on how the game works with a link to `docs/gameplay.md`. `GET /games` supplies `finished`, `gameTimeMs` and `lastPlayedMs` for each game, and Continue lists only started games that are not finished (`shell/continueList.ts`). Multiplayer entry points are not on the menu.
 
-**New game** (`shell/NewGame.svelte`, pure rules in `shell/newGame.ts`): Scenario (title, briefing, sides and expected length, from `GET /scenarios`; the client hard-codes none of it), Your side (only sides the scenario leaves to people when the server has a computer opponent), Clock rate (1:1, 4:1, 12:1 or a custom ratio, with a line such as "12:1 means one hour of battle passes in five minutes") and a note on who plays the other side (scripted opponent or AI commander, as reported by `/scenarios`). Defaults are the first scenario, Blue and 12:1. Start posts `POST /games` and opens the game; a double click makes one game, and a validation or server error (signed out, game limit, bad rate) is shown above the buttons with the form intact. Back returns to the menu. Multiplayer seats are not on this screen.
+**New game** (`NewGameComponent`, pure rules in `shell/newGame.ts`): Scenario (title, briefing, sides and expected length, from `GET /scenarios`; the client hard-codes none of it), Your side (only sides the scenario leaves to people when the server has a computer opponent), Clock rate (1:1, 4:1, 12:1 or a custom ratio, with a line such as "12:1 means one hour of battle passes in five minutes") and a note on who plays the other side (scripted opponent or AI commander, as reported by `/scenarios`). Defaults are the first scenario, Blue and 12:1. Start posts `POST /games` and opens the game; a double click makes one game, and a validation or server error (signed out, game limit, bad rate) is shown above the buttons with the form intact. Back returns to the menu. Multiplayer seats are not on this screen.
 
-**In-game menu** (`shell/GameMenu.svelte`): a Menu button, and Esc when the table is showing (in a desk view Esc still returns to the table). It offers Resume, Leave to main menu and Sign out. Leaving closes the WebSocket, then loads the menu; the game keeps running on the server. It is a modal dialog: focus starts on Resume and Esc closes it.
+**In-game menu** (`GameMenuComponent`): a Menu button, and Esc when the table is showing (in a desk view Esc still returns to the table). It offers Resume, Leave to main menu and Sign out. Leaving closes the WebSocket, then loads the menu; the game keeps running on the server. It is a modal dialog: focus starts on Resume and Esc closes it.
 
 ## The map layers
 
@@ -106,7 +106,7 @@ Period style, not a fantasy skin: aged paper, ink, sealing wax, pencil, brass in
   - table dressing: ruler, dividers, inkwell, lamp, which also give a sense of scale
 - **Camera.** Orbit and zoom within limits, with a "top-down" snap for precise plotting. Tilts away from the table to the desk.
 - **Desk (HTML/CSS over the canvas).** In-tray, orders desk, order of battle, journal and staff conference are 2D Papers Please-style screens. Papers can be dragged, stamped and filed, and text stays crisp and selectable. A transition (camera dolly plus fade) moves between table and desk. Dragging a report from the desk onto the table to place a marker is a core interaction, so the two layers share a drag-and-drop system.
-- **UI framework for the desk:** Svelte (preferred) or React. Vanilla Three.js for the scene, with no react-three-fiber unless the scene gets complicated.
+- **UI framework for the desk:** Angular (D29; it was Svelte before the cutover). Vanilla Three.js for the scene, with no react-three-fiber unless the scene gets complicated.
 - **Picking.** Raycast against the flat map plane to convert pointer position to map coordinates. Pieces are picked by raycasting their meshes. Because the map is flat, coordinates are plain (x, y) in metres with no height, which is what the engine's continuous plane uses (D15). Pieces stand at any position and facing and are drawn at their footprint; there are no cells to snap to.
 
 The map remains flat, with no elevation mesh. Numerical elevation is planned in M3c for contour rendering, terrain-aware generation and future height/slope queries. Connecting it to gameplay line of sight and movement is separate work; existing annotated terrain and per-feature height tags remain relevant. A flat display does not remove the need for numerical topography.
@@ -114,7 +114,7 @@ The map remains flat, with no elevation mesh. Numerical elevation is planned in 
 ## Implications for the build
 
 - The engine's vector terrain is the **truth layer** and a debug view only. The player never sees it.
-- The player-facing client is the Three.js table and the Svelte desk, built fresh.
+- The player-facing client is the Three.js table and the Angular desk, built fresh.
 - Info panels are diegetic: terrain notes and sketches for places, the journal and roster for units.
 
 ## Open questions

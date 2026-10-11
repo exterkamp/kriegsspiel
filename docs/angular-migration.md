@@ -1,6 +1,6 @@
 # Angular migration plan (issue #269)
 
-Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) and step 1 (services and stores, #272) done; step 2 in progress, with the roster, journal, conference and pause panel (#273), the in-tray, orders desk and umpire window (#274), and the desk shell, game over screen, HUD and marks (#275) done; step 4 (shell and entry, #276) done, step 5 (admin, map authoring and benchmarks, #277) and step 6 (HQ fixture UI retired, #278) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
+Status: **COMPLETE: the cutover (step 7, #279) is done, see Step 7 below and D29.** Earlier status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) and step 1 (services and stores, #272) done; step 2 in progress, with the roster, journal, conference and pause panel (#273), the in-tray, orders desk and umpire window (#274), and the desk shell, game over screen, HUD and marks (#275) done; step 4 (shell and entry, #276) done, step 5 (admin, map authoring and benchmarks, #277) and step 6 (HQ fixture UI retired, #278) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
 
 ## What the spike proves
 
@@ -95,6 +95,17 @@ Decision **D28**: retire, do not port. Nothing in `client/src/hq` is in `client-
 - `client-ng`'s `ShellComponent` loses its `fixture` branch too (the offline board and the hidden game menu); `session.ts`, `shell/screens.ts`, `shell/boot.ts` and `main.ts` lose the `fixture` mode and screen; their tests were updated (`?mode=fixture` is the menu). `table/gameTime.ts` (and its test) moved out of `hq/presentation` because table tags use it.
 - `test/review/hq-mutations.json` keeps the three game-time cases (the runner now accepts sources under `client/src/table` as well as `client/src/hq`); the seven that mutated deleted files are gone and the manifest count in `test/review-workflow.test.js` is 3.
 - Not done here: deleting the Svelte client (#279). The component inventory above is kept as the record of what existed.
+
+## Step 7: cutover (#279)
+
+Decision **D29**. `client/` (Svelte) is deleted and `client-ng/` renamed `client/`.
+
+- Removed: every `.svelte` file; `svelte`, `@sveltejs/vite-plugin-svelte`, `svelte-check`, `eslint-plugin-svelte`, `prettier-plugin-svelte`, `svelte.config.js`, the Vite config and the multi-page `*.html` entries. Root `package.json` drops the `client-ng` workspace; `eslint.config.js` and `.prettierrc.json` lose their Svelte parts.
+- Kept pure code moved to `client/src/legacy/` (what `@legacy/*` pointed at); the alias now resolves there. Its `*.test.ts` run under plain Vitest (`client/vitest.config.ts`) because Angular's runner cannot hoist `vi.mock` in them; `npm test -w client` runs `ng test` then `vitest run`. The effectiveness probes in `test/review/hq-mutations.json` point at `client/src/legacy/table`.
+- Deleted because only the Svelte shell used them: `liveClient.ts`, `main.ts`, `shell/boot.ts`, `shell/gameHandle.ts`, `lobby/lobby.ts`, `admin/main.ts`, `map-authoring/main.ts`, `desk/store.ts`, `game-setup/`, and the dev-only `map-table` page with `dev/mapCatalog` (its Vite plugin; `docs/dev-map-catalog.md` describes it and is now historical).
+- Dropped tests: `main.test`, `shell.test`, `guest.test`, `desk.test`, `lobby.test`, `game-setup/*`, `map-table/*` (their code is gone; shell, guest and desk cases live in the Angular specs). In the seven `desk/*.test.ts` files only the mount-and-query describes (ported to component specs in steps 2 to 3) and the Svelte-store persistence cases (journal persistence, draft store round trip; covered by `desk.store.spec.ts`) were removed; their pure-logic cases stay.
+- Dockerfile always serves `client/dist/browser`; the `CLIENT` build arg is gone. `SPA_FALLBACK` defaults on; `/index.html`, `/admin/index.html` and `/map-table.html` redirect along with the other old pages.
+- Docs updated: README, AGENTS.md, `deployment.md`, `architecture.md`, `hq-interface.md`, `decisions.md` (D3 retitled, D29 added).
 
 ## Decisions
 

@@ -23,7 +23,7 @@ A deterministic engine owns the world: terrain, movement, line of sight, combat,
 
 The engine, filtered game API and live client are implemented. The client page opens the main menu, sign-in, new-game form and the live Three.js map table with its desk (in-tray, orders, order of battle, journal, staff conference). The earlier fixture-only HQ demonstration was retired in D28.
 
-The accepted live client remains available at `/?new=1&side=blue&rate=12` to create a game, or `/?game=<id>` to join. `/?lobby=1` opens the accepted lobby/game list. Sign in using the emailed magic link; the session cookie and game seat authenticate access. Vite proxies `/auth`, `/scenarios` and `/games` HTTP and WebSocket requests to `API_URL` (default `http://localhost:3000`).
+The accepted live client remains available at `/?new=1&side=blue&rate=12` to create a game, or `/?game=<id>` to join. `/?lobby=1` opens the accepted lobby/game list. Sign in using the emailed magic link; the session cookie and game seat authenticate access. The Angular dev server proxies `/auth`, `/scenarios`, `/games` and `/admin/api` (HTTP and WebSocket) to `API_URL` (default `http://localhost:3000`).
 
 ## Development
 
@@ -33,12 +33,12 @@ Node version is in `.nvmrc` (`nvm use`); use npm 10.9.7 for the pinned map sourc
 - `packages/protocol`: shared types between server and client
 - `packages/maps`: standalone battlefield generation and validated export
 - `server`: Node.js server
-- `client`: Vite + TypeScript client
+- `client`: Angular 22 + TypeScript client (standalone components, signals, zoneless) over a Three.js table
 
 ```bash
 npm run setup:map-source # verify pinned engine source and build its local tarball
 npm ci
-npm test          # Vitest in every package
+npm test          # Vitest in every package (`ng test` plus the framework-free suites in client)
 npm run test:stress # whole suite repeatedly under CPU load; fails on any flake
 npm run lint      # ESLint + Prettier check
 npm run typecheck # tsc --noEmit in every package

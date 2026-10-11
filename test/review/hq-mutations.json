@@ -5,25 +5,25 @@
       "id": "game-time",
       "invariant": "BigInt reconstructed milliseconds differs by 1ms at largest safe-second boundary",
       "rationale": "Exact duration metadata must retain every safe-integer millisecond. Replacing integer-second/remainder formatting with direct division loses 1ms at the selected BigInt boundary assertion.",
-      "source": "client/src/table/gameTime.ts",
+      "source": "client/src/legacy/table/gameTime.ts",
       "sourceSha256": "d77034896743a94f72de8222e467ab420ed58bad35c595ad3697a0a89bda9524",
       "before": "  const remainder = value % 1000;\n  const seconds = (value - remainder) / 1000;\n  const fraction =\n    remainder === 0 ? '' : `.${String(remainder).padStart(3, '0').replace(/0+$/, '')}`;\n  return `PT${seconds}${fraction}S`;",
       "after": "  return `PT${value / 1000}S`;",
       "selected": [
         {
-          "file": "client/src/table/gameTime.test.ts",
+          "file": "client/src/legacy/table/gameTime.test.ts",
           "name": "elapsed game-time presentation retains each millisecond around the largest safe-integer second boundary"
         }
       ],
       "testSha256": [
         {
-          "file": "client/src/table/gameTime.test.ts",
+          "file": "client/src/legacy/table/gameTime.test.ts",
           "sha256": "ab23a74681fa50f5f8f2d3a149640b97353bc71f753b9f408181a365c22cef4c"
         }
       ],
       "expected": [
         {
-          "file": "client/src/table/gameTime.test.ts",
+          "file": "client/src/legacy/table/gameTime.test.ts",
           "name": "elapsed game-time presentation retains each millisecond around the largest safe-integer second boundary",
           "line": 67,
           "column": 28,
@@ -36,25 +36,25 @@
       "id": "invalid-time",
       "invariant": "Negative game milliseconds remain explicitly unavailable.",
       "rationale": "Remove only the nonnegative validation guard; selected parameterized assertion checks the visible value.",
-      "source": "client/src/table/gameTime.ts",
+      "source": "client/src/legacy/table/gameTime.ts",
       "sourceSha256": "d77034896743a94f72de8222e467ab420ed58bad35c595ad3697a0a89bda9524",
       "before": " && value >= 0",
       "after": "",
       "selected": [
         {
-          "file": "client/src/table/gameTime.test.ts",
+          "file": "client/src/legacy/table/gameTime.test.ts",
           "name": "elapsed game-time presentation keeps invalid input -1 explicitly unavailable"
         }
       ],
       "testSha256": [
         {
-          "file": "client/src/table/gameTime.test.ts",
+          "file": "client/src/legacy/table/gameTime.test.ts",
           "sha256": "ab23a74681fa50f5f8f2d3a149640b97353bc71f753b9f408181a365c22cef4c"
         }
       ],
       "expected": [
         {
-          "file": "client/src/table/gameTime.test.ts",
+          "file": "client/src/legacy/table/gameTime.test.ts",
           "name": "elapsed game-time presentation keeps invalid input -1 explicitly unavailable",
           "line": 74,
           "column": 37,
@@ -67,25 +67,25 @@
       "id": "hours-beyond-24",
       "invariant": "Elapsed hours never wrap at midnight.",
       "rationale": "Plausible calendar-time formatter regression at a 25-hour game timestamp.",
-      "source": "client/src/table/gameTime.ts",
+      "source": "client/src/legacy/table/gameTime.ts",
       "sourceSha256": "d77034896743a94f72de8222e467ab420ed58bad35c595ad3697a0a89bda9524",
       "before": "  const hours = Math.floor(seconds / 3600);",
       "after": "  const hours = Math.floor(seconds / 3600) % 24;",
       "selected": [
         {
-          "file": "client/src/table/gameTime.test.ts",
+          "file": "client/src/legacy/table/gameTime.test.ts",
           "name": "elapsed game-time presentation formats 90061007 milliseconds as 25:01:01"
         }
       ],
       "testSha256": [
         {
-          "file": "client/src/table/gameTime.test.ts",
+          "file": "client/src/legacy/table/gameTime.test.ts",
           "sha256": "ab23a74681fa50f5f8f2d3a149640b97353bc71f753b9f408181a365c22cef4c"
         }
       ],
       "expected": [
         {
-          "file": "client/src/table/gameTime.test.ts",
+          "file": "client/src/legacy/table/gameTime.test.ts",
           "name": "elapsed game-time presentation formats 90061007 milliseconds as 25:01:01",
           "line": 19,
           "column": 35,
