@@ -69,8 +69,17 @@ export interface LobbyStore {
   many(ids: readonly string[]): LobbyGame[];
   /** Forgets the games this account made that have not started, and removes it from ready lists and role seats. */
   forgetUser(userId: string): void;
+  /** Hands everything `from` made or holds (creator, ready, role seats) to `to`; used when a guest signs in. */
+  reassignUser(from: string, to: string): void;
   close(): void;
 }
+
+const moveUser = (g: LobbyGame, from: string, to: string): LobbyGame => ({
+  ...g,
+  creator: g.creator === from ? to : g.creator,
+  ready: [...new Set(g.ready.map((u) => (u === from ? to : u)))],
+  ...(g.roles ? { roles: g.roles.map((r) => (r.userId === from ? { ...r, userId: to } : r)) } : {}),
+});
 
 const newestFirst = (a: LobbyGame, b: LobbyGame) => b.createdAtMs - a.createdAtMs;
 
@@ -105,6 +114,10 @@ export class MemoryLobbyStore implements LobbyStore {
       .map((id) => this.get(id))
       .filter((g): g is LobbyGame => g !== undefined)
       .sort(newestFirst);
+  }
+
+  reassignUser(from: string, to: string): void {
+    for (const [id, g] of this.games) this.games.set(id, moveUser(g, from, to));
   }
 
   forgetUser(userId: string): void {
@@ -180,6 +193,14 @@ export class SqliteLobbyStore implements LobbyStore {
       .map((id) => this.get(id))
       .filter((g): g is LobbyGame => g !== undefined)
       .sort(newestFirst);
+  }
+
+  reassignUser(from: string, to: string): void {
+    for (const row of this.db.prepare('SELECT body FROM lobby_games').all() as Row[]) {
+      const g = parse(row);
+      const moved = moveUser(g, from, to);
+      if (JSON.stringify(moved) !== JSON.stringify(g)) this.put(moved);
+    }
   }
 
   forgetUser(userId: string): void {

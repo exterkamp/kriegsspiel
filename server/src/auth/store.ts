@@ -13,11 +13,22 @@ export interface User {
   id: string;
   email: string;
   createdAtMs: number;
+  /** A guest has no real address (`guest-<id>@guest.invalid`) and is removed when idle (D17c). */
+  guest: boolean;
 }
 
 export interface AuthStore {
   /** The user with this (already normalised) email, created on first use. */
   upsertUser(email: string, nowMs: number): User;
+  /** A new guest user with a placeholder address. */
+  createGuest(nowMs: number): User;
+  /**
+   * Moves the guest's seats to `userId` and deletes the guest. A seat that collides with one the
+   * target already holds (same game) is dropped. Returns the game ids that moved.
+   */
+  adoptGuest(guestId: string, userId: string): string[];
+  /** Guests with no live session at `nowMs`. */
+  idleGuests(nowMs: number): string[];
   getUser(id: string): User | undefined;
   /** Removes the user, their sessions, pending links and seats. Returns the game ids they held seats in. */
   deleteUser(id: string): string[];
@@ -38,6 +49,8 @@ export interface AuthStore {
   close(): void;
 }
 
+export const guestEmail = (id: string): string => `guest-${id}@guest.invalid`;
+
 export const hashToken = (token: string): string =>
   createHash('sha256').update(token).digest('hex');
 
@@ -50,9 +63,35 @@ export class MemoryAuthStore implements AuthStore {
 
   upsertUser(email: string, nowMs: number): User {
     for (const u of this.users.values()) if (u.email === email) return u;
-    const user = { id: randomUUID(), email, createdAtMs: nowMs };
+    const user = { id: randomUUID(), email, createdAtMs: nowMs, guest: false };
     this.users.set(user.id, user);
     return user;
+  }
+
+  createGuest(nowMs: number): User {
+    const id = randomUUID();
+    const user = { id, email: guestEmail(id), createdAtMs: nowMs, guest: true };
+    this.users.set(id, user);
+    return user;
+  }
+
+  adoptGuest(guestId: string, userId: string): string[] {
+    const moved: string[] = [];
+    for (const [gameId, bySide] of this.seats) {
+      for (const [side, u] of bySide) {
+        if (u !== guestId) continue;
+        bySide.delete(side);
+        if (this.claimSeat(gameId, side, userId)) moved.push(gameId);
+      }
+    }
+    this.deleteUser(guestId);
+    return moved;
+  }
+
+  idleGuests(nowMs: number): string[] {
+    const live = new Set<string>();
+    for (const s of this.sessions.values()) if (s.exp > nowMs) live.add(s.userId);
+    return [...this.users.values()].filter((u) => u.guest && !live.has(u.id)).map((u) => u.id);
   }
 
   getUser(id: string): User | undefined {
@@ -174,6 +213,51 @@ export class SqliteAuthStore implements AuthStore {
     this.db = new DatabaseSync(path);
     this.db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
     this.db.exec(SCHEMA);
+    const cols = this.db.prepare('PRAGMA table_info(auth_users)').all() as Row[];
+    if (!cols.some((c) => c.name === 'guest')) {
+      this.db.exec('ALTER TABLE auth_users ADD COLUMN guest INTEGER NOT NULL DEFAULT 0');
+    }
+  }
+
+  createGuest(nowMs: number): User {
+    const id = randomUUID();
+    this.db
+      .prepare('INSERT INTO auth_users (id, email, created_at_ms, guest) VALUES (?, ?, ?, 1)')
+      .run(id, guestEmail(id), nowMs);
+    return { id, email: guestEmail(id), createdAtMs: nowMs, guest: true };
+  }
+
+  adoptGuest(guestId: string, userId: string): string[] {
+    const seats = this.db
+      .prepare('SELECT game_id, side FROM auth_seats WHERE user_id = ?')
+      .all(guestId) as Row[];
+    const moved: string[] = [];
+    this.db.exec('BEGIN');
+    try {
+      this.db.prepare('DELETE FROM auth_seats WHERE user_id = ?').run(guestId);
+      for (const r of seats) {
+        if (this.claimSeat(String(r.game_id), String(r.side) as SideId, userId)) {
+          moved.push(String(r.game_id));
+        }
+      }
+      this.db.exec('COMMIT');
+    } catch (e) {
+      this.db.exec('ROLLBACK');
+      throw e;
+    }
+    this.deleteUser(guestId);
+    return moved;
+  }
+
+  idleGuests(nowMs: number): string[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT id FROM auth_users WHERE guest = 1 AND id NOT IN
+             (SELECT user_id FROM auth_sessions WHERE expires_at_ms > ?)`,
+        )
+        .all(nowMs) as Row[]
+    ).map((r) => String(r.id));
   }
 
   upsertUser(email: string, nowMs: number): User {
@@ -293,4 +377,5 @@ const toUser = (r: Row): User => ({
   id: String(r.id),
   email: String(r.email),
   createdAtMs: Number(r.created_at_ms),
+  guest: Number(r.guest ?? 0) === 1,
 });
