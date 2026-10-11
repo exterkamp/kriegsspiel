@@ -1,0 +1,84 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it } from 'vitest';
+import type { Mark } from '@kriegsspiel/protocol';
+import {
+  annexLine,
+  deliveryStatus,
+  emptyDraft,
+  estimateRideMs,
+  formatEstimate,
+  loadDraft,
+  saveDraft,
+  withAnnex,
+} from './orders.js';
+
+const arrow = (id: string, madeAtGame = 0): Mark => ({
+  id,
+  kind: 'arrow',
+  from: { x: 100, y: 200 },
+  to: { x: 400.4, y: 600 },
+  label: 'Main thrust',
+  madeAtGame,
+});
+
+describe('delivery estimate', () => {
+  const hq = { x: 0, y: 0 };
+  it('is the straight line at the courier pace, fast sooner than safe', () => {
+    const to = { x: 600, y: 800 }; // 1000 m
+    expect(estimateRideMs(hq, to, 'fast')).toBe(Math.round((1000 / 600) * 60_000));
+    expect(estimateRideMs(hq, to, 'safe')).toBe(Math.round((1000 / 300) * 60_000));
+    expect(estimateRideMs(hq, to, 'fast')).toBeLessThan(estimateRideMs(hq, to, 'safe'));
+  });
+  it('words the estimate', () => {
+    expect(formatEstimate(10 * 60_000)).toBe('about 10 min');
+    expect(formatEstimate(130 * 60_000)).toBe('about 2 h 10 min');
+    expect(formatEstimate(120 * 60_000)).toBe('about 2 h');
+    expect(formatEstimate(0)).toBe('about 1 min');
+  });
+});
+
+describe('annex', () => {
+  it('attaches only the chosen arrows, in the order made', () => {
+    const marks: Mark[] = [
+      arrow('b', 20),
+      arrow('a', 10),
+      { id: 'p', kind: 'pin', at: { x: 1, y: 1 }, madeAtGame: 0 },
+    ];
+    expect(annexLine(arrow('a') as never)).toBe(
+      'arrow "Main thrust" from (100 m, 200 m) to (400 m, 600 m)',
+    );
+    const text = withAnnex('Advance.', marks, ['b', 'a', 'p']);
+    expect(text.startsWith('Advance.\n\nAnnex (marked map): ')).toBe(true);
+    expect(text.indexOf('(100 m')).toBeLessThan(text.length);
+    expect(text.match(/arrow/g)).toHaveLength(2);
+    expect(withAnnex('Advance.', marks, [])).toBe('Advance.');
+    expect(withAnnex('Advance.', marks, ['gone'])).toBe('Advance.');
+  });
+});
+
+describe('draft autosave', () => {
+  afterEach(() => localStorage.clear());
+  it('round-trips a draft and forgets an empty one', () => {
+    const d = { to: 'blue-1', text: 'Hold the bridge', courier: 'fast' as const, annex: ['a'] };
+    saveDraft('g1', d);
+    expect(loadDraft('g1')).toEqual(d);
+    expect(loadDraft('g2')).toEqual(emptyDraft());
+    saveDraft('g1', emptyDraft());
+    expect(localStorage.length).toBe(0);
+  });
+  it('survives garbage in storage', () => {
+    localStorage.setItem('kriegsspiel.orderDraft.g1', '{"text":5,"courier":"x"}');
+    expect(loadDraft('g1')).toEqual(emptyDraft());
+    localStorage.setItem('kriegsspiel.orderDraft.g1', 'not json');
+    expect(loadDraft('g1')).toEqual(emptyDraft());
+  });
+});
+
+describe('delivery status', () => {
+  const p = { orderId: 'o', text: 't', sentAtGame: 1000, etaGame: 3000 };
+  it('rides, then is due', () => {
+    expect(deliveryStatus(p, 2000)).toMatchObject({ state: 'riding', fraction: 0.5 });
+    expect(deliveryStatus(p, 3000)).toMatchObject({ state: 'due', fraction: 1 });
+    expect(deliveryStatus({ ...p, etaGame: undefined }, 2000).state).toBe('unknown');
+  });
+});
