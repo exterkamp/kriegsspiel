@@ -203,9 +203,12 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       return { ...s, notices };
     }
     case 'error': {
+      const aboutOrder = m.code === 'order_rejected' || m.code === 'order_clarification';
       const id = orderIdOf(m.message);
       const dropped = id === undefined ? s.pending : s.pending.filter((p) => p.orderId !== id);
-      const notices = [...s.notices, { code: m.code, message: m.message }].slice(-MAX_NOTICES);
+      // The prefix is for matching the pending order; the player reads only the staff's words.
+      const message = aboutOrder && id !== undefined ? m.message.slice(id.length + 2) : m.message;
+      const notices = [...s.notices, { code: m.code, message }].slice(-MAX_NOTICES);
       return { ...s, pending: dropped, notices };
     }
   }

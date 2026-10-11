@@ -5,6 +5,7 @@ import {
   type Difficulty,
   type Personality,
 } from './opponent/llmCommander.js';
+import type { UmpireConfig } from './umpire/index.js';
 import { LogMailer, WebhookMailer, type Mailer } from './auth/mailer.js';
 
 /** Scripted sides are played by the built-in opponent unless `SCRIPTED_OPPONENTS` is `0`, `false` or `off`. */
@@ -56,4 +57,19 @@ export function authFromEnv(
       ? new WebhookMailer(hook, env.MAIL_WEBHOOK_TOKEN?.trim() || undefined)
       : new LogMailer(log),
   };
+}
+
+/**
+ * Whether orders are parsed by the LLM: the `parse` stage's provider is usable (Anthropic needs its
+ * API key; any other configured provider counts) and `ORDER_PARSER` is not `stub`. Otherwise the
+ * rule-based stub parses orders, as in tests and with no key.
+ */
+export function llmOrderParserEnabled(
+  env: Record<string, string | undefined>,
+  config: UmpireConfig,
+): boolean {
+  if (env.ORDER_PARSER?.trim().toLowerCase() === 'stub') return false;
+  const spec = config.providers[config.stages.parse.provider];
+  if (!spec) return false;
+  return spec.type === 'anthropic' ? Boolean(env[spec.apiKeyEnv ?? 'ANTHROPIC_API_KEY']) : true;
 }

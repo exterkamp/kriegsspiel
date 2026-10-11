@@ -70,7 +70,34 @@ describe('applyServerMessage', () => {
     };
     s = applyServerMessage(s, m, 0);
     expect(s.pending.map((p) => p.orderId)).toEqual(['o2']);
-    expect(s.notices[0]?.message).toBe('o1: no such unit');
+    expect(s.notices[0]?.message).toBe('no such unit');
+  });
+});
+
+describe('order clarification', () => {
+  it('shows the question without the order id and drops the pending order', () => {
+    let s = withPendingOrder(initialState, { orderId: 'o-lq3-1', text: 'x', sentAtGame: 0 });
+    s = applyServerMessage(
+      s,
+      {
+        v,
+        kind: 'error',
+        code: 'order_clarification',
+        message: 'o-lq3-1: Which wood do you mean? (Northern wood)',
+      },
+      0,
+    );
+    expect(s.pending).toEqual([]);
+    expect(s.notices[0]?.message).toBe('Which wood do you mean? (Northern wood)');
+  });
+
+  it('leaves other errors as sent', () => {
+    const s = applyServerMessage(
+      initialState,
+      { v, kind: 'error', code: 'bad_message', message: 'bad frame: not JSON' },
+      0,
+    );
+    expect(s.notices[0]?.message).toBe('bad frame: not JSON');
   });
 });
 

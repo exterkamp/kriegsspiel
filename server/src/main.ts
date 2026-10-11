@@ -6,6 +6,7 @@
  *   STATIC_DIR          built client to serve at `/`; unset serves the API only
  *   SCRIPTED_OPPONENTS  scripted sides are played by the built-in opponent unless `0`, `false` or `off`
  *   AI_COMMANDER        `llm` plays scripted sides with the LLM commander (needs a provider key, see docs/llm-providers.md); AI_DIFFICULTY easy|normal|hard, AI_PERSONALITY cautious|balanced|aggressive
+ *   ORDER_PARSER        `stub` forces the rule-based order parser; otherwise the LLM parses orders whenever the parse stage's provider is configured (ANTHROPIC_API_KEY for the default)
  *   ADMIN_ENABLED       `1`/`true`/`on` mounts the read-only /admin/api (loopback only unless ADMIN_TOKEN is set)
  *   PUBLIC_URL          origin used in login links (default http://localhost:$PORT); https makes the session cookie Secure
  *   MAIL_WEBHOOK_URL    POST `{to, subject, text}` here to send the magic link; unset logs the link instead (dev only)
@@ -21,6 +22,7 @@ import { SqliteLobbyStore } from './lobby/store.js';
 import {
   aiCommanderFromEnv,
   authFromEnv,
+  llmOrderParserEnabled,
   scriptedOpponentsFromEnv,
   trustProxyFromEnv,
 } from './config.js';
@@ -39,13 +41,35 @@ const authStore = process.env.DB_PATH ? new SqliteAuthStore(process.env.DB_PATH)
 const notifyStore = process.env.DB_PATH ? new SqliteNotifyStore(process.env.DB_PATH) : undefined;
 const lobby = process.env.DB_PATH ? new SqliteLobbyStore(process.env.DB_PATH) : undefined;
 
-// The LLM commander, when asked for: one capped client per game over the shared one.
+// The LLM umpire, when a provider is configured or the LLM commander is asked for: one capped
+// client per game over the shared one, used by both the order parser and the commander.
 const ai = aiCommanderFromEnv(process.env);
-const umpireConfig = ai ? loadUmpireConfig(process.env) : undefined;
+const loadedConfig = loadUmpireConfig(process.env);
+const llmParser = llmOrderParserEnabled(process.env, loadedConfig);
+const umpireConfig = ai || llmParser ? loadedConfig : undefined;
 const umpire = umpireConfig ? createUmpireClient({ config: umpireConfig }) : undefined;
+const gameClients = new Map<string, ReturnType<typeof createGameUmpire>>();
+const gameUmpire = (gameId: string) => {
+  let client = gameClients.get(gameId);
+  if (!client) {
+    client = createGameUmpire(umpire!, {
+      gameId,
+      limits: umpireConfig?.gameBudget,
+      onMetric: (m) => server.log.info({ umpire: m }, 'umpire call'),
+    });
+    gameClients.set(gameId, client);
+  }
+  return client;
+};
 
 const { server } = await buildApp({
-  parser: new StubOrderParser(),
+  parser: llmParser
+    ? (gameId) =>
+        new LlmOrderParser(gameUmpire(gameId), {
+          fallbackParser: new StubOrderParser(),
+          onFallback: (f) => server.log.warn({ gameId, reason: f.reason }, 'order parser fallback'),
+        })
+    : new StubOrderParser(),
   store,
   lobby,
   staticDir: process.env.STATIC_DIR,
@@ -54,11 +78,7 @@ const { server } = await buildApp({
   aiAgents:
     ai && umpire
       ? (gameId, world, scripted) => {
-          const client = createGameUmpire(umpire, {
-            gameId,
-            limits: umpireConfig?.gameBudget,
-            onMetric: (m) => server.log.info({ umpire: m }, 'umpire call'),
-          });
+          const client = gameUmpire(gameId);
           const llm = llmAgents(world, {
             ...ai,
             client,
