@@ -7,7 +7,7 @@ import { facingToRotationY, fitDistance } from './framing.js';
 import { createDressing, positionDressing } from './dressing.js';
 import { ghostOpacity, tagLines } from './tagText.js';
 import { createMarkGroup, markSignature, validateSceneMarks } from './fixtureMarks.js';
-import type { BaseMap, GhostPiece, OwnPiece, SceneState } from './types.js';
+import type { BaseMap, GhostPiece, OwnPiece, SceneMark, SceneState } from './types.js';
 
 const SIDE_COLOURS: Record<string, number> = { blue: 0x2f55a4, red: 0xa83232 };
 export const MAX_ARTWORK_TEXTURE_PX = 4096;
@@ -95,8 +95,11 @@ export class TableScene {
   private raf = 0;
   private renderGeneration = 0;
   private disposed = false;
-  private readonly mode: 'fixture' | 'public-map-preview';
+  private readonly mode: 'fixture' | 'public-map-preview' | 'local-hq-board';
   private applyingPreview = false;
+  private applyingLocal = false;
+  private localRaster: PreviewRaster | null = null;
+  private localRasterBinding: PreviewRaster | null = null;
   private previewAvailable = false;
   private previewRenderFailed = false;
   private onPreviewUnavailable: ((error: PreviewApplyError) => void) | undefined;
@@ -110,7 +113,7 @@ export class TableScene {
       resource.dispose();
     } catch (error) {
       // User disposal listeners must not interrupt preview cleanup or publication.
-      if (this.mode !== 'public-map-preview') throw error;
+      if (this.mode === 'fixture') throw error;
     }
   };
   private releaseTree(object: THREE.Object3D): void {
@@ -121,12 +124,12 @@ export class TableScene {
     readonly canvas: HTMLCanvasElement,
     opts: {
       preserveDrawingBuffer?: boolean;
-      mode?: 'fixture' | 'public-map-preview';
+      mode?: 'fixture' | 'public-map-preview' | 'local-hq-board';
       onPreviewUnavailable?: (error: PreviewApplyError) => void;
     } = {},
   ) {
     this.mode = opts.mode ?? 'fixture';
-    if (!['fixture', 'public-map-preview'].includes(this.mode))
+    if (!['fixture', 'public-map-preview', 'local-hq-board'].includes(this.mode))
       throw new TypeError('Invalid table mode');
     this.onPreviewUnavailable =
       this.mode === 'public-map-preview' ? opts.onPreviewUnavailable : undefined;
@@ -432,6 +435,20 @@ export class TableScene {
 
   previewTextureLimit(): number {
     this.requirePreview();
+    return this.registeredTextureLimit();
+  }
+
+  private requireLocalBoard(): void {
+    if (this.mode !== 'local-hq-board')
+      throw new TypeError('Only local HQ tables accept board marks');
+  }
+
+  localBoardTextureLimit(): number {
+    this.requireLocalBoard();
+    return this.registeredTextureLimit();
+  }
+
+  private registeredTextureLimit(): number {
     if (this.disposed) throw new PreviewApplyError('Table is disposed', 'unavailable');
     const limit = Math.min(MAX_ARTWORK_TEXTURE_PX, this.renderer.capabilities.maxTextureSize);
     if (!Number.isSafeInteger(limit) || limit < 1)
@@ -488,6 +505,10 @@ export class TableScene {
   /** A synchronous rendered transaction. Old resources survive until the candidate frame succeeds. */
   applyPreviewRaster(raster: PreviewRaster): void {
     this.requirePreview();
+    this.applyRegisteredRaster(raster);
+  }
+
+  private applyRegisteredRaster(raster: PreviewRaster): void {
     const display = () =>
       this.previewAvailable && !this.previewRenderFailed && !this.disposed && !this.contextLost()
         ? ('retained' as const)
@@ -525,7 +546,7 @@ export class TableScene {
       dressingScale: this.dressing?.scale.clone(),
     };
     try {
-      const limit = this.previewTextureLimit();
+      const limit = this.registeredTextureLimit();
       const { canvas, widthM, heightM, contentWidthPx: w, contentHeightPx: h } = raster;
       if (
         !(canvas instanceof HTMLCanvasElement) ||
@@ -639,6 +660,99 @@ export class TableScene {
     } finally {
       this.applyingPreview = false;
     }
+  }
+
+  /** Fixed raster plus render-only personal marks; never accepts fixture/game state. */
+  applyLocalBoard(raster: PreviewRaster, rawMarks: readonly SceneMark[]): void {
+    this.requireLocalBoard();
+    if (this.disposed) throw new Error('Local HQ table is disposed');
+    if (this.applyingLocal) throw new Error('Nested local board update rejected');
+    if (
+      this.localRaster &&
+      (this.localRaster !== raster ||
+        !Object.entries(this.localRasterBinding!).every(
+          ([key, value]) => Reflect.get(raster, key) === value,
+        ))
+    )
+      throw new TypeError('Local HQ board binding cannot be replaced');
+    const map: BaseMap = { width: raster.widthM, height: raster.heightM, features: [] };
+    const marks = validateSceneMarks(rawMarks, map);
+    const next = new Map<string, MarkObject>();
+    const created: THREE.Group[] = [];
+    const previous = this.marks;
+    let previousState = this.state;
+    let committed = false;
+    this.applyingLocal = true;
+    const alive = () => {
+      if (this.disposed) throw new Error('Local HQ table is disposed');
+    };
+    try {
+      for (const mark of marks) {
+        const signature = markSignature(mark, map);
+        const old = previous.get(mark.id);
+        if (old?.signature === signature) next.set(mark.id, old);
+        else {
+          const group = createMarkGroup(mark, map);
+          created.push(group);
+          next.set(mark.id, { group, signature });
+        }
+      }
+      if (!this.localRaster) {
+        this.applyRegisteredRaster(raster);
+        alive();
+        this.localRaster = raster;
+        this.localRasterBinding = Object.freeze({ ...raster });
+        previousState = this.state;
+      }
+      for (const old of previous.values()) {
+        this.marksRoot.remove(old.group);
+        alive();
+      }
+      for (const mark of next.values()) {
+        this.marksRoot.add(mark.group);
+        alive();
+      }
+      this.state = { side: '', map, own: [], ghosts: [], marks };
+      this.clipPaperLabels();
+      this.renderLocalBoardFrame();
+      this.marks = next;
+      committed = true;
+      for (const [id, old] of previous) {
+        if (next.get(id)?.group !== old.group) this.releaseTree(old.group);
+        alive();
+      }
+    } catch (error) {
+      if (!committed && !this.disposed) {
+        for (const mark of next.values()) this.marksRoot.remove(mark.group);
+        for (const old of previous.values()) {
+          if (this.disposed) break;
+          this.marksRoot.add(old.group);
+        }
+        if (!this.disposed) {
+          // A first map may already have succeeded; retain its empty map state for retry.
+          if (previousState) this.state = previousState;
+          try {
+            this.renderLocalBoardFrame();
+          } catch {
+            /* Caller receives the failed update. */
+          }
+        }
+      }
+      for (const group of created) {
+        if (!committed || this.disposed) this.releaseTree(group);
+      }
+      throw error;
+    } finally {
+      this.applyingLocal = false;
+    }
+  }
+
+  /** Used after camera framing as well as apply; success acknowledges an actual frame. */
+  renderLocalBoardFrame(): void {
+    this.requireLocalBoard();
+    if (this.disposed || this.contextLost()) throw new Error('Local HQ display is unavailable');
+    this.renderer.render(this.scene, this.camera);
+    if (this.disposed || this.contextLost()) throw new Error('Local HQ display is unavailable');
   }
 
   fitPreview(): void {
@@ -1057,6 +1171,8 @@ export class TableScene {
     this.mapMesh = this.tableMesh = undefined;
     this.dressing = undefined;
     this.artworkImage = undefined;
+    this.localRaster = null;
+    this.localRasterBinding = null;
     this.renderer.dispose();
   }
 }
