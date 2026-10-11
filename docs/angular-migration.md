@@ -1,6 +1,6 @@
 # Angular migration plan (issue #269)
 
-Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271), step 1 (services and stores, #272) and step 5 (admin, map authoring and benchmarks, #277) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
+Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) and step 1 (services and stores, #272) and step 2.2 (roster, journal, conference, pause panel, #273) and step 5 (admin, map authoring and benchmarks, #277) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
 
 ## What the spike proves
 
@@ -29,6 +29,15 @@ Not in the spike: sign-in, menus, orders, marks, any other view, the admin, map-
 - **Plan change:** the `gameState` store is not duplicated in `DeskStore`; it is `GameService.state`. `gameId` lives on `GameService`, not the desk store. Marks, hot-seat switching and canvas pointer handling stay for step 3 (`MarksService`, `GameComponent`).
 - **Behaviour difference.** A Svelte `subscribe` saw every state; an Angular `effect` runs once per tick, so game states applied within one tick are folded into one. `persistJournal` compares only the previous *seen* state, so a pause then resume (or an order added then refused) inside a single tick leaves no diary entry. Each WebSocket message is its own task, so this should be rare.
 - Tests: `game.service.spec.ts`, `ports.spec.ts`, `desk/desk.store.spec.ts` (no timers; `TestBed.tick()` flushes effects). No Svelte tests were dropped: the Svelte store has no tests of its own.
+
+## Step 2.2: roster, journal, conference and pause panel (#273)
+
+- Ported to `client-ng/src/app/desk/{roster,journal,conference,pause-panel}/` as standalone `OnPush` components (`RosterComponent`, `JournalComponent`, `ConferenceComponent`, `PausePanelComponent`) over the unchanged pure `@legacy/desk/*` logic, `GameService.state` and `DeskStore`. Templates and styles are copied from the Svelte versions, so markup, labels, roles and test ids match.
+- Re-reads of game time (roster, journal, conference) and the pause countdown use a `setInterval` that writes a `wall` signal, cleared in `DestroyRef.onDestroy`, as `ClockComponent` does. The pause panel marks `document.title` from an `effect` and restores it on destroy.
+- **Conference sender.** Svelte left `conferenceSender` unset offline so the fixture charged the cost. `CONFERENCE_SENDER` always exists now, so the component skips it when `GameService.state().link === 'offline'`.
+- No `@angular/forms`: inputs use `[value]` and `(input)` bound to signals.
+- The components are not mounted yet; `DeskComponent` (step 3) lays them out. `desk/testing.ts` has a `stubGame()` helper that provides a `GameService` whose state a test sets directly.
+- Tests: one spec per component, covering the mount assertions of `roster.test.ts`, `journal.test.ts`, `conference.test.ts` and `pause.test.ts`, with the `PausePanel` cases of `pause.test.ts` ported and a countdown test on fake timers. The pure-logic halves of those Svelte test files stay where they are until the cutover. No test was dropped; the Svelte `Desk`-mounted cases (for example the clock vote shown beside the pause panel) belong to `DeskComponent`.
 
 ## Step 5: admin, map authoring and benchmarks (#277)
 
