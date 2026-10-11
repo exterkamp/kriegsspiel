@@ -56,6 +56,68 @@ function renderMark(mark: PersonalMark): SceneMark {
   }
 }
 
+function sceneState(p: MapPresentation, side: Scope['sideId']): SceneState {
+  return {
+    side: side,
+    map: publicMap,
+    marks: p.marks.map(renderMark),
+    own: p.pieces
+      .filter((piece) => piece.relationship === 'own')
+      .map((piece) => ({
+        kind: 'own',
+        id: piece.unitId,
+        side: side,
+        label: piece.label,
+        snapshotAtGame: p.snapshot.atGame,
+        position: { x: piece.position.x, y: piece.position.y },
+        facing: piece.appearance!.facingRad,
+        formation: piece.appearance!.formation,
+        footprint: {
+          frontage: piece.appearance!.frontageM,
+          depth: piece.appearance!.depthM,
+        },
+        ...(piece.appearance!.shape === null
+          ? {}
+          : {
+              shape: piece.appearance!.shape.map((point) => ({ ...point })),
+            }),
+      })),
+    ghosts: p.pieces
+      .filter((piece) => piece.relationship === 'enemy')
+      .map((piece) => ({
+        kind: 'ghost',
+        id: piece.unitId,
+        position: { x: piece.position.x, y: piece.position.y },
+        ageMs: piece.ageMs ?? 0,
+        ageTag:
+          piece.observedAtGame === null
+            ? 'Snapshot'
+            : `${Math.floor((piece.ageMs ?? 0) / 60000)}m old`,
+        sizeEstimate: piece.label,
+        facing: piece.appearance?.facingRad ?? 0,
+        uncertaintyRadius: piece.uncertaintyRadiusM ?? 0,
+        ...(piece.appearance === null
+          ? {}
+          : {
+              formation: piece.appearance.formation,
+              footprint: {
+                frontage: piece.appearance.frontageM,
+                depth: piece.appearance.depthM,
+              },
+              ...(piece.appearance.shape === null
+                ? {}
+                : {
+                    shape: piece.appearance.shape.map((point) => ({
+                      ...point,
+                    })),
+                  }),
+            }),
+        snapshotAtGame: p.snapshot.atGame,
+        ...(piece.observedAtGame === null ? {} : { observedAtGame: piece.observedAtGame }),
+      })),
+  };
+}
+
 /** Public-art fixture surface using the accepted continuous metre renderer. */
 export class ContinuousSurface implements MapSurface {
   readonly coordinates = 'metres';
@@ -162,70 +224,16 @@ export class ContinuousSurface implements MapSurface {
     if (old && p.revision === old.revision && JSON.stringify(p) !== JSON.stringify(old))
       return failure('conflict', 'The same table revision contains different data.');
     if (old && JSON.stringify(p) === JSON.stringify(old)) return success(undefined);
-    const state: SceneState = {
-      side: this.scope.sideId,
-      map: publicMap,
-      marks: p.marks.map(renderMark),
-      own: p.pieces
-        .filter((piece) => piece.relationship === 'own')
-        .map((piece) => ({
-          kind: 'own',
-          id: piece.unitId,
-          side: this.scope.sideId,
-          label: piece.label,
-          snapshotAtGame: p.snapshot.atGame,
-          position: { x: piece.position.x, y: piece.position.y },
-          facing: piece.appearance!.facingRad,
-          formation: piece.appearance!.formation,
-          footprint: {
-            frontage: piece.appearance!.frontageM,
-            depth: piece.appearance!.depthM,
-          },
-          ...(piece.appearance!.shape === null
-            ? {}
-            : {
-                shape: piece.appearance!.shape.map((point) => ({ ...point })),
-              }),
-        })),
-      ghosts: p.pieces
-        .filter((piece) => piece.relationship === 'enemy')
-        .map((piece) => ({
-          kind: 'ghost',
-          id: piece.unitId,
-          position: { x: piece.position.x, y: piece.position.y },
-          ageMs: piece.ageMs ?? 0,
-          ageTag:
-            piece.observedAtGame === null
-              ? 'Snapshot'
-              : `${Math.floor((piece.ageMs ?? 0) / 60000)}m old`,
-          sizeEstimate: piece.label,
-          facing: piece.appearance?.facingRad ?? 0,
-          uncertaintyRadius: piece.uncertaintyRadiusM ?? 0,
-          ...(piece.appearance === null
-            ? {}
-            : {
-                formation: piece.appearance.formation,
-                footprint: {
-                  frontage: piece.appearance.frontageM,
-                  depth: piece.appearance.depthM,
-                },
-                ...(piece.appearance.shape === null
-                  ? {}
-                  : {
-                      shape: piece.appearance.shape.map((point) => ({
-                        ...point,
-                      })),
-                    }),
-              }),
-          snapshotAtGame: p.snapshot.atGame,
-          ...(piece.observedAtGame === null ? {} : { observedAtGame: piece.observedAtGame }),
-        })),
-    };
+    const state = sceneState(p, this.scope.sideId);
+    const beforeActive = this.active;
+    let applied = false;
+    let accepted = false;
     this.applying = true;
     try {
       const image = old ? null : await this.loadImage(op.signal);
       if (this.disposed) return this.unavailable();
       if (op.signal.aborted) return failure('aborted', 'Table update cancelled.');
+      applied = true;
       this.table.apply(state, image ?? undefined);
       if (this.disposed) return failure('disposed', 'The table is closed.');
       if (this.settled === 'table' && !this.transitioning) {
@@ -236,6 +244,7 @@ export class ContinuousSurface implements MapSurface {
       if (op.signal.aborted) return failure('aborted', 'Table update cancelled.');
       // Activation runs synchronous callbacks and can fail. Only cache a successful lifetime.
       this.presentation = immutable(structuredClone(p));
+      accepted = true;
       return success(undefined);
     } catch {
       if (this.disposed) return failure('disposed', 'The table is closed.');
@@ -243,6 +252,22 @@ export class ContinuousSurface implements MapSurface {
         ? failure('aborted', 'Map loading cancelled.')
         : failure('invalid-data', 'Public map artwork could not be loaded.');
     } finally {
+      if (applied && !accepted && old && !this.disposed) {
+        // Physical scene and accepted picking data must agree after a failed update.
+        try {
+          const stopped = this.activate(false);
+          if (!stopped.ok) this.dispose();
+          else {
+            this.table.apply(sceneState(old, this.scope.sideId));
+            if (!this.disposed) {
+              const restored = this.activate(beforeActive);
+              if (!restored.ok) this.dispose();
+            }
+          }
+        } catch {
+          this.dispose();
+        }
+      }
       this.applying = false;
     }
   }
@@ -447,6 +472,15 @@ export class ContinuousSurface implements MapSurface {
           table.camera.position.copy(goal.position);
           table.controls.target.copy(goal.target);
           table.controls.update();
+          if (this.disposed || op.signal.aborted) {
+            if (!this.disposed) rollback();
+            this.transitioning = false;
+            this.syncControls();
+            resolve(
+              this.disposed ? this.unavailable() : failure('aborted', 'Navigation cancelled.'),
+            );
+            return;
+          }
           table.renderer.render(table.scene, table.camera);
           if (this.disposed || op.signal.aborted) {
             if (!this.disposed) rollback();

@@ -173,6 +173,67 @@ afterEach(() => {
 });
 
 describe('continuous surface lifecycle', () => {
+  it('restores the accepted scene when a newer presentation fails to restart', async () => {
+    const { surface } = await mounted();
+    const scene = harness.scenes[0] as {
+      apply: ReturnType<typeof vi.fn>;
+      renderOnStart: boolean;
+      running: boolean;
+      renderer: { render: ReturnType<typeof vi.fn> };
+    };
+    scene.renderOnStart = true;
+    const accepted = presentation();
+    const next = presentation(2);
+    const newer = {
+      ...next,
+      pieces: next.pieces.map((piece, index) =>
+        index === 0
+          ? { ...piece, position: { ...piece.position, x: piece.position.x + 1 } }
+          : piece,
+      ),
+    };
+    expect((await surface.apply(accepted, op())).ok).toBe(true);
+    const acceptedState = scene.apply.mock.calls.at(-1)![0];
+    surface.setActive(false);
+    scene.renderer.render.mockImplementationOnce(() => {
+      throw new Error('Restart failed');
+    });
+    expect((await surface.apply(newer, op())).ok).toBe(false);
+    expect(scene.apply.mock.calls.at(-1)![0]).toEqual(acceptedState);
+    expect((await surface.apply(accepted, op())).ok).toBe(true);
+    expect(surface.setActive(true).ok).toBe(true);
+    expect(scene.apply.mock.calls.at(-1)![0]).toEqual(acceptedState);
+    expect(scene.running).toBe(true);
+    expect((await surface.apply(newer, op())).ok).toBe(true);
+    expect(scene.apply.mock.calls.at(-1)![0]).not.toEqual(acceptedState);
+    surface.dispose();
+    expect(frames.size).toBe(0);
+  });
+
+  it.each(['abort', 'dispose'] as const)(
+    'does not render after the final transition control callback %s',
+    async (cancel) => {
+      const { surface } = await mounted();
+      await surface.apply(presentation(), op());
+      const scene = harness.scenes[0] as {
+        controls: { update: () => void };
+        renderer: { render: ReturnType<typeof vi.fn> };
+      };
+      const controller = new AbortController();
+      vi.spyOn(scene.controls, 'update')
+        .mockImplementationOnce(() => {})
+        .mockImplementationOnce(() => {
+          if (cancel === 'abort') controller.abort();
+          else surface.dispose();
+        });
+      const result = await surface.transitionTo('desk', true, { signal: controller.signal });
+      expect(!result.ok && result.error.code).toBe(cancel === 'abort' ? 'aborted' : 'disposed');
+      expect(scene.renderer.render).not.toHaveBeenCalled();
+      expect(frames.size).toBe(0);
+      surface.dispose();
+    },
+  );
+
   it('does not cache a failed initial activation and renders an identical retry', async () => {
     const { surface } = await mounted();
     const scene = harness.scenes[0] as {

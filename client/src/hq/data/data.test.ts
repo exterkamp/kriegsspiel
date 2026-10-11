@@ -266,7 +266,6 @@ describe('preference commit boundary regressions', () => {
         const controller = new AbortController();
         let callback: (() => void) | undefined;
         let counter = 0;
-        let repository: BrowserRepository;
         let nested: Promise<unknown> | undefined;
         const invoke = (at: string) => {
           if (at === phase && callback) {
@@ -284,7 +283,7 @@ describe('preference commit boundary regressions', () => {
             records.set(k, v);
           },
         };
-        repository = new BrowserRepository(
+        const repository = new BrowserRepository(
           demoScope,
           () => {
             invoke('factory');
