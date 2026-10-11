@@ -10,6 +10,7 @@ import {
   orderDraft,
   orderSender,
   persistDraft,
+  persistJournal,
   type OrderSender,
 } from './store.js';
 import {
@@ -231,9 +232,11 @@ describe('Orders desk', () => {
         },
       ],
     });
+    const stop = persistJournal('orders-test');
     activeView.set('journal');
     cmp = mount(Desk, { target: document.body });
     flushSync();
+    stop();
     const li = q('#view-journal li');
     expect(li.textContent).toContain('Order sent to Guards by steady courier: Advance');
     expect(li.textContent).toContain('Courier riding, expected Day 1 00:10');

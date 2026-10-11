@@ -31,6 +31,7 @@ import {
   gameState,
   orderSender,
   persistDraft,
+  persistJournal,
   persistTray,
   showOnTable,
   viewedDispatch,
@@ -153,6 +154,7 @@ async function main(app: HTMLElement): Promise<void> {
   const gameKey = params.mode === 'join' ? params.game : 'fixture';
   persistTray(gameKey);
   persistDraft(gameKey);
+  persistJournal(gameKey);
   showOnTable.subscribe((at) => {
     if (!at) return;
     table.panTo(at);
