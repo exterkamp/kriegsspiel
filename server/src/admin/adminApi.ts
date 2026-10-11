@@ -22,8 +22,7 @@ import type { GameHost } from '../game/index.js';
 import { sideViewOf } from '../api/sideView.js';
 import type { TraceEntry, TraceStore } from '../debug/trace.js';
 import type { GameStore } from '../game/store.js';
-import { createRegistry, loadScenarioById, startingState } from '../game/registry.js';
-import { replayAt, replayTimeline, type ReplayInput } from './replayView.js';
+import { loadReplayInput, replayAt, replayTimeline } from './replayView.js';
 
 export const ADMIN_PREFIX = '/admin/api';
 export const DEFAULT_ENTRY_LIMIT = 200;
@@ -159,18 +158,7 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
     },
   );
 
-  /** The input log of a game, or why it cannot be replayed. Replay never touches a parser or umpire. */
-  async function replayInput(id: string): Promise<ReplayInput | undefined> {
-    const header = await options.store.logHeader(id);
-    if (!header) return undefined;
-    return {
-      header,
-      world: loadScenarioById(header.scenarioId),
-      entries: await options.store.inputLog(id),
-      registry: createRegistry(),
-      init: startingState,
-    };
-  }
+  const replayInput = (id: string) => loadReplayInput(options.store, id);
 
   server.get<{ Params: { id: string } }>(`${ADMIN_PREFIX}/games/:id/replay`, async (req, reply) => {
     const input = await replayInput(req.params.id).catch(() => null);
