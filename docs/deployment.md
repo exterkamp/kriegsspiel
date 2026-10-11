@@ -16,6 +16,7 @@ Compose reads the shell environment and a git-ignored `.env` next to `docker-com
 |---|---|---|
 | `KRIEGSSPIEL_PORT` | `3000` | Host port for the web UI and API |
 | `ANTHROPIC_API_KEY` | empty | Passed to the server for the Anthropic provider (see [llm-providers.md](llm-providers.md)) |
+| `ORDER_PARSER` | unset | With a provider key the LLM parses orders; `stub` forces the rule-based parser |
 | `BACKUP_DIR` | `./backups` | Host directory that receives backups |
 | `BACKUP_KEEP` | `14` | Number of newest backups kept |
 | `BACKUP_HOUR_UTC` | `3` | Hour of the nightly backup |
@@ -26,6 +27,8 @@ Login needs two more settings (see D17 in [decisions.md](decisions.md)); add the
 |---|---|---|
 | `PUBLIC_URL` | `http://localhost:$PORT` | Origin that login links point at. Set it to the https address players use; an https value also marks the session cookie `Secure` |
 | `TRUST_PROXY` | off | Set to `1` behind a reverse proxy so the login rate limits use the caller's `X-Forwarded-For` address. Without it every request shares the proxy's address and the per-address limits become global (20 login mails an hour for everyone). Leave it off when the port is reachable directly, because the header can then be forged to dodge the limits |
+| `GUEST_PLAY` | on outside production, off when `NODE_ENV=production`; the compose file sets `1` | `1` lets a visitor press "Play as guest" and play with no email (D17c). A guest is a throwaway account tied to one browser cookie: clearing the cookie loses the games. Turn it off (`0`) on a public deployment that should require login, since anyone can then create games (limited to 10 guests per address per hour, so `TRUST_PROXY` matters here too) |
+| `GUEST_IDLE_HOURS` | `168` | A guest unused for this long is deleted with their games |
 | `MAIL_WEBHOOK_URL` | unset | The server POSTs `{to, subject, text}` JSON here to send the login link. Unset, the link is written to the server log (development only: anyone who can read the log can sign in) |
 | `MAIL_WEBHOOK_TOKEN` | unset | Optional bearer token sent to the webhook |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | unset | Enable web push. Generate a pair with `npx web-push generate-vapid-keys`. Unset, notifications go by WebSocket and email only |

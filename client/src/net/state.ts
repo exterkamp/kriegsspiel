@@ -23,6 +23,19 @@ export interface PendingOrder {
   etaGame?: number;
 }
 
+/** What became of an order the player sent, when the client knows. */
+export interface OrderOutcome {
+  kind: 'refused';
+  /** The player's own words, as sent. */
+  text: string;
+  toName?: string;
+  sentAtGame: number;
+  /** The staff's reply with the internal order id removed. */
+  reason: string;
+  /** The server's error code, such as `order_clarification`. */
+  code?: string;
+}
+
 export interface Notice {
   code: string;
   message: string;
@@ -58,6 +71,9 @@ export interface PauseVote {
   proposal?: PauseProposal & { closesAtWall: number };
 }
 
+/** What the server said about a staff question: charged (with the answer time), or refused. */
+export type StaffCharge = { answerAtGame: number; askedAtGame: number; costMs: number } | 'refused';
+
 export interface ClientState {
   link: LinkStatus;
   view?: SideView;
@@ -70,6 +86,12 @@ export interface ClientState {
   /** Absent until the server reports it; a game without voters never does. */
   pause?: PauseVote;
   pending: PendingOrder[];
+  /** Orders the staff could not carry out, by order id; the order itself leaves `pending`. */
+  outcomes: Record<string, OrderOutcome>;
+  /** Staff questions by client question id, as the server charged them. */
+  staffCharges: Record<string, StaffCharge>;
+  /** Wall time of the last error that names no question (`game_closed`, `bad_message`), which may have eaten a staff question. */
+  staffFaultAtWall?: number;
   /** Set once the server says the game has ended. */
   gameOver?: GameOver;
   /** The side's marks on the table, as the server last sent them plus this client's own edits. */
@@ -86,6 +108,8 @@ export const initialState: ClientState = {
   read: new Set(),
   staffAtWork: false,
   pending: [],
+  outcomes: {},
+  staffCharges: {},
   marks: [],
   notices: [],
 };
@@ -163,6 +187,18 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       const notices = [...s.notices, { code: 'pause_result', message }].slice(-MAX_NOTICES);
       return { ...s, notices };
     }
+    case 'staffQueued':
+      return {
+        ...s,
+        staffCharges: {
+          ...s.staffCharges,
+          [m.questionId]: {
+            askedAtGame: m.askedAtGame,
+            answerAtGame: m.answerAtGame,
+            costMs: m.costMs,
+          },
+        },
+      };
     case 'marks':
       return { ...s, marks: m.marks };
     case 'drafts':
@@ -205,8 +241,34 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
     case 'error': {
       const id = orderIdOf(m.message);
       const dropped = id === undefined ? s.pending : s.pending.filter((p) => p.orderId !== id);
+      const refused = id === undefined ? undefined : s.pending.find((p) => p.orderId === id);
+      const outcomes: Record<string, OrderOutcome> = refused
+        ? {
+            ...s.outcomes,
+            [refused.orderId]: {
+              kind: 'refused',
+              text: refused.text,
+              ...(refused.toName ? { toName: refused.toName } : {}),
+              sentAtGame: refused.sentAtGame,
+              reason: m.message.slice(m.message.indexOf(': ') + 2),
+              code: m.code,
+            },
+          }
+        : s.outcomes;
       const notices = [...s.notices, { code: m.code, message: m.message }].slice(-MAX_NOTICES);
-      return { ...s, pending: dropped, notices };
+      const staffCharges =
+        (m.code === 'staff_busy' || m.code === 'game_over') && id !== undefined
+          ? { ...s.staffCharges, [id]: 'refused' as const }
+          : s.staffCharges;
+      const unnamed = id === undefined && (m.code === 'game_closed' || m.code === 'bad_message');
+      return {
+        ...s,
+        pending: dropped,
+        outcomes,
+        staffCharges,
+        notices,
+        ...(unnamed ? { staffFaultAtWall: nowWall } : {}),
+      };
     }
   }
 }

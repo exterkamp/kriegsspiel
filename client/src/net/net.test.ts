@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { PROTOCOL_VERSION, type Dispatch, type ServerMessage } from '@kriegsspiel/protocol';
 import { describe, expect, it } from 'vitest';
+import { noticeText } from '../desk/orders.js';
 import { fixtureView } from '../table/fixture.js';
 import { Hud, buildOrderText, gameOverText, orderPrefix } from '../hud/hud.js';
 import { parseSession, wsUrl } from '../session.js';
@@ -74,6 +75,37 @@ describe('applyServerMessage', () => {
   });
 });
 
+describe('order clarification', () => {
+  it('shows the question without the order id and drops the pending order', () => {
+    let s = withPendingOrder(initialState, { orderId: 'o-lq3-1', text: 'x', sentAtGame: 0 });
+    s = applyServerMessage(
+      s,
+      {
+        v,
+        kind: 'error',
+        code: 'order_clarification',
+        message: 'o-lq3-1: Which wood do you mean? (Northern wood)',
+      },
+      0,
+    );
+    expect(s.pending).toEqual([]);
+    // The notice keeps the id so the desk can find the order's outcome; noticeText hides it.
+    expect(noticeText(s.notices[0]!, s.outcomes)).toContain(
+      'Which wood do you mean? (Northern wood)',
+    );
+    expect(noticeText(s.notices[0]!, s.outcomes)).not.toMatch(/o-lq3-1/);
+  });
+
+  it('leaves other errors as sent', () => {
+    const s = applyServerMessage(
+      initialState,
+      { v, kind: 'error', code: 'bad_message', message: 'bad frame: not JSON' },
+      0,
+    );
+    expect(s.notices[0]?.message).toBe('bad frame: not JSON');
+  });
+});
+
 describe('server restart', () => {
   it('keeps a notice that the game came back paused', () => {
     const s = applyServerMessage(initialState, { v, kind: 'serverRestarted', downMs: 600_000 }, 0);
@@ -97,6 +129,53 @@ describe('notification', () => {
       code: 'notify_contact',
       message: 'Contact reported. Look to your desk.',
     });
+  });
+});
+
+describe('staff questions', () => {
+  it('records the server’s charge by question id', () => {
+    const s = applyServerMessage(
+      initialState,
+      {
+        v,
+        kind: 'staffQueued',
+        questionId: 'q-1',
+        role: 'engineer',
+        askedAtGame: 1000,
+        answerAtGame: 1000 + 1_200_000,
+        costMs: 1_200_000,
+      },
+      0,
+    );
+    expect(s.staffCharges['q-1']).toEqual({
+      askedAtGame: 1000,
+      answerAtGame: 1_201_000,
+      costMs: 1_200_000,
+    });
+  });
+  it('marks a refused question, by the id prefixing the error', () => {
+    for (const code of ['staff_busy', 'game_over']) {
+      const s = applyServerMessage(
+        initialState,
+        { v, kind: 'error', code, message: 'q-2: that officer is still answering' },
+        0,
+      );
+      expect(s.staffCharges['q-2']).toBe('refused');
+    }
+  });
+  it('notes an error that names no question, with the wall time', () => {
+    const s = applyServerMessage(
+      initialState,
+      { v, kind: 'error', code: 'game_closed', message: 'this game is no longer running' },
+      777,
+    );
+    expect(s.staffFaultAtWall).toBe(777);
+    const other = applyServerMessage(
+      initialState,
+      { v, kind: 'error', code: 'not_implemented', message: 'nope' },
+      5,
+    );
+    expect(other.staffFaultAtWall).toBeUndefined();
   });
 });
 
@@ -140,7 +219,8 @@ describe('session params', () => {
     expect(parseSession('?game=g&side=red')).toEqual({ mode: 'join', game: 'g', side: 'red' });
     expect(parseSession('?new=1&rate=12')).toEqual({ mode: 'create', rate: 12 });
     expect(parseSession('?new=1&side=red')).toEqual({ mode: 'create', side: 'red' });
-    expect(parseSession('')).toEqual({ mode: 'fixture' });
+    expect(parseSession('')).toEqual({ mode: 'menu' });
+    expect(parseSession('?mode=fixture')).toEqual({ mode: 'fixture' });
     expect(wsUrl({ protocol: 'https:', host: 'a.b' }, 'g')).toBe('wss://a.b/games/g/ws');
   });
 });

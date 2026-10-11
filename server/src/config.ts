@@ -5,6 +5,8 @@ import {
   type Difficulty,
   type Personality,
 } from './opponent/llmCommander.js';
+import type { UmpireConfig } from './umpire/index.js';
+import { COMMANDER_BUDGET_SHARE, type GameLimits } from './umpire/gameLimits.js';
 import { LogMailer, WebhookMailer, type Mailer } from './auth/mailer.js';
 
 /** Scripted sides are played by the built-in opponent unless `SCRIPTED_OPPONENTS` is `0`, `false` or `off`. */
@@ -36,6 +38,22 @@ export function aiCommanderFromEnv(
   };
 }
 
+/**
+ * A startup warning when the AI commander is on and no per-game cost or token cap is set, since
+ * it then spends without a limit. Its share (`COMMANDER_BUDGET_SHARE`) is a share of a cap, so
+ * without a cap there is nothing to share. Undefined when a cap exists.
+ */
+export function aiCommanderBudgetWarning(gameBudget?: GameLimits): string | undefined {
+  if (gameBudget?.maxCostUsd !== undefined || gameBudget?.maxTotalTokens !== undefined) {
+    return undefined;
+  }
+  return (
+    'AI_COMMANDER=llm is on with no per-game cost cap: the AI commander can spend without limit. ' +
+    'Set UMPIRE_GAME_BUDGET_USD or UMPIRE_GAME_BUDGET_TOKENS; the commander is then held to ' +
+    `${Math.round(COMMANDER_BUDGET_SHARE * 100)}% of it.`
+  );
+}
+
 /** `TRUST_PROXY` of `1`, `true` or `on` trusts `X-Forwarded-For`; set it behind a reverse proxy only. */
 export function trustProxyFromEnv(env: Record<string, string | undefined>): boolean {
   const v = env.TRUST_PROXY?.trim().toLowerCase();
@@ -56,4 +74,38 @@ export function authFromEnv(
       ? new WebhookMailer(hook, env.MAIL_WEBHOOK_TOKEN?.trim() || undefined)
       : new LogMailer(log),
   };
+}
+
+/**
+ * `GUEST_PLAY` of `1`, `true` or `on` lets a visitor start a guest session with no email; `0`, `false`
+ * or `off` turns it off. Unset: on outside production, off when `NODE_ENV=production` (D17c).
+ */
+export function guestPlayFromEnv(env: Record<string, string | undefined>): boolean {
+  const v = env.GUEST_PLAY?.trim().toLowerCase();
+  if (v === '1' || v === 'true' || v === 'on') return true;
+  if (v === '0' || v === 'false' || v === 'off') return false;
+  return env.NODE_ENV !== 'production';
+}
+
+/** `GUEST_IDLE_HOURS` (default 168): how long an unused guest and their games are kept. */
+export function guestIdleMsFromEnv(env: Record<string, string | undefined>): number {
+  const h = Number(env.GUEST_IDLE_HOURS);
+  return (Number.isFinite(h) && h > 0 ? h : 168) * 3_600_000;
+}
+
+/**
+ * Whether orders are parsed by the LLM: the `parse` stage's provider is usable (Anthropic needs its
+ * API key; any other configured provider counts) and `ORDER_PARSER` is not `stub`. Otherwise the
+ * rule-based stub parses orders, as in tests and with no key. A non-Anthropic provider is not
+ * checked for credentials here: if it is misconfigured, each order fails over to the fallback and
+ * logs an `order parser fallback` warning. That trade-off keeps the game playable and the problem visible.
+ */
+export function llmOrderParserEnabled(
+  env: Record<string, string | undefined>,
+  config: UmpireConfig,
+): boolean {
+  if (env.ORDER_PARSER?.trim().toLowerCase() === 'stub') return false;
+  const spec = config.providers[config.stages.parse.provider];
+  if (!spec) return false;
+  return spec.type === 'anthropic' ? Boolean(env[spec.apiKeyEnv ?? 'ANTHROPIC_API_KEY']) : true;
 }

@@ -29,6 +29,27 @@ The game is played from a general's headquarters. There is no HUD and no minimap
 
 The orders desk is built: a form addressed to a named commander, free text, an optional annex of table arrows, a fast or steady courier with a staff estimate for each, an autosaved draft, and a sign-and-stamp animation; sent orders show delivery progress in the journal (D16c). Navigation is by clicking desk objects, plus hotkeys (T table, I in-tray, O orders, R order of battle, J journal, C conference, Esc back to the table). The in-tray is built: six piles (newest arrival first, with unread counts), a dispatch viewer with sender, written and received times and the attached facts (unit, strength, a "Show on table" button for the place), a filed drawer, and discard. Read, filed and discarded marks are local and persist per game in the browser; reliability and sender confidence are never shown. The desk shell is built; moving to a desk view dollies the camera down to the desk and fades the canvas, and the canvas keeps rendering and keeps its state. The order of battle lists the formations in the SideView with strength, supply and morale, each dated by the view and aged in game time (fresh under 30 min, aging under 2 h, then stale, shown fainter); figures that are missing show as "unknown", never zero; clicking a formation pans the table to it. The SideView carries no commander and no per-figure report dates yet, so the roster shows the formation name and one date per row. The journal is built (`desk/Journal.svelte`): a persistent per-game diary in the browser of orders sent, dispatches received, pauses and resumes, and the player's own notes, newest first, with search, filters by kind and an export as a text file; the post-game critique (Epic 6) can read the same entries. It is local to the browser, like the in-tray marks. A small clock on the desk and a "new papers" indicator avoid a constant need to check every view. The desk clock (`desk/DeskClock.svelte`, pure logic in `desk/clock.ts`) sits above the view buttons and shows game time, the rate, a Paused or Stopped badge and "Staff at work…" while the umpire holds game time. It is compact at the table and full size on a desk view, and it runs forward locally from the last `ClockState`.
 
+## App shell and main menu
+
+`client/src/main.ts` starts the shell (`client/src/shell`), which decides what the page shows. The shell has explicit screens, a small typed state machine in `shell/screens.ts` (pure functions, unit tested): `sign-in`, `menu`, `new-game`, `game`, `game-over`, plus `fixture`.
+
+| URL | Screen |
+|-----|--------|
+| `/` (no parameters) | `sign-in` when signed out, otherwise `menu`. Never a half-loaded game. The emailed `/auth/verify` link redirects to `/`, so it lands on the menu. |
+| `/?lobby=1` | `new-game` (the New game form, `shell/NewGame.svelte`) |
+| `/?new=1&side=&rate=` | `game`, creating a game first |
+| `/?game=<id>[&side=]` | `game`; a reload returns to the same game |
+| `/?game=<id>&over=1` | `game-over` (served by the live client until the game over screen task) |
+| `/?mode=fixture` | The offline HQ fixture. Reached only by this URL, with no account. |
+
+Signed-out visitors are held at `sign-in` for every screen but `fixture`. Browser back and forward follow the URL. The live client (`liveClient.ts`, the 3D table and desk) is the game screen and cannot be unloaded, so a move to or from a live screen after it has loaded is a fresh page load.
+
+**Main menu** (`shell/Menu.svelte`, aged paper and serif to match the desk): New game; Continue, the player's unfinished games with scenario, side, game time and last played (hidden when there are none); the signed-in email with Sign out; and About, a paragraph on how the game works with a link to `docs/gameplay.md`. `GET /games` supplies `finished`, `gameTimeMs` and `lastPlayedMs` for each game, and Continue lists only started games that are not finished (`shell/continueList.ts`). Multiplayer entry points are not on the menu.
+
+**New game** (`shell/NewGame.svelte`, pure rules in `shell/newGame.ts`): Scenario (title, briefing, sides and expected length, from `GET /scenarios`; the client hard-codes none of it), Your side (only sides the scenario leaves to people when the server has a computer opponent), Clock rate (1:1, 4:1, 12:1 or a custom ratio, with a line such as "12:1 means one hour of battle passes in five minutes") and a note on who plays the other side (scripted opponent or AI commander, as reported by `/scenarios`). Defaults are the first scenario, Blue and 12:1. Start posts `POST /games` and opens the game; a double click makes one game, and a validation or server error (signed out, game limit, bad rate) is shown above the buttons with the form intact. Back returns to the menu. Multiplayer seats are not on this screen.
+
+**In-game menu** (`shell/GameMenu.svelte`): a Menu button, and Esc when the table is showing (in a desk view Esc still returns to the table). It offers Resume, Leave to main menu and Sign out. Leaving closes the WebSocket, then loads the menu; the game keeps running on the server. It is a modal dialog: focus starts on Resume and Esc closes it.
+
 ## The map layers
 
 Layers are what let one historical map serve both sides and the engine.
@@ -38,6 +59,10 @@ Layers are what let one historical map serve both sides and the engine.
 3. **Player marks layer**: pins and counters the player places, plus marks the staff add automatically when a report arrives. Each mark records its source report and time, and fades or greys with age. Built as D16b: pins, pencil lines, arrows and range rings, stored per side on the server and never corrected.
 4. **Report sketches**: scouts' sketches attached to a location, for example "bridge at Hohenau, intact, 2 companies".
 5. **Overlays** (toggle): order arrows, planned routes, estimated march times, and a "last known" fog shading showing how old your knowledge is per area.
+
+### Truth layer annotation format
+
+The truth layer is the `map` object of a scenario: `width` and `height` in metres and a list of `features`. Each has an `id`, a `kind` (`field`, `wood`, `marsh`, `water`, `road`, `river`, `stream`, `bridge`, `ford`, `building`), one geometry (`polygon` as `[x, y]` vertices, `polyline` with a `width`, or `at: {x, y}` with a `radius`) and optional overrides of the kind's defaults: `moveCost`, `cover`, `concealment`, `height` (`low`, `flat`, `rise`, `high`: used by line of sight, so woods, ridges and buildings can be tagged), `passable`, `layer`. Kind-specific: `roadClass` (`highway`, `road`, `track`) on roads, `capacity` (metres of column frontage) on bridges and fords, `risk` (0..1) on fords. A slope or ridge is a `field` polygon with a `height` tag and a higher `moveCost`; a village is a `building` polygon. `SAMPLE_TERRAIN` in `packages/engine/src/raster.ts` is a 200 x 100 m example, and `rasterise(map, cell)` renders it as a character grid (see `raster.test.ts`) so an annotation can be checked by eye. The grid is a derived view only; the engine reads the vector features (D15, D15a).
 
 ## Using historical maps: the hard part
 

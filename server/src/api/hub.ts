@@ -20,8 +20,10 @@ import {
 import type { GameActor, GameStore } from '../game/index.js';
 import type { PauseTransition } from '../pause.js';
 import { DraftBook, DraftError } from '../drafts/book.js';
+import { StaffDesk } from './conference.js';
 import { sideViewOf } from './sideView.js';
-import type { SideId } from '@kriegsspiel/engine';
+import { mayForward, viewForRole, type Seat, type SideId } from '@kriegsspiel/engine';
+import type { Forward } from '../lobby/store.js';
 
 /** The slice of a `ws` socket the hub uses. */
 export interface Socket {
@@ -37,6 +39,8 @@ const OPEN = 1;
 interface Connection {
   side: SideId;
   userId: string | undefined;
+  /** The role this player holds. Unset in shared-HQ play, where the connection sees the whole side view. */
+  seat: Seat | undefined;
   socket: Socket;
   lastView: string;
   lastClock: string;
@@ -76,6 +80,8 @@ const error = (code: string, message: string): ServerMessage => ({
 
 export class Hub {
   private readonly conns = new Map<string, Set<Connection>>();
+  /** When each side's staff officers are next free (game time). */
+  private readonly staffDesk = new StaffDesk();
 
   /** Each side's marks, loaded from the store on first use and kept here (the hub is their only writer). */
   private readonly marks = new Map<string, Promise<Mark[]>>();
@@ -96,7 +102,43 @@ export class Hub {
     /** The side a signed-in user sits on in a game, to name who asked for a pause. */
     private readonly sideOf: (gameId: string, userId: string) => SideId | undefined = () =>
       undefined,
+    /** Papers HQ has forwarded in a game (kept by the lobby record, so they survive a restart). */
+    private readonly forwards: {
+      list(gameId: string): readonly Forward[];
+      add(gameId: string, forward: Forward): void;
+    } = { list: () => [], add: () => undefined },
   ) {}
+
+  /** Forwards per game, read from the lobby record once and kept in step by `handleForward`. */
+  private readonly forwardCache = new Map<string, Forward[]>();
+
+  private forwardsOf(gameId: string): Forward[] {
+    let list = this.forwardCache.get(gameId);
+    if (!list) {
+      list = [...this.forwards.list(gameId)];
+      this.forwardCache.set(gameId, list);
+    }
+    return list;
+  }
+
+  /** The ids of papers HQ forwarded to the seat's formations. */
+  private forwardedTo(gameId: string, conn: Connection): string[] {
+    const units = conn.seat?.role === 'subordinate' ? (conn.seat.units ?? []) : [];
+    return this.forwardsOf(gameId)
+      .filter((f) => f.side === conn.side && units.includes(f.unit))
+      .map((f) => f.dispatchId);
+  }
+
+  private viewOf(gameId: string, game: GameActor, conn: Connection) {
+    return sideViewOf(
+      game.state,
+      conn.side,
+      game.gameClock.snapshot(),
+      conn.seat,
+      conn.seat ? this.forwardedTo(gameId, conn) : [],
+      game.narrationFor(conn.side),
+    );
+  }
 
   private marksOf(gameId: string, side: SideId): Promise<Mark[]> {
     const key = `${gameId}\0${side}`;
@@ -305,10 +347,11 @@ export class Hub {
   }
 
   /** Serve one player's socket: send the initial view, then handle its commands. */
-  attach(gameId: string, side: SideId, socket: Socket, userId?: string): void {
+  attach(gameId: string, side: SideId, socket: Socket, userId?: string, seat?: Seat): void {
     const conn: Connection = {
       side,
       userId,
+      seat,
       socket,
       lastView: '',
       lastClock: '',
@@ -370,7 +413,7 @@ export class Hub {
   private sendCatchUp(gameId: string, conn: Connection, since: number | undefined): void {
     const game = this.lookup(gameId);
     if (since === undefined || !game) return;
-    const view = sideViewOf(game.state, conn.side, game.gameClock.snapshot());
+    const view = this.viewOf(gameId, game, conn);
     if (view.atGame <= since) return;
     const dispatchIds = view.dispatches.filter((d) => d.receivedAtGame > since).map((d) => d.id);
     this.send(conn, {
@@ -420,7 +463,7 @@ export class Hub {
     if (!game) return;
     try {
       const clock: ClockState = game.gameClock.snapshot();
-      const view = sideViewOf(game.state, conn.side, clock);
+      const view = this.viewOf(gameId, game, conn);
       this.seen.set(`${gameId}\0${conn.side}`, view.atGame);
       const clockJson = JSON.stringify(clock);
       if (clockJson !== conn.lastClock) {
@@ -513,6 +556,41 @@ export class Hub {
       phase: state.phase,
       ...(proposal ? { proposal } : {}),
     });
+  }
+
+  /** HQ passes a paper in its own view on to the subordinate commanding `unit`. */
+  private handleForward(
+    gameId: string,
+    game: GameActor,
+    conn: Connection,
+    command: Extract<Command, { kind: 'forwardDispatch' }>,
+  ): void {
+    if (!conn.seat || !mayForward(conn.seat)) {
+      this.send(conn, error('not_permitted', 'only the commander or chief of staff can forward'));
+      return;
+    }
+    const world = game.state.world;
+    const unit = world.units.find((u) => u.id === command.unit);
+    if (!unit || unit.side !== conn.side || unit.strength <= 0) {
+      this.send(conn, error('bad_unit', 'that is not one of your living formations'));
+      return;
+    }
+    // Only a paper the forwarder can see themselves can be passed on.
+    const mine = viewForRole(world, conn.side, conn.seat, game.state.time);
+    const known = [...mine.reports, ...mine.documents].some((p) => p.id === command.dispatchId);
+    if (!known) {
+      this.send(conn, error('no_such_dispatch', 'you hold no such paper'));
+      return;
+    }
+    const already = this.forwardsOf(gameId).some(
+      (f) => f.side === conn.side && f.unit === command.unit && f.dispatchId === command.dispatchId,
+    );
+    if (!already) {
+      const forward = { side: conn.side, dispatchId: command.dispatchId, unit: command.unit };
+      this.forwards.add(gameId, forward);
+      this.forwardsOf(gameId).push(forward);
+      this.notify(gameId);
+    }
   }
 
   private async handlePauseCommand(
@@ -621,6 +699,37 @@ export class Hub {
       await this.handlePauseCommand(game, conn, command);
       return;
     }
+    if (command.kind === 'forwardDispatch') {
+      this.handleForward(gameId, game, conn, command);
+      return;
+    }
+    if (command.kind === 'askStaff') {
+      if (game.state.world.outcome) {
+        this.send(conn, error('game_over', `${command.questionId}: the game has ended`));
+        return;
+      }
+      const charge = this.staffDesk.ask(gameId, conn.side, command.role, game.gameClock.now());
+      if (charge.ok) {
+        this.send(conn, {
+          v: PROTOCOL_VERSION,
+          kind: 'staffQueued',
+          questionId: command.questionId,
+          role: command.role,
+          askedAtGame: charge.askedAtGame,
+          answerAtGame: charge.answerAtGame,
+          costMs: charge.costMs,
+        });
+      } else {
+        this.send(
+          conn,
+          error(
+            'staff_busy',
+            `${command.questionId}: that officer is still answering your last question`,
+          ),
+        );
+      }
+      return;
+    }
     if (command.kind !== 'issueOrder') {
       this.send(conn, error('not_implemented', `${command.kind} is not supported yet`));
       return;
@@ -629,12 +738,19 @@ export class Hub {
       this.send(conn, error('not_implemented', 'order drafts are not supported yet; send text'));
       return;
     }
+    // Only the commander and subordinate commanders sign. Whether a subordinate may sign for the
+    // addressee is checked by the actor once the parse names it.
+    if (conn.seat && conn.seat.role !== 'commander' && conn.seat.role !== 'subordinate') {
+      this.send(conn, error('not_permitted', 'staff officers draft orders; the commander signs'));
+      return;
+    }
     let result;
     try {
       result = await game.submit({
         kind: 'order',
         side: conn.side,
         text: command.text,
+        ...(conn.seat ? { signer: conn.seat } : {}),
         ...(command.courier ? { courier: command.courier } : {}),
       });
     } catch (e) {

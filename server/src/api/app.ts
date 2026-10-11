@@ -8,8 +8,11 @@
  *                                  `lobby` is true: then it waits in the lobby for `start`
  *   GET  /games                    signed in: the games you made or hold a seat in
  *   GET  /games/:id                signed in: the game's settings, status, which sides are taken and ready, and which are yours
- *   POST /games/:id/join           signed in: take a free side, body `{ "side": string }` (the invite link is `/?game=<id>`)
- *   POST /games/:id/ready          signed in, seated: body `{ "ready": boolean }`
+ *   POST /games/:id/join           signed in: take a free side, body `{ "side": string }` (the invite link is `/?game=<id>`);
+ *                                  with a `role` (chiefOfStaff, intelligence, quartermaster, or subordinate with `units`) join
+ *                                  the table of a side that already has its commander, while the game is in the lobby
+ *   POST /games/:id/leave-role     signed in: give up the role you joined in the lobby
+ *   POST /games/:id/ready          signed in, seated or holding a role: body `{ "ready": boolean }`
  *   POST /games/:id/start          the creator: start a lobby game once every side is taken and every player is ready
  *   GET  /games/:id/window         seated, game over: the umpire's window timeline (403 `game_not_over` before the end)
  *   GET  /games/:id/window/at?at=  seated, game over: true positions, beliefs, dice and rulings at a game time
@@ -27,8 +30,8 @@ import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
-import { holdTheBridge, loadScenario, type SideId } from '@kriegsspiel/engine';
-import Fastify, { type FastifyInstance } from 'fastify';
+import { holdTheBridge, loadScenario, type Seat, type SideId } from '@kriegsspiel/engine';
+import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { WallClock } from '../clock.js';
 import {
@@ -43,7 +46,7 @@ import {
   type Timers,
 } from '../game/index.js';
 import { adminApi } from '../admin/adminApi.js';
-import { loadReplayInput } from '../admin/replayView.js';
+import { loadReplayInput, replayTimeline } from '../admin/replayView.js';
 import { LogMailer, type Mailer } from '../auth/mailer.js';
 import { authRoutes, type Auth } from '../auth/routes.js';
 import { MemoryAuthStore, type AuthStore } from '../auth/store.js';
@@ -51,12 +54,13 @@ import { TraceStore } from '../debug/trace.js';
 import {
   MemoryLobbyStore,
   SESSION_TYPES,
+  type Forward,
   type LobbyGame,
   type LobbyStore,
+  type RoleSeat,
   type SessionType,
 } from '../lobby/store.js';
 import type { PauseConfig } from '../pause.js';
-import type { OrderParser } from '../orders/index.js';
 import {
   Notifier,
   MemoryNotifyStore,
@@ -99,7 +103,13 @@ const CreateGame = z
   })
   .strict();
 
-const JoinGame = z.object({ side: SideName }).strict();
+const JoinGame = z
+  .object({
+    side: SideName,
+    role: z.enum(['chiefOfStaff', 'intelligence', 'quartermaster', 'subordinate']).optional(),
+    units: z.array(z.string().min(1).max(64)).min(1).max(64).optional(),
+  })
+  .strict();
 
 const Ready = z.object({ ready: z.boolean() }).strict();
 
@@ -111,7 +121,8 @@ const WsQuery = z.object({ side: SideName.optional() });
 const MAX_PAYLOAD_BYTES = 16 * 1024;
 
 export interface AppOptions {
-  parser: OrderParser;
+  /** One parser for every game, or one per game. See `GameHostOptions.parser`. */
+  parser: GameHostOptions['parser'];
   store?: GameStore;
   /** Lobby records. Defaults to memory; `main.ts` supplies the SQLite store. */
   lobby?: LobbyStore;
@@ -123,6 +134,8 @@ export interface AppOptions {
   scriptedOpponents?: boolean;
   /** Replaces the built-in opponent's agents for a game, for example with LLM commanders. See `GameHostOptions.aiAgents`. */
   aiAgents?: GameHostOptions['aiAgents'];
+  /** Narrates each side's dispatches per window. See `GameHostOptions.narrator`. */
+  narrator?: GameHostOptions['narrator'];
   /** Directory of the built client to serve at `/`. Unset: API only (dev uses the Vite server). */
   staticDir?: string;
   /**
@@ -141,6 +154,12 @@ export interface AppOptions {
     publicUrl?: string;
     loginPerEmail?: number;
     loginPerIp?: number;
+    /** Guest play (D17c): `POST /auth/guest` starts a session with no email. Default off. */
+    guestPlay?: boolean;
+    /** Unused guests, and their games, are removed after this long (default 7 days). */
+    guestIdleMs?: number;
+    /** Guests created per client address per hour (default 10). */
+    guestPerIp?: number;
   };
   /**
    * Trust `X-Forwarded-For` for `req.ip`, which keys the login rate limits. On behind a reverse proxy,
@@ -186,7 +205,20 @@ export async function buildApp(options: AppOptions): Promise<App> {
     (id) => host.get(id),
     onError,
     store,
-    (id, userId) => authStore.seatOf(id, userId),
+    (id, userId) => {
+      const rec = lobby.get(id);
+      return (
+        authStore.seatOf(id, userId) ??
+        (rec?.roles?.find((r) => r.userId === userId)?.side as SideId | undefined)
+      );
+    },
+    {
+      list: (id) => lobby.get(id)?.forwards ?? [],
+      add: (id, f: Forward) => {
+        const rec = lobby.get(id);
+        if (rec) lobby.put({ ...rec, forwards: [...(rec.forwards ?? []), f] });
+      },
+    },
   );
   const lobby = options.lobby ?? new MemoryLobbyStore();
   const authStore = options.auth?.store ?? new MemoryAuthStore();
@@ -224,13 +256,19 @@ export async function buildApp(options: AppOptions): Promise<App> {
       const rec = recordOf(id);
       if (!rec?.pause) return undefined;
       const voters =
-        rec.sessionType === 'hot_seat' ? [rec.creator] : authStore.seatsOf(id).map((s) => s.userId);
+        rec.sessionType === 'hot_seat'
+          ? [rec.creator]
+          : [
+              ...authStore.seatsOf(id).map((s) => s.userId),
+              ...(rec.roles ?? []).map((r) => r.userId),
+            ];
       return { voters, ...rec.pause };
     },
     // Only a co-op game has the built-in opponent; the other shapes leave every side to people.
     scriptedOpponents: (id) =>
       options.scriptedOpponents === true && recordOf(id)?.sessionType === 'co_op_vs_ai',
     aiAgents: options.aiAgents,
+    narrator: options.narrator,
     trace,
     onUpdate: (id) => {
       hub.notify(id);
@@ -274,12 +312,20 @@ export async function buildApp(options: AppOptions): Promise<App> {
     wallNow: options.wallNow,
     loginPerEmail: options.auth?.loginPerEmail,
     loginPerIp: options.auth?.loginPerIp,
+    guestPlay: options.auth?.guestPlay,
+    guestIdleMs: options.auth?.guestIdleMs,
+    guestPerIp: options.auth?.guestPerIp,
     onAccountDeleted: (userId) => {
       notifyStore.deleteUser(userId);
       lobby.forgetUser(userId);
       hub.disconnectUser(userId, 'account deleted');
     },
     onLogout: (userId) => hub.disconnectUser(userId),
+    onGuestAdopted: (guestId, userId) => {
+      lobby.reassignUser(guestId, userId);
+      notifyStore.deleteUser(guestId);
+      hub.disconnectUser(guestId, 'signed in');
+    },
   });
 
   notifyRoutes(server, { auth, store: notifyStore, push: options.notify?.push });
@@ -299,7 +345,23 @@ export async function buildApp(options: AppOptions): Promise<App> {
       const sides = humanSides(rec);
       return want ? sides.find((s) => s === want) : sides[0];
     }
-    return authStore.seatOf(rec.id, userId);
+    return authStore.seatOf(rec.id, userId) ?? (roleOf(rec, userId)?.side as SideId | undefined);
+  };
+
+  /** The role seat a user joined with, if any (the side's commander has the side seat instead). */
+  const roleOf = (rec: LobbyGame, userId: string): RoleSeat | undefined =>
+    rec.roles?.find((r) => r.userId === userId);
+
+  /**
+   * The seat a connection plays under. A side with nobody in a role plays shared HQ and has none;
+   * once a side has role holders, its commander is the seat holder, and each of them has a seat.
+   */
+  const seatFor = (rec: LobbyGame, userId: string): Seat | undefined => {
+    const held = roleOf(rec, userId);
+    if (held) return { role: held.role, ...(held.units ? { units: held.units } : {}) };
+    const side = authStore.seatOf(rec.id, userId);
+    if (side && rec.roles?.some((r) => r.side === side)) return { role: 'commander' };
+    return undefined;
   };
 
   /** A started game is reopened (paused) if the server restarted since it was last used. */
@@ -325,7 +387,13 @@ export async function buildApp(options: AppOptions): Promise<App> {
     createdAtMs: rec.createdAtMs,
   });
 
-  server.get('/scenarios', async () => ({ scenarios: scenarioList() }));
+  server.get('/scenarios', async () => ({
+    scenarios: scenarioList(),
+    // Who plays a side nobody sits at: absent when this server has no computer opponent.
+    ...(options.scriptedOpponents === true
+      ? { opponent: options.aiAgents ? 'ai_commander' : 'scripted' }
+      : {}),
+  }));
 
   server.post('/games', async (req, reply) => {
     const user = auth.userOf(req);
@@ -397,6 +465,35 @@ export async function buildApp(options: AppOptions): Promise<App> {
     return undefined;
   };
 
+  /** Where a started game stands: over or not, its game time and when it was last played (wall time). */
+  const progressOf = async (
+    rec: LobbyGame,
+  ): Promise<{ finished: boolean; gameTimeMs: number; lastPlayedMs: number }> => {
+    const none = { finished: false, gameTimeMs: 0, lastPlayedMs: rec.createdAtMs };
+    if (rec.status !== 'started') return none;
+    const input = await loadReplayInput(store, rec.id).catch(() => undefined);
+    const lastPlayedMs = input?.entries.reduce((m, e) => Math.max(m, e.wallMs), rec.createdAtMs);
+    const live = host.get(rec.id);
+    if (live) {
+      return {
+        finished: Boolean(live.state.world.outcome),
+        gameTimeMs: live.state.time,
+        lastPlayedMs: lastPlayedMs ?? rec.createdAtMs,
+      };
+    }
+    if (!input) return none;
+    try {
+      const tl = replayTimeline(input);
+      return {
+        finished: Boolean(tl.outcome),
+        gameTimeMs: tl.endMs,
+        lastPlayedMs: lastPlayedMs ?? rec.createdAtMs,
+      };
+    } catch {
+      return { ...none, lastPlayedMs: lastPlayedMs ?? rec.createdAtMs };
+    }
+  };
+
   server.get('/games', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
@@ -404,29 +501,46 @@ export async function buildApp(options: AppOptions): Promise<App> {
     const recs = [
       ...[...mine].map(recordOf).filter((r): r is LobbyGame => r !== undefined),
       ...lobby.byCreator(user.id).filter((r) => !mine.has(r.id)),
+      ...lobby.byRoleHolder(user.id).filter((r) => !mine.has(r.id) && r.creator !== user.id),
     ];
     recs.sort((a, b) => b.createdAtMs - a.createdAtMs);
-    return { games: recs.map((r) => summary(r, user.id)) };
+    const games = await Promise.all(
+      recs.map(async (r) => ({ ...summary(r, user.id), ...(await progressOf(r)) })),
+    );
+    return { games };
   });
+
+  /** A guest's game is theirs alone (D17c): to anyone else it does not exist, so an invite link to it fails. */
+  const isPrivateTo = (rec: LobbyGame, userId: string): boolean =>
+    rec.creator !== userId && authStore.getUser(rec.creator)?.guest === true;
 
   server.get<{ Params: { id: string } }>('/games/:id', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const { id } = req.params;
     const rec = recordOf(id);
-    if (!rec) return reply.code(404).send({ error: 'no_such_game' });
+    if (!rec || isPrivateTo(rec, user.id)) return reply.code(404).send({ error: 'no_such_game' });
     const seats = authStore.seatsOf(id);
     const hotSeat = rec.sessionType === 'hot_seat';
     return {
       ...summary(rec, user.id),
       you: sideFor(rec, user.id) ?? null,
       ready: rec.ready.includes(user.id) || (rec.creator === user.id && !hotSeat),
+      role: seatFor(rec, user.id)?.role ?? null,
       pause: rec.pause ?? null,
       sides: humanSides(rec).map((side) => {
         const seat = seats.find((s) => s.side === side);
         return {
           side,
           taken: hotSeat || seat !== undefined,
+          // Who sits where is not told, only which jobs are filled and which of them is yours.
+          roles: (rec.roles ?? [])
+            .filter((r) => r.side === side)
+            .map((r) => ({
+              role: r.role,
+              ...(r.units ? { units: r.units } : {}),
+              you: r.userId === user.id,
+            })),
           // The creator starts the game, so they count as ready.
           ready:
             hotSeat ||
@@ -437,12 +551,73 @@ export async function buildApp(options: AppOptions): Promise<App> {
     };
   });
 
+  /**
+   * Join a side's table in a role. The side's seat holder is its commander, so it must exist first;
+   * each staff role is held by one player, and a subordinate commands units no one else does.
+   */
+  const joinRole = (
+    rec: LobbyGame,
+    userId: string,
+    side: SideId,
+    role: RoleSeat['role'],
+    units: string[] | undefined,
+    reply: FastifyReply,
+  ) => {
+    if (rec.status !== 'lobby' || starting.has(rec.id))
+      return reply.code(409).send({ error: 'already_started' });
+    if (!authStore.seatsOf(rec.id).some((s) => s.side === side)) {
+      return reply.code(409).send({ error: 'no_commander' });
+    }
+    if (authStore.seatOf(rec.id, userId) || roleOf(rec, userId)) {
+      return reply.code(409).send({ error: 'seat_unavailable' });
+    }
+    const roles = rec.roles ?? [];
+    let mine: string[] | undefined;
+    if (role === 'subordinate') {
+      const own = new Set(
+        loadScenarioById(rec.scenario)
+          .units.filter((u) => u.side === side)
+          .map((u) => u.id),
+      );
+      mine = [...new Set(units ?? [])];
+      if (mine.length === 0 || mine.some((u) => !own.has(u))) {
+        return reply.code(400).send({ error: 'bad_units' });
+      }
+      const taken = new Set(roles.filter((r) => r.side === side).flatMap((r) => r.units ?? []));
+      if (mine.some((u) => taken.has(u))) return reply.code(409).send({ error: 'units_taken' });
+    } else {
+      if (units) return reply.code(400).send({ error: 'bad_role' });
+      if (roles.some((r) => r.side === side && r.role === role)) {
+        return reply.code(409).send({ error: 'role_taken' });
+      }
+    }
+    const seat: RoleSeat = { userId, side, role, ...(mine ? { units: mine } : {}) };
+    lobby.put({ ...rec, roles: [...roles, seat] });
+    return { id: rec.id, side, role, ...(mine ? { units: mine } : {}), ws: `/games/${rec.id}/ws` };
+  };
+
+  server.post<{ Params: { id: string } }>('/games/:id/leave-role', async (req, reply) => {
+    const user = auth.userOf(req);
+    if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+    const rec = recordOf(req.params.id);
+    if (!rec) return reply.code(404).send({ error: 'no_such_game' });
+    if (rec.status !== 'lobby' || starting.has(rec.id))
+      return reply.code(409).send({ error: 'already_started' });
+    if (!roleOf(rec, user.id)) return reply.code(404).send({ error: 'no_role' });
+    lobby.put({
+      ...rec,
+      roles: (rec.roles ?? []).filter((r) => r.userId !== user.id),
+      ready: rec.ready.filter((u) => u !== user.id),
+    });
+    return { left: true };
+  });
+
   server.post<{ Params: { id: string } }>('/games/:id/join', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const { id } = req.params;
     const rec = recordOf(id);
-    if (!rec) return reply.code(404).send({ error: 'no_such_game' });
+    if (!rec || isPrivateTo(rec, user.id)) return reply.code(404).send({ error: 'no_such_game' });
     const body = JoinGame.safeParse(req.body);
     if (!body.success) {
       return reply.code(400).send({ error: 'bad_request', message: body.error.message });
@@ -450,6 +625,9 @@ export async function buildApp(options: AppOptions): Promise<App> {
     const { side } = body.data;
     if (rec.sessionType === 'hot_seat') return reply.code(400).send({ error: 'hot_seat_game' });
     if (!humanSides(rec).includes(side)) return reply.code(400).send({ error: 'bad_side' });
+    if (body.data.role) return joinRole(rec, user.id, side, body.data.role, body.data.units, reply);
+    if (body.data.units) return reply.code(400).send({ error: 'bad_role' });
+    if (roleOf(rec, user.id)) return reply.code(409).send({ error: 'seat_unavailable' });
     if (!authStore.claimSeat(id, side, user.id)) {
       return reply.code(409).send({ error: 'seat_unavailable' });
     }
@@ -465,8 +643,11 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (!body.success) {
       return reply.code(400).send({ error: 'bad_request', message: body.error.message });
     }
-    if (rec.status !== 'lobby') return reply.code(409).send({ error: 'already_started' });
-    if (!authStore.seatOf(rec.id, user.id)) return reply.code(403).send({ error: 'no_seat' });
+    if (rec.status !== 'lobby' || starting.has(rec.id))
+      return reply.code(409).send({ error: 'already_started' });
+    if (!authStore.seatOf(rec.id, user.id) && !roleOf(rec, user.id)) {
+      return reply.code(403).send({ error: 'no_seat' });
+    }
     const others = rec.ready.filter((u) => u !== user.id);
     lobby.put({ ...rec, ready: body.data.ready ? [...others, user.id] : others });
     return { ready: body.data.ready };
@@ -485,11 +666,14 @@ export async function buildApp(options: AppOptions): Promise<App> {
       const seats = authStore.seatsOf(rec.id);
       const open = humanSides(rec).filter((side) => !seats.some((s) => s.side === side));
       if (open.length > 0) return reply.code(409).send({ error: 'sides_open', sides: open });
-      const waiting = seats.filter(
-        (s) => s.userId !== rec.creator && !rec.ready.includes(s.userId),
-      );
+      const waiting = [
+        ...seats,
+        ...(rec.roles ?? []).map((r) => ({ side: r.side as SideId, userId: r.userId })),
+      ].filter((s) => s.userId !== rec.creator && !rec.ready.includes(s.userId));
       if (waiting.length > 0) {
-        return reply.code(409).send({ error: 'not_ready', sides: waiting.map((s) => s.side) });
+        return reply
+          .code(409)
+          .send({ error: 'not_ready', sides: [...new Set(waiting.map((s) => s.side))] });
       }
     }
     starting.add(rec.id);
@@ -576,7 +760,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
       const want = WsQuery.safeParse(req.query);
       const side = user && rec && want.success && sideFor(rec, user.id, want.data.side);
       if (!user || !side) return socket.close(1008, 'no seat');
-      hub.attach(req.params.id, side, socket as unknown as Socket, user.id);
+      hub.attach(req.params.id, side, socket as unknown as Socket, user.id, seatFor(rec, user.id));
     },
   );
 

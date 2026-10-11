@@ -124,7 +124,7 @@ export class Notifier {
       const key = `${seat.userId}\0${gameId}`;
       const last = this.lastEmail.get(key);
       const limit = this.o.emailEveryMs ?? 60_000;
-      if (user && (isUrgent(event) || last === undefined || now - last >= limit)) {
+      if (user && !user.guest && (isUrgent(event) || last === undefined || now - last >= limit)) {
         this.lastEmail.set(key, now);
         sends.push(
           this.o.mailer.sendNotification!(user.email, title, `${text}\n\n${url}`).catch((e) =>

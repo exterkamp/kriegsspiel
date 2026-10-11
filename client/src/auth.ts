@@ -3,6 +3,8 @@
 export interface Me {
   id: string;
   email: string;
+  /** A guest session (D17c): no real address, games kept in this browser until the player signs in. */
+  guest?: boolean;
 }
 
 /** The signed-in user, or undefined when there is no valid session. */
@@ -25,6 +27,25 @@ export async function requestLink(
   if (res.status === 429) return 'Too many requests. Try again later.';
   if (res.status === 400) return 'That does not look like an email address.';
   return `Could not send the link (${res.status}).`;
+}
+
+/** Whether the server lets visitors play as a guest. */
+export async function guestEnabled(fetchFn: typeof fetch = fetch): Promise<boolean> {
+  try {
+    const res = await fetchFn('/auth/guest', { credentials: 'same-origin' });
+    return res.ok && ((await res.json()) as { enabled?: boolean }).enabled === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Starts a guest session. Resolves to an error message, or undefined on success. */
+export async function startGuest(fetchFn: typeof fetch = fetch): Promise<string | undefined> {
+  const res = await fetchFn('/auth/guest', { method: 'POST', credentials: 'same-origin' });
+  if (res.ok) return undefined;
+  if (res.status === 429) return 'Too many guests from this address. Try again later.';
+  if (res.status === 404) return 'Guest play is turned off on this server.';
+  return `Could not start a guest session (${res.status}).`;
 }
 
 export async function signOut(fetchFn: typeof fetch = fetch): Promise<void> {

@@ -13,13 +13,15 @@ import { scriptedAgents, type SideAgent } from '../opponent/index.js';
 import type { PauseConfig } from '../pause.js';
 import type { OrderParser } from '../orders/index.js';
 import { GameActor, type GameActorOptions, type StaffAtWork, type Timers } from './actor.js';
+import type { UmpireClient } from '../umpire/index.js';
 import type { TraceSink } from '../debug/trace.js';
 import { replayFrom } from './replay.js';
 import type { GameStore } from './store.js';
 
 export interface GameHostOptions {
   store: GameStore;
-  parser: OrderParser;
+  /** One parser for every game, or a parser per game (for example one with the game's own LLM budget). */
+  parser: OrderParser | ((gameId: string) => OrderParser);
   registry: EventRegistry<GameState>;
   wallNow: WallClock;
   timers?: Timers;
@@ -44,6 +46,8 @@ export interface GameHostOptions {
   scriptedOpponents?: boolean | ((gameId: string) => boolean);
   /** Swap the agents a game gets for another set, such as LLM commanders wrapping the scripted ones. Called only for games that have scripted agents. */
   aiAgents?: (gameId: string, world: GameState, scripted: SideAgent[]) => SideAgent[];
+  /** The umpire client that narrates a game's dispatches (one per game, so caps are per game). Unset: players see the engine's template text. */
+  narrator?: (gameId: string) => UmpireClient | undefined;
   /** Pause voting for a game: who votes and the host's rules. Unset: players cannot vote to pause. */
   pause?: (id: string, world: GameState) => PauseConfig | undefined;
 }
@@ -74,7 +78,7 @@ export class GameHost {
       id,
       registry: o.registry,
       wallNow: o.wallNow,
-      parser: o.parser,
+      parser: typeof o.parser === 'function' ? o.parser(id) : o.parser,
       store: o.store,
       timers: o.timers,
       onUpdate: () => o.onUpdate?.(id),
@@ -83,6 +87,7 @@ export class GameHost {
       onError: (e) => o.onError?.(id, e),
       onEmitted: (events) => o.onEmitted?.(id, events),
       onStaffAtWork: (state) => o.onStaffAtWork?.(id, state),
+      umpire: o.narrator?.(id),
       parseRetries: o.parseRetries,
       parseTimeoutMs: o.parseTimeoutMs,
       parseRetryDelayMs: o.parseRetryDelayMs,

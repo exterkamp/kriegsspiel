@@ -8,6 +8,10 @@ import {
   busy,
   fixtureAnswer,
   newExchange,
+  nextExchangeId,
+  reconcileExchanges,
+  SERVER_REPLY_TIMEOUT_MS,
+  type Exchange,
   questionProblem,
   staffFor,
   FIXTURE_STAFF,
@@ -30,7 +34,7 @@ describe('fixtureAnswer', () => {
   it('quartermaster reports each unit supply and never invents one', () => {
     const a = fixtureAnswer(req('quartermaster'), fixtureView);
     for (const u of fixtureView.ownUnits)
-      expect(a.text).toContain(`${u.name}: supply ${Math.round(u.supply * 100)}%`);
+      expect(a.text).toContain(`${u.name}: supply ${Math.round((u.supply ?? 0) * 100)}%`);
   });
   it('admits ignorance with no view or no contacts', () => {
     expect(fixtureAnswer(req('intelligence'), undefined).text).toContain('no reports');
@@ -105,5 +109,54 @@ describe('Conference view', () => {
     flushSync();
     expect(document.querySelector('[role=alert]')?.textContent).toMatch(/still answering/);
     expect(get(conferenceLog)).toHaveLength(1);
+  });
+});
+
+describe('reconcileExchanges', () => {
+  const waiting = (id: number, sentAtWall = 1000): Exchange => ({
+    ...newExchange(id, req('engineer', 0)),
+    answerAtGame: Infinity,
+    questionId: `q-${id}`,
+    sentAtWall,
+  });
+  const server = (over: Partial<Parameters<typeof reconcileExchanges>[1]> = {}) => ({
+    charges: {},
+    link: 'open' as const,
+    nowWall: 2000,
+    ...over,
+  });
+
+  it('takes the server’s answer time', () => {
+    const [e] = reconcileExchanges(
+      [waiting(1)],
+      server({ charges: { 'q-1': { askedAtGame: 500, answerAtGame: 9000, costMs: 8500 } } }),
+    );
+    expect(e).toMatchObject({ askedAtGame: 500, answerAtGame: 9000 });
+  });
+  it('matches by the exchange’s own id, so a remount (new ids for new asks) cannot orphan it', () => {
+    const log = [waiting(1)];
+    expect(nextExchangeId(log)).toBe(2);
+    const [e] = reconcileExchanges(
+      log,
+      server({ charges: { 'q-1': { askedAtGame: 1, answerAtGame: 2, costMs: 1 } } }),
+    );
+    expect(e!.answerAtGame).toBe(2);
+  });
+  it('fails a refused question', () => {
+    const [e] = reconcileExchanges([waiting(1)], server({ charges: { 'q-1': 'refused' } }));
+    expect(e!.failed).toBe(true);
+  });
+  it('fails waiting exchanges when the link is down, after an unnamed error, and on timeout', () => {
+    expect(reconcileExchanges([waiting(1)], server({ link: 'closed' }))[0]!.failed).toBe(true);
+    expect(reconcileExchanges([waiting(1)], server({ faultAtWall: 1500 }))[0]!.failed).toBe(true);
+    expect(
+      reconcileExchanges([waiting(1, 1600)], server({ faultAtWall: 1500 }))[0]!.failed,
+    ).toBeUndefined();
+    const late = server({ nowWall: 1000 + SERVER_REPLY_TIMEOUT_MS });
+    expect(reconcileExchanges([waiting(1)], late)[0]!.failed).toBe(true);
+  });
+  it('leaves a healthy wait, answered exchanges and unchanged logs alone', () => {
+    const log = [waiting(1), newExchange(2, req('intelligence'))];
+    expect(reconcileExchanges(log, server())).toBe(log);
   });
 });

@@ -46,7 +46,7 @@ The window is the same map table with a scrubber over the whole game. It shows e
 
 ## Pace: the clock ratio
 
-The ratio is the pace setting. It is chosen per game in the lobby and can be changed mid-game by agreement.
+The ratio is the pace setting. It is chosen per game on the New game screen (1:1, 4:1, 12:1 or a custom ratio; 12:1 by default) and can be changed mid-game by agreement.
 
 | Ratio | A 12-hour battle takes | Feel |
 |---|---|---|
@@ -95,7 +95,7 @@ Real play was already a team game. Each side is a group of **roles**:
 | Quartermaster | Supply, fatigue, road capacity | Warns about shortages and march limits |
 | Wing/division commanders | Their sector plus what HQ sends | Issue their own orders to subordinates |
 
-Unfilled roles are played by the LLM (a staff officer with personality traits), so a game with two humans per side still has a full staff.
+In the lobby the commander's table fills as players join the side with a role; a subordinate picks the formations they command. A side nobody joins in a role is shared HQ. Unfilled roles are played by the LLM (a staff officer with personality traits), so a game with two humans per side still has a full staff.
 
 ### Drafting orders together
 

@@ -1,6 +1,6 @@
 import { viewFor } from '@kriegsspiel/engine';
 import { parseServerMessage, PROTOCOL_VERSION, type ServerMessage } from '@kriegsspiel/protocol';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp, type App } from '../api/app.js';
 import { MemoryGameStore } from '../game/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
@@ -39,6 +39,7 @@ afterEach(async () => {
   notices.length = 0;
   pushed.length = 0;
   pushResult = 'ok';
+  vi.restoreAllMocks();
 });
 
 async function start(wallNow?: () => number) {
@@ -181,6 +182,18 @@ describe('delivery', () => {
       title: 'Dispatch received',
       url: expect.stringContaining(`game=${g.id}`),
     });
+  });
+
+  it('never emails a guest, whose address is a placeholder, but still pushes', async () => {
+    const { actor } = await setup();
+    const real = app!.authStore.getUser.bind(app!.authStore);
+    vi.spyOn(app!.authStore, 'getUser').mockImplementation((id) => {
+      const u = real(id);
+      return u && { ...u, guest: true };
+    });
+    await actor.submit({ kind: 'order', side: 'blue', text: 'blue-1 march to the bridge' });
+    await waitUntil(() => pushed.length > 0);
+    expect(notices).toHaveLength(0);
   });
 
   it('tells a player with the game open over the WebSocket instead', async () => {
