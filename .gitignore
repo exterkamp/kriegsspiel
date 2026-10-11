@@ -7,3 +7,4 @@ backups/
 .cache/
 vendor/settlemaker-runtime.tgz
 vendor/settlemaker-runtime.tgz.tmp
+.angular/

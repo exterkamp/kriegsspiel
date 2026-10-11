@@ -1,0 +1,23 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compileOnSave": false,
+  "compilerOptions": {
+    "noEmit": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "rootDir": "..",
+    "declaration": false,
+    "isolatedModules": true,
+    "paths": {
+      "@kriegsspiel/protocol": ["../packages/protocol/src/index.ts"],
+      "@legacy/*": ["../client/src/*"]
+    }
+  },
+  "angularCompilerOptions": {
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true,
+    "strictTemplates": true
+  }
+}

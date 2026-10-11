@@ -8,3 +8,4 @@ vendor/settlemaker/upstream-package.json
 # Preserve the original measured evidence bytes.
 docs/map-verification/*.json
 server/baselines/*.recording.json
+.angular
