@@ -212,4 +212,8 @@ describe('checkStaffOutput', () => {
     expect(check(note('report', ' '))).toEqual(['empty message']);
     expect(check(note('report', 'blue-1 is lost.'))).toEqual(['unknown entity "blue-1"']);
   });
+
+  it('does not treat ordinary hyphenated words as ids', () => {
+    expect(check(note('report', 'A counter-attack on the south-west flank.'))).toEqual([]);
+  });
 });

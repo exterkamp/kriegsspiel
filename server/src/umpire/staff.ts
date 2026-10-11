@@ -197,7 +197,8 @@ export function staffInput(officer: StaffOfficer, view: EngineRoleView, now: num
   };
 }
 
-const ID_PATTERN = /\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/gi;
+/** Ids here end in a number (`blue-1`), so ordinary hyphenated words (`counter-attack`) are not checked. */
+const ID_PATTERN = /\b[a-z][a-z0-9]*(?:-[a-z0-9]+)*-\d+\b/gi;
 
 /** The problems with a reply, against the seat's view. Empty means it passes. */
 export function checkStaffOutput(
@@ -275,6 +276,8 @@ export async function runStaff(
         calls: 0,
         rejections: [],
       };
+      // Marked before the first call on purpose: a failing provider or a twice-rejected reply costs the seat
+      // one quiet window rather than a retry every tick, and game time never waits on staff.
       roster.markSpoke(seat, now);
       while (turn.calls < maxCalls) {
         turn.calls++;
