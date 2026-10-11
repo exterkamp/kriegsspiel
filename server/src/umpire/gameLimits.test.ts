@@ -6,6 +6,7 @@ import type { GameUmpireMetric } from './gameLimits.js';
 import { STAFF_OVERLOADED_NOTICE, narrateReports } from './narrate.js';
 import { UmpireError } from './umpireClient.js';
 import type { UmpireClient, UmpireRequest, UmpireResponse } from './umpireClient.js';
+import { aiCommanderBudgetWarning } from '../config.js';
 import { loadUmpireConfig, umpireConfigFromEnv } from './config.js';
 
 const request: UmpireRequest = {
@@ -187,6 +188,59 @@ describe('staff sub-cap', () => {
     await expect(g.call(parse)).rejects.toMatchObject({ kind: 'rate-limit' });
     t = 61_000;
     await expect(g.call(staff)).resolves.toBeDefined();
+  });
+});
+
+describe('AI commander sub-cap', () => {
+  const command: UmpireRequest = { ...request, stage: 'command' };
+  const parse: UmpireRequest = { ...request, stage: 'parse' };
+
+  it('a saturated commander share never blocks an order parse', async () => {
+    const g = new GameUmpireClient(inner().client, {
+      gameId: 'g',
+      limits: { maxTotalTokens: 1000 },
+    });
+    const ai = g.commanderClient();
+    await ai.call(command);
+    await ai.call(command);
+    await ai.call(command);
+    await ai.call(command); // 400 >= 400, the commander share
+    await expect(ai.call(command)).rejects.toMatchObject({ kind: 'budget', attempts: 0 });
+    await expect(g.call(parse)).resolves.toBeDefined();
+    expect(g.report().budgetSpent).toBe(false);
+  });
+
+  it('the parses of the commander text count against its share, not the humans', async () => {
+    const g = new GameUmpireClient(inner().client, { gameId: 'g', limits: { maxCostUsd: 0.125 } });
+    const ai = g.commanderClient();
+    for (let i = 0; i < 5; i++) await ai.call(parse); // 0.05 >= 0.05
+    await expect(ai.call(parse)).rejects.toMatchObject({ kind: 'budget' });
+    await expect(ai.call(command)).rejects.toMatchObject({ kind: 'budget' });
+    await expect(g.call(parse)).resolves.toBeDefined();
+  });
+
+  it('commander calls per minute stop at their share', async () => {
+    const g = new GameUmpireClient(inner().client, {
+      gameId: 'g',
+      limits: { maxCallsPerMinute: 10 },
+      now: () => 0,
+    });
+    const ai = g.commanderClient();
+    for (let i = 0; i < 4; i++) await ai.call(command);
+    await expect(ai.call(command)).rejects.toMatchObject({ kind: 'rate-limit' });
+    await expect(g.call(parse)).resolves.toBeDefined();
+  });
+});
+
+describe('aiCommanderBudgetWarning', () => {
+  it('warns when no per-game cost or token cap is set', () => {
+    expect(aiCommanderBudgetWarning(undefined)).toMatch(/no per-game cost cap/);
+    expect(aiCommanderBudgetWarning({ maxCallsPerMinute: 5 })).toMatch(/UMPIRE_GAME_BUDGET_USD/);
+  });
+
+  it('is silent once a cap is configured', () => {
+    expect(aiCommanderBudgetWarning({ maxCostUsd: 1 })).toBeUndefined();
+    expect(aiCommanderBudgetWarning({ maxTotalTokens: 1000 })).toBeUndefined();
   });
 });
 
