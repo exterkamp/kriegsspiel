@@ -1,10 +1,6 @@
 import type { GhostPiece, OwnPiece } from './types.js';
+import { formatGameAge, formatGameTime } from '../hq/presentation/gameTime.js';
 
-const gameTime = (value: number | undefined): string | undefined => {
-  if (value === undefined || !Number.isSafeInteger(value) || value < 0) return undefined;
-  const seconds = Math.floor(value / 1000);
-  return `${Math.floor(seconds / 3600)}:${String(Math.floor((seconds % 3600) / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')} game`;
-};
 const shortLabel = (value: string): string => {
   const text = value.replace(/\s+/gu, ' ').trim();
   return text.length > 42 ? `${text.slice(0, 41)}…` : text || 'Unnamed formation';
@@ -12,8 +8,9 @@ const shortLabel = (value: string): string => {
 
 /** Paper lines only. No wall clock, report-time inference, or markup interpretation. */
 export function tagLines(piece: OwnPiece | GhostPiece): readonly string[] {
-  const snapshot = gameTime(piece.snapshotAtGame);
-  const snapshotLine = snapshot ? `Snapshot at ${snapshot}` : 'Snapshot time unavailable';
+  const snapshot = formatGameTime(piece.snapshotAtGame);
+  const snapshotLine =
+    snapshot === 'Time unavailable' ? 'Snapshot time unavailable' : `Snapshot at ${snapshot}`;
   if (piece.kind === 'own') {
     const strength = piece.strength;
     return [
@@ -26,15 +23,17 @@ export function tagLines(piece: OwnPiece | GhostPiece): readonly string[] {
     ];
   }
   const stale = piece.observedAtGame !== undefined || piece.ageMs > 0;
-  const observed = gameTime(piece.observedAtGame);
-  const validAge = Number.isSafeInteger(piece.ageMs) && piece.ageMs >= 0;
-  const minutes = Math.floor(piece.ageMs / 60_000);
-  const age = minutes < 1 ? 'less than 1m ago' : `${minutes}m ago`;
+  const observed = formatGameTime(piece.observedAtGame);
+  const age = formatGameAge(piece.ageMs);
   return [
     shortLabel(piece.sizeEstimate ?? 'Enemy contact'),
     'Strength unavailable',
-    stale ? (validAge ? `Observed ${age}` : 'Observation age unavailable') : snapshotLine,
-    observed ? `Observed at ${observed}` : 'Report date unavailable',
+    age === 'Age unavailable'
+      ? 'Observation age unavailable'
+      : stale
+        ? `Observed ${age}`
+        : snapshotLine,
+    observed === 'Time unavailable' ? 'Report date unavailable' : `Observed at ${observed}`,
   ];
 }
 

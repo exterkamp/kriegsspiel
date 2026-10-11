@@ -1,4 +1,5 @@
 import type { Paper } from '../../contracts';
+import { formatGameTime } from '../../presentation/gameTime';
 export const categories = [
   'urgent',
   'scouts',
@@ -49,5 +50,4 @@ export function collectPapers(papers: readonly Paper[]) {
     invalid,
   };
 }
-export const gameDate = (value: number | null) =>
-  value !== null && Number.isFinite(value) ? `Game time ${value} ms` : 'Unknown';
+export const gameDate = formatGameTime;

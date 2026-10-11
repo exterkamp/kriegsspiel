@@ -9,14 +9,8 @@
     sameScope,
     type StorageFactory,
   } from './notes';
-  import {
-    categories,
-    matchesPaper,
-    paperText,
-    gameTime,
-    suppliedPapers,
-    type Filter,
-  } from './presentation';
+  import { categories, matchesPaper, paperText, suppliedPapers, type Filter } from './presentation';
+  import { formatGameTime } from '../../presentation/gameTime';
 
   let {
     snapshot,
@@ -132,12 +126,12 @@
             <p>Paper ID: {paper.id}</p>
             <dl>
               <dt>Written</dt>
-              <dd>{gameTime(paper.writtenAtGame)}</dd>
+              <dd>{formatGameTime(paper.writtenAtGame)}</dd>
               <dt>Received</dt>
-              <dd>{gameTime(paper.receivedAtGame)}</dd>
+              <dd>{formatGameTime(paper.receivedAtGame)}</dd>
               <dt>Observed</dt>
               <dd>
-                {paper.observedAtGame === null ? 'Unavailable' : gameTime(paper.observedAtGame)}
+                {formatGameTime(paper.observedAtGame)}
               </dd>
             </dl>
             <p class="prose">{paper.text}</p>

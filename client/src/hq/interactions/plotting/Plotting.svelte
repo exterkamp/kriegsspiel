@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
+  import { formatGameTime } from '../../presentation/gameTime';
   import type { PointM } from '../../contracts';
   import type { PlotPointer, PlotState, ReportPlacementController } from './types';
   let {
@@ -128,6 +129,14 @@
     }
     function key(event: KeyboardEvent) {
       if (event.key !== 'Escape' || !active()) return;
+      // Native modal Escape must reach the dialog's default cancel action.
+      // Modal backgrounds are implicitly inert; explicit inert controls also yield.
+      if (
+        event.defaultPrevented ||
+        hub.ownerDocument.querySelector('dialog[open]') ||
+        (event.target instanceof win.Element && event.target.closest('[inert]'))
+      )
+        return;
       event.preventDefault();
       event.stopImmediatePropagation();
       cancel();
@@ -192,9 +201,11 @@
     <p>Private local pin. Save local marks explicitly to persist it.</p>
     <p>Captured paper: {plotState.paper?.id} — {plotState.paper?.from}</p>
     <p>
-      Written: {plotState.paper?.writtenAtGame ?? 'Unknown'} game ms · Received: {plotState.paper
-        ?.receivedAtGame ?? 'Unknown'} game ms · Observed: {plotState.paper?.observedAtGame ??
-        'Unknown'} · Placement time: {plotState.gameMs ?? 'Unknown'}
+      Written: {formatGameTime(plotState.paper?.writtenAtGame)} · Received: {formatGameTime(
+        plotState.paper?.receivedAtGame,
+      )} · Observed: {formatGameTime(plotState.paper?.observedAtGame)} · Placement time: {formatGameTime(
+        plotState.gameMs,
+      )}
     </p>
     <p>
       Reported location: {plotState.paper?.location

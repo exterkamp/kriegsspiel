@@ -106,18 +106,48 @@ const notebook = () => target.querySelector<HTMLTextAreaElement>('textarea:not([
 const exported = () => target.querySelector<HTMLTextAreaElement>('textarea[readonly]')!;
 
 describe('fixture journal DOM and storage', () => {
+  it('floors visible time while preserving original export milliseconds and timestamp kinds', async () => {
+    const supplied = {
+      ...paper(),
+      writtenAtGame: 999,
+      receivedAtGame: 90061007,
+      observedAtGame: 0,
+    };
+    await render(snapshot([supplied]));
+    expect([...target.querySelectorAll('article dd')].map((el) => el.textContent?.trim())).toEqual([
+      '00:00:00',
+      '25:01:01',
+      '00:00:00',
+    ]);
+    expect(target.querySelector('article')?.textContent).not.toContain('game ms');
+    button('Prepare text export').click();
+    await flush();
+    expect(exported().value).toContain('Written: 00:00:00.999 (999 game ms)');
+    expect(exported().value).toContain('Received: 25:01:01.007 (90061007 game ms)');
+    expect(exported().value).toContain('Observed: 00:00:00.000 (0 game ms)');
+    expect(supplied.receivedAtGame).toBe(90061007);
+  });
+  it.each([-1, NaN, Infinity, 0.5, Number.MAX_SAFE_INTEGER + 1])(
+    'shows invalid visible journal timestamps %s as unavailable',
+    async (time) => {
+      await render(snapshot([{ ...paper(), writtenAtGame: time, observedAtGame: time }]));
+      const dates = [...target.querySelectorAll('article dd')];
+      expect(dates[0]?.textContent).toBe('Time unavailable');
+      expect(dates[2]?.textContent?.trim()).toBe('Time unavailable');
+    },
+  );
   it('deduplicates stable IDs and orders by received game time then ID with distinct written times', async () => {
     const first = paper('a', 2000);
     await render(snapshot([paper('z', 3000), first, { ...first }, paper('b', 2000)]));
     expect(
       [...target.querySelectorAll('article')].map((el) => el.getAttribute('aria-label')),
     ).toEqual(['Paper a', 'Paper b', 'Paper z']);
-    expect(target.querySelector('article')?.textContent).toContain('1000 game ms');
-    expect(target.querySelector('article')?.textContent).toContain('2000 game ms');
+    expect(target.querySelector('article')?.textContent).toContain('00:00:01');
+    expect(target.querySelector('article')?.textContent).toContain('00:00:02');
     expect(target.textContent?.replace(/\s+/g, ' ')).toContain(
       'Order history and pause history are unavailable',
     );
-    expect(target.querySelector('article dd:last-child')?.textContent).toBe('Unavailable');
+    expect(target.querySelector('article dd:last-child')?.textContent).toBe('Time unavailable');
   });
   it('omits conflicting content under one ID instead of fabricating an event', async () => {
     await render(snapshot([paper(), paper('first', 2000, 'Changed report'), paper('safe')]));

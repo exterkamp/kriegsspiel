@@ -50,6 +50,7 @@ export function matchesPaper(paper: Paper, query: string, filter: Filter) {
     )
   );
 }
+/** Preserve the original millisecond-precise journal text export. */
 export function gameTime(ms: number) {
   const hours = Math.floor(ms / 3600000);
   const minutes = Math.floor((ms % 3600000) / 60000);

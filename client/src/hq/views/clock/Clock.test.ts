@@ -6,6 +6,7 @@ import Clock from './Clock.svelte';
 import TestHarness from './TestHarness.svelte';
 import type { HqClock, SourceState } from '../../contracts';
 import { projectGameTime } from '../../data/fixture';
+import { clockDisplay, formatGameTime } from './presentation';
 
 function source(
   clock: Partial<HqClock> = {},
@@ -72,10 +73,31 @@ function field(label: string) {
 }
 const text = () => target.textContent?.replace(/\s+/g, ' ');
 function expectTime(time: number) {
-  expect(field('Game time')).toContain(`(${time} game ms)`);
+  expect(field('Game time')).toBe(formatGameTime(time));
 }
 
 describe('bounded clock DOM', () => {
+  it('retains exact clock projection and anchor precision behind the floored display', async () => {
+    const state = source({}, {}, 60007);
+    expect(clockDisplay(state, 'fixture', 65009)).toEqual({
+      time: 65009,
+      eligible: true,
+      projected: true,
+    });
+    expect(clockDisplay(state, 'fixture', 60006)).toEqual({
+      time: 60007,
+      eligible: true,
+      projected: false,
+    });
+    expect(clockDisplay(source({ status: 'paused' }, {}, 60007), 'fixture', 65009)).toEqual({
+      time: 60007,
+      eligible: false,
+      projected: false,
+    });
+    await render(state, 65009);
+    expect(field('Game time')).toBe('00:01:05');
+    expect(state.snapshot!.clock.authoritativeGameMs).toBe(60007);
+  });
   it.each([1, 4, 12, 1000])(
     'uses parent projection at supplied rate %s without owning the ticker',
     async (rate) => {
@@ -116,7 +138,7 @@ describe('bounded clock DOM', () => {
       if (needAtGame === null) {
         expect(text()).toContain('Need time unavailable');
         expect(text()).not.toContain('Supplied need time:');
-      } else expect(text()).toContain(`(${needAtGame} game ms)`);
+      } else expect(text()).toContain(`Supplied need time: ${formatGameTime(needAtGame)}.`);
     },
   );
   it.each([-1, NaN, Infinity, 1000])(
@@ -155,12 +177,12 @@ describe('bounded clock DOM', () => {
     'shows absent snapshot as unavailable for %s without defaulting to zero',
     async (kind) => {
       await render(source({}, { connection: 'opening', snapshot: null }), 999999, kind);
-      expect(field('Game time')).toBe('Unavailable');
+      expect(field('Game time')).toBe('Time unavailable');
       expect(field('Supplied rate')).toBe('Unavailable');
       expect(field('Supplied status')).toBe('unknown');
       expect(field('Mode')).toBe('unknown');
       expect(text()).toContain('Barrier unknown');
-      expect(text()).not.toContain('0 game ms');
+      expect(field('Game time')).not.toBe('00:00:00');
     },
   );
   it.each([null, -1, NaN, Infinity, 1.5, Number.MAX_SAFE_INTEGER + 1, 59999])(
@@ -175,8 +197,8 @@ describe('bounded clock DOM', () => {
     'shows invalid authoritative time %s as unavailable even if parent value looks valid',
     async (authoritativeGameMs) => {
       await render(source({ authoritativeGameMs }), 999999);
-      expect(field('Game time')).toBe('Unavailable');
-      expect(text()).not.toContain('0 game ms');
+      expect(field('Game time')).toBe('Time unavailable');
+      expect(field('Game time')).not.toBe('00:00:00');
       expect(text()).not.toContain('Shared parent display time');
     },
   );
@@ -221,11 +243,11 @@ describe('bounded clock DOM', () => {
   it('accepts genuine zero and formats elapsed game hours without treating them as wall dates', async () => {
     await render(source({}, {}, 0), 0);
     expectTime(0);
-    expect(field('Game time')).toBe('00:00:00.000 (0 game ms)');
+    expect(field('Game time')).toBe('00:00:00');
   });
-  it('shows hours beyond 24 and preserves milliseconds', async () => {
+  it('shows hours beyond 24 and floors visible seconds', async () => {
     await render(source({ mode: 'manual' }, {}, 90061007), null);
-    expect(field('Game time')).toBe('25:01:01.007 (90061007 game ms)');
+    expect(field('Game time')).toBe('25:01:01');
   });
   it('reacts to disconnect, barrier, resume and a newer anchor with no paused-duration catch-up', async () => {
     const packet = writable({

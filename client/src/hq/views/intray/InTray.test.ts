@@ -40,6 +40,32 @@ afterEach(async () => {
   document.body.replaceChildren();
   vi.restoreAllMocks();
 });
+it('uses elapsed timestamps in arrival list and reader without changing supplied milliseconds', async () => {
+  const supplied = paper('time', {
+    writtenAtGame: 999,
+    receivedAtGame: 90061007,
+    observedAtGame: 0,
+  });
+  await render({ snapshot: snapshot([supplied]) });
+  expect(document.querySelector('li span')?.textContent).toContain('25:01:01');
+  await click('Open time — Supplied scout');
+  const dates = [...document.querySelectorAll('article dd')].slice(2, 5);
+  expect(dates.map((date) => date.textContent)).toEqual(['00:00:00', '25:01:01', '00:00:00']);
+  expect(document.querySelector('article')?.textContent).not.toContain('game ms');
+  expect(supplied.receivedAtGame).toBe(90061007);
+});
+it.each([-1, NaN, Infinity, 0.5, Number.MAX_SAFE_INTEGER + 1])(
+  'shows invalid paper timestamps %s as unavailable',
+  async (time) => {
+    await render({
+      snapshot: snapshot([paper('invalid', { writtenAtGame: time, observedAtGame: time })]),
+    });
+    await click('Open invalid — Supplied scout');
+    const dates = [...document.querySelectorAll('article dd')];
+    expect(dates[2]?.textContent).toBe('Time unavailable');
+    expect(dates[4]?.textContent).toBe('Time unavailable');
+  },
+);
 it('shows six piles, sorts 200 arrivals, searches and safely reads full supplied text', async () => {
   const papers = Array.from({ length: 200 }, (_, i) =>
     paper(`p${i.toString().padStart(3, '0')}`, {
@@ -62,7 +88,7 @@ it('shows six piles, sorts 200 arrivals, searches and safely reads full supplied
   await click('Open p199 — Supplied scout');
   expect(document.querySelector('article')?.textContent).toContain('<script>evil()</script>');
   expect(document.querySelector('script')).toBeNull();
-  expect(document.querySelector('article')?.textContent).toContain('Observed at Unknown');
+  expect(document.querySelector('article')?.textContent).toContain('Observed at Time unavailable');
   expect(document.body.textContent).toContain('Attachments and sketches unavailable.');
 });
 it('deduplicates exact IDs, excludes conflicting IDs and deterministically sorts ties', async () => {
@@ -180,7 +206,7 @@ it('shows supplied zero dates and unknown fields without inventing observed date
   });
   await click('Open zero — Supplied scout');
   const values = Array.from(document.querySelectorAll('article dd')).map((n) => n.textContent);
-  expect(values.slice(2, 5)).toEqual(['Game time 0 ms', 'Game time 0 ms', 'Game time 0 ms']);
+  expect(values.slice(2, 5)).toEqual(['00:00:00', '00:00:00', '00:00:00']);
   expect(values.slice(5)).toEqual(['Unknown', 'Unknown', 'Unknown', 'Unknown']);
   expect(button('Plot paper').disabled).toBe(true);
 });

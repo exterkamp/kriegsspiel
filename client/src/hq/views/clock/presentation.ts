@@ -1,5 +1,6 @@
 import type { SourceState } from '../../contracts';
 import { projectGameTime } from '../../data/fixture';
+export { formatGameTime } from '../../presentation/gameTime';
 
 export function validGameTime(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -31,12 +32,4 @@ export function clockDisplay(state: SourceState, kind: 'fixture' | 'live', gameM
   );
   const projected = eligible && validGameTime(gameMs) && anchor !== null && gameMs >= anchor;
   return { time: projected ? gameMs : anchor, projected, eligible };
-}
-
-export function formatGameTime(value: number | null) {
-  if (!validGameTime(value)) return 'Unavailable';
-  const hours = Math.floor(value / 3600000);
-  const minutes = Math.floor((value % 3600000) / 60000);
-  const seconds = Math.floor((value % 60000) / 1000);
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(value % 1000).padStart(3, '0')} (${value} game ms)`;
 }

@@ -207,7 +207,7 @@ describe('TableScene.apply', () => {
     expect(findTag()).toBe(tag);
     expect(tag.parent!.getObjectByName('pick')).toBe(body);
     expect(textureDisposed).toHaveBeenCalledTimes(1);
-    expect(tag.userData.lines).toContain('Snapshot at 1:01:00 game');
+    expect(tag.userData.lines).toContain('Snapshot at 01:01:00');
     t.dispose();
     expect(geometryDisposed).not.toHaveBeenCalled();
   });

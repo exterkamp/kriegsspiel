@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, tick } from 'svelte';
+  import { formatGameTime } from '../../presentation/gameTime';
   import type {
     MarkCreateInput,
     MarkEditInput,
@@ -313,8 +314,10 @@
     exported = JSON.stringify(marks, null, 2);
     exportedDirty = dirty;
   }
-  const time = (value: number | null, display = false) =>
-    value === null ? 'Unavailable' : `${value} game ms${display ? ' (fixture display time)' : ''}`;
+  const time = (value: number | null, display = false) => {
+    const formatted = formatGameTime(value);
+    return `${formatted}${display && formatted !== 'Time unavailable' ? ' (fixture display time)' : ''}`;
+  };
 </script>
 
 <section class="marks" aria-label="Personal fixture marks" aria-busy={occupied}>

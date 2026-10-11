@@ -4,7 +4,7 @@ import { mount, tick, unmount } from 'svelte';
 import { fromStore, writable } from 'svelte/store';
 import Marks from './Marks.svelte';
 import { fail, mark, ok, paper, props } from './fakes';
-import type { MarkGeometry, Result } from '../../contracts';
+import type { MarkGeometry, PersonalMark, Result } from '../../contracts';
 
 let target: HTMLDivElement;
 let component: ReturnType<typeof mount> | null = null;
@@ -82,6 +82,70 @@ async function enterShape(shape: MarkGeometry) {
 }
 
 describe('numeric personal fixture marks', () => {
+  it('keeps placement/edit display provenance distinct from frozen paper dates and preserves JSON precision', async () => {
+    const existing: PersonalMark = {
+      ...mark(),
+      placedAtGame: 90061007,
+      editedAtGame: 90062999,
+      source: {
+        kind: 'paper',
+        paperId: paper.id,
+        writtenAtGame: 0,
+        receivedAtGame: 999,
+        observedAtGame: null,
+        reportedLocation: paper.location,
+        excerpt: paper.text,
+      },
+    };
+    await render(props([existing]));
+    button('Edit').click();
+    await flush();
+    const source = target.querySelector('[aria-label="Frozen mark provenance"]')!;
+    expect([...source.querySelectorAll('dt')].map((el) => el.textContent)).toEqual([
+      'Originally placed',
+      'Edited',
+      'Paper ID',
+      'Written',
+      'Received',
+      'Observed',
+      'Reported location',
+    ]);
+    expect([...source.querySelectorAll('dd')].map((el) => el.textContent)).toEqual([
+      '25:01:01 (fixture display time)',
+      '25:01:02 (fixture display time)',
+      paper.id,
+      '00:00:00',
+      '00:00:00',
+      'Time unavailable',
+      '0 m east, 10 m south',
+    ]);
+    button('Export marks as JSON').click();
+    await flush();
+    const exported = JSON.parse(
+      target.querySelector<HTMLTextAreaElement>('textarea.export')!.value,
+    );
+    expect(exported).toEqual([existing]);
+  });
+  it.each([-1, NaN, Infinity, 0.5, Number.MAX_SAFE_INTEGER + 1])(
+    'renders invalid mark provenance time %s explicitly unavailable',
+    async (time) => {
+      const existing: PersonalMark = {
+        ...mark(),
+        placedAtGame: time,
+        editedAtGame: time,
+        source: { kind: 'manual' },
+      };
+      await render(props([existing]));
+      button('Edit').click();
+      await flush();
+      expect(
+        [...target.querySelectorAll('[aria-label="Frozen mark provenance"] dd')].map(
+          (el) => el.textContent,
+        ),
+      ).toEqual(['Time unavailable', 'Time unavailable']);
+      expect(target.textContent).toContain('Manual source. No report dates or reported location.');
+    },
+  );
   it.each(shapes)(
     'creates $kind from accessible text/numeric fields without snapping',
     async (shape) => {
@@ -110,8 +174,8 @@ describe('numeric personal fixture marks', () => {
       await flush();
       expect(control('paperId')).toBeNull();
       expect(target.textContent).toContain('Frozen source');
-      expect(target.textContent).toContain('300 game ms');
-      expect(target.textContent).toContain('Unavailable');
+      expect(target.textContent).toContain('00:00:00 (fixture display time)');
+      expect(target.textContent).toContain('Time unavailable');
       await set('label', 'Revised label');
       await submit();
       expect(options.onEdit).toHaveBeenCalledExactlyOnceWith(existing.id, {
@@ -137,8 +201,19 @@ describe('numeric personal fixture marks', () => {
     button('Edit').click();
     await flush();
     expect(target.textContent).toContain('0 m east, 10 m south');
-    expect(target.textContent).toContain('100 game ms');
-    expect(target.textContent).toContain('200 game ms');
+    expect(
+      [...target.querySelectorAll('[aria-label="Frozen mark provenance"] dd')].map(
+        (el) => el.textContent,
+      ),
+    ).toEqual([
+      '00:00:00 (fixture display time)',
+      'Time unavailable',
+      'paper-1',
+      '00:00:00',
+      '00:00:00',
+      'Time unavailable',
+      '0 m east, 10 m south',
+    ]);
     expect(target.textContent).toContain(paper.text);
   });
   it.each(['create', 'edit'] as const)(

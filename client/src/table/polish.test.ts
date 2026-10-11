@@ -27,6 +27,82 @@ const ghost: GhostPiece = {
 };
 
 describe('paper tag knowledge', () => {
+  it.each([
+    [0, '00:00:00'],
+    [999, '00:00:00'],
+    [3_600_000, '01:00:00'],
+    [90_061_007, '25:01:01'],
+  ] as const)(
+    'shares timestamp presentation at %s while keeping source kinds distinct',
+    (time, expected) => {
+      expect(tagLines({ ...own, snapshotAtGame: time }).slice(2)).toEqual([
+        `Snapshot at ${expected}`,
+        'Report date unavailable',
+      ]);
+      expect(tagLines({ ...ghost, snapshotAtGame: time }).slice(2)).toEqual([
+        `Snapshot at ${expected}`,
+        'Report date unavailable',
+      ]);
+      expect(tagLines({ ...ghost, snapshotAtGame: time, observedAtGame: time }).slice(2)).toEqual([
+        'Observed current snapshot',
+        `Observed at ${expected}`,
+      ]);
+    },
+  );
+
+  it.each([
+    [1, 'less than 1s ago'],
+    [999, 'less than 1s ago'],
+    [1000, '1s ago'],
+    [59_999, '59s ago'],
+    [60_000, '1m ago'],
+    [300_999, '5m ago'],
+    [3_599_999, '59m ago'],
+    [3_600_000, '1h ago'],
+    [86_399_999, '23h ago'],
+    [86_400_000, '1d ago'],
+    [172_800_999, '2d ago'],
+    [Number.MAX_SAFE_INTEGER, '104249991d ago'],
+  ] as const)(
+    'shares age presentation for %s milliseconds without inferring an observed date',
+    (ageMs, expected) => {
+      expect(tagLines({ ...ghost, ageMs, snapshotAtGame: 90_061_007 }).slice(2)).toEqual([
+        `Observed ${expected}`,
+        'Report date unavailable',
+      ]);
+    },
+  );
+
+  it.each([undefined, -1, NaN, Infinity, -Infinity, 0.5, Number.MAX_SAFE_INTEGER + 1])(
+    'retains unavailable timestamp labels for %s',
+    (time) => {
+      expect(tagLines({ ...own, snapshotAtGame: time }).slice(2)).toEqual([
+        'Snapshot time unavailable',
+        'Report date unavailable',
+      ]);
+      const lines = tagLines({ ...ghost, snapshotAtGame: time, observedAtGame: time });
+      expect(lines[3]).toBe('Report date unavailable');
+      // An unusable report date never becomes a snapshot date.
+      expect(lines[2]).toBe(
+        time === undefined ? 'Snapshot time unavailable' : 'Observed current snapshot',
+      );
+    },
+  );
+
+  it.each([-1, NaN, Infinity, -Infinity, 0.5, Number.MAX_SAFE_INTEGER + 1])(
+    'keeps invalid age %s unavailable with or without an observed date',
+    (ageMs) => {
+      expect(tagLines({ ...ghost, ageMs, snapshotAtGame: 90_061_007 }).slice(2)).toEqual([
+        'Observation age unavailable',
+        'Report date unavailable',
+      ]);
+      expect(tagLines({ ...ghost, ageMs, observedAtGame: 0 }).slice(2)).toEqual([
+        'Observation age unavailable',
+        'Observed at 00:00:00',
+      ]);
+    },
+  );
+
   it('labels missing strength and timestamps unavailable instead of inventing reports', () => {
     expect(tagLines(own)).toEqual([
       '1st Battalion',
@@ -36,7 +112,7 @@ describe('paper tag knowledge', () => {
     ]);
     expect(tagLines({ ...own, strength: 0, snapshotAtGame: 0 })).toContain('Strength: 0');
     expect(tagLines({ ...own, strength: 600, snapshotAtGame: 3_600_000 })).toContain(
-      'Snapshot at 1:00:00 game',
+      'Snapshot at 01:00:00',
     );
   });
 
@@ -44,7 +120,7 @@ describe('paper tag knowledge', () => {
     expect(tagLines({ ...ghost, snapshotAtGame: 3_600_000 })).toEqual([
       'Enemy contact',
       'Strength unavailable',
-      'Snapshot at 1:00:00 game',
+      'Snapshot at 01:00:00',
       'Report date unavailable',
     ]);
     expect(
@@ -59,7 +135,7 @@ describe('paper tag knowledge', () => {
       'Enemy contact',
       'Strength unavailable',
       'Observed 30m ago',
-      'Observed at 0:30:00 game',
+      'Observed at 00:30:00',
     ]);
     expect(tagLines({ ...ghost, ageMs: 30 * 60_000, snapshotAtGame: 3_600_000 })[3]).toBe(
       'Report date unavailable',
