@@ -8,6 +8,7 @@
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DraftSnapshot, Mark } from '@kriegsspiel/protocol';
+import type { UmpireCallRecord } from '../umpire/umpireClient.js';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
 import type { PauseTransition } from '../pause.js';
@@ -46,7 +47,12 @@ export type GameCommand =
    * The server came back after being down for `downMs` of wall time (an estimate, from the last
    * heartbeat). Journal only: the game was reopened paused, so no game time passed.
    */
-  | { kind: 'restart'; downMs: number };
+  | { kind: 'restart'; downMs: number }
+  /**
+   * The narrate stage ran for one side's window ending at `windowEndMs`. Journal only: narration
+   * is display text and never changes the engine; the model calls are on the entry (`calls`).
+   */
+  | { kind: 'narrate'; side: string; windowEndMs: number };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {
@@ -76,6 +82,8 @@ export interface InputLogEntry {
   pause?: PauseTransition[];
   /** Ratio-vote steps this command caused. A `passed` step carries the new ratio. */
   ratio?: RatioTransition[];
+  /** For `narrate` commands: every model call the stage made, so the narration replays with no network. */
+  calls?: UmpireCallRecord[];
   /** The command was refused or failed; the reason. */
   error?: string;
 }

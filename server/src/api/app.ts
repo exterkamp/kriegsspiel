@@ -123,6 +123,8 @@ export interface AppOptions {
   scriptedOpponents?: boolean;
   /** Replaces the built-in opponent's agents for a game, for example with LLM commanders. See `GameHostOptions.aiAgents`. */
   aiAgents?: GameHostOptions['aiAgents'];
+  /** Narrates each side's dispatches per window. See `GameHostOptions.narrator`. */
+  narrator?: GameHostOptions['narrator'];
   /** Directory of the built client to serve at `/`. Unset: API only (dev uses the Vite server). */
   staticDir?: string;
   /**
@@ -231,6 +233,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     scriptedOpponents: (id) =>
       options.scriptedOpponents === true && recordOf(id)?.sessionType === 'co_op_vs_ai',
     aiAgents: options.aiAgents,
+    narrator: options.narrator,
     trace,
     onUpdate: (id) => {
       hub.notify(id);

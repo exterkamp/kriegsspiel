@@ -370,7 +370,12 @@ export class Hub {
   private sendCatchUp(gameId: string, conn: Connection, since: number | undefined): void {
     const game = this.lookup(gameId);
     if (since === undefined || !game) return;
-    const view = sideViewOf(game.state, conn.side, game.gameClock.snapshot());
+    const view = sideViewOf(
+      game.state,
+      conn.side,
+      game.gameClock.snapshot(),
+      game.narrationFor(conn.side),
+    );
     if (view.atGame <= since) return;
     const dispatchIds = view.dispatches.filter((d) => d.receivedAtGame > since).map((d) => d.id);
     this.send(conn, {
@@ -420,7 +425,7 @@ export class Hub {
     if (!game) return;
     try {
       const clock: ClockState = game.gameClock.snapshot();
-      const view = sideViewOf(game.state, conn.side, clock);
+      const view = sideViewOf(game.state, conn.side, clock, game.narrationFor(conn.side));
       this.seen.set(`${gameId}\0${conn.side}`, view.atGame);
       const clockJson = JSON.stringify(clock);
       if (clockJson !== conn.lastClock) {
