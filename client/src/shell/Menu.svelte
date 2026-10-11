@@ -13,59 +13,61 @@
   let { email, games, loadError, onNewGame, onContinue, onSignOut }: Props = $props();
 </script>
 
-<main class="menu">
-  <h1>Kriegsspiel</h1>
-  <p class="tag">An umpired war game, played in real time or slower.</p>
+<div class="page">
+  <main class="menu">
+    <h1>Kriegsspiel</h1>
+    <p class="tag">An umpired war game, played in real time or slower.</p>
 
-  <nav aria-label="Main menu">
-    <button type="button" class="primary" onclick={onNewGame}>New game</button>
-  </nav>
+    <nav aria-label="Main menu">
+      <button type="button" class="primary" onclick={onNewGame}>New game</button>
+    </nav>
 
-  {#if games === undefined && !loadError}
-    <p role="status" class="muted">Looking for your games…</p>
-  {:else if loadError}
-    <p role="alert" class="err">{loadError}</p>
-  {:else if games && games.length > 0}
-    <section aria-labelledby="continue-h">
-      <h2 id="continue-h">Continue</h2>
-      <ul>
-        {#each games as g (g.id)}
-          <li>
-            <button
-              type="button"
-              class="game"
-              aria-label={`Continue: ${g.label}`}
-              onclick={() => onContinue(g.id)}
-            >
-              <b>{g.scenario}</b>
-              <span>{g.side}</span>
-              <span>{g.gameTime}</span>
-              <span class="muted">played {g.lastPlayed}</span>
-            </button>
-          </li>
-        {/each}
-      </ul>
+    {#if games === undefined && !loadError}
+      <p role="status" class="muted">Looking for your games…</p>
+    {:else if loadError}
+      <p role="alert" class="err">{loadError}</p>
+    {:else if games && games.length > 0}
+      <section aria-labelledby="continue-h">
+        <h2 id="continue-h">Continue</h2>
+        <ul>
+          {#each games as g (g.id)}
+            <li>
+              <button
+                type="button"
+                class="game"
+                aria-label={`Continue: ${g.label}`}
+                onclick={() => onContinue(g.id)}
+              >
+                <b>{g.scenario}</b>
+                <span>{g.side}</span>
+                <span>{g.gameTime}</span>
+                <span class="muted">played {g.lastPlayed}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
+    <section aria-labelledby="account-h" class="account">
+      <h2 id="account-h">Account</h2>
+      <p>Signed in as <b>{email}</b></p>
+      <button type="button" onclick={onSignOut}>Sign out</button>
     </section>
-  {/if}
 
-  <section aria-labelledby="account-h" class="account">
-    <h2 id="account-h">Account</h2>
-    <p>Signed in as <b>{email}</b></p>
-    <button type="button" onclick={onSignOut}>Sign out</button>
-  </section>
-
-  <section aria-labelledby="about-h">
-    <h2 id="about-h">About</h2>
-    <p>
-      You command one side of a battle from a desk. Orders are written in plain words and carried by
-      couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game
-      keeps running on the server while you are away.
-      <a href="https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md"
-        >Read how it plays</a
-      >.
-    </p>
-  </section>
-</main>
+    <section aria-labelledby="about-h">
+      <h2 id="about-h">About</h2>
+      <p>
+        You command one side of a battle from a desk. Orders are written in plain words and carried
+        by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The
+        game keeps running on the server while you are away.
+        <a href="https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md"
+          >Read how it plays</a
+        >.
+      </p>
+    </section>
+  </main>
+</div>
 
 <style>
   .menu {
@@ -77,7 +79,9 @@
     color: #2a2118;
     font-family: Georgia, 'Times New Roman', serif;
   }
-  :global(body:has(.menu)) {
+  .page {
+    min-height: 100%;
+    overflow: auto;
     background: #e9dcb8 radial-gradient(circle at 30% 20%, #f3e9c9, #d9c795);
   }
   h1 {

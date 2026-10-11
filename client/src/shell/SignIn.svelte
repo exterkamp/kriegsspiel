@@ -19,15 +19,17 @@
   }
 </script>
 
-<main class="signin">
-  <h1>Kriegsspiel</h1>
-  <form onsubmit={submit} aria-labelledby="signin-h">
-    <h2 id="signin-h">Sign in</h2>
-    <label>Email <input type="email" required autocomplete="email" bind:value={email} /></label>
-    <button type="submit" disabled={busy}>Send me a login link</button>
-    <p role="status" class:err={failed}>{message}</p>
-  </form>
-</main>
+<div class="page">
+  <main class="signin">
+    <h1>Kriegsspiel</h1>
+    <form onsubmit={submit} aria-labelledby="signin-h">
+      <h2 id="signin-h">Sign in</h2>
+      <label>Email <input type="email" required autocomplete="email" bind:value={email} /></label>
+      <button type="submit" disabled={busy}>Send me a login link</button>
+      <p role="status" class:err={failed}>{message}</p>
+    </form>
+  </main>
+</div>
 
 <style>
   .signin {
@@ -38,7 +40,9 @@
     color: #2a2118;
     font-family: Georgia, 'Times New Roman', serif;
   }
-  :global(body:has(.signin)) {
+  .page {
+    min-height: 100%;
+    overflow: auto;
     background: #e9dcb8 radial-gradient(circle at 30% 20%, #f3e9c9, #d9c795);
   }
   h1 {
