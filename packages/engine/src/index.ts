@@ -137,6 +137,7 @@ export {
 export { describePlace } from './place.js';
 export { beginMarch } from './movement.js';
 export {
+  ACK_DELAY_MS,
   COURIER_DELAY_MS,
   SCAN_INTERVAL_MS,
   SIGHT_RANGE_MM,

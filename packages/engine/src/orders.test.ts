@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   COURIER_CHOICES,
-  COURIER_DELAY_MS,
+  ACK_DELAY_MS,
   COURIER_MS_PER_METRE,
   EventRegistry,
   MS_PER_METRE,
@@ -93,12 +93,12 @@ describe('courier delivery', () => {
     ]);
   });
 
-  it('tells HQ of the delivery once the report has ridden back, and only HQ', () => {
+  it('tells HQ of the delivery once the acknowledgement has ridden back, and only HQ', () => {
     const s0 = issueOrder(game(), order('blue-1', { kind: 'hold', at: P(1850, 2450) }));
     const delivered = advanceTo(s0, DELIVERY_MS, registry()).state;
     expect(viewFor(delivered.world, 'blue', DELIVERY_MS).reports).toEqual([]);
 
-    const t = DELIVERY_MS + COURIER_DELAY_MS;
+    const t = DELIVERY_MS + ACK_DELAY_MS;
     const later = advanceTo(delivered, t, registry()).state;
     const reports = viewFor(later.world, 'blue', t).reports;
     expect(reports).toHaveLength(1);

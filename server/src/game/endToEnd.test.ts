@@ -170,7 +170,11 @@ describe('the in-tray of a live game', () => {
       const run = await play(rate, 10 * MIN);
       const blue = viewFor(run.state.world, 'blue', run.state.time).reports.map(toDispatch);
       const opening = blue.find((d) => d.text.includes('no enemy yet in sight'));
-      expect(opening).toMatchObject({ from: 'Chief of staff', category: 'staff', receivedAtGame: 0 });
+      expect(opening).toMatchObject({
+        from: 'Chief of staff',
+        category: 'staff',
+        receivedAtGame: 0,
+      });
       expect(opening!.location).toBeDefined();
       const ack = blue.find((d) => d.text.includes('received its orders'));
       expect(ack).toMatchObject({ category: 'subordinates', confidence: 'high' });

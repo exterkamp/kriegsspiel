@@ -37,8 +37,8 @@ export class InTrayComponent {
   protected readonly sorted = computed(() =>
     sortTray(this.game.state().dispatches, this.desk.trayMarks()),
   );
-  protected readonly current = computed(
-    () => this.sorted().piles.find((p) => p.id === this.pile())!,
+  protected readonly current = computed(() =>
+    this.sorted().piles.find((p) => p.id === this.pile())!,
   );
   protected readonly list = computed(() =>
     this.showFiled() ? this.sorted().filed : this.current().items,

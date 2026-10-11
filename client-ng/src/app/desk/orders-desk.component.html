@@ -81,7 +81,9 @@
   </fieldset>
 
   <div class="sign">
-    <span class="signature" aria-hidden="true">{{ stamping() ? 'Signed, the Commander' : '' }}</span>
+    <span class="signature" aria-hidden="true">{{
+      stamping() ? 'Signed, the Commander' : ''
+    }}</span>
     <button type="button" id="order-sign" (click)="sign()" [disabled]="over()">
       Sign and send
     </button>

@@ -7,7 +7,8 @@
     <p role="alert">{{ errorText() }}</p>
   } @else if (timeline(); as tl) {
     <p class="outcome">
-      {{ tl.outcome.winner ? tl.outcome.winner + ' won' : 'No winner' }}: {{ tl.outcome.reason }}, at
+      {{ tl.outcome.winner ? tl.outcome.winner + ' won' : 'No winner' }}: {{ tl.outcome.reason }},
+      at
       {{ formatGameTime(tl.outcome.time) }}
     </p>
     <div class="scrub">
