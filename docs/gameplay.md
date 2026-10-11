@@ -42,6 +42,8 @@ This is the main skill the game tests, and it is what the umpire grades. Command
 
 The umpire's window reveals true positions, dice and rulings. The umpire then writes a critique: what each side knew and when, decisions that mattered, and misreadings. This is built properly, not left as an afterthought.
 
+The window is the same map table with a scrubber over the whole game. It shows every unit's true position at the scrubbed time, can overlay what either side believed (live sightings and aged ghosts), and shows the dice, modifiers and umpire rulings for a unit under the pointer. It is rebuilt from the input log with no model call, and the server refuses it (`403 game_not_over`) until the game has ended (`GET /games/:id/window`, `/window/at`).
+
 ## Pace: the clock ratio
 
 The ratio is the pace setting. It is chosen per game in the lobby and can be changed mid-game by agreement.
