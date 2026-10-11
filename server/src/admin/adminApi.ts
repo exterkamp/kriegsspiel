@@ -3,6 +3,7 @@
  *
  *   GET /admin/api/games                       open games with clock and trace counts
  *   GET /admin/api/games/:id/state             master state snapshot (unfiltered; never sent to clients)
+ *                                              plus each side's current `SideView`, for comparison
  *   GET /admin/api/games/:id/entries           trace entries: ?kind= &correlationId= &after= &limit=
  *   GET /admin/api/games/:id/replay            timeline of the input log: end time and marks to jump to
  *   GET /admin/api/games/:id/replay/at?at=ms   master state, both side views and events at a game time
@@ -11,13 +12,14 @@
  * Gating: `buildApp` registers this plugin only when the admin view is enabled, so otherwise every
  * `/admin` path is an ordinary 404. When enabled, a request must come from a loopback address or
  * carry the admin token (`Authorization: Bearer` or `?token=`). Only GET routes exist, and they
- * share no code with the game clients' views (`api/sideView.ts`, `api/hub.ts`).
+ * never feed the game clients' hub (`api/hub.ts`); `/state` only reads `api/sideView.ts` to show what a side is sent.
  */
 import { timingSafeEqual } from 'node:crypto';
 import { isIP } from 'node:net';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { GameHost } from '../game/index.js';
+import { sideViewOf } from '../api/sideView.js';
 import type { TraceEntry, TraceStore } from '../debug/trace.js';
 import type { GameStore } from '../game/store.js';
 import { createRegistry, loadScenarioById, startingState } from '../game/registry.js';
@@ -118,12 +120,17 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
   server.get<{ Params: { id: string } }>(`${ADMIN_PREFIX}/games/:id/state`, async (req, reply) => {
     const actor = host.get(req.params.id);
     if (!actor) return reply.code(404).send({ error: 'no_such_game' });
+    const clock = actor.gameClock.snapshot();
     return {
       id: actor.id,
-      clock: actor.gameClock.snapshot(),
+      clock,
       clockHistory: actor.gameClock.history(),
       staffAtWork: actor.staffAtWork,
       engine: actor.state,
+      // What each side's client is sent right now, so the page can show it beside `engine`.
+      sideViews: Object.fromEntries(
+        actor.state.world.sides.map((s) => [s.id, sideViewOf(actor.state, s.id, clock)]),
+      ),
     };
   });
 

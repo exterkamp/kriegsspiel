@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { serialize } from '@kriegsspiel/engine';
+import { sideViewOf } from '../api/sideView.js';
 import { buildApp, type App } from '../api/app.js';
 import { hashToken } from '../auth/store.js';
 import { StubOrderParser } from '../orders/stubParser.js';
@@ -130,6 +131,18 @@ describe('reads', () => {
     const state = (await get(`/admin/api/games/${id}/state`, '127.0.0.1')).json();
     expect(state.id).toBe(id);
     expect(state.engine.world.units.length).toBeGreaterThan(0);
+    // Each side's view comes with the master state, and holds no more than the filter lets through.
+    expect(Object.keys(state.sideViews).sort()).toEqual(['blue', 'red']);
+    expect(state.sideViews.blue.side).toBe('blue');
+    expect(state.sideViews.blue.ownUnits.length).toBeGreaterThan(0);
+    expect(JSON.stringify(state.sideViews.blue)).not.toContain('"intent"');
+    // Exactly what the hub sends: same builder, same side, same clock.
+    for (const side of ['blue', 'red'] as const) {
+      expect(state.sideViews[side]).toEqual(
+        JSON.parse(JSON.stringify(sideViewOf(app!.host.get(id)!.state, side, state.clock))),
+      );
+    }
+    expect(state.engine.world.units[0]).toHaveProperty('intent');
 
     const all = (await get(`/admin/api/games/${id}/entries?limit=1000`, '127.0.0.1')).json();
     expect(all.entries.length).toBeGreaterThan(1);
