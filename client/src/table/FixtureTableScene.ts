@@ -44,6 +44,16 @@ export type PreviewRaster = Readonly<{
   contentHeightPx: number;
 }>;
 
+export type PreviewResourceCounts = Readonly<{
+  textures: number;
+  geometries: number;
+}>;
+export type PreviewSceneObservation = Readonly<{
+  sourceKey: string;
+  deviceMaxTextureSizePx: number | null;
+  resources: PreviewResourceCounts | null;
+}>;
+
 export class PreviewApplyError extends Error {
   constructor(
     message: string,
@@ -426,6 +436,48 @@ export class TableScene {
     if (!Number.isSafeInteger(limit) || limit < 1)
       throw new PreviewApplyError('Invalid device texture limit', 'unavailable');
     return limit;
+  }
+
+  /** Historical value snapshot; renderer-managed counts are not GPU byte totals. */
+  previewObservation(): PreviewSceneObservation | null {
+    this.requirePreview();
+    const sourceKey = this.mapKey;
+    const map = this.mapMesh;
+    const current = () =>
+      !this.disposed &&
+      !this.applyingPreview &&
+      this.previewAvailable &&
+      !this.previewRenderFailed &&
+      this.mapKey === sourceKey &&
+      this.mapMesh === map;
+    const available = () => {
+      if (!current()) return false;
+      try {
+        // Read the existing context only; failures here have no display authority.
+        return !this.contextLost() && current();
+      } catch {
+        return false;
+      }
+    };
+    if (!available()) return null;
+    let deviceMaxTextureSizePx: number | null = null;
+    let resources: PreviewResourceCounts | null = null;
+    try {
+      const maximum = this.renderer.capabilities.maxTextureSize;
+      if (Number.isSafeInteger(maximum) && maximum > 0) deviceMaxTextureSizePx = maximum;
+    } catch {
+      // Observations cannot change display authority or lifetime.
+    }
+    if (!current()) return null;
+    try {
+      const { textures, geometries } = this.renderer.info.memory;
+      if ([textures, geometries].every((n) => Number.isSafeInteger(n) && n >= 0))
+        resources = Object.freeze({ textures, geometries });
+    } catch {
+      // A missing counter remains explicitly unavailable.
+    }
+    if (!available()) return null;
+    return Object.freeze({ sourceKey, deviceMaxTextureSizePx, resources });
   }
 
   private contextLost(): boolean {

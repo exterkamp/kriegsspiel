@@ -16,7 +16,12 @@ import {
   type ValidationWorker,
   type ValidationRequest,
 } from '../map-authoring/runtime/index.js';
-import { TableScene, PreviewApplyError, type PreviewRaster } from '../table/FixtureTableScene.js';
+import {
+  TableScene,
+  PreviewApplyError,
+  type PreviewRaster,
+  type PreviewSceneObservation,
+} from '../table/FixtureTableScene.js';
 import { createSavedMapLoader, readSavedFile } from './loader.js';
 import * as THREE from 'three';
 
@@ -24,6 +29,7 @@ vi.mock('three', async (importOriginal) => {
   const actual = await importOriginal<typeof import('three')>();
   class Renderer {
     capabilities = { maxTextureSize: 2048, getMaxAnisotropy: () => 4 };
+    info = { memory: { textures: 3, geometries: 5 } };
     setPixelRatio() {}
     setSize() {}
     render() {}
@@ -108,7 +114,15 @@ function setup(options: Parameters<typeof createSavedMapLoader>[1] = {}, real = 
     },
     waitTimeoutMs: options.waitTimeoutMs ?? 30000,
   });
-  const table = { previewTextureLimit: vi.fn(() => 2048), applyPreviewRaster: vi.fn() };
+  const table = {
+    previewTextureLimit: vi.fn(() => 2048),
+    applyPreviewRaster: vi.fn<(raster: PreviewRaster) => void>(),
+    previewObservation: vi.fn((): PreviewSceneObservation | null => ({
+      sourceKey: table.applyPreviewRaster.mock.calls.at(-1)![0].sourceKey,
+      deviceMaxTextureSizePx: 8192,
+      resources: { textures: 3, geometries: 5 },
+    })),
+  };
   const prepare = vi.fn((asset, sourceKey: string, limit: number): PreviewRaster => {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = limit;
@@ -275,12 +289,17 @@ describe('saved-only independent certification and immutable full identity', () 
     const r = setup();
     await ready(r);
     const first = r.loader.state.displayed!.sourceKey;
+    const firstInspection = r.loader.state.displayed!.inspection;
     const renamed = { ...certified, name: 'Renamed saved map' };
     expect(canonicalGeometry(renamed)).toBe(canonicalGeometry(certified));
     await r.loader.load(file(canonicalizeAsset(renamed)));
     r.workers.at(-1)!.reply();
     await vi.waitFor(() => expect(r.loader.state.displayed!.name).toBe('Renamed saved map'));
     expect(r.loader.state.displayed!.sourceKey).not.toBe(first);
+    expect(r.loader.state.displayed!.inspection!.sourceKey).toBe(
+      r.loader.state.displayed!.sourceKey,
+    );
+    expect(r.loader.state.displayed!.inspection).not.toBe(firstInspection);
   });
 });
 
@@ -353,6 +372,10 @@ describe('read, validation and preparation ownership', () => {
     r.workers[0]!.reply();
     await vi.waitFor(() => expect(r.loader.state.phase).toBe('ready'));
     expect(r.loader.state.displayed!.filename).toBe('C');
+    expect(r.loader.state.displayed!.inspection!.sourceKey).toBe(
+      r.loader.state.displayed!.sourceKey,
+    );
+    expect(r.table.previewObservation).toHaveBeenCalledOnce();
     const d = r.loader.load(file('', 'D'));
     r.loader.cancel();
     reads[3]!.resolve(saved);
@@ -424,6 +447,7 @@ describe('read, validation and preparation ownership', () => {
       await settle();
       expect(r.prepare).not.toHaveBeenCalled();
       expect(r.table.applyPreviewRaster).not.toHaveBeenCalled();
+      expect(r.table.previewObservation).not.toHaveBeenCalled();
     },
   );
   it.each(['prepare', 'retained', 'unavailable'] as const)(
@@ -450,4 +474,158 @@ describe('read, validation and preparation ownership', () => {
       expect(r.loader.state.available).toBe(true);
     },
   );
+});
+
+describe('non-authoritative operation observations', () => {
+  it('measures inclusive phases and freezes a source-bound snapshot before subscriber reentry', async () => {
+    let clock = 100;
+    const r = setup({
+      now: () => clock,
+      read: async () => {
+        clock += 3;
+        return saved;
+      },
+      identity: async () => {
+        clock += 13;
+        return 'accepted-key';
+      },
+    });
+    const loadSavedAsset = r.runtime.controller.loadSavedAsset.bind(r.runtime.controller);
+    vi.spyOn(r.runtime.controller, 'loadSavedAsset').mockImplementation((text) => {
+      const id = loadSavedAsset(text);
+      clock += 7;
+      return id;
+    });
+    const prepare = r.prepare.getMockImplementation()!;
+    r.prepare.mockImplementation((...args) => {
+      clock += 17;
+      return prepare(...args);
+    });
+    r.table.applyPreviewRaster.mockImplementation(() => {
+      clock += 19;
+    });
+    const resources = { textures: 3, geometries: 5 };
+    r.table.previewObservation.mockImplementation(() => {
+      expect(r.loader.state.displayed).toBeNull();
+      expect(r.table.applyPreviewRaster).toHaveBeenCalledOnce();
+      return { sourceKey: 'accepted-key', deviceMaxTextureSizePx: 8192, resources };
+    });
+    r.loader.subscribe((state) => {
+      if (state.phase === 'ready') {
+        expect(r.table.previewObservation).toHaveBeenCalledOnce();
+        resources.textures = 99;
+        r.loader.unavailable('Later failure');
+      }
+    });
+    await r.loader.load(file());
+    clock += 11;
+    r.workers[0]!.reply();
+    await settle();
+    const inspection = r.loader.state.displayed!.inspection!;
+    expect(inspection).toEqual({
+      sourceKey: 'accepted-key',
+      textureLimitPx: 2048,
+      deviceMaxTextureSizePx: 8192,
+      textureWidthPx: 2048,
+      textureHeightPx: 2048,
+      contentWidthPx: 2048,
+      contentHeightPx: 2048,
+      readMs: 3,
+      parseAndDispatchMs: 7,
+      certificationWaitMs: 11,
+      identityMs: 13,
+      rasterMs: 17,
+      applyAndRetireMs: 19,
+      resources: { textures: 3, geometries: 5 },
+    });
+    expect(Object.isFrozen(inspection)).toBe(true);
+    expect(Object.isFrozen(inspection.resources)).toBe(true);
+    expect(r.loader.state.available).toBe(false);
+  });
+  it.each(['throw', 'absent', 'mismatch'] as const)(
+    'acknowledges geography with null inspection on %s observation',
+    async (fault) => {
+      const r = setup();
+      r.table.previewObservation.mockImplementation(() => {
+        if (fault === 'throw') throw new Error('counter failure');
+        if (fault === 'absent') return null;
+        return { sourceKey: 'other-map', deviceMaxTextureSizePx: 8192, resources: null };
+      });
+      await ready(r);
+      expect(r.loader.state.displayed!.inspection).toBeNull();
+      expect(r.loader.state.available).toBe(true);
+      expect(r.table.applyPreviewRaster).toHaveBeenCalledOnce();
+    },
+  );
+  it.each(['cancel', 'replace', 'dispose'] as const)(
+    'rechecks current operation after observation reentry with %s',
+    async (action) => {
+      const r = setup({ identity: async () => 'accepted-key' });
+      await ready(r);
+      const prior = r.loader.state.displayed;
+      r.table.previewObservation.mockImplementationOnce(() => {
+        if (action === 'cancel') r.loader.cancel();
+        else if (action === 'dispose') r.loader.dispose();
+        else void r.loader.load(file(saved, 'C'));
+        return { sourceKey: 'accepted-key', deviceMaxTextureSizePx: 8192, resources: null };
+      });
+      await r.loader.load(file(saved, 'B'));
+      r.workers.at(-1)!.reply();
+      await settle();
+      expect(r.loader.state.displayed).toBe(prior);
+      if (action === 'replace') {
+        await vi.waitFor(() => expect(r.workers).toHaveLength(3));
+        r.workers.at(-1)!.reply();
+        await vi.waitFor(() => expect(r.loader.state.displayed!.filename).toBe('C'));
+        expect(r.loader.state.displayed!.inspection!.sourceKey).toBe('accepted-key');
+      }
+    },
+  );
+  it('keeps clock validity per operation and missing endpoints nullable without losing acceptance', async () => {
+    const readings: (number | Error)[] = [
+      100,
+      90,
+      NaN,
+      Infinity,
+      -1,
+      new Error('clock failed'),
+      105,
+      104,
+      110,
+      111,
+      112,
+    ];
+    const now = vi.fn(() => {
+      const value = readings.shift()!;
+      if (value instanceof Error) throw value;
+      return value;
+    });
+    const r = setup({ now, identity: async () => 'clock-key' });
+    await ready(r);
+    expect(r.loader.state.displayed!.inspection).toMatchObject({
+      readMs: null,
+      parseAndDispatchMs: null,
+      certificationWaitMs: null,
+      identityMs: null,
+      rasterMs: null,
+      applyAndRetireMs: 1,
+    });
+    expect(now).toHaveBeenCalledTimes(11);
+    // A new request may start below the previous request's last timestamp.
+    readings.push(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
+    await ready(r, 'new-clock.json');
+    expect(r.loader.state.displayed!.inspection).toMatchObject({
+      readMs: 1,
+      parseAndDispatchMs: 1,
+      certificationWaitMs: 1,
+      identityMs: 1,
+      rasterMs: 1,
+      applyAndRetireMs: 1,
+    });
+    r.loader.unavailable('Later render failure');
+    const prior = r.loader.state.displayed;
+    expect(prior!.inspection!.sourceKey).toBe('clock-key');
+    r.loader.cancel();
+    expect(r.loader.state.displayed).toBe(prior);
+  });
 });

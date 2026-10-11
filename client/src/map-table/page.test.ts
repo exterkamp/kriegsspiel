@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LoadState } from './loader.js';
+import type { LoadState, DisplayInspection } from './loader.js';
 import { PreviewApplyError, TableScene } from '../table/FixtureTableScene.js';
 
 // DOM composition doubles only; certification/render transactions have dedicated real-boundary tests.
@@ -58,6 +58,22 @@ const displayed = Object.freeze({
   filename: 'public.json',
   widthM: 15000,
   heightM: 5000,
+  inspection: Object.freeze({
+    sourceKey: 'full-asset-digest',
+    textureLimitPx: 4096,
+    deviceMaxTextureSizePx: 8192,
+    textureWidthPx: 4096,
+    textureHeightPx: 1366,
+    contentWidthPx: 4096,
+    contentHeightPx: 4096 / 3,
+    readMs: null,
+    parseAndDispatchMs: 10,
+    certificationWaitMs: 20,
+    identityMs: 1,
+    rasterMs: 30,
+    applyAndRetireMs: 5,
+    resources: Object.freeze({ textures: 3, geometries: 5 }),
+  }),
 });
 function setup() {
   const table = {
@@ -96,6 +112,42 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe('standalone empty page and controls', () => {
+  it('exposes only the displayed snapshot, retaining historical evidence and removing absent or unserializable evidence', () => {
+    setup();
+    expect(get('displayed-identity').hasAttribute('data-inspection')).toBe(false);
+    const ready: LoadState = { phase: 'ready', message: 'Map loaded.', displayed, available: true };
+    harness.listener!(ready);
+    const snapshot = get('displayed-identity').dataset.inspection!;
+    expect(JSON.parse(snapshot)).toEqual(displayed.inspection);
+    for (const phase of ['reading', 'validating', 'cancelled', 'failed'] as const) {
+      harness.listener!({ ...ready, phase, message: 'Replacement request' });
+      expect(get('displayed-identity').dataset.inspection).toBe(snapshot);
+    }
+    harness.listener!({ ...ready, phase: 'failed', available: false });
+    expect(get('displayed-identity').dataset.inspection).toBe(snapshot);
+    expect(get('retained-display').textContent).toContain('historical');
+    harness.listener!({ ...ready, displayed: { ...displayed, inspection: null } });
+    expect(get('displayed-identity').hasAttribute('data-inspection')).toBe(false);
+    harness.listener!(ready);
+    const broken = {
+      ...displayed.inspection,
+      toJSON() {
+        throw new Error('serialization failed');
+      },
+    };
+    expect(() =>
+      harness.listener!({
+        ...ready,
+        displayed: { ...displayed, inspection: broken as DisplayInspection },
+      }),
+    ).not.toThrow();
+    expect(get('displayed-identity').hasAttribute('data-inspection')).toBe(false);
+    expect(get('displayed-identity').textContent).toBe(displayed.sourceKey);
+    expect((get('fit') as HTMLButtonElement).disabled).toBe(false);
+    harness.listener!(ready);
+    harness.listener!({ ...ready, displayed: null });
+    expect(get('displayed-identity').hasAttribute('data-inspection')).toBe(false);
+  });
   it('starts empty, allows file selection, resets input for equal-file reapply and shows certification progress/cancel', () => {
     const { create, table } = setup();
     expect(create).toHaveBeenCalledWith(get('map-canvas'), expect.any(Function));

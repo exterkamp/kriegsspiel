@@ -48,7 +48,15 @@ export function mountMapTable(
       ? `${state.displayed.widthM.toLocaleString()} × ${state.displayed.heightM.toLocaleString()} m · ${state.displayed.filename}`
       : '';
     element('identity-details').hidden = !state.displayed;
-    element('displayed-identity').textContent = state.displayed?.sourceKey ?? '';
+    const identity = element('displayed-identity');
+    identity.textContent = state.displayed?.sourceKey ?? '';
+    delete identity.dataset.inspection;
+    try {
+      if (state.displayed?.inspection)
+        identity.dataset.inspection = JSON.stringify(state.displayed.inspection);
+    } catch {
+      // DOM evidence is optional; serialization cannot change display state.
+    }
     element('empty-table').hidden = !!state.displayed;
     const retained = element('retained-display');
     retained.hidden = !state.displayed || (state.available && state.phase === 'ready');

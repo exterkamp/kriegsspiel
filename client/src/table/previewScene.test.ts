@@ -5,6 +5,7 @@ const gpu = vi.hoisted(() => ({ lost: false, limit: 4096, allocationFailure: fal
 vi.mock('three', async (importOriginal) => {
   const actual = await importOriginal<typeof import('three')>();
   class FakeRenderer {
+    info = { memory: { textures: 3, geometries: 5 } };
     capabilities = {
       get maxTextureSize() {
         return gpu.limit;
@@ -96,9 +97,170 @@ describe('fixed preview authority', () => {
     tables.push(table);
     expect(() => table.applyPreviewRaster(raster())).toThrow('Fixture tables');
     expect(() => table.previewTextureLimit()).toThrow('Fixture tables');
+    expect(() => table.previewObservation()).toThrow('Fixture tables');
     expect(() => table.fitPreview()).toThrow('Fixture tables');
     const state = buildSceneState(fixtureView, fixtureMap);
     expect(() => table.apply(state, raster().canvas as unknown as HTMLImageElement)).toThrow();
+  });
+});
+
+describe('preview observation snapshots', () => {
+  it('reads raw capability and copied renderer counts only after retirement, without rendering', () => {
+    const table = make();
+    expect(table.previewObservation()).toBeNull();
+    gpu.limit = 8192;
+    table.applyPreviewRaster(raster());
+    const old = mesh(table);
+    const during: unknown[] = [];
+    old.material.map!.addEventListener('dispose', () => during.push(table.previewObservation()));
+    vi.spyOn(table.renderer, 'render').mockImplementationOnce(() => {
+      during.push(table.previewObservation());
+    });
+    table.applyPreviewRaster(raster('renamed-B'));
+    expect(during).toEqual([null, null]);
+    const render = vi.spyOn(table.renderer, 'render');
+    render.mockClear();
+    const context = vi.spyOn(table.renderer, 'getContext');
+    const snapshot = table.previewObservation()!;
+    expect(snapshot).toEqual({
+      sourceKey: 'renamed-B',
+      deviceMaxTextureSizePx: 8192,
+      resources: { textures: 3, geometries: 5 },
+    });
+    expect(table.previewTextureLimit()).toBe(4096);
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(Object.isFrozen(snapshot.resources)).toBe(true);
+    table.renderer.info.memory.textures = 99;
+    expect(snapshot.resources!.textures).toBe(3);
+    expect(table.previewObservation()!.resources!.textures).toBe(99);
+    expect(render).not.toHaveBeenCalled();
+    expect(context).toHaveBeenCalledTimes(4);
+    table.dispose();
+    expect(table.previewObservation()).toBeNull();
+  });
+  it('returns null for an already-lost context or a throwing context getter without mutating display authority', () => {
+    const table = make();
+    table.applyPreviewRaster(raster());
+    const paper = mesh(table);
+    const render = vi.spyOn(table.renderer, 'render');
+    const dispose = vi.spyOn(paper.material.map!, 'dispose');
+    gpu.lost = true;
+    expect(table.previewObservation()).toBeNull();
+    gpu.lost = false;
+    const context = vi.spyOn(table.renderer, 'getContext').mockImplementationOnce(() => {
+      throw new Error('context getter failed');
+    });
+    expect(table.previewObservation()).toBeNull();
+    const existing = table.renderer.getContext();
+    context.mockReturnValueOnce({
+      ...existing,
+      isContextLost() {
+        throw new Error('context status failed');
+      },
+    });
+    expect(table.previewObservation()).toBeNull();
+    expect(table.previewObservation()!.sourceKey).toBe('asset-A');
+    expect(mesh(table)).toBe(paper);
+    expect(render).not.toHaveBeenCalled();
+    expect(dispose).not.toHaveBeenCalled();
+  });
+  it.each(['context', 'capability', 'memory'] as const)(
+    'returns null after terminal disposal during the %s getter',
+    (getter) => {
+      const table = make();
+      table.applyPreviewRaster(raster());
+      const dispose = vi.spyOn(mesh(table).material.map!, 'dispose');
+      const render = vi.spyOn(table.renderer, 'render');
+      if (getter === 'context') {
+        const existing = table.renderer.getContext();
+        vi.spyOn(table.renderer, 'getContext').mockImplementationOnce(() => {
+          table.dispose();
+          return existing;
+        });
+      } else if (getter === 'capability')
+        vi.spyOn(table.renderer.capabilities, 'maxTextureSize', 'get').mockImplementationOnce(
+          () => {
+            table.dispose();
+            return 8192;
+          },
+        );
+      else
+        Object.defineProperty(table.renderer.info.memory, 'textures', {
+          get() {
+            table.dispose();
+            return 3;
+          },
+        });
+      expect(table.previewObservation()).toBeNull();
+      expect(table.scene.children).toHaveLength(0);
+      expect(dispose).toHaveBeenCalledOnce();
+      expect(render).not.toHaveBeenCalled();
+      expect(table.previewObservation()).toBeNull();
+    },
+  );
+  it.each(['asset-B', 'asset-A'])(
+    'rejects counters from a synchronous replacement with %s during a getter',
+    (key) => {
+      const table = make();
+      table.applyPreviewRaster(raster());
+      const old = mesh(table);
+      const memory = table.renderer.info.memory;
+      let replace = true;
+      Object.defineProperty(memory, 'textures', {
+        get() {
+          if (replace) {
+            replace = false;
+            table.applyPreviewRaster(raster(key));
+          }
+          return 3;
+        },
+      });
+      expect(table.previewObservation()).toBeNull();
+      expect(mesh(table)).not.toBe(old);
+      expect(table.previewObservation()!.sourceKey).toBe(key);
+    },
+  );
+  it('retains the accepted source after recoverable replacement and returns null after known unavailable display', () => {
+    const table = make();
+    table.applyPreviewRaster(raster());
+    const render = vi.spyOn(table.renderer, 'render').mockImplementationOnce(() => {
+      throw new Error('candidate');
+    });
+    expect(errorFrom(() => table.applyPreviewRaster(raster('B'))).display).toBe('retained');
+    expect(table.previewObservation()!.sourceKey).toBe('asset-A');
+    render.mockImplementation(() => {
+      throw new Error('unavailable');
+    });
+    expect(errorFrom(() => table.applyPreviewRaster(raster('C'))).display).toBe('unavailable');
+    expect(table.previewObservation()).toBeNull();
+  });
+  it('keeps missing, invalid and throwing capability/counters nullable without changing accepted resources', () => {
+    const table = make();
+    table.applyPreviewRaster(raster());
+    const paper = mesh(table);
+    gpu.limit = NaN;
+    table.renderer.info.memory.textures = -1;
+    expect(table.previewObservation()).toEqual({
+      sourceKey: 'asset-A',
+      deviceMaxTextureSizePx: null,
+      resources: null,
+    });
+    Object.defineProperty(table.renderer, 'capabilities', {
+      get() {
+        throw new Error('capability');
+      },
+    });
+    Object.defineProperty(table.renderer, 'info', {
+      get() {
+        throw new Error('counter');
+      },
+    });
+    expect(table.previewObservation()).toEqual({
+      sourceKey: 'asset-A',
+      deviceMaxTextureSizePx: null,
+      resources: null,
+    });
+    expect(mesh(table)).toBe(paper);
   });
 });
 
@@ -451,6 +613,7 @@ describe('preview-only frame failure reporting', () => {
         display: 'unavailable',
         message: `later ${stage} failed`,
       });
+      expect(table.previewObservation()).toBeNull();
       expect(schedule).toHaveBeenCalledOnce();
       expect(cancel).toHaveBeenCalledWith(1);
       table.start();

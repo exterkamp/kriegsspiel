@@ -1,20 +1,58 @@
 import { assetIdentity, HARD_LIMITS, type MapAsset } from '@kriegsspiel/maps';
 import { createAuthoringRuntime } from '../map-authoring/runtime/index.js';
 import type { PreviewAsset } from '../map-authoring/asset.js';
-import { PreviewApplyError, type PreviewRaster } from '../table/FixtureTableScene.js';
+import {
+  PreviewApplyError,
+  type PreviewRaster,
+  type PreviewResourceCounts,
+  type PreviewSceneObservation,
+} from '../table/FixtureTableScene.js';
 import { prepareRaster } from './raster.js';
 
 type Runtime = ReturnType<typeof createAuthoringRuntime>;
+type ObservationTimestamp =
+  | 'readStart'
+  | 'readEnd'
+  | 'dispatchStart'
+  | 'dispatchEnd'
+  | 'ready'
+  | 'identityStart'
+  | 'identityEnd'
+  | 'rasterStart'
+  | 'rasterEnd'
+  | 'applyStart'
+  | 'applyEnd';
 export interface PreviewTable {
   previewTextureLimit(): number;
   applyPreviewRaster(raster: PreviewRaster): void;
+  previewObservation(): PreviewSceneObservation | null;
 }
+export type DisplayInspection = Readonly<{
+  sourceKey: string;
+  textureLimitPx: number;
+  deviceMaxTextureSizePx: number | null;
+  textureWidthPx: number;
+  textureHeightPx: number;
+  contentWidthPx: number;
+  contentHeightPx: number;
+  readMs: number | null;
+  // Synchronous parse, candidate setup, worker construction and dispatch.
+  parseAndDispatchMs: number | null;
+  // Remaining worker/export/response/scheduling wait, not validation CPU time.
+  certificationWaitMs: number | null;
+  identityMs: number | null;
+  rasterMs: number | null;
+  // Synchronous apply and retirement, not GPU completion or presentation.
+  applyAndRetireMs: number | null;
+  resources: PreviewResourceCounts | null;
+}>;
 export type DisplayedMap = Readonly<{
   name: string;
   filename: string;
   sourceKey: string;
   widthM: number;
   heightM: number;
+  inspection: DisplayInspection | null;
 }>;
 export type LoadState = Readonly<{
   phase: 'empty' | 'reading' | 'validating' | 'preparing' | 'ready' | 'cancelled' | 'failed';
@@ -85,6 +123,7 @@ export function createSavedMapLoader(
     prepare?: typeof prepareRaster;
     identity?: (asset: PreviewAsset) => Promise<string>;
     waitTimeoutMs?: number;
+    now?: () => number;
   } = {},
 ) {
   const runtime =
@@ -111,6 +150,10 @@ export function createSavedMapLoader(
     filename: string;
     id: number | null;
     preparing: boolean;
+    lastClock: number | null;
+    timestamps: Partial<Record<ObservationTimestamp, number | null>>;
+    readMs: number | null;
+    parseAndDispatchMs: number | null;
   } | null = null;
   let disposed = false;
   const update = (patch: Partial<LoadState>) => {
@@ -119,6 +162,33 @@ export function createSavedMapLoader(
   };
   const current = (target: NonNullable<typeof operation>) =>
     !disposed && operation === target && !target.abort.signal.aborted;
+  const timestamp = (target: NonNullable<typeof operation>, phase: ObservationTimestamp): void => {
+    target.timestamps[phase] = null;
+    try {
+      const value = (options.now ?? (() => performance.now()))();
+      if (
+        !Number.isFinite(value) ||
+        value < 0 ||
+        (target.lastClock !== null && value < target.lastClock)
+      )
+        return;
+      target.lastClock = value;
+      target.timestamps[phase] = value;
+    } catch {
+      // Missing timestamps remain null; use neither zero nor wall-clock time.
+    }
+  };
+  const duration = (
+    target: NonNullable<typeof operation>,
+    from: ObservationTimestamp,
+    to: ObservationTimestamp,
+  ): number | null => {
+    const start = target.timestamps[from] ?? null;
+    const end = target.timestamps[to] ?? null;
+    if (start === null || end === null) return null;
+    const elapsed = end - start;
+    return Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : null;
+  };
   const failure = (target: NonNullable<typeof operation>, error: unknown) => {
     if (!current(target)) return;
     operation = null;
@@ -151,21 +221,59 @@ export function createSavedMapLoader(
         return;
       }
       target.preparing = true;
+      timestamp(target, 'ready');
+      const certificationWaitMs = duration(target, 'dispatchEnd', 'ready');
       update({ phase: 'preparing', message: 'Preparing registered map artwork…' });
       void (async () => {
         try {
           if (!current(target)) return;
+          timestamp(target, 'identityStart');
           const key = await (
             options.identity ?? ((a) => assetIdentity(structuredClone(a) as MapAsset, 'asset'))
           )(asset);
+          timestamp(target, 'identityEnd');
+          const identityMs = duration(target, 'identityStart', 'identityEnd');
           if (!current(target)) return;
-          const raster = (options.prepare ?? prepareRaster)(
-            asset,
-            key,
-            table.previewTextureLimit(),
-          );
+          timestamp(target, 'rasterStart');
+          const textureLimitPx = table.previewTextureLimit();
+          const raster = (options.prepare ?? prepareRaster)(asset, key, textureLimitPx);
+          timestamp(target, 'rasterEnd');
+          const rasterMs = duration(target, 'rasterStart', 'rasterEnd');
           if (!current(target)) return;
+          timestamp(target, 'applyStart');
           table.applyPreviewRaster(raster);
+          timestamp(target, 'applyEnd');
+          const applyAndRetireMs = duration(target, 'applyStart', 'applyEnd');
+          if (!current(target)) return;
+          let inspection: DisplayInspection | null = null;
+          try {
+            const observation = table.previewObservation();
+            if (observation?.sourceKey === key) {
+              inspection = Object.freeze({
+                sourceKey: key,
+                textureLimitPx,
+                deviceMaxTextureSizePx: observation.deviceMaxTextureSizePx,
+                textureWidthPx: raster.canvas.width,
+                textureHeightPx: raster.canvas.height,
+                contentWidthPx: raster.contentWidthPx,
+                contentHeightPx: raster.contentHeightPx,
+                readMs: target.readMs,
+                parseAndDispatchMs: target.parseAndDispatchMs,
+                certificationWaitMs,
+                identityMs,
+                rasterMs,
+                applyAndRetireMs,
+                resources: observation.resources
+                  ? Object.freeze({
+                      textures: observation.resources.textures,
+                      geometries: observation.resources.geometries,
+                    })
+                  : null,
+              });
+            }
+          } catch {
+            // Snapshot failure must not invalidate an acknowledged map.
+          }
           if (!current(target)) return;
           operation = null;
           update({
@@ -178,6 +286,7 @@ export function createSavedMapLoader(
               sourceKey: key,
               widthM: raster.widthM,
               heightM: raster.heightM,
+              inspection,
             }),
           });
         } catch (error) {
@@ -209,6 +318,10 @@ export function createSavedMapLoader(
         filename: file.name,
         id: null as number | null,
         preparing: false,
+        lastClock: null as number | null,
+        timestamps: {} as Partial<Record<ObservationTimestamp, number | null>>,
+        readMs: null as number | null,
+        parseAndDispatchMs: null as number | null,
       };
       operation = target;
       update({ phase: 'reading', message: `Reading ${file.name}…` });
@@ -217,15 +330,21 @@ export function createSavedMapLoader(
         // Also enforce the cap before an injected reader (not just the native reader).
         if (!Number.isSafeInteger(file.size) || file.size < 0 || file.size > HARD_LIMITS.maxBytes)
           throw new RangeError('Saved JSON exceeds the 64 MiB file limit');
+        timestamp(target, 'readStart');
         const text = await (options.read ?? readSavedFile)(
           file,
           target.abort.signal,
           options.waitTimeoutMs,
         );
+        timestamp(target, 'readEnd');
+        target.readMs = duration(target, 'readStart', 'readEnd');
         if (!current(target)) return;
         update({ phase: 'validating', message: 'Independently certifying saved geometry…' });
         if (!current(target)) return;
+        timestamp(target, 'dispatchStart');
         target.id = runtime.controller.loadSavedAsset(text);
+        timestamp(target, 'dispatchEnd');
+        target.parseAndDispatchMs = duration(target, 'dispatchStart', 'dispatchEnd');
       } catch (error) {
         failure(target, error);
       }
