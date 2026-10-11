@@ -88,6 +88,8 @@ export class TableScene {
   private readonly mode: 'fixture' | 'public-map-preview';
   private applyingPreview = false;
   private previewAvailable = false;
+  private previewRenderFailed = false;
+  private onPreviewUnavailable: ((error: PreviewApplyError) => void) | undefined;
   // Record before dispatching Three's synchronous disposal event. Terminal
   // cleanup can re-enter while a replaced resource is still being released.
   private releasedResources = new WeakSet<{ dispose(): void }>();
@@ -107,11 +109,17 @@ export class TableScene {
 
   constructor(
     readonly canvas: HTMLCanvasElement,
-    opts: { preserveDrawingBuffer?: boolean; mode?: 'fixture' | 'public-map-preview' } = {},
+    opts: {
+      preserveDrawingBuffer?: boolean;
+      mode?: 'fixture' | 'public-map-preview';
+      onPreviewUnavailable?: (error: PreviewApplyError) => void;
+    } = {},
   ) {
     this.mode = opts.mode ?? 'fixture';
     if (!['fixture', 'public-map-preview'].includes(this.mode))
       throw new TypeError('Invalid table mode');
+    this.onPreviewUnavailable =
+      this.mode === 'public-map-preview' ? opts.onPreviewUnavailable : undefined;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -428,15 +436,29 @@ export class TableScene {
   applyPreviewRaster(raster: PreviewRaster): void {
     this.requirePreview();
     const display = () =>
-      this.previewAvailable && !this.disposed && !this.contextLost()
+      this.previewAvailable && !this.previewRenderFailed && !this.disposed && !this.contextLost()
         ? ('retained' as const)
         : ('unavailable' as const);
     if (this.applyingPreview)
       throw new PreviewApplyError('Nested preview replacement rejected', display());
     if (this.disposed) throw new PreviewApplyError('Table is disposed', 'unavailable');
+    if (this.previewRenderFailed)
+      throw new PreviewApplyError('Table rendering failed; reload the page', 'unavailable');
     this.applyingPreview = true;
     let candidate: THREE.Group | undefined;
-    let attached = false;
+    let candidateMap: THREE.Mesh | undefined;
+    let candidateBoard: THREE.Mesh | undefined;
+    const ensureAlive = () => {
+      if (this.disposed) throw new Error('Table disposed during preview transaction');
+    };
+    const detachCandidate = () => {
+      for (const object of [candidate, candidateMap, candidateBoard]) object?.removeFromParent();
+    };
+    const releaseCandidate = () => {
+      for (const object of [candidate, candidateMap, candidateBoard])
+        if (object) this.releaseTree(object);
+      candidate?.clear();
+    };
     let committed = false;
     const previous = {
       state: this.state,
@@ -474,13 +496,16 @@ export class TableScene {
         marks: [],
       };
       candidate = this.makeMap(state.map, undefined, raster);
-      if (this.disposed) throw new Error('Table disposed during preparation');
-      const map = candidate.getObjectByName('map-artwork') as THREE.Mesh;
-      const board = candidate.getObjectByName('table-board') as THREE.Mesh;
-      for (const old of [previous.map, previous.board]) if (old) this.scene.remove(old);
+      const map = (candidateMap = candidate.getObjectByName('map-artwork') as THREE.Mesh);
+      const board = (candidateBoard = candidate.getObjectByName('table-board') as THREE.Mesh);
+      ensureAlive();
+      for (const old of [previous.map, previous.board])
+        if (old) {
+          this.scene.remove(old);
+          ensureAlive();
+        }
       this.scene.add(candidate);
-      attached = true;
-      if (this.disposed) throw new Error('Table disposed during attachment');
+      ensureAlive();
       this.state = state;
       this.updateCameraLimits();
       if (previous.key !== raster.sourceKey) this.snapTopDown();
@@ -489,14 +514,18 @@ export class TableScene {
       this.renderer.render(this.scene, this.camera);
       if (this.disposed || this.contextLost())
         throw new Error('Table became unavailable during render');
-      candidate.remove(map, board);
+      // Three dispatches synchronous removed/added/childadded events for each object.
+      // Terminal disposal in any one event must prevent the next attachment.
+      candidate.remove(map);
+      ensureAlive();
+      candidate.remove(board);
+      ensureAlive();
       this.scene.remove(candidate);
-      this.scene.add(map, board);
-      if (this.disposed) {
-        this.releaseTree(map);
-        this.releaseTree(board);
-        throw new Error('Table disposed during publication');
-      }
+      ensureAlive();
+      this.scene.add(map);
+      ensureAlive();
+      this.scene.add(board);
+      ensureAlive();
       this.mapMesh = map;
       this.tableMesh = board;
       this.mapKey = raster.sourceKey;
@@ -505,8 +534,9 @@ export class TableScene {
       for (const old of [previous.map, previous.board]) if (old) this.releaseTree(old);
       if (this.disposed) throw new Error('Table disposed during replacement cleanup');
     } catch (error) {
+      detachCandidate();
       if (committed || this.disposed) {
-        if (candidate) this.releaseTree(candidate);
+        releaseCandidate();
         for (const old of [previous.map, previous.board]) if (old) this.releaseTree(old);
         this.previewAvailable = false;
         if (this.disposed) {
@@ -518,12 +548,20 @@ export class TableScene {
           cause: error,
         });
       }
-      if (attached && candidate) this.scene.remove(candidate);
       this.state = previous.state;
       this.mapKey = previous.key;
       this.mapMesh = previous.map;
       this.tableMesh = previous.board;
-      for (const old of [previous.map, previous.board]) if (old) this.scene.add(old);
+      for (const old of [previous.map, previous.board])
+        if (old && !this.disposed) this.scene.add(old);
+      if (this.disposed) {
+        releaseCandidate();
+        for (const old of [previous.map, previous.board]) if (old) this.releaseTree(old);
+        this.previewAvailable = false;
+        throw new PreviewApplyError('Table disposed during restoration', 'unavailable', {
+          cause: error,
+        });
+      }
       this.camera.position.copy(previous.position);
       this.controls.target.copy(previous.target);
       this.camera.quaternion.copy(previous.quaternion);
@@ -532,7 +570,7 @@ export class TableScene {
         this.dressing.position.copy(previous.dressingPosition);
         this.dressing.scale.copy(previous.dressingScale);
       }
-      if (candidate) this.releaseTree(candidate);
+      releaseCandidate();
       try {
         if (this.disposed || this.contextLost()) throw new Error('WebGL unavailable');
         this.renderer.render(this.scene, this.camera);
@@ -908,15 +946,38 @@ export class TableScene {
     this.updateCameraLimits();
   }
   start(): void {
-    if (this.disposed || this.raf) return;
+    if (this.disposed || this.raf || this.previewRenderFailed) return;
     const generation = ++this.renderGeneration;
+    const active = () => !this.disposed && generation === this.renderGeneration;
     const loop = (): void => {
-      if (this.disposed || generation !== this.renderGeneration) return;
-      this.controls.update();
-      if (this.disposed || generation !== this.renderGeneration) return;
-      this.renderer.render(this.scene, this.camera);
-      if (!this.disposed && generation === this.renderGeneration)
-        this.raf = requestAnimationFrame(loop);
+      if (!active()) return;
+      try {
+        this.controls.update();
+        if (!active()) return;
+        if (this.mode === 'public-map-preview' && this.contextLost())
+          throw new Error('WebGL context is lost');
+        this.renderer.render(this.scene, this.camera);
+        if (!active()) return;
+        if (this.mode === 'public-map-preview' && this.contextLost())
+          throw new Error('WebGL context is lost');
+      } catch (error) {
+        // Fixture callers keep the existing exception behavior. Preview failure is
+        // terminal for this render loop; only a fresh page promises another display.
+        if (this.mode !== 'public-map-preview') throw error;
+        if (!active()) return;
+        this.previewRenderFailed = true;
+        this.previewAvailable = false;
+        this.stop();
+        this.onPreviewUnavailable?.(
+          new PreviewApplyError(
+            error instanceof Error ? error.message : 'Table frame failed',
+            'unavailable',
+            { cause: error },
+          ),
+        );
+        return;
+      }
+      if (active()) this.raf = requestAnimationFrame(loop);
     };
     loop();
   }
@@ -928,6 +989,7 @@ export class TableScene {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.onPreviewUnavailable = undefined;
     this.stop();
     this.controls.removeEventListener('change', this.clipPaperLabels);
     this.controls.dispose();

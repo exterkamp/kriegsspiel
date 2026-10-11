@@ -22,7 +22,7 @@ Independent review requested four repairs: mandatory preview isolation; candidat
 
 ## PR1 packet
 
-State: awaiting independent implementation review. C0 engineering accepted by map-board-plan-review, Sol/high, after source and Three.js UV/flipY inspection; no blockers. Acceptance releases the frozen saved-map inspection seam only; product evidence remains pending.
+State: repairs complete; awaiting exact-candidate delta review and product evidence. C0 engineering accepted by map-board-plan-review, Sol/high, after source and Three.js UV/flipY inspection; no blockers. Acceptance releases the frozen saved-map inspection seam only; product evidence remains pending.
 
 Writer map-table-import, w3:p5, fresh session `01a12979-7234-7d61-99c8-bbfdc3413891`; live `/status` verified GPT-6.1-Sol/high, Workspace (Approve for me), cwd `/Users/dominic/code`. Its bounded packet targets the feature worktree explicitly. Pinned source setup and `npm ci` succeeded. No dependency or lockfile changes requested.
 
@@ -40,6 +40,14 @@ Fresh primary reviewer map-table-review, w3:p6, session `01a12981-a6ab-77c0-bf6f
 
 Preliminary browser smoke: browser-generated/exported river-valley97 JSON downloaded successfully and has exactly the CLI export hash `bf704cc07170dcf9b7587c11bee7db54139220ef9b8a69384c01f4de68b7aba2`. The actual file control loaded it, certification completed and Battlefield97/5,000×5,000m rendered. A file-chooser failure was resolved after enabling extension file access and reloading stable source; no product workaround was added. Final-candidate evidence will supersede this preliminary smoke.
 
+Review r0 at `b1044528371f8bab434fbe47ac17837dbfe52daa` (tree `07f8da637bbe794918e5bd1928a16ddd868b1dcd`) covered all17 changed paths and requested two lifecycle repairs: persisted pagehide/pageshow suspension/resumption, and no reattachment after terminal disposal during sequential Three.js promotion events. A nonblocking later-RAF error-reporting gap is included in the bounded repair. Reviewer found remaining certification/registration/authority boundaries sound. Writer retains original exclusive paths for these repairs; shared docs remain coordinator-owned.
+
+At r0 root lint, typecheck, test and build passed. The sandbox-only first test attempt failed on existing server `listen EPERM`; the approved loopback rerun passed2,369 Vitest tests plus47 Node tests, with1 optional server skip. Build retains existing size/annotation warnings. Three one-off scratch probes detected stale reads, fractional UV orientation and polygon parity via exact designated assertions, clean collection/hook/unhandled channels, matching selected tests and original/restored source hashes. Pilot calibration and verified transactions are staged outside the tree; repairs require affected evidence reconciliation before acceptance.
+
 ## Prepared browser inputs
 
 Coordinator generated and certified seven genuine assets with the existing CLI, without changing generation: 5 km flat17, wooded31, river97; default10 km17; flat15 km17; flat17 rectangles5×10 km and15×5 km. All seven export commands exited0. Recipes/settings, output JSON and command/timing records are staged in `/private/tmp/map-table-evidence-20261010/assets`. These establish real inputs, not acceptance of their future table display. Largest JSON is approximately8.7 MB. The rectangle recipes are feasible and do not stretch square output.
+
+Repair handoff: writer settled after changing five owned files (`main.ts`, `page.ts`, `page.test.ts`, `FixtureTableScene.ts`, `previewScene.test.ts`). Passed182 focused tests (11 added), client typecheck and owned ESLint/Prettier. Persisted pagehide stops RAF and cancels pending loading while retaining accepted texture/camera; persisted pageshow resizes/resumes. Each Three.js promotion step checks terminal lifetime; detached candidates are released exactly once. Preview-only frame failures terminate rendering and clear the page’s ready claim. Native browser replay, final-source effectiveness, independent delta review and CI remain coordinator gates.
+
+C0 repair supplement: constructor option `onPreviewUnavailable?: (error: PreviewApplyError) => void` is effective only in immutable public-map-preview mode. The page supplies it through its factory. After a frame/control/context failure, the scene stops and reports unavailable once; terminal disposal clears the callback and cannot restart. Fixture callers retain their accepted exception behavior. This narrow callback seam is released for the repair and included in independent boundary re-review.

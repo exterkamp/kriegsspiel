@@ -195,3 +195,7 @@ Status: **Independent plan delta and C0 engineering signature accepted by Sol/hi
 The independent Sol/high review required explicit preview isolation, a candidate-frame render/recovery boundary, rejection of reentrant replacement, and completion of repairs for any failed inspection gate. These revisions address all four; the reviewer must accept the delta before dispatch.
 
 The first implementation packet is PR1. After delta acceptance, refresh the exact base and ownership, create the isolated execution worktree, record C0 engineering acceptance, then dispatch one Sol/high writer with its exclusive paths, protected boundaries, saved-file demo and failure/browser/check evidence. PR2 and PR3 remain separate proposals until their prerequisites and scope are accepted. No implementation agent has been dispatched at this planning checkpoint.
+
+### C0 lifecycle repair supplement
+
+The implementation review added a preview-only `onPreviewUnavailable?: (error: PreviewApplyError) => void` constructor callback. Later animation-frame/control/context failure stops preview rendering, reports an unavailable display and requires a fresh page; the default fixture behavior stays intact. Terminal disposal clears the callback. The page suspends rendering and cancels pending requests on persisted pagehide, then resizes/resumes the retained accepted map and camera on persisted pageshow. Nonpersisted pagehide remains terminal teardown. These narrow repairs require independent boundary re-review with the candidate.

@@ -74,6 +74,7 @@ beforeEach(() => {
 afterEach(() => {
   tables.splice(0).forEach((t) => t.dispose());
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('fixed preview authority', () => {
@@ -345,4 +346,182 @@ describe('bounded rendered replacement', () => {
       expect(allDisposals).toHaveBeenCalledTimes(2);
     },
   );
+});
+
+describe('promotion events and terminal candidate cleanup', () => {
+  it.each(['added', 'childadded'] as const)(
+    'remains empty when the actual Three %s promotion callback disposes the scene',
+    (eventType) => {
+      const table = make();
+      table.applyPreviewRaster(raster());
+      const oldPaper = mesh(table);
+      const oldBoard = table.scene.getObjectByName('table-board') as THREE.Mesh;
+      const owned = (objects: THREE.Object3D[]) => {
+        const resources = new Set<{ dispose(): void }>();
+        for (const object of objects)
+          object.traverse((child) => {
+            const mesh = child as THREE.Mesh;
+            if (mesh.geometry) resources.add(mesh.geometry);
+            const material = mesh.material as THREE.MeshStandardMaterial | undefined;
+            if (material) {
+              resources.add(material);
+              if (material.map) resources.add(material.map);
+            }
+          });
+        return [...resources];
+      };
+      const oldDisposals = owned([oldPaper, oldBoard]).map((resource) =>
+        vi.spyOn(resource, 'dispose'),
+      );
+      let candidate!: THREE.Object3D;
+      let paper!: THREE.Object3D;
+      let board!: THREE.Object3D;
+      let candidateDisposals: ReturnType<typeof vi.spyOn>[] = [];
+      const callback = vi.fn(() => table.dispose());
+      const next = raster('promoted-failure');
+      vi.spyOn(table.renderer, 'render').mockImplementationOnce((scene) => {
+        paper = scene.getObjectByName('map-artwork')!;
+        board = scene.getObjectByName('table-board')!;
+        candidate = paper.parent!;
+        candidateDisposals = owned([candidate]).map((resource) => vi.spyOn(resource, 'dispose'));
+        if (eventType === 'added') paper.addEventListener('added', callback);
+        else
+          scene.addEventListener('childadded', (event) => {
+            if (event.child === paper) callback();
+          });
+      });
+      const add = vi.spyOn(table.scene, 'add');
+      expect(errorFrom(() => table.applyPreviewRaster(next)).display).toBe('unavailable');
+      expect(callback).toHaveBeenCalledOnce();
+      expect(add.mock.calls.some((objects) => objects.includes(board))).toBe(false);
+      expect(table.scene.children).toHaveLength(0);
+      expect(candidate.parent).toBeNull();
+      expect(candidate.children).toHaveLength(0);
+      expect(paper.parent).toBeNull();
+      expect(board.parent).toBeNull();
+      expect(Object.values(table)).not.toContain(paper);
+      expect(Object.values(table)).not.toContain(board);
+      expect(Object.values(table)).not.toContain(next.canvas);
+      for (const disposed of [...oldDisposals, ...candidateDisposals])
+        expect(disposed).toHaveBeenCalledOnce();
+      table.dispose();
+      table.start();
+      expect(errorFrom(() => table.applyPreviewRaster(next)).display).toBe('unavailable');
+      expect(table.scene.children).toHaveLength(0);
+      for (const disposed of [...oldDisposals, ...candidateDisposals])
+        expect(disposed).toHaveBeenCalledOnce();
+    },
+  );
+});
+
+describe('preview-only frame failure reporting', () => {
+  function frames() {
+    const queued: FrameRequestCallback[] = [];
+    const schedule = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation((callback) => {
+        queued.push(callback);
+        return queued.length;
+      });
+    const cancel = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {});
+    return { queued, schedule, cancel };
+  }
+  it.each(['controls', 'render'] as const)(
+    'reports later %s failure, stops scheduling and refuses false rendered acceptance',
+    (stage) => {
+      const { queued, schedule, cancel } = frames();
+      const report = vi.fn();
+      const table = new TableScene(document.createElement('canvas'), {
+        mode: 'public-map-preview',
+        onPreviewUnavailable: report,
+      });
+      tables.push(table);
+      table.applyPreviewRaster(raster());
+      table.start();
+      const failed =
+        stage === 'controls'
+          ? vi.spyOn(table.controls, 'update')
+          : vi.spyOn(table.renderer, 'render');
+      failed.mockImplementationOnce(() => {
+        throw new Error(`later ${stage} failed`);
+      });
+      expect(() => queued[0]!(1)).not.toThrow();
+      expect(report).toHaveBeenCalledOnce();
+      expect(report.mock.calls[0]![0]).toMatchObject({
+        display: 'unavailable',
+        message: `later ${stage} failed`,
+      });
+      expect(schedule).toHaveBeenCalledOnce();
+      expect(cancel).toHaveBeenCalledWith(1);
+      table.start();
+      queued[0]!(2);
+      expect(schedule).toHaveBeenCalledOnce();
+      expect(report).toHaveBeenCalledOnce();
+      expect(errorFrom(() => table.applyPreviewRaster(raster('another'))).display).toBe(
+        'unavailable',
+      );
+      table.dispose();
+      table.start();
+      queued[0]!(3);
+      expect(schedule).toHaveBeenCalledOnce();
+      expect(report).toHaveBeenCalledOnce();
+    },
+  );
+  it('cannot restart from a failure callback that disposes the scene', () => {
+    const { queued, schedule } = frames();
+    const report = vi.fn(() => {
+      table.dispose();
+      table.start();
+    });
+    const table = new TableScene(document.createElement('canvas'), {
+      mode: 'public-map-preview',
+      onPreviewUnavailable: report,
+    });
+    tables.push(table);
+    table.start();
+    vi.spyOn(table.renderer, 'render').mockImplementationOnce(() => {
+      throw new Error('later render failure');
+    });
+    queued[0]!(1);
+    queued[0]!(2);
+    table.start();
+    expect(report).toHaveBeenCalledOnce();
+    expect(schedule).toHaveBeenCalledOnce();
+    expect(table.scene.children).toHaveLength(0);
+  });
+  it('suppresses reports for a controls exception after its callback terminally disposed the scene', () => {
+    const { queued, schedule } = frames();
+    const report = vi.fn();
+    const table = new TableScene(document.createElement('canvas'), {
+      mode: 'public-map-preview',
+      onPreviewUnavailable: report,
+    });
+    tables.push(table);
+    table.start();
+    vi.spyOn(table.controls, 'update').mockImplementationOnce(() => {
+      table.dispose();
+      throw new Error('disposed frame');
+    });
+    queued[0]!(1);
+    queued[0]!(2);
+    table.start();
+    expect(report).not.toHaveBeenCalled();
+    expect(schedule).toHaveBeenCalledOnce();
+    expect(table.scene.children).toHaveLength(0);
+  });
+  it('preserves fixture frame exceptions and never invokes the preview callback for a fixture', () => {
+    const { queued, schedule } = frames();
+    const report = vi.fn();
+    const table = new TableScene(document.createElement('canvas'), {
+      onPreviewUnavailable: report,
+    });
+    tables.push(table);
+    table.start();
+    vi.spyOn(table.renderer, 'render').mockImplementationOnce(() => {
+      throw new Error('fixture render failure');
+    });
+    expect(() => queued[0]!(1)).toThrow('fixture render failure');
+    expect(report).not.toHaveBeenCalled();
+    expect(schedule).toHaveBeenCalledOnce();
+  });
 });

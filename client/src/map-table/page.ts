@@ -1,9 +1,12 @@
-import type { TableScene } from '../table/FixtureTableScene.js';
+import type { TableScene, PreviewApplyError } from '../table/FixtureTableScene.js';
 import { createSavedMapLoader, type LoadState } from './loader.js';
 
 export function mountMapTable(
   doc: Document,
-  createTable: (canvas: HTMLCanvasElement) => TableScene,
+  createTable: (
+    canvas: HTMLCanvasElement,
+    onUnavailable: (error: PreviewApplyError) => void,
+  ) => TableScene,
 ) {
   function element<T extends HTMLElement>(id: string): T {
     const found = doc.getElementById(id);
@@ -20,6 +23,8 @@ export function mountMapTable(
   let observer: ResizeObserver | undefined;
   const listeners = new AbortController();
   let disposed = false;
+  let suspended = false;
+  let available = true;
   function dispose() {
     if (disposed) return;
     disposed = true;
@@ -29,6 +34,7 @@ export function mountMapTable(
     table?.dispose();
   }
   function show(state: LoadState) {
+    available = state.available;
     const busy = ['reading', 'validating', 'preparing'].includes(state.phase);
     status.textContent = state.message;
     status.dataset.error = String(state.phase === 'failed');
@@ -56,10 +62,16 @@ export function mountMapTable(
     }
   }
   try {
-    table = createTable(canvas);
+    table = createTable(canvas, (error) => {
+      if (disposed) return;
+      loader.unavailable(
+        `Table rendering failed: ${error.message}. Reload the page to restore the display.`,
+      );
+    });
     loader = createSavedMapLoader(table);
     loader.subscribe(show);
     const resize = () => {
+      if (disposed || suspended) return;
       try {
         table.resize();
       } catch (error) {
@@ -75,7 +87,7 @@ export function mountMapTable(
       () => {
         const file = input.files?.[0];
         input.value = '';
-        if (file) void loader.load(file);
+        if (file && !disposed && !suspended) void loader.load(file);
       },
       { signal: listeners.signal },
     );
@@ -97,10 +109,30 @@ export function mountMapTable(
       },
       { signal: listeners.signal },
     );
-    doc.defaultView?.addEventListener('pagehide', dispose, {
-      once: true,
-      signal: listeners.signal,
-    });
+    doc.defaultView?.addEventListener(
+      'pagehide',
+      (event) => {
+        if (disposed) return;
+        if (!event.persisted) {
+          dispose();
+          return;
+        }
+        suspended = true;
+        table.stop();
+        loader.cancel();
+      },
+      { signal: listeners.signal },
+    );
+    doc.defaultView?.addEventListener(
+      'pageshow',
+      (event) => {
+        if (disposed || !event.persisted || !suspended) return;
+        suspended = false;
+        resize();
+        if (!disposed && available) table.start();
+      },
+      { signal: listeners.signal },
+    );
     table.start();
   } catch (error) {
     dispose();
