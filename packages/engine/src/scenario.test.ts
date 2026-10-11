@@ -228,6 +228,13 @@ describe('loader validation', () => {
   });
   it('rejects duplicate unit ids', () =>
     bad((d) => (d.units[1].id = d.units[0].id), /duplicate unit id/));
+  it('rejects two units of a side with the same name, but not across sides', () => {
+    bad((d) => (d.units[1].name = d.units[0].name), /duplicate unit name/);
+    const d = clone();
+    const other = d.units.find((u: { side: string }) => u.side !== d.units[0].side)!;
+    other.name = d.units[0].name;
+    expect(() => loadScenario(d)).not.toThrow();
+  });
   it('rejects units off the map', () => bad((d) => (d.units[0].at.x = 9999), /off the map/));
   it('rejects units whose footprint runs off the map', () =>
     bad((d) => (d.units[0].at = { x: 20, y: 2000 }), /footprint extends off the map/));

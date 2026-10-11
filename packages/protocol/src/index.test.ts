@@ -64,6 +64,7 @@ describe('Command', () => {
     { v, kind: 'issueOrder', orderId: 'o2', text: 'Blue-1 march to the bridge' },
     { v, kind: 'setReady', ready: true },
     { v, kind: 'proposePause', reason: 'door' },
+    { v, kind: 'proposeResume' },
     { v, kind: 'vote', proposal: 'p1', yes: false },
     { v, kind: 'draftEdit', draft: 'd1', ops: [] },
   ];
@@ -91,6 +92,8 @@ describe('Command', () => {
       JSON.stringify({ v, kind: 'issueOrder', orderId: 'o', text: ' ' }),
     ],
     ['extra field', JSON.stringify({ v, kind: 'setReady', ready: true, admin: true })],
+    ['reason too long', JSON.stringify({ v, kind: 'proposePause', reason: 'x'.repeat(201) })],
+    ['resume with a reason', JSON.stringify({ v, kind: 'proposeResume', reason: 'x' })],
   ])('rejects %s', (_n, json) => {
     expect(parseCommand(json).ok).toBe(false);
   });
@@ -116,6 +119,25 @@ describe('ServerMessage', () => {
       },
     },
     { v, kind: 'clockState', clock },
+    { v, kind: 'pauseState', phase: 'running' },
+    {
+      v,
+      kind: 'pauseState',
+      phase: 'pause_proposed',
+      proposal: {
+        id: 'p1',
+        kind: 'pause',
+        bySide: 'red',
+        byYou: false,
+        reason: 'door',
+        yes: 1,
+        no: 0,
+        voters: 2,
+        msLeft: 30_000,
+      },
+    },
+    { v, kind: 'pauseResult', outcome: 'cancelled', cause: 'no-vote', proposalKind: 'pause' },
+    { v, kind: 'pauseResult', outcome: 'resumed', cause: 'max-pause' },
     { v, kind: 'staffAtWork', working: true, needAtMs: 5000 },
     { v, kind: 'staffAtWork', working: false },
     { v, kind: 'gameOver', winner: 'blue', reason: 'objective-held', atGame: 9000 },
