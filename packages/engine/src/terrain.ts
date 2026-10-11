@@ -15,6 +15,7 @@ import type {
   FeatureGeometry,
   FeatureKind,
   Point,
+  RoadClass,
   TerrainAttrs,
   TerrainFeature,
   TerrainMap,
@@ -61,12 +62,15 @@ export const KIND_DEFAULTS: Record<FeatureKind, { layer: number; attrs: TerrainA
     attrs: { moveCost: 2, cover: 0, concealment: 0, height: 'low', passable: true },
   },
   bridge: { layer: 4, attrs: { ...OPEN_GROUND, height: 'flat' } },
-  ford: { layer: 4, attrs: { ...OPEN_GROUND, moveCost: 2, height: 'low' } },
+  ford: { layer: 4, attrs: { ...OPEN_GROUND, moveCost: 3, height: 'low' } },
   building: {
     layer: 2,
     attrs: { moveCost: 2, cover: 0.8, concealment: 1, height: 'flat', passable: true },
   },
 };
+
+/** March-cost multiplier per road class; a plain `road` feature is class `road`. */
+export const ROAD_CLASS_COST: Record<RoadClass, number> = { highway: 0.4, road: 0.5, track: 0.8 };
 
 /** What lies at a point: the ground that applies there and the features covering it. */
 export interface TerrainSample {

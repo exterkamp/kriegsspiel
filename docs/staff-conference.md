@@ -9,6 +9,10 @@ The staff conference is a desk view (hotkey C) where the player puts questions t
 - Answers use only the asking side's `SideView`. The fixture client (`client/src/desk/conference.ts`, `fixtureAnswer`) names only units and contacts in the view and says so when the view is silent; it works with no LLM.
 - The client talks to a `ConferenceClient` held in the `conferenceClient` store. The fixture is the default; the server-backed client replaces it when the endpoint exists.
 
+## Cost enforced by the server (#242)
+
+Over the game WebSocket the client sends `askStaff { questionId, role, question }`. The server charges the officer's cost in game time (see D6b in [decisions.md](decisions.md)) and replies `staffQueued { questionId, role, askedAtGame, answerAtGame, costMs }`; a question to a busy officer gets an `error` with code `staff_busy`. The client takes `answerAtGame` from the reply and does not compute it. Answer text is still the client fixture.
+
 ## Server endpoint contract (not yet implemented; Epic #3)
 
 `POST /games/:id/conference`, authenticated by the session cookie and seat like the game WebSocket (D16, D17).

@@ -20,6 +20,7 @@ import {
 import type { GameActor, GameStore } from '../game/index.js';
 import type { PauseTransition } from '../pause.js';
 import { DraftBook, DraftError } from '../drafts/book.js';
+import { StaffDesk } from './conference.js';
 import { sideViewOf } from './sideView.js';
 import { mayForward, viewForRole, type Seat, type SideId } from '@kriegsspiel/engine';
 import type { Forward } from '../lobby/store.js';
@@ -79,6 +80,8 @@ const error = (code: string, message: string): ServerMessage => ({
 
 export class Hub {
   private readonly conns = new Map<string, Set<Connection>>();
+  /** When each side's staff officers are next free (game time). */
+  private readonly staffDesk = new StaffDesk();
 
   /** Each side's marks, loaded from the store on first use and kept here (the hub is their only writer). */
   private readonly marks = new Map<string, Promise<Mark[]>>();
@@ -697,6 +700,33 @@ export class Hub {
     }
     if (command.kind === 'forwardDispatch') {
       this.handleForward(gameId, game, conn, command);
+      return;
+    }
+    if (command.kind === 'askStaff') {
+      if (game.state.world.outcome) {
+        this.send(conn, error('game_over', `${command.questionId}: the game has ended`));
+        return;
+      }
+      const charge = this.staffDesk.ask(gameId, conn.side, command.role, game.gameClock.now());
+      if (charge.ok) {
+        this.send(conn, {
+          v: PROTOCOL_VERSION,
+          kind: 'staffQueued',
+          questionId: command.questionId,
+          role: command.role,
+          askedAtGame: charge.askedAtGame,
+          answerAtGame: charge.answerAtGame,
+          costMs: charge.costMs,
+        });
+      } else {
+        this.send(
+          conn,
+          error(
+            'staff_busy',
+            `${command.questionId}: that officer is still answering your last question`,
+          ),
+        );
+      }
       return;
     }
     if (command.kind !== 'issueOrder') {

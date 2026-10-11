@@ -10,6 +10,13 @@ const Envelope = { v: z.literal(PROTOCOL_VERSION) };
 /** Longest reason a player may give for a pause request. */
 export const MAX_PAUSE_REASON = 200;
 
+/** The officers a player can put a question to in the staff conference (docs/staff-conference.md). */
+export const StaffRole = z.enum(['chiefOfStaff', 'intelligence', 'quartermaster', 'engineer']);
+export type StaffRole = z.infer<typeof StaffRole>;
+
+/** Longest question put to a staff officer. */
+export const MAX_STAFF_QUESTION = 400;
+
 /** Where the pause vote stands, as the server's state machine has it (docs/architecture.md). */
 export const PausePhase = z.enum(['running', 'pause_proposed', 'paused', 'resume_proposed']);
 export type PausePhase = z.infer<typeof PausePhase>;
@@ -68,6 +75,18 @@ export const Command = z.discriminatedUnion('kind', [
   // Create or replace one of the side's marks (by `mark.id`). Not game input: it never reaches the engine.
   z.object({ ...Envelope, kind: z.literal('putMark'), mark: Mark }).strict(),
   z.object({ ...Envelope, kind: z.literal('deleteMark'), markId: Id }).strict(),
+  // Put a question to a staff officer. The server charges the officer's game-time cost (D6b): the
+  // officer is busy until `staffQueued.answerAtGame`, and asking again before then is `staff_busy`.
+  // `questionId` is chosen by the client; errors for it are prefixed `<questionId>: `.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('askStaff'),
+      questionId: Id.max(64),
+      role: StaffRole,
+      question: z.string().trim().min(1).max(MAX_STAFF_QUESTION),
+    })
+    .strict(),
   // Shared order drafts (D6c). None of these reach the engine or the input log. Drafts belong to the
   // sender's side; ids are chosen by the client and unique within a side.
   z
@@ -172,6 +191,19 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       draft: Id,
       reader: Id,
       rev: z.number().int().nonnegative(),
+    })
+    .strict(),
+  // The server took a staff question and charged its cost: the officer answers at `answerAtGame`
+  // (`askedAtGame + costMs`, in game time, so a paused game does not move it).
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('staffQueued'),
+      questionId: Id,
+      role: StaffRole,
+      askedAtGame: GameMs,
+      answerAtGame: GameMs,
+      costMs: GameMs,
     })
     .strict(),
   z.object({ ...Envelope, kind: z.literal('clockState'), clock: ClockState }).strict(),

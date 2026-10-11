@@ -23,6 +23,22 @@ export interface GameLimits {
  */
 export const STAFF_BUDGET_SHARE = 0.25;
 
+/**
+ * The same for the AI commander: its `command` calls and the order parses of its own text
+ * (made through `commanderClient()`) together use at most this share of each cap, so it cannot
+ * starve a human's order parsing and judging. With the staff share, at least a third is kept
+ * for the other stages.
+ */
+export const COMMANDER_BUDGET_SHARE = 0.4;
+
+/** A capped spender: staff calls, or everything the AI commander does. */
+type Bucket = 'staff' | 'commander';
+const SHARES: Record<Bucket, number> = {
+  staff: STAFF_BUDGET_SHARE,
+  commander: COMMANDER_BUDGET_SHARE,
+};
+const BUCKET_LABEL: Record<Bucket, string> = { staff: 'staff', commander: 'AI commander' };
+
 /** One line of the metrics log: a call that ran, or one refused before it ran. */
 export type GameUmpireMetric =
   | {
@@ -82,7 +98,11 @@ export class GameUmpireClient implements UmpireClient {
   private refusedBudget = 0;
   private refusedRateLimit = 0;
   private readonly starts: number[] = [];
-  private readonly staffStarts: number[] = [];
+  private readonly bucketStarts: Record<Bucket, number[]> = { staff: [], commander: [] };
+  private readonly bucketSpend: Record<Bucket, { costUsd: number; totalTokens: number }> = {
+    staff: { costUsd: 0, totalTokens: 0 },
+    commander: { costUsd: 0, totalTokens: 0 },
+  };
   private readonly byStage: GameUmpireReport['byStage'] = {
     parse: { calls: 0, costUsd: 0, totalTokens: 0 },
     judge: { calls: 0, costUsd: 0, totalTokens: 0 },
@@ -113,12 +133,13 @@ export class GameUmpireClient implements UmpireClient {
     );
   }
 
-  private get staffBudgetSpent(): boolean {
+  private bucketBudgetSpent(bucket: Bucket): boolean {
     const { maxCostUsd, maxTotalTokens } = this.limits;
-    const staff = this.byStage.staff;
+    const spend = this.bucketSpend[bucket];
+    const share = SHARES[bucket];
     return (
-      (maxCostUsd !== undefined && staff.costUsd >= maxCostUsd * STAFF_BUDGET_SHARE) ||
-      (maxTotalTokens !== undefined && staff.totalTokens >= maxTotalTokens * STAFF_BUDGET_SHARE)
+      (maxCostUsd !== undefined && spend.costUsd >= maxCostUsd * share) ||
+      (maxTotalTokens !== undefined && spend.totalTokens >= maxTotalTokens * share)
     );
   }
 
@@ -137,39 +158,59 @@ export class GameUmpireClient implements UmpireClient {
     };
   }
 
-  async call<T>(request: UmpireRequest): Promise<UmpireResponse<T>> {
+  call<T>(request: UmpireRequest): Promise<UmpireResponse<T>> {
+    return this.run(request, request.stage === 'staff' ? 'staff' : undefined);
+  }
+
+  /**
+   * A client for the AI commander: its calls, whatever the stage (it also has its text parsed),
+   * are held to `COMMANDER_BUDGET_SHARE` of the caps and never use the share kept for humans.
+   */
+  commanderClient(): UmpireClient {
+    return { call: (request) => this.run(request, 'commander') };
+  }
+
+  private async run<T>(
+    request: UmpireRequest,
+    inBucket: Bucket | undefined,
+  ): Promise<UmpireResponse<T>> {
     const { stage } = request;
+    const bucket = inBucket ?? (stage === 'command' ? 'commander' : undefined);
     if (this.budgetSpent) this.refuse(stage, 'budget', 'game budget spent');
-    if (stage === 'staff' && this.staffBudgetSpent) {
-      this.refuse(stage, 'budget', 'staff share of the game budget spent');
+    if (bucket && this.bucketBudgetSpent(bucket)) {
+      this.refuse(stage, 'budget', `${BUCKET_LABEL[bucket]} share of the game budget spent`);
     }
     const cap = this.limits.maxCallsPerMinute;
     if (cap !== undefined) {
       const now = this.now();
-      for (const list of [this.starts, this.staffStarts]) {
+      for (const list of [this.starts, ...Object.values(this.bucketStarts)]) {
         while (list.length > 0 && list[0]! <= now - MINUTE_MS) list.shift();
       }
       if (this.starts.length >= cap) {
         this.refuse(stage, 'rate-limit', `more than ${cap} umpire calls in a minute`);
       }
-      if (stage === 'staff') {
-        const staffCap = Math.max(1, Math.floor(cap * STAFF_BUDGET_SHARE));
-        if (this.staffStarts.length >= staffCap) {
-          this.refuse(stage, 'rate-limit', `more than ${staffCap} staff calls in a minute`);
+      if (bucket) {
+        const bucketCap = Math.max(1, Math.floor(cap * SHARES[bucket]));
+        if (this.bucketStarts[bucket].length >= bucketCap) {
+          this.refuse(
+            stage,
+            'rate-limit',
+            `more than ${bucketCap} ${BUCKET_LABEL[bucket]} calls in a minute`,
+          );
         }
-        this.staffStarts.push(now);
+        this.bucketStarts[bucket].push(now);
       }
       this.starts.push(now);
     }
     try {
       const res = await this.inner.call<T>(request);
-      this.add(stage, res.record.usage, res.record.costUsd, true, res.record.model);
+      this.add(stage, bucket, res.record.usage, res.record.costUsd, true, res.record.model);
       return res;
     } catch (err) {
       if (err instanceof UmpireError && err.usage) {
-        this.add(stage, err.usage, err.costUsd ?? null, false, '');
+        this.add(stage, bucket, err.usage, err.costUsd ?? null, false, '');
       } else {
-        this.add(stage, ZERO_USAGE, null, false, '');
+        this.add(stage, bucket, ZERO_USAGE, null, false, '');
       }
       throw err;
     }
@@ -184,6 +225,7 @@ export class GameUmpireClient implements UmpireClient {
 
   private add(
     stage: UmpireStage,
+    bucket: Bucket | undefined,
     usage: TokenUsage,
     cost: number | null,
     ok: boolean,
@@ -197,6 +239,10 @@ export class GameUmpireClient implements UmpireClient {
     s.calls++;
     s.costUsd += cost ?? 0;
     s.totalTokens += usage.inputTokens + usage.outputTokens;
+    if (bucket) {
+      this.bucketSpend[bucket].costUsd += cost ?? 0;
+      this.bucketSpend[bucket].totalTokens += usage.inputTokens + usage.outputTokens;
+    }
     this.opts.onMetric?.({
       kind: 'call',
       gameId: this.opts.gameId,
