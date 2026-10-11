@@ -1,4 +1,4 @@
-import { canSee, viewFor } from './visibility.js';
+import { canSee, coarseMetres, viewFor } from './visibility.js';
 import type { EngineSideView, ViewEnemy, ViewReport, ViewUnit } from './visibility.js';
 import type { GameState, GameTime, SideId } from './types.js';
 
@@ -21,10 +21,14 @@ export interface Seat {
   units?: string[];
 }
 
-/** Where a unit is and what shape it is in, without its condition. */
+/**
+ * Where a unit is and what formation it is in, without its condition. The footprint is coarse
+ * (nearest 10 m, as an enemy's is) and the loose `shape` is left out, since both follow from
+ * strength and would give it away.
+ */
 export type ViewUnitOutline = Pick<
   ViewUnit,
-  'id' | 'name' | 'kind' | 'position' | 'facing' | 'formation' | 'footprint' | 'shape'
+  'id' | 'name' | 'kind' | 'position' | 'facing' | 'formation' | 'footprint'
 >;
 
 /** What one role may see: the side view cut down. Never has anything the side view lacks. */
@@ -46,8 +50,10 @@ const outline = (u: ViewUnit): ViewUnitOutline => ({
   position: u.position,
   facing: u.facing,
   formation: u.formation,
-  footprint: u.footprint,
-  ...(u.shape ? { shape: u.shape } : {}),
+  footprint: {
+    frontage: coarseMetres(u.footprint.frontage),
+    depth: coarseMetres(u.footprint.depth),
+  },
 });
 
 const SUPPLY_REPORTS: Array<ViewReport['kind']> = ['lowAmmo', 'exhausted'];
@@ -129,11 +135,11 @@ export function maySign(world: GameState, side: SideId, seat: Seat, unitId: stri
 
 /**
  * Whether `seat` may put text into the shared draft of an order to `unitId`. Anyone on the
- * staff may draft for any unit of the side; a subordinate only for their own formations.
+ * staff may draft for any living unit of the side; a subordinate only for their own formations.
  */
 export function mayDraft(world: GameState, side: SideId, seat: Seat, unitId: string): boolean {
   const unit = world.units.find((u) => u.id === unitId);
-  if (!unit || unit.side !== side) return false;
+  if (!unit || unit.side !== side || unit.strength <= 0) return false;
   if (seat.role === 'subordinate') return commanded(world, side, seat).has(unitId);
   return true;
 }

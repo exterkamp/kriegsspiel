@@ -81,6 +81,23 @@ describe('viewForRole', () => {
     }
   });
 
+  it('does not let intelligence recover our strength from footprint or shape', () => {
+    const viewWith = (strength: number) => {
+      const w = played();
+      const fresh = miniWorld({
+        units: [
+          { id: 'b1', side: 'blue', x: at(5), y: at(5), strength },
+          { id: 'b2', side: 'blue', x: at(2), y: at(14), strength: 777 },
+          { id: 'r-near', side: 'red', x: at(8), y: at(5) },
+        ],
+      });
+      return viewForRole({ ...w, units: fresh.units }, 'blue', seats.intelligence!).ownUnits;
+    };
+    // 777 and 790 make exact footprints a few decimetres apart; the outline must not show it.
+    expect(viewWith(777)).toEqual(viewWith(790));
+    expect(viewWith(777).every((u) => !('shape' in u))).toBe(true);
+  });
+
   it('shows the quartermaster our condition and supply reports but no enemy', () => {
     const w = played();
     const v = viewForRole(w, 'blue', seats.quartermaster!);
@@ -191,5 +208,11 @@ describe('permissions', () => {
     }
     expect(mayDraft(w, 'blue', seats.subordinate!, 'b2')).toBe(true);
     expect(mayDraft(w, 'blue', seats.subordinate!, 'b1')).toBe(false);
+  });
+
+  it('agrees with maySign that a dead unit gets no orders', () => {
+    const dead = { ...w, units: w.units.map((u) => (u.id === 'b1' ? { ...u, strength: 0 } : u)) };
+    expect(mayDraft(dead, 'blue', seats.chiefOfStaff!, 'b1')).toBe(false);
+    expect(mayDraft(dead, 'blue', { role: 'subordinate', units: ['b1'] }, 'b1')).toBe(false);
   });
 });
