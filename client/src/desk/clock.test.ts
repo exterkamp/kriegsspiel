@@ -118,4 +118,14 @@ describe('DeskClock', () => {
     expect(q('[data-testid=clock-rate]')!.textContent).toBe('1:1');
     expect(q('[data-testid=clock-status]')!.textContent).toContain('Stopped');
   });
+
+  it('shows the link state at the table too, and hides it when open', () => {
+    gameState.set({ ...initialState, link: 'closed' });
+    open();
+    expect(q('#clock')!.classList.contains('compact')).toBe(true);
+    expect(q('.link')!.textContent).toBe('reconnecting…');
+    gameState.update((s) => ({ ...s, link: 'open' }));
+    flushSync();
+    expect(q('.link')).toBeNull();
+  });
 });

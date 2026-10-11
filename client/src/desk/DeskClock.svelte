@@ -29,13 +29,15 @@
   <b class="time">{v.time}</b>
   <span class="rate" data-testid="clock-rate">{v.rate}</span>
   <span class="status" data-testid="clock-status">
-    {#if v.status === 'paused'}⏸{:else if v.status === 'stopped'}⏹{:else if v.status === 'running'}▶{/if}
+    <span aria-hidden="true"
+      >{#if v.status === 'paused'}⏸{:else if v.status === 'stopped'}⏹{:else if v.status === 'running'}▶{/if}</span
+    >
     <span class:sr-only={compact && v.status === 'running'}>{v.label}</span>
   </span>
   {#if v.staffAtWork}
     <span class="staff" data-testid="clock-staff" role="status">Staff at work…</span>
   {/if}
-  {#if linkText && !compact}<span class="link">{linkText}</span>{/if}
+  {#if linkText}<span class="link">{linkText}</span>{/if}
 </section>
 
 <style>
