@@ -29,6 +29,25 @@ The game is played from a general's headquarters. There is no HUD and no minimap
 
 The orders desk is built: a form addressed to a named commander, free text, an optional annex of table arrows, a fast or steady courier with a staff estimate for each, an autosaved draft, and a sign-and-stamp animation; sent orders show delivery progress in the journal (D16c). Navigation is by clicking desk objects, plus hotkeys (T table, I in-tray, O orders, R order of battle, J journal, C conference, Esc back to the table). The in-tray is built: six piles (newest arrival first, with unread counts), a dispatch viewer with sender, written and received times and the attached facts (unit, strength, a "Show on table" button for the place), a filed drawer, and discard. Read, filed and discarded marks are local and persist per game in the browser; reliability and sender confidence are never shown. The desk shell is built; moving to a desk view dollies the camera down to the desk and fades the canvas, and the canvas keeps rendering and keeps its state. The order of battle lists the formations in the SideView with strength, supply and morale, each dated by the view and aged in game time (fresh under 30 min, aging under 2 h, then stale, shown fainter); figures that are missing show as "unknown", never zero; clicking a formation pans the table to it. The SideView carries no commander and no per-figure report dates yet, so the roster shows the formation name and one date per row. The journal is built (`desk/Journal.svelte`): a persistent per-game diary in the browser of orders sent, dispatches received, pauses and resumes, and the player's own notes, newest first, with search, filters by kind and an export as a text file; the post-game critique (Epic 6) can read the same entries. It is local to the browser, like the in-tray marks. A small clock on the desk and a "new papers" indicator avoid a constant need to check every view. The desk clock (`desk/DeskClock.svelte`, pure logic in `desk/clock.ts`) sits above the view buttons and shows game time, the rate, a Paused or Stopped badge and "Staff at work…" while the umpire holds game time. It is compact at the table and full size on a desk view, and it runs forward locally from the last `ClockState`.
 
+## App shell and main menu
+
+`client/src/main.ts` starts the shell (`client/src/shell`), which decides what the page shows. The shell has explicit screens, a small typed state machine in `shell/screens.ts` (pure functions, unit tested): `sign-in`, `menu`, `new-game`, `game`, `game-over`, plus `fixture`.
+
+| URL | Screen |
+|-----|--------|
+| `/` (no parameters) | `sign-in` when signed out, otherwise `menu`. Never a half-loaded game. The emailed `/auth/verify` link redirects to `/`, so it lands on the menu. |
+| `/?lobby=1` | `new-game` (today the lobby form from `client/src/lobby`; the new game form task replaces it) |
+| `/?new=1&side=&rate=` | `game`, creating a game first |
+| `/?game=<id>[&side=]` | `game`; a reload returns to the same game |
+| `/?game=<id>&over=1` | `game-over` (served by the live client until the game over screen task) |
+| `/?mode=fixture` | The offline HQ fixture. Reached only by this URL, with no account. |
+
+Signed-out visitors are held at `sign-in` for every screen but `fixture`. Browser back and forward follow the URL. The live client (`liveClient.ts`, the 3D table and desk) is the game screen and cannot be unloaded, so a move to or from a live screen after it has loaded is a fresh page load.
+
+**Main menu** (`shell/Menu.svelte`, aged paper and serif to match the desk): New game; Continue, the player's unfinished games with scenario, side, game time and last played (hidden when there are none); the signed-in email with Sign out; and About, a paragraph on how the game works with a link to `docs/gameplay.md`. `GET /games` supplies `finished`, `gameTimeMs` and `lastPlayedMs` for each game, and Continue lists only started games that are not finished (`shell/continueList.ts`). Multiplayer entry points are not on the menu.
+
+**In-game menu** (`shell/GameMenu.svelte`): a Menu button, and Esc when the table is showing (in a desk view Esc still returns to the table). It offers Resume, Leave to main menu and Sign out. Leaving closes the WebSocket, then loads the menu; the game keeps running on the server. It is a modal dialog: focus starts on Resume and Esc closes it.
+
 ## The map layers
 
 Layers are what let one historical map serve both sides and the engine.
