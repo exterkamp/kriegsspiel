@@ -116,6 +116,20 @@ describe('AdminPage', () => {
     page.stop();
   });
 
+  it('loads the replay timeline when the Replay tab is opened after picking a game', async () => {
+    const fetchFn = vi.fn((url: string) =>
+      ok(url.endsWith('/replay') ? { endMs: 1000, marks: [] } : { games }),
+    );
+    const page = mount(fetchFn as never);
+    page.start();
+    await flush();
+    expect(fetchFn).not.toHaveBeenCalledWith('/admin/api/games/aaaaaaaa-1/replay');
+    page.show('Replay');
+    await flush();
+    expect(fetchFn).toHaveBeenCalledWith('/admin/api/games/aaaaaaaa-1/replay');
+    page.stop();
+  });
+
   it('shows disabled on 404', async () => {
     const page = mount(vi.fn(() => Promise.resolve({ ok: false, status: 404 }) as never));
     page.start();

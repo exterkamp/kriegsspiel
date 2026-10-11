@@ -141,7 +141,7 @@ async function main(app: HTMLElement): Promise<void> {
     const now = state.clock ? gameNowMs(state.clock, Date.now()) : 0;
     state = withPendingOrder(state, { orderId, text: full, sentAtGame: now, ...extra });
     gameState.set(state);
-    hud.render(state, Date.now());
+    hud.render(state);
     return undefined;
   };
   const hud = new Hud(app, {
@@ -238,7 +238,7 @@ async function main(app: HTMLElement): Promise<void> {
 
   const rerender = () => {
     gameState.set(state);
-    hud.render(state, Date.now());
+    hud.render(state);
     if (state.view) table.apply(buildSceneState(state.view, fixtureMap));
     redrawMarks();
   };
@@ -319,12 +319,11 @@ async function main(app: HTMLElement): Promise<void> {
       },
     });
     conn.start();
-    setInterval(() => hud.tick(Date.now()), 250);
   } else {
     // No server: the fixture board with an empty desk.
     state = { ...withLink(state, 'offline'), view: fixtureView };
     gameState.set(state);
-    hud.render(state, Date.now());
+    hud.render(state);
   }
 }
 

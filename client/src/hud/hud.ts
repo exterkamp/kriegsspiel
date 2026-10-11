@@ -1,5 +1,5 @@
 import type { SideView } from '@kriegsspiel/protocol';
-import { formatGameTime, formatRate, gameNowMs, type ClientState } from '../net/state.js';
+import { formatGameTime, type ClientState } from '../net/state.js';
 
 export interface HudHandlers {
   /** The player pressed Send. Return an error string to keep the text in the box. */
@@ -7,20 +7,6 @@ export interface HudHandlers {
 }
 
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-
-const LINK_LABEL = {
-  offline: 'no server (fixture)',
-  connecting: 'connecting…',
-  open: 'connected',
-  closed: 'reconnecting…',
-};
-
-/** Text for the clock panel. Pure, so it can be tested without a DOM. */
-export function clockText(state: ClientState, nowWall: number): string {
-  if (!state.clock) return 'no clock yet';
-  const { rate, status } = state.clock;
-  return `${formatGameTime(gameNowMs(state.clock, nowWall))} · ${formatRate(rate)} · ${status}`;
-}
 
 const REASON_TEXT = {
   'objective-taken': 'the objective was taken',
@@ -64,10 +50,8 @@ export function buildOrderText(
   return named ? text : `${prefix}${text}`;
 }
 
-/** Plain HUD: clock and orders desk. Static markup is built once; `render` updates the parts that change. */
+/** Plain HUD: the orders desk. Static markup is built once; `render` updates the parts that change. */
 export class Hud {
-  private readonly clockEl: HTMLElement;
-  private readonly linkEl: HTMLElement;
   private readonly unitSel: HTMLSelectElement;
   private readonly textEl: HTMLTextAreaElement;
   private readonly errEl: HTMLElement;
@@ -84,8 +68,7 @@ export class Hud {
   ) {
     root.insertAdjacentHTML(
       'beforeend',
-      `<section id="clock" aria-label="Clock"><b id="clock-text"></b> <span id="link"></span><span id="staff" hidden> · staff at work</span></section>
-       <section id="gameover" aria-label="Game over" role="status" hidden></section>
+      `<section id="gameover" aria-label="Game over" role="status" hidden></section>
        <section id="orders" aria-label="Orders">
          <h2>Orders</h2>
          <select id="order-unit" aria-label="Unit"></select>
@@ -97,14 +80,11 @@ export class Hud {
        </section>`,
     );
     const q = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
-    this.clockEl = q('#clock-text');
-    this.linkEl = q('#link');
     this.unitSel = q('#order-unit');
     this.textEl = q('#order-text');
     this.errEl = q('#order-err');
     this.pendingEl = q('#pending');
     this.noticeEl = q('#notices');
-    this.staffEl = q('#staff');
     this.overEl = q('#gameover');
     this.sendBtn = q('#order-send');
     q('#order-send').addEventListener('click', () => this.send());
@@ -113,7 +93,6 @@ export class Hud {
     });
   }
 
-  private readonly staffEl: HTMLElement;
   private readonly overEl: HTMLElement;
   private readonly sendBtn: HTMLButtonElement;
 
@@ -138,16 +117,8 @@ export class Hud {
     if (!err) this.textEl.value = '';
   }
 
-  /** Refresh the clock text only; cheap enough to call every animation frame. */
-  tick(nowWall: number): void {
-    if (this.latest) this.clockEl.textContent = clockText(this.latest, nowWall);
-  }
-
-  render(state: ClientState, nowWall: number): void {
+  render(state: ClientState): void {
     this.latest = state;
-    this.tick(nowWall);
-    this.linkEl.textContent = LINK_LABEL[state.link];
-    this.staffEl.hidden = !state.staffAtWork;
     const over = gameOverText(state);
     this.overEl.hidden = over === undefined;
     this.overEl.textContent = over ?? '';

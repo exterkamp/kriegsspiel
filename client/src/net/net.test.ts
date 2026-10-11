@@ -2,7 +2,7 @@
 import { PROTOCOL_VERSION, type Dispatch, type ServerMessage } from '@kriegsspiel/protocol';
 import { describe, expect, it } from 'vitest';
 import { fixtureView } from '../table/fixture.js';
-import { Hud, buildOrderText, clockText, gameOverText, orderPrefix } from '../hud/hud.js';
+import { Hud, buildOrderText, gameOverText, orderPrefix } from '../hud/hud.js';
 import { parseSession, wsUrl } from '../session.js';
 import { GameConnection, type WebSocketLike } from './connection.js';
 import {
@@ -112,18 +112,8 @@ describe('clock', () => {
     expect(gameNowMs({ gameMs: 1000, localWallMs: 0, rate: 12, status: 'paused' }, 500)).toBe(1000);
   });
 
-  it('formats game time and the clock panel', () => {
+  it('formats game time', () => {
     expect(formatGameTime(26 * 3_600_000 + 5 * 60_000)).toBe('Day 2 02:05');
-    const s = applyServerMessage(
-      initialState,
-      {
-        v,
-        kind: 'clockState',
-        clock: { gameMsAtAnchor: 0, wallMsAtAnchor: 0, rate: 4, status: 'running' },
-      },
-      0,
-    );
-    expect(clockText(s, 60_000)).toBe('Day 1 00:04 · 4:1 · running');
   });
 });
 
@@ -245,17 +235,13 @@ describe('Hud', () => {
       0,
     );
     s = withPendingOrder(s, { orderId: 'o1', text: '1st Battalion, advance', sentAtGame: 60_000 });
-    hud.render(s, 0);
+    hud.render(s);
     expect(document.querySelector('#pending')!.textContent).toContain('1st Battalion, advance');
-    expect(document.querySelector('#clock-text')!.textContent).toBe('Day 1 01:00 · 1:1 · paused');
   });
 
   it('sends the order box text with the chosen unit and clears it', () => {
     const { hud, sent } = mount();
-    hud.render(
-      applyServerMessage(initialState, { v, kind: 'viewUpdate', view: fixtureView }, 0),
-      0,
-    );
+    hud.render(applyServerMessage(initialState, { v, kind: 'viewUpdate', view: fixtureView }, 0));
     hud.selectUnit('blue-2');
     const text = document.querySelector<HTMLTextAreaElement>('#order-text')!;
     expect(text.value).toBe('2nd Battalion, ');
@@ -274,7 +260,7 @@ describe('Hud', () => {
       0,
     );
     const q = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
-    hud.render(running, 0);
+    hud.render(running);
     expect(q('#order-text').hasAttribute('disabled')).toBe(false);
     expect(q('#order-send').hasAttribute('disabled')).toBe(false);
     expect(q('#order-unit').hasAttribute('disabled')).toBe(false);
@@ -285,7 +271,7 @@ describe('Hud', () => {
       { v, kind: 'gameOver', winner: 'blue', reason: 'objective-held', atGame: 3_600_000 },
       0,
     );
-    hud.render(over, 0);
+    hud.render(over);
     expect(q('#order-text').hasAttribute('disabled')).toBe(true);
     expect(q('#order-send').hasAttribute('disabled')).toBe(true);
     expect(q('#order-unit').hasAttribute('disabled')).toBe(true);
@@ -301,10 +287,7 @@ describe('Hud', () => {
 
   it('replaces the auto-inserted prefix when another unit is selected, but keeps typed text', () => {
     const { hud } = mount();
-    hud.render(
-      applyServerMessage(initialState, { v, kind: 'viewUpdate', view: fixtureView }, 0),
-      0,
-    );
+    hud.render(applyServerMessage(initialState, { v, kind: 'viewUpdate', view: fixtureView }, 0));
     const text = document.querySelector<HTMLTextAreaElement>('#order-text')!;
     hud.selectUnit('blue-1');
     hud.selectUnit('blue-2');
