@@ -1,0 +1,27 @@
+<section id="clock" [attr.data-status]="v().status" aria-label="Clock" [title]="summary()">
+  <b class="time">{{ v().time }}</b>
+  <span class="rate" data-testid="clock-rate">{{ v().rate }}</span>
+  <span class="status" data-testid="clock-status">
+    <span aria-hidden="true">{{
+      v().status === 'paused'
+        ? '⏸'
+        : v().status === 'stopped'
+          ? '⏹'
+          : v().status === 'running'
+            ? '▶'
+            : ''
+    }}</span>
+    <span>{{ v().label }}</span>
+  </span>
+  @if (v().vote; as vote) {
+    <span class="vote" data-testid="clock-vote" role="status"
+      >{{ vote === 'pause' ? 'Pause' : 'Resume' }} proposed</span
+    >
+  }
+  @if (v().staffAtWork) {
+    <span class="staff" data-testid="clock-staff" role="status">Staff at work…</span>
+  }
+  @if (linkText()) {
+    <span class="link">{{ linkText() }}</span>
+  }
+</section>
