@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { canonicalizeAsset, createReferenceAsset } from '@kriegsspiel/maps';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { GenerationWorker } from './generation/index.js';
 import { mountAuthoringApp } from './authoring-app.js';
 import { createAuthoringRuntime, type ValidationRequest } from './runtime/index.js';
 
@@ -62,7 +63,7 @@ async function settle() {
 function setup(readFileText?: (file: File, signal: AbortSignal) => Promise<string>) {
   document.body.innerHTML = `<h1>Preview</h1><p id="asset-status"></p><aside><section><div id="summary"></div><p class="note">Fixture</p></section><div id="layers"></div><input id="contrast" type="checkbox"><ul id="diagnostics"></ul></aside><nav><button id="fit"></button><button id="detail"></button><button id="zoom-in"></button><button id="zoom-out"></button></nav><canvas id="map"></canvas><p id="position"></p>`;
   const workers: ValidationDouble[] = [];
-  const generation = vi.fn(() => {
+  const generation = vi.fn((): GenerationWorker => {
     throw new Error('No generation expected in saved test');
   });
   const runtime = createAuthoringRuntime({
@@ -205,4 +206,109 @@ describe('authoring mount integration (injected fixture worker doubles)', () => 
     expect(r.runtime.controller.state.status).toBe('disposed');
     expect(previewCalls.dispose).toHaveBeenCalled();
   });
+});
+
+describe('empty preview shared actions and native site selector', () => {
+  it('shows initial recovery actions, disables unavailable navigation and uses the shared generation/load path', async () => {
+    const r = setup();
+    const empty = document.querySelector<HTMLElement>('.map-empty-state')!;
+    expect(empty.hidden).toBe(false);
+    expect(empty.textContent).toContain('No map generated yet');
+    const select = document.querySelector<HTMLSelectElement>('.site-selector')!;
+    expect(select.disabled).toBe(true);
+    expect(select.options[0]!.textContent).toBe('Select site…');
+    for (const id of ['fit', 'detail', 'zoom-in', 'zoom-out'])
+      expect((document.getElementById(id) as HTMLButtonElement).disabled).toBe(true);
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+    document.querySelector<HTMLButtonElement>('[data-action="empty-load"]')!.click();
+    r.app.panel.element.querySelector<HTMLButtonElement>('[data-action="load"]')!.click();
+    expect(click).toHaveBeenCalledTimes(2);
+    document.querySelector<HTMLButtonElement>('[data-action="empty-generate"]')!.click();
+    await settle();
+    expect(r.generation).toHaveBeenCalledOnce();
+    expect(empty.hidden).toBe(false);
+    expect(empty.textContent).toContain('failure');
+    expect(empty.textContent).toContain('No generation expected');
+    r.app.panel.loadText(canonicalizeAsset(createReferenceAsset()));
+    await settle();
+    expect(empty.textContent).toContain('Validating');
+    r.workers[0]!.accept();
+    await settle();
+    expect(empty.hidden).toBe(true);
+    expect(select.disabled).toBe(false);
+    expect((document.getElementById('fit') as HTMLButtonElement).disabled).toBe(false);
+  });
+  it('blocks all Generate/export actions for a hidden invalid field after Simple edits', async () => {
+    const r = setup();
+    const field = r.app.panel.element.querySelector<HTMLInputElement>(
+      '[name="roads.maxGlobalExpansions"]',
+    )!;
+    field.value = '';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    const seed = r.app.panel.element.querySelector<HTMLInputElement>('[name="seed"]')!;
+    seed.value = '42';
+    seed.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(field.value).toBe('');
+    for (const action of ['generate', 'empty-generate', 'export'])
+      expect(document.querySelector<HTMLButtonElement>(`[data-action="${action}"]`)!.disabled).toBe(
+        true,
+      );
+    expect(
+      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Export SVG')!
+        .disabled,
+    ).toBe(true);
+    expect(r.generation).not.toHaveBeenCalled();
+    expect(r.app.panel.generate()).toBeNull();
+    expect(r.app.panel.canExport()).toBe(false);
+    await settle();
+  });
+  it('keeps a validated preview and selector after failed or cancelled replacement', async () => {
+    const r = setup();
+    r.app.panel.loadText(canonicalizeAsset(createReferenceAsset()));
+    r.workers[0]!.accept();
+    await settle();
+    const empty = document.querySelector<HTMLElement>('.map-empty-state')!;
+    const select = document.querySelector<HTMLSelectElement>('.site-selector')!;
+    select.value = 'site:village:0000';
+    select.dispatchEvent(new Event('change'));
+    r.app.panel.loadText('invalid JSON');
+    await settle();
+    expect(empty.hidden).toBe(true);
+    expect(previewCalls.loaded).toHaveLength(1);
+    expect(select.value).toBe('site:village:0000');
+    expect(r.app.panel.canExport()).toBe(false);
+    r.app.panel.loadText(canonicalizeAsset(createReferenceAsset()));
+    r.app.panel.cancel();
+    await settle();
+    expect(empty.hidden).toBe(true);
+    expect(previewCalls.loaded).toHaveLength(1);
+    expect(select.disabled).toBe(false);
+    expect(r.app.panel.canExport()).toBe(false);
+  });
+});
+
+it('keeps the empty preview during generation and initial cancellation with recovery actions', async () => {
+  const r = setup();
+  const worker: GenerationWorker = {
+    onmessage: null,
+    onerror: null,
+    onmessageerror: null,
+    postMessage: vi.fn(),
+    terminate: vi.fn(),
+  };
+  r.generation.mockReturnValue(worker);
+  document.querySelector<HTMLButtonElement>('[data-action="empty-generate"]')!.click();
+  await settle();
+  const empty = document.querySelector<HTMLElement>('.map-empty-state')!;
+  expect(empty.hidden).toBe(false);
+  expect(empty.textContent).toContain('Generating request');
+  expect(worker.postMessage).toHaveBeenCalledOnce();
+  r.app.panel.cancel();
+  await settle();
+  expect(empty.hidden).toBe(false);
+  expect(empty.textContent).toContain('Cancelled');
+  expect(
+    document.querySelector<HTMLButtonElement>('[data-action="empty-generate"]')!.disabled,
+  ).toBe(false);
+  expect(worker.terminate).toHaveBeenCalledOnce();
 });

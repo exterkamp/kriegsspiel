@@ -314,3 +314,95 @@ nav select {
     flex: 1;
   }
 }
+
+/* Shared primary actions stay above both settings views. */
+.map-authoring-controls [hidden],
+.map-empty-state[hidden] {
+  display: none;
+}
+.authoring-actions [data-action='generate'],
+.map-empty-state [data-action='empty-generate'] {
+  background: #365c43;
+  color: #fffefa;
+  font-weight: 600;
+}
+.authoring-actions [data-role='status'] {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.map-authoring-controls [role='tablist'] {
+  display: flex;
+  border-bottom: 1px solid #b4bdb0;
+  margin: 16px 0 12px;
+}
+.map-authoring-controls [role='tab'] {
+  flex: 1;
+}
+.map-authoring-controls [aria-selected='true'] {
+  background: #dce7d7;
+  border-bottom: 3px solid #365c43;
+}
+.map-authoring-controls output,
+.map-authoring-controls [role='tabpanel'] > p {
+  font-size: 12px;
+  line-height: 1.5;
+}
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #a86b15;
+  outline-offset: -3px;
+}
+nav .site-selector {
+  min-width: 170px;
+  max-width: 280px;
+  padding: 6px 32px 6px 12px;
+  border: 1px solid #b4bdb0;
+  border-radius: 3px;
+  background-color: #fffefa;
+  color: #283b2d;
+}
+.map-empty-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  overflow: auto;
+  padding: 24px;
+  text-align: center;
+  border: 1px solid #b4bdb0;
+  border-radius: 6px;
+  background: #f6f5ee;
+  box-shadow: 0 8px 28px #253e3312;
+}
+.map-empty-state h2 {
+  font-size: 20px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.map-empty-state p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.empty-map-outline {
+  margin: 0 auto 20px;
+  width: 96px;
+  height: 64px;
+  border: 2px solid #879b7e;
+  border-radius: 8px 2px;
+  transform: rotate(-6deg);
+  font-size: 42px;
+  color: #879b7e;
+  background: repeating-linear-gradient(90deg, transparent 0 30px, #879b7e33 30px 32px);
+}
+.map-empty-state .empty-map-message {
+  font-size: 12px;
+  color: #526057;
+}
+@media (max-width: 760px) {
+  nav .site-selector {
+    max-width: 100%;
+    flex: 1;
+  }
+}

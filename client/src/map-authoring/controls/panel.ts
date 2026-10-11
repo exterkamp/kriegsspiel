@@ -35,6 +35,7 @@ export interface PanelOptions {
     provenance: ReadonlyData<MapAsset['provenance']>,
     recipe: ReadonlyData<ReplayParameters>,
   ) => ReplaySupport;
+  onStatusChange?: (message: string, canGenerate: boolean) => void;
   onDraftChange?: (recipe: ReadonlyData<ReplayParameters>) => void;
   onValidatedAsset?: (asset: ReadonlyData<MapAsset>) => void;
   onFocusOverride?: (override: ReadonlyData<MapOverride>, index: number) => void;
@@ -51,6 +52,7 @@ export interface AuthoringPanel {
   applyOverride(edit: OverrideEdit): void;
   generate(): number | null;
   cancel(): void;
+  openSavedFile(): void;
   loadText(text: string): number;
   loadFile(file: File): Promise<number | null>;
   exportJson(): JsonExport | null;
@@ -196,12 +198,111 @@ export function createAuthoringPanel(
       }
     }
   }
-  settingFields(form, baseline.settings);
+  const tablist = document.createElement('div');
+  tablist.setAttribute('role', 'tablist');
+  tablist.setAttribute('aria-label', 'Authoring settings');
+  form.before(tablist);
+  const simple = document.createElement('div');
+  const advanced = document.createElement('div');
+  const panels = [simple, advanced];
+  const tabs = ['Simple', 'Advanced'].map((text, index) => {
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.textContent = text;
+    tab.id = `authoring-tab-${index}`;
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-controls', `authoring-panel-${index}`);
+    panels[index]!.id = `authoring-panel-${index}`;
+    panels[index]!.setAttribute('role', 'tabpanel');
+    panels[index]!.setAttribute('aria-labelledby', tab.id);
+    tab.addEventListener('click', () => selectTab(index));
+    tab.addEventListener('keydown', (event) => {
+      const next =
+        event.key === 'ArrowRight' || event.key === 'ArrowLeft'
+          ? 1 - index
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? 1
+              : event.key === 'Enter' || event.key === ' '
+                ? index
+                : null;
+      if (next === null) return;
+      event.preventDefault();
+      selectTab(next);
+      tabs[next]!.focus();
+    });
+    tablist.append(tab);
+    return tab;
+  });
+  function selectTab(index: number): void {
+    tabs.forEach((tab, i) => {
+      tab.setAttribute('aria-selected', String(i === index));
+      tab.tabIndex = i === index ? 0 : -1;
+      panels[i]!.hidden = i !== index;
+    });
+  }
+  selectTab(0);
+  form.append(simple, advanced);
+  settingFields(advanced, baseline.settings);
+  const size = document.createElement('select');
+  size.name = 'simpleSize';
+  for (const [value, text] of [
+    ['', 'Custom / recorded size'],
+    ['5000', '5 km square'],
+    ['10000', '10 km square'],
+    ['15000', '15 km square'],
+  ] as const) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = text;
+    size.append(option);
+  }
+  labelInput(simple, 'Map size', size);
+  const simpleSliders = new Map<string, { input: HTMLInputElement; output: HTMLOutputElement }>();
+  for (const [path, label] of [
+    ['terrain.roughness', 'Roughness'],
+    ['cover.woodFraction', 'Woodland'],
+  ] as const) {
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = '0';
+    input.max = '1';
+    input.step = '0.01';
+    input.name = `simple.${path}`;
+    const output = document.createElement('output');
+    input.id = `simple-${path}`;
+    output.htmlFor = input.id;
+    labelInput(simple, label, input);
+    simple.append(output);
+    simpleSliders.set(path, { input, output });
+  }
+  const coverNote = document.createElement('p');
+  simple.append(coverNote);
+  function exactField(path: string): HTMLInputElement {
+    return fields.find((field) => field.input.name === path)!.input;
+  }
+  function syncSimple(): void {
+    const width = exactField('widthM').value,
+      height = exactField('heightM').value;
+    size.value = width === height && ['5000', '10000', '15000'].includes(width) ? width : '';
+    for (const [path, slider] of simpleSliders) {
+      const raw = exactField(path).value;
+      slider.input.value = raw;
+      slider.output.value = raw || 'Invalid draft — fix in Advanced';
+      slider.input.setAttribute('aria-valuetext', raw || 'Invalid draft');
+    }
+    const raw = exactField('cover.fieldFraction').value;
+    const available =
+      raw.trim() && Number.isFinite(Number(raw)) ? String(Math.max(0, 1 - Number(raw))) : 'unknown';
+    coverNote.textContent = `Fields: ${raw || 'invalid draft'}. Woodland available: 0–${available}. Fields stay unchanged; woodland plus fields must not exceed 1.`;
+  }
+
   const overrideGroup = document.createElement('fieldset');
   const legend = document.createElement('legend');
   legend.textContent = 'Ordered overrides';
   overrideGroup.append(legend);
-  element.append(overrideGroup);
+  advanced.append(overrideGroup);
   const siteId = document.createElement('input');
   siteId.name = 'siteId';
   siteId.maxLength = 96;
@@ -306,6 +407,7 @@ export function createAuthoringPanel(
       else field.input.value = String(value);
     }
     presetSelect.value = '';
+    syncSimple();
     renderOverrides();
   }
   function synchronizeReadyRecipe(): void {
@@ -368,6 +470,7 @@ export function createAuthoringPanel(
   }
   function changed(): void {
     revision++;
+    syncSimple();
     invalidateRead();
     problem = null;
     presetSelect.value = '';
@@ -623,8 +726,9 @@ export function createAuthoringPanel(
     }
   }
   const actions = document.createElement('div');
-  element.append(actions);
-  const generateButton = button(actions, 'Generate', 'generate', () => {
+  actions.className = 'authoring-actions';
+  heading.after(actions);
+  const generateButton = button(actions, 'Generate map', 'generate', () => {
     generate();
   });
   const cancelButton = button(actions, 'Cancel', 'cancel', cancel);
@@ -632,17 +736,61 @@ export function createAuthoringPanel(
   file.type = 'file';
   file.accept = '.json,application/json';
   file.name = 'savedMap';
-  labelInput(actions, 'Load saved map JSON', file);
+  file.hidden = true;
+  actions.append(file);
+  button(actions, 'Load saved map', 'load', () => file.click());
   const exportButton = button(actions, 'Export validated map JSON', 'export', () => {
     void deliverExport();
   });
-  element.append(status, progress, diagnosticList, provenance);
+  actions.append(status, progress, diagnosticList);
+  const versions = document.createElement('details');
+  const versionsHeading = document.createElement('summary');
+  versionsHeading.textContent = 'Recorded provenance and versions';
+  versions.append(versionsHeading, provenance);
+  advanced.append(versions);
+  const fix = button(actions, 'Fix in Advanced', 'fix-advanced', () => {
+    selectTab(1);
+    let invalid = fields.find(
+      (field) =>
+        field.kind === 'number' &&
+        (!field.input.value.trim() || !Number.isFinite(Number(field.input.value))),
+    );
+    invalid ??= fields.find(
+      (field) =>
+        validationError.includes(field.input.name) || validationError.includes(field.path.at(-1)!),
+    );
+    if (!invalid) {
+      const path = validationError.match(/\$\.settings\.([a-zA-Z0-9_.]+)/)?.[1];
+      invalid = fields.find(
+        (field) => field.input.name === path || field.input.name.startsWith(`${path}.`),
+      );
+    }
+    const target = invalid?.input ?? seed;
+    let parent = target.parentElement;
+    while (parent && parent !== advanced) {
+      if (parent.tagName === 'DETAILS') (parent as HTMLDetailsElement).open = true;
+      parent = parent.parentElement;
+    }
+    target.focus();
+  });
+  let validationError = '';
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!disposed) generate();
   });
   form.addEventListener('input', (event) => {
-    if (!disposed && event.target !== presetSelect) changed();
+    if (disposed || event.target === presetSelect) return;
+    const target = event.target;
+    for (const [path, slider] of simpleSliders) {
+      if (target === slider.input) exactField(path).value = slider.input.value;
+    }
+    if (target === size) {
+      if (!size.value) return;
+      exactField('widthM').value = size.value;
+      exactField('heightM').value = size.value;
+    }
+    changed();
   });
   presetSelect.addEventListener('change', () => {
     if (disposed || !presetSelect.value) return;
@@ -689,6 +837,8 @@ export function createAuthoringPanel(
         problem = { kind: 'programming', message: validationMessage };
       }
     }
+    validationError = validationMessage;
+    fix.hidden = parameters !== null;
     generateButton.disabled = state.status === 'disposed' || !!validationMessage;
     cancelButton.disabled =
       !reading && state.status !== 'generating' && state.status !== 'validating';
@@ -722,6 +872,11 @@ export function createAuthoringPanel(
       row.textContent = `${diagnostic.severity} ${diagnostic.stage} [${diagnostic.code}]: ${diagnostic.message}${diagnostic.featureId ? ` (${diagnostic.featureId})` : ''}${diagnostic.remediation ? ` — ${diagnostic.remediation}` : ''}`;
       diagnosticList.append(row);
     }
+    try {
+      options.onStatusChange?.(status.textContent, !generateButton.disabled);
+    } catch (error) {
+      problem = { kind: 'programming', message: errorMessage(error) };
+    }
     provenance.textContent = recorded
       ? `Recorded generator/fork/stage versions:\n${JSON.stringify(recorded, null, 2)}`
       : 'No recorded generator version yet.';
@@ -736,6 +891,10 @@ export function createAuthoringPanel(
     applyOverride,
     generate,
     cancel,
+    openSavedFile() {
+      live();
+      file.click();
+    },
     loadText,
     loadFile,
     exportJson,

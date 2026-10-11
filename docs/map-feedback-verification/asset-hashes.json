@@ -1,0 +1,34 @@
+{
+  "browser-flat17.json": {
+    "sha256": "6305b91faa19915eeea48e0bb473d900415ff00584fce318866d4e79e883926a",
+    "bytes": 1598509
+  },
+  "browser-flat17-after-tabs.json": {
+    "sha256": "6305b91faa19915eeea48e0bb473d900415ff00584fce318866d4e79e883926a",
+    "bytes": 1598509
+  },
+  "browser-custom.json": {
+    "sha256": "fef84239b835c411c28f036d5cf3b67af842dc6e831b1e6789a2d25cb0e6e1de",
+    "bytes": 1760513
+  },
+  "browser-custom.svg": {
+    "sha256": "f29d63ec833abeb794296c1aa86f51ccc8cba2c0c86684e2f59a966d9d7d7a78",
+    "bytes": 354510
+  },
+  "browser-custom-reloaded.json": {
+    "sha256": "fef84239b835c411c28f036d5cf3b67af842dc6e831b1e6789a2d25cb0e6e1de",
+    "bytes": 1760513
+  },
+  "cli-custom.json": {
+    "sha256": "fef84239b835c411c28f036d5cf3b67af842dc6e831b1e6789a2d25cb0e6e1de",
+    "bytes": 1760513
+  },
+  "browser-adjusted-regenerated.json": {
+    "sha256": "c3fb36409721baaf41cc82445a07f3f6dc1210ea576c0bfa7b6c2f334080cd29",
+    "bytes": 2214456
+  },
+  "browser-adjusted-reloaded.json": {
+    "sha256": "c3fb36409721baaf41cc82445a07f3f6dc1210ea576c0bfa7b6c2f334080cd29",
+    "bytes": 2214456
+  }
+}

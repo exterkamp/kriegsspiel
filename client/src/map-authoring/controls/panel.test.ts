@@ -249,7 +249,8 @@ describe('bounded authoring DOM panel', () => {
   it('adopts every recorded setting and ordered override without default reset or regeneration', async () => {
     const asset = createReferenceAsset();
     asset.provenance.seed = 97;
-    asset.settings.terrain.roughness = 0.2;
+    asset.settings.terrain.roughness = 0.123456;
+    asset.settings.cover.woodFraction = 0.123456;
     asset.settings.contours.maxRefinementWork = 12345;
     asset.settings.settlements.maxGlobalReconciliationWork = 123456;
     asset.settings.roads.maxGlobalExpansions = 2345678;
@@ -262,6 +263,9 @@ describe('bounded authoring DOM panel', () => {
     }));
     const { panel, factory, workers } = setup({ checkReplaySupport: support });
     panel.loadText(canonicalizeAsset(asset));
+    const tabs = panel.element.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    tabs[1]!.click();
+    tabs[0]!.click();
     await settle();
     expect(factory).not.toHaveBeenCalled();
     expect(panel.getParameters()).toEqual({
@@ -699,5 +703,114 @@ describe('bounded authoring DOM panel', () => {
     expect(() => panel.getParameters()).toThrow('disposed');
     expect(() => panel.generate()).toThrow('disposed');
     expect(controller.state.status).toBe('ready');
+  });
+});
+
+describe('Simple and Advanced recipe preservation', () => {
+  function tab(panel: AuthoringPanel, index: number) {
+    return panel.element.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]!;
+  }
+  it('switches accessible tabs by keyboard without submitting or changing exact custom recipes', () => {
+    const { panel, factory } = setup();
+    const recipe = panel.getParameters();
+    recipe.settings.widthM = 6000;
+    recipe.settings.heightM = 5000;
+    recipe.settings.terrain.roughness = 0.123456;
+    recipe.settings.cover.woodFraction = 0.123456;
+    panel.setParameters(recipe);
+    expect(panel.element.querySelector<HTMLSelectElement>('[name="simpleSize"]')!.value).toBe('');
+    for (const key of ['ArrowRight', 'Enter', ' ', 'Home', 'End']) {
+      tab(panel, 0).dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      expect(panel.getParameters()).toEqual(recipe);
+    }
+    expect(factory).not.toHaveBeenCalled();
+    expect(tab(panel, 1).getAttribute('aria-selected')).toBe('true');
+    expect(panel.element.querySelectorAll<HTMLElement>('[role="tabpanel"]')[0]!.hidden).toBe(true);
+    expect(tab(panel, 0).tabIndex).toBe(-1);
+  });
+  it('preserves hidden raw invalid drafts through Simple seed, size and slider edits and focuses recovery', () => {
+    const { panel, factory } = setup();
+    tab(panel, 1).click();
+    change(panel, 'roads.maxGlobalExpansions', '');
+    tab(panel, 0).click();
+    change(panel, 'seed', '42');
+    const size = panel.element.querySelector<HTMLSelectElement>('[name="simpleSize"]')!;
+    size.value = '5000';
+    size.dispatchEvent(new Event('input', { bubbles: true }));
+    change(panel, 'simple.terrain.roughness', '0.2');
+    expect(input(panel, 'roads.maxGlobalExpansions').value).toBe('');
+    expect(button(panel, 'generate').disabled).toBe(true);
+    expect(panel.generate()).toBeNull();
+    expect(panel.exportJson()).toBeNull();
+    expect(factory).not.toHaveBeenCalled();
+    button(panel, 'fix-advanced').click();
+    expect(document.activeElement).toBe(input(panel, 'roads.maxGlobalExpansions'));
+    expect(tab(panel, 1).getAttribute('aria-selected')).toBe('true');
+  });
+  it('rejects Woodland/fields conflict and recovers without reducing fields or changing other settings', () => {
+    const { panel, factory } = setup();
+    const recipe = panel.getParameters();
+    recipe.settings.cover.fieldFraction = 0.6;
+    recipe.settings.cover.woodFraction = 0.3;
+    panel.setParameters(recipe);
+    change(panel, 'simple.cover.woodFraction', '0.5');
+    expect(panel.generate()).toBeNull();
+    expect(factory).not.toHaveBeenCalled();
+    button(panel, 'fix-advanced').click();
+    expect(document.activeElement).toBe(input(panel, 'cover.woodFraction'));
+    expect(input(panel, 'cover.fieldFraction').value).toBe('0.6');
+    change(panel, 'simple.cover.woodFraction', '0.3');
+    expect(panel.getParameters()).toEqual(recipe);
+    expect(button(panel, 'generate').disabled).toBe(false);
+    change(panel, 'terrain.roughness', '0.123456');
+    expect(panel.element.querySelector('output')!.textContent).toBe('0.123456');
+  });
+  it('keeps pending file acceptance across tab-only changes', async () => {
+    const read = pending<string>();
+    const { panel, controller } = setup({
+      readFileText: () => read.promise,
+      checkReplaySupport: () => ({ supported: true }),
+    });
+    const loading = panel.loadFile(new File(['map'], 'map.json'));
+    tab(panel, 1).click();
+    tab(panel, 0).click();
+    read.resolve(canonicalizeAsset(createReferenceAsset()));
+    expect(await loading).not.toBeNull();
+    await settle();
+    expect(controller.state.status).toBe('ready');
+    expect(panel.canExport()).toBe(true);
+  });
+  it('keeps pending saved validation through tabs but guards actual Simple edits from older export', async () => {
+    const validation = pending<ValidationOutcome>();
+    const { panel } = setup(
+      { checkReplaySupport: () => ({ supported: true }) },
+      () => validation.promise,
+    );
+    panel.loadText(canonicalizeAsset(createReferenceAsset()));
+    tab(panel, 1).click();
+    tab(panel, 0).click();
+    change(panel, 'simple.terrain.roughness', '0.22');
+    validation.resolve(accept);
+    await settle();
+    expect(panel.getParameters().settings.terrain.roughness).toBe(0.22);
+    expect(panel.canExport()).toBe(false);
+    expect(panel.exportJson()).toBeNull();
+  });
+  it('explicit preset replacement retains seed and ordered overrides', () => {
+    const fixture = createReferenceAsset();
+    const settings = structuredClone(fixture.settings);
+    settings.terrain.roughness = 0.25;
+    const { panel } = setup({ presets: [{ id: 'test', label: 'Test preset', settings }] });
+    const recipe = panel.getParameters();
+    recipe.seed = 73;
+    recipe.overrides = [
+      { kind: 'rename', siteId: 'site:village:0000', name: 'First' },
+      { kind: 'rename', siteId: 'site:village:0000', name: 'Second' },
+    ];
+    panel.setParameters(recipe);
+    const preset = panel.element.querySelector<HTMLSelectElement>('[name="preset"]')!;
+    preset.value = 'test';
+    preset.dispatchEvent(new Event('change'));
+    expect(panel.getParameters()).toEqual({ ...recipe, settings });
   });
 });

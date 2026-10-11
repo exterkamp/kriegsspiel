@@ -56,8 +56,42 @@ export function mountAuthoringApp(
   detail.textContent = 'Site detail';
   const select = document.createElement('select');
   select.setAttribute('aria-label', 'Site detail selection');
+  select.className = 'site-selector';
+  const blank = document.createElement('option');
+  blank.value = '';
+  blank.textContent = 'Select site…';
+  select.append(blank);
+  select.disabled = true;
+  detail.disabled = true;
+  for (const id of ['fit', 'zoom-in', 'zoom-out']) element<HTMLButtonElement>(id).disabled = true;
+  const empty = document.createElement('section');
+  empty.className = 'map-empty-state';
+  empty.setAttribute('aria-label', 'Start a battlefield map');
+  const outline = document.createElement('div');
+  outline.className = 'empty-map-outline';
+  outline.setAttribute('aria-hidden', 'true');
+  outline.textContent = '⌁';
+  const emptyHeading = document.createElement('h2');
+  emptyHeading.textContent = 'No map generated yet';
+  const emptyCopy = document.createElement('p');
+  emptyCopy.textContent = 'Choose a preset and generate your battlefield, or load a saved map.';
+  const emptyMessage = document.createElement('p');
+  emptyMessage.className = 'empty-map-message';
+  const emptyGenerate = document.createElement('button');
+  emptyGenerate.type = 'button';
+  emptyGenerate.textContent = 'Generate map';
+  emptyGenerate.dataset.action = 'empty-generate';
+  const emptyLoad = document.createElement('button');
+  emptyLoad.type = 'button';
+  emptyLoad.textContent = 'Load saved map';
+  emptyLoad.dataset.action = 'empty-load';
+  empty.append(outline, emptyHeading, emptyCopy, emptyGenerate, emptyLoad, emptyMessage);
+  element('map').parentElement!.append(empty);
   detail.before(select);
   function updateSites(asset: ReadonlyData<MapAsset>): void {
+    select.disabled = false;
+    for (const id of ['fit', 'zoom-in', 'zoom-out'])
+      element<HTMLButtonElement>(id).disabled = false;
     const previous = select.value;
     select.replaceChildren();
     const blank = document.createElement('option');
@@ -143,6 +177,10 @@ export function mountAuthoringApp(
   }
   const panel = createAuthoringPanel(document, runtime.controller, {
     ...options,
+    onStatusChange: (message, canGenerate) => {
+      emptyGenerate.disabled = !canGenerate;
+      emptyMessage.textContent = message;
+    },
     onDraftChange: () => {
       svgButton.disabled = !currentFiles();
     },
@@ -150,6 +188,7 @@ export function mountAuthoringApp(
       const loaded = preview.loadAsset(asset);
       if (!loaded.ok) throw new Error('Complete validated asset failed preview contract parsing');
       displayed = asset;
+      empty.hidden = true;
       updateSites(asset);
       summary.replaceChildren();
       diagnostics.replaceChildren();
@@ -186,6 +225,14 @@ export function mountAuthoringApp(
       downloadFile(document, file.filename, file.mimeType, files.json);
     },
   });
+  emptyGenerate.addEventListener(
+    'click',
+    () => {
+      panel.generate();
+    },
+    { signal },
+  );
+  emptyLoad.addEventListener('click', () => panel.openSavedFile(), { signal });
   panel.element.append(svgButton);
   element('summary').parentElement!.before(panel.element);
   svgButton.addEventListener(
@@ -235,6 +282,7 @@ export function mountAuthoringApp(
     preview.dispose();
     runtime.dispose();
     select.remove();
+    empty.remove();
   }
   document.defaultView?.addEventListener(
     'pagehide',

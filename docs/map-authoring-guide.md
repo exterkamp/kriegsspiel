@@ -27,7 +27,7 @@ If the launcher is absent from this shell's PATH, the current review machine has
 
 ## Generate and inspect
 
-Choose a preset, set the seed explicitly, review the complete settings and press **Generate**. Nothing generates automatically. The reference preset recipes are:
+The initial **Simple** tab keeps **Generate map** and **Load saved map** at the top. The empty preview also offers these same actions and explains that no map has been generated. Choose a preset, set the seed explicitly and press **Generate map**. Nothing generates automatically. The reference preset recipes are:
 
 | Preset           | Reference seed | Extent      |
 | ---------------- | -------------: | ----------- |
@@ -37,7 +37,11 @@ Choose a preset, set the seed explicitly, review the complete settings and press
 
 The authoring preset picker replaces the complete settings, while keeping your seed and ordered overrides. Set the reference seed yourself when following this table. The initial default draft is seed 17 with the 10 km default settings; it is not an already generated map. The benchmark picker separately sets the selected preset's reference seed.
 
-Settings include width/height and sample spacing, relief/roughness, water selection and width policies, requested wood/field fractions, village/farm counts and populations, placement/grade constraints and configured work/resource limits. Expand the settings groups to inspect advanced fields. Literal versioned policies are read-only. Water selection is expressed through an upstream-sample threshold, not a general artistic density slider. Cover reports achieved fractions; slope, represented water and conservative shoreline masking can prevent exact requested fractions. Changing constraints can make a recipe infeasible.
+Simple offers square map sizes (5/10/15 km), with **Custom** reflecting rectangular or nonstandard settings, plus Roughness and Woodland sliders with exact numeric readouts. Size changes only width and height; sliders change only their named values. The displayed field fraction is retained, and Woodland plus fields must not exceed 1. A conflicting value blocks generation: lower Woodland or explicitly edit fields in Advanced; fields are never silently reduced. Valid settings can still be infeasible for generation.
+
+**Advanced** contains every exact settings field, policies, resource limits, ordered adjustments and detailed provenance. Switching tabs changes presentation only: it preserves loaded precision, override order, invalid input and pending loading/validation. Invalid fields in a hidden panel still block Generate and export. Use **Fix in Advanced** to open and focus the first invalid field. The tabs support arrow keys, Home/End and Enter/Space without submitting generation.
+
+Settings include width/height and sample spacing, relief/roughness, water selection and width policies, requested wood/field fractions, village/farm counts and populations, placement/grade constraints and configured work/resource limits. Open Advanced and expand the settings groups to inspect these fields. Literal versioned policies are read-only. Water selection is expressed through an upstream-sample threshold, not a general artistic density slider. Cover reports achieved fractions; slope, represented water and conservative shoreline masking can prevent exact requested fractions. Changing constraints can make a recipe infeasible.
 
 Pressing Generate starts a fresh worker, then independently validates and prepares exports in a second worker. The status distinguishes generating, validating, ready and failure. The synchronous generator currently supplies start progress rather than a continuous percentage estimate. Settings must pass schema and relational checks before generation. The authoring wait limit is 30 seconds across generation, complete validation and worker export; a wait timeout is separate from deterministic generator work limits.
 
@@ -45,7 +49,7 @@ Use **Fit map**, pan, zoom and keyboard arrows/+/-/F to inspect the result. Sele
 
 ## Ordered adjustments
 
-The **Ordered overrides** panel records changes to the generation recipe. Enter the exact stable site ID, such as `site:village:0000` or `site:farm:0000`, from the asset's `layers.sites[].id`. IDs identify kind/ordinal slots, not names or current coordinates. The JSON export is the authoritative source for them. If you reduce a site count or remove a slot, an override referring to it can fail; do not replace it with a guessed nearest name.
+The **Ordered overrides** panel in Advanced records changes to the generation recipe. Enter the exact stable site ID, such as `site:village:0000` or `site:farm:0000`, from the asset's `layers.sites[].id`. IDs identify kind/ordinal slots, not names or current coordinates. The JSON export is the authoritative source for them. If you reduce a site count or remove a slot, an override referring to it can fail; do not replace it with a guessed nearest name.
 
 - **Append rename:** enter the stable ID and name. A later rename for the same ID takes precedence. A name change preserves geometry identity while changing full asset identity.
 - **Append move:** enter the stable ID and anchor x/y in metres. x increases east; y increases south from the north-west origin. Regeneration must place the site at the requested anchor and revalidate its dependent approaches and settlement; impossible moves fail rather than being silently repaired.

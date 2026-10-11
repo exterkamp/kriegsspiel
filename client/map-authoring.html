@@ -3,24 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Map authoring · reference preview</title>
+    <title>Map authoring · Kriegsspiel</title>
   </head>
   <body>
     <main class="shell">
       <header>
         <div>
           <p class="eyebrow">KRIEGSSPIEL / MAP AUTHORING</p>
-          <h1>Battlefield preview</h1>
+          <h1>Battlefield authoring</h1>
         </div>
-        <p id="asset-status" role="status">Loading reference fixture…</p>
+        <p id="asset-status" role="status">No validated map · generate or load a saved asset</p>
       </header>
       <aside aria-label="Map inspection controls">
         <section>
           <h2>Asset</h2>
           <div id="summary"></div>
           <p class="note">
-            Hand-authored public contract oracle. Not generated, playable or composition-certified.
-            #140 acceptance awaits real #139 assets.
+            Generate or load a saved battlefield map. Only complete validated maps can be exported.
           </p>
         </section>
         <fieldset>
@@ -35,7 +34,7 @@
       </aside>
       <section class="map-panel" aria-label="Top-down map preview">
         <nav aria-label="Viewport controls">
-          <button id="fit">Fit map</button><button id="detail" disabled>First site detail</button
+          <button id="fit">Fit map</button><button id="detail" disabled>Site detail</button
           ><span class="spacer"></span><button id="zoom-out" aria-label="Zoom out">−</button
           ><button id="zoom-in" aria-label="Zoom in">+</button>
         </nav>
