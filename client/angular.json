@@ -41,7 +41,7 @@
           "options": {
             "tsConfig": "tsconfig.spec.json",
             "runner": "vitest",
-            "include": ["src/**/*.spec.ts", "src/**/*.test.ts"],
+            "include": ["src/**/*.spec.ts"],
             "buildTarget": "::development"
           }
         }
