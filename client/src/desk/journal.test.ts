@@ -182,6 +182,10 @@ describe('Journal view', () => {
     flushSync();
     expect(document.querySelectorAll('#view-journal li')).toHaveLength(1);
     expect(q('#view-journal li').dataset.kind).toBe('order');
+    orders.click();
+    flushSync();
+    expect(document.querySelectorAll('#view-journal li')).toHaveLength(2);
+    expect(orders.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('adds a note', () => {

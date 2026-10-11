@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SvelteSet } from 'svelte/reactivity';
   import { gameState, journal, addNote } from './store.js';
   import { deliveryStatus } from './orders.js';
   import { formatGameTime, gameNowMs } from '../net/state.js';
@@ -11,7 +12,7 @@
   } from './journal.js';
 
   let query = $state('');
-  let kinds = $state<ReadonlySet<JournalKind>>(new Set());
+  const kinds = new SvelteSet<JournalKind>();
   let note = $state('');
 
   // Delivery status is read against game time, so the journal re-reads it now and then.
@@ -33,9 +34,7 @@
   }
 
   function toggle(k: JournalKind): void {
-    const next = new Set(kinds);
-    if (!next.delete(k)) next.add(k);
-    kinds = next;
+    if (!kinds.delete(k)) kinds.add(k);
   }
 
   function addNoteNow(e: Event): void {
@@ -89,7 +88,11 @@
         {j.text}
         {#if r}
           <div class="delivery">
-            {#if r.progress !== undefined}<progress max="1" value={r.progress} aria-label="Delivery progress"></progress>{/if}
+            {#if r.progress !== undefined}<progress
+                max="1"
+                value={r.progress}
+                aria-label="Delivery progress"
+              ></progress>{/if}
             <small>{r.label}</small>
           </div>
         {/if}

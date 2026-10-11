@@ -13,19 +13,16 @@
   const compact = $derived($activeView === 'table');
   const link = $derived($gameState.link);
   const linkText = $derived(
-    { offline: 'no server (fixture)', connecting: 'connecting…', open: '', closed: 'reconnecting…' }[
-      link
-    ],
+    {
+      offline: 'no server (fixture)',
+      connecting: 'connecting…',
+      open: '',
+      closed: 'reconnecting…',
+    }[link],
   );
 </script>
 
-<section
-  id="clock"
-  class:compact
-  data-status={v.status}
-  aria-label="Clock"
-  title={clockSummary(v)}
->
+<section id="clock" class:compact data-status={v.status} aria-label="Clock" title={clockSummary(v)}>
   <b class="time">{v.time}</b>
   <span class="rate" data-testid="clock-rate">{v.rate}</span>
   <span class="status" data-testid="clock-status">

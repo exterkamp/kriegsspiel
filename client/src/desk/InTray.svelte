@@ -1,8 +1,17 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { formatGameTime } from '../net/state.js';
-  import { PILES, sortTray, type Pile } from './tray.js';
-  import { discard, gameState, markRead, setFiled, showOnTable, trayMarks, activeView, viewedDispatch } from './store.js';
+  import { sortTray, type Pile } from './tray.js';
+  import {
+    discard,
+    gameState,
+    markRead,
+    setFiled,
+    showOnTable,
+    trayMarks,
+    activeView,
+    viewedDispatch,
+  } from './store.js';
 
   let pile = $state<Pile>('urgent');
   let openId = $state<string | undefined>(undefined);
@@ -63,7 +72,11 @@
         onclick={() => pick(p.id)}
       >
         {p.label} <span class="n">{p.items.length}</span>
-        {#if p.unread > 0}<span class="unread-dot"><span aria-hidden="true">●{p.unread}</span><span class="sr-only">{p.unread} unread</span></span>{/if}
+        {#if p.unread > 0}<span class="unread-dot"
+            ><span aria-hidden="true">●{p.unread}</span><span class="sr-only"
+              >{p.unread} unread</span
+            ></span
+          >{/if}
       </button>
     {/each}
     <button

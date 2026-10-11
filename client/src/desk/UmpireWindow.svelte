@@ -56,9 +56,7 @@
     { id: 'red', label: 'Red believed' },
   ];
 
-  const notes = $derived(
-    $windowFrame && $windowHover ? unitNotes($windowFrame, $windowHover) : [],
-  );
+  const notes = $derived($windowFrame && $windowHover ? unitNotes($windowFrame, $windowHover) : []);
   const hovered = $derived($windowFrame?.units.find((u) => u.id === $windowHover));
 </script>
 
@@ -73,8 +71,8 @@
     <p role="status">Rebuilding the game from its log…</p>
   {:else}
     <p class="outcome">
-      {timeline.outcome.winner ? `${timeline.outcome.winner} won` : 'No winner'}: {timeline.outcome.reason},
-      at {formatGameTime(timeline.outcome.time)}
+      {timeline.outcome.winner ? `${timeline.outcome.winner} won` : 'No winner'}: {timeline.outcome
+        .reason}, at {formatGameTime(timeline.outcome.time)}
     </p>
     <div class="scrub">
       <button type="button" aria-label="Previous event" onclick={() => step(-1)}>◀</button>
@@ -95,15 +93,22 @@
     <fieldset>
       <legend>Overlay</legend>
       {#each BELIEFS as b (b.id)}
-        <label><input type="radio" name="belief" value={b.id} bind:group={$windowBelief} /> {b.label}</label>
+        <label
+          ><input type="radio" name="belief" value={b.id} bind:group={$windowBelief} />
+          {b.label}</label
+        >
       {/each}
     </fieldset>
     <div class="hover" aria-live="polite">
       {#if hovered}
         <b>{hovered.name}</b>
-        ({hovered.side}) strength {Math.round(hovered.strength)}, morale {Math.round(hovered.morale)}
+        ({hovered.side}) strength {Math.round(hovered.strength)}, morale {Math.round(
+          hovered.morale,
+        )}
         {#if notes.length === 0}<p>No fire or rulings in the last 30 minutes.</p>
-        {:else}<ul>{#each notes as n, i (i)}<li>{n}</li>{/each}</ul>{/if}
+        {:else}<ul>
+            {#each notes as n, i (i)}<li>{n}</li>{/each}
+          </ul>{/if}
       {:else}
         <p>Point at a unit on the table for its dice, modifiers and rulings.</p>
       {/if}

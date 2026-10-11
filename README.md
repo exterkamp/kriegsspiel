@@ -15,19 +15,23 @@ A deterministic engine owns the world: terrain, movement, line of sight, combat,
 - [docs/design.md](docs/design.md): pillars, feature ideas, hybrid adjudication model, trust risks
 - [docs/gameplay.md](docs/gameplay.md): how Kriegsspiel is played, the continuous game clock, pacing, pausing, and collaborative roles
 - [docs/hq-interface.md](docs/hq-interface.md): the general's-HQ desk: historical map table, in-tray of dispatches, orders desk, staff
+- [docs/hq-getting-started.md](docs/hq-getting-started.md): current HQ features, user instructions and hands-on validation checklist
 - [docs/architecture.md](docs/architecture.md): server/engine/umpire design, tech choices, testing
 - [docs/roadmap.md](docs/roadmap.md): milestones and next steps
 
 ## Current state
 
-Early scaffold. The monorepo is set up (engine, protocol, server and client packages with tests, lint and CI); there is no game logic yet. The planned client is a Three.js map table (flat historical map, 3D pieces) plus a Papers Please-style Svelte desk, backed by a TypeScript server with a continuous-time engine and an LLM umpire. An earlier Phaser prototype was abandoned.
+The engine, filtered game API and live client are implemented. The default client page now opens a fixture-driven Three.js map table and Svelte HQ desk with scoped browser notes, personal marks, paper dispositions and autosaved order drafts. It is an interface demonstration; live HQ integration and browser acceptance remain pending. [HQ contracts](docs/hq-contracts.md) and the [execution log](docs/hq-execution-log.md) record the gates.
+
+The accepted live client remains available at `/?new=1&side=blue&rate=12` to create a game, or `/?game=<id>` to join. `/?lobby=1` opens the accepted lobby/game list. Sign in using the emailed magic link; the session cookie and game seat authenticate access. Vite proxies `/auth`, `/scenarios` and `/games` HTTP and WebSocket requests to `API_URL` (default `http://localhost:3000`).
 
 ## Development
 
-Node version is in `.nvmrc` (`nvm use`). This is an npm workspaces monorepo:
+Node version is in `.nvmrc` (`nvm use`); use npm 10.9.7 for the pinned map source build. This is an npm workspaces monorepo:
 
 - `packages/engine`: pure, deterministic game engine
 - `packages/protocol`: shared types between server and client
+- `packages/maps`: standalone battlefield generation and validated export
 - `server`: Node.js server
 - `client`: Vite + TypeScript client
 

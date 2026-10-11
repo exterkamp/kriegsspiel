@@ -34,6 +34,9 @@ Gameplay milestones should end in something playable. The standalone map-authori
 - [ ] One handcrafted scenario, playable start to finish
 
 ## M3b: HQ interface (see [hq-interface.md](hq-interface.md))
+
+[HQ implementation plan](hq-implementation-plan.md) defines dependency gates, agent ownership, Herdr orchestration, model selection and end-to-end acceptance for Epic 4.
+
 - [ ] **Spike:** Three.js table with a flat map plane, a few block pieces, camera orbit/zoom and picking; plus one Svelte desk screen with a draggable report that places a pin on the table
 - [ ] Map table: flat historical base map + 3D pieces + player marks layer (Three.js)
 - [ ] In-tray, orders desk, order of battle, journal as Svelte views over the canvas; table ↔ desk transition

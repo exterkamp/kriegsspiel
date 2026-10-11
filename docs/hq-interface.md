@@ -1,5 +1,9 @@
 # The HQ interface
 
+For current user instructions and a hands-on validation checklist, see [HQ getting started](hq-getting-started.md).
+
+Implementation ports and capability gates are recorded in [HQ contracts](hq-contracts.md), with packet evidence in [HQ execution log](hq-execution-log.md). The current HQ composition is an explicitly identified fixture demonstration; its continuous-metre table consumes accepted #118. Local order drafts autosave in this browser; signing and delivery are unavailable in HQ. Explicit report placement supports a chosen pin location with frozen provenance; its contract and review status are recorded in [report placement](hq-plotting-proposal.md). Browser rendering/performance and live-server acceptance remain pending. Opening the client without session parameters shows the HQ fixture. Existing `/?new=1&side=blue&rate=12` and `/?game=<id>` URLs select the accepted live desk, shared marks and transport with cookie authentication and a game seat; live HQ composition awaits its contract gate.
+
 The game is played from a general's headquarters. There is no HUD and no minimap. The screen is a **desk in a tent or requisitioned farmhouse**, and everything you know arrives as paper.
 
 ## Principles
@@ -63,7 +67,7 @@ Reports should carry structured data beside the prose (location, unit, size esti
 
 ## Visual direction
 
-Period style, not a fantasy skin: aged paper, ink, sealing wax, pencil, brass instruments, with restrained animation (a courier arrival, a stamp). The text must stay readable. Serif for dispatches, handwriting-style only for short marginalia. Offer a plain high-contrast mode.
+Period style, not a fantasy skin: aged paper, ink, sealing wax, pencil, brass instruments, with restrained animation (a courier arrival, a stamp). The text must stay readable. Serif for dispatches, handwriting-style only for short marginalia. Offer a plain high-contrast mode. Fixture asset sources and the pending visual review are recorded in [HQ assets](hq-assets.md).
 
 ## Rendering decision: hybrid 3D table + 2D desk
 
@@ -77,7 +81,7 @@ Period style, not a fantasy skin: aged paper, ink, sealing wax, pencil, brass in
 - **Camera.** Orbit and zoom within limits, with a "top-down" snap for precise plotting. Tilts away from the table to the desk.
 - **Desk (HTML/CSS over the canvas).** In-tray, orders desk, order of battle, journal and staff conference are 2D Papers Please-style screens. Papers can be dragged, stamped and filed, and text stays crisp and selectable. A transition (camera dolly plus fade) moves between table and desk. Dragging a report from the desk onto the table to place a marker is a core interaction, so the two layers share a drag-and-drop system.
 - **UI framework for the desk:** Svelte (preferred) or React. Vanilla Three.js for the scene, with no react-three-fiber unless the scene gets complicated.
-- **Picking.** Raycast against the flat map plane to convert pointer position to map coordinates. Pieces are picked by raycasting their meshes. Because the map is flat, coordinates are plain (x, y) in metres with no height, which is what the engine's continuous plane uses (D13). Pieces stand at any position and facing and are drawn at their footprint; there are no cells to snap to.
+- **Picking.** Raycast against the flat map plane to convert pointer position to map coordinates. Pieces are picked by raycasting their meshes. Because the map is flat, coordinates are plain (x, y) in metres with no height, which is what the engine's continuous plane uses (D15). Pieces stand at any position and facing and are drawn at their footprint; there are no cells to snap to.
 
 The map remains flat, with no elevation mesh. Numerical elevation is planned in M3c for contour rendering, terrain-aware generation and future height/slope queries. Connecting it to gameplay line of sight and movement is separate work; existing annotated terrain and per-feature height tags remain relevant. A flat display does not remove the need for numerical topography.
 
