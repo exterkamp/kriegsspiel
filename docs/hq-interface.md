@@ -39,6 +39,10 @@ Layers are what let one historical map serve both sides and the engine.
 4. **Report sketches**: scouts' sketches attached to a location, for example "bridge at Hohenau, intact, 2 companies".
 5. **Overlays** (toggle): order arrows, planned routes, estimated march times, and a "last known" fog shading showing how old your knowledge is per area.
 
+### Truth layer annotation format
+
+The truth layer is the `map` object of a scenario: `width` and `height` in metres and a list of `features`. Each has an `id`, a `kind` (`field`, `wood`, `marsh`, `water`, `road`, `river`, `stream`, `bridge`, `ford`, `building`), one geometry (`polygon` as `[x, y]` vertices, `polyline` with a `width`, or `at: {x, y}` with a `radius`) and optional overrides of the kind's defaults: `moveCost`, `cover`, `concealment`, `height` (`low`, `flat`, `rise`, `high`: used by line of sight, so woods, ridges and buildings can be tagged), `passable`, `layer`. Kind-specific: `roadClass` (`highway`, `road`, `track`) on roads, `capacity` (metres of column frontage) on bridges and fords, `risk` (0..1) on fords. A slope or ridge is a `field` polygon with a `height` tag and a higher `moveCost`; a village is a `building` polygon. `SAMPLE_TERRAIN` in `packages/engine/src/raster.ts` is a 200 x 100 m example, and `rasterise(map, cell)` renders it as a character grid (see `raster.test.ts`) so an annotation can be checked by eye. The grid is a derived view only; the engine reads the vector features (D15, D15a).
+
 ## Using historical maps: the hard part
 
 The engine needs vector terrain features, but players should see the original map. Options:

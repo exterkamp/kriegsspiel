@@ -9,13 +9,16 @@ export type { AdvanceResult } from './advance.js';
 export { serialize, deserialize } from './snapshot.js';
 
 export * from './types.js';
-export { loadScenario, ScenarioError } from './scenario.js';
+export { loadScenario, parseTerrain, ScenarioError } from './scenario.js';
 export { holdTheBridge } from './scenarios/holdTheBridge.js';
 export * from './geometry.js';
+export { rasterise, SAMPLE_TERRAIN } from './raster.js';
+export type { TerrainRaster } from './raster.js';
 export {
   BLOCKS_SIGHT,
   KIND_DEFAULTS,
   OPEN_GROUND,
+  ROAD_CLASS_COST,
   featureAnchor,
   featuresAlong,
   featuresIn,
