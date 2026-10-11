@@ -36,6 +36,10 @@ Login needs two more settings (see D17 in [decisions.md](decisions.md)); add the
 
 Inside the container the server uses `HOST`, `PORT`, `DB_PATH` (`/data/games.db`) and `STATIC_DIR` (the built client); see `server/src/main.ts`. Without `DB_PATH` the server keeps games in memory. `GET /healthz` returns `{"ok":true}` and backs the container health check.
 
+### Angular client (#269, not the default)
+
+The image serves the Svelte client unless built with `--build-arg CLIENT=ng`, which serves the Angular `client-ng` build instead. Run that image with `SPA_FALLBACK=1`: the server then answers `/admin`, `/map-authoring`, `/map-benchmark` and anything below them (except `/admin/api`) with `index.html`, and redirects the old `/map-authoring.html`, `/map-benchmark.html` and `/table-benchmark.html` to the new routes. `/games`, `/scenarios`, `/auth` and `/admin/api` stay API routes. With `SPA_FALLBACK` unset (the default) nothing changes for the Svelte client. Both builds are always compiled; `CLIENT` only picks which one is copied into the image.
+
 ## Data and logs
 
 The volume `data` holds one SQLite file in WAL mode. The input log, snapshots and clock history for every game are in it, so it is the whole game record and replays with no model calls. Server logs go to stdout (`docker compose logs kriegsspiel`), rotated at 5 × 10 MB.

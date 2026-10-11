@@ -1,4 +1,5 @@
 # One image: the game server and the built client it serves. See docs/deployment.md.
+ARG CLIENT=svelte
 FROM node:22.23.3-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
@@ -14,6 +15,14 @@ COPY vendor/settlemaker-runtime.canonical.tgz ./vendor/settlemaker-runtime.canon
 RUN npm run setup:map-source && npm ci && npm run build \
  && npm prune --omit=dev
 
+# CLIENT picks which build the image serves: `svelte` (default, client/dist) or `ng` (the Angular
+# client-ng build, plus SPA_FALLBACK=1 for its routes). See docs/deployment.md.
+FROM build AS client-svelte
+RUN mkdir /out && cp -r client/dist/. /out/
+FROM build AS client-ng
+RUN mkdir /out && cp -r client-ng/dist/browser/. /out/
+FROM client-${CLIENT} AS client-out
+
 FROM node:22.23.3-slim
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
@@ -28,7 +37,7 @@ COPY --from=build /app/packages ./packages
 COPY --from=build /app/server/package.json ./server/package.json
 COPY --from=build /app/server/dist ./server/dist
 COPY server/backup-loop.sh ./server/backup-loop.sh
-COPY --from=build /app/client/dist ./client/dist
+COPY --from=client-out /out ./client/dist
 RUN mkdir /data && chown node:node /data
 USER node
 VOLUME /data

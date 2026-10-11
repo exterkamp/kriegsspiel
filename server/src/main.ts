@@ -4,6 +4,7 @@
  *   HOST                listen address (default 127.0.0.1; the container sets 0.0.0.0)
  *   DB_PATH             SQLite file for durable games; unset keeps games in memory
  *   STATIC_DIR          built client to serve at `/`; unset serves the API only
+ *   SPA_FALLBACK        `1`/`true`/`on` serves index.html for the Angular client's routes and redirects the old *.html pages; needs STATIC_DIR
  *   SCRIPTED_OPPONENTS  scripted sides are played by the built-in opponent unless `0`, `false` or `off`
  *   AI_COMMANDER        `llm` plays scripted sides with the LLM commander (needs a provider key, see docs/llm-providers.md); AI_DIFFICULTY easy|normal|hard, AI_PERSONALITY cautious|balanced|aggressive
  *   ORDER_PARSER        `stub` forces the rule-based order parser; otherwise the LLM parses orders whenever the parse stage's provider is configured (ANTHROPIC_API_KEY for the default)
@@ -80,6 +81,7 @@ const { server } = await buildApp({
   store,
   lobby,
   staticDir: process.env.STATIC_DIR,
+  spaFallback: /^(1|true|on)$/i.test(process.env.SPA_FALLBACK ?? ''),
   logger: true,
   scriptedOpponents: scriptedOpponentsFromEnv(process.env),
   aiAgents:

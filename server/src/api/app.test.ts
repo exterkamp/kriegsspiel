@@ -1069,6 +1069,83 @@ describe('deployment endpoints', () => {
   });
 });
 
+describe('SPA fallback for the Angular client', () => {
+  async function spaApp(spaFallback: boolean) {
+    const dir = mkdtempSync(joinPath(tmpdir(), 'ks-spa-'));
+    writeFileSync(joinPath(dir, 'index.html'), '<title>ng</title>');
+    const { server } = await buildApp({
+      parser: new StubOrderParser(),
+      staticDir: dir,
+      spaFallback,
+      auth: { mailer },
+    });
+    return { server, done: () => rmSync(dir, { recursive: true, force: true }) };
+  }
+
+  it('serves index.html for the client routes and keeps the API paths as API', async () => {
+    const { server, done } = await spaApp(true);
+    try {
+      for (const url of [
+        '/',
+        '/admin',
+        '/admin/',
+        '/admin/games/3',
+        '/map-authoring',
+        '/map-benchmark?x=1',
+      ]) {
+        const res = await server.inject(url);
+        expect(res.statusCode, url).toBe(200);
+        expect(res.body, url).toContain('<title>ng</title>');
+      }
+      for (const url of [
+        '/admin/api',
+        '/admin/api/games',
+        '/games/nope/x',
+        '/scenarios/nope/x',
+        '/auth/nope',
+        '/other',
+      ]) {
+        const res = await server.inject(url);
+        expect(res.statusCode, url).toBe(404);
+        expect(res.json().error, url).toBe('Not Found');
+      }
+      expect((await server.inject({ method: 'POST', url: '/admin', payload: {} })).statusCode).toBe(
+        404,
+      );
+    } finally {
+      await server.close();
+      done();
+    }
+  });
+
+  it('redirects the old .html pages, keeping the query', async () => {
+    const { server, done } = await spaApp(true);
+    try {
+      const map = await server.inject('/map-authoring.html?a=1');
+      expect(map.statusCode).toBe(301);
+      expect(map.headers.location).toBe('/map-authoring?a=1');
+      expect((await server.inject('/map-benchmark.html')).headers.location).toBe('/map-benchmark');
+      expect((await server.inject('/table-benchmark.html')).headers.location).toBe(
+        '/map-benchmark',
+      );
+    } finally {
+      await server.close();
+      done();
+    }
+  });
+
+  it('is off by default, so the Svelte client keeps its own pages', async () => {
+    const { server, done } = await spaApp(false);
+    try {
+      expect((await server.inject('/map-authoring')).statusCode).toBe(404);
+      expect((await server.inject('/map-authoring.html')).statusCode).toBe(404);
+    } finally {
+      await server.close();
+      done();
+    }
+  });
+});
+
 describe('pause voting over the WebSocket', () => {
   const cmd = (body: object) => JSON.stringify({ v, ...body });
   /** Blue and red players in a started lobby game with pause voting (voters are the seats taken at the start). */
