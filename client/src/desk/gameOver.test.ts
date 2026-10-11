@@ -16,7 +16,7 @@ import { flushSync, mount, unmount } from 'svelte';
 import Desk from './Desk.svelte';
 import { activeView, gameId, gameState, windowOpen } from './store.js';
 import { initialState } from '../net/state.js';
-import { reasonText, replayRequest, resultFor } from './gameOver.js';
+import { lossesBetween, reasonText, summaryLines, replayRequest, resultFor } from './gameOver.js';
 
 describe('result mapping', () => {
   it('maps the winner to a result for each side', () => {
@@ -31,6 +31,16 @@ describe('result mapping', () => {
     expect(reasonText({ winner: 'red', reason: 'objective-held', atGame: 3_600_000 })).toMatch(
       /^Red held the objective at /,
     );
+  });
+  it('counts losses per side between two frames', () => {
+    const u = (id: string, side: string, strength: number) => ({ id, side, strength });
+    const start = { units: [u('a', 'blue', 100), u('b', 'red', 80), u('c', 'red', 50)] };
+    const end = { units: [u('a', 'blue', 70), u('b', 'red', 0), u('c', 'red', 50)] };
+    expect(lossesBetween(start, end, 'blue')).toEqual({ own: 30, enemy: 80 });
+    expect(lossesBetween(start, end, 'red')).toEqual({ own: 80, enemy: 30 });
+    expect(
+      summaryLines({ winner: 'blue', reason: 'eliminated', atGame: 0 }, { own: 30, enemy: 80 }),
+    ).toContain('Enemy losses: 80');
   });
   it('repeats scenario, rate, session type and side', () => {
     expect(replayRequest({ scenario: 's', rate: 12, sessionType: 'hot_seat' }, 'red')).toEqual({
@@ -90,7 +100,7 @@ describe('game-over screen', () => {
     const [win, journal] = [
       ...document.querySelectorAll<HTMLButtonElement>('[role=dialog] button'),
     ];
-    journal.click();
+    journal!.click();
     flushSync();
     expect(document.querySelector('#over-h')).toBeNull();
     expect(document.querySelector('#view-journal')).not.toBeNull();
@@ -130,7 +140,7 @@ describe('game-over screen', () => {
     flushSync();
     document.querySelectorAll<HTMLButtonElement>('[role=dialog] button')[2]!.click();
     await vi.waitFor(() => expect(assign).toHaveBeenCalled());
-    expect(JSON.parse(calls[1]![1]!.body as string)).toEqual({
+    expect(JSON.parse(calls.find(([u]) => u === '/games')![1]!.body as string)).toEqual({
       scenario: 'bridge',
       rate: 4,
       sessionType: 'team_vs_team',

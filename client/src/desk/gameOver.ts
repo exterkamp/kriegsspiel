@@ -39,9 +39,26 @@ export function reasonText(over: GameOver): string {
   }
 }
 
-/** The lines under the headline. */
-export function summaryLines(over: GameOver): string[] {
-  return [`Game time elapsed: ${formatGameTime(over.atGame)}`];
+/** Strength lost per side between two true-position frames of the umpire's window. */
+export function lossesBetween(
+  start: { units: { id: string; side: string; strength: number }[] },
+  end: { units: { id: string; side: string; strength: number }[] },
+  side: string,
+): { own: number; enemy: number } {
+  const endById = new Map(end.units.map((u) => [u.id, u.strength]));
+  const lost = { own: 0, enemy: 0 };
+  for (const u of start.units) {
+    const l = Math.max(0, u.strength - (endById.get(u.id) ?? 0));
+    lost[u.side === side ? 'own' : 'enemy'] += Math.round(l);
+  }
+  return lost;
+}
+
+/** The lines under the headline; losses appear once the umpire's reveal has been read. */
+export function summaryLines(over: GameOver, losses?: { own: number; enemy: number }): string[] {
+  const lines = [`Game time elapsed: ${formatGameTime(over.atGame)}`];
+  if (losses) lines.push(`Your losses: ${losses.own}`, `Enemy losses: ${losses.enemy}`);
+  return lines;
 }
 
 /** The body of the POST /games that repeats a finished game: same scenario, side, rate and session type. */

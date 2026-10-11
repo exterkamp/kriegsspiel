@@ -1,7 +1,15 @@
 <script lang="ts">
   import { fetchGame } from '../lobby/api.js';
+  import { fetchWindowAt } from '../window/api.js';
   import { activeView, gameId, gameState, windowOpen } from './store.js';
-  import { HEADLINE, reasonText, replayRequest, resultFor, summaryLines } from './gameOver.js';
+  import {
+    HEADLINE,
+    lossesBetween,
+    reasonText,
+    replayRequest,
+    resultFor,
+    summaryLines,
+  } from './gameOver.js';
 
   let {
     onMenu,
@@ -16,6 +24,16 @@
   const over = $derived($gameState.gameOver!);
   const side = $derived($gameState.view?.side);
   const result = $derived(resultFor(over, side));
+  let losses = $state<{ own: number; enemy: number } | undefined>();
+  $effect(() => {
+    const game = $gameId;
+    const s = side;
+    if (!game || !s) return;
+    const end = over.atGame;
+    Promise.all([fetchWindowAt(game, 0, s), fetchWindowAt(game, end, s)])
+      .then(([a, b]) => (losses = lossesBetween(a, b, s)))
+      .catch(() => {});
+  });
   let busy = $state(false);
   let error = $state('');
 
@@ -48,7 +66,7 @@
   <h2 id="over-h">{HEADLINE[result]}</h2>
   <p class="reason">{reasonText(over)}</p>
   <ul>
-    {#each summaryLines(over) as line (line)}<li>{line}</li>{/each}
+    {#each summaryLines(over, losses) as line (line)}<li>{line}</li>{/each}
   </ul>
   <div class="row">
     <button type="button" onclick={() => windowOpen.set(true)}>View the umpire's window</button>
