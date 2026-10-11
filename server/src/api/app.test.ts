@@ -23,6 +23,7 @@ import {
   replayLog,
   startingState,
 } from '../game/index.js';
+import { FakeTime } from '../game/testing.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { scriptedOpponentsFromEnv } from '../config.js';
 import { buildApp, type App } from './app.js';
@@ -664,6 +665,78 @@ describe('catch-up on reconnect', () => {
   });
 });
 
+describe('shared order drafts', () => {
+  const cmd = (c: Record<string, unknown>) => JSON.stringify({ v, ...c });
+
+  it('puts two clients’ concurrent edits and comments in one order, and keeps the other side out', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const a = await join(ws, game, 'blue');
+    const b = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    expect((await a.waitFor('drafts')).drafts).toEqual([]);
+    a.send(cmd({ kind: 'createDraft', draft: 'd1', text: 'Hold the bridge', title: 'Order 1' }));
+    await b.waitFor('draftState', (m) => m.draft.id === 'd1');
+    // Both edit the same rev before hearing from each other.
+    a.send(cmd({ kind: 'draftEdit', draft: 'd1', baseRev: 0, op: ['Colonel: ', 15], opId: 'a1' }));
+    b.send(
+      cmd({ kind: 'draftEdit', draft: 'd1', baseRev: 0, op: [15, ' at all costs'], opId: 'b1' }),
+    );
+    for (const c of [a, b]) {
+      await c.waitFor('draftEntry', (m) => m.entry.rev === 2);
+    }
+    const last = b.messages.filter((m) => m.kind === 'draftEntry');
+    expect(last.map((m) => m.entry.rev)).toEqual([1, 2]);
+    a.send(
+      cmd({
+        kind: 'draftComment',
+        draft: 'd1',
+        baseRev: 2,
+        comment: { id: 'c1', from: 9, to: 13, body: 'Which hold?' },
+      }),
+    );
+    await b.waitFor('draftEntry', (m) => m.entry.kind === 'comment');
+    b.send(cmd({ kind: 'readDraft', draft: 'd1', rev: 3 }));
+    const receipt = await a.waitFor('draftReceipt');
+    expect(receipt.rev).toBe(3);
+    // A fresh connection (a player coming back later) gets the whole draft.
+    a.socket.close();
+    const again = await join(ws, game, 'blue');
+    const [d] = (await again.waitFor('drafts')).drafts;
+    expect(d!.text).toBe('Colonel: Hold the bridge at all costs');
+    expect(d!.history.map((e) => e.rev)).toEqual([1, 2, 3]);
+    expect(d!.comments).toHaveLength(1);
+    expect(Object.values(d!.receipts)).toEqual([3]);
+    expect(red.messages.filter((m) => m.kind.startsWith('draft') && m.kind !== 'drafts')).toEqual(
+      [],
+    );
+    expect((await red.waitFor('drafts')).drafts).toEqual([]);
+  });
+
+  it('forks and merges, saves to the store, and answers a bad edit with an error', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const a = await join(ws, game, 'blue');
+    await a.waitFor('drafts');
+    a.send(cmd({ kind: 'createDraft', draft: 'd1', text: 'abc' }));
+    a.send(cmd({ kind: 'forkDraft', draft: 'd1', newDraft: 'd2' }));
+    await a.waitFor('draftState', (m) => m.draft.id === 'd2');
+    a.send(cmd({ kind: 'draftEdit', draft: 'd2', baseRev: 0, op: [3, 'd'] }));
+    a.send(cmd({ kind: 'draftEdit', draft: 'd1', baseRev: 0, op: ['<', 3] }));
+    a.send(cmd({ kind: 'mergeDraft', draft: 'd2' }));
+    const closed = await a.waitFor('draftState', (m) => m.draft.mergedInto === 'd1');
+    expect(closed.draft.id).toBe('d2');
+    a.send(cmd({ kind: 'draftEdit', draft: 'd1', baseRev: 0, op: [99] }));
+    expect((await a.waitFor('error', (m) => m.code === 'bad_op')).code).toBe('bad_op');
+    a.send(cmd({ kind: 'draftEdit', draft: 'd2', baseRev: 1, op: [4] }));
+    await a.waitFor('error', (m) => m.code === 'draft_closed');
+    await vi.waitFor(async () => {
+      const saved = await store.loadDrafts(game.id, 'blue');
+      expect(saved.find((d) => d.id === 'd1')?.text).toBe('<abcd');
+    });
+  });
+});
+
 describe('seen time on shutdown', () => {
   it('flushSeen saves the seen time of a side that is still connected', async () => {
     const { base, ws } = await start();
@@ -785,7 +858,7 @@ describe('malformed messages', () => {
       JSON.stringify({ v, kind: 'issueOrder', orderId: 'o' }),
       JSON.stringify({ v, kind: 'issueOrder', orderId: 'o', text: 'go', side: 'red' }),
       JSON.stringify({ v, kind: 'vote', proposal: 'p', yes: 'maybe' }),
-      '{"v":1,"kind":"draftEdit","draft":"d","ops":' + '['.repeat(10_000),
+      '{"v":1,"kind":"draftEdit","draft":"d","baseRev":0,"op":' + '['.repeat(10_000),
     ];
     for (const m of bad) blue.send(m);
     blue.send(new Uint8Array([1, 2, 3]));
@@ -821,14 +894,20 @@ async function until(cond: () => boolean, ms = 5000): Promise<void> {
 }
 
 describe('scripted opponent', () => {
+  /** Wall time the game runs on here, so nothing waits on the real clock or the machine's load. */
+  let time: FakeTime;
+
   /** Starts the app with the settings `main.ts` derives from the given environment. */
   async function startLikeMain(env: Record<string, string | undefined>) {
     store = new MemoryGameStore();
+    time = new FakeTime(Date.now());
     app = await buildApp({
       parser: new StubOrderParser(),
       store,
       scriptedOpponents: scriptedOpponentsFromEnv(env),
       auth: { mailer },
+      wallNow: time.now,
+      timers: time,
     });
     const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
     return base;
@@ -836,43 +915,32 @@ describe('scripted opponent', () => {
 
   const redUnits = (id: string) =>
     app!.host.get(id)!.state.world.units.filter((u) => u.side === 'red');
+  const agentOrders = async (id: string) => (await store.inputLog(id)).filter((e) => e.agent);
 
   it('moves Red by default with no client input', async () => {
     const base = await startLikeMain({});
     const game = (await createGame(base, { rate: 86_400 }, false)).json;
     const start = redUnits(game.id).map((u) => u.center);
-    const deadline = Date.now() + 5000;
-    while (Date.now() < deadline) {
-      const log = await store.inputLog(game.id);
-      const moved = redUnits(game.id).some(
-        (u, i) => u.center.x !== start[i]!.x || u.center.y !== start[i]!.y,
-      );
-      if (log.some((e) => e.agent) && moved) break;
-      await new Promise((r) => setTimeout(r, 25));
-    }
-    expect((await store.inputLog(game.id)).some((e) => e.agent)).toBe(true);
+    await time.advance(5000);
+    expect(await agentOrders(game.id)).not.toHaveLength(0);
     expect(
       redUnits(game.id).some((u, i) => u.center.x !== start[i]!.x || u.center.y !== start[i]!.y),
     ).toBe(true);
   });
 
   it('leaves Red idle when SCRIPTED_OPPONENTS=0', async () => {
-    // Calibrate the wait: time how long the default setting takes to produce an agent order, so
-    // the idle check below can't pass vacuously by looking for less time than that.
+    // The same span of fake time that gives the default setting an agent order, so the idle
+    // check below can't pass vacuously by looking for less time than that.
     const defaultBase = await startLikeMain({});
     const calibration = (await createGame(defaultBase, { rate: 86_400 }, false)).json;
-    const t0 = Date.now();
-    while (!(await store.inputLog(calibration.id)).some((e) => e.agent)) {
-      if (Date.now() - t0 > 5000) throw new Error('default setting never produced an agent order');
-      await new Promise((r) => setTimeout(r, 10));
-    }
-    const agentLatency = Date.now() - t0;
+    await time.advance(5000);
+    expect(await agentOrders(calibration.id)).not.toHaveLength(0);
     await app!.server.close();
 
     const base = await startLikeMain({ SCRIPTED_OPPONENTS: '0' });
     const game = (await createGame(base, { rate: 86_400 }, false)).json;
-    await new Promise((r) => setTimeout(r, Math.max(500, agentLatency * 3)));
-    expect((await store.inputLog(game.id)).some((e) => e.agent)).toBe(false);
+    await time.advance(5000);
+    expect(await agentOrders(game.id)).toHaveLength(0);
   });
 
   it.each([

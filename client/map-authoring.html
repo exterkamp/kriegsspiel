@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Map authoring · Kriegsspiel</title>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <div>
+          <p class="eyebrow">KRIEGSSPIEL / MAP AUTHORING</p>
+          <h1>Battlefield authoring</h1>
+        </div>
+        <p id="asset-status" role="status">No validated map · generate or load a saved asset</p>
+      </header>
+      <aside aria-label="Map inspection controls">
+        <section>
+          <h2>Asset</h2>
+          <div id="summary"></div>
+          <p class="note">
+            Generate or load a saved battlefield map. Only complete validated maps can be exported.
+          </p>
+        </section>
+        <fieldset>
+          <legend>Independent layers</legend>
+          <div id="layers"></div>
+        </fieldset>
+        <label class="contrast"><input id="contrast" type="checkbox" /> High contrast</label>
+        <section>
+          <h2>Diagnostics</h2>
+          <ul id="diagnostics" aria-live="polite"></ul>
+        </section>
+      </aside>
+      <section class="map-panel" aria-label="Top-down map preview">
+        <nav aria-label="Viewport controls">
+          <button id="fit">Fit map</button><button id="detail" disabled>Site detail</button
+          ><span class="spacer"></span><button id="zoom-out" aria-label="Zoom out">−</button
+          ><button id="zoom-in" aria-label="Zoom in">+</button>
+        </nav>
+        <div class="canvas-wrap">
+          <canvas
+            id="map"
+            tabindex="0"
+            aria-label="Public map asset in local metres. Drag to pan, scroll to zoom; arrow keys pan, plus and minus zoom, F fits the map."
+            aria-describedby="map-help"
+            >Canvas2D is required to view this map.</canvas
+          ><span class="north" aria-hidden="true">↑ N</span>
+        </div>
+        <footer>
+          <p id="position"></p>
+          <p id="map-help">Drag to pan · scroll or + / − to zoom · F to fit · arrows to pan</p>
+        </footer>
+      </section>
+    </main>
+    <script type="module" src="/src/map-authoring/main.ts"></script>
+  </body>
+</html>

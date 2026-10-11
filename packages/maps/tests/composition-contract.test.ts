@@ -1,0 +1,237 @@
+import { beforeAll, expect, it } from 'vitest';
+import { DEFAULT_SETTINGS, type GenerationResult, type MapAsset } from '../src/contract.js';
+import { canonicalGeometry, canonicalizeAsset } from '../src/canonical.js';
+import { importAsset } from '../src/import.js';
+import { createElevationQueries } from '../src/queries.js';
+import { compositionLimits, Meter } from '../src/composition/budget.js';
+import { settlementFrame } from '../src/composition/frame.js';
+import {
+  generateBattlefield,
+  validateBattlefield,
+  exportBattlefield,
+  supportsReplay,
+  CONSUMED_FORK,
+} from '../src/composition/index.js';
+
+function value<T>(r: GenerationResult<T>): T {
+  if (!r.ok) throw Error(JSON.stringify(r));
+  return r.value;
+}
+const settings = structuredClone(DEFAULT_SETTINGS);
+settings.widthM = settings.heightM = 500;
+settings.terrain.reliefM = 0;
+settings.cover.woodFraction = settings.cover.fieldFraction = 0;
+settings.settlements.villageCount = 1;
+settings.settlements.farmCount = 1;
+settings.settlements.villagePopulation = 12;
+settings.settlements.minSpacingM = 150;
+settings.roads.extraLinks = 0;
+let asset: MapAsset;
+beforeAll(() => {
+  asset = value(generateBattlefield({ seed: 17, settings, overrides: [] }));
+});
+it('generates occupied truthful sites, safe IDs and explicit connected access geometry', () => {
+  expect(asset.layers.buildings).toHaveLength(6);
+  expect(asset.layers.sites.map((s) => s.population.assigned)).toEqual([12, 12]);
+  expect(
+    asset.layers.sites.every((s) => s.occupiedFootprint !== null && s.population.unassigned === 0),
+  ).toBe(true);
+  for (const rows of Object.values(asset.layers))
+    for (const row of rows) expect(row.id).toMatch(/^[a-z][a-z0-9:_-]{0,95}$/);
+  expect(asset.layers.roads.filter((r) => r.id.endsWith(':access'))).toHaveLength(6);
+  expect(value(validateBattlefield(asset)).connected).toBe(true);
+});
+it('binds stable slots and dwelling kinds even with identical populations and site-size intervals', () => {
+  const same = structuredClone(settings);
+  same.settlements.farmSite = structuredClone(same.settlements.villageSite);
+  const positive = value(generateBattlefield({ seed: 17, settings: same, overrides: [] }));
+  expect(positive.layers.buildings).toHaveLength(6);
+  expect(value(validateBattlefield(positive)).assignedPopulation).toBe(24);
+  const swapped = structuredClone(positive);
+  for (const site of swapped.layers.sites) site.kind = site.kind === 'village' ? 'farm' : 'village';
+  // Counts, requested populations, permissible sizes and basic schema still agree.
+  const loaded = importAsset(canonicalizeAsset(swapped));
+  expect(validateBattlefield(loaded)).toMatchObject({
+    ok: false,
+    diagnostics: [{ code: 'SITE_IDENTITY' }],
+  });
+  const wrongBuilding = structuredClone(positive);
+  const b = wrongBuilding.layers.buildings.find((b) => b.kind === 'residential')!;
+  b.kind = 'agricultural';
+  expect(validateBattlefield(importAsset(canonicalizeAsset(wrongBuilding)))).toMatchObject({
+    ok: false,
+    diagnostics: [{ code: 'BUILDING_IDENTITY' }],
+  });
+});
+it('canonical export/reload preserves complete geometry and SVG uses supplied paths', () => {
+  const result = value(exportBattlefield(asset)),
+    loaded = importAsset(result.json);
+  expect(canonicalGeometry(loaded)).toBe(canonicalGeometry(asset));
+  expect(validateBattlefield(loaded).ok).toBe(true);
+  expect(result.svg).toContain('fill-rule="evenodd"');
+  expect(result.svg).toContain(`data-feature="${asset.layers.buildings[0]!.id}"`);
+  expect(result.svg).toContain('Local metres: x east, y south, z up');
+});
+it('name-only ordered overrides preserve geometry and place IDs', () => {
+  const renamed = value(
+    generateBattlefield({
+      seed: 17,
+      settings,
+      overrides: [
+        { kind: 'rename', siteId: 'site:village:0000', name: 'First' },
+        { kind: 'rename', siteId: 'site:village:0000', name: 'A & <B>' },
+      ],
+    }),
+  );
+  expect(canonicalGeometry(renamed)).toBe(canonicalGeometry(asset));
+  expect(renamed.layers.sites.find((s) => s.id === 'site:village:0000')!.name).toBe('A & <B>');
+  expect(value(exportBattlefield(renamed)).svg).toContain('A &amp; &lt;B&gt;');
+});
+it('supports only exact schema/generator/stage/fork recipe identities', () => {
+  expect(supportsReplay(asset)).toBe(true);
+  expect(asset.provenance.fork).toEqual(CONSUMED_FORK);
+  const changed = structuredClone(asset);
+  changed.provenance.generator.version = 'unsupported-v99';
+  expect(supportsReplay(changed)).toBe(false);
+  expect(validateBattlefield(changed)).toMatchObject({
+    ok: false,
+    diagnostics: [{ code: 'UNSUPPORTED_REPLAY' }],
+  });
+  expect(supportsReplay({ ...asset, schemaVersion: 2 })).toBe(false);
+});
+it('rejects one-sided local entrance provenance while the regional graph survives', () => {
+  const changed = structuredClone(asset),
+    e = changed.layers.sites[0]!.entrances[0]!;
+  const local = changed.layers.roads.find(
+    (r) => r.kind === 'street' && (r.fromNodeId === e.nodeId || r.toNodeId === e.nodeId),
+  )!;
+  local.routeIds = [];
+  // Contract parses successfully; only independent composition knows the join.
+  const canonical = importAsset(canonicalizeAsset(changed));
+  expect(validateBattlefield(canonical)).toMatchObject({
+    ok: false,
+    diagnostics: [{ code: 'ENTRANCE_JOIN' }],
+  });
+});
+it('rejects removed access, forged logical route, capacity and occupied-envelope evidence', () => {
+  for (const mutation of ['access', 'route', 'capacity', 'occupied'] as const) {
+    const changed = structuredClone(asset);
+    if (mutation === 'access') {
+      const road = changed.layers.roads.find((r) => r.id.endsWith(':access'))!;
+      changed.layers.roads = changed.layers.roads.filter((r) => r.id !== road.id);
+      changed.layers.roadNodes = changed.layers.roadNodes.filter((n) => n.id !== road.fromNodeId);
+    }
+    if (mutation === 'route') {
+      const ids = new Map<string, string>();
+      for (const road of changed.layers.roads)
+        for (const id of road.routeIds)
+          if (id.startsWith('route:site:') && !ids.has(id))
+            ids.set(id, `route:missing:${ids.size}`);
+      for (const road of changed.layers.roads)
+        road.routeIds = road.routeIds.map((id) => ids.get(id) ?? id);
+      for (const site of changed.layers.sites)
+        for (const e of site.entrances) e.routeId = ids.get(e.routeId) ?? e.routeId;
+    }
+    if (mutation === 'capacity') changed.layers.buildings[0]!.capacity = 300;
+    if (mutation === 'occupied')
+      changed.layers.sites[0]!.occupiedFootprint = structuredClone(
+        changed.layers.sites[0]!.placementArea,
+      );
+    expect(validateBattlefield(importAsset(canonicalizeAsset(changed))).ok).toBe(false);
+  }
+});
+it('independently enforces resolved exclusions and unknown move/name IDs', () => {
+  const changed = structuredClone(asset);
+  changed.overrides = [
+    { kind: 'exclude-sites', id: 'exclude:one', polygon: changed.layers.sites[0]!.placementArea },
+  ];
+  expect(validateBattlefield(changed)).toMatchObject({
+    ok: false,
+    diagnostics: [{ code: 'SITE_OVERRIDE' }],
+  });
+  expect(() =>
+    generateBattlefield({
+      seed: 17,
+      settings,
+      overrides: [{ kind: 'rename', siteId: 'site:missing', name: 'Missing' }],
+    }),
+  ).toThrow(/Unknown stable/);
+});
+it('rejects a raised interior sample independently of flat anchors and outer ring nodes', () => {
+  const changed = structuredClone(asset),
+    s = changed.layers.sites.find((s) => s.kind === 'village')!,
+    e = changed.elevation;
+  const col = Math.round(s.anchor[0] / e.spacingM),
+    row = Math.round(s.anchor[1] / e.spacingM);
+  changed.elevation.samples[row * e.columns + col] = 120;
+  // Keep separate filled drainage admissible under its frozen monotonic contract.
+  changed.drainage!.filledSamples.fill(120);
+  expect(validateBattlefield(changed)).toMatchObject({
+    ok: false,
+    diagnostics: [{ code: 'SITE_SUITABILITY' }],
+  });
+});
+it('captures coherent detached rotated frame and reuses authoritative analytic queries', () => {
+  const site = { anchor: [3456, 1234] as [number, number], rotationDeg: 90 },
+    frame = settlementFrame(site);
+  expect(frame.world({ x: 137, y: -241 })).toEqual([3697, 1371]);
+  expect(frame.local([3697, 1371])).toEqual({ x: 137, y: -241 });
+  expect(frame.localGradient({ dx: 0.012, dy: 0.034 })).toEqual({ dx: 0.034, dy: -0.012 });
+  site.anchor[0] = 4000;
+  site.rotationDeg = 180;
+  expect(frame.world({ x: 137, y: -241 })).toEqual([3697, 1371]);
+  expect(frame.localBearing(90)).toBe(0);
+  const columns = 161,
+    rows = 81,
+    spacingM = 25,
+    samples = Array.from(
+      { length: columns * rows },
+      (_, i) => 120 + 0.012 * (i % columns) * 25 + 0.034 * Math.floor(i / columns) * 25,
+    );
+  const q = createElevationQueries({
+    bounds: { minX: 0, minY: 0, maxX: 4000, maxY: 2000 },
+    elevation: { columns, rows, spacingM, samples },
+  });
+  expect(q.heightAt(...frame.world({ x: 137, y: -241 }))).toBeCloseTo(210.978, 10);
+});
+it('limits reject accessors/unknown inherited names before traversal without invoking them', () => {
+  let getters = 0;
+  const limits = Object.defineProperty({}, 'maxConstraintWork', {
+    enumerable: true,
+    get() {
+      getters++;
+      return 1;
+    },
+  });
+  expect(() => compositionLimits(limits)).toThrow();
+  expect(getters).toBe(0);
+  expect(() => compositionLimits({ toString: 1 } as never)).toThrow();
+  expect(() => compositionLimits([] as never)).toThrow();
+  expect(() => compositionLimits(null as never)).toThrow();
+  const input = { seed: 17, settings, limits: { maxConstraintWork: 1 } };
+  const ring = Object.defineProperty({}, 'settings', {
+    enumerable: true,
+    get() {
+      getters++;
+      return settings;
+    },
+  });
+  expect(() => generateBattlefield(ring as never)).toThrow();
+  expect(getters).toBe(0);
+  expect(generateBattlefield(input)).toMatchObject({
+    ok: false,
+    diagnostics: [{ code: 'COMPOSITION_RESOURCE_LIMIT' }],
+  });
+});
+it('complete validation low cap fails before cloning/query allocations and never heals source', () => {
+  const before = JSON.stringify(asset);
+  expect(validateBattlefield(asset, { maxValidationWork: 1 })).toMatchObject({
+    ok: false,
+    diagnostics: [{ code: 'COMPOSITION_RESOURCE_LIMIT' }],
+  });
+  expect(JSON.stringify(asset)).toBe(before);
+  const meter = new Meter(10, 'attempts');
+  meter.take(6);
+  expect(() => meter.take(5)).toThrow();
+  expect(meter.used).toBe(10);
+});

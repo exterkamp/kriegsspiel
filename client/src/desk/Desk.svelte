@@ -5,6 +5,7 @@
   import InTray from './InTray.svelte';
   import OrdersDesk from './OrdersDesk.svelte';
   import Journal from './Journal.svelte';
+  import Roster from './Roster.svelte';
   import DeskClock from './DeskClock.svelte';
   import PausePanel from './PausePanel.svelte';
   import { VIEWS, isDeskView, isTypingTarget, viewForKey, type ViewId } from './views.js';
@@ -32,7 +33,6 @@
     if (sel) queueMicrotask(() => document.querySelector<HTMLElement>(sel)?.focus());
   }
 
-  const units = $derived($gameState.view?.ownUnits ?? []);
   const unread = $derived(unreadCount($gameState.dispatches, $trayMarks));
 </script>
 
@@ -78,14 +78,7 @@
   </section>
 {:else if $activeView === 'roster'}
   <section id="view-roster" class="paper" tabindex="-1" aria-label="Order of battle">
-    <h2>Order of battle</h2>
-    {#if units.length === 0}
-      <p>No formations reported yet.</p>
-    {:else}
-      <ul>
-        {#each units as u (u.id)}<li>{u.name}</li>{/each}
-      </ul>
-    {/if}
+    <Roster />
   </section>
 {:else if $activeView === 'journal'}
   <section id="view-journal" class="paper" tabindex="-1" aria-label="Journal">

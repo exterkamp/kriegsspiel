@@ -3,3 +3,7 @@ dist/
 .DS_Store
 .env
 backups/
+.local/
+.cache/
+vendor/settlemaker-runtime.tgz
+vendor/settlemaker-runtime.tgz.tmp

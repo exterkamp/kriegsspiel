@@ -1,0 +1,103 @@
+import { Point } from '../types/point.js';
+import { Polygon } from '../geom/polygon.js';
+import { WardType } from '../types/interfaces.js';
+import { interpolate } from '../geom/geom-utils.js';
+import { Ward } from './ward.js';
+import { SYMBOL_MANIFEST } from '../assets/symbol-manifest.js';
+import type { Model } from '../generator/model.js';
+import type { Patch } from '../generator/patch.js';
+import { buildCivicBlock } from '../generator/civic-blocks.js';
+
+export class Market extends Ward {
+  constructor(model: Model, patch: Patch) {
+    super(model, patch);
+    this.type = WardType.Market;
+  }
+
+  override createGeometry(): void {
+    if (this.model.params.development) {
+      buildCivicBlock(this, false);
+      return;
+    }
+    // Only the plaza becomes a true plaza with the cross; secondary Market
+    // wards keep the legacy statue/fountain object. `this.model.plaza ===
+    // this.patch` relies on object identity (===), which is valid because
+    // createWards assigns each patch the same Patch object instance
+    // throughout — model.plaza is never a copy.
+    if (this.model.plaza !== this.patch) {
+      this.createLegacyGeometry();
+      return;
+    }
+    const rng = this.rng;
+    let at = this.patch.shape.centroid;
+    if (rng.bool(0.3)) {
+      let v0: Point | null = null, v1: Point | null = null, maxLength = -1;
+      this.patch.shape.forEdge((p0, p1) => {
+        const len = Point.distance(p0, p1);
+        if (len > maxLength) { maxLength = len; v0 = p0; v1 = p1; }
+      });
+      at = interpolate(this.patch.shape.centroid, interpolate(v0!, v1!), 0.2 + rng.float() * 0.4);
+    }
+    const meta = SYMBOL_MANIFEST['sm-market-cross'];
+    const size = Math.max(...(meta.footprint ?? [3, 3]));
+    const rotationDeg = meta.rotation === 'snap-cardinal'
+      ? Math.floor(rng.float() * 4) * 90
+      : meta.rotation === 'invariant' ? Math.round(rng.float() * 360) : 0;
+    this.model.symbols.push({
+      id: 'sm-market-cross', at, scale: size, rotationDeg, zBand: 'structure',
+      wardType: WardType.Market,
+    });
+    this.model.claimedSites.push({ at, radius: size });
+    this.geometry = []; // open ground — the plaza is the point
+  }
+
+  private createLegacyGeometry(): void {
+    const rng = this.rng;
+    const statue = rng.bool(0.6);
+    const offset = statue || rng.bool(0.3);
+
+    let v0: Point | null = null;
+    let v1: Point | null = null;
+    if (statue || offset) {
+      let maxLength = -1;
+      this.patch.shape.forEdge((p0, p1) => {
+        const len = Point.distance(p0, p1);
+        if (len > maxLength) {
+          maxLength = len;
+          v0 = p0;
+          v1 = p1;
+        }
+      });
+    }
+
+    let object: Polygon;
+    if (statue) {
+      object = Polygon.rect(1 + rng.float(), 1 + rng.float());
+      object.rotate(Math.atan2(v1!.y - v0!.y, v1!.x - v0!.x));
+    } else {
+      object = Polygon.circle(1 + rng.float());
+    }
+
+    if (offset) {
+      const gravity = interpolate(v0!, v1!);
+      object.offset(interpolate(this.patch.shape.centroid, gravity, 0.2 + rng.float() * 0.4));
+    } else {
+      object.offset(this.patch.shape.centroid);
+    }
+
+    this.geometry = [object];
+  }
+
+  static override rateLocation(model: Model, patch: Patch): number {
+    for (const p of model.inner) {
+      if (p.ward instanceof Market && p.shape.borders(patch.shape)) {
+        return Infinity;
+      }
+    }
+    return model.plaza !== null
+      ? patch.shape.square / model.plaza.shape.square
+      : patch.shape.distance(model.center);
+  }
+
+  override getLabel() { return 'Market'; }
+}
