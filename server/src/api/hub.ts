@@ -106,11 +106,22 @@ export class Hub {
     } = { list: () => [], add: () => undefined },
   ) {}
 
+  /** Forwards per game, read from the lobby record once and kept in step by `handleForward`. */
+  private readonly forwardCache = new Map<string, Forward[]>();
+
+  private forwardsOf(gameId: string): Forward[] {
+    let list = this.forwardCache.get(gameId);
+    if (!list) {
+      list = [...this.forwards.list(gameId)];
+      this.forwardCache.set(gameId, list);
+    }
+    return list;
+  }
+
   /** The ids of papers HQ forwarded to the seat's formations. */
   private forwardedTo(gameId: string, conn: Connection): string[] {
     const units = conn.seat?.role === 'subordinate' ? (conn.seat.units ?? []) : [];
-    return this.forwards
-      .list(gameId)
+    return this.forwardsOf(gameId)
       .filter((f) => f.side === conn.side && units.includes(f.unit))
       .map((f) => f.dispatchId);
   }
@@ -567,18 +578,13 @@ export class Hub {
       this.send(conn, error('no_such_dispatch', 'you hold no such paper'));
       return;
     }
-    const already = this.forwards
-      .list(gameId)
-      .some(
-        (f) =>
-          f.side === conn.side && f.unit === command.unit && f.dispatchId === command.dispatchId,
-      );
+    const already = this.forwardsOf(gameId).some(
+      (f) => f.side === conn.side && f.unit === command.unit && f.dispatchId === command.dispatchId,
+    );
     if (!already) {
-      this.forwards.add(gameId, {
-        side: conn.side,
-        dispatchId: command.dispatchId,
-        unit: command.unit,
-      });
+      const forward = { side: conn.side, dispatchId: command.dispatchId, unit: command.unit };
+      this.forwards.add(gameId, forward);
+      this.forwardsOf(gameId).push(forward);
       this.notify(gameId);
     }
   }

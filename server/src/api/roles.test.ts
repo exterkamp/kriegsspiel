@@ -335,6 +335,28 @@ describe('forwarding from HQ', () => {
       code: 'no_such_dispatch',
     });
 
+    // A unit of the other side, or none at all, cannot be the addressee.
+    for (const unit of ['red-1', 'nowhere']) {
+      const before = lead.messages.filter((x) => x.kind === 'error').length;
+      lead.send({ kind: 'forwardDispatch', dispatchId: id, unit });
+      await lead.until((m) =>
+        m.filter((x) => x.kind === 'error').length > before ? true : undefined,
+      );
+      expect(lead.messages.filter((x) => x.kind === 'error').at(-1)).toMatchObject({
+        code: 'bad_unit',
+      });
+    }
+
+    // A paper forwarded to a formation this subordinate does not command (blue-3) stays away from them.
+    cos.send({ kind: 'forwardDispatch', dispatchId: id, unit: 'blue-3' });
+    const seen = sub.messages.length;
+    await lead.until((m) => (lead.lastView() && m.length > 0 ? true : undefined));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(sub.lastView()!.dispatches.map((d) => d.id)).not.toContain(id);
+    expect(
+      sub.messages.slice(seen).some((x) => x.kind === 'dispatch' && x.dispatch.id === id),
+    ).toBe(false);
+
     cos.send({ kind: 'forwardDispatch', dispatchId: id, unit: 'blue-2' });
     const forwarded = await sub.until((m) =>
       m.find((x) => x.kind === 'dispatch' && x.dispatch.id === id),

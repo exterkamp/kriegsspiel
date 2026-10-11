@@ -504,7 +504,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
     units: string[] | undefined,
     reply: FastifyReply,
   ) => {
-    if (rec.status !== 'lobby') return reply.code(409).send({ error: 'already_started' });
+    if (rec.status !== 'lobby' || starting.has(rec.id))
+      return reply.code(409).send({ error: 'already_started' });
     if (!authStore.seatsOf(rec.id).some((s) => s.side === side)) {
       return reply.code(409).send({ error: 'no_commander' });
     }
@@ -541,7 +542,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const rec = recordOf(req.params.id);
     if (!rec) return reply.code(404).send({ error: 'no_such_game' });
-    if (rec.status !== 'lobby') return reply.code(409).send({ error: 'already_started' });
+    if (rec.status !== 'lobby' || starting.has(rec.id))
+      return reply.code(409).send({ error: 'already_started' });
     if (!roleOf(rec, user.id)) return reply.code(404).send({ error: 'no_role' });
     lobby.put({
       ...rec,
@@ -582,7 +584,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (!body.success) {
       return reply.code(400).send({ error: 'bad_request', message: body.error.message });
     }
-    if (rec.status !== 'lobby') return reply.code(409).send({ error: 'already_started' });
+    if (rec.status !== 'lobby' || starting.has(rec.id))
+      return reply.code(409).send({ error: 'already_started' });
     if (!authStore.seatOf(rec.id, user.id) && !roleOf(rec, user.id)) {
       return reply.code(403).send({ error: 'no_seat' });
     }
