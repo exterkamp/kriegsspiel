@@ -373,7 +373,13 @@ export async function buildApp(options: AppOptions): Promise<App> {
     createdAtMs: rec.createdAtMs,
   });
 
-  server.get('/scenarios', async () => ({ scenarios: scenarioList() }));
+  server.get('/scenarios', async () => ({
+    scenarios: scenarioList(),
+    // Who plays a side nobody sits at: absent when this server has no computer opponent.
+    ...(options.scriptedOpponents === true
+      ? { opponent: options.aiAgents ? 'ai_commander' : 'scripted' }
+      : {}),
+  }));
 
   server.post('/games', async (req, reply) => {
     const user = auth.userOf(req);

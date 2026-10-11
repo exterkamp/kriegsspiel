@@ -4,6 +4,8 @@ import { MemoryGameStore } from '../game/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { buildApp, type App } from './app.js';
 
+type BuildOptions = Parameters<typeof buildApp>[0];
+
 const mailbox: Array<{ to: string; link: string }> = [];
 const mailer = {
   async sendLoginLink(to: string, link: string) {
@@ -19,11 +21,12 @@ afterEach(async () => {
   mailbox.length = 0;
 });
 
-async function start(scriptedOpponents = false) {
+async function start(scriptedOpponents = false, aiAgents?: BuildOptions['aiAgents']) {
   app = await buildApp({
     parser: new StubOrderParser(),
     store: new MemoryGameStore(),
     scriptedOpponents,
+    aiAgents,
     auth: { mailer },
   });
   return app.server.listen({ port: 0, host: '127.0.0.1' });
@@ -223,9 +226,30 @@ describe('lobby', () => {
   it('lists the scenarios', async () => {
     const base = await start();
     const res = await fetch(`${base}/scenarios`);
-    expect(await res.json()).toEqual({
-      scenarios: [{ id: 'hold-the-bridge', name: 'Hold the Bridge' }],
+    const body = (await res.json()) as { scenarios: Array<Record<string, unknown>> };
+    expect(body.scenarios).toHaveLength(1);
+    expect(body.scenarios[0]).toMatchObject({
+      id: 'hold-the-bridge',
+      name: 'Hold the Bridge',
+      sides: [
+        { id: 'blue', name: 'Blue', controller: 'human' },
+        { id: 'red', name: 'Red', controller: 'scripted' },
+      ],
+      defaults: { side: 'blue', rate: 12 },
     });
+    expect(typeof body.scenarios[0]!.briefing).toBe('string');
+    expect(body.scenarios[0]!.lengthMinutes).toBeGreaterThan(0);
+  });
+
+  it('says who plays the empty side on /scenarios', async () => {
+    const opponentOn = async (scripted: boolean, ai?: BuildOptions['aiAgents']) => {
+      await app?.server.close();
+      const base = await start(scripted, ai);
+      return ((await (await fetch(`${base}/scenarios`)).json()) as { opponent?: string }).opponent;
+    };
+    expect(await opponentOn(false)).toBeUndefined();
+    expect(await opponentOn(true)).toBe('scripted');
+    expect(await opponentOn(true, () => [])).toBe('ai_commander');
   });
 
   it('gives a started game the pause rules chosen at creation', async () => {

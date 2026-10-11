@@ -5,8 +5,10 @@ import type { GameSummary } from '../lobby/api.js';
 import { continueRows, type ContinueRow, type PlayedGame } from './continueList.js';
 import { disconnectGame } from './gameHandle.js';
 import GameMenu from './GameMenu.svelte';
+import NewGame from './NewGame.svelte';
 import MenuScreen from './MenuScreen.svelte';
 import SignIn from './SignIn.svelte';
+import type { CreateRequest, ScenarioOptions } from './newGame.js';
 import {
   initialShell,
   isLiveScreen,
@@ -23,6 +25,8 @@ export interface ShellDeps {
   fetchMe: () => Promise<Me | undefined>;
   fetchGames: () => Promise<Array<GameSummary | PlayedGame>>;
   fetchScenarios: () => Promise<Array<{ id: string; name: string }>>;
+  fetchScenarioOptions: () => Promise<ScenarioOptions>;
+  createGame: (req: CreateRequest) => Promise<string>;
   requestLink: (email: string) => Promise<string | undefined>;
   signOut: () => Promise<void>;
   /** Loads the 3D table and desk into `app` (it reads the URL itself). Called at most once per page. */
@@ -97,12 +101,21 @@ export async function startShell(deps: ShellDeps): Promise<Shell> {
           onSignOut: () => void signedOut(),
         },
       });
+    } else if (screen.name === 'new-game') {
+      mounted = mount(NewGame, {
+        target: app,
+        props: {
+          load: deps.fetchScenarioOptions,
+          create: deps.createGame,
+          onStarted: (game: string) => shell.go({ name: 'game', game }),
+          onBack: () => shell.go({ name: 'menu' }),
+        },
+      });
     } else if (screen.name === 'fixture') {
       deps.startFixture(app);
     } else if (isLiveScreen(screen)) {
       liveLoaded = true;
       void deps.startLive().then(() => {
-        if (screen.name === 'new-game') return;
         const host = document.createElement('div');
         document.body.append(host);
         gameMenu = {

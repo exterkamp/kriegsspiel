@@ -36,7 +36,7 @@ The orders desk is built: a form addressed to a named commander, free text, an o
 | URL | Screen |
 |-----|--------|
 | `/` (no parameters) | `sign-in` when signed out, otherwise `menu`. Never a half-loaded game. The emailed `/auth/verify` link redirects to `/`, so it lands on the menu. |
-| `/?lobby=1` | `new-game` (today the lobby form from `client/src/lobby`; the new game form task replaces it) |
+| `/?lobby=1` | `new-game` (the New game form, `shell/NewGame.svelte`) |
 | `/?new=1&side=&rate=` | `game`, creating a game first |
 | `/?game=<id>[&side=]` | `game`; a reload returns to the same game |
 | `/?game=<id>&over=1` | `game-over` (served by the live client until the game over screen task) |
@@ -45,6 +45,8 @@ The orders desk is built: a form addressed to a named commander, free text, an o
 Signed-out visitors are held at `sign-in` for every screen but `fixture`. Browser back and forward follow the URL. The live client (`liveClient.ts`, the 3D table and desk) is the game screen and cannot be unloaded, so a move to or from a live screen after it has loaded is a fresh page load.
 
 **Main menu** (`shell/Menu.svelte`, aged paper and serif to match the desk): New game; Continue, the player's unfinished games with scenario, side, game time and last played (hidden when there are none); the signed-in email with Sign out; and About, a paragraph on how the game works with a link to `docs/gameplay.md`. `GET /games` supplies `finished`, `gameTimeMs` and `lastPlayedMs` for each game, and Continue lists only started games that are not finished (`shell/continueList.ts`). Multiplayer entry points are not on the menu.
+
+**New game** (`shell/NewGame.svelte`, pure rules in `shell/newGame.ts`): Scenario (title, briefing, sides and expected length, from `GET /scenarios`; the client hard-codes none of it), Your side (only sides the scenario leaves to people when the server has a computer opponent), Clock rate (1:1, 4:1, 12:1 or a custom ratio, with a line such as "12:1 means one hour of battle passes in five minutes") and a note on who plays the other side (scripted opponent or AI commander, as reported by `/scenarios`). Defaults are the first scenario, Blue and 12:1. Start posts `POST /games` and opens the game; a double click makes one game, and a validation or server error (signed out, game limit, bad rate) is shown above the buttons with the form intact. Back returns to the menu. Multiplayer seats are not on this screen.
 
 **In-game menu** (`shell/GameMenu.svelte`): a Menu button, and Esc when the table is showing (in a desk view Esc still returns to the table). It offers Resume, Leave to main menu and Sign out. Leaving closes the WebSocket, then loads the menu; the game keeps running on the server. It is a modal dialog: focus starts on Resume and Esc closes it.
 
