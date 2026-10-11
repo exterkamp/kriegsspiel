@@ -56,6 +56,7 @@
   let data = $state<SourceState>({ connection: 'idle', stale: false, snapshot: null, error: null });
   let error = $state('');
   let storageStatus = $state('Preferences not loaded.');
+  let preferenceFailure = $state<string | null>(null);
   let highContrast = $state(false);
   let reducedMotion = $state(false);
   let letterShortcuts = $state(true);
@@ -191,12 +192,17 @@
         if (result.ok === true) {
           document = result.value.document;
           storageStatus = `Preferences saved (${result.value.durability}).`;
+          preferenceFailure = null;
         } else {
           storageStatus = `Preferences not saved: ${result.error.message}`;
+          preferenceFailure = storageStatus;
           if (result.error.code === 'conflict') document = null;
         }
       } catch {
-        if (alive) storageStatus = 'Preferences not saved: repository failed.';
+        if (alive) {
+          storageStatus = 'Preferences not saved: repository failed.';
+          preferenceFailure = storageStatus;
+        }
       }
     };
     saveQueue = saveQueue.then(save, save);
@@ -463,6 +469,7 @@
           if (choices.contrast === loadChoices.contrast) highContrast = document.highContrast;
           if (choices.motion === loadChoices.motion) reducedMotion = document.reducedMotion;
           storageStatus = `Preferences loaded (${loaded.value.durability}).`;
+          preferenceFailure = null;
           const camera = document.camera;
           if (
             choices.camera === loadChoices.camera &&
@@ -486,6 +493,7 @@
             loaded.ok === true
               ? 'Preferences rejected: incompatible version or scope.'
               : `Preferences unavailable: ${loaded.error.message}`;
+          preferenceFailure = storageStatus;
         }
         const opened = await opening;
         if (!alive) return;
@@ -549,6 +557,12 @@
       {:else}
         {sourceSeparator}no snapshot available{/if}
     </p>
+    {#if preferenceFailure}
+      <p class="notice preference-notice" role="status" aria-live="polite">{preferenceFailure}</p>
+    {/if}
+    {#if error}
+      <p class="notice error" role="status" aria-live="polite">{error}</p>
+    {/if}
   </header>
   <nav class="desk" aria-label="Desk objects">
     {#each routes as route (route.view)}<button
@@ -631,10 +645,6 @@
     </p>
   </main>
   {#if interaction && context && root && canvas}{@render interaction(context, root, canvas)}{/if}
-  <footer>
-    <p role="status" aria-live="polite">{storageStatus}</p>
-    <p class="error" role="status" aria-live="polite">{error}</p>
-  </footer>
   <dialog
     bind:this={settingsDialog}
     class="settings"
@@ -691,7 +701,6 @@
     display: block;
   }
   header,
-  footer,
   main {
     background: var(--paper);
     padding: 1rem 1.4rem;
@@ -820,7 +829,10 @@
   .settings button {
     margin-block-start: 0.75rem;
   }
-  .error {
+  .notice {
+    border-inline-start: 0.2rem solid currentColor;
+    padding-inline-start: 0.6rem;
+    font-size: 0.95rem;
     font-weight: bold;
   }
   .error {
@@ -843,7 +855,6 @@
     min-width: 0;
   }
   header,
-  footer,
   main {
     overflow-wrap: anywhere;
   }
@@ -868,7 +879,6 @@
       flex: 1;
     }
     header,
-    footer,
     main {
       padding: 0.8rem;
     }

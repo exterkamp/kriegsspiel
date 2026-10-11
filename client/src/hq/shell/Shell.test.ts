@@ -147,7 +147,9 @@ describe('fixture desk DOM', () => {
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
     const dialog = target.querySelector('dialog')!;
     expect(dialog.open).toBe(false);
-    expect(target.querySelectorAll('footer input')).toHaveLength(0);
+    expect(target.querySelector('footer')).toBeNull();
+    expect(target.querySelector('header [role="status"]')).toBeNull();
+    expect(target.querySelector('header')?.textContent).not.toContain('Preferences');
     trigger.focus();
     trigger.click();
     await flush();
@@ -236,7 +238,7 @@ describe('fixture desk DOM', () => {
     expect(target.querySelector('dialog [role="status"]')?.textContent).toContain('quota-exceeded');
     button('Close settings').click();
     await flush();
-    expect(target.querySelector('footer [role="status"]')?.textContent).toContain(
+    expect(target.querySelector('header .preference-notice')?.textContent).toContain(
       'Preferences not saved: quota-exceeded',
     );
     expect(target.querySelector('.hq')?.classList.contains('high-contrast')).toBe(true);
@@ -247,9 +249,12 @@ describe('fixture desk DOM', () => {
     expect(ports.getDocument().highContrast).toBe(true);
     expect(vi.mocked(ports.repository.save).mock.calls.at(-2)?.[1]).toBe(revision);
     button('Close settings').click();
-    expect(target.querySelector('footer [role="status"]')?.textContent).toContain(
+    await flush();
+    expect(target.querySelector('header .preference-notice')).toBeNull();
+    expect(target.querySelector('dialog [role="status"]')?.textContent).toContain(
       'Preferences saved',
     );
+    expect(target.querySelector('footer')).toBeNull();
   });
   it('keeps storage conflicts discoverable after closing and does not overwrite the competing revision', async () => {
     const ports = await render();
@@ -259,7 +264,7 @@ describe('fixture desk DOM', () => {
     target.querySelectorAll<HTMLInputElement>('dialog input')[1]!.click();
     await flush();
     button('Close settings').click();
-    expect(target.querySelector('footer [role="status"]')?.textContent).toContain('conflict');
+    expect(target.querySelector('header .preference-notice')?.textContent).toContain('conflict');
     const calls = vi.mocked(ports.repository.save).mock.calls.length;
     button('Settings').click();
     target.querySelectorAll<HTMLInputElement>('dialog input')[2]!.click();
@@ -403,7 +408,11 @@ describe('fixture desk DOM', () => {
     const ports = makePorts();
     vi.mocked(ports.repository.load).mockResolvedValue(fail(code));
     await render(ports);
-    expect(target.textContent).toContain(`Preferences unavailable: ${code}`);
+    expect(target.querySelector('header .preference-notice')?.textContent).toContain(
+      `Preferences unavailable: ${code}`,
+    );
+    expect(target.querySelector('dialog')?.open).toBe(false);
+    expect(target.querySelector('footer')).toBeNull();
     button('Orders').click();
     await flush();
     expect(ports.repository.save).not.toHaveBeenCalled();
@@ -413,7 +422,10 @@ describe('fixture desk DOM', () => {
     vi.mocked(ports.repository.save).mockResolvedValue(fail('quota-exceeded'));
     button('Orders').click();
     await flush();
-    expect(target.textContent).toContain('Preferences not saved: quota-exceeded');
+    expect(target.querySelector('header .preference-notice')?.textContent).toContain(
+      'Preferences not saved: quota-exceeded',
+    );
+    expect(target.querySelector('footer')).toBeNull();
   });
   it('rolls back failed transition and keeps canvas/focus usable', async () => {
     const ports = await render();
@@ -422,7 +434,8 @@ describe('fixture desk DOM', () => {
     button('Orders').click();
     await flush();
     expect(heading()).toBe('Map table');
-    expect(target.textContent).toContain('internal');
+    expect(target.querySelector('header .error')?.textContent).toContain('internal');
+    expect(target.querySelector('footer')).toBeNull();
     expect(target.querySelector('canvas')).toBe(canvas);
     expect(ports.surface.restoreCamera).toHaveBeenCalled();
     expect(ports.surface.setActive).toHaveBeenLastCalledWith(true);

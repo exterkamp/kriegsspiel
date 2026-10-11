@@ -259,3 +259,7 @@ Keyboard users can disable letter shortcuts for the session, while Tab/Enter and
 ### HQ feedback final baseline refresh — 2026-10-10
 
 Accepted main `6343c2b` adds lobby/hot-seat, live desk clock and admin replay. Preserve those implementations in the separate live composition, with explicit live routes (`?lobby=1`, `?new=1`, `?game=<id>`); root remains the scoped HQ fixture. This extends the already reviewed renderer/composition split, without changing HQ fixture storage or inventing live service adapters. Bootstrap checks include lobby and both hot-seat side URLs; independent review and full checks gate publication.
+
+### HQ Settings status placement — 2026-10-10
+
+**Owner refinement.** Remove the remaining bottom preferences status bar. Routine load/save status is shown only inside Settings. Failed preference operations and general HQ errors remain conditional notices in the existing header, including while Settings is closed; successful preference recovery clears its notice. This changes presentation without changing persistence, revisions or recovery behavior.
