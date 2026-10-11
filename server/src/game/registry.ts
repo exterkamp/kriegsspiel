@@ -43,3 +43,8 @@ export function loadScenarioById(id: string): GameState {
   if (!load) throw new Error(`unknown scenario: ${id}`);
   return load();
 }
+
+/** The scenarios a game can be made from. */
+export function scenarioList(): Array<{ id: string; name: string }> {
+  return [{ id: holdTheBridge.id, name: holdTheBridge.name }];
+}

@@ -1,12 +1,17 @@
 <script lang="ts">
-  import { activeView, gameState } from './store.js';
+  import { activeView, gameState, trayMarks } from './store.js';
+  import { unreadCount } from './tray.js';
+  import InTray from './InTray.svelte';
+  import OrdersDesk from './OrdersDesk.svelte';
+  import { deliveryStatus } from './orders.js';
+  import DeskClock from './DeskClock.svelte';
   import { VIEWS, isDeskView, isTypingTarget, viewForKey, type ViewId } from './views.js';
-  import { formatGameTime } from '../net/state.js';
+  import { formatGameTime, gameNowMs } from '../net/state.js';
 
   /** What to focus when a view opens, so keyboard users land inside it. */
   const FOCUS: Record<string, string> = {
     inTray: '#tray',
-    orders: '#order-text',
+    orders: '#desk-order-text',
     roster: '#view-roster',
     journal: '#view-journal',
     conference: '#view-conference',
@@ -27,23 +32,41 @@
   }
 
   const units = $derived($gameState.view?.ownUnits ?? []);
+  // Delivery status is read against game time, so the journal re-reads it now and then.
+  let wall = $state(Date.now());
+  $effect(() => {
+    const t = setInterval(() => (wall = Date.now()), 1000);
+    return () => clearInterval(t);
+  });
+  const nowGame = $derived($gameState.clock ? gameNowMs($gameState.clock, wall) : 0);
   const journal = $derived(
     [
-      ...$gameState.pending.map((p) => ({
-        at: p.sentAtGame,
-        text: `Order sent: ${p.text}`,
-      })),
+      ...$gameState.pending.map((p) => {
+        const to = p.toName ? ` to ${p.toName}` : '';
+        const how = p.courier ? ` by ${p.courier === 'fast' ? 'fast rider' : 'steady courier'}` : '';
+        const status = deliveryStatus(p, nowGame);
+        return {
+          at: p.sentAtGame,
+          text: `Order sent${to}${how}: ${p.text}`,
+          progress: p.etaGame === undefined ? undefined : status.fraction,
+          status: status.label,
+        };
+      }),
       ...$gameState.dispatches.map((d) => ({
         at: d.receivedAtGame,
         text: `${d.from}: ${d.text}`,
+        progress: undefined as number | undefined,
+        status: '',
       })),
     ].sort((a, b) => b.at - a.at),
   );
-  const unread = $derived($gameState.dispatches.filter((d) => !$gameState.read.has(d.id)).length);
+  const unread = $derived(unreadCount($gameState.dispatches, $trayMarks));
 </script>
 
 <svelte:window onkeydown={onKey} />
 
+<div class="dock">
+<DeskClock />
 <nav class="desk-bar" aria-label="Desk">
   {#each VIEWS as v (v.id)}
     <button
@@ -58,10 +81,19 @@
     </button>
   {/each}
 </nav>
+</div>
 
 <div class="fade" class:on={isDeskView($activeView)} aria-hidden="true"></div>
 
-{#if $activeView === 'roster'}
+{#if $activeView === 'inTray'}
+  <section id="tray" class="paper wide" tabindex="-1" aria-label="In-tray">
+    <InTray />
+  </section>
+{:else if $activeView === 'orders'}
+  <section id="view-orders" class="paper" tabindex="-1" aria-label="Orders desk">
+    <OrdersDesk />
+  </section>
+{:else if $activeView === 'roster'}
   <section id="view-roster" class="paper" tabindex="-1" aria-label="Order of battle">
     <h2>Order of battle</h2>
     {#if units.length === 0}
@@ -79,7 +111,18 @@
       <p>Nothing recorded yet.</p>
     {:else}
       <ul>
-        {#each journal as j, i (i)}<li><small>{formatGameTime(j.at)}</small> {j.text}</li>{/each}
+        {#each journal as j, i (i)}
+          <li>
+            <small>{formatGameTime(j.at)}</small>
+            {j.text}
+            {#if j.status}
+              <div class="delivery">
+                {#if j.progress !== undefined}<progress max="1" value={j.progress} aria-label="Delivery progress"></progress>{/if}
+                <small>{j.status}</small>
+              </div>
+            {/if}
+          </li>
+        {/each}
       </ul>
     {/if}
   </section>
@@ -91,17 +134,24 @@
 {/if}
 
 <style>
-  .desk-bar {
+  .dock {
     position: fixed;
     left: 50%;
     bottom: 8px;
     transform: translateX(-50%);
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: max-content;
+    max-width: calc(100% - 16px);
+    z-index: 5;
+  }
+  .desk-bar {
+    display: flex;
     gap: 6px;
     flex-wrap: wrap;
     justify-content: center;
-    max-width: calc(100% - 16px);
-    z-index: 5;
   }
   button {
     background: #efe6c8;
@@ -162,11 +212,23 @@
     z-index: 3;
     animation: slide-in 450ms ease-out;
   }
+  .paper.wide {
+    width: min(760px, calc(100% - 16px));
+  }
   .paper:focus-visible {
     outline: 3px solid #ffd76a;
   }
   .paper h2 {
     margin: 0 0 8px;
+  }
+  .delivery {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 2px 0 6px;
+  }
+  .delivery progress {
+    width: 8em;
   }
   .paper ul {
     margin: 0;

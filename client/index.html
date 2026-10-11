@@ -84,9 +84,7 @@
         top: 8px;
         right: 8px;
       }
-      #clock,
-      #orders,
-      #tray {
+      #orders {
         position: fixed;
         background: rgba(42, 33, 24, 0.88);
         color: #efe6c8;
@@ -95,9 +93,37 @@
         border-radius: 4px;
         box-sizing: border-box;
       }
-      #clock {
-        top: 8px;
-        right: 8px;
+      #lobby,
+      #sides {
+        position: fixed;
+        background: rgba(42, 33, 24, 0.95);
+        color: #efe6c8;
+        font-size: 14px;
+        padding: 16px;
+        box-sizing: border-box;
+      }
+      #lobby {
+        top: 48px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(560px, calc(100% - 32px));
+        max-height: calc(100% - 64px);
+        overflow: auto;
+      }
+      #lobby label {
+        display: block;
+        margin: 6px 0;
+      }
+      #lobby a,
+      #account a {
+        color: #efe6c8;
+      }
+      #sides {
+        left: 8px;
+        bottom: 8px;
+        display: flex;
+        gap: 8px;
+        padding: 8px;
       }
       #orders {
         left: 8px;
@@ -106,15 +132,7 @@
         max-height: 45%;
         overflow: auto;
       }
-      #tray {
-        right: 8px;
-        top: 44px;
-        bottom: 8px;
-        width: min(320px, 45%);
-        overflow: auto;
-      }
-      #orders h2,
-      #tray h2 {
+      #orders h2 {
         margin: 0 0 4px;
         font-size: 14px;
       }
@@ -124,79 +142,22 @@
         box-sizing: border-box;
         margin-bottom: 4px;
       }
-      #orders ul,
-      #tray ul {
+      #orders ul {
         list-style: none;
         margin: 4px 0 0;
         padding: 0;
       }
-      #tray li {
-        border-top: 1px solid #5a4a36;
-        padding: 4px 0;
-        cursor: pointer;
-      }
-      #tray li.unread {
-        font-weight: bold;
-      }
-      #tray small {
-        display: block;
-        opacity: 0.75;
-        font-weight: normal;
-      }
       #order-err {
         color: #ff9a8a;
       }
-      /* Orders and in-tray are desk objects: shown as papers over the dollied-in desk, hidden at the table. */
-      #app:not([data-view='orders']) #orders,
-      #app:not([data-view='inTray']) #tray {
+      /* The orders desk is a Svelte paper (OrdersDesk.svelte); the plain HUD panel stays in the DOM but unseen. */
+      #orders {
         display: none;
       }
-      #app[data-view='orders'] #orders,
-      #app[data-view='inTray'] #tray {
-        left: 50%;
-        right: auto;
-        top: 8%;
-        bottom: auto;
-        transform: translateX(-50%);
-        width: min(560px, calc(100% - 16px));
-        max-height: 70%;
-        background: #f4eedb;
-        color: #2a2014;
-        padding: 16px 20px;
-        z-index: 3;
-      }
-      #app[data-view='orders'] #orders:focus-visible,
-      #app[data-view='inTray'] #tray:focus-visible {
-        outline: 3px solid #ffd76a;
-      }
-      #app[data-view='inTray'] #tray li {
-        border-top-color: #cbbf9b;
-      }
-      #app[data-view='orders'] #order-err {
-        color: #a83232;
-      }
       @media (max-width: 600px) {
-        #clock {
-          top: 44px;
-          left: 8px;
-          right: auto;
-        }
-        #tray {
-          top: auto;
-          bottom: 8px;
-          right: 8px;
-          width: calc(100% - 16px);
-          max-height: 22%;
-        }
         #orders {
           bottom: calc(22% + 16px);
           max-height: 30%;
-        }
-        #app[data-view='orders'] #orders,
-        #app[data-view='inTray'] #tray {
-          top: 8%;
-          bottom: auto;
-          max-height: 70%;
         }
       }
     </style>

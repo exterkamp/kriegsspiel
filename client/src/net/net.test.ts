@@ -2,7 +2,7 @@
 import { PROTOCOL_VERSION, type Dispatch, type ServerMessage } from '@kriegsspiel/protocol';
 import { describe, expect, it } from 'vitest';
 import { fixtureView } from '../table/fixture.js';
-import { Hud, buildOrderText, clockText, gameOverText, orderPrefix } from '../hud/hud.js';
+import { Hud, buildOrderText, gameOverText, orderPrefix } from '../hud/hud.js';
 import { parseSession, wsUrl } from '../session.js';
 import { GameConnection, type WebSocketLike } from './connection.js';
 import {
@@ -11,7 +11,6 @@ import {
   gameNowMs,
   initialState,
   withPendingOrder,
-  withRead,
 } from './state.js';
 
 const v = PROTOCOL_VERSION;
@@ -113,18 +112,8 @@ describe('clock', () => {
     expect(gameNowMs({ gameMs: 1000, localWallMs: 0, rate: 12, status: 'paused' }, 500)).toBe(1000);
   });
 
-  it('formats game time and the clock panel', () => {
+  it('formats game time', () => {
     expect(formatGameTime(26 * 3_600_000 + 5 * 60_000)).toBe('Day 2 02:05');
-    const s = applyServerMessage(
-      initialState,
-      {
-        v,
-        kind: 'clockState',
-        clock: { gameMsAtAnchor: 0, wallMsAtAnchor: 0, rate: 4, status: 'running' },
-      },
-      0,
-    );
-    expect(clockText(s, 60_000)).toBe('Day 1 00:04 · 4:1 · running');
   });
 });
 
@@ -225,36 +214,11 @@ describe('Hud', () => {
   function mount() {
     document.body.innerHTML = '<div id="root"></div>';
     const sent: Array<[string | undefined, string]> = [];
-    const opened: Dispatch[] = [];
     const hud = new Hud(document.getElementById('root')!, {
       onSendOrder: (u, t) => (sent.push([u, t]), undefined),
-      onOpenDispatch: (d) => opened.push(d),
     });
-    return { hud, sent, opened };
+    return { hud, sent };
   }
-
-  it('lists dispatches with written and received times and read state, and opens on click', () => {
-    const { hud, opened } = mount();
-    let s = applyServerMessage(
-      initialState,
-      {
-        v,
-        kind: 'viewUpdate',
-        view: { ...fixtureView, dispatches: [disp('d1', { location: { x: 5, y: 6 } })] },
-      },
-      0,
-    );
-    hud.render(s, 0);
-    const li = document.querySelector<HTMLElement>('#tray-list li')!;
-    expect(li.className).toBe('unread');
-    expect(li.textContent).toContain('written Day 1 00:01');
-    expect(li.textContent).toContain('received Day 1 00:02');
-    li.click();
-    expect(opened.map((d) => d.id)).toEqual(['d1']);
-    s = withRead(s, 'd1');
-    hud.render(s, 0);
-    expect(document.querySelector('#tray-list li')!.className).toBe('read');
-  });
 
   it('escapes dispatch text and shows pending orders and the clock', () => {
     const { hud } = mount();
@@ -271,18 +235,13 @@ describe('Hud', () => {
       0,
     );
     s = withPendingOrder(s, { orderId: 'o1', text: '1st Battalion, advance', sentAtGame: 60_000 });
-    hud.render(s, 0);
-    expect(document.querySelector('#tray-list img')).toBeNull();
+    hud.render(s);
     expect(document.querySelector('#pending')!.textContent).toContain('1st Battalion, advance');
-    expect(document.querySelector('#clock-text')!.textContent).toBe('Day 1 01:00 · 1:1 · paused');
   });
 
   it('sends the order box text with the chosen unit and clears it', () => {
     const { hud, sent } = mount();
-    hud.render(
-      applyServerMessage(initialState, { v, kind: 'viewUpdate', view: fixtureView }, 0),
-      0,
-    );
+    hud.render(applyServerMessage(initialState, { v, kind: 'viewUpdate', view: fixtureView }, 0));
     hud.selectUnit('blue-2');
     const text = document.querySelector<HTMLTextAreaElement>('#order-text')!;
     expect(text.value).toBe('2nd Battalion, ');
@@ -301,7 +260,7 @@ describe('Hud', () => {
       0,
     );
     const q = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
-    hud.render(running, 0);
+    hud.render(running);
     expect(q('#order-text').hasAttribute('disabled')).toBe(false);
     expect(q('#order-send').hasAttribute('disabled')).toBe(false);
     expect(q('#order-unit').hasAttribute('disabled')).toBe(false);
@@ -312,7 +271,7 @@ describe('Hud', () => {
       { v, kind: 'gameOver', winner: 'blue', reason: 'objective-held', atGame: 3_600_000 },
       0,
     );
-    hud.render(over, 0);
+    hud.render(over);
     expect(q('#order-text').hasAttribute('disabled')).toBe(true);
     expect(q('#order-send').hasAttribute('disabled')).toBe(true);
     expect(q('#order-unit').hasAttribute('disabled')).toBe(true);
@@ -328,10 +287,7 @@ describe('Hud', () => {
 
   it('replaces the auto-inserted prefix when another unit is selected, but keeps typed text', () => {
     const { hud } = mount();
-    hud.render(
-      applyServerMessage(initialState, { v, kind: 'viewUpdate', view: fixtureView }, 0),
-      0,
-    );
+    hud.render(applyServerMessage(initialState, { v, kind: 'viewUpdate', view: fixtureView }, 0));
     const text = document.querySelector<HTMLTextAreaElement>('#order-text')!;
     hud.selectUnit('blue-1');
     hud.selectUnit('blue-2');
@@ -350,5 +306,18 @@ describe('Hud', () => {
       '1st Battalion, advance',
     );
     expect(buildOrderText(fixtureView, undefined, 'advance')).toBe('advance');
+  });
+});
+
+describe('catch-up', () => {
+  it('records what arrived while away and posts a notice', () => {
+    const s = applyServerMessage(
+      initialState,
+      { v, kind: 'catchUp', sinceGame: 3_600_000, atGame: 7_200_000, dispatchIds: ['d1', 'd2'] },
+      0,
+    );
+    expect(s.catchUp?.dispatchIds).toEqual(['d1', 'd2']);
+    expect(s.notices[0]!.message).toContain('2 new dispatches');
+    expect(s.notices[0]!.message).toContain('Day 1 01:00');
   });
 });

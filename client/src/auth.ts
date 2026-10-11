@@ -65,6 +65,9 @@ export function showAccountBar(app: HTMLElement, me: Me, onGone: () => void): vo
   bar.id = 'account';
   const who = document.createElement('span');
   who.textContent = me.email;
+  const games = document.createElement('a');
+  games.href = '/?lobby=1';
+  games.textContent = 'Games';
   const out = document.createElement('button');
   out.textContent = 'Sign out';
   out.addEventListener('click', () => void signOut().then(onGone));
@@ -74,6 +77,6 @@ export function showAccountBar(app: HTMLElement, me: Me, onGone: () => void): vo
     if (!confirm('Delete your account and leave your games? This cannot be undone.')) return;
     void deleteAccount().then((ok) => ok && onGone());
   });
-  bar.append(who, out, del);
+  bar.append(who, games, out, del);
   app.append(bar);
 }

@@ -3,6 +3,8 @@ import {
   GARBLE_MAX_M,
   GARBLE_MIN_M,
   INTERCEPT_CHECK_MS,
+  MAX_GARBLE,
+  MAX_LOSS,
   courierPosition,
   destinationOf,
   interceptChance,
@@ -54,6 +56,28 @@ export interface Order {
    * (move, hold, withdraw) and keeps each `when` / `at` as a standing order until it fires.
    */
   intents: OrderIntent[];
+  /** The courier the sender chose. Absent means the ordinary ride. */
+  courier?: CourierChoice;
+}
+
+/** A fast courier rides hard and is more likely to be lost or to garble; a safe one takes the quiet way. */
+export type CourierChoice = 'fast' | 'safe';
+
+/** Ride speed and hazard, as multiples of the ordinary courier's. */
+export const COURIER_CHOICES: Record<CourierChoice, { speed: number; risk: number }> = {
+  fast: { speed: 1.5, risk: 2 },
+  safe: { speed: 0.75, risk: 0.5 },
+};
+
+/** The ride's loss and garble chances scaled by the courier's hazard, still held under the caps. */
+export function choiceRisk(
+  base: { loss: number; garble: number },
+  hazard: number,
+): { loss: number; garble: number } {
+  return {
+    loss: Math.min(MAX_LOSS, base.loss * hazard),
+    garble: Math.min(MAX_GARBLE, base.garble * hazard),
+  };
 }
 
 /**
@@ -102,7 +126,13 @@ function undeliverable(world: GameState, order: Order): string | undefined {
 }
 
 /** The courier's ride as legs, timed so the last one ends when the whole route's cost is ridden. */
-function ridesAlong(map: TerrainMap, waypoints: Point[], cost: number, start: number): Leg[] {
+function ridesAlong(
+  map: TerrainMap,
+  waypoints: Point[],
+  cost: number,
+  start: number,
+  speed = 1,
+): Leg[] {
   const costs = waypoints.slice(1).map((p, i) => legCost(map, waypoints[i]!, p) ?? 0);
   const total = costs.reduce((a, b) => a + b, 0) || 1;
   const legs: Leg[] = [];
@@ -110,7 +140,8 @@ function ridesAlong(map: TerrainMap, waypoints: Point[], cost: number, start: nu
   let from = start;
   for (const [i, c] of costs.entries()) {
     ridden += c;
-    const arriveAt = start + Math.round(((cost * (ridden / total)) / 1000) * COURIER_MS_PER_METRE);
+    const arriveAt =
+      start + Math.round((((cost * (ridden / total)) / 1000) * COURIER_MS_PER_METRE) / speed);
     legs.push({ from: waypoints[i]!, to: waypoints[i + 1]!, startedAt: from, arriveAt });
     from = arriveAt;
   }
@@ -146,11 +177,13 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     const route = hq && findPath(world.map, hq, unit.center);
     if (!hq || !route) return failed(world, order, 'no route for courier');
 
-    const legs = ridesAlong(world.map, route.waypoints, route.cost, ev.time);
+    const choice = order.courier ? COURIER_CHOICES[order.courier] : { speed: 1, risk: 1 };
+    const legs = ridesAlong(world.map, route.waypoints, route.cost, ev.time, choice.speed);
     const length = route.waypoints
       .slice(1)
       .reduce((a, p, i) => a + distance(route.waypoints[i]!, p), 0);
-    const risk = rideRisk(world, unit, length, route.cost);
+    const base = rideRisk(world, unit, length, route.cost);
+    const risk = choiceRisk(base, choice.risk);
     const courier: Courier = {
       id: `courier-${order.id}`,
       side: order.side,

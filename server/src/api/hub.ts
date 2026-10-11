@@ -51,13 +51,15 @@ export class Hub {
 
   /** Each side's marks, loaded from the store on first use and kept here (the hub is their only writer). */
   private readonly marks = new Map<string, Promise<Mark[]>>();
+  /** Game time each side was last pushed a view at; written to the store when its last connection closes. */
+  private readonly seen = new Map<string, number>();
   /** Saves run one after another per side, so the last write is the newest list. */
   private readonly saves = new Map<string, Promise<void>>();
 
   constructor(
     private readonly lookup: (gameId: string) => GameActor | undefined,
     private readonly onError: (gameId: string, e: unknown) => void,
-    private readonly store?: Pick<GameStore, 'saveMarks' | 'loadMarks'>,
+    private readonly store?: Pick<GameStore, 'saveMarks' | 'loadMarks' | 'saveSeen' | 'loadSeen'>,
   ) {}
 
   private marksOf(gameId: string, side: SideId): Promise<Mark[]> {
@@ -116,10 +118,18 @@ export class Hub {
       gameOverSent: false,
     };
     const set = this.conns.get(gameId) ?? new Set();
+    // A side with a connection already open is not away, so it gets no catch-up.
+    const away = ![...set].some((c) => c.side === side);
+    const seenKey = `${gameId}\0${side}`;
+    const seenInMemory = this.seen.get(seenKey);
     set.add(conn);
     this.conns.set(gameId, set);
     const detach = () => {
-      set.delete(conn);
+      if (!set.delete(conn)) return;
+      const at = this.seen.get(seenKey);
+      if (at !== undefined && ![...set].some((c) => c.side === side)) {
+        void this.store?.saveSeen(gameId, side, at).catch((e) => this.onError(gameId, e));
+      }
       if (set.size === 0 && this.conns.get(gameId) === set) this.conns.delete(gameId);
     };
     socket.on('close', detach);
@@ -133,10 +143,34 @@ export class Hub {
         this.send(conn, error('internal', 'the server could not handle that message'));
       });
     });
+    const sinceP: Promise<number | undefined> = !away
+      ? Promise.resolve(undefined)
+      : seenInMemory !== undefined
+        ? Promise.resolve(seenInMemory)
+        : (this.store?.loadSeen(gameId, side) ?? Promise.resolve(undefined));
     this.push(gameId, conn);
+    void sinceP
+      .then((since) => this.sendCatchUp(gameId, conn, since))
+      .catch((e) => this.onError(gameId, e));
     void this.marksOf(gameId, side)
       .then((marks) => this.send(conn, { v: PROTOCOL_VERSION, kind: 'marks', marks: [...marks] }))
       .catch((e) => this.onError(gameId, e));
+  }
+
+  /** Tell a returning side what arrived while it was away: dispatches delivered after its last visit. */
+  private sendCatchUp(gameId: string, conn: Connection, since: number | undefined): void {
+    const game = this.lookup(gameId);
+    if (since === undefined || !game) return;
+    const view = sideViewOf(game.state, conn.side, game.gameClock.snapshot());
+    if (view.atGame <= since) return;
+    const dispatchIds = view.dispatches.filter((d) => d.receivedAtGame > since).map((d) => d.id);
+    this.send(conn, {
+      v: PROTOCOL_VERSION,
+      kind: 'catchUp',
+      sinceGame: since,
+      atGame: view.atGame,
+      dispatchIds,
+    });
   }
 
   /** The game changed (a tick or a command): bring every connection up to date. */
@@ -148,6 +182,19 @@ export class Hub {
   closeGame(gameId: string, code = 1001, reason = 'game closed'): void {
     for (const conn of [...(this.conns.get(gameId) ?? [])]) conn.socket.close(code, reason);
     this.conns.delete(gameId);
+  }
+
+  /** Save the seen time of every side that still has a connection, so a restart does not lose it. */
+  async flushSeen(): Promise<void> {
+    const saves: Promise<void>[] = [];
+    for (const [gameId, set] of this.conns) {
+      for (const side of new Set([...set].map((c) => c.side))) {
+        const at = this.seen.get(`${gameId}\0${side}`);
+        if (at !== undefined && this.store)
+          saves.push(this.store.saveSeen(gameId, side, at).catch((e) => this.onError(gameId, e)));
+      }
+    }
+    await Promise.all(saves);
   }
 
   closeAll(): void {
@@ -165,6 +212,7 @@ export class Hub {
     try {
       const clock: ClockState = game.gameClock.snapshot();
       const view = sideViewOf(game.state, conn.side, clock);
+      this.seen.set(`${gameId}\0${conn.side}`, view.atGame);
       const clockJson = JSON.stringify(clock);
       if (clockJson !== conn.lastClock) {
         // The first push carries the clock inside the view.
@@ -259,7 +307,12 @@ export class Hub {
     }
     let result;
     try {
-      result = await game.submit({ kind: 'order', side: conn.side, text: command.text });
+      result = await game.submit({
+        kind: 'order',
+        side: conn.side,
+        text: command.text,
+        ...(command.courier ? { courier: command.courier } : {}),
+      });
     } catch (e) {
       this.send(conn, error('game_closed', e instanceof Error ? e.message : 'game is closed'));
       return;
