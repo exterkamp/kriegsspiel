@@ -61,3 +61,6 @@ Verified once on 2026-10-10: a game was created, backed up, the database file de
 ## Known limits
 
 Accounts and seats are stored in the same database file, so they survive a restart and are included in backups. The server does not yet reload stored games when it restarts, so a restart or restore keeps the data for replay and inspection but players need a new game.
+## Map distribution gate
+
+The container build bootstraps the pinned map source before installing the root dependencies. This makes the source-review recipe reproducible; publishing or distributing a combined browser build remains gated by the owner's licensing decision (D23). No container publication or deployment is part of Epic #132's review PR.

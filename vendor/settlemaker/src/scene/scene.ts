@@ -1,0 +1,129 @@
+import type { LocalBounds } from '../generator/bounds.js';
+import type { BuildingCapacity } from '../generator/model.js';
+
+/**
+ * Versioned semantic scene: WHAT is where, never how it looks. This is the
+ * spec's long-term integration contract — a future AFMG-side assembler
+ * consumes this same shape. Additive evolution only; bump SCENE_VERSION on
+ * breaking change.
+ */
+export const SCENE_VERSION = 2 as const;
+
+export interface ScenePoint { x: number; y: number }
+
+export interface WaterLayer {
+  /** Polygon grouping, including holes, when supplied by the physical planner. */
+  polygons?: ScenePoint[][][];
+  /** Even-odd rings in output coords; holes = islands. Empty = landlocked. */
+  rings: ScenePoint[][];
+  /** True when synthesized from oceanBearing rather than caller geometry. */
+  synthetic: boolean;
+}
+
+export interface FieldPlot {
+  /** Native biome field tile; pattern pitch stays independent of parcel size. */
+  glyph?: string;
+  ring: ScenePoint[];
+  /** Furrow-hatch direction in degrees, from the plot's OBB. */
+  angleDeg: number;
+  /** false → plot ground draws but furrow hatch is suppressed (windmill plot). */
+  hatch?: boolean;
+}
+/** @deprecated Always empty since settlemaker 0.8.0 — fields carry angleDeg instead of furrow segments. */
+export interface Furrow { start: ScenePoint; end: ScenePoint }
+export interface GreenFeature {
+  /** A civic square occupies open ground but is paved rather than grassed. */
+  surface?: 'paved';
+  ring: ScenePoint[];
+  paths?: ScenePoint[][];
+  pathWidth?: number;
+}
+
+export interface VegetationInstance {
+  at: ScenePoint;
+  /** Glyph id (refined canopy) or legacy unit-box kind ('tree'). */
+  kind: string;
+  scale: number;       // world-unit size of the whole glyph box
+  rotationDeg: number;
+}
+export interface SymbolInstance {
+  materialVariant?: number;
+  id: string;          // glyph id, e.g. 'sm-well'
+  at: ScenePoint;
+  scale: number;       // world-unit art-box width; height defaults to the same
+  scaleY?: number;
+  buildingId?: string;
+  rotationDeg: number;
+  zBand: 'structure' | 'overlay';
+}
+
+export interface RoadFeature {
+  id?: string;
+  reservedWidthM?: number;
+  surfaceWidthM?: number;
+  setbackM?: number;
+  fromNodeId?: string;
+  toNodeId?: string;
+  crossingId?: string;
+  routeIds?: string[];
+  path: ScenePoint[];
+  /** artery = trunk; road = external approach; alley = local street or block service lane. */
+  kind: 'artery' | 'road' | 'alley';
+  /** Full reserved street surface, in local mesh units. */
+  width?: number;
+}
+
+export interface BuildingFeature {
+  /** Same deterministic identity as GeoJSON building_id. */
+  id?: string;
+  ring: ScenePoint[];
+  /** Ward type string (WardType value) — semantic, drives styling/symbols. */
+  kind: string;
+  landmark: boolean;
+  glyphBacked?: true;
+}
+
+export interface PierFeature { ring: ScenePoint[] }
+
+export interface WallGate {
+  /** Endpoints of the gate bar, precomputed from wall direction. */
+  p1: ScenePoint;
+  p2: ScenePoint;
+  routeIds: string[];
+}
+
+export interface WallFeature {
+  material?: 'curtain' | 'rubble' | 'palisade';
+  polylines: ScenePoint[][];
+  towers: ScenePoint[];
+  gates: WallGate[];
+  /** Citadel walls render heavier towers. */
+  large: boolean;
+}
+
+export interface Scene {
+  buildingCapacity?: BuildingCapacity;
+  version: typeof SCENE_VERSION;
+  name?: string;
+  seed: number;
+  population: number;
+  biome?: string;
+  /** City scale estimate for glyph minimum sizes, not a surveyed measurement. */
+  metersPerUnit?: number;
+  bounds: LocalBounds;
+  layers: {
+    water: WaterLayer;
+    fields: FieldPlot[];
+    /** @deprecated Always empty since settlemaker 0.8.0 — fields carry angleDeg instead. */
+    furrows: Furrow[];
+    greens: GreenFeature[];
+    vegetation: VegetationInstance[];
+    symbols: SymbolInstance[];
+    roads: RoadFeature[];
+    buildings: BuildingFeature[];
+    piers: PierFeature[];
+    walls: WallFeature[];
+    /** Bank-to-bank crossings; absent on older version-2 scenes. */
+    bridges?: Array<{id:string;path:ScenePoint[];width:number}>;
+  };
+}

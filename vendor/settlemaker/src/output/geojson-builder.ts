@@ -1,0 +1,428 @@
+import { cityLocalStreets } from '../generator/city-streets.js';
+import { VILLAGE_POP_CEILING } from '../input/settlement-engine.js';
+import type { Feature, FeatureCollection, Polygon as GeoPolygon } from 'geojson';
+import type { Polygon } from '../geom/polygon.js';
+import type { Model, BuildingCapacity } from '../generator/model.js';
+import type { CurtainWall, GateMeta } from '../generator/curtain-wall.js';
+import type { GenerationParams } from '../generator/generation-params.js';
+import { computeLocalBounds, computeDiameterLocal } from '../generator/bounds.js';
+import type { LocalBounds } from '../generator/bounds.js';
+import { computeSettlementScale } from './settlement-tiler.js';
+import { Castle } from '../wards/castle.js';
+import { Park } from '../wards/park.js';
+import { CommonWard } from '../wards/common-ward.js';
+import { Harbour } from '../wards/harbour.js';
+import { Point } from '../types/point.js';
+import { IdAllocator, buildingIds } from './id-allocator.js';
+import { selectPois, regimeFor } from '../poi/poi-selector.js';
+import { FLOATING_POI_KINDS } from '../poi/poi-kinds.js';
+import { NO_SHIFT, applyOutputShift, type OriginShift } from '../generator/origin-shift.js';
+
+/**
+ * Version of the output document shape. Bump whenever a breaking change lands
+ * (renamed properties, dropped fields) so consumers can gate their ingestion.
+ */
+export const GEOJSON_SCHEMA_VERSION = 4;
+
+/**
+ * Source-of-truth library version. Kept in sync with package.json manually —
+ * cheaper than a JSON import assertion and lets tests pin a deterministic value.
+ */
+export const SETTLEMAKER_VERSION = '3.0.1';
+
+export interface GenerateGeoJsonOptions {
+  /** ISO-8601 timestamp to stamp on the output. Defaults to `new Date().toISOString()`. */
+  generatedAt?: string;
+  /** Override the library version string (mostly for tests). */
+  settlemakerVersion?: string;
+  /**
+   * Padding (local units) for `metadata.local_bounds`. MUST match
+   * `SvgOptions.padding` if both generators are invoked on the same model,
+   * otherwise the SVG viewBox and GeoJSON bounds will drift. Defaults to 20
+   * to match the SVG default.
+   */
+  padding?: number;
+  /** Translation applied to every emitted coordinate; defaults to `NO_SHIFT`. */
+  shift?: OriginShift;
+}
+
+/**
+ * Convert a generated Model to a GeoJSON FeatureCollection.
+ *
+ * Coordinates are in settlement-local units: origin near the burg centroid,
+ * Y axis pointing DOWN (SVG convention). Consumers wanting compass-up rendering
+ * should mirror Y.
+ *
+ * The top-level `metadata` block carries schema + generation-version info so
+ * downstream systems (e.g. questables) can detect stale output and upsert on
+ * a stable `gate_id` within each gate feature.
+ */
+/** Shorthand: translate a model-frame point into the output frame. */
+function sc(p: { x: number; y: number }, shift: OriginShift): [number, number] {
+  return applyOutputShift(p.x, p.y, shift);
+}
+
+export function generateGeoJson(model: Model, options: GenerateGeoJsonOptions = {}): FeatureCollection {
+  const features: Feature[] = [];
+  const allocator = new IdAllocator();
+  const buildingIdMap = buildingIds(model);
+  const shift = options.shift ?? NO_SHIFT;
+
+  // 1. Wards + buildings (buildings get building_id; populate map for POI linking).
+  for (const patch of model.patches) {
+    if (!patch.ward) continue;
+
+    features.push({
+      type: 'Feature',
+      properties: {
+        layer: 'ward',
+        wardType: patch.ward.type,
+        label: patch.ward.getLabel(),
+        withinCity: patch.withinCity,
+        withinWalls: patch.withinWalls,
+      },
+      geometry: polygonToGeoJson(patch.shape, shift),
+    });
+
+    for (const building of patch.ward.geometry) {
+      const buildingId = buildingIdMap.get(building)!;
+      features.push({
+        type: 'Feature',
+        properties: {
+          layer: 'building',
+          wardType: patch.ward.type,
+          building_id: buildingId,
+        },
+        geometry: polygonToGeoJson(building, shift),
+      });
+    }
+
+    if(patch.ward instanceof CommonWard)for(const garden of patch.ward.gardens){
+      features.push({type:'Feature',properties:{layer:'green',kind:'garden',wardType:patch.ward.type},geometry:polygonToGeoJson(garden.ring,shift)});
+    }
+    if (patch.ward instanceof Harbour) {
+      for (const pier of patch.ward.piers) {
+        features.push({
+          type: 'Feature',
+          properties: {
+            layer: 'pier',
+            wardType: patch.ward.type,
+          },
+          geometry: polygonToGeoJson(pier, shift),
+        });
+      }
+    }
+  }
+
+  // 2. Streets: arteries then roads, each with a stable street_id.
+  for (const artery of model.arteries) {
+    features.push({
+      type: 'Feature',
+      properties: { layer: 'street', streetType: 'artery', street_id: allocator.alloc('s') },
+      geometry: { type: 'LineString', coordinates: artery.vertices.map(v => sc(v, shift)) },
+    });
+  }
+  for (const road of model.roads) {
+    features.push({
+      type: 'Feature',
+      properties: { layer: 'street', streetType: 'road', street_id: allocator.alloc('s') },
+      geometry: { type: 'LineString', coordinates: road.vertices.map(v => sc(v, shift)) },
+    });
+  }
+
+  // Positive-width subdivision cuts and park walks, from the same accepted
+  // ward state rendered by buildScene. Existing arterial IDs stay unchanged.
+  for (const patch of model.patches) {
+    for (const lane of patch.ward?.lanes ?? []) {
+      features.push({ type: 'Feature', properties: { layer: 'street', streetType: 'alley', width: lane.width,
+        street_id: allocator.alloc('s') }, geometry: { type: 'LineString', coordinates: [sc(lane.a, shift), sc(lane.b, shift)] } });
+    }
+    if (patch.ward instanceof Park && patch.ward.geometry.length) for (const path of patch.ward.paths) {
+      features.push({ type: 'Feature', properties: { layer: 'street', streetType: 'park', width: patch.ward.pathWidth,
+        street_id: allocator.alloc('s') }, geometry: { type: 'LineString', coordinates: path.map(p => sc(p, shift)) } });
+    }
+  }
+
+  // Reserved inter-block streets share geometry with the SVG scene.
+  for (const street of cityLocalStreets(model)) {
+    features.push({ type: 'Feature', properties: { layer: 'street', streetType: 'alley', width: street.width,
+      street_id: allocator.alloc('s') }, geometry: { type: 'LineString', coordinates: [sc(street.a, shift), sc(street.b, shift)] } });
+  }
+
+  // 3. Walls + entrances.
+  if (model.wall !== null) {
+    addWallFeatures(features, model.wall, 'city_wall', shift);
+  }
+  if (model.citadel !== null && model.citadel.ward instanceof Castle) {
+    addWallFeatures(features, (model.citadel.ward as Castle).wall, 'citadel_wall', shift);
+  }
+  addEntranceFeatures(features, model, shift);
+
+  // 4. POIs: selected after the rest of the map is built.
+  const pois = selectPois(model, model.params.population, allocator, buildingIdMap);
+  for (const poi of pois) {
+    // Per spec: floating POIs are only `pier` and `well`; all other kinds must
+    // have a non-null building_id or be omitted entirely (the selector enforces this).
+    // Validate BEFORE allocating an id so the allocator stays in sync on failure.
+    if (poi.buildingId === null && !FLOATING_POI_KINDS.has(poi.kind)) {
+      throw new Error(`POI kind ${poi.kind} emitted without a building_id — selector bug`);
+    }
+    const props: Record<string, unknown> = {
+      layer: 'poi',
+      poi_id: allocator.alloc('p'),
+      kind: poi.kind,
+      ward_type: poi.wardType,
+      building_id: poi.buildingId,
+    };
+    features.push({
+      type: 'Feature',
+      properties: props,
+      geometry: { type: 'Point', coordinates: sc(poi.point, shift) },
+    });
+  }
+
+  return {
+    type: 'FeatureCollection',
+    features,
+    // Extra top-level keys are permitted by RFC 7946 §6.1 ("foreign members").
+    metadata: buildMetadata(model, model.params, options, shift),
+  } as FeatureCollection & { metadata: OutputMetadata };
+}
+
+interface OutputMetadata {
+  building_capacity?: BuildingCapacity;
+  schema_version: number;
+  settlemaker_version: string;
+  settlement_generation_version: string;
+  coordinate_system: string;
+  coordinate_units: string;
+  generated_at: string;
+  local_bounds: LocalBounds;
+  scale: {
+    meters_per_unit: number;
+    diameter_meters: number;
+    diameter_local: number;
+    source: string;
+  };
+  stable_ids: { prefixes: { entrance: 'g'; poi: 'p'; street: 's'; building: 'b' } };
+  poi_density: 'hamlet' | 'town';
+  degraded_flags: string[];
+  local_origin_shift: OriginShift;
+}
+
+function buildMetadata(
+  model: Model,
+  params: GenerationParams,
+  options: GenerateGeoJsonOptions,
+  shift: OriginShift,
+): OutputMetadata {
+  const diameterMeters = computeSettlementScale(params.population).diameterMeters;
+  const diameterLocal = computeDiameterLocal(model);
+  return {
+    ...(model.usesCityLayout ? { building_capacity: model.getBuildingCapacity() } : {}),
+    schema_version: GEOJSON_SCHEMA_VERSION,
+    settlemaker_version: options.settlemakerVersion ?? SETTLEMAKER_VERSION,
+    settlement_generation_version: computeGenerationVersion(params, shift),
+    coordinate_system: 'local_origin_y_down',
+    coordinate_units: 'settlement_units',
+    generated_at: options.generatedAt ?? new Date().toISOString(),
+    local_bounds: computeLocalBounds(model, options.padding ?? 20, shift),
+    scale: {
+      meters_per_unit: diameterMeters / diameterLocal,
+      diameter_meters: diameterMeters,
+      diameter_local: diameterLocal,
+      source: 'population_heuristic_v1',
+    },
+    stable_ids: { prefixes: { entrance: 'g', poi: 'p', street: 's', building: 'b' } },
+    poi_density: regimeFor(params.population),
+    degraded_flags: [...model.degradedFlags].sort(),
+    local_origin_shift: shift,
+  };
+}
+
+/**
+ * Content hash of every input that influences gate placement. Stable across
+ * identical runs; changes the moment any gate-affecting input changes.
+ *
+ * population is a hash input because a burg crossing the P=300 regime boundary
+ * produces a different POI set.
+ */
+function computeGenerationVersion(params: GenerationParams, shift: OriginShift): string {
+  const relevant = {
+    schema: GEOJSON_SCHEMA_VERSION,
+    settlemakerVersion: SETTLEMAKER_VERSION,
+    seed: params.seed,
+    population: params.population,
+    ...(params.cityLayout && params.population <= VILLAGE_POP_CEILING ? { cityLayout: true } : {}),
+    nPatches: params.nPatches,
+    urbanDensity: params.urbanDensity ?? null,
+    walls: params.wallsNeeded,
+    citadel: params.citadelNeeded,
+    plaza: params.plazaNeeded,
+    temple: params.templeNeeded,
+    shanty: params.shantyNeeded,
+    capital: params.capitalNeeded,
+    oceanBearing: params.oceanBearing ?? null,
+    harbourSize: params.harbourSize ?? null,
+    roadBearings: params.roadEntryPoints?.map(r => ({
+      b: Math.round(r.bearingDeg * 10) / 10,
+      r: r.routeId ?? null,
+      k: r.kind ?? null,
+    })) ?? null,
+    coastlineGeometry: params.coastlineGeometry?.map(ring =>
+      ring.map(p => [Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100]),
+    ) ?? null,
+    originShift: {
+      dx: Math.round(shift.dx * 100) / 100,
+      dy: Math.round(shift.dy * 100) / 100,
+      source: shift.source,
+    },
+  };
+  return djb2(JSON.stringify(relevant)).toString(36);
+}
+
+function djb2(s: string): number {
+  let hash = 5381;
+  for (let i = 0; i < s.length; i++) {
+    hash = ((hash << 5) + hash + s.charCodeAt(i)) & 0x7fffffff;
+  }
+  return hash || 1;
+}
+
+function addEntranceFeatures(features: Feature[], model: Model, shift: OriginShift): void {
+  // model.border always exists post-buildWalls(); it holds gateMeta for
+  // walled AND unwalled burgs. Citadel-wall gates live on a different
+  // CurtainWall and are excluded naturally by the gateMeta.get() filter.
+  if (model.border === null) return;
+  const border = model.border;
+  const diameterLocal = computeDiameterLocal(model);
+
+  for (const gate of model.gates) {
+    const meta = border.gateMeta.get(gate);
+    if (!meta) continue;
+    features.push(entranceFeatureFor(gate, meta, border, model, diameterLocal, shift));
+  }
+}
+
+function entranceFeatureFor(
+  gate: Point,
+  meta: GateMeta,
+  border: CurtainWall,
+  model: Model,
+  diameterLocal: number,
+  shift: OriginShift,
+): Feature {
+  const isHarbour = meta.kind === 'sea' || isOnHarbourWater(gate, model);
+  const kind: 'land' | 'harbour' = isHarbour ? 'harbour' : 'land';
+  const subKind = isHarbour ? 'harbour' : (meta.kind === 'foot' ? 'foot' : 'road');
+  const entranceId = `g${meta.wallVertexIndex}`;
+
+  const neighbours = findNeighbourEntrances(gate, border);
+
+  // Offset arrival a short distance inward so tokens render inside the
+  // boundary, not on it. Cap the offset so tiny settlements don't overshoot
+  // the origin.
+  const r = Math.hypot(gate.x, gate.y);
+  const offset = Math.min(3, 0.05 * diameterLocal);
+  const arrivalScale = r > 0 ? (r - offset) / r : 0;
+  const arrivalModelFrame: [number, number] = [
+    Math.round(gate.x * arrivalScale * 100) / 100,
+    Math.round(gate.y * arrivalScale * 100) / 100,
+  ];
+  const arrivalLocal = sc({ x: arrivalModelFrame[0], y: arrivalModelFrame[1] }, shift);
+
+  const properties: Record<string, unknown> = {
+    layer: 'entrance',
+    entrance_id: entranceId,
+    kind,
+    sub_kind: subKind,
+    wall_vertex_index: meta.wallVertexIndex,
+    bearing_deg: meta.bearingDeg,
+    arrival_local: arrivalLocal,
+  };
+  if (meta.routeId != null) properties.matched_route_id = meta.routeId;
+  if (meta.matchDeltaDeg != null) properties.bearing_match_delta_deg = meta.matchDeltaDeg;
+  const routeIds = meta.routes.map(r => r.routeId).filter((id): id is string => id != null);
+  if (routeIds.length > 0) properties.matched_route_ids = routeIds;
+  if (meta.routes.length > 0) {
+    properties.matched_routes = meta.routes.map(r => {
+      const out: Record<string, unknown> = {
+        requested_bearing_deg: Math.round(r.requestedBearingDeg * 10) / 10,
+        match_delta_deg: r.matchDeltaDeg,
+      };
+      if (r.routeId != null) out.route_id = r.routeId;
+      if (r.kind != null) out.kind = r.kind;
+      return out;
+    });
+  }
+  if (neighbours.prev != null) properties.prev_entrance_id = neighbours.prev;
+  if (neighbours.next != null) properties.next_entrance_id = neighbours.next;
+
+  return {
+    type: 'Feature',
+    properties,
+    geometry: { type: 'Point', coordinates: sc(gate, shift) },
+  };
+}
+
+function isOnHarbourWater(gate: Point, model: Model): boolean {
+  if (model.harbour === null) return false;
+  return model.harbour.shape.contains(gate);
+}
+
+/**
+ * Walk the wall polygon from the gate vertex outward in both directions until
+ * the next border gate is found. Returns the neighbour gate ids for the
+ * "patrol from gate A to gate B" narrative use case.
+ *
+ * Scoped to border gates only — citadel-wall gates can coincide with border
+ * vertices by identity, so walking over `model.gates` would spuriously stop
+ * at them even though they belong to a separate wall.
+ */
+function findNeighbourEntrances(
+  gate: Point,
+  border: CurtainWall,
+): { prev?: string; next?: string } {
+  const verts = border.shape.vertices;
+  const n = verts.length;
+  const startIdx = verts.indexOf(gate);
+  if (startIdx === -1) return {};
+
+  const borderGates = new Set(border.gateMeta.keys());
+
+  const findInDirection = (step: 1 | -1): string | undefined => {
+    for (let k = 1; k < n; k++) {
+      const v = verts[((startIdx + step * k) % n + n) % n];
+      if (v !== gate && borderGates.has(v)) {
+        return `g${border.gateMeta.get(v)!.wallVertexIndex}`;
+      }
+    }
+    return undefined;
+  };
+
+  return { next: findInDirection(1), prev: findInDirection(-1) };
+}
+
+function addWallFeatures(features: Feature[], wall: CurtainWall, wallType: string, shift: OriginShift): void {
+  features.push({
+    type: 'Feature',
+    properties: { layer: 'wall', wallType },
+    geometry: polygonToGeoJson(wall.shape, shift),
+  });
+
+  for (const tower of wall.towers) {
+    features.push({
+      type: 'Feature',
+      properties: { layer: 'tower', wallType },
+      geometry: { type: 'Point', coordinates: sc(tower, shift) },
+    });
+  }
+}
+
+function polygonToGeoJson(poly: Polygon, shift: OriginShift): GeoPolygon {
+  const coords = poly.vertices.map(v => sc(v, shift));
+  if (coords.length > 0) {
+    coords.push([coords[0][0], coords[0][1]]);
+  }
+  return { type: 'Polygon', coordinates: [coords] };
+}

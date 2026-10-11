@@ -1,0 +1,42 @@
+{
+  "name": "@kriegsspiel/settlemaker-source",
+  "version": "3.0.1-constrained.1",
+  "private": true,
+  "type": "module",
+  "description": "Attributed immutable SettleMaker source snapshot for local Kriegsspiel map review",
+  "license": "GPL-3.0-only",
+  "author": "barrulus",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/verify-map-source.mjs && tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@types/geojson": "7946.0.16",
+    "polygon-clipping": "0.15.7",
+    "splaytree": "3.2.3",
+    "robust-predicates": "3.0.3"
+  },
+  "files": [
+    "src",
+    "dist",
+    "tsconfig.json",
+    "LICENSE",
+    "NOTICE",
+    "upstream-package.json",
+    "upstream-package-lock.json",
+    "symbols/LICENSE",
+    "symbols/CREDITS",
+    "docs/terrain-constraints.md"
+  ],
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

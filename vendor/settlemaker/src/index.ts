@@ -1,0 +1,312 @@
+import { planSettlement, type SettlementOptions, type PlannedSettlement } from './settlement/generate.js';
+export { planSettlement, createSettlementModel, type SettlementOptions, type PlannedSettlement } from './settlement/generate.js';
+export { renderSettlement, exportSettlement, type SettlementGeoJson, type SettlementRenderOptions } from './settlement/output.js';
+export type { SettlementModel, SettlementBuilding, SettlementDistrict, ResidentAccount } from './settlement/model.js';
+export type { DevelopmentOptions, DevelopmentProfile } from './settlement/development.js';
+import { paletteForTheme, type ThemeName } from './output/palette.js';
+import type { RenderTheme } from './output/render-theme.js';
+export { BIOMES, normaliseBiome, biomeThemeFor } from './appearance/biomes.js';
+export type { Biome, BiomeTheme } from './appearance/biomes.js';
+export { paletteForTheme } from './output/palette.js';
+export type { ThemeName } from './output/palette.js';
+import { resolveSettlementEngine, type SettlementEngine } from './input/settlement-engine.js';
+export { resolveSettlementEngine, SETTLEMENT_ENGINES } from './input/settlement-engine.js';
+export type { SettlementEngine } from './input/settlement-engine.js';
+import { skinBiomeFor, type SettlementSkin } from './assets/skins.js';
+export { createSkin, skinBiomeFor, SKIN_VERSION, SKIN_SLOTS, SKIN_TOKENS } from './assets/skins.js';
+export type { SkinDefinition, SkinStyle, SkinBiome, SkinBaseBiome, SkinGlyph, SettlementSkin } from './assets/skins.js';
+export type { VillageRenderOptions } from './village/render.js';
+import { validateWaterContext } from './input/water-context.js';
+export { WaterContextError } from './input/water-context.js';
+export type { WaterContextV1, WaterContextResult, WaterIssueCode } from './input/water-context.js';
+// Public API
+export { Model } from './generator/model.js';
+export type { GenerationParams, RoadEntry, RouteKind, RouteRelief, DegradedFlag } from './generator/generation-params.js';
+export { Patch } from './generator/patch.js';
+export { CurtainWall } from './generator/curtain-wall.js';
+export type { GateMeta, GateRouteAssignment } from './generator/curtain-wall.js';
+export type { OriginShift } from './generator/origin-shift.js';
+
+export type { AzgaarBurgInput, RoadBearingInput } from './input/azgaar-input.js';
+export { mapToGenerationParams } from './input/azgaar-input.js';
+export { Harbour } from './wards/harbour.js';
+
+export { generateSvg } from './output/svg-builder.js';
+export type { SvgOptions } from './output/svg-builder.js';
+export {
+  generateGeoJson,
+  GEOJSON_SCHEMA_VERSION,
+  SETTLEMAKER_VERSION,
+} from './output/geojson-builder.js';
+export type { GenerateGeoJsonOptions } from './output/geojson-builder.js';
+export {
+  parseSvgViewBox,
+  computeSettlementScale,
+  computeTileInfo,
+  cropSvgToTile,
+  enumerateTiles,
+  totalTileCount,
+} from './output/settlement-tiler.js';
+export type {
+  SvgViewBox,
+  SettlementScale,
+  TileInfo,
+  TileCoord,
+} from './output/settlement-tiler.js';
+
+export { WardType } from './types/interfaces.js';
+export type { Palette, Street } from './types/interfaces.js';
+export { PALETTES, PALETTE_DEFAULT, paletteForBiome } from './output/palette.js';
+export { themeFrom } from './output/render-theme.js';
+export type { RenderTheme } from './output/render-theme.js';
+
+export { Point } from './types/point.js';
+export { Polygon } from './geom/polygon.js';
+export { SeededRandom } from './utils/random.js';
+
+export { computeLocalBounds, computeDiameterLocal } from './generator/bounds.js';
+export { declaredMetersPerUnit } from './output/settlement-tiler.js';
+export type { LocalBounds } from './generator/bounds.js';
+
+export type { Poi, PoiKind } from './poi/poi-kinds.js';
+
+export { SCENE_VERSION } from './scene/scene.js';
+export type {
+  Scene, ScenePoint, WaterLayer, FieldPlot, Furrow, GreenFeature,
+  VegetationInstance, RoadFeature, BuildingFeature, PierFeature,
+  WallFeature, WallGate,
+} from './scene/scene.js';
+export { buildScene } from './scene/build-scene.js';
+export type { BuildSceneOptions } from './scene/build-scene.js';
+
+export { assembleSvg, themeToCss } from './output/assemble-svg.js';
+export type { AssembleOptions } from './output/assemble-svg.js';
+
+export { SCHEMATIC_SET, REFINED_SET, SETTLEMENT_SET, assetSetFor } from './assets/asset-sets.js';
+export type { AssetSet, GlyphAsset } from './assets/asset-sets.js';
+
+export {
+  URL_PAYLOAD_VERSION, UrlCodecError,
+  encodeBurgParam, decodeBurgParam, encodeJsonParam, decodeJsonParam,
+} from './url/codec.js';
+export type { UrlCodecFailure } from './url/codec.js';
+
+export { parseSettlementUrl } from './url/params.js';
+export type { ParsedSettlementUrl } from './url/params.js';
+
+import type { AzgaarBurgInput } from './input/azgaar-input.js';
+
+// Phase 5: the village engine, imported (not merely re-exported) so
+// `generateSettlement` below can call it.
+import { generateVillage, VILLAGE_POP_CEILING } from './village/village-model.js';
+import { renderVillage } from './village/render.js';
+import { generateVillageGeoJson } from './village/geojson.js';
+import type { VillageModel } from './village/types.js';
+import type { VillageTheme } from './village/theme.js';
+import type { FeatureCollection } from 'geojson';
+import type { DegradedFlag } from './generator/generation-params.js';
+import { mapToGenerationParams } from './input/azgaar-input.js';
+import { Model } from './generator/model.js';
+import { generateSvg, type SvgOptions } from './output/svg-builder.js';
+import { generateGeoJson, type GenerateGeoJsonOptions } from './output/geojson-builder.js';
+import { Point } from './types/point.js';
+import { computeOriginShift, NO_SHIFT, type OriginShift } from './generator/origin-shift.js';
+
+export interface GenerateFromBurgResult {
+  waterContextResult?: import('./input/water-context.js').WaterContextResult;
+  model: Model;
+  svg: string;
+  geojson: FeatureCollection;
+  /**
+   * Input flags that settlemaker was forced to disable because the requested
+   * feature wasn't geometrically feasible (e.g. walls on a population-50
+   * hamlet, citadel on a very non-compact patch). Sorted, stable order so
+   * consumer persistence is deterministic.
+   */
+  degradedFlags: DegradedFlag[];
+  /**
+   * Translation from Model-internal frame → output frame. Always defined;
+   * `source === 'none'` with `{dx: 0, dy: 0}` means no shift was applied
+   * (inland burg, no coastline, or hysteresis gate not cleared). When
+   * `source === 'coast_pull'`, settlemaker has pulled the output toward
+   * the caller's coastline to close the wall-to-coast visual gap.
+   */
+  originShift: OriginShift;
+}
+
+/**
+ * Convenience function: Azgaar burg data → generated model + SVG + GeoJSON.
+ */
+export function generateFromBurg(
+  burg: AzgaarBurgInput,
+  options?: { seed?: number; skin?: SettlementSkin; theme?: ThemeName; style?: Partial<RenderTheme>; svg?: SvgOptions; geojson?: GenerateGeoJsonOptions },
+): GenerateFromBurgResult {
+  validateWaterContext(burg, 'city');
+  if (options?.theme !== undefined) paletteForTheme(options.theme);
+  const skin = options?.skin ?? options?.svg?.skin;
+  const skinBiome = options?.svg?.skinBiome ?? burg.biome;
+  const effectiveBurg = skin ? { ...burg, biome: skinBiomeFor(skin, skinBiome).base } : burg;
+  const paramsPass1 = mapToGenerationParams(effectiveBurg, options?.seed);
+
+  // Pass 1: minimal probe for wallRadius. Strip coastlineGeometry + harbourSize
+  // so classifyWater and placeHarbour are skipped — neither influences the
+  // border radius.
+  const paramsRadiusProbe = {
+    ...paramsPass1,
+    coastlineGeometry: undefined,
+    harbourSize: undefined,
+  };
+  const wallRadius = new Model(paramsRadiusProbe).probeWallRadius();
+
+  // Compute shift from ORIGINAL coastline + pass-1 wallRadius.
+  const shift: OriginShift =
+    computeOriginShift(paramsPass1.coastlineGeometry, wallRadius) ?? NO_SHIFT;
+
+  // Pass 2: apply pre-shift to coastlineGeometry so the Model sees water
+  // near origin. Model internals stay (0,0)-centred and untouched.
+  // For 'none' (no coast / inside water / close enough) and 'coast_too_far'
+  // (polygon beyond MAX_SHIFT_MULTIPLIER, declined) the coastline is passed
+  // through unchanged — dx/dy are both 0 so the pre-shift would be a no-op
+  // either way, but we skip the allocation for clarity.
+  const paramsPass2 = shift.source === 'coast_pull'
+    ? {
+        ...paramsPass1,
+        coastlineGeometry: paramsPass1.coastlineGeometry?.map(ring =>
+          ring.map(p => new Point(p.x - shift.dx, p.y - shift.dy)),
+        ),
+      }
+    : paramsPass1;
+  const model = new Model(paramsPass2).generate();
+
+  const svg = generateSvg(model, {
+    ...options?.svg, skin, skinBiome, shift,
+    palette: options?.svg?.palette ?? (options?.theme !== undefined ? paletteForTheme(options.theme) : undefined),
+    theme: { ...options?.svg?.theme, ...options?.style },
+  });
+  const geojson = generateGeoJson(model, { ...options?.geojson, shift });
+  const degradedFlags = [...model.degradedFlags].sort() as DegradedFlag[];
+  return { model, svg, geojson, degradedFlags, originShift: shift };
+}
+
+// ---------------------------------------------------------------------------
+// Roads-first village engine. Automatic selection uses VILLAGE_POP_CEILING;
+// explicit selection may use either planner at any positive population.
+export { generateVillage, VILLAGE_POP_CEILING };
+
+/** Shared result. The city discriminator remains 'settlement' for compatibility. */
+export type GenerateSettlementResult =
+  | ({ kind: 'village'; model: VillageModel } & {
+      waterContextResult?: import('./input/water-context.js').WaterContextResult;
+      svg: string;
+      geojson: FeatureCollection;
+      degradedFlags: DegradedFlag[];
+      originShift: OriginShift;
+    })
+  | ({ kind: 'settlement' } & GenerateFromBurgResult);
+
+export interface GenerateSettlementOptions {
+  seed?: number;
+  /** Overrides burg.engine; auto retains the population-based selection. */
+  engine?: SettlementEngine;
+  /** Named colour treatment shared by both engines; omitted uses natural biome colours. */
+  theme?: ThemeName;
+  /** Shared colour overrides, applied after the palette and skin. */
+  style?: Partial<RenderTheme>;
+  /** One skin for both village and city generation/rendering. */
+  skin?: SettlementSkin;
+  /** Palette/theme/skin also apply to villages. Other SVG settings are city-specific. */
+  svg?: SvgOptions;
+  /** City GeoJSON options; village metadata uses its physical model scale. */
+  geojson?: GenerateGeoJsonOptions;
+  /** Legacy village appearance overrides take precedence over shared colours. */
+  village?: { pxPerMetre?: number; theme?: VillageTheme };
+}
+
+export function generateSettlement(burg: AzgaarBurgInput, options: SettlementOptions): PlannedSettlement;
+export function generateSettlement(burg: AzgaarBurgInput, options?: GenerateSettlementOptions): GenerateSettlementResult;
+export function generateSettlement(
+  burg: AzgaarBurgInput,
+  options?: GenerateSettlementOptions | SettlementOptions,
+): GenerateSettlementResult | PlannedSettlement {
+  if (options && 'development' in options) return planSettlement(burg, options);
+  if (options?.theme !== undefined) paletteForTheme(options.theme);
+  const requestedEngine = options?.engine ?? burg.engine;
+  const engine = resolveSettlementEngine(burg.population, requestedEngine);
+  validateWaterContext(burg, engine);
+  if (engine === 'village') {
+    // The seed default MUST match the settlement branch's, which is
+    // `hashString(burg.name)` inside `mapToGenerationParams`. Hard-coding 1
+    // here made every unseeded village with the same route/population shape
+    // the SAME village, and no amount of regenerating an FMG map could
+    // change it. Derived through `mapToGenerationParams` rather than
+    // re-implementing the hash, so the two branches cannot drift apart.
+    const seed = options?.seed ?? mapToGenerationParams(burg).seed;
+    const skin = options?.skin ?? options?.svg?.skin;
+    const skinBiome = options?.svg?.skinBiome ?? burg.biome;
+    const effectiveBurg = skin ? { ...burg, biome: skinBiomeFor(skin, skinBiome).base } : burg;
+    const model = generateVillage(effectiveBurg, seed);
+    return {
+      kind: 'village',
+      model,
+      ...(model.site.waterContextResult ? { waterContextResult: model.site.waterContextResult } : {}),
+      // A caller's theme is honoured here exactly as `svg.palette`/`theme`
+      // are on the settlement branch; without this the same option was
+      // silently obeyed for a town and dropped for a village.
+      svg: renderVillage(model, options?.village?.pxPerMetre, options?.village?.theme, {
+        skin, skinBiome,
+        palette: options?.svg?.palette ?? (options?.theme !== undefined ? paletteForTheme(options.theme) : undefined),
+        style: { ...options?.svg?.theme, ...options?.style },
+      }),
+      geojson: generateVillageGeoJson(model),
+      // Village diagnostics live on the model; this city compatibility field is empty.
+      degradedFlags: [],
+      // The village never pre-shifts a coast toward the origin, but the field
+      // is always defined on the settlement branch — so define it here too
+      // rather than make callers test for its absence.
+      originShift: NO_SHIFT,
+    };
+  }
+  return { kind: 'settlement', ...generateFromBurg({ ...burg, engine: requestedEngine }, options) };
+}
+export { renderVillage };
+// Phase 4 (output parity): the village's GeoJSON, in the same
+// `layer`-discriminated schema and at the same `schema_version` as the city
+// builder's, so an existing consumer needs no new branch to read a village.
+export { generateVillageGeoJson };
+// Phase 4 (theming): a village's ground follows its biome, because the glyph
+// set already resolves desert/tundra/tropical/coastal dwellings. Consumers can
+// pass their own theme to `renderVillage` for a night scene or a snow one.
+export {
+  villageThemeFor, normaliseVillageBiome,
+  TEMPERATE_THEME, VILLAGE_BIOMES, type VillageTheme, type VillageBiome,
+} from './village/theme.js';
+// Exported so a consumer that builds a VillageTheme from its own untrusted
+// input can apply the same gate the renderer does. Callers do NOT need to
+// call it — `renderVillage` sanitizes what it is given regardless.
+export { sanitizeVillageTokens } from './village/render.js';
+export type {
+  Site, SiteRoute, Green, GreenShape, Lane, Lot, Building, Croft, EdgeStyle, EdgeStamp,
+  FieldBlock, Vegetation,
+  VillageModel,
+} from './village/types.js';
+// The village's own `Poi` collides with the generator's existing `Poi`
+// (./poi/poi-kinds.js) exported above — aliased so both can be named.
+export type { Poi as VillagePoi } from './village/types.js';
+// ROUTE_CLASS_ORDER is exported as a VALUE, not just a type: it is exactly
+// what `roads=` validates against, and a consumer building a road picker had
+// to hardcode the seven classes without it. Same reason VILLAGE_BIOMES is
+// exported — the builder page reads both rather than keeping its own copy.
+export { ROUTE_CLASS_ORDER } from './village/route-class.js';
+export type { RouteType } from './village/route-class.js';
+export type { DeckEntry } from './village/deck.js';
+
+export { ARTWORK_GLYPHS, ARTWORK_MANIFEST, ARTWORK_INK } from './assets/artwork.js';
+
+export {
+  createConstrainedSettlementModel,
+  validateConstrainedSettlementModel,
+  SettlementConstraintError,
+  DEFAULT_CONSTRAINT_LIMITS,
+  CONSTRAINT_VERSION,
+} from './settlement/constraints/index.js';
+export type * from './settlement/constraints/types.js';

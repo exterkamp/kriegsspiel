@@ -43,10 +43,12 @@ The engine needs vector terrain features, but players should see the original ma
 |----------|------|------|
 | **A. Hand-annotate** each scenario: trace roads, woods, rivers, slope onto the scan as vector layers; they are the engine's features directly. | Accurate, controllable, great quality | Labour per map |
 | **B. Semi-automatic**: use a vision model plus colour segmentation to propose features, then a human cleans up in an editor. | Faster once the tool exists | Needs an annotation editor, and maps vary |
-| **C. Real elevation data** (DEM) georeferenced to the historical map. *Dropped: the table is flat, see the rendering decision below.* | Real slopes and viewsheds | Terrain has changed, and georeferencing takes work |
+| **C. Real elevation data** (DEM) georeferenced to the historical map. *Deferred; outside procedural map milestone M3c.* | Real slopes and viewsheds | Terrain has changed, and georeferencing takes work |
 | **D. Procedural** (generated terrain) restyled to look like a period map | Infinite scenarios | Not "historical" |
 
 Suggested path: **D now, A for the first historical scenario, build a small annotation editor (B) when we want a second one.** C is worth a spike for line of sight.
+
+Procedural map authoring is now planned as **M3c / [Epic 9](https://github.com/exterkamp/kriegsspiel/issues/132)**, with a terrain-aware SettleMaker fork for settlement layouts. It produces numerical elevation, terrain and infrastructure geometry, contours and a standalone top-down preview with validated export. Roads through woods retain both layers. Simple building footprints are sufficient. Map generation and preview are separate from scenario assembly, in-game table rendering and elevation-based movement/visibility; see [roadmap.md](roadmap.md) and decision **D18: Procedural battlefield maps are a standalone milestone**.
 
 Candidate map sources to check licences for (all need verification before use): David Rumsey Map Collection, Library of Congress, Gallica (BnF), Wikimedia Commons, and national survey archives. Prefer public-domain scans of pre-1900 maps. Pick battlefields with good period maps and lots of documentation, so the scenarios have historical notes the umpire can draw on.
 
@@ -77,7 +79,7 @@ Period style, not a fantasy skin: aged paper, ink, sealing wax, pencil, brass in
 - **UI framework for the desk:** Svelte (preferred) or React. Vanilla Three.js for the scene, with no react-three-fiber unless the scene gets complicated.
 - **Picking.** Raycast against the flat map plane to convert pointer position to map coordinates. Pieces are picked by raycasting their meshes. Because the map is flat, coordinates are plain (x, y) in metres with no height, which is what the engine's continuous plane uses (D13). Pieces stand at any position and facing and are drawn at their footprint; there are no cells to snap to.
 
-Because the map is flat, **elevation data is no longer needed** (option C above is dropped). Line of sight and cover come from the annotated terrain layer plus per-feature height tags (woods, ridges, buildings) in the engine.
+The map remains flat, with no elevation mesh. Numerical elevation is planned in M3c for contour rendering, terrain-aware generation and future height/slope queries. Connecting it to gameplay line of sight and movement is separate work; existing annotated terrain and per-feature height tags remain relevant. A flat display does not remove the need for numerical topography.
 
 ## Implications for the build
 

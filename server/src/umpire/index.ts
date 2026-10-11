@@ -73,3 +73,23 @@ export {
   reportsDueForNarration,
 } from './narrate.js';
 export type { NarrateOptions, NarrateOutput, NarrateResult, NarratedDispatch } from './narrate.js';
+export {
+  STAFF_MESSAGE_KINDS,
+  STAFF_PROMPT_VERSION,
+  STAFF_SCHEMA,
+  STAFF_SYSTEM,
+  StaffRoster,
+  checkStaffOutput,
+  runStaff,
+  staffInput,
+  staffOfficer,
+} from './staff.js';
+export type {
+  StaffMessage,
+  StaffMessageKind,
+  StaffOfficer,
+  StaffOptions,
+  StaffOutput,
+  StaffSeat,
+  StaffTurn,
+} from './staff.js';

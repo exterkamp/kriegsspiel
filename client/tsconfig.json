@@ -5,7 +5,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client", "svelte"],
     "verbatimModuleSyntax": true,
-    "paths": { "@kriegsspiel/protocol": ["../packages/protocol/src/index.ts"] }
+    "paths": {
+      "@kriegsspiel/protocol": ["../packages/protocol/src/index.ts"],
+      "@kriegsspiel/maps": ["../packages/maps/src/index.ts"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }
