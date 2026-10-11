@@ -53,10 +53,10 @@ Signed-out visitors are held at `sign-in` for every screen but `fixture`. Browse
 When the server sends `gameOver` (on the spot, or again when a finished game is opened by URL, since the server resends it on connect) the desk drops back to the table and shows a paper over it (`client/src/desk/GameOver.svelte`, logic in `gameOver.ts`):
 
 - A headline for the player's side: Victory, Defeat or Draw (no winner), from the payload's `winner` and the side of the SideView.
-- The reason in words, from the payload's `reason` code and `atGame` ("Red held the objective at ..."), and the game time elapsed.
-- **View the umpire's window** (closing it returns to the screen), **Read the journal** (Escape returns to the screen), **Play again** (a new game with the same scenario, rate, session type and side, then enters it), **New game** (`/?lobby=1`) and **Main menu**.
+- The reason in words, from the payload's `reason` code and `atGame` ("Red held the objective at ..."), then a bullet list: the game time elapsed, and, once the screen has read the umpire's window, `Your losses` and `Enemy losses`. Losses are the strength lost between the window's first frame (`at=0`) and its final frame (`at=atGame`), per unit, for the player's side and the enemy. If that fetch fails the two lines are silently omitted.
+- **View the umpire's window** (closing it returns to the screen), **Read the journal** (Escape returns to the screen), **Play again** (a new game with the same scenario, rate, session type, pause settings and side, then enters it), **New game** (`/?lobby=1`) and **Main menu**.
 
-The orders desk is already closed once the game is over (#175). Not yet shown: objectives held and losses (the `gameOver` payload carries neither; the umpire's window has the true picture), and the scenario's own wording of the reason.
+The orders desk is already closed once the game is over (#175). Not yet shown: objectives held (the `gameOver` payload does not carry them; the umpire's window has the true picture) and the scenario's own wording of the reason. When the screen appears, focus moves to its first button.
 
 ## The map layers
 

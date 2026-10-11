@@ -61,15 +61,16 @@ export function summaryLines(over: GameOver, losses?: { own: number; enemy: numb
   return lines;
 }
 
-/** The body of the POST /games that repeats a finished game: same scenario, side, rate and session type. */
+/** The body of the POST /games that repeats a finished game: same scenario, side, rate, session type and pause settings. */
 export function replayRequest(
-  info: Pick<GameInfo, 'scenario' | 'rate' | 'sessionType'>,
+  info: Pick<GameInfo, 'scenario' | 'rate' | 'sessionType'> & Partial<Pick<GameInfo, 'pause'>>,
   side: string | undefined,
 ) {
   return {
     scenario: info.scenario,
     rate: info.rate,
     sessionType: info.sessionType,
+    ...(info.pause ? { pause: info.pause } : {}),
     ...(side ? { side } : {}),
   };
 }

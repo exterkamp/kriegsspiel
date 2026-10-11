@@ -34,6 +34,8 @@
       .then(([a, b]) => (losses = lossesBetween(a, b, s)))
       .catch(() => {});
   });
+  let firstButton = $state<HTMLButtonElement>();
+  $effect(() => firstButton?.focus());
   let busy = $state(false);
   let error = $state('');
 
@@ -62,14 +64,22 @@
   }
 </script>
 
-<div class="over" class:victory={result === 'victory'} aria-labelledby="over-h" role="dialog">
+<div
+  class="over"
+  class:victory={result === 'victory'}
+  aria-labelledby="over-h"
+  aria-modal="true"
+  role="dialog"
+>
   <h2 id="over-h">{HEADLINE[result]}</h2>
   <p class="reason">{reasonText(over)}</p>
   <ul>
     {#each summaryLines(over, losses) as line (line)}<li>{line}</li>{/each}
   </ul>
   <div class="row">
-    <button type="button" onclick={() => windowOpen.set(true)}>View the umpire's window</button>
+    <button type="button" bind:this={firstButton} onclick={() => windowOpen.set(true)}
+      >View the umpire's window</button
+    >
     <button type="button" onclick={journal}>Read the journal</button>
   </div>
   <div class="row">

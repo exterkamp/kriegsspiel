@@ -49,6 +49,10 @@ describe('result mapping', () => {
       sessionType: 'hot_seat',
       side: 'red',
     });
+    const pause = { mode: 'x' } as never;
+    expect(
+      replayRequest({ scenario: 's', rate: 12, sessionType: 'hot_seat', pause }, undefined).pause,
+    ).toBe(pause);
   });
 });
 
@@ -146,5 +150,82 @@ describe('game-over screen', () => {
     });
     expect(assign).toHaveBeenCalledWith('/?game=g2&side=red');
     vi.unstubAllGlobals();
+  });
+
+  it('moves focus to the first button', () => {
+    gameState.update((s) => ({ ...s, gameOver: over }));
+    app = mount(Desk, { target: document.body });
+    flushSync();
+    expect(document.activeElement).toBe(document.querySelector('[role=dialog] button'));
+  });
+
+  describe('losses', () => {
+    const fp = { frontage: 100, depth: 50 };
+    const u = (id: string, side: string, strength: number) => ({
+      id,
+      side,
+      name: id,
+      position: { x: 0, y: 0 },
+      facing: 0,
+      formation: 'line',
+      footprint: fp,
+      strength,
+      morale: 80,
+      ammo: 90,
+    });
+    const frame = (gameMs: number, units: ReturnType<typeof u>[]) => ({
+      gameMs,
+      units,
+      beliefs: {},
+      events: [],
+      rulings: [],
+    });
+    const setup = () => {
+      gameId.set('g1');
+      gameState.update((s) => ({ ...s, gameOver: over, view: { side: 'blue' } as never }));
+    };
+
+    it('fetches the first and final frames for the side and shows the losses', async () => {
+      setup();
+      const urls: string[] = [];
+      vi.stubGlobal('fetch', async (url: string) => {
+        urls.push(url);
+        const at = url.includes('at=0&') ? 0 : 60_000;
+        return new Response(
+          JSON.stringify(
+            at === 0
+              ? frame(0, [u('a', 'blue', 100), u('b', 'red', 80)])
+              : frame(60_000, [u('a', 'blue', 70), u('b', 'red', 0)]),
+          ),
+          { status: 200 },
+        );
+      });
+      app = mount(Desk, { target: document.body });
+      flushSync();
+      await vi.waitFor(() =>
+        expect(document.querySelector('[role=dialog]')?.textContent).toMatch(/Your losses: 30/),
+      );
+      expect(document.querySelector('[role=dialog]')?.textContent).toMatch(/Enemy losses: 80/);
+      expect(urls.sort()).toEqual([
+        '/games/g1/window/at?at=0&side=blue',
+        '/games/g1/window/at?at=60000&side=blue',
+      ]);
+      vi.unstubAllGlobals();
+    });
+
+    it('omits the losses lines when the fetch fails', async () => {
+      setup();
+      const f = vi.fn(async () => new Response('{}', { status: 500 }));
+      vi.stubGlobal('fetch', f);
+      app = mount(Desk, { target: document.body });
+      flushSync();
+      await vi.waitFor(() => expect(f).toHaveBeenCalledTimes(2));
+      await new Promise((r) => setTimeout(r, 0));
+      flushSync();
+      const text = document.querySelector('[role=dialog]')?.textContent ?? '';
+      expect(text).toMatch(/Game time elapsed/);
+      expect(text).not.toMatch(/losses/i);
+      vi.unstubAllGlobals();
+    });
   });
 });
