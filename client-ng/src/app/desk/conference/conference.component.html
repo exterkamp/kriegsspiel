@@ -1,0 +1,59 @@
+<h2>Staff conference</h2>
+<div class="tabs" role="group" aria-label="Staff officer">
+  @for (r of roles; track r) {
+    <button type="button" [attr.aria-pressed]="role() === r" (click)="choose(r)">
+      {{ staffFor(r).title }}
+      @if (busy(r)) {
+        <span class="busy" aria-label="busy">…</span>
+      }
+    </button>
+  }
+</div>
+
+<p class="who">
+  <strong>{{ officer().name }}</strong
+  >, {{ officer().title.toLowerCase() }}.
+  <span class="traits">Traits: {{ officer().traits.join(', ') }}.</span>
+  <small
+    >Each question takes about {{ formatCost(officer().costMs) }} of game time to answer.</small
+  >
+</p>
+
+@if (log().length === 0) {
+  <p><em>No questions yet.</em></p>
+} @else {
+  <ul class="log">
+    @for (e of log(); track e.id) {
+      <li>
+        <small>{{ formatGameTime(e.askedAtGame) }}</small>
+        <p class="q">You: {{ e.question }}</p>
+        @if (e.failed) {
+          <p class="a failed">{{ officer().name }} could not be reached. Ask again.</p>
+        } @else if (isPending(e, nowGame())) {
+          <p class="a pending">
+            {{ officer().name }} is consulting the papers… answer due
+            {{ formatGameTime(e.answerAtGame) }}.
+          </p>
+        } @else if (e.answer) {
+          <p class="a">{{ e.answer.text }}</p>
+          <small>Based on reports as of {{ formatGameTime(e.answer.basedOnGame) }}.</small>
+        }
+      </li>
+    }
+  </ul>
+}
+
+<form (submit)="ask($event)">
+  <label for="conference-question">Ask {{ officer().name }}</label>
+  <textarea
+    id="conference-question"
+    rows="2"
+    [attr.maxlength]="maxLength"
+    [value]="question()"
+    (input)="question.set($any($event.target).value)"
+  ></textarea>
+  @if (error(); as err) {
+    <p class="error" role="alert">{{ err }}</p>
+  }
+  <button type="submit">Ask (costs {{ formatCost(officer().costMs) }})</button>
+</form>
