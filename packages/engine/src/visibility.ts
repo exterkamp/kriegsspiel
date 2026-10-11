@@ -32,7 +32,8 @@ const viewFootprint = (u: Unit) => ({
  * What a watcher can judge of an enemy's footprint: to the nearest 10 m. A footprint follows
  * from the formation and strength, so an exact one would give the strength away.
  */
-const coarse = (mmLen: number) => Math.max(10, Math.round(metres(mmLen) / 10) * 10);
+export const coarseMetres = (m: number) => Math.max(10, Math.round(m / 10) * 10);
+const coarse = (mmLen: number) => coarseMetres(metres(mmLen));
 const viewEnemyFootprint = (u: Unit) => ({
   frontage: coarse(u.footprint.frontage),
   depth: coarse(u.footprint.depth),
@@ -221,6 +222,8 @@ export interface EngineSideView {
   /** Map size in metres. */
   mapWidth: number;
   mapHeight: number;
+  /** This side's own headquarters, where its couriers set out. */
+  hq?: Point;
   ownUnits: ViewUnit[];
   visibleEnemies: ViewEnemy[];
   lastKnownContacts: ViewContact[];
@@ -269,11 +272,13 @@ export function viewFor(
   const intel = state.intel[side];
   const seen = visibleTo(state, side);
   const seenIds = new Set(seen.map((u) => u.id));
+  const hq = state.sides.find((s) => s.id === side)?.hq;
   return {
     side,
     time: state.time,
     mapWidth: metres(state.map.width),
     mapHeight: metres(state.map.height),
+    ...(hq ? { hq: viewPoint(hq) } : {}),
     ownUnits: state.units
       .filter((u) => u.side === side)
       .map((u) => ({

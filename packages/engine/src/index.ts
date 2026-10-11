@@ -104,9 +104,11 @@ export {
 } from './contact.js';
 export type { Aspect } from './contact.js';
 export {
+  COURIER_CHOICES,
   COURIER_LOST_EVENT,
   COURIER_MS_PER_METRE,
   COURIER_STEP_EVENT,
+  choiceRisk,
   issueOrder,
   registerOrders,
 } from './orders.js';
@@ -115,11 +117,13 @@ export {
   GARBLE_MIN_M,
   INTERCEPT_BY_KIND,
   INTERCEPT_CHECK_MS,
+  MAX_GARBLE,
+  MAX_LOSS,
   courierPosition,
   interceptChance,
   rideRisk,
 } from './courier.js';
-export type { Order, OrderIntent } from './orders.js';
+export type { CourierChoice, Order, OrderIntent } from './orders.js';
 export {
   STANDING_EVENT,
   applyIntents,
@@ -163,3 +167,5 @@ export {
   registerSupply,
   wagonsReach,
 } from './supply.js';
+export { ROLES, maySign, mayDraft, viewForRole } from './roles.js';
+export type { EngineRoleView, Role, Seat, ViewUnitOutline } from './roles.js';

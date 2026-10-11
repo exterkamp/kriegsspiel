@@ -64,8 +64,14 @@ export class GameConnection {
     return true;
   }
 
-  sendOrder(orderId: string, text: string): boolean {
-    return this.send({ v: PROTOCOL_VERSION, kind: 'issueOrder', orderId, text });
+  sendOrder(orderId: string, text: string, courier?: 'fast' | 'safe'): boolean {
+    return this.send({
+      v: PROTOCOL_VERSION,
+      kind: 'issueOrder',
+      orderId,
+      text,
+      ...(courier ? { courier } : {}),
+    });
   }
 
   putMark(mark: Mark): boolean {
@@ -74,6 +80,19 @@ export class GameConnection {
 
   deleteMark(markId: string): boolean {
     return this.send({ v: PROTOCOL_VERSION, kind: 'deleteMark', markId });
+  }
+
+  proposePause(reason?: string): boolean {
+    const r = reason?.trim();
+    return this.send({ v: PROTOCOL_VERSION, kind: 'proposePause', ...(r ? { reason: r } : {}) });
+  }
+
+  proposeResume(): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'proposeResume' });
+  }
+
+  vote(proposal: string, yes: boolean): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'vote', proposal, yes });
   }
 
   private open(): void {

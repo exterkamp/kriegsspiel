@@ -26,6 +26,7 @@ import {
 import { StubOrderParser } from '../orders/stubParser.js';
 import { scriptedOpponentsFromEnv } from '../config.js';
 import { buildApp, type App } from './app.js';
+import { sideViewOf } from './sideView.js';
 
 /** One game hour per wall second, so a courier ride and its report take well under a second. */
 const RATE = 3600;
@@ -408,6 +409,9 @@ describe('views', () => {
     expect(bv.ownUnits.length).toBeGreaterThan(0);
     expect(bv.ownUnits.every((u) => u.id.startsWith('blue-'))).toBe(true);
     expect(rv.ownUnits.every((u) => u.id.startsWith('red-'))).toBe(true);
+    // Each side is told where its own HQ is, and only that.
+    expect(bv.hq).toEqual({ x: 2050, y: 2950 });
+    expect(rv.hq).toEqual({ x: 2050, y: 50 });
 
     // Armies start out of sight of each other: nothing hidden rides along.
     expect(bv.visibleEnemies).toEqual([]);
@@ -493,6 +497,30 @@ describe('orders', () => {
     expect(red.messages.some((m) => m.kind === 'dispatch')).toBe(false);
   });
 
+  it('carries the courier chosen on the wire to the signed order, and none when none was chosen', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    await blue.waitFor('viewUpdate');
+    blue.send(
+      JSON.stringify({
+        v,
+        kind: 'issueOrder',
+        orderId: 'f',
+        text: 'blue-1 hold the bridge',
+        courier: 'fast',
+      }),
+    );
+    blue.send(order('blue-1 hold the bridge', 'p'));
+    await vi.waitFor(async () => {
+      const orders = (await store.inputLog(game.id)).filter((e) => e.command.kind === 'order');
+      expect(orders).toHaveLength(2);
+    });
+    const [fast, plain] = (await store.inputLog(game.id)).filter((e) => e.command.kind === 'order');
+    expect(fast!.command).toMatchObject({ courier: 'fast' });
+    expect(plain!.command).not.toHaveProperty('courier');
+  });
+
   it('reports a dispatch once, not again in later pushes', async () => {
     const { base, ws } = await start();
     const game = (await createGame(base)).json;
@@ -572,6 +600,78 @@ describe('orders', () => {
       'error',
       (m) => m.code === 'not_implemented' && m.message.includes('setReady'),
     );
+  });
+});
+
+describe('catch-up on reconnect', () => {
+  it('tells a returning side what arrived while away, once, without duplicating papers', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const first = await join(ws, game, 'blue');
+    const initial = await first.waitFor('viewUpdate');
+    // A first visit has nothing to catch up on.
+    // One report reaches the desk while the player is here, so it is not new on return.
+    first.send(order('blue-1 march to the bridge', 'o1'));
+    const seenHere = await first.waitFor('viewUpdate', (m) => m.view.dispatches.length > 0);
+    const before = seenHere.view.dispatches.map((d) => d.id);
+    first.send(order('blue-1 march to the bridge', 'o2'));
+    first.socket.close();
+    const actor = app!.host.get(game.id)!;
+    // Game hours pass with nobody connected until the second report reaches the desk.
+    const arrived = await vi.waitFor(() => {
+      const view = sideViewOf(actor.state, 'blue', actor.gameClock.snapshot());
+      if (view.dispatches.length <= before.length) throw new Error('not yet');
+      return view;
+    });
+    const newIds = arrived.dispatches.map((d) => d.id).filter((id) => !before.includes(id));
+    expect(newIds.length).toBeGreaterThan(0);
+    await vi.waitFor(async () =>
+      expect(await store.loadSeen(game.id, 'blue')).toBeGreaterThanOrEqual(initial.view.atGame),
+    );
+
+    const again = await join(ws, game, 'blue');
+    const catchUp = await again.waitFor('catchUp');
+    expect(catchUp.sinceGame).toBeGreaterThanOrEqual(initial.view.atGame);
+    expect(catchUp.sinceGame).toBeLessThan(catchUp.atGame);
+    // Only what arrived while away: the report seen before leaving is in the view, not the catch-up.
+    expect(catchUp.dispatchIds).toEqual(newIds);
+    // The papers are in the view, once; they are not also pushed one by one.
+    const view = await again.waitFor('viewUpdate');
+    const ids = view.view.dispatches.map((d) => d.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual(expect.arrayContaining([...before, ...(catchUp.dispatchIds as string[])]));
+    expect(again.messages.some((m) => m.kind === 'dispatch')).toBe(false);
+
+    // A second tab of the same side is not "away", and neither is the other side's first visit.
+    // Make the saved seen time stale and attach the tab in the same tick (no tick can refresh it in
+    // between), so that only the open-tab rule, not "nothing changed since", can suppress a catch-up.
+    const sent: string[] = [];
+    const fakeTab = {
+      readyState: 1,
+      send: (data: string) => void sent.push(data),
+      close: () => undefined,
+      on: () => undefined,
+    };
+    (app!.hub as unknown as { seen: Map<string, number> }).seen.set(`${game.id}\0blue`, 0);
+    app!.hub.attach(game.id, 'blue', fakeTab);
+    const red = await join(ws, game, 'red');
+    await vi.waitFor(() => expect(sent.some((m) => m.includes('"viewUpdate"'))).toBe(true));
+    await red.waitFor('viewUpdate');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(sent.some((m) => m.includes('"catchUp"'))).toBe(false);
+    expect(red.messages.some((m) => m.kind === 'catchUp')).toBe(false);
+    expect(first.messages.some((m) => m.kind === 'catchUp')).toBe(false);
+  });
+});
+
+describe('seen time on shutdown', () => {
+  it('flushSeen saves the seen time of a side that is still connected', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    const initial = await blue.waitFor('viewUpdate');
+    await app!.hub.flushSeen();
+    expect(await store.loadSeen(game.id, 'blue')).toBeGreaterThanOrEqual(initial.view.atGame);
   });
 });
 
@@ -835,5 +935,119 @@ describe('deployment endpoints', () => {
       await server.close();
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('pause voting over the WebSocket', () => {
+  const cmd = (body: object) => JSON.stringify({ v, ...body });
+  /** Blue and red players in a started lobby game with pause voting (voters are the seats taken at the start). */
+  async function votingGame(pause: object = { rule: 'unanimous' }) {
+    const { base, ws } = await start();
+    const bluePlayer = await signIn(base, 'vote-blue@example.test');
+    const redPlayer = await signIn(base, 'vote-red@example.test');
+    const res = await fetch(
+      `${base}/games`,
+      json(bluePlayer, { lobby: true, rate: RATE, side: 'blue', pause }),
+    );
+    const game = (await res.json()) as Created;
+    game.cookies = { blue: bluePlayer, red: redPlayer };
+    await fetch(`${base}/games/${game.id}/join`, json(redPlayer, { side: 'red' }));
+    await fetch(`${base}/games/${game.id}/ready`, json(redPlayer, { ready: true }));
+    const started = await fetch(`${base}/games/${game.id}/start`, json(bluePlayer, {}));
+    expect(started.status).toBe(200);
+    const blue = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    return { game, blue, red, ws };
+  }
+
+  it('tells both players about a proposal, lets them vote, and pauses on all yes', async () => {
+    const { game, blue, red } = await votingGame();
+    await blue.waitFor('pauseState', (m) => m.phase === 'running' && !m.proposal);
+
+    blue.send(cmd({ kind: 'proposePause', reason: 'door' }));
+    const mine = await blue.waitFor('pauseState', (m) => m.phase === 'pause_proposed');
+    expect(mine.proposal).toMatchObject({
+      kind: 'pause',
+      bySide: 'blue',
+      byYou: true,
+      reason: 'door',
+      yes: 1,
+      no: 0,
+      voters: 2,
+      myVote: true,
+    });
+    const theirs = await red.waitFor('pauseState', (m) => m.phase === 'pause_proposed');
+    expect(theirs.proposal).toMatchObject({ byYou: false, bySide: 'blue', yes: 1 });
+    expect(theirs.proposal!.myVote).toBeUndefined();
+    expect(theirs.proposal!.msLeft).toBeGreaterThan(0);
+
+    red.send(cmd({ kind: 'vote', proposal: theirs.proposal!.id, yes: true }));
+    await blue.waitFor('pauseResult', (m) => m.outcome === 'paused');
+    await red.waitFor('pauseState', (m) => m.phase === 'paused' && !m.proposal);
+    await blue.waitFor('clockState', (c) => c.clock.status === 'paused');
+    expect(app!.host.get(game.id)!.gameClock.status).toBe('paused');
+
+    // And back again.
+    red.send(cmd({ kind: 'proposeResume' }));
+    const ask = await blue.waitFor('pauseState', (m) => m.phase === 'resume_proposed');
+    blue.send(cmd({ kind: 'vote', proposal: ask.proposal!.id, yes: true }));
+    await red.waitFor('pauseResult', (m) => m.outcome === 'resumed');
+    await blue.waitFor('clockState', (c) => c.clock.status === 'running');
+  });
+
+  it('cancels on a no and says so to both players', async () => {
+    const { blue, red } = await votingGame();
+    blue.send(cmd({ kind: 'proposePause' }));
+    const open = await red.waitFor('pauseState', (m) => m.phase === 'pause_proposed');
+    red.send(cmd({ kind: 'vote', proposal: open.proposal!.id, yes: false }));
+    for (const c of [blue, red]) {
+      const r = await c.waitFor('pauseResult');
+      expect(r).toMatchObject({
+        outcome: 'cancelled',
+        cause: 'no-vote',
+        proposalKind: 'pause',
+        bySide: 'red',
+      });
+    }
+    await blue.waitFor('pauseState', (m) => m.phase === 'running' && !m.proposal);
+  });
+
+  it('cancels when a voter never answers, and shows an open vote to one who reconnects', async () => {
+    const {
+      game,
+      blue,
+      red: first,
+      ws,
+    } = await votingGame({
+      rule: 'unanimous',
+      voteTimeoutMs: 1000,
+    });
+    first.socket.close();
+    blue.send(cmd({ kind: 'proposePause' }));
+    await blue.waitFor('pauseState', (m) => m.phase === 'pause_proposed');
+
+    const red = await join(ws, game, 'red');
+    const seen = await red.waitFor('pauseState');
+    expect(seen.phase).toBe('pause_proposed');
+    expect(seen.proposal!.myVote).toBeUndefined();
+
+    const r = await red.waitFor('pauseResult', () => true, 8000);
+    expect(r).toMatchObject({ outcome: 'cancelled', cause: 'timeout' });
+    expect(app!.host.get(game.id)!.gameClock.status).toBe('running');
+  });
+
+  it('refuses a pause request in a game without voting', async () => {
+    const { base, ws } = await start();
+    const plain = (await createGame(base)).json;
+    const c = await join(ws, plain, 'blue');
+    c.send(cmd({ kind: 'proposePause' }));
+    expect((await c.waitFor('error')).code).toBe('pause_unavailable');
+    expect(c.messages.some((m) => m.kind === 'pauseState')).toBe(false);
+  });
+
+  it('refuses a vote on a proposal that is not open', async () => {
+    const { blue } = await votingGame();
+    blue.send(cmd({ kind: 'vote', proposal: 'nope', yes: true }));
+    expect((await blue.waitFor('error')).code).toBe('pause_refused');
   });
 });

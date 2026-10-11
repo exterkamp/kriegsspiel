@@ -11,10 +11,13 @@ import {
   PROTOCOL_VERSION,
   MAX_MARKS,
   type ClockState,
+  type Command,
   type Mark,
+  type PauseProposal,
   type ServerMessage,
 } from '@kriegsspiel/protocol';
 import type { GameActor, GameStore } from '../game/index.js';
+import type { PauseTransition } from '../pause.js';
 import { sideViewOf } from './sideView.js';
 import type { SideId } from '@kriegsspiel/engine';
 
@@ -37,6 +40,29 @@ interface Connection {
   lastClock: string;
   sentDispatches: Set<string>;
   gameOverSent: boolean;
+  /** The last `pauseState` sent, without its countdown. */
+  lastPause: string;
+  /** The newest pause step this connection has been told about. */
+  pauseSeen: number;
+}
+
+type PauseResult = Extract<ServerMessage, { kind: 'pauseResult' }>;
+
+/** What a pause machine step means to the players, or undefined for a step that only opens a vote. */
+export function pauseResultOf(step: PauseTransition): Omit<PauseResult, 'v' | 'kind'> | undefined {
+  const cause = step.cause;
+  if (cause === 'proposed') return undefined;
+  if (step.to === 'paused') {
+    return step.from === 'resume_proposed'
+      ? { outcome: 'cancelled', cause, proposalKind: 'resume' }
+      : { outcome: 'paused', cause };
+  }
+  if (step.to === 'running') {
+    return step.from === 'pause_proposed'
+      ? { outcome: 'cancelled', cause, proposalKind: 'pause' }
+      : { outcome: 'resumed', cause };
+  }
+  return undefined;
 }
 
 const error = (code: string, message: string): ServerMessage => ({
@@ -51,13 +77,18 @@ export class Hub {
 
   /** Each side's marks, loaded from the store on first use and kept here (the hub is their only writer). */
   private readonly marks = new Map<string, Promise<Mark[]>>();
+  /** Game time each side was last pushed a view at; written to the store when its last connection closes. */
+  private readonly seen = new Map<string, number>();
   /** Saves run one after another per side, so the last write is the newest list. */
   private readonly saves = new Map<string, Promise<void>>();
 
   constructor(
     private readonly lookup: (gameId: string) => GameActor | undefined,
     private readonly onError: (gameId: string, e: unknown) => void,
-    private readonly store?: Pick<GameStore, 'saveMarks' | 'loadMarks'>,
+    private readonly store?: Pick<GameStore, 'saveMarks' | 'loadMarks' | 'saveSeen' | 'loadSeen'>,
+    /** The side a signed-in user sits on in a game, to name who asked for a pause. */
+    private readonly sideOf: (gameId: string, userId: string) => SideId | undefined = () =>
+      undefined,
   ) {}
 
   private marksOf(gameId: string, side: SideId): Promise<Mark[]> {
@@ -126,12 +157,22 @@ export class Hub {
       lastClock: '',
       sentDispatches: new Set(),
       gameOverSent: false,
+      lastPause: '',
+      pauseSeen: this.lookup(gameId)?.pauseSteps.at(-1)?.n ?? 0,
     };
     const set = this.conns.get(gameId) ?? new Set();
+    // A side with a connection already open is not away, so it gets no catch-up.
+    const away = ![...set].some((c) => c.side === side);
+    const seenKey = `${gameId}\0${side}`;
+    const seenInMemory = this.seen.get(seenKey);
     set.add(conn);
     this.conns.set(gameId, set);
     const detach = () => {
-      set.delete(conn);
+      if (!set.delete(conn)) return;
+      const at = this.seen.get(seenKey);
+      if (at !== undefined && ![...set].some((c) => c.side === side)) {
+        void this.store?.saveSeen(gameId, side, at).catch((e) => this.onError(gameId, e));
+      }
       if (set.size === 0 && this.conns.get(gameId) === set) this.conns.delete(gameId);
     };
     socket.on('close', detach);
@@ -145,10 +186,34 @@ export class Hub {
         this.send(conn, error('internal', 'the server could not handle that message'));
       });
     });
+    const sinceP: Promise<number | undefined> = !away
+      ? Promise.resolve(undefined)
+      : seenInMemory !== undefined
+        ? Promise.resolve(seenInMemory)
+        : (this.store?.loadSeen(gameId, side) ?? Promise.resolve(undefined));
     this.push(gameId, conn);
+    void sinceP
+      .then((since) => this.sendCatchUp(gameId, conn, since))
+      .catch((e) => this.onError(gameId, e));
     void this.marksOf(gameId, side)
       .then((marks) => this.send(conn, { v: PROTOCOL_VERSION, kind: 'marks', marks: [...marks] }))
       .catch((e) => this.onError(gameId, e));
+  }
+
+  /** Tell a returning side what arrived while it was away: dispatches delivered after its last visit. */
+  private sendCatchUp(gameId: string, conn: Connection, since: number | undefined): void {
+    const game = this.lookup(gameId);
+    if (since === undefined || !game) return;
+    const view = sideViewOf(game.state, conn.side, game.gameClock.snapshot());
+    if (view.atGame <= since) return;
+    const dispatchIds = view.dispatches.filter((d) => d.receivedAtGame > since).map((d) => d.id);
+    this.send(conn, {
+      v: PROTOCOL_VERSION,
+      kind: 'catchUp',
+      sinceGame: since,
+      atGame: view.atGame,
+      dispatchIds,
+    });
   }
 
   /** The game changed (a tick or a command): bring every connection up to date. */
@@ -160,6 +225,19 @@ export class Hub {
   closeGame(gameId: string, code = 1001, reason = 'game closed'): void {
     for (const conn of [...(this.conns.get(gameId) ?? [])]) conn.socket.close(code, reason);
     this.conns.delete(gameId);
+  }
+
+  /** Save the seen time of every side that still has a connection, so a restart does not lose it. */
+  async flushSeen(): Promise<void> {
+    const saves: Promise<void>[] = [];
+    for (const [gameId, set] of this.conns) {
+      for (const side of new Set([...set].map((c) => c.side))) {
+        const at = this.seen.get(`${gameId}\0${side}`);
+        if (at !== undefined && this.store)
+          saves.push(this.store.saveSeen(gameId, side, at).catch((e) => this.onError(gameId, e)));
+      }
+    }
+    await Promise.all(saves);
   }
 
   closeAll(): void {
@@ -177,6 +255,7 @@ export class Hub {
     try {
       const clock: ClockState = game.gameClock.snapshot();
       const view = sideViewOf(game.state, conn.side, clock);
+      this.seen.set(`${gameId}\0${conn.side}`, view.atGame);
       const clockJson = JSON.stringify(clock);
       if (clockJson !== conn.lastClock) {
         // The first push carries the clock inside the view.
@@ -184,6 +263,7 @@ export class Hub {
           this.send(conn, { v: PROTOCOL_VERSION, kind: 'clockState', clock });
         conn.lastClock = clockJson;
       }
+      this.pushPause(gameId, game, conn);
       const first = conn.lastView === '';
       // Only while the game is still waiting on the confirm: later joiners must not be told it is paused.
       if (first && game.restart && clock.status === 'paused' && !game.state.world.outcome) {
@@ -218,6 +298,99 @@ export class Hub {
       }
     } catch (e) {
       this.onError(gameId, e);
+    }
+  }
+
+  /** Tell a connection how the pause vote stands and what was settled since it last looked. */
+  private pushPause(gameId: string, game: GameActor, conn: Connection): void {
+    const state = game.pauseState;
+    if (!state) return;
+    const steps = game.pauseSteps.filter((s) => s.n > conn.pauseSeen);
+    for (const { n, step } of steps) {
+      conn.pauseSeen = n;
+      const result = pauseResultOf(step);
+      if (!result) continue;
+      const bySide = step.by === undefined ? undefined : this.sideOf(gameId, step.by);
+      this.send(conn, {
+        v: PROTOCOL_VERSION,
+        kind: 'pauseResult',
+        ...result,
+        ...(bySide === undefined ? {} : { bySide }),
+      });
+    }
+    const open = state.proposal;
+    let proposal: PauseProposal | undefined;
+    if (open) {
+      const votes = Object.values(open.votes);
+      const mine = conn.userId === undefined ? undefined : open.votes[conn.userId];
+      const bySide = this.sideOf(gameId, open.by);
+      proposal = {
+        id: open.id,
+        kind: state.phase === 'resume_proposed' ? 'resume' : 'pause',
+        ...(bySide === undefined ? {} : { bySide }),
+        byYou: conn.userId !== undefined && open.by === conn.userId,
+        ...(open.reason === undefined ? {} : { reason: open.reason }),
+        yes: votes.filter((v) => v).length,
+        no: votes.filter((v) => !v).length,
+        voters: state.voters,
+        ...(mine === undefined ? {} : { myVote: mine }),
+        msLeft: Math.max(0, open.deadlineMs - state.nowMs),
+      };
+    }
+    // The countdown changes every push, so only the rest decides whether anything is new.
+    const key = JSON.stringify([state.phase, proposal && { ...proposal, msLeft: 0 }]);
+    if (key === conn.lastPause) return;
+    conn.lastPause = key;
+    this.send(conn, {
+      v: PROTOCOL_VERSION,
+      kind: 'pauseState',
+      phase: state.phase,
+      ...(proposal ? { proposal } : {}),
+    });
+  }
+
+  private async handlePauseCommand(
+    game: GameActor,
+    conn: Connection,
+    command: Extract<Command, { kind: 'proposePause' | 'proposeResume' | 'vote' }>,
+  ): Promise<void> {
+    if (!game.pauseState) {
+      this.send(conn, error('pause_unavailable', 'this game has no pause voting'));
+      return;
+    }
+    if (conn.userId === undefined) {
+      this.send(conn, error('not_a_voter', 'sign in to vote on a pause'));
+      return;
+    }
+    const by = conn.userId;
+    let result;
+    try {
+      if (command.kind === 'vote') {
+        result = await game.submit({
+          kind: 'vote',
+          by,
+          proposal: command.proposal,
+          yes: command.yes,
+        });
+      } else if (command.kind === 'proposeResume') {
+        result = await game.submit({ kind: 'proposeResume', by });
+      } else {
+        const reason = command.reason?.trim();
+        result = await game.submit({ kind: 'proposePause', by, ...(reason ? { reason } : {}) });
+      }
+    } catch (e) {
+      this.send(conn, error('game_closed', e instanceof Error ? e.message : 'game is closed'));
+      return;
+    }
+    if (result.ok) return;
+    // The machine's messages name the player; the client gets fixed wording instead.
+    const text = result.kind === 'rejection' ? result.reason : '';
+    if (/not a voter/.test(text)) {
+      this.send(conn, error('not_a_voter', 'you do not vote in this game'));
+    } else if (/already voted/.test(text)) {
+      this.send(conn, error('pause_refused', 'you have already voted on that'));
+    } else {
+      this.send(conn, error('pause_refused', 'that vote is closed or cannot be started now'));
     }
   }
 
@@ -261,6 +434,14 @@ export class Hub {
       this.broadcastMarks(gameId, conn.side, list);
       return;
     }
+    if (
+      command.kind === 'proposePause' ||
+      command.kind === 'proposeResume' ||
+      command.kind === 'vote'
+    ) {
+      await this.handlePauseCommand(game, conn, command);
+      return;
+    }
     if (command.kind !== 'issueOrder') {
       this.send(conn, error('not_implemented', `${command.kind} is not supported yet`));
       return;
@@ -271,7 +452,12 @@ export class Hub {
     }
     let result;
     try {
-      result = await game.submit({ kind: 'order', side: conn.side, text: command.text });
+      result = await game.submit({
+        kind: 'order',
+        side: conn.side,
+        text: command.text,
+        ...(command.courier ? { courier: command.courier } : {}),
+      });
     } catch (e) {
       this.send(conn, error('game_closed', e instanceof Error ? e.message : 'game is closed'));
       return;

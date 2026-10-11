@@ -53,5 +53,16 @@ failures (<n>):          (or `failures: none`)
 ## Cost
 Cost is read from an optional `usage()` method on the parser (`{ inputTokens, outputTokens, usd }`, running totals). The harness takes the difference around each call. The stub has no `usage()`, so it reports zero. An LLM parser implements `usage()` and gets cost with no harness change.
 
+## The LLM parser
+`LlmOrderParser` (`server/src/orders/llmParser.ts`) is the `parseOrders` stage. Run it with:
+```
+npm run eval:orders -w server -- --llm                  # replay baselines/llm-parser.recording.json, no network
+npm run eval:orders -w server -- --llm --live --record  # call the configured parse provider and store the calls
+npm run eval:orders -w server -- --llm --live --update  # also accept the new output as baselines/llm-parser.json
+```
+`llmParser.test.ts` replays the recording in CI and requires 90% overall accuracy, every injection refused (never `intents`), zero unsafe results and no change from `baselines/llm-parser.json`. A prompt change bumps `PARSE_ORDERS_PROMPT_VERSION`, which invalidates the recording, so re-record it with `--live --record --update` and check the report before committing.
+
+The checked-in recording is a hand-authored seed (`model: hand-authored-seed`, zero cost), not output from a real model. It proves the plumbing, the validation and the fallbacks. The accuracy and injection numbers are only meaningful after a live run replaces it.
+
 ## Evaluating another parser
 Construct it in `cli.ts` in place of `StubOrderParser` and give it its own baseline file. Stored outputs for an LLM run should come from the recorded LLM outputs, so the regression check needs no model calls.

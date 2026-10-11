@@ -173,7 +173,12 @@ export async function buildApp(options: AppOptions): Promise<App> {
   };
   // The hub and host refer to each other: the host notifies the hub, the hub looks games up.
   const store = options.store ?? new MemoryGameStore();
-  const hub: Hub = new Hub((id) => host.get(id), onError, store);
+  const hub: Hub = new Hub(
+    (id) => host.get(id),
+    onError,
+    store,
+    (id, userId) => authStore.seatOf(id, userId),
+  );
   const lobby = options.lobby ?? new MemoryLobbyStore();
   const authStore = options.auth?.store ?? new MemoryAuthStore();
   /**
@@ -514,6 +519,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   );
 
   server.addHook('onClose', async () => {
+    await hub.flushSeen();
     hub.closeAll();
     await trace?.close();
     await host.shutdown();

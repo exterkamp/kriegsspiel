@@ -325,3 +325,16 @@ describe('Hud', () => {
     expect(buildOrderText(fixtureView, undefined, 'advance')).toBe('advance');
   });
 });
+
+describe('catch-up', () => {
+  it('records what arrived while away and posts a notice', () => {
+    const s = applyServerMessage(
+      initialState,
+      { v, kind: 'catchUp', sinceGame: 3_600_000, atGame: 7_200_000, dispatchIds: ['d1', 'd2'] },
+      0,
+    );
+    expect(s.catchUp?.dispatchIds).toEqual(['d1', 'd2']);
+    expect(s.notices[0]!.message).toContain('2 new dispatches');
+    expect(s.notices[0]!.message).toContain('Day 1 01:00');
+  });
+});

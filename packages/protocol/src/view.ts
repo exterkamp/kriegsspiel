@@ -79,6 +79,8 @@ export const SideView = z
   .object({
     side: Side,
     atGame: GameMs,
+    /** Where this side's couriers set out from. */
+    hq: Coord.optional(),
     ownUnits: z.array(OwnUnit),
     visibleEnemies: z.array(VisibleEnemyUnit),
     lastKnownContacts: z.array(LastKnownContact),

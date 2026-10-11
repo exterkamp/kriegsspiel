@@ -6,6 +6,35 @@ import { Dispatch, SideView } from './view.js';
 const Id = z.string().min(1);
 const Envelope = { v: z.literal(PROTOCOL_VERSION) };
 
+/** Longest reason a player may give for a pause request. */
+export const MAX_PAUSE_REASON = 200;
+
+/** Where the pause vote stands, as the server's state machine has it (docs/architecture.md). */
+export const PausePhase = z.enum(['running', 'pause_proposed', 'paused', 'resume_proposed']);
+export type PausePhase = z.infer<typeof PausePhase>;
+
+/** The open pause or resume proposal, as one player sees it. Votes are tallies, not names. */
+export const PauseProposal = z
+  .object({
+    id: z.string().min(1),
+    kind: z.enum(['pause', 'resume']),
+    /** The side of the player who asked; absent when the server cannot tell. */
+    bySide: Side.optional(),
+    /** This player asked. */
+    byYou: z.boolean(),
+    reason: z.string().optional(),
+    yes: z.number().int().nonnegative(),
+    no: z.number().int().nonnegative(),
+    /** How many players vote in all. */
+    voters: z.number().int().positive(),
+    /** This player's own vote, once cast. */
+    myVote: z.boolean().optional(),
+    /** Wall ms until the vote closes and is cancelled. */
+    msLeft: z.number().finite().nonnegative(),
+  })
+  .strict();
+export type PauseProposal = z.infer<typeof PauseProposal>;
+
 /** Player-to-server. Every command is logged for replay. */
 export const Command = z.discriminatedUnion('kind', [
   // Signs a shared draft, or (until drafts exist) sends the order wording directly as `text`.
@@ -17,6 +46,8 @@ export const Command = z.discriminatedUnion('kind', [
       orderId: Id,
       draft: Id.optional(),
       text: z.string().trim().min(1).max(2000).optional(),
+      // Fast rides sooner and is likelier lost or garbled; safe the reverse. Absent: the ordinary ride.
+      courier: z.enum(['fast', 'safe']).optional(),
     })
     .strict()
     .refine((c) => (c.draft === undefined) !== (c.text === undefined), {
@@ -24,8 +55,14 @@ export const Command = z.discriminatedUnion('kind', [
     }),
   z.object({ ...Envelope, kind: z.literal('setReady'), ready: z.boolean() }).strict(),
   z
-    .object({ ...Envelope, kind: z.literal('proposePause'), reason: z.string().optional() })
+    .object({
+      ...Envelope,
+      kind: z.literal('proposePause'),
+      reason: z.string().max(MAX_PAUSE_REASON).optional(),
+    })
     .strict(),
+  // Ask to resume a paused game. Voted on with `vote`, like a pause.
+  z.object({ ...Envelope, kind: z.literal('proposeResume') }).strict(),
   z.object({ ...Envelope, kind: z.literal('vote'), proposal: Id, yes: z.boolean() }).strict(),
   // Create or replace one of the side's marks (by `mark.id`). Not game input: it never reaches the engine.
   z.object({ ...Envelope, kind: z.literal('putMark'), mark: Mark }).strict(),
@@ -57,6 +94,28 @@ export const ServerMessage = z.discriminatedUnion('kind', [
   // Every mark the side has made, sent on connect and again after any change by either connection.
   z.object({ ...Envelope, kind: z.literal('marks'), marks: z.array(Mark) }).strict(),
   z.object({ ...Envelope, kind: z.literal('clockState'), clock: ClockState }).strict(),
+  // The pause vote. Sent on connect (only to a game that has voters) and whenever the phase or the
+  // open proposal changes, including each vote. Absent `proposal` means nothing is being voted on.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('pauseState'),
+      phase: PausePhase,
+      proposal: PauseProposal.optional(),
+    })
+    .strict(),
+  // A pause or resume vote has been settled, or the pause was ended some other way.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('pauseResult'),
+      outcome: z.enum(['paused', 'resumed', 'cancelled']),
+      cause: z.enum(['all-yes', 'majority-yes', 'no-vote', 'timeout', 'max-pause', 'forced']),
+      /** What the cancelled proposal was for; set when `outcome` is `cancelled`. */
+      proposalKind: z.enum(['pause', 'resume']).optional(),
+      bySide: Side.optional(),
+    })
+    .strict(),
   // "Staff at work": the umpire is still on something game time depends on. While `working`, game
   // time may be held at `needAtMs` (the earliest game time that needs a result); it carries on
   // from there when the result arrives.
@@ -75,6 +134,18 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       ...Envelope,
       kind: z.literal('serverRestarted'),
       downMs: z.number().finite().nonnegative(),
+    })
+    .strict(),
+  // Sent once when a side returns after being away (no connection open): game time of its last
+  // visit, game time now, and the ids of dispatches that arrived in between (all of them also in
+  // the view). Nothing is sent to a side that has never visited or that is still connected.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('catchUp'),
+      sinceGame: GameMs,
+      atGame: GameMs,
+      dispatchIds: z.array(z.string().min(1)),
     })
     .strict(),
   // The game has ended. Public to both sides and sent once per connection, also to a late joiner.
