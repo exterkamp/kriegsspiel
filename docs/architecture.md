@@ -129,6 +129,10 @@ An `EngineSideView` (engine type, `viewFor`; not the protocol `SideView`, see D1
 
 Adding a field means updating this list and the leak tests in `visibility.test.ts`.
 
+### Reconnect and catch-up
+
+The hub remembers the game time of the last view pushed to each side and saves it (`GameStore.saveSeen`, table `side_seen`) when the side's last connection closes. When a connection opens and the side has none open, the hub sends the full view as always (so nothing is missed, and papers in it are not pushed again) and then one `catchUp` message: `sinceGame`, `atGame` and the ids of dispatches delivered after `sinceGame`. A side that has never visited, or opens a second tab, gets none. After a hard crash the saved time may be older than the true last visit, so the catch-up can over-report but never under-report. The HUD shows it as a notice. It carries only ids already in the filtered view.
+
 ## LLM load and cost at continuous time
 
 - LLM calls fire on discrete triggers: an order issued (parse), an order delivered (interpretation), an ambiguity (judge), and a report due (narrate). Quiet stretches cost nothing.

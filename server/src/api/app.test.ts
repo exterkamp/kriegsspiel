@@ -26,6 +26,7 @@ import {
 import { StubOrderParser } from '../orders/stubParser.js';
 import { scriptedOpponentsFromEnv } from '../config.js';
 import { buildApp, type App } from './app.js';
+import { sideViewOf } from './sideView.js';
 
 /** One game hour per wall second, so a courier ride and its report take well under a second. */
 const RATE = 3600;
@@ -572,6 +573,78 @@ describe('orders', () => {
       'error',
       (m) => m.code === 'not_implemented' && m.message.includes('setReady'),
     );
+  });
+});
+
+describe('catch-up on reconnect', () => {
+  it('tells a returning side what arrived while away, once, without duplicating papers', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const first = await join(ws, game, 'blue');
+    const initial = await first.waitFor('viewUpdate');
+    // A first visit has nothing to catch up on.
+    // One report reaches the desk while the player is here, so it is not new on return.
+    first.send(order('blue-1 march to the bridge', 'o1'));
+    const seenHere = await first.waitFor('viewUpdate', (m) => m.view.dispatches.length > 0);
+    const before = seenHere.view.dispatches.map((d) => d.id);
+    first.send(order('blue-1 march to the bridge', 'o2'));
+    first.socket.close();
+    const actor = app!.host.get(game.id)!;
+    // Game hours pass with nobody connected until the second report reaches the desk.
+    const arrived = await vi.waitFor(() => {
+      const view = sideViewOf(actor.state, 'blue', actor.gameClock.snapshot());
+      if (view.dispatches.length <= before.length) throw new Error('not yet');
+      return view;
+    });
+    const newIds = arrived.dispatches.map((d) => d.id).filter((id) => !before.includes(id));
+    expect(newIds.length).toBeGreaterThan(0);
+    await vi.waitFor(async () =>
+      expect(await store.loadSeen(game.id, 'blue')).toBeGreaterThanOrEqual(initial.view.atGame),
+    );
+
+    const again = await join(ws, game, 'blue');
+    const catchUp = await again.waitFor('catchUp');
+    expect(catchUp.sinceGame).toBeGreaterThanOrEqual(initial.view.atGame);
+    expect(catchUp.sinceGame).toBeLessThan(catchUp.atGame);
+    // Only what arrived while away: the report seen before leaving is in the view, not the catch-up.
+    expect(catchUp.dispatchIds).toEqual(newIds);
+    // The papers are in the view, once; they are not also pushed one by one.
+    const view = await again.waitFor('viewUpdate');
+    const ids = view.view.dispatches.map((d) => d.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual(expect.arrayContaining([...before, ...(catchUp.dispatchIds as string[])]));
+    expect(again.messages.some((m) => m.kind === 'dispatch')).toBe(false);
+
+    // A second tab of the same side is not "away", and neither is the other side's first visit.
+    // Make the saved seen time stale and attach the tab in the same tick (no tick can refresh it in
+    // between), so that only the open-tab rule, not "nothing changed since", can suppress a catch-up.
+    const sent: string[] = [];
+    const fakeTab = {
+      readyState: 1,
+      send: (data: string) => void sent.push(data),
+      close: () => undefined,
+      on: () => undefined,
+    };
+    (app!.hub as unknown as { seen: Map<string, number> }).seen.set(`${game.id}\0blue`, 0);
+    app!.hub.attach(game.id, 'blue', fakeTab);
+    const red = await join(ws, game, 'red');
+    await vi.waitFor(() => expect(sent.some((m) => m.includes('"viewUpdate"'))).toBe(true));
+    await red.waitFor('viewUpdate');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(sent.some((m) => m.includes('"catchUp"'))).toBe(false);
+    expect(red.messages.some((m) => m.kind === 'catchUp')).toBe(false);
+    expect(first.messages.some((m) => m.kind === 'catchUp')).toBe(false);
+  });
+});
+
+describe('seen time on shutdown', () => {
+  it('flushSeen saves the seen time of a side that is still connected', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    const initial = await blue.waitFor('viewUpdate');
+    await app!.hub.flushSeen();
+    expect(await store.loadSeen(game.id, 'blue')).toBeGreaterThanOrEqual(initial.view.atGame);
   });
 });
 
