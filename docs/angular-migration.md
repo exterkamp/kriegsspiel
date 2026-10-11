@@ -1,6 +1,6 @@
 # Angular migration plan (issue #269)
 
-Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) and step 1 (services and stores, #272) done; step 2 in progress, with the roster, journal, conference and pause panel (#273) and the in-tray, orders desk and umpire window (#274) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
+Status: **stage 1 (the spike) done; stage 2 step 0 (tooling, #271) and step 1 (services and stores, #272) done; step 2 in progress, with the roster, journal, conference and pause panel (#273) and the in-tray, orders desk and umpire window (#274) done; step 5 (admin, map authoring and benchmarks, #277) done, see below.** The Angular app lives in `client-ng/`, beside the Svelte client in `client/`, which is untouched and still what the server and Docker image serve. Stage 2 ports everything, then deletes `client/` and renames `client-ng/` to `client/`. Nothing here changes the protocol, the visibility filter or the server.
 
 ## What the spike proves
 
@@ -48,6 +48,19 @@ Components in `client-ng/src/app/desk/`, each standalone, `OnPush`, signals, wit
 - **`UmpireWindowComponent`** (`umpire-window.component.*`, port of `UmpireWindow.svelte`). Reads `GameService.gameId`, fetches the timeline and frames through the unchanged `@legacy/window/api`, writes `DeskStore.windowFrame`, and clears frame and hover on destroy. A ticket counter drops a frame that lands after a newer request.
 - **Plan change:** none. Specs use a small `fake-game.ts` (a `GameService` stand-in whose state is a plain signal) instead of a fake socket.
 - **Tests:** `in-tray`, `orders-desk` and `umpire-window` `.component.spec.ts`, no wall-clock timing (the one timer test uses fake timers and `TestBed.tick()`, because the zoneless scheduler itself runs on timers). The Svelte `tray.test.ts` and `orders.test.ts` mount-and-query cases are ported one for one; their pure-logic cases (`sortTray`, persistence, estimates, annex, draft autosave, delivery status, refusals) stay where they are and still run. Not ported, because they test other parts: the journal case that lists a sent order (belongs to `JournalComponent`), the `MarksBar` toggle, and the `index.html` icon check. Added: empty-pile text, the #267 situation report and acknowledgement in the right piles, focus after a paper goes, Ctrl+Enter, the stamp expiring, a game-over form, a vanished annex arrow, and every umpire-window case (the Svelte one had no component test).
+
+## Step 5: admin, map authoring and benchmarks (#277)
+
+Lazy routes in `client-ng/src/app/app.routes.ts`, each a standalone `OnPush` component that creates the existing imperative app after the first render and tears it down in `ngOnDestroy`:
+
+- `/admin` (`admin/admin.component.ts`): creates the unchanged `AdminPage` in `#app`, calls `start()`, and `stop()` on destroy. Its page CSS moved out of `admin/index.html` into `admin.component.css`, nested under `ks-admin` so it does not restyle other routes. A rewrite stays later work.
+- `/map-authoring` (`map-authoring/`): the markup of `map-authoring.html` as the template, `mountAuthoringApp` with the same presets and replay-support check as `map-authoring/main.ts`, `dispose()` on destroy. `style.css` is copied and nested under `ks-map-authoring`. The generate and validate workers are referenced from `client/src/map-authoring` (`webWorkerTsConfig`: `tsconfig.worker.json`).
+- `/map-benchmark`: `mountBenchmark`. The template deliberately has no `#benchmark` id, since the legacy module mounts itself on that id when imported.
+- `/table-benchmark`: imports `table/benchmark.ts`, which is a script that starts on import and reads `#table`/`#result`; it runs once per page load, so reopening the route needs a reload. `hq-preview.svg` was copied to `client-ng/public`.
+- `/admin` and `/admin/` both resolve: `TrailingSlashUrlSerializer` drops a trailing slash before parsing (Angular otherwise finds no route for `/admin/`). The old `/map-authoring.html`, `/map-benchmark.html` and `/table-benchmark.html` redirect to the new routes. `proxy.conf.cjs` now proxies `/admin/api`.
+- `@kriegsspiel/maps` resolves to `packages/maps/src` through `tsconfig.json` paths.
+- Tests: `admin/admin.component.spec.ts` (both URLs mount the page, leaving stops it), `app.routes.spec.ts` (redirects, serializer). The Svelte-side admin and map-authoring tests are framework-free and unchanged. Not covered: mounting map authoring and the benchmarks in jsdom (workers and canvas are unavailable), so those were not exercised in a browser here.
+- Not done: `map-table.html` (dev map catalog page, not named by the issue) and the server fallback for the cutover.
 
 ## Decisions
 

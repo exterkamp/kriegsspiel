@@ -1,0 +1,409 @@
+/* Scoped under the host element so the route does not restyle other pages. */
+ks-map-authoring {
+  display: block;
+  font-family: system-ui, sans-serif;
+  color: #28322d;
+  background: #e7e9e4;
+  font-synthesis: none;
+
+  *,
+  & {
+    box-sizing: border-box;
+  }
+  .shell {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100dvh;
+  }
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 32px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    background: #253e33;
+    color: #f4f5ee;
+  }
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    margin: 0 0 6px;
+  }
+  h1 {
+    margin: 0;
+    font-weight: 500;
+    font-size: 24px;
+  }
+  #asset-status {
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid #819487;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+  #asset-status[data-error='true'] {
+    background: #7b2828;
+    color: white;
+  }
+  aside {
+    overflow: auto;
+    padding: 22px;
+    background: #f6f5ee;
+    border-right: 1px solid #ccd0c7;
+  }
+  h2,
+  legend {
+    margin: 0 0 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  section + section {
+    margin-top: 24px;
+  }
+  #summary p {
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 5px 0;
+    overflow-wrap: anywhere;
+  }
+  #summary p:first-child {
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .note {
+    font-size: 12px;
+    line-height: 1.6;
+    color: #526057;
+    border-left: 2px solid #a1ac9a;
+    padding-left: 10px;
+    margin: 16px 0 24px;
+  }
+  fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  #layers {
+    display: grid;
+    gap: 2px;
+  }
+  label {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-size: 13px;
+    min-height: 32px;
+    cursor: pointer;
+  }
+  input {
+    accent-color: #365c43;
+    width: 16px;
+    height: 16px;
+  }
+  .contrast {
+    margin: 14px 0 26px;
+    border-top: 1px solid #d5d7cf;
+    padding-top: 14px;
+  }
+  #diagnostics {
+    padding: 0;
+    list-style: none;
+    font-size: 12px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+  #diagnostics li {
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    background: #e9ece3;
+    border-left: 2px solid #87907d;
+  }
+  #diagnostics [data-severity='error'] {
+    color: #731c1c;
+    background: #fae4df;
+    border-color: #b23434;
+  }
+  #diagnostics [data-severity='warning'] {
+    background: #f4e9ca;
+    border-color: #987228;
+  }
+  .map-panel {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  nav {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #f4f5ef;
+    border-bottom: 1px solid #cdd1c8;
+  }
+  button {
+    font: inherit;
+    font-size: 12px;
+    min-height: 36px;
+    padding: 6px 12px;
+    border: 1px solid #b4bdb0;
+    background: #fffefa;
+    color: #283b2d;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #e3eadb;
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  button:focus-visible,
+  input:focus-visible,
+  canvas:focus-visible {
+    outline: 3px solid #a86b15;
+    outline-offset: -3px;
+  }
+  .spacer {
+    flex: 1;
+  }
+  .canvas-wrap {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: grab;
+  }
+  canvas:active {
+    cursor: grabbing;
+  }
+  .north {
+    position: absolute;
+    right: 18px;
+    top: 16px;
+    padding: 6px 10px;
+    background: #fffefa;
+    font-size: 12px;
+    pointer-events: none;
+    border: 1px solid #b4bdb0;
+  }
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: 6px 16px;
+    gap: 3px 16px;
+    background: #f4f5ef;
+    font-size: 11px;
+    color: #526057;
+  }
+  footer p {
+    margin: 3px 0;
+  }
+  @media (max-width: 760px) {
+    .shell {
+      height: auto;
+      min-height: 100dvh;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto;
+    }
+    header {
+      padding: 16px;
+    }
+    h1 {
+      font-size: 20px;
+    }
+    .map-panel {
+      grid-row: 2;
+      height: 65dvh;
+      min-height: 380px;
+    }
+    aside {
+      grid-row: 3;
+      border-right: 0;
+      padding: 20px;
+    }
+    #layers {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    nav {
+      padding: 10px;
+      gap: 6px;
+    }
+    button {
+      padding: 6px 9px;
+    }
+  }
+
+  /* Authoring inputs are independent from compact layer checkboxes. */
+  .map-authoring-controls {
+    margin-bottom: 24px;
+  }
+  .map-authoring-controls label {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    margin: 8px 0;
+    cursor: default;
+  }
+  .map-authoring-controls input:not([type='checkbox']),
+  .map-authoring-controls select,
+  .map-authoring-controls textarea {
+    width: 100%;
+    height: auto;
+    min-height: 32px;
+    padding: 6px;
+    font: inherit;
+    border: 1px solid #b4bdb0;
+    background: #fffefa;
+  }
+  .map-authoring-controls input[type='checkbox'] {
+    width: 16px;
+    height: 16px;
+  }
+  .map-authoring-controls details {
+    margin: 12px 0;
+  }
+  .map-authoring-controls summary {
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .map-authoring-controls fieldset {
+    margin: 18px 0;
+  }
+  .map-authoring-controls button {
+    margin: 4px 4px 4px 0;
+  }
+  .map-authoring-controls pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 10px;
+  }
+  .map-authoring-controls progress {
+    width: 100%;
+  }
+  .map-authoring-controls ol,
+  .map-authoring-controls ul {
+    padding-left: 18px;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+  }
+  nav select {
+    min-width: 0;
+    max-width: 220px;
+    font: inherit;
+  }
+  @media (max-width: 760px) {
+    nav {
+      flex-wrap: wrap;
+    }
+    nav select {
+      max-width: 100%;
+      flex: 1;
+    }
+  }
+
+  /* Shared primary actions stay above both settings views. */
+  .map-authoring-controls [hidden],
+  .map-empty-state[hidden] {
+    display: none;
+  }
+  .authoring-actions [data-action='generate'],
+  .map-empty-state [data-action='empty-generate'] {
+    background: #365c43;
+    color: #fffefa;
+    font-weight: 600;
+  }
+  .authoring-actions [data-role='status'] {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .map-authoring-controls [role='tablist'] {
+    display: flex;
+    border-bottom: 1px solid #b4bdb0;
+    margin: 16px 0 12px;
+  }
+  .map-authoring-controls [role='tab'] {
+    flex: 1;
+  }
+  .map-authoring-controls [aria-selected='true'] {
+    background: #dce7d7;
+    border-bottom: 3px solid #365c43;
+  }
+  .map-authoring-controls output,
+  .map-authoring-controls [role='tabpanel'] > p {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 3px solid #a86b15;
+    outline-offset: -3px;
+  }
+  nav .site-selector {
+    min-width: 170px;
+    max-width: 280px;
+    padding: 6px 32px 6px 12px;
+    border: 1px solid #b4bdb0;
+    border-radius: 3px;
+    background-color: #fffefa;
+    color: #283b2d;
+  }
+  .map-empty-state {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(440px, calc(100% - 32px));
+    max-height: calc(100% - 32px);
+    overflow: auto;
+    padding: 24px;
+    text-align: center;
+    border: 1px solid #b4bdb0;
+    border-radius: 6px;
+    background: #f6f5ee;
+    box-shadow: 0 8px 28px #253e3312;
+  }
+  .map-empty-state h2 {
+    font-size: 20px;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+  .map-empty-state p {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .empty-map-outline {
+    margin: 0 auto 20px;
+    width: 96px;
+    height: 64px;
+    border: 2px solid #879b7e;
+    border-radius: 8px 2px;
+    transform: rotate(-6deg);
+    font-size: 42px;
+    color: #879b7e;
+    background: repeating-linear-gradient(90deg, transparent 0 30px, #879b7e33 30px 32px);
+  }
+  .map-empty-state .empty-map-message {
+    font-size: 12px;
+    color: #526057;
+  }
+  @media (max-width: 760px) {
+    nav .site-selector {
+      max-width: 100%;
+      flex: 1;
+    }
+  }
+}
