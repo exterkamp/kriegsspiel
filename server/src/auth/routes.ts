@@ -4,6 +4,7 @@
  *   POST   /auth/login    `{ email }`  mail a one-time login link; always 202 so it does not reveal who has an account
  *   GET    /auth/verify   `?token=`    spend the link, start a session, redirect to `/`
  *   GET    /auth/me                    the signed-in user, or 401
+ *   GET    /auth/guest              `{ enabled }`: whether guest play is on
  *   POST   /auth/guest              start a guest session with no email (only when `guestPlay` is on, else 404)
  *   POST   /auth/logout                end this session
  *   DELETE /auth/account               delete the user, their sessions and seats
@@ -105,6 +106,8 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
   const timer = setInterval(sweep, 10 * 60_000);
   timer.unref();
   server.addHook('onClose', async () => clearInterval(timer));
+
+  server.get('/auth/guest', async () => ({ enabled: o.guestPlay === true }));
 
   server.post('/auth/guest', async (req, reply) => {
     if (!o.guestPlay) return reply.code(404).send({ error: 'guest_play_disabled' });

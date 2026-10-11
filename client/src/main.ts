@@ -3,7 +3,7 @@ import App from './hq/App.svelte';
 import { demoArtwork, demoScope, FixtureSource } from './hq/data/fixture.js';
 import { BrowserRepository } from './hq/data/repository.js';
 import { ContinuousSurface } from './hq/data/continuousSurface.js';
-import { fetchMe, requestLink, signOut } from './auth.js';
+import { fetchMe, guestEnabled, requestLink, signOut, startGuest } from './auth.js';
 import { fetchGames, fetchScenarios } from './lobby/api.js';
 import { startShell } from './shell/boot.js';
 
@@ -32,6 +32,8 @@ if (app) {
     fetchScenarios,
     requestLink,
     signOut,
+    guestEnabled,
+    startGuest,
     // The accepted live client (3D table and desk) is the game screen; it reads its game from the URL.
     startLive: () => import('./liveClient.js').then(() => undefined),
     startFixture,

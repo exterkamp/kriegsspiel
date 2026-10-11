@@ -17,6 +17,9 @@ services:
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       TRUST_PROXY: ${TRUST_PROXY:-}
+      # The demo lets visitors play as a guest; set GUEST_PLAY=0 on a public deployment that needs accounts.
+      GUEST_PLAY: ${GUEST_PLAY:-1}
+      GUEST_IDLE_HOURS: ${GUEST_IDLE_HOURS:-}
     volumes:
       - data:/data
     logging:

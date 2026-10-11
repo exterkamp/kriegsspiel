@@ -25,6 +25,9 @@ export interface ShellDeps {
   fetchScenarios: () => Promise<Array<{ id: string; name: string }>>;
   requestLink: (email: string) => Promise<string | undefined>;
   signOut: () => Promise<void>;
+  /** Guest play (D17c). Absent or resolving false: the sign-in screen has no guest button. */
+  guestEnabled?: () => Promise<boolean>;
+  startGuest?: () => Promise<string | undefined>;
   /** Loads the 3D table and desk into `app` (it reads the URL itself). Called at most once per page. */
   startLive: () => Promise<void>;
   startFixture: (app: HTMLElement) => void;
@@ -41,6 +44,7 @@ export interface Shell {
 export async function startShell(deps: ShellDeps): Promise<Shell> {
   const { app, win } = deps;
   const me = await deps.fetchMe().catch(() => undefined);
+  const guestOn = me === undefined && (await deps.guestEnabled?.().catch(() => false)) === true;
   let state = initialShell(win.location.search, me !== undefined);
   let liveLoaded = false;
   let mounted: ReturnType<typeof mount> | undefined;
@@ -72,6 +76,16 @@ export async function startShell(deps: ShellDeps): Promise<Shell> {
     return continueRows(games, names, deps.now());
   };
 
+  /** With the guest cookie set, a fresh page load starts a game from the plain menu URL, or reopens the URL asked for. */
+  const playAsGuest = async (): Promise<string | undefined> => {
+    const err = await deps.startGuest!();
+    if (err !== undefined) return err;
+    const plain = state.screen.name === 'sign-in' && win.location.search === '';
+    if (plain) win.location.assign(urlFor({ name: 'game', create: {} }));
+    else win.location.reload();
+    return undefined;
+  };
+
   const signedOut = async (): Promise<void> => {
     disconnectGame();
     await deps.signOut();
@@ -85,7 +99,13 @@ export async function startShell(deps: ShellDeps): Promise<Shell> {
     clear();
     const screen = state.screen;
     if (screen.name === 'sign-in') {
-      mounted = mount(SignIn, { target: app, props: { onRequest: deps.requestLink } });
+      mounted = mount(SignIn, {
+        target: app,
+        props: {
+          onRequest: deps.requestLink,
+          ...(guestOn && deps.startGuest ? { onGuest: playAsGuest } : {}),
+        },
+      });
     } else if (screen.name === 'menu') {
       mounted = mount(MenuScreen, {
         target: app,
@@ -95,6 +115,8 @@ export async function startShell(deps: ShellDeps): Promise<Shell> {
           onNewGame: () => shell.go({ name: 'new-game' }),
           onContinue: (game: string) => shell.go({ name: 'game', game }),
           onSignOut: () => void signedOut(),
+          guest: me?.guest === true,
+          onSignIn: () => shell.go({ name: 'sign-in' }),
         },
       });
     } else if (screen.name === 'fixture') {

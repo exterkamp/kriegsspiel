@@ -67,6 +67,9 @@ describe('guest play', () => {
   it('is off unless enabled', async () => {
     const server = await start({ guestPlay: false });
     expect((await guest(server)).res.statusCode).toBe(404);
+    expect((await server.inject({ method: 'GET', url: '/auth/guest' })).json()).toEqual({
+      enabled: false,
+    });
     app = undefined;
     await server.close();
     app = await buildApp({ parser: new StubOrderParser(), auth: { mailer } });
