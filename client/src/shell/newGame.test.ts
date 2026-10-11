@@ -88,6 +88,7 @@ describe('new game form', () => {
     expect(rateExplanation(4)).toBe('4:1 means one hour of battle passes in 15 minutes.');
     expect(rateExplanation(1)).toMatch(/real time/);
     expect(rateExplanation(120)).toContain('30 seconds');
+    expect(rateExplanation(86400)).toBe('86400:1 means one hour of battle passes in one second.');
     expect(rateExplanation(0.5)).toContain('2 hours');
     expect(lengthLine(240, 12)).toBe('About 4 hours of battle, 20 minutes at this rate.');
     expect(lengthLine(0, 12)).toBe('');

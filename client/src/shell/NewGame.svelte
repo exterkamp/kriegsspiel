@@ -137,6 +137,7 @@
         </fieldset>
 
         {#if error}<p role="alert" class="err">{error}</p>{/if}
+        {#if starting}<p class="muted" role="status">Starting the game…</p>{/if}
 
         <div class="actions">
           <button type="submit" class="primary" aria-disabled={starting}>

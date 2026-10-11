@@ -71,7 +71,10 @@ export function rateOf(f: Form): number | undefined {
 }
 
 function span(minutes: number): string {
-  if (minutes < 1) return `${Math.max(1, Math.round(minutes * 60))} seconds`;
+  if (minutes < 1) {
+    const sec = Math.max(1, Math.round(minutes * 60));
+    return sec === 1 ? 'one second' : `${sec} seconds`;
+  }
   if (minutes < 120) {
     const m = Math.round(minutes);
     return m === 1 ? 'one minute' : `${m} minutes`;
