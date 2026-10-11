@@ -129,6 +129,10 @@ An `EngineSideView` (engine type, `viewFor`; not the protocol `SideView`, see D1
 
 Adding a field means updating this list and the leak tests in `visibility.test.ts`.
 
+#### Role views
+
+`viewForRole(world, side, seat, now)` (`packages/engine/src/roles.ts`) cuts the side view down for one seat; every role gets a subset of `viewFor`, never more. Commander and chief of staff see the whole HQ picture. Intelligence sees all enemy information and where our units stand, but not their strength, morale, fatigue or ammunition. The quartermaster sees our units in full and the `lowAmmo`/`exhausted` reports, and nothing about the enemy. A subordinate commander (a seat naming the unit ids they command) sees only those units, the enemy those units can see themselves, and the reports those units filed. Shared-HQ mode needs no role: every player uses `viewFor`. `maySign` (commander for any unit; a subordinate for their own formations; staff never) and `mayDraft` (any staff for any unit; a subordinate for their own) are the permission checks. Leak and permission tests are in `roles.test.ts`.
+
 ## LLM load and cost at continuous time
 
 - LLM calls fire on discrete triggers: an order issued (parse), an order delivered (interpretation), an ambiguity (judge), and a report due (narrate). Quiet stretches cost nothing.
