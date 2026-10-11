@@ -93,7 +93,7 @@ export async function startShell(deps: ShellDeps): Promise<Shell> {
           email: me?.email ?? '',
           load: loadRows,
           onNewGame: () => shell.go({ name: 'new-game' }),
-          onContinue: (game) => shell.go({ name: 'game', game }),
+          onContinue: (game: string) => shell.go({ name: 'game', game }),
           onSignOut: () => void signedOut(),
         },
       });

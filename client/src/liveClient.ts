@@ -393,7 +393,12 @@ async function main(app: HTMLElement): Promise<void> {
     });
     conn.start();
     registerGame({ disconnect: () => conn?.stop() });
+    // A page kept in the back/forward cache is not closed, so it must come back with a live connection.
+    // The listeners live as long as the page, like the client itself.
     window.addEventListener('pagehide', () => conn?.stop());
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted) conn?.start();
+    });
   } else {
     // No server: the fixture board with an empty desk.
     state = { ...withLink(state, 'offline'), view: fixtureView };

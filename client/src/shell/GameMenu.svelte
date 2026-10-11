@@ -11,12 +11,30 @@
   let { onLeave, onSignOut }: Props = $props();
   let open = $state(false);
   let resume: HTMLButtonElement | undefined = $state();
+  let opener: HTMLButtonElement | undefined = $state();
+  let panel: HTMLDivElement | undefined = $state();
 
   async function setOpen(v: boolean): Promise<void> {
     open = v;
-    if (v) {
-      await tick();
-      resume?.focus();
+    await tick();
+    if (v) resume?.focus();
+    else opener?.focus();
+  }
+
+  /** Keeps Tab inside the open panel, since the page behind it is not usable while it is up. */
+  function trapTab(e: KeyboardEvent): void {
+    if (e.key !== 'Tab' || !panel) return;
+    const items = [...panel.querySelectorAll<HTMLButtonElement>('button')];
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (!first || !last) return;
+    const at = document.activeElement;
+    if (e.shiftKey && (at === first || !panel.contains(at))) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (at === last || !panel.contains(at))) {
+      e.preventDefault();
+      first.focus();
     }
   }
 
@@ -26,6 +44,7 @@
    * it sees the view as it was before the desk handles the same key.
    */
   function onKey(e: KeyboardEvent): void {
+    if (open) trapTab(e);
     if (e.key !== 'Escape') return;
     if (open) {
       e.preventDefault();
@@ -39,13 +58,17 @@
 
 <svelte:window onkeydowncapture={onKey} />
 
-<button type="button" class="open" aria-haspopup="dialog" onclick={() => setOpen(true)}
-  >Menu (Esc)</button
+<button
+  type="button"
+  class="open"
+  bind:this={opener}
+  aria-haspopup="dialog"
+  onclick={() => setOpen(true)}>Menu (Esc)</button
 >
 
 {#if open}
   <div class="scrim">
-    <div class="panel" role="dialog" aria-modal="true" aria-labelledby="gm-h">
+    <div class="panel" bind:this={panel} role="dialog" aria-modal="true" aria-labelledby="gm-h">
       <h2 id="gm-h">Menu</h2>
       <button type="button" bind:this={resume} onclick={() => setOpen(false)}>Resume</button>
       <button type="button" onclick={onLeave}>Leave to main menu</button>

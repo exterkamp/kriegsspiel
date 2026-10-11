@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushSync, tick } from 'svelte';
 import axe from 'axe-core';
 import { startShell, type ShellDeps } from './boot.js';
+import { activeView } from '../desk/store.js';
 import { registerGame } from './gameHandle.js';
 import type { PlayedGame } from './continueList.js';
 
@@ -216,6 +217,45 @@ describe('in-game menu', () => {
     esc();
     await settle();
     expect(document.querySelector('[role=dialog]')).toBeNull();
+  });
+  it('leaves Esc to the desk in a desk view, and to the field in a text field', async () => {
+    await open('/?game=g1');
+    activeView.set('orders');
+    esc();
+    await settle();
+    expect(document.querySelector('[role=dialog]')).toBeNull();
+    activeView.set('table');
+    const field = document.createElement('textarea');
+    document.body.append(field);
+    field.focus();
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    flushSync();
+    await settle();
+    expect(document.querySelector('[role=dialog]')).toBeNull();
+    field.remove();
+  });
+  it('closes on Esc without the desk handler also seeing the key, and returns focus to the button', async () => {
+    await open('/?game=g1');
+    esc();
+    await settle();
+    const desk = vi.fn();
+    document.addEventListener('keydown', desk);
+    esc();
+    await settle();
+    document.removeEventListener('keydown', desk);
+    expect(desk).not.toHaveBeenCalled();
+    expect(document.activeElement?.textContent).toBe('Menu (Esc)');
+  });
+  it('keeps Tab inside the open menu', async () => {
+    await open('/?game=g1');
+    esc();
+    await settle();
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>('[role=dialog] button')];
+    buttons.at(-1)!.focus();
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    window.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(buttons[0]);
   });
   it('Leave closes the connection, then loads the main menu on a fresh page', async () => {
     const disconnect = vi.fn();
