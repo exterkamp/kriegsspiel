@@ -1,5 +1,12 @@
 import { InjectionToken } from '@angular/core';
-import { deleteAccount, fetchMe, guestEnabled, requestLink, signOut, startGuest } from '@legacy/auth';
+import {
+  deleteAccount,
+  fetchMe,
+  guestEnabled,
+  requestLink,
+  signOut,
+  startGuest,
+} from '@legacy/auth';
 import type { Me } from '@legacy/auth';
 import {
   fetchGame,

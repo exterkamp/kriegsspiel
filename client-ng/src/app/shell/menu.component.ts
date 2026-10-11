@@ -1,11 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  OnInit,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, input, output, signal } from '@angular/core';
 import type { ContinueRow } from '@legacy/shell/continueList';
 import { PAGE_CSS } from './page-styles';
 
@@ -82,8 +75,20 @@ import { PAGE_CSS } from './page-styles';
   styles: [
     PAGE_CSS,
     `
-      h1 { margin: 0; }
-      .game { width: 100%; display: flex; flex-wrap: wrap; gap: 4px 16px; text-align: left; font-size: inherit; padding: 8px 14px; background: #f6edd0; color: #2a2118; }
+      h1 {
+        margin: 0;
+      }
+      .game {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        text-align: left;
+        font-size: inherit;
+        padding: 8px 14px;
+        background: #f6edd0;
+        color: #2a2118;
+      }
     `,
   ],
 })

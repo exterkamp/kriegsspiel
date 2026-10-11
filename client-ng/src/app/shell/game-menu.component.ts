@@ -18,13 +18,7 @@ import { DeskStore } from '../desk/desk.store';
   selector: 'ks-game-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <button
-      #opener
-      type="button"
-      class="open"
-      aria-haspopup="dialog"
-      (click)="setOpen(true)"
-    >
+    <button #opener type="button" class="open" aria-haspopup="dialog" (click)="setOpen(true)">
       Menu (Esc)
     </button>
     @if (open()) {
@@ -40,9 +34,17 @@ import { DeskStore } from '../desk/desk.store';
     }
   `,
   styles: `
-    .open { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 30; }
+    .open {
+      position: fixed;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+    }
     button {
-      font: 13px/1.2 Georgia, serif;
+      font:
+        13px/1.2 Georgia,
+        serif;
       padding: 6px 12px;
       background: #2a2118;
       color: #efe6c8;
@@ -50,15 +52,39 @@ import { DeskStore } from '../desk/desk.store';
       border-radius: 3px;
       cursor: pointer;
     }
-    button:focus-visible { outline: 3px solid #f2c94c; outline-offset: 2px; }
-    .scrim { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.5); display: grid; place-items: center; }
-    .panel {
-      display: grid; gap: 8px; width: min(320px, calc(100% - 32px)); padding: 16px;
-      background: #f3e9c9; color: #2a2118; border: 1px solid #5a4c33; font-family: Georgia, serif;
+    button:focus-visible {
+      outline: 3px solid #f2c94c;
+      outline-offset: 2px;
     }
-    .panel button { font-size: 15px; }
-    h2 { margin: 0; }
-    .note { margin: 0; font-size: 13px; color: #5a4c33; }
+    .scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      background: rgba(0, 0, 0, 0.5);
+      display: grid;
+      place-items: center;
+    }
+    .panel {
+      display: grid;
+      gap: 8px;
+      width: min(320px, calc(100% - 32px));
+      padding: 16px;
+      background: #f3e9c9;
+      color: #2a2118;
+      border: 1px solid #5a4c33;
+      font-family: Georgia, serif;
+    }
+    .panel button {
+      font-size: 15px;
+    }
+    h2 {
+      margin: 0;
+    }
+    .note {
+      margin: 0;
+      font-size: 13px;
+      color: #5a4c33;
+    }
   `,
 })
 export class GameMenuComponent {
@@ -80,10 +106,9 @@ export class GameMenuComponent {
 
   protected setOpen(v: boolean): void {
     this.open.set(v);
-    afterNextRender(
-      () => (v ? this.resume() : this.opener())?.nativeElement.focus(),
-      { injector: this.injector },
-    );
+    afterNextRender(() => (v ? this.resume() : this.opener())?.nativeElement.focus(), {
+      injector: this.injector,
+    });
   }
 
   /** Keeps Tab inside the open panel, since the page behind it is not usable while it is up. */

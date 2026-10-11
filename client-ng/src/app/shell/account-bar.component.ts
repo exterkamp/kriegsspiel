@@ -16,12 +16,32 @@ import { SHELL_API } from './shell-api';
   `,
   styles: `
     #account {
-      position: fixed; right: 8px; bottom: 8px; z-index: 20; display: flex; gap: 8px; align-items: center;
-      padding: 6px 8px; background: rgba(42, 33, 24, 0.95); color: #efe6c8; font: 13px Georgia, serif;
+      position: fixed;
+      right: 8px;
+      bottom: 8px;
+      z-index: 20;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 8px;
+      background: rgba(42, 33, 24, 0.95);
+      color: #efe6c8;
+      font:
+        13px Georgia,
+        serif;
     }
-    a { color: #f2c94c; }
-    button { font: inherit; cursor: pointer; }
-    a:focus-visible, button:focus-visible { outline: 3px solid #f2c94c; outline-offset: 2px; }
+    a {
+      color: #f2c94c;
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+    }
+    a:focus-visible,
+    button:focus-visible {
+      outline: 3px solid #f2c94c;
+      outline-offset: 2px;
+    }
   `,
 })
 export class AccountBarComponent {

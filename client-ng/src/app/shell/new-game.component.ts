@@ -52,9 +52,7 @@ import { PAGE_CSS } from './page-styles';
                 </label>
               }
               <p>{{ scenario()!.briefing }}</p>
-              <p class="muted">
-                Sides: {{ sideNames() }}. {{ length() }}
-              </p>
+              <p class="muted">Sides: {{ sideNames() }}. {{ length() }}</p>
             </fieldset>
 
             <fieldset>
@@ -139,12 +137,32 @@ import { PAGE_CSS } from './page-styles';
   styles: [
     PAGE_CSS,
     `
-      h1 { font-size: 2rem; }
-      fieldset { border: 1px solid #8a7a52; margin: 0 0 16px; padding: 8px 12px 12px; }
-      legend { font-weight: bold; }
-      .choice { display: block; padding: 6px 0; }
-      input[type='text'] { display: block; font: inherit; padding: 6px; margin-top: 4px; width: 8em; }
-      .actions { display: flex; gap: 12px; }
+      h1 {
+        font-size: 2rem;
+      }
+      fieldset {
+        border: 1px solid #8a7a52;
+        margin: 0 0 16px;
+        padding: 8px 12px 12px;
+      }
+      legend {
+        font-weight: bold;
+      }
+      .choice {
+        display: block;
+        padding: 6px 0;
+      }
+      input[type='text'] {
+        display: block;
+        font: inherit;
+        padding: 6px;
+        margin-top: 4px;
+        width: 8em;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+      }
     `,
   ],
 })

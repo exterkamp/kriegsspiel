@@ -59,7 +59,10 @@ type Prep =
     @if (state(); as st) {
       @switch (st.screen.name) {
         @case ('sign-in') {
-          <ks-sign-in [onRequest]="api.requestLink" [onGuest]="guestOn() ? playAsGuest : undefined" />
+          <ks-sign-in
+            [onRequest]="api.requestLink"
+            [onGuest]="guestOn() ? playAsGuest : undefined"
+          />
         }
         @case ('menu') {
           <ks-menu
@@ -109,9 +112,23 @@ type Prep =
     }
   `,
   styles: `
-    :host { display: block; height: 100%; }
-    .failed { color: #efe6c8; font-family: Georgia, serif; padding: 16px; }
-    .games { max-width: 560px; margin: 0 auto; padding: 0 16px 32px; font-family: Georgia, serif; color: #2a2118; background: #e9dcb8; }
+    :host {
+      display: block;
+      height: 100%;
+    }
+    .failed {
+      color: #efe6c8;
+      font-family: Georgia, serif;
+      padding: 16px;
+    }
+    .games {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 0 16px 32px;
+      font-family: Georgia, serif;
+      color: #2a2118;
+      background: #e9dcb8;
+    }
   `,
 })
 export class ShellComponent implements OnInit, OnDestroy {
@@ -215,7 +232,12 @@ export class ShellComponent implements OnInit, OnDestroy {
     this.prep.set({ step: 'working' });
     if (screen.name === 'fixture') return this.enter();
     try {
-      let id = screen.name === 'game' ? screen.game : screen.name === 'game-over' ? screen.game : undefined;
+      let id =
+        screen.name === 'game'
+          ? screen.game
+          : screen.name === 'game-over'
+            ? screen.game
+            : undefined;
       let side = screen.name === 'game' ? screen.side : undefined;
       if (id === undefined) {
         const create = screen.name === 'game' ? screen.create : undefined;

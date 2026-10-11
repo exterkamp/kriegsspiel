@@ -48,7 +48,12 @@ import { SHELL_API, SHELL_WINDOW } from '../shell/shell-api';
           </button>
         }
         @if (info().creator) {
-          <button id="room-start" type="button" [disabled]="blocker() !== undefined" (click)="start()">
+          <button
+            id="room-start"
+            type="button"
+            [disabled]="blocker() !== undefined"
+            (click)="start()"
+          >
             Start game
           </button>
         }
@@ -59,12 +64,42 @@ import { SHELL_API, SHELL_WINDOW } from '../shell/shell-api';
     </div>
   `,
   styles: `
-    :host { display: block; height: 100%; }
-    .page { min-height: 100%; background: #e9dcb8 radial-gradient(circle at 30% 20%, #f3e9c9, #d9c795); }
-    main { box-sizing: border-box; padding: 32px 16px; max-width: 560px; margin: 0 auto; color: #2a2118; font-family: Georgia, serif; }
-    ul { list-style: none; padding: 0; display: grid; gap: 8px; }
-    button { font: inherit; padding: 6px 12px; border: 1px solid #5a4c33; border-radius: 3px; background: #f6edd0; color: #2a2118; cursor: pointer; }
-    button:focus-visible, input:focus-visible { outline: 3px solid #1f5fbf; outline-offset: 2px; }
+    :host {
+      display: block;
+      height: 100%;
+    }
+    .page {
+      min-height: 100%;
+      background: #e9dcb8 radial-gradient(circle at 30% 20%, #f3e9c9, #d9c795);
+    }
+    main {
+      box-sizing: border-box;
+      padding: 32px 16px;
+      max-width: 560px;
+      margin: 0 auto;
+      color: #2a2118;
+      font-family: Georgia, serif;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      display: grid;
+      gap: 8px;
+    }
+    button {
+      font: inherit;
+      padding: 6px 12px;
+      border: 1px solid #5a4c33;
+      border-radius: 3px;
+      background: #f6edd0;
+      color: #2a2118;
+      cursor: pointer;
+    }
+    button:focus-visible,
+    input:focus-visible {
+      outline: 3px solid #1f5fbf;
+      outline-offset: 2px;
+    }
   `,
 })
 export class RoomComponent implements OnInit {

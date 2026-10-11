@@ -37,12 +37,36 @@ import { PAGE_CSS } from './page-styles';
   styles: [
     PAGE_CSS,
     `
-      main { max-width: 420px; }
-      label { display: block; margin-bottom: 12px; }
-      input { display: block; width: 100%; box-sizing: border-box; font: inherit; padding: 6px; margin-top: 4px; }
-      h2 { border: 0; margin: 0 0 8px; }
-      .hint { margin-top: -4px; font-size: 0.9rem; }
-      .primary { font-weight: bold; background: #e3d09a; color: #2a2118; font-size: inherit; padding: 8px 14px; }
+      main {
+        max-width: 420px;
+      }
+      label {
+        display: block;
+        margin-bottom: 12px;
+      }
+      input {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        font: inherit;
+        padding: 6px;
+        margin-top: 4px;
+      }
+      h2 {
+        border: 0;
+        margin: 0 0 8px;
+      }
+      .hint {
+        margin-top: -4px;
+        font-size: 0.9rem;
+      }
+      .primary {
+        font-weight: bold;
+        background: #e3d09a;
+        color: #2a2118;
+        font-size: inherit;
+        padding: 8px 14px;
+      }
     `,
   ],
 })

@@ -32,12 +32,32 @@ interface Row {
     }
   `,
   styles: `
-    :host { display: block; margin-top: 24px; }
-    h2 { font-size: 1.1rem; margin: 0 0 8px; border-bottom: 1px solid #8a7a52; }
-    ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-    a { color: #6b1d12; }
-    a:focus-visible { outline: 3px solid #1f5fbf; outline-offset: 2px; }
-    .err { color: #8a1c10; }
+    :host {
+      display: block;
+      margin-top: 24px;
+    }
+    h2 {
+      font-size: 1.1rem;
+      margin: 0 0 8px;
+      border-bottom: 1px solid #8a7a52;
+    }
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 6px;
+    }
+    a {
+      color: #6b1d12;
+    }
+    a:focus-visible {
+      outline: 3px solid #1f5fbf;
+      outline-offset: 2px;
+    }
+    .err {
+      color: #8a1c10;
+    }
   `,
 })
 export class GameListComponent implements OnInit {
