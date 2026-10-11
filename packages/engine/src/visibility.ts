@@ -61,6 +61,9 @@ export const SCAN_INTERVAL_MS = MS_PER_MINUTE;
 /** Courier time for a report to reach HQ. */
 export const COURIER_DELAY_MS = 10 * MS_PER_MINUTE;
 
+/** An acknowledgement rides a shorter way back than a sighting: the unit is already on the road to HQ. */
+export const ACK_DELAY_MS = 2 * MS_PER_MINUTE;
+
 export const SCAN_EVENT = 'intel.scan';
 export const REPORT_EVENT = 'intel.report';
 const REPORT_KINDS: Array<Report['kind']> = ['unitLost', 'orderDelivered', 'lowAmmo', 'exhausted'];
@@ -239,6 +242,8 @@ export function renderReport(r: Report, ageMs: number): string {
   const where = r.place;
   const when = `${mins} min ago`;
   switch (r.kind) {
+    case 'situation':
+      return `${r.from} reports ${r.sizeEstimate ?? 'the formations'} in position ${where}; no enemy yet in sight.`;
     case 'contact':
       return `${r.from} sighted ${r.sizeEstimate ?? 'enemy troops'} ${where}, ${when} (${r.confidence} confidence).`;
     case 'unitLost':
@@ -415,12 +420,13 @@ export function fileReport(
   kind: Report['kind'],
   unit: Unit,
   time: GameTime,
+  delayMs: number = COURIER_DELAY_MS,
 ): GameState {
   const report: Report = {
     id: reportId(world, unit.side),
     kind,
     observedAt: time,
-    deliverAt: time + COURIER_DELAY_MS,
+    deliverAt: time + delayMs,
     from: unit.name,
     location: { ...unit.center },
     place: describePlace(world.map, unit.center),
@@ -454,11 +460,41 @@ export function registerVisibility(registry: EventRegistry<GameState>): void {
     }
     const unit = world.units.find((u) => u.id === p.unitId);
     if (!unit) throw new Error(`${REPORT_EVENT}: unknown unit ${String(p.unitId)}`);
-    return { world: fileReport(world, p.kind as Report['kind'], unit, ev.time) };
+    const delay = p.kind === 'orderDelivered' ? ACK_DELAY_MS : COURIER_DELAY_MS;
+    return { world: fileReport(world, p.kind as Report['kind'], unit, ev.time, delay) };
   });
+}
+
+/**
+ * Each side's chief of staff hands over an opening situation report at once, so a player has
+ * paper to read before any contact. It carries no enemy information, only the side's own.
+ */
+function openingReports(state: EngineState<GameState>): EngineState<GameState> {
+  let world = state.world;
+  for (const side of world.sides) {
+    if (world.intel[side.id].reports.some((r) => r.kind === 'situation')) continue;
+    const mine = world.units.filter((u) => u.side === side.id && u.strength > 0);
+    const first = mine[0];
+    if (!first) continue;
+    const at = side.hq ?? first.center;
+    const report: Report = {
+      id: reportId(world, side.id),
+      kind: 'situation',
+      observedAt: state.time,
+      deliverAt: state.time,
+      from: 'Chief of staff',
+      location: { ...at },
+      place: describePlace(world.map, at),
+      uncertainty: 0,
+      sizeEstimate: `${mine.length} ${mine.length === 1 ? 'formation' : 'formations'}`,
+      confidence: 'high',
+    };
+    world = withIntel(world, side.id, { reports: [...world.intel[side.id].reports, report] });
+  }
+  return { ...state, world };
 }
 
 /** Queue the first scan at the state's current time. Call once when a game starts. */
 export function startVisibility(state: EngineState<GameState>): EngineState<GameState> {
-  return schedule(state, [{ time: state.time, type: SCAN_EVENT } as NewEvent]);
+  return schedule(openingReports(state), [{ time: state.time, type: SCAN_EVENT } as NewEvent]);
 }
