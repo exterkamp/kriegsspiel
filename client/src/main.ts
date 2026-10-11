@@ -11,7 +11,6 @@ import {
   withMarkDeleted,
   withMarkPut,
   withPendingOrder,
-  withRead,
   type ClientState,
 } from './net/state.js';
 import { Hud, buildOrderText } from './hud/hud.js';
@@ -24,7 +23,7 @@ import { parseSession, wsUrl } from './session.js';
 import { fetchMe, showAccountBar, showLogin } from './auth.js';
 import { mount } from 'svelte';
 import Desk from './desk/Desk.svelte';
-import { activeView, gameState } from './desk/store.js';
+import { activeView, gameState, persistTray, showOnTable, viewedDispatch } from './desk/store.js';
 import { isDeskView } from './desk/views.js';
 
 /** Make a game as the signed-in user and take `side` (the server picks one when unset). */
@@ -108,6 +107,14 @@ async function main(app: HTMLElement): Promise<void> {
   }
 
   let state: ClientState = initialState;
+  // The desk marks dispatches read through the store, so keep this copy in step with it.
+  gameState.subscribe((s) => (state = s));
+  persistTray(params.mode === 'join' ? params.game : 'fixture');
+  showOnTable.subscribe((at) => {
+    if (!at) return;
+    table.panTo(at);
+    showOnTable.set(undefined);
+  });
   let conn: GameConnection | undefined;
   let orderSeq = 0;
   const hud = new Hud(app, {
@@ -121,14 +128,6 @@ async function main(app: HTMLElement): Promise<void> {
       gameState.set(state);
       hud.render(state, Date.now());
       return undefined;
-    },
-    onOpenDispatch(d) {
-      state = withRead(state, d.id);
-      if (d.location) lastReport = d;
-      redrawMarks();
-      gameState.set(state);
-      hud.render(state, Date.now());
-      if (d.location) table.panTo(d.location);
     },
   });
 
@@ -201,6 +200,12 @@ async function main(app: HTMLElement): Promise<void> {
     redrawMarks();
   };
   setInterval(redrawMarks, 2000);
+  // The last located report the player opened in the desk viewer is the one Plot report pins.
+  viewedDispatch.subscribe((d) => {
+    if (!d?.location) return;
+    lastReport = d;
+    redrawMarks();
+  });
 
   const rerender = () => {
     gameState.set(state);
