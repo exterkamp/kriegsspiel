@@ -16,7 +16,12 @@ import {
 } from './journal.js';
 import { loadMarks, saveMarks, type TrayMarks } from './tray.js';
 import type { ViewId } from './views.js';
-import { fixtureClient, type ConferenceClient, type Exchange } from './conference.js';
+import {
+  fixtureClient,
+  type ConferenceRole,
+  type ConferenceClient,
+  type Exchange,
+} from './conference.js';
 
 /** The shared app store: both the Three.js table and the Svelte desk read from and write to these. */
 export const gameState = writable<ClientState>(initialState);
@@ -121,6 +126,10 @@ export function persistDraft(key: string): () => void {
 
 /** The staff conference: where answers come from (the fixture until the server endpoint exists) and what has been asked. */
 export const conferenceClient = writable<ConferenceClient>(fixtureClient);
+/** Sends a question to the server, which charges its game-time cost. Absent offline: the fixture charges it. */
+export const conferenceSender = writable<
+  ((questionId: string, role: ConferenceRole, question: string) => boolean) | undefined
+>(undefined);
 export const conferenceLog = writable<readonly Exchange[]>([]);
 
 /** The war diary: orders sent, dispatches received, pauses and the player's notes, kept per game. */

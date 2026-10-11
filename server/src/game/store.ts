@@ -7,6 +7,7 @@
  */
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { Seat } from '@kriegsspiel/engine';
 import type { DraftSnapshot, Mark } from '@kriegsspiel/protocol';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
@@ -24,7 +25,14 @@ export interface GameSnapshot {
 
 /** Commands a player or the host can send to a game. Plain JSON so they can be logged. */
 export type GameCommand =
-  | { kind: 'order'; side: string; text: string; courier?: 'fast' | 'safe' }
+  | {
+      kind: 'order';
+      side: string;
+      text: string;
+      courier?: 'fast' | 'safe';
+      /** The seat that signed, when the side plays with roles; the order is refused if it may not sign for the addressee. */
+      signer?: Seat;
+    }
   | { kind: 'setRate'; rate: number }
   | { kind: 'pause' }
   | { kind: 'resume' }

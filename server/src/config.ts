@@ -6,6 +6,7 @@ import {
   type Personality,
 } from './opponent/llmCommander.js';
 import type { UmpireConfig } from './umpire/index.js';
+import { COMMANDER_BUDGET_SHARE, type GameLimits } from './umpire/gameLimits.js';
 import { LogMailer, WebhookMailer, type Mailer } from './auth/mailer.js';
 
 /** Scripted sides are played by the built-in opponent unless `SCRIPTED_OPPONENTS` is `0`, `false` or `off`. */
@@ -35,6 +36,22 @@ export function aiCommanderFromEnv(
     difficulty: pick('AI_DIFFICULTY', DIFFICULTIES, 'normal'),
     personality: pick('AI_PERSONALITY', PERSONALITIES, 'balanced'),
   };
+}
+
+/**
+ * A startup warning when the AI commander is on and no per-game cost or token cap is set, since
+ * it then spends without a limit. Its share (`COMMANDER_BUDGET_SHARE`) is a share of a cap, so
+ * without a cap there is nothing to share. Undefined when a cap exists.
+ */
+export function aiCommanderBudgetWarning(gameBudget?: GameLimits): string | undefined {
+  if (gameBudget?.maxCostUsd !== undefined || gameBudget?.maxTotalTokens !== undefined) {
+    return undefined;
+  }
+  return (
+    'AI_COMMANDER=llm is on with no per-game cost cap: the AI commander can spend without limit. ' +
+    'Set UMPIRE_GAME_BUDGET_USD or UMPIRE_GAME_BUDGET_TOKENS; the commander is then held to ' +
+    `${Math.round(COMMANDER_BUDGET_SHARE * 100)}% of it.`
+  );
 }
 
 /** `TRUST_PROXY` of `1`, `true` or `on` trusts `X-Forwarded-For`; set it behind a reverse proxy only. */

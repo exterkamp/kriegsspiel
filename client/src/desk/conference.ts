@@ -1,4 +1,5 @@
 import type { SideView } from '@kriegsspiel/protocol';
+import type { LinkStatus, StaffCharge } from '../net/state.js';
 import { formatAge, pct } from './roster.js';
 
 /** The four officers the player can consult (docs/hq-interface.md, "Staff conference"). */
@@ -79,9 +80,59 @@ export interface Exchange {
   answerAtGame: number;
   answer?: ConferenceAnswer;
   failed?: boolean;
+  /** Set when the server is charging the cost: the id its reply carries, and the wall time it was sent. */
+  questionId?: string;
+  sentAtWall?: number;
 }
 
 export const MAX_QUESTION_LENGTH = 400;
+
+/** How long an exchange waits for the server's reply before it counts as lost (wall ms). */
+export const SERVER_REPLY_TIMEOUT_MS = 15_000;
+
+/** The next free exchange id: derived from the log, so it never depends on which mount asks. */
+export const nextExchangeId = (log: readonly Exchange[]): number =>
+  log.reduce((m, e) => Math.max(m, e.id), 0) + 1;
+
+/** What the page knows about the server when it reconciles the log. */
+export interface ServerStaffState {
+  charges: Readonly<Record<string, StaffCharge>>;
+  link: LinkStatus;
+  /** Wall time of the last error that names no question (`game_closed`, `bad_message`). */
+  faultAtWall?: number;
+  nowWall: number;
+}
+
+/**
+ * Settle the exchanges waiting on the server (`answerAtGame` is Infinity): take the cost from its
+ * reply, fail the ones it refused, and fail any whose reply cannot come (link down, an unnamed
+ * error since they were sent, or a timeout). Returns the same array when nothing changed.
+ */
+export function reconcileExchanges(
+  log: readonly Exchange[],
+  server: ServerStaffState,
+): readonly Exchange[] {
+  let changed = false;
+  const next = log.map((e) => {
+    if (e.answerAtGame !== Infinity || e.failed) return e;
+    const c = e.questionId === undefined ? undefined : server.charges[e.questionId];
+    let out: Exchange = e;
+    if (c === 'refused') out = { ...e, failed: true };
+    else if (c !== undefined)
+      out = { ...e, askedAtGame: c.askedAtGame, answerAtGame: c.answerAtGame };
+    else if (
+      server.link !== 'open' ||
+      (server.faultAtWall !== undefined &&
+        e.sentAtWall !== undefined &&
+        e.sentAtWall <= server.faultAtWall) ||
+      (e.sentAtWall !== undefined && server.nowWall - e.sentAtWall >= SERVER_REPLY_TIMEOUT_MS)
+    )
+      out = { ...e, failed: true };
+    if (out !== e) changed = true;
+    return out;
+  });
+  return changed ? next : log;
+}
 
 export const staffFor = (
   role: ConferenceRole,
@@ -163,8 +214,14 @@ export function fixtureAnswer(
       break;
     }
     case 'quartermaster': {
-      const low = own.filter((u) => u.supply < 0.4);
-      for (const u of own) lines.push(`${u.name}: supply ${pct(u.supply)}%.`);
+      const low = own.filter((u) => u.supply !== undefined && u.supply < 0.4);
+      for (const u of own) {
+        lines.push(
+          u.supply === undefined
+            ? `${u.name}: supply unknown.`
+            : `${u.name}: supply ${pct(u.supply)}%.`,
+        );
+      }
       lines.push(
         low.length
           ? `${list(low.map((u) => u.name))} ${low.length === 1 ? 'is' : 'are'} running short.`

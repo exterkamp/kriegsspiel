@@ -66,6 +66,8 @@ The OpenAI-compatible adapter always sends `max_tokens`. OpenAI's newer models (
    with `local` defined as `{ "type": "ollama" }` in `umpire.json`. Ollama's default context window is small; set `numCtx` (above) to fit the board state plus the prompt.
 3. Or use Ollama's OpenAI-compatible endpoint: `{ "type": "openai-compatible", "baseUrl": "http://localhost:11434/v1" }`. The same works for llama.cpp server, LM Studio and vLLM with their own base URL.
 
+With `AI_COMMANDER=llm` and no `gameBudget` dollar or token cap, the server logs a startup warning, because the commander's share is a share of a cap and there is then nothing to limit it. Set `UMPIRE_GAME_BUDGET_USD` or `UMPIRE_GAME_BUDGET_TOKENS`.
+
 Local models are slow. Raise `timeoutMs` (a 60 s default is tight for a large model on a CPU), and expect `costUsd: null` in the call record since only Claude models are priced; use `budget.maxTotalTokens` to cap them.
 
 ### Live test
@@ -97,5 +99,5 @@ Only adapter files may import a vendor SDK; a test enforces it.
 | Retry, backoff, timeout, validation, repair | `ProviderUmpireClient` | Per stage, same for every provider. |
 | Rate limit | `RateLimitedUmpireClient` | `maxConcurrent`, `minIntervalMs`. |
 | Budget | `BudgetedUmpireClient` | Counts failed attempts. Dollars only for priced models. |
-| Per-game caps and cost report | `GameUmpireClient` | One per game over the shared client. `gameBudget`: dollars, tokens, calls per sliding minute. Refuses with `UmpireError` kind `budget` or `rate-limit` (nothing sent), so stage code falls back. `report()` gives calls, tokens, cost and refusals per stage; `onMetric` logs each call and refusal. |
+| Per-game caps and cost report | `GameUmpireClient` | One per game over the shared client. `gameBudget`: dollars, tokens, calls per sliding minute. Staff calls are held to a quarter of each cap and the AI commander (its `command` calls and the parses of its text, via `commanderClient()`) to 40%, so neither starves a human's parsing or judging. Refuses with `UmpireError` kind `budget` or `rate-limit` (nothing sent), so stage code falls back. `report()` gives calls, tokens, cost and refusals per stage; `onMetric` logs each call and refusal. |
 | Record / playback | `CallRecorder`, `PlaybackUmpireClient` | Playback has no provider, so no network. |

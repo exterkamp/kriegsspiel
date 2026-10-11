@@ -20,6 +20,7 @@ import { SqliteNotifyStore, pushFromEnv } from './notify/index.js';
 import { SqliteAuthStore } from './auth/store.js';
 import { SqliteLobbyStore } from './lobby/store.js';
 import {
+  aiCommanderBudgetWarning,
   aiCommanderFromEnv,
   authFromEnv,
   llmOrderParserEnabled,
@@ -47,6 +48,10 @@ const ai = aiCommanderFromEnv(process.env);
 const loadedConfig = loadUmpireConfig(process.env);
 const llmParser = llmOrderParserEnabled(process.env, loadedConfig);
 const umpireConfig = ai || llmParser ? loadedConfig : undefined;
+if (ai && umpireConfig) {
+  const warning = aiCommanderBudgetWarning(umpireConfig.gameBudget);
+  if (warning) console.warn(warning);
+}
 const umpire = umpireConfig ? createUmpireClient({ config: umpireConfig }) : undefined;
 const gameClients = new Map<string, ReturnType<typeof createGameUmpire>>();
 const gameUmpire = (gameId: string) => {
@@ -79,10 +84,11 @@ const { server } = await buildApp({
     ai && umpire
       ? (gameId, world, scripted) => {
           const client = gameUmpire(gameId);
+          const commanderClient = client.commanderClient();
           const llm = llmAgents(world, {
             ...ai,
-            client,
-            parser: new LlmOrderParser(client),
+            client: commanderClient,
+            parser: new LlmOrderParser(commanderClient),
             onNote: (side, note) => server.log.warn({ gameId, side, note }, 'ai commander'),
           });
           return llm.length > 0 ? llm : scripted;
