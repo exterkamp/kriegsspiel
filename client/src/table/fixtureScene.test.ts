@@ -113,6 +113,39 @@ describe('TableScene.apply', () => {
     raf.mockRestore();
   });
 
+  it('retries the real synchronous startup after a first render failure', () => {
+    const raf = vi.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(7);
+    const table = make();
+    const render = vi.spyOn(table.renderer, 'render').mockImplementationOnce(() => {
+      throw new Error('Initial render failed');
+    });
+    expect(() => table.start()).toThrow('Initial render failed');
+    expect(raf).not.toHaveBeenCalled();
+    table.start();
+    expect(render).toHaveBeenCalledTimes(2);
+    expect(raf).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['controls', 'render'] as const)(
+    'keeps real renderer startup terminal when its %s callback disposes',
+    (callback) => {
+      const raf = vi.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(7);
+      const table = make();
+      const render = vi.spyOn(table.renderer, 'render');
+      if (callback === 'controls')
+        vi.spyOn(table.controls, 'update').mockImplementationOnce(() => {
+          table.dispose();
+          return true;
+        });
+      else render.mockImplementationOnce(() => table.dispose());
+      table.start();
+      table.start();
+      expect(raf).not.toHaveBeenCalled();
+      expect(render).toHaveBeenCalledTimes(callback === 'controls' ? 0 : 1);
+      expect(table.scene.children).toHaveLength(0);
+    },
+  );
+
   it('reconciles 60 fixture pieces without multiplying bodies or paper resources', () => {
     const t = make();
     t.apply(performanceSceneState);
@@ -1050,6 +1083,140 @@ describe('map texture and types', () => {
 describe('continuous reconciliation regressions', () => {
   const piece = (table: TableScene, id = 'blue-1') =>
     piecesOf(table).children.find((object) => object.userData.id === id)!;
+
+  it.each(['top-down', 'oblique'] as const)(
+    'bounds generic edge/corner paper fragments in the %s sprite shader without moving knowledge',
+    (view) => {
+      // Verify the installed shader path, rather than assuming Material inheritance clips sprites.
+      expect(THREE.ShaderLib.sprite.vertexShader).toContain('#include <clipping_planes_vertex>');
+      expect(THREE.ShaderLib.sprite.fragmentShader).toContain(
+        '#include <clipping_planes_fragment>',
+      );
+      expect(THREE.ShaderChunk.clipping_planes_vertex).toContain(
+        'vClipPosition = - mvPosition.xyz',
+      );
+      expect(THREE.ShaderChunk.clipping_planes_fragment).toContain(
+        'if ( dot( vClipPosition, plane.xyz ) > plane.w ) discard;',
+      );
+      const rendererSource = readFileSync(
+        resolve(process.cwd(), '../node_modules/three/src/renderers/WebGLRenderer.js'),
+        'utf8',
+      );
+      expect(rendererSource).toContain('clipping.setState( material, camera, useCache )');
+      const positions = [
+        { x: 0, y: 0 },
+        { x: 4000, y: 0 },
+        { x: 0, y: 3000 },
+        { x: 4000, y: 3000 },
+        { x: 0, y: 1500 },
+        { x: 4000, y: 1500 },
+        { x: 2000, y: 0 },
+        { x: 2000, y: 3000 },
+      ];
+      const ghosts = positions.map((position, index) => ({
+        ...state.ghosts[0]!,
+        id: `edge-${index}`,
+        position,
+        footprint: undefined,
+        shape: undefined,
+        uncertaintyRadius: 3000,
+      }));
+      const input = { ...state, own: [], ghosts };
+      const original = structuredClone(input);
+      const table = make();
+      table.apply(input);
+      if (view === 'top-down') table.snapTopDown();
+      else table.snapOblique();
+      table.scene.updateMatrixWorld(true);
+      table.camera.updateMatrixWorld(true);
+      for (const ghost of ghosts) {
+        const group = piece(table, ghost.id);
+        const tag = group.getObjectByName('paper-tag') as THREE.Sprite;
+        expect(group.position).toEqual(mapToWorld(fixtureMap, ghost.position));
+        expect(group.userData).toEqual({ pieceKind: 'ghost', id: ghost.id });
+        expect(
+          (group.getObjectByName('uncertainty')!.children[0] as THREE.Mesh<THREE.CircleGeometry>)
+            .geometry.parameters.radius,
+        ).toBe(3000);
+        expect(table.renderer.localClippingEnabled).toBe(true);
+        // Sprite vertices expand in camera space, not in the object's local XY plane.
+        const centreView = tag
+          .getWorldPosition(new THREE.Vector3())
+          .applyMatrix4(table.camera.matrixWorldInverse);
+        const scale = tag.getWorldScale(new THREE.Vector3());
+        const planes = (tag.material.clippingPlanes ?? []).map((plane) => {
+          const projected = plane.clone().applyMatrix4(table.camera.matrixWorldInverse);
+          // WebGLClipping uploads Float32 normals/constants.
+          return new Float32Array([...projected.normal.toArray(), projected.constant]);
+        });
+        const discarded = (viewPoint: THREE.Vector3) =>
+          planes.some(
+            (plane) =>
+              -viewPoint.x * plane[0]! - viewPoint.y * plane[1]! - viewPoint.z * plane[2]! >
+              plane[3]!,
+          );
+        let kept = 0;
+        for (let u = 0; u <= 8; u++)
+          for (let v = 0; v <= 8; v++) {
+            const fragment = centreView
+              .clone()
+              .add(
+                new THREE.Vector3(
+                  (u / 8 - tag.center.x) * scale.x,
+                  (v / 8 - tag.center.y) * scale.y,
+                  0,
+                ),
+              );
+            if (discarded(fragment)) continue;
+            kept++;
+            const world = fragment.clone().applyMatrix4(table.camera.matrixWorld);
+            expect(world.x).toBeGreaterThanOrEqual(-2000 - 1e-6);
+            expect(world.x).toBeLessThanOrEqual(2000 + 1e-6);
+            expect(world.z).toBeGreaterThanOrEqual(-1500 - 1e-6);
+            expect(world.z).toBeLessThanOrEqual(1500 + 1e-6);
+            // A visible label fragment must project over the paper, even when elevated.
+            const projected = world.clone().project(table.camera);
+            const ray = new THREE.Raycaster();
+            ray.setFromCamera(new THREE.Vector2(projected.x, projected.y), table.camera);
+            const onPaper = ray.ray.intersectPlane(
+              new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+              new THREE.Vector3(),
+            )!;
+            expect(onPaper.x).toBeGreaterThanOrEqual(-2000 - 1e-6);
+            expect(onPaper.x).toBeLessThanOrEqual(2000 + 1e-6);
+            expect(onPaper.z).toBeGreaterThanOrEqual(-1500 - 1e-6);
+            expect(onPaper.z).toBeLessThanOrEqual(1500 + 1e-6);
+          }
+        expect(kept).toBeGreaterThan(0); // Clipping the whole edge label away is not a repair.
+        expect(tag.material.clippingPlanes).toHaveLength(8);
+        for (const outside of [
+          new THREE.Vector3(-2001, 0, 0),
+          new THREE.Vector3(2001, 0, 0),
+          new THREE.Vector3(0, 0, -1501),
+          new THREE.Vector3(0, 0, 1501),
+        ])
+          expect(discarded(outside.applyMatrix4(table.camera.matrixWorldInverse))).toBe(true);
+        // Labels stay decorative: targeting the source piece retains its identity.
+        // Elevated body centres at an edge project to off-map ground (correctly unpickable).
+        // Target an in-bounds ground point inside the unchanged widened edge pick mesh.
+        const body = mapToWorld(fixtureMap, {
+          x: THREE.MathUtils.clamp(ghost.position.x, 1, 3999),
+          y: THREE.MathUtils.clamp(ghost.position.y, 1, 2999),
+        });
+        const projected = body.project(table.camera);
+        if (Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1)
+          expect(table.pickNdc(new THREE.Vector2(projected.x, projected.y))).toMatchObject({
+            type: 'piece',
+            pieceKind: 'ghost',
+            id: ghost.id,
+          });
+      }
+      expect(input).toEqual(original);
+      const groups = ghosts.map((ghost) => piece(table, ghost.id));
+      table.apply(input);
+      ghosts.forEach((ghost, index) => expect(piece(table, ghost.id)).toBe(groups[index]));
+    },
+  );
 
   it('keeps the supplied thin depth exact and widens only the invisible target', () => {
     const table = make();

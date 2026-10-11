@@ -224,11 +224,18 @@ export class ContinuousSurface implements MapSurface {
     this.applying = true;
     try {
       const image = old ? null : await this.loadImage(op.signal);
-      if (this.disposed || op.signal.aborted) return failure('aborted', 'Table update cancelled.');
+      if (this.disposed) return this.unavailable();
+      if (op.signal.aborted) return failure('aborted', 'Table update cancelled.');
       this.table.apply(state, image ?? undefined);
       if (this.disposed) return failure('disposed', 'The table is closed.');
+      if (this.settled === 'table' && !this.transitioning) {
+        const activated = this.activate(true);
+        if (!activated.ok) return activated;
+      }
+      if (this.disposed) return this.unavailable();
+      if (op.signal.aborted) return failure('aborted', 'Table update cancelled.');
+      // Activation runs synchronous callbacks and can fail. Only cache a successful lifetime.
       this.presentation = immutable(structuredClone(p));
-      if (this.settled === 'table' && !this.transitioning) this.setActive(true);
       return success(undefined);
     } catch {
       if (this.disposed) return failure('disposed', 'The table is closed.');
@@ -272,11 +279,24 @@ export class ContinuousSurface implements MapSurface {
   }
   setActive(active: boolean): Result<void> {
     if (this.disposed || !this.table || !this.presentation) return this.unavailable();
+    return this.activate(active);
+  }
+  private activate(active: boolean): Result<void> {
+    if (this.disposed || !this.table) return this.unavailable();
+    const table = this.table;
     this.active = active;
     this.syncControls();
-    if (active) this.table.start();
-    else this.table.stop();
-    return success(undefined);
+    try {
+      if (active) table.start();
+      else table.stop();
+      return this.disposed ? this.unavailable() : success(undefined);
+    } catch {
+      if (this.disposed) return this.unavailable();
+      this.active = false;
+      table.stop();
+      this.syncControls();
+      return failure('internal', 'The table could not start rendering.');
+    }
   }
   getCamera(): Result<CameraBookmark> {
     if (this.disposed || !this.table || !this.presentation) return this.unavailable();
@@ -453,6 +473,7 @@ export class ContinuousSurface implements MapSurface {
       this.transitionCancel = abort;
       op.signal.addEventListener('abort', abort, { once: true });
       const tick = (now: number) => {
+        if (finished) return;
         if (op.signal.aborted || this.disposed) {
           finish(true);
           return;
@@ -463,6 +484,12 @@ export class ContinuousSurface implements MapSurface {
           table.camera.position.lerpVectors(before.position, goal.position, ease);
           table.controls.target.lerpVectors(before.target, goal.target, ease);
           table.controls.update();
+          // OrbitControls dispatches synchronous change listeners; cleanup may already have run.
+          if (finished) return;
+          if (op.signal.aborted || this.disposed) {
+            finish(true);
+            return;
+          }
           if (t === 1) finish(false);
           else frame = requestAnimationFrame(tick);
         } catch {

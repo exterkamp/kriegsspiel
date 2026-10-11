@@ -65,6 +65,7 @@ export class BrowserRepository implements HqRepository {
   private baseline: string | null | undefined;
   private busy = false;
   private reentered = false;
+  private readonly seenRevisions = new Set<string>();
   private readonly key: string;
   constructor(
     scope: Scope,
@@ -82,7 +83,7 @@ export class BrowserRepository implements HqRepository {
   }
   private defaults(): Result<LocalDocument> {
     const revision = this.revision();
-    if (revision === this.current?.revision)
+    if (this.seenRevisions.has(revision))
       return failure('invalid-data', 'The new preferences revision is invalid. Retry loading.');
     return this.validate({
       schemaVersion: 1,
@@ -171,6 +172,7 @@ export class BrowserRepository implements HqRepository {
       if (after) return after;
       if (!unchanged)
         return failure('conflict', 'Preferences changed elsewhere. Reload before saving.');
+      this.seenRevisions.add(result.value.document.revision);
       this.current = result.value.document;
       this.baseline = result.value.raw;
       return success({ document: result.value.document, durability: this.durability });
@@ -205,7 +207,7 @@ export class BrowserRepository implements HqRepository {
       )
         return failure('conflict', 'Preferences changed elsewhere. Reload before saving.');
       const revision = this.revision();
-      if (!id.safeParse(revision).success || revision === expectedRevision)
+      if (!id.safeParse(revision).success || this.seenRevisions.has(revision))
         return failure(
           'invalid-data',
           'The new preferences revision is invalid. Preferences were not saved.',
@@ -220,6 +222,7 @@ export class BrowserRepository implements HqRepository {
       if (!unchanged)
         return failure('conflict', 'Preferences changed elsewhere. Reload before saving.');
       storage.setItem(this.key, raw);
+      this.seenRevisions.add(revision);
       // A completed synchronous write is committed even if its callback aborts/disposes.
       if (!this.disposed) {
         this.current = next;

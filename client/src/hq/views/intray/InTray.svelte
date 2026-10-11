@@ -32,7 +32,8 @@
       action === focusAction &&
       scopeValid &&
       opened?.id === paperId &&
-      reader?.isConnected
+      reader?.isConnected &&
+      !reader.closest('[hidden], [inert]')
     )
       reader.focus();
   }

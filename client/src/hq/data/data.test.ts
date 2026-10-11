@@ -404,3 +404,47 @@ describe('preference commit boundary regressions', () => {
     expect(!later.ok && later.error.code).toBe('disposed');
   });
 });
+
+it('rejects historical generated revision reuse after an intervening save and default reset', async () => {
+  let raw: string | null = null;
+  let revision = 'r1';
+  const repository = new BrowserRepository(
+    demoScope,
+    () => ({
+      getItem: () => raw,
+      setItem: (_key, value) => {
+        raw = value;
+      },
+    }),
+    () => revision,
+  );
+  const initial = await repository.load(operation());
+  if (!initial.ok) throw new Error('Expected initial load');
+  revision = 'r2';
+  const second = await repository.save(
+    { ...initial.value.document, highContrast: true },
+    'r1',
+    operation(),
+  );
+  if (!second.ok) throw new Error('Expected first save');
+  const savedRaw = raw;
+  revision = 'r1';
+  const reused = await repository.save(
+    { ...second.value.document, reducedMotion: true },
+    'r2',
+    operation(),
+  );
+  expect(!reused.ok && reused.error.code).toBe('invalid-data');
+  expect(raw).toBe(savedRaw);
+  revision = 'r3';
+  expect((await repository.save(second.value.document, 'r2', operation())).ok).toBe(true);
+  expect((await repository.save(initial.value.document, 'r1', operation())).ok).toBe(false);
+  raw = null;
+  revision = 'r1';
+  const reusedDefault = await repository.load(operation());
+  expect(!reusedDefault.ok && reusedDefault.error.code).toBe('invalid-data');
+  expect(raw).toBeNull();
+  revision = 'r4';
+  const recovered = await repository.load(operation());
+  expect(recovered.ok && recovered.value.document.revision).toBe('r4');
+});

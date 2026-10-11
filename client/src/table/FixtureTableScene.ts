@@ -93,6 +93,7 @@ export class TableScene {
       this.scene.background = new THREE.Color(0x2a2118);
       controls = new OrbitControls(this.camera, canvas);
       this.controls = controls;
+      controls.addEventListener('change', this.clipPaperLabels);
       controls.enablePan = true;
       controls.enableDamping = false;
       controls.minPolarAngle = 0;
@@ -233,6 +234,26 @@ export class TableScene {
         if (terminated()) return;
       }
       obj.group.position.copy(mapToWorld(state.map, p.position));
+      // Keep the camera-facing quad inside the paper for any billboard orientation.
+      // Only the decoration moves; the supplied piece position and pick meshes do not.
+      const tagRadius = Math.hypot(tag.scale.x, tag.scale.y) / 2;
+      const insetX = Math.min(tagRadius, state.map.width / 2);
+      const insetZ = Math.min(tagRadius, state.map.height / 2);
+      const tagOffset = tag.userData.offsetZ as number;
+      tag.position.x =
+        THREE.MathUtils.clamp(
+          obj.group.position.x,
+          -state.map.width / 2 + insetX,
+          state.map.width / 2 - insetX,
+        ) - obj.group.position.x;
+      tag.position.z =
+        THREE.MathUtils.clamp(
+          obj.group.position.z + tagOffset,
+          -state.map.height / 2 + insetZ,
+          state.map.height / 2 - insetZ,
+        ) - obj.group.position.z;
+      // The installed Three sprite shader clips its expanded view-space vertices/fragments.
+      tag.material.clippingPlanes = clippingPlanes;
       obj.group.getObjectByName('body')!.rotation.y = facingToRotationY(p.facing);
       obj.group.traverse((object) => {
         const mesh = object as THREE.Mesh;
@@ -268,6 +289,7 @@ export class TableScene {
     if (this.dressing) positionDressing(this.dressing, state.map.width, state.map.height);
     this.updateCameraLimits();
     if (dimensionsChanged) this.snapTopDown();
+    this.clipPaperLabels();
   }
 
   private validateState(state: SceneState): void {
@@ -397,6 +419,33 @@ export class TableScene {
     ];
   }
 
+  private clipPaperLabels = (): void => {
+    if (this.disposed || !this.state) return;
+    const { map } = this.state;
+    const corners = [
+      new THREE.Vector3(-map.width / 2, 0, -map.height / 2),
+      new THREE.Vector3(map.width / 2, 0, -map.height / 2),
+      new THREE.Vector3(map.width / 2, 0, map.height / 2),
+      new THREE.Vector3(-map.width / 2, 0, map.height / 2),
+    ];
+    // Elevated billboards can project beyond the paper despite world-XZ clipping.
+    // Planes through the camera and each paper edge bound the visible fragments too.
+    const planes = this.mapClipping(map);
+    for (let index = 0; index < corners.length; index++) {
+      const plane = new THREE.Plane().setFromCoplanarPoints(
+        this.camera.position,
+        corners[index]!,
+        corners[(index + 1) % corners.length]!,
+      );
+      if (plane.distanceToPoint(new THREE.Vector3()) < 0) plane.negate();
+      planes.push(plane);
+    }
+    for (const { group } of this.pieces.values()) {
+      const tag = group.getObjectByName('paper-tag') as THREE.Sprite;
+      tag.material.clippingPlanes = planes;
+    }
+  };
+
   private makePiece(p: OwnPiece | GhostPiece, map: BaseMap): THREE.Group {
     const span = Math.max(map.width, map.height);
     const minSize = pickMinSize(map);
@@ -493,6 +542,7 @@ export class TableScene {
       const scale = span / 40;
       tag.scale.set(3.4 * scale, 1.0625 * scale, 1);
       tag.position.set(0, height + 0.6 * scale, reach + 1.1 * scale);
+      tag.userData.offsetZ = tag.position.z;
       group.add(tag);
       return group;
     } catch (error) {
@@ -654,6 +704,7 @@ export class TableScene {
     const loop = (): void => {
       if (this.disposed || generation !== this.renderGeneration) return;
       this.controls.update();
+      if (this.disposed || generation !== this.renderGeneration) return;
       this.renderer.render(this.scene, this.camera);
       if (!this.disposed && generation === this.renderGeneration)
         this.raf = requestAnimationFrame(loop);
@@ -669,6 +720,7 @@ export class TableScene {
     if (this.disposed) return;
     this.disposed = true;
     this.stop();
+    this.controls.removeEventListener('change', this.clipPaperLabels);
     this.controls.dispose();
     this.releaseTree(this.scene);
     this.pieces.clear();

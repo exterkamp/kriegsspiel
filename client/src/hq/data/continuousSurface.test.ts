@@ -26,19 +26,45 @@ vi.mock('../../table/FixtureTableScene.js', async () => {
       enabled: false,
       update: () => this.camera.lookAt(this.controls.target),
     };
-    readonly dispose = vi.fn();
+    readonly dispose = vi.fn(() => {
+      this.disposed = true;
+      this.stop();
+    });
     readonly apply = vi.fn();
     readonly setArtwork = vi.fn();
     running = false;
+    renderOnStart = false;
+    private disposed = false;
+    private raf = 0;
+    private generation = 0;
     constructor(readonly canvas: HTMLCanvasElement) {
       this.camera.position.set(0, 6000, 0.001);
       this.controls.update();
       harness.scenes.push(this);
     }
     start() {
+      if (this.disposed || this.running) return;
+      if (this.renderOnStart) {
+        // Opt in to the real renderer's synchronous first frame and RAF lifetime.
+        const generation = ++this.generation;
+        const loop = () => {
+          if (this.disposed || generation !== this.generation) return;
+          this.controls.update();
+          this.renderer.render(this.scene, this.camera);
+          if (!this.disposed && generation === this.generation) {
+            this.running = true;
+            this.raf = requestAnimationFrame(loop);
+          }
+        };
+        loop();
+        return;
+      }
       this.running = true;
     }
     stop() {
+      this.generation++;
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
       this.running = false;
     }
     snapTopDown() {
@@ -147,6 +173,99 @@ afterEach(() => {
 });
 
 describe('continuous surface lifecycle', () => {
+  it('does not cache a failed initial activation and renders an identical retry', async () => {
+    const { surface } = await mounted();
+    const scene = harness.scenes[0] as {
+      renderOnStart: boolean;
+      running: boolean;
+      renderer: { render: ReturnType<typeof vi.fn> };
+    };
+    scene.renderOnStart = true;
+    scene.renderer.render.mockImplementationOnce(() => {
+      throw new Error('Initial render failed');
+    });
+    const candidate = presentation();
+    expect((await surface.apply(candidate, op())).ok).toBe(false);
+    expect(scene.running).toBe(false);
+    expect(frames.size).toBe(0);
+    expect.soft(surface.getCamera().ok).toBe(false);
+    expect((await surface.apply(candidate, op())).ok).toBe(true);
+    expect(scene.renderer.render).toHaveBeenCalledTimes(2);
+    expect(scene.running).toBe(true);
+    expect(frames.size).toBe(1);
+    surface.dispose();
+    expect(frames.size).toBe(0);
+  });
+
+  it.each(['controls', 'render'] as const)(
+    'returns disposed without caching or scheduling when initial activation disposes from %s',
+    async (callback) => {
+      const { surface } = await mounted();
+      const scene = harness.scenes[0] as {
+        renderOnStart: boolean;
+        running: boolean;
+        controls: { update: () => void };
+        renderer: { render: ReturnType<typeof vi.fn> };
+      };
+      scene.renderOnStart = true;
+      if (callback === 'controls')
+        vi.spyOn(scene.controls, 'update').mockImplementationOnce(() => surface.dispose());
+      else scene.renderer.render.mockImplementationOnce(() => surface.dispose());
+      const candidate = presentation();
+      const result = await surface.apply(candidate, op());
+      expect(!result.ok && result.error.code).toBe('disposed');
+      expect(surface.getCamera().ok).toBe(false);
+      expect(scene.running).toBe(false);
+      expect(frames.size).toBe(0);
+      expect((await surface.apply(candidate, op())).ok).toBe(false);
+    },
+  );
+
+  it.each(['abort', 'dispose'] as const)(
+    'settles an intermediate control callback %s without another transition RAF',
+    async (cancel) => {
+      vi.spyOn(performance, 'now').mockReturnValue(100);
+      const { surface } = await mounted();
+      await surface.apply(presentation(), op());
+      const scene = harness.scenes[0] as {
+        camera: { position: import('three').Vector3 };
+        controls: { target: import('three').Vector3; enabled: boolean; update: () => void };
+        running: boolean;
+      };
+      const before = scene.camera.position.clone();
+      const target = scene.controls.target.clone();
+      const controller = new AbortController();
+      const pending = surface.transitionTo('desk', false, { signal: controller.signal });
+      let terminal = before;
+      vi.spyOn(scene.controls, 'update').mockImplementationOnce(() => {
+        expect(scene.camera.position).not.toEqual(before);
+        if (cancel === 'abort') controller.abort();
+        else surface.dispose();
+        terminal = scene.camera.position.clone();
+      });
+      const [id, tick] = [...frames][0]!;
+      frames.delete(id);
+      tick(220); // Halfway through the 240 ms dolly, not its final frame.
+      const result = await pending;
+      expect(!result.ok && result.error.code).toBe(cancel === 'abort' ? 'aborted' : 'disposed');
+      expect(frames.size).toBe(0);
+      const requests = vi.spyOn(globalThis, 'requestAnimationFrame');
+      tick(230); // A retained obsolete callback must also stay inert.
+      expect(requests).not.toHaveBeenCalled();
+      expect(scene.camera.position).toEqual(terminal);
+      if (cancel === 'abort') {
+        expect(scene.camera.position).toEqual(before);
+        expect(scene.controls.target).toEqual(target);
+        expect(scene.controls.enabled).toBe(true);
+      } else {
+        expect(scene.controls.enabled).toBe(false);
+        expect(scene.running).toBe(false);
+        expect(surface.getCamera().ok).toBe(false);
+      }
+      surface.dispose();
+    },
+  );
+
   it('keeps controls disabled when an update arrives during dolly and rejects time regression', async () => {
     const { surface } = await mounted();
     await surface.apply(presentation(), op());

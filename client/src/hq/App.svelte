@@ -325,27 +325,32 @@
         gameMs={projectGameTime(context.sourceState, source.kind, monotonicMs)}
         onFocusUnit={(id) => focus(context, id)}
       />
-    {:else if context.state.view === 'in-tray'}
-      <InTray
-        snapshot={context.sourceState.snapshot}
-        scope={source.scope}
-        onPlotPaper={(id) => plotPaper(context, id)}
-      >
-        {#snippet placementHandle(paperId: string)}
-          <ReportPlotHandle
-            {paperId}
-            disabled={markState.busy || !markState.writable}
-            onStart={(id, pointer) => startPlacement(context, id, pointer)}
-          />
-        {/snippet}
-      </InTray>
-    {:else if context.state.view === 'orders'}
-      <Orders snapshot={context.sourceState.snapshot} scope={source.scope} />
-    {:else if context.state.view === 'journal'}
-      <Journal snapshot={context.sourceState.snapshot} scope={source.scope} />
-    {:else}
+    {:else if !['table', 'in-tray', 'orders', 'journal'].includes(context.state.view)}
       <p>This service is unavailable in the fixture desk.</p>
     {/if}
+    {#key JSON.stringify([source.scope.gameId, source.scope.sideId, source.scope.playerId])}
+      <div hidden={context.state.view !== 'in-tray'} inert={context.state.view !== 'in-tray'}>
+        <InTray
+          snapshot={context.sourceState.snapshot}
+          scope={source.scope}
+          onPlotPaper={(id) => plotPaper(context, id)}
+        >
+          {#snippet placementHandle(paperId: string)}
+            <ReportPlotHandle
+              {paperId}
+              disabled={markState.busy || !markState.writable}
+              onStart={(id, pointer) => startPlacement(context, id, pointer)}
+            />
+          {/snippet}
+        </InTray>
+      </div>
+      <div hidden={context.state.view !== 'orders'} inert={context.state.view !== 'orders'}>
+        <Orders snapshot={context.sourceState.snapshot} scope={source.scope} />
+      </div>
+      <div hidden={context.state.view !== 'journal'} inert={context.state.view !== 'journal'}>
+        <Journal snapshot={context.sourceState.snapshot} scope={source.scope} />
+      </div>
+    {/key}
   {/snippet}
 </Shell>
 

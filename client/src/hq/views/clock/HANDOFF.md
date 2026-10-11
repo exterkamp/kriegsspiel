@@ -24,8 +24,8 @@ wall-clock read, storage or commands. It only responds to props.
 
 ## Behavior and limits
 
-- Game time is an elapsed `HH:MM:SS.mmm` value plus exact game milliseconds; hours
-  can exceed 24. Absent/invalid time is unavailable, never invented zero. A
+- Visible game time is elapsed `HH:MM:SS`, flooring seconds; underlying values
+  and machine-readable durations retain exact milliseconds. Hours can exceed 24. Absent/invalid time is unavailable, never invented zero. A
   supplied zero is valid.
 - The frozen fallback calls the existing
   `projectGameTime(state, kind, clock.receivedMonotonicMs)`. Both the original

@@ -544,7 +544,7 @@ it('creates one report mark when subsequent navigation fails and explains the pa
   );
 });
 it.each([false, true])(
-  'preserves session plot feedback after panel teardown and ignores superseded focus (new action=%s)',
+  'preserves session plot feedback after hiding the panel and ignores superseded focus (new action=%s)',
   async (supersede) => {
     const ports = await mountPlottingApp();
     let finish!: (result: import('./contracts').Result<void>) => void;
@@ -558,7 +558,14 @@ it.each([false, true])(
       .find((b) => b.textContent?.trim() === 'Plot paper')!
       .click();
     await flush();
-    expect(target.querySelector('[aria-label="In-tray"]')).toBeNull();
+    expect(target.querySelector('[aria-label="In-tray"]')?.closest('[hidden]')).not.toBeNull();
+    expect(
+      (
+        target.querySelector('[aria-label="In-tray"]')?.closest('[hidden]') as HTMLElement & {
+          inert: boolean;
+        }
+      ).inert,
+    ).toBe(true);
     if (supersede) {
       target
         .querySelector<HTMLButtonElement>('[aria-label="Focus mark Root scout: report"]')!
@@ -601,7 +608,16 @@ it('autosaves the last order keystroke across desk navigation without enabling s
   draft.dispatchEvent(new Event('input', { bubbles: true }));
   await flush();
   await navigate('Journal');
-  expect(target.querySelector('[aria-label="Local order draft"]')).toBeNull();
+  expect(
+    target.querySelector('[aria-label="Local order draft"]')?.closest('[hidden]'),
+  ).not.toBeNull();
+  expect(
+    (
+      target
+        .querySelector('[aria-label="Local order draft"]')
+        ?.closest('[hidden]') as HTMLElement & { inert: boolean }
+    ).inert,
+  ).toBe(true);
   await navigate('Orders');
   expect(
     target.querySelector<HTMLTextAreaElement>('[aria-label="Local order draft"] textarea')!.value,
@@ -662,7 +678,7 @@ it('places a captured report at chosen keyboard coordinates after report refresh
   expect(ports.marksStorage.setItem).not.toHaveBeenCalled();
 });
 
-it('retains a captured drag across InTray teardown and commits only an exposed final CSS drop', async () => {
+it('retains a captured drag across hiding InTray and commits only an exposed final CSS drop', async () => {
   const ports = await mountPlottingApp();
   const hub = target.querySelector<HTMLElement>('.hq')!;
   const canvas = target.querySelector('canvas')!;
@@ -709,7 +725,14 @@ it('retains a captured drag across InTray teardown and commits only an exposed f
   )!;
   pointer(handle, 'pointerdown', 200, 150);
   await flush();
-  expect(target.querySelector('[aria-label="In-tray"]')).toBeNull();
+  expect(target.querySelector('[aria-label="In-tray"]')?.closest('[hidden]')).not.toBeNull();
+  expect(
+    (
+      target.querySelector('[aria-label="In-tray"]')?.closest('[hidden]') as HTMLElement & {
+        inert: boolean;
+      }
+    ).inert,
+  ).toBe(true);
   expect(capture).toBe(true);
   pointer(hub, 'pointermove', 250, 180);
   pointer(hub, 'pointerup', 300, 190);
@@ -767,4 +790,170 @@ it('keeps delayed preference restoration from moving a camera reserved by report
   expect(target.querySelector('[aria-label="Report placement"]')?.textContent).toContain(
     'Choose a map contact',
   );
+});
+
+it.each(['quota', 'conflict', 'oversized'] as const)(
+  'retains unsaved order draft across navigation after %s failure and exports recovery',
+  async (mode) => {
+    window.localStorage.clear();
+    const ports = await mountPlottingApp();
+    const navigate = async (label: string) => {
+      [...target.querySelectorAll<HTMLButtonElement>('nav.desk button')]
+        .find((b) => b.textContent?.includes(label))!
+        .click();
+      await flush();
+    };
+    await navigate('Orders');
+    const key = JSON.stringify([
+      'kriegsspiel.hq.order-draft',
+      ports.source.scope.gameId,
+      ports.source.scope.sideId,
+      ports.source.scope.playerId,
+    ]);
+    let savedRaw: string | null = null;
+    const write = Storage.prototype.setItem;
+    if (mode === 'quota')
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k, v) {
+        if (k === key) {
+          const e = new Error('Full');
+          e.name = 'QuotaExceededError';
+          throw e;
+        }
+        write.call(this, k, v);
+      });
+    if (mode === 'conflict') {
+      savedRaw = JSON.stringify({
+        schemaVersion: 1,
+        scope: ports.source.scope,
+        revision: 'external',
+        recipientUnitId: null,
+        text: 'External draft',
+      });
+      window.localStorage.setItem(key, savedRaw);
+    }
+    const text = mode === 'oversized' ? 'x'.repeat(16385) : `Keep unsaved ${mode} draft`;
+    const draft = target.querySelector<HTMLTextAreaElement>(
+      '[aria-label="Local order draft"] textarea',
+    )!;
+    draft.value = text;
+    draft.dispatchEvent(new Event('input', { bubbles: true }));
+    await flush();
+    expect(target.querySelector('[aria-label="Local order draft"]')?.textContent).toContain(
+      'Unsaved draft changes.',
+    );
+    expect(window.localStorage.getItem(key)).toBe(savedRaw);
+    await navigate('Map table');
+    await navigate('Journal');
+    await navigate('Orders');
+    const panel = target.querySelector('[aria-label="Local order draft"]')!;
+    expect(panel.closest('[hidden]')).toBeNull();
+    expect(panel.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe(text);
+    [...panel.querySelectorAll('button')].find((b) => b.textContent === 'Export draft')!.click();
+    await flush();
+    expect(panel.querySelector<HTMLTextAreaElement>('textarea[readonly]')!.value).toBe(text);
+    expect(panel.textContent).toContain('includes unsaved draft');
+    if (mode === 'quota') {
+      vi.restoreAllMocks();
+      [...panel.querySelectorAll('button')].find((b) => b.textContent === 'Retry save')!.click();
+      await flush();
+      expect(JSON.parse(window.localStorage.getItem(key)!).text).toBe(text);
+      expect(panel.textContent).not.toContain('Unsaved draft changes.');
+    }
+    window.localStorage.clear();
+  },
+);
+
+it('retains pending in-tray disposition across navigation after quota failure and retries it', async () => {
+  window.localStorage.clear();
+  const ports = await mountPlottingApp();
+  const key = JSON.stringify([
+    'kriegsspiel.hq.intray-state',
+    ports.source.scope.gameId,
+    ports.source.scope.sideId,
+    ports.source.scope.playerId,
+  ]);
+  const saved = window.localStorage.getItem(key);
+  const write = Storage.prototype.setItem;
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, k, v) {
+    if (k === key) {
+      const e = new Error('Full');
+      e.name = 'QuotaExceededError';
+      throw e;
+    }
+    write.call(this, k, v);
+  });
+  let panel = target.querySelector('[aria-label="In-tray"]')!;
+  [...panel.querySelectorAll('button')].find((b) => b.textContent === 'File')!.click();
+  // Navigate before autosave completion: keeping the session view mounted must not cancel it.
+  [...target.querySelectorAll<HTMLButtonElement>('nav.desk button')]
+    .find((b) => b.textContent?.includes('Map table'))!
+    .click();
+  await flush();
+  [...target.querySelectorAll<HTMLButtonElement>('nav.desk button')]
+    .find((b) => b.textContent?.includes('In-tray'))!
+    .click();
+  await flush();
+  panel = target.querySelector('[aria-label="In-tray"]')!;
+  expect(panel.textContent).toContain('Unsaved local changes.');
+  expect(window.localStorage.getItem(key)).toBe(saved);
+  [...panel.querySelectorAll('button')].find((b) => b.textContent === 'Export JSON')!.click();
+  await flush();
+  expect(panel.querySelector<HTMLTextAreaElement>('textarea[readonly]')!.value).toContain('filed');
+  expect(panel.textContent).toContain('includes unsaved changes');
+  vi.restoreAllMocks();
+  [...panel.querySelectorAll('button')].find((b) => b.textContent === 'Retry save')!.click();
+  await flush();
+  expect(JSON.parse(window.localStorage.getItem(key)!).records).toContainEqual({
+    paperId: 'root-plot',
+    status: 'filed',
+  });
+  expect(panel.textContent).not.toContain('Unsaved local changes.');
+  window.localStorage.clear();
+});
+
+it('keeps unsaved journal notes across desk navigation and clears session RAM on a different player mount', async () => {
+  window.localStorage.clear();
+  await mountPlottingApp();
+  const navigate = async (label: string) => {
+    [...target.querySelectorAll<HTMLButtonElement>('nav.desk button')]
+      .find((b) => b.textContent?.includes(label))!
+      .click();
+    await flush();
+  };
+  await navigate('Journal');
+  const notebook = target.querySelector<HTMLTextAreaElement>(
+    '[aria-label="Local personal notebook"] textarea',
+  )!;
+  notebook.value = 'Private unsaved session notes';
+  notebook.dispatchEvent(new Event('input', { bubbles: true }));
+  await flush();
+  await navigate('Map table');
+  await navigate('Orders');
+  await navigate('Journal');
+  expect(
+    target.querySelector<HTMLTextAreaElement>('[aria-label="Local personal notebook"] textarea')!
+      .value,
+  ).toBe('Private unsaved session notes');
+  const journal = target.querySelector('[aria-label="Fixture journal"]')!;
+  [...journal.querySelectorAll('button')]
+    .find((b) => b.textContent === 'Prepare text export')!
+    .click();
+  await flush();
+  expect(journal.querySelector<HTMLTextAreaElement>('textarea[readonly]')!.value).toContain(
+    'Private unsaved session notes',
+  );
+  await unmount(component!);
+  component = null;
+  target.remove();
+  await mountPlottingApp((ports) => {
+    Object.assign(ports.source.scope, { playerId: 'another-player' });
+    Object.assign(ports.snapshot.scope, { playerId: 'another-player' });
+  });
+  await navigate('Journal');
+  expect(
+    target.querySelector<HTMLTextAreaElement>('[aria-label="Local personal notebook"] textarea')!
+      .value,
+  ).toBe('');
+  expect(target.textContent).not.toContain('Private unsaved session notes');
+  window.localStorage.clear();
 });

@@ -632,11 +632,16 @@
       <p class="credit">{artwork.credit} · {artwork.licence}</p>
     {:else}
       <button onclick={() => go('table')}>Return to map table</button>
-      {#if view}{@render view(context!)}{:else}<p class="empty">{unavailable(shellState.view)}</p>
+      {#if !view}<p class="empty">{unavailable(shellState.view)}</p>
         <p>
           This is an empty fixture desk view. Orders, annotations, staff requests and replay reveal
           are unavailable.
         </p>{/if}
+    {/if}
+    {#if view && context}
+      <div hidden={shellState.view === 'table'} inert={shellState.view === 'table'}>
+        {@render view(context)}
+      </div>
     {/if}
     <p class="selection">
       Shared selection: {shellState.selection.kind === 'none'
