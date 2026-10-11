@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { describe, expect, it } from 'vitest';
-import { noteEntry, type JournalEntry } from '@legacy/desk/journal';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { initialState } from '@legacy/net/state';
+import { type JournalEntry } from '@legacy/desk/journal';
 import { DeskStore } from '../desk.store';
 import { stubGame } from '../testing';
 import { JournalComponent } from './journal.component';
@@ -12,8 +13,8 @@ const e = (id: string, kind: JournalEntry['kind'], at: number, text: string): Jo
   text,
 });
 
-async function open() {
-  stubGame();
+async function open(state = initialState) {
+  stubGame(state);
   const desk = TestBed.inject(DeskStore);
   desk.journal.set([
     e('order:o1', 'order', 0, 'Order sent: Advance'),
@@ -28,6 +29,8 @@ async function open() {
 }
 
 describe('JournalComponent', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it('lists entries and says when there are none', async () => {
     const { items, desk, f, el } = await open();
     expect(items()).toHaveLength(2);
@@ -77,21 +80,69 @@ describe('JournalComponent', () => {
     expect(el.textContent).toContain('Check the ford');
     expect(desk.journal().some((j) => j.kind === 'note')).toBe(true);
     expect(ta.value).toBe('');
-    expect(noteEntry('x', 0, 'y').kind).toBe('note');
+  });
+
+  it('shows the delivery progress of an order still riding', async () => {
+    const pending = (etaGame?: number) => ({
+      ...initialState,
+      pending: [
+        {
+          orderId: 'o1',
+          text: 'Advance',
+          sentAtGame: 0,
+          toName: 'Guards',
+          courier: 'safe' as const,
+          ...(etaGame === undefined ? {} : { etaGame }),
+        },
+      ],
+    });
+    const riding = await open(pending(600_000));
+    const order = riding.el.querySelector('li[data-kind=order]')!;
+    expect(order.querySelector('progress')).not.toBeNull();
+    expect(order.textContent).toContain('Courier riding, expected Day 1 00:10');
+    expect(riding.el.querySelector('li[data-kind=dispatch] progress')).toBeNull();
+    TestBed.resetTestingModule();
+
+    const unknown = await open(pending());
+    const noEta = unknown.el.querySelector('li[data-kind=order]')!;
+    expect(noEta.querySelector('progress')).toBeNull();
+    expect(noEta.textContent).toContain('Courier riding; no estimate');
+  });
+
+  it('re-reads delivery against game time on a timer', () => {
+    vi.useFakeTimers();
+    try {
+      stubGame({
+        ...initialState,
+        clock: { gameMs: 0, localWallMs: Date.now(), rate: 12, status: 'running' },
+        pending: [{ orderId: 'o1', text: 'Advance', sentAtGame: 0, etaGame: 600_000 }],
+      });
+      TestBed.inject(DeskStore).journal.set([e('order:o1', 'order', 0, 'Order sent: Advance')]);
+      const f = TestBed.createComponent(JournalComponent);
+      f.detectChanges();
+      const el = f.nativeElement as HTMLElement;
+      expect(el.textContent).toContain('Courier riding');
+      // 1 wall minute at 12:1 is 12 game minutes, past the 10 minute estimate.
+      vi.advanceTimersByTime(60_000);
+      f.detectChanges();
+      expect(el.textContent).toContain('Should have arrived by');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('exports as a text download', async () => {
     const { q } = await open();
     let blob: Blob | undefined;
-    URL.createObjectURL = ((b: Blob) => ((blob = b), 'blob:x')) as typeof URL.createObjectURL;
-    URL.revokeObjectURL = () => undefined;
-    const click = HTMLAnchorElement.prototype.click;
+    vi.spyOn(URL, 'createObjectURL').mockImplementation((b) => ((blob = b as Blob), 'blob:x'));
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
     let name = '';
-    HTMLAnchorElement.prototype.click = function () {
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
       name = this.download;
-    };
+    });
     q<HTMLButtonElement>('#journal-export').click();
-    HTMLAnchorElement.prototype.click = click;
     expect(name).toBe('war-diary.txt');
     expect(blob?.type).toContain('text/plain');
   });

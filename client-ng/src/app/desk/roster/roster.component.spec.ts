@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { SideView } from '@kriegsspiel/protocol';
 import { initialState } from '@legacy/net/state';
 import { fixtureView } from '@legacy/table/fixture';
@@ -20,7 +20,7 @@ describe('RosterComponent', () => {
 
   it('renders aging and unknowns, and focuses a unit on the table when clicked', async () => {
     const u = { ...view.ownUnits[0]!, morale: NaN };
-    const game = stubGame({
+    stubGame({
       ...initialState,
       view: { ...view, ownUnits: [u] },
       clock: {
@@ -39,7 +39,6 @@ describe('RosterComponent', () => {
     expect(row.classList.contains('stale')).toBe(true);
     expect(row.textContent).toContain('unknown');
     expect(row.textContent).toContain('2 h old (stale)');
-    expect(game()).toBeDefined();
     row.querySelector('button')!.click();
     expect(desk.showOnTable()).toEqual(u.position);
     expect(desk.activeView()).toBe('table');
@@ -63,5 +62,29 @@ describe('RosterComponent', () => {
     const row = (f.nativeElement as HTMLElement).querySelector(`tr[data-unit="${u.id}"]`)!;
     expect(row.classList.contains('stale')).toBe(true);
     expect(row.textContent).toContain('2 h old (stale)');
+  });
+
+  it('re-reads the clock on a timer, so a row ages while it is watched', () => {
+    vi.useFakeTimers();
+    try {
+      const u = view.ownUnits[0]!;
+      stubGame({
+        ...initialState,
+        view: { ...view, ownUnits: [u] },
+        clock: { gameMs: view.atGame, localWallMs: Date.now(), rate: 12, status: 'running' },
+      });
+      const f = TestBed.createComponent(RosterComponent);
+      f.detectChanges();
+      const row = () =>
+        (f.nativeElement as HTMLElement).querySelector(`tr[data-unit="${u.id}"]`)!.textContent;
+      const before = row();
+      expect(before).not.toContain('2 h old');
+      // 10 wall minutes at 12:1 is 2 game hours.
+      vi.advanceTimersByTime(10 * 60_000);
+      f.detectChanges();
+      expect(row()).toContain('2 h old (stale)');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
