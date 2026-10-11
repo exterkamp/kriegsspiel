@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { buildSceneState } from './table/sceneState.js';
 import { TableScene } from './table/TableScene.js';
 import { fixtureMap, fixtureView } from './table/fixture.js';
@@ -7,11 +8,18 @@ import {
   gameNowMs,
   initialState,
   withLink,
+  withMarkDeleted,
+  withMarkPut,
   withPendingOrder,
   withRead,
   type ClientState,
 } from './net/state.js';
 import { Hud, buildOrderText } from './hud/hud.js';
+import { MarksBar } from './hud/marksBar.js';
+import { Gesture, type MarkTool } from './table/markTools.js';
+import { newMarkId } from './table/marks.js';
+import { pickMinSize } from './table/picking.js';
+import type { Dispatch, Mark } from '@kriegsspiel/protocol';
 import { parseSession, wsUrl } from './session.js';
 import { fetchMe, showAccountBar, showLogin } from './auth.js';
 import { mount } from 'svelte';
@@ -116,25 +124,152 @@ async function main(app: HTMLElement): Promise<void> {
     },
     onOpenDispatch(d) {
       state = withRead(state, d.id);
+      if (d.location) lastReport = d;
+      redrawMarks();
       gameState.set(state);
       hud.render(state, Date.now());
       if (d.location) table.panTo(d.location);
     },
   });
 
+  // Marks: the player's own picture of the table. Edits show at once and go to the server, which stores them as sent.
+  let tool: MarkTool = 'view';
+  let selectedId: string | undefined;
+  let gesture: Gesture | undefined;
+  let draft: Mark | undefined;
+  let lastReport: Dispatch | undefined;
+  let markSeq = 0;
+  const nowGame = (): number =>
+    state.clock ? gameNowMs(state.clock, Date.now()) : (state.view?.atGame ?? 0);
+  const marksBar = new MarksBar(app, {
+    onTool(t) {
+      tool = t;
+      gesture = draft = undefined;
+      // Drawing tools take the left button; the camera keeps the wheel and the other buttons.
+      table.controls.mouseButtons.LEFT = t === 'view' ? THREE.MOUSE.ROTATE : (null as never);
+      table.controls.touches.ONE = t === 'view' ? THREE.TOUCH.ROTATE : (null as never);
+      redrawMarks();
+    },
+    onDelete: () => deleteSelected(),
+    onPlotReport() {
+      const d = lastReport;
+      if (!d?.location) return;
+      const label = [d.sizeEstimate, d.unit].filter(Boolean).join(' ') || d.from;
+      // Plotting the same report again moves its pin rather than stacking a second one.
+      const already = state.marks.find((m) => m.sourceReport === d.id);
+      commitMark({
+        id: already?.id ?? newMarkId(++markSeq, Date.now()),
+        kind: 'pin',
+        at: d.location,
+        label,
+        madeAtGame: nowGame(),
+        sourceReport: d.id,
+      });
+    },
+    onOverlays: (o) => table.setOverlays(o),
+  });
+  // The toolbar and the drawing tools belong to the table: in a desk view, hide them and go back to Look.
+  const marksEl = app.querySelector<HTMLElement>('#marks');
+  let deskOpen = false;
+  activeView.subscribe((v) => {
+    deskOpen = isDeskView(v);
+    if (marksEl) marksEl.hidden = deskOpen;
+    if (deskOpen) marksBar.setTool('view');
+  });
+  const deleteSelected = (): void => {
+    if (!selectedId) return;
+    state = withMarkDeleted(state, selectedId);
+    conn?.deleteMark(selectedId);
+    selectedId = undefined;
+    redrawMarks();
+  };
+  const redrawMarks = (): void => {
+    const shown = draft ? [...state.marks.filter((m) => m.id !== draft!.id), draft] : state.marks;
+    table.setMarks(shown, nowGame(), selectedId);
+    marksBar.setAvailable({
+      selected: selectedId !== undefined,
+      plottable: !!lastReport?.location,
+    });
+  };
+  const commitMark = (mark: Mark): void => {
+    state = withMarkPut(state, mark);
+    if (conn && !conn.putMark(mark)) {
+      if (out)
+        out.textContent =
+          'Not connected: that mark was not saved, and will be lost when the connection comes back.';
+    }
+    redrawMarks();
+  };
+  setInterval(redrawMarks, 2000);
+
   const rerender = () => {
     gameState.set(state);
     hud.render(state, Date.now());
     if (state.view) table.apply(buildSceneState(state.view, fixtureMap));
+    redrawMarks();
   };
 
+  const mapPoint = (e: PointerEvent) => {
+    const r = table.pickAt(e.clientX, e.clientY);
+    return r.type === 'none' ? undefined : r.coord;
+  };
   let down: { x: number; y: number } | undefined;
-  canvas.addEventListener('pointerdown', (e) => (down = { x: e.clientX, y: e.clientY }));
+  canvas.addEventListener('pointerdown', (e) => {
+    down = { x: e.clientX, y: e.clientY };
+    if (deskOpen || tool === 'view' || e.button !== 0) return;
+    const c = mapPoint(e);
+    if (!c) return;
+    const span = pickMinSize(fixtureMap);
+    gesture = new Gesture(tool, c, {
+      id: newMarkId(++markSeq, Date.now()),
+      nowGame: nowGame(),
+      label: marksBar.peekLabel(),
+      marks: state.marks,
+      tolerance: span,
+      minStep: span / 3,
+    });
+    canvas.setPointerCapture?.(e.pointerId);
+    if (tool === 'select') selectedId = gesture.grabbed?.id;
+    draft = gesture.draft();
+    redrawMarks();
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!gesture) return;
+    const c = mapPoint(e);
+    if (!c) return;
+    gesture.update(c);
+    draft = gesture.draft();
+    redrawMarks();
+  });
   canvas.addEventListener('pointerup', (e) => {
+    if (gesture) {
+      const c = mapPoint(e);
+      const made = c ? gesture.finish(c) : gesture.draft();
+      const wasSelect = gesture.tool === 'select';
+      gesture = draft = undefined;
+      if (made) {
+        if (!wasSelect) marksBar.takeLabel();
+        commitMark(made);
+      } else redrawMarks();
+      return;
+    }
     if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
     const r = table.pickAt(e.clientX, e.clientY);
     if (out) out.textContent = JSON.stringify(r);
     if (r.type === 'piece' && r.pieceKind === 'own') hud.selectUnit(r.id);
+  });
+  canvas.addEventListener('pointercancel', () => {
+    gesture = draft = undefined;
+    redrawMarks();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (
+      e.key === 'Delete' &&
+      !deskOpen &&
+      selectedId &&
+      !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)
+    )
+      deleteSelected();
   });
 
   if (params.mode === 'join') {
