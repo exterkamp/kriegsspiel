@@ -14,6 +14,11 @@ export interface PendingOrder {
   text: string;
   /** Game time when it was sent, as best the client knows. */
   sentAtGame: number;
+  /** Who it was addressed to, when sent from the orders desk. */
+  toName?: string;
+  courier?: 'fast' | 'safe';
+  /** The staff's estimate of when it arrives, in game ms. */
+  etaGame?: number;
 }
 
 export interface Notice {

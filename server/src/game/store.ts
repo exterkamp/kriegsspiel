@@ -24,7 +24,7 @@ export interface GameSnapshot {
 
 /** Commands a player or the host can send to a game. Plain JSON so they can be logged. */
 export type GameCommand =
-  | { kind: 'order'; side: string; text: string }
+  | { kind: 'order'; side: string; text: string; courier?: 'fast' | 'safe' }
   | { kind: 'setRate'; rate: number }
   | { kind: 'pause' }
   | { kind: 'resume' }

@@ -17,6 +17,8 @@ export const Command = z.discriminatedUnion('kind', [
       orderId: Id,
       draft: Id.optional(),
       text: z.string().trim().min(1).max(2000).optional(),
+      // Fast rides sooner and is likelier lost or garbled; safe the reverse. Absent: the ordinary ride.
+      courier: z.enum(['fast', 'safe']).optional(),
     })
     .strict()
     .refine((c) => (c.draft === undefined) !== (c.text === undefined), {

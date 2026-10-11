@@ -154,38 +154,14 @@
       #order-err {
         color: #ff9a8a;
       }
-      /* Orders and in-tray are desk objects: shown as papers over the dollied-in desk, hidden at the table. */
-      #app:not([data-view='orders']) #orders {
+      /* The orders desk is a Svelte paper (OrdersDesk.svelte); the plain HUD panel stays in the DOM but unseen. */
+      #orders {
         display: none;
-      }
-      #app[data-view='orders'] #orders {
-        left: 50%;
-        right: auto;
-        top: 8%;
-        bottom: auto;
-        transform: translateX(-50%);
-        width: min(560px, calc(100% - 16px));
-        max-height: 70%;
-        background: #f4eedb;
-        color: #2a2014;
-        padding: 16px 20px;
-        z-index: 3;
-      }
-      #app[data-view='orders'] #orders:focus-visible {
-        outline: 3px solid #ffd76a;
-      }
-      #app[data-view='orders'] #order-err {
-        color: #a83232;
       }
       @media (max-width: 600px) {
         #orders {
           bottom: calc(22% + 16px);
           max-height: 30%;
-        }
-        #app[data-view='orders'] #orders {
-          top: 8%;
-          bottom: auto;
-          max-height: 70%;
         }
       }
     </style>

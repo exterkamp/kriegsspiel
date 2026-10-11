@@ -34,6 +34,8 @@ Full integrated lint, typecheck, tests and production build pass. Svelte reports
 
 After the second accepted-main refresh to `6343c2b` (lobby/hot-seat, live DeskClock and admin replay), independent review accepted the resolved composition boundary. Full lint, typecheck, tests and build pass again: **1,723 passed** (328 engine, 55 protocol, 452 server, 875 client, 13 root), one optional server skip and zero Svelte diagnostics. Main bundle is 832.47 kB / 229.67 kB gzip. A browser reload reconfirmed the same HQ timestamps, seven-column desktop table and plain heading; incoming live features retain their separate routes.
 
+Merge-readiness refresh consumes accepted main `4714b73` (reconnect/catch-up and live Orders). The entry/decision conflicts are independently reviewed and resolved while preserving the fixture router, accepted live composition and all decisions. Full lint/types/tests/build pass: **1,748 tests** (332/56/456/891/13), one optional skip and zero Svelte diagnostics; main bundle 833.08 kB / 229.85 kB gzip. Browser reload reconfirms visible fixture Orders with signing disabled, seven roster columns and no footer. The separate live Orders desk does not turn this fixture into a live HQ. PR #193 records the final published head, CI and mergeability.
+
 ## Remaining owner/epic validation
 
 Use [the getting-started guide](hq-getting-started.md) to check actual 200% browser zoom and physical touch input. Live HQ projection/commands, shared mark authority, signing/couriers, conference/replay services, accepted generated-map handoff and measured 60-piece FPS remain separate epic gates. This pass did not merge a GitHub PR, deploy, close issues or modify the map-generation checkout.
