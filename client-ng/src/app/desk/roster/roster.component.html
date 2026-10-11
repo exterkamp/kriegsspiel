@@ -1,0 +1,40 @@
+<h2>Order of battle</h2>
+@if (rows().length === 0) {
+  <p>No formations reported yet.</p>
+} @else {
+  <table class="roster">
+    <thead>
+      <tr>
+        <th>Formation</th>
+        <th>Strength</th>
+        <th>Supply</th>
+        <th>Morale</th>
+        <th>Reported</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (r of rows(); track r.id) {
+        <tr [class]="r.freshness" [attr.data-unit]="r.id">
+          <th scope="row">
+            <button type="button" (click)="focus(r)" [attr.aria-label]="'Show ' + r.name + ' on the table'">
+              {{ r.name }}
+            </button>
+          </th>
+          <td [class.unknown]="r.strength === undefined">{{ r.strength ?? 'unknown' }}</td>
+          <td [class.unknown]="r.supply === undefined">
+            {{ r.supply === undefined ? 'unknown' : r.supply + '%' }}
+          </td>
+          <td [class.unknown]="r.morale === undefined">
+            {{ r.morale === undefined ? 'unknown' : r.morale + '%' }}
+          </td>
+          <td>
+            {{ formatGameTime(r.reportedAt) }}
+            <small class="age"
+              >{{ formatAge(r.ageMs) }} old{{ r.freshness === 'fresh' ? '' : ' (' + r.freshness + ')' }}</small
+            >
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}

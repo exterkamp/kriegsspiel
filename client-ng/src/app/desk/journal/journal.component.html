@@ -1,0 +1,43 @@
+<h2>Journal</h2>
+
+<form class="note" (submit)="addNote($event)">
+  <label for="journal-note">Add a note</label>
+  <textarea id="journal-note" rows="2" [value]="note()" (input)="note.set($any($event.target).value)"></textarea>
+  <button type="submit" id="journal-add" [disabled]="note().trim() === ''">Write in diary</button>
+</form>
+
+<div class="tools">
+  <label for="journal-search">Search</label>
+  <input id="journal-search" type="search" [value]="query()" (input)="query.set($any($event.target).value)" />
+  @for (k of kindList; track k.id) {
+    <button type="button" [attr.aria-pressed]="kinds().has(k.id)" (click)="toggle(k.id)">
+      {{ k.label }}
+    </button>
+  }
+  <button type="button" id="journal-export" (click)="download()" [disabled]="desk.journal().length === 0">
+    Export as text
+  </button>
+</div>
+
+@if (desk.journal().length === 0) {
+  <p>Nothing recorded yet.</p>
+} @else if (shown().length === 0) {
+  <p>No entries match.</p>
+} @else {
+  <ul>
+    @for (x of shown(); track x.j.id) {
+      <li [attr.data-kind]="x.j.kind">
+        <small>{{ formatGameTime(x.j.at) }}</small>
+        {{ x.j.text }}
+        @if (x.ride; as r) {
+          <div class="delivery">
+            @if (r.progress !== undefined) {
+              <progress max="1" [value]="r.progress" aria-label="Delivery progress"></progress>
+            }
+            <small>{{ r.label }}</small>
+          </div>
+        }
+      </li>
+    }
+  </ul>
+}
