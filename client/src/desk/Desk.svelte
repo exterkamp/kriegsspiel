@@ -5,6 +5,7 @@
   import InTray from './InTray.svelte';
   import OrdersDesk from './OrdersDesk.svelte';
   import Roster from './Roster.svelte';
+  import Conference from './Conference.svelte';
   import { deliveryStatus } from './orders.js';
   import DeskClock from './DeskClock.svelte';
   import PausePanel from './PausePanel.svelte';
@@ -133,8 +134,7 @@
   </section>
 {:else if $activeView === 'conference'}
   <section id="view-conference" class="paper" tabindex="-1" aria-label="Staff conference">
-    <h2>Staff conference</h2>
-    <p>The staff are not yet assembled.</p>
+    <Conference />
   </section>
 {/if}
 
