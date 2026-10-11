@@ -16,6 +16,13 @@ export interface GameLimits {
   maxCallsPerMinute?: number;
 }
 
+/**
+ * The share of each cap that `staff` calls may use, so staff officers (up to five calls per
+ * window) cannot starve order parsing and judging. Staff are refused at their share; the rest
+ * is kept for the other stages.
+ */
+export const STAFF_BUDGET_SHARE = 0.25;
+
 /** One line of the metrics log: a call that ran, or one refused before it ran. */
 export type GameUmpireMetric =
   | {
@@ -75,6 +82,7 @@ export class GameUmpireClient implements UmpireClient {
   private refusedBudget = 0;
   private refusedRateLimit = 0;
   private readonly starts: number[] = [];
+  private readonly staffStarts: number[] = [];
   private readonly byStage: GameUmpireReport['byStage'] = {
     parse: { calls: 0, costUsd: 0, totalTokens: 0 },
     judge: { calls: 0, costUsd: 0, totalTokens: 0 },
@@ -104,6 +112,15 @@ export class GameUmpireClient implements UmpireClient {
     );
   }
 
+  private get staffBudgetSpent(): boolean {
+    const { maxCostUsd, maxTotalTokens } = this.limits;
+    const staff = this.byStage.staff;
+    return (
+      (maxCostUsd !== undefined && staff.costUsd >= maxCostUsd * STAFF_BUDGET_SHARE) ||
+      (maxTotalTokens !== undefined && staff.totalTokens >= maxTotalTokens * STAFF_BUDGET_SHARE)
+    );
+  }
+
   report(): GameUmpireReport {
     return {
       gameId: this.opts.gameId,
@@ -122,12 +139,24 @@ export class GameUmpireClient implements UmpireClient {
   async call<T>(request: UmpireRequest): Promise<UmpireResponse<T>> {
     const { stage } = request;
     if (this.budgetSpent) this.refuse(stage, 'budget', 'game budget spent');
+    if (stage === 'staff' && this.staffBudgetSpent) {
+      this.refuse(stage, 'budget', 'staff share of the game budget spent');
+    }
     const cap = this.limits.maxCallsPerMinute;
     if (cap !== undefined) {
       const now = this.now();
-      while (this.starts.length > 0 && this.starts[0]! <= now - MINUTE_MS) this.starts.shift();
+      for (const list of [this.starts, this.staffStarts]) {
+        while (list.length > 0 && list[0]! <= now - MINUTE_MS) list.shift();
+      }
       if (this.starts.length >= cap) {
         this.refuse(stage, 'rate-limit', `more than ${cap} umpire calls in a minute`);
+      }
+      if (stage === 'staff') {
+        const staffCap = Math.max(1, Math.floor(cap * STAFF_BUDGET_SHARE));
+        if (this.staffStarts.length >= staffCap) {
+          this.refuse(stage, 'rate-limit', `more than ${staffCap} staff calls in a minute`);
+        }
+        this.staffStarts.push(now);
       }
       this.starts.push(now);
     }
