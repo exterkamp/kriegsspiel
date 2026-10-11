@@ -6,3 +6,7 @@ node_modules
 docs
 backups
 .env
+.local
+.cache
+vendor/settlemaker-runtime.tgz
+vendor/settlemaker-runtime.tgz.tmp

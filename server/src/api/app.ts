@@ -15,6 +15,7 @@
  *   GET  /games/:id/window/at?at=  seated, game over: true positions, beliefs, dice and rulings at a game time
  *   GET  /games/:id/ws             WebSocket for the side the signed-in user holds (`@kriegsspiel/protocol` messages);
  *                                  in hot-seat, `?side=` picks which of the creator's sides
+ *   /notifications/*               signed in: notification preferences and web push subscriptions (see ../notify)
  *   GET  /healthz                  liveness, `{ ok: true }`
  *   /admin/api/*                   read-only debug API, only when `admin.enabled` (see ../admin)
  *   GET  /*                        the built client, when `staticDir` is set
@@ -55,6 +56,13 @@ import {
 } from '../lobby/store.js';
 import type { PauseConfig } from '../pause.js';
 import type { OrderParser } from '../orders/index.js';
+import {
+  Notifier,
+  MemoryNotifyStore,
+  notifyRoutes,
+  type NotifyStore,
+  type PushSender,
+} from '../notify/index.js';
 import { Hub, type Socket } from './hub.js';
 import { windowAt, windowTimeline } from './umpireWindow.js';
 
@@ -136,6 +144,8 @@ export interface AppOptions {
    * so each player has their own bucket; off when the port is reachable directly, where the header can be forged.
    */
   trustProxy?: boolean;
+  /** Notifications (epic #5): preferences and push subscriptions (default in memory), and the web push sender (unset: no web push). */
+  notify?: { store?: NotifyStore; push?: PushSender; emailEveryMs?: number };
   onError?: (gameId: string, error: unknown) => void;
 }
 
@@ -143,6 +153,8 @@ export interface App {
   server: FastifyInstance;
   host: GameHost;
   hub: Hub;
+  notifier: Notifier;
+  notifyStore: NotifyStore;
   auth: Auth;
   authStore: AuthStore;
   lobby: LobbyStore;
@@ -216,7 +228,27 @@ export async function buildApp(options: AppOptions): Promise<App> {
     scriptedOpponents: (id) =>
       options.scriptedOpponents === true && recordOf(id)?.sessionType === 'co_op_vs_ai',
     trace,
-    onUpdate: (id) => hub.notify(id),
+    onUpdate: (id) => {
+      hub.notify(id);
+      notifier.observe(id);
+    },
+    onClose: (id) => notifier.forget(id),
+    onError,
+  });
+  const notifyStore = options.notify?.store ?? new MemoryNotifyStore();
+  const mailer = options.auth?.mailer ?? new LogMailer((line) => server.log.info(line));
+  const publicUrl = options.auth?.publicUrl ?? 'http://localhost:3000';
+  const wallNow = options.wallNow ?? Date.now;
+  const notifier = new Notifier({
+    auth: authStore,
+    store: notifyStore,
+    mailer,
+    push: options.notify?.push,
+    publicUrl,
+    lookup: (id) => host.get(id),
+    sendToUser: (id, userId, message, side) => hub.sendToUser(id, userId, message, side),
+    wallNow,
+    emailEveryMs: options.notify?.emailEveryMs,
     onError,
   });
 
@@ -233,17 +265,20 @@ export async function buildApp(options: AppOptions): Promise<App> {
 
   const auth = await authRoutes(server, {
     store: authStore,
-    mailer: options.auth?.mailer ?? new LogMailer((line) => server.log.info(line)),
-    publicUrl: options.auth?.publicUrl ?? 'http://localhost:3000',
+    mailer,
+    publicUrl,
     wallNow: options.wallNow,
     loginPerEmail: options.auth?.loginPerEmail,
     loginPerIp: options.auth?.loginPerIp,
     onAccountDeleted: (userId) => {
+      notifyStore.deleteUser(userId);
       lobby.forgetUser(userId);
       hub.disconnectUser(userId, 'account deleted');
     },
     onLogout: (userId) => hub.disconnectUser(userId),
   });
+
+  notifyRoutes(server, { auth, store: notifyStore, push: options.notify?.push });
 
   const aiPlays = options.scriptedOpponents === true;
 
@@ -546,9 +581,11 @@ export async function buildApp(options: AppOptions): Promise<App> {
     hub.closeAll();
     await trace?.close();
     await host.shutdown();
+    await notifier.flush();
     if (!options.auth?.store) authStore.close();
     if (!options.lobby) lobby.close();
+    if (!options.notify?.store) notifyStore.close();
   });
 
-  return { server, host, hub, auth, authStore, lobby };
+  return { server, host, hub, notifier, notifyStore, auth, authStore, lobby };
 }

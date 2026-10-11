@@ -123,7 +123,7 @@ Mail goes through the `Mailer` interface: `WebhookMailer` POSTs `{to, subject, t
 **Open.** No SMTP client or vendor mail integration: a deployment needs a webhook gateway (follow-up issue). A mail scanner that prefetches the link would spend it (a confirm page would fix that). Rate limits are per process and keyed on `req.ip`, so behind a proxy `TRUST_PROXY=1` is required (off by default, as a forged `X-Forwarded-For` would dodge them); the admin guard still treats any forwarded header as non-loopback. Anyone can use up a victim's 5 links an hour by posting their address (the usual per-email trade-off); the per-address counter is charged before the per-email one on purpose. The WebSocket upgrade has no `Origin` check (`SameSite=Lax` covers cross-site pages, not sibling subdomains). Games are still not reloaded after a restart, so seats outlive the process but the games they point to do not (D14b open item). No lobby, invitations or display names yet, and a user has one seat per game. `/admin/api` keeps its own token and is not tied to accounts.
 **See.** [architecture.md](architecture.md), [deployment.md](deployment.md)
 
-## D18: Lobby and game creation (story 5.2, #62)
+## D17a: Lobby and game creation (story 5.2, #62)
 
 **Decision.** Every game has a lobby record (`server/src/lobby/store.ts`; memory, or SQLite in the game database) made when the game is created: scenario, clock ratio, session type (`team_vs_team`, `co_op_vs_ai`, `hot_seat`), optional pause rules (`unanimous` or `majority`, vote timeout, maximum pause) and a `lobby` or `started` status. `POST /games` with `lobby: true` makes the record and the creator's seat only; no engine state or clock exists until `POST /games/:id/start`. Without `lobby` the game starts at once, as before. The invite link is `/?game=<id>`, which opens the game and offers a free side. Players take a side (`/join`) and mark themselves ready (`/ready`); the creator starts once every side people play is taken and every other player is ready (`/start`). `GET /games` lists the games the account made or sits in. A lobby game's WebSocket is refused (409 `not_started`).
 - **Co-op vs AI** leaves the scenario's `scripted` side to the built-in opponent (needs `SCRIPTED_OPPONENTS` on); **team vs team** and **hot-seat** leave every side to people. The scenario data is never changed, so replay is unaffected; `GameHost` takes `scriptedOpponents` per game.
@@ -257,6 +257,101 @@ Keyboard users can disable letter shortcuts for the session, while Tab/Enter and
 **Why.** Docs say the picture can be wrong and the server never silently corrects it. Keeping marks outside the engine and the log keeps replay deterministic with no model calls. A full list on every change is simple and cheap at 500 marks, and avoids per-mark merge rules; the last writer of an id wins.
 **Open.** Per-player marks inside a side (chain-of-command mode) need player identities. Staff-placed marks from reports (and a good or poor chief of staff plotting them) are not built; the player plots a report by hand.
 
+## D17b: Notifications (story 5.8, #68)
+**Decision.** The `Notifier` (`server/src/notify`) runs after each host update. It keeps, per game, what each side had seen (report and document ids from `viewFor`, clock status, open pause and ratio proposals, game over), reports nothing on its first look, and then turns each change into an event for the seat's side: `dispatch`, `contact`, `unitLost`, `pauseProposed` (to sides that are not the proposer and have not voted), `decision` (an open ratio vote), `paused`, `resumed`, `gameOver`. A player with the game open gets a `notification` WebSocket message; a player with no open socket gets web push (VAPID, `PushSender`, `web-push`) and email (`Mailer.sendNotification`), unless their quiet hours are on. Preferences are per user (`GET/PUT /notifications/prefs`): threshold `all`, `urgent` (contact, unit lost, pause proposed, decision, game over), `contact` or `off`; quiet hours as minutes of the local day plus a UTC offset; push and email switches. Default: urgent, push and email on. Push subscriptions are registered at `/notifications/push/subscription` (https endpoints only, at most 10 per user) and dropped when the push service answers 404 or 410. Routine emails are limited to one a minute per player per game.
+**No hidden information.** Title and text are fixed per event kind (`NOTICE` in `policy.ts`); a notification never names a unit, place, number or the content of a dispatch. The link in push and email is the game URL only.
+**Why.** Players are away most of the time, and a fixed-text message cannot leak what the visibility filter withheld.
+**Open.** "Your turn to decide" is only the open votes for now; order clarifications are answered in the same request, and the roles epic will add more decisions. Dispatches that arrive while the server is down are not announced. There is no client UI yet for preferences or for subscribing (no service worker); the HUD shows an in-game notification as a notice. Pause voting is not wired into the app yet (roadmap), so `pauseProposed` fires only once it is. Hot-seat games send no notifications: they have no seats (the creator plays every side at one table), so there is nobody to route to. Push endpoints are checked for https and a public-looking host (no IP literals, `localhost` or single-label names), but a public name that resolves to a private address is not caught, so a deployment should also block egress to private ranges. One notice per side and kind is sent for each look at a game, so five contact reports in a tick are one push and one email.
+**See.** [architecture.md](architecture.md), [gameplay.md](gameplay.md)
+
+## D18: Procedural battlefield maps are a standalone milestone
+
+**Decision.** M3c / [Epic 9 (#132)](https://github.com/exterkamp/kriegsspiel/issues/132) covers planning stages 1–5: assess and extend SettleMaker, define the battlefield data contract, generate topography and terrain, assemble terrain-aware roads and settlements, and provide a standalone preview with limited adjustments and validated export. The owner requested a project plan before further implementation and resumed the planned implementation on 2026-10-10, with PR delivery and no merge or deployment. The initial local prototype remains experimental and is not an accepted implementation.
+
+**Owner direction.** Use SettleMaker as the preferred settlement foundation. Generate roads, terrain and buildings for a high-level Kriegsspiel map; simple building footprints are sufficient. Keep this work distinct from gameplay integration.
+
+**Development execution.** The owner delegates development-agent model selection to the coordinator: default for ordinary implementation, stronger reasoning for architecture/geometry/review, faster cheaper models for bounded mechanical work, and evidence-based escalation after substantive failures. Choose within configured availability and owner-supplied cost limits, and record choices in the execution log. Specific model IDs and a numerical budget are not prescribed. See [the implementation plan](map-implementation-plan.md#model-selection).
+
+**Suggested architecture.** Separate battlefield generation, settlement planning and rendering/export. Use local metre coordinates with independent elevation, land-cover and infrastructure layers. Any sampled elevation field is an internal numerical representation, not a gameplay tile grid. Story 9.1 selects the physical `createSettlementModel` village preset after comparing all four physical/legacy candidates with flat/constrained fixtures. The assessed fork pin is `d5cf3590cf59e1d382110d25a6910f12507299e2`; production constraints and exact entrance joins remain #138 gates. Use an immutable fork revision and integrity-pinned source-bearing artifact (attributed committed source snapshot as fallback), never the ignored checkout. See [map architecture](map-architecture.md) for coordinate transforms, source strategy, configurable assumptions and the open combined-work distribution/licensing gate.
+
+**Assumptions, not owner decisions.** A temperate battlefield about 5–15 km across, containing several villages and farms; a generate/preview/adjust/export workflow. Map size, sampling resolution, grade limits, resource budgets and exact adjustment controls must be resolved in 9.1.
+
+**Completion boundary.** The milestone ends with reproducible map authoring and export, not a playable generated scenario. Numerical elevation accompanies a flat map; no 3D terrain is required. Scenario assembly/objectives/OOB and balance remain #90; game loading and elevation-based movement/visibility remain separate work. Coordinate with continuous-space work #113/#114/#115, vector table work #118/#129 and movement-routing follow-up #130 without duplicating them. Historical annotation remains #85/#88.
+
+**See.** [roadmap.md](roadmap.md), [hq-interface.md](hq-interface.md), [milestone M3c](https://github.com/exterkamp/kriegsspiel/milestone/1).
+
+
+## D19: Standalone maps use a versioned local-metre asset contract
+
+**Decision.** `packages/maps` defines `kriegsspiel/local-map` v1, independent of engine state, protocol, clock, LLM and rendering. Its north-west origin uses x east, y south and elevation up in metres. Original/carved elevation, filled drainage, cover, water, roads/crossings, settlements/buildings and contours remain independent layers. Bilinear interpolation and analytic derivatives share one surface; seam ownership and boundary handling are explicit. Regional boundary exits and reserved round-capped road corridors have versioned geometry policies.
+
+**Replay and validation.** Strict descriptor-safe imports cap bytes, sample values, features, vertices and deterministic work before expensive processing. `decimal-6-v1` canonicalization revalidates rounded geometry and provides separate asset, geometry and recipe identities. Stable place slots and ordered overrides preserve naming without changing geometry. Seed, stage/fork versions, source/package identities, settings and overrides are recorded. Parsing establishes contract validity; complete terrain suitability, connectivity and local street joins must pass the later independent composition validator before an asset is exported as validated.
+
+**Boundary.** The reference map and numerical fixtures are not a generated playable scenario. Cross-browser generation/replay and resource targets remain milestone gates; the GPL combined-work distribution decision remains open. No gameplay tile migration or hidden-state delivery path is introduced.
+
+**See.** [Map contract and numerical policies](../packages/maps/README.md), [map architecture](map-architecture.md), [execution log](map-execution-log.md).
+
+## D20: Terrain contours certify the canonical bilinear ground
+
+**Decision.** Standalone terrain uses independently seeded multiscale value noise with configurable ridge and valley shaping. The authoritative ground and grid metadata must be stable under `decimal-6-v1` before contour extraction. Contours use a bilinear graph, determinant-based saddle connectivity, explicit exact-level branches and bounded adaptive refinement. A separate query-based validator checks the complete rounded segment, including interior quadratic extrema, against the recorded vertical tolerance.
+
+**Failure handling.** Sample, level, cell-level, refinement, stitching and vertex work are bounded. Precision that cannot satisfy the requested tolerance produces an explicit failure rather than accepted inconsistent geometry. Hydrology must normalize any changed authoritative ground before regenerating contours; a filled drainage surface remains separate.
+
+**Boundary.** This is consistency with a sampled numerical model, not surveyed terrain accuracy. Full drainage, settlement composition and Node/browser replay remain subsequent gates.
+
+**See.** [Terrain numerical policies](../packages/maps/docs/terrain.md), [execution log](map-execution-log.md).
+
+## D21: Geography separates drainage, represented water and graded ground
+
+**Decision.** Deterministic priority flood fills a separate drainage surface; metric D8 receivers and stable pop ranks produce an acyclic graph without epsilon elevation changes. Lakes represent conservative submerged cell cores with dry holes preserved. A qualifying source drainage trunk can produce a coarse carved channel with an explicit constant backwater surface. Versioned, bounded bank grading provides a low-gradient approach band without relaxing road constraints. Original ground remains available in the stage handoff; normalized changed ground becomes authoritative and requires regenerated contours.
+
+**Validation and cover.** Independent water certification checks complete represented polygons, including boundary quadratic extrema and interior grid nodes. Crossing candidates require complete dry abutments and a transverse reserved corridor; the road planner must still establish grade-feasible connections. Independently seeded coherent cover masks water conservatively, preserves dry islands and reports achieved fractions and shoreline loss. Deterministic phase budgets return explicit failure without truncated successful output.
+
+**Boundary.** These are coarse cartographic generation policies, not discharge, erosion or surveyed bathymetry. Required-river infeasibility, unsupported geometry and exhausted work remain explicit. Whole-map connectivity, settlements and browser replay are later gates. The owner keeps combined-build distribution gated for source review.
+
+**See.** [Geography policies](../packages/maps/docs/geography.md), [cover policies](../packages/maps/docs/geography-cover.md), [execution log](map-execution-log.md).
+
+## D22: Regional planning certifies emitted roads and settlement approaches
+
+**Decision.** Deterministic site slots rank whole permissible footprints by certified bilinear gradient and seeded ties. A bounded cardinal lattice routes regional roads by length and directional grade, preserving exact boundary entrances and explicit graph intersections. Complete reserved corridors and normalized emitted geometry are revalidated. Bridges use a linear deck between authoritative dry endpoint heights, with dry approaches and reciprocal road links; channel-bed elevation does not substitute for deck grade.
+
+**Validation and reconciliation.** Independent graph validation checks required approaches, boundary exits, crossing joins, site geometry and recorded overrides. Local layouts supply actual world-space entrance endpoints, bearings and reserved widths; bounded reconciliation validates changed regional approaches and accumulates work across passes. Site capacity, occupied footprints and internal street connectivity remain fork/composition responsibilities. Conservative certificates and exhausted deterministic budgets return explicit infeasibility.
+
+**Boundary.** This standalone cartographic network introduces no gameplay movement rule or visibility path. Full local settlement composition and Node/browser replay remain later gates. Combined-build distribution remains gated for source review.
+
+**See.** [Regional planning policies](../packages/maps/docs/planning.md), [map architecture](map-architecture.md), [execution log](map-execution-log.md).
+
+## D23: Review builds consume an attributed, integrity-pinned local source artifact
+
+**Decision.** Until the owner resolves combined-work distribution, Kriegsspiel commits the accepted SettleMaker source snapshot and original notices, with an exact source manifest and standalone dependency lock. `npm run setup:map-source` verifies that payload, installs its locked compiler dependencies without lifecycle scripts, compiles it, and creates an ignored local npm tarball. The root dependency consumes that tarball through a file dependency with recorded SHA-256 and SHA-512 integrity; CI runs the same setup before `npm ci`. Node22.22.2/npm10.9.7 are pinned for build verification. macOS and Linux ship different zlib implementations: bootstrap requires the complete rebuilt uncompressed tar SHA to match, verifies that the committed canonical engine gzip encodes exactly that tar, then verifies the unchanged consumed compressed SHA/SRI before staging it. The canonical engine package accompanies its complete attributed source; it is not a combined browser build. No ignored development checkout or experimental terrain/render patch participates.
+
+**Identity.** The consumed fork revision is `e08ec2e09f9a15f9110a3048123a31a58d08c341`, tree `dd79e4a4e7644e81e1417fb7d945ee85be58b919`. Provenance distinguishes the exact corresponding-source archive from the exact consumed npm tarball. Bootstrap rejects mismatches before installation into the root graph. Snapshot attribution and GPL-3.0-only terms remain intact.
+
+**Owner boundary.** The owner explicitly selected “Keep distribution gated; prepare review PR.” This authorizes source review and local verification, without changing Kriegsspiel's license or publishing a combined browser build/package. The source-bearing fallback implements the existing plan, rather than resolving that owner licensing decision.
+
+**See.** [Snapshot instructions](../vendor/settlemaker/README.md), [map architecture](map-architecture.md), [execution log](map-execution-log.md).
+
+## D24: Complete maps persist certified access and validate saved geometry independently
+
+**Decision.** The `complete-frontage-access-v1` composition pipeline runs terrain, geography, contours, regional planning, constrained physical settlements and bounded join reconciliation before canonical whole-map certification. A versioned50m farm preference stays inside recorded site intervals. Four-person dwellings persist their real0.8m access corridors as tracks connected to split local street nodes. Compatible degree-two street chains retain every bend. Occupied footprints are convex actual-building envelopes clipped to permissible land, with disconnected results explicitly infeasible.
+
+**Validation and replay.** The saved validator calls no generator and heals no geometry. It checks exact supported source/stage identities, kind-bound stable place slots, actual capacity and footprints, water/grade/contour suitability, regional route connectivity, local access and entrance joins, bridges and ordered overrides. Metered conservative spatial indexes prune only impossible intersection candidates; existing exact predicates and deterministic caps remain authoritative. Lower caller work limits change success/failure rather than successful canonical geometry. Node-only CLI and canonical JSON/SVG exports share complete certification.
+
+**Boundary.** This is a public cartographic asset and scenario adapter seam, separate from engine state, movement, combat, visibility and objectives. Source review/local verification remain authorized; combined distribution stays gated under D23. Complete milestone acceptance still requires the authoring, replay and resource evidence in the execution log.
+
+**See.** [Composition policies](../packages/maps/docs/composition.md), [authoring guide](map-authoring-guide.md), [gameplay handoff](map-gameplay-handoff.md), [execution log](map-execution-log.md).
+
+## D25: Authoring publishes only current, independently certified worker results
+
+**Decision.** The standalone Canvas2D authoring entry generates in a replaceable worker and certifies generated or saved candidates in a separate fresh worker. Only the current ready recipe exposes its exact certified JSON/SVG files. Draft edits, failed validation, cancellation and replacement disable export while retaining the last valid preview. Saved loading certifies persisted geometry without generation; supported regeneration uses recorded settings, ordered overrides and exact stage/fork identities.
+
+**Authoring workflow.** Simple is the initial view, with shared Generate/load actions, preset/seed/size selectors and direct roughness/woodland controls. Advanced retains every exact field, resource policy, ordered override and detailed provenance. Both views share one draft: presentation-only tab changes preserve precise settings, raw invalid input, pending loads and export identity. Woodland never silently changes the field fraction; conflicts block generation until explicitly repaired. Invalid hidden fields remain guarded and can be focused through Fix in Advanced. An empty preview explains that no map exists and offers the same actions; replacement failure or cancellation retains the prior valid map. Tabs and the native site selector retain keyboard and focus semantics.
+
+**Preview and measurement.** Canonical public vectors supply independent layers, overview/detail, metric navigation and high contrast. Renderer caches and viewport culling affect presentation only. A separate diagnostic entry measures real worker results and scripted viewport operations; foreground/size/DPR changes invalidate the entire sample. Initial setup, steady-state frame intervals and synchronous drawing costs are reported separately, with raw outliers preserved.
+
+**Boundary.** No game, LLM, hidden state, movement or scenario assembly participates. Local browser review remains authorized; distribution remains gated under D23.
+
+**See.** [Authoring guide](map-authoring-guide.md), [verification report](map-verification-report.md), [execution log](map-execution-log.md).
 
 ## HQ feedback presentation refinements — 2026-10-10
 

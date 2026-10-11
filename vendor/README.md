@@ -1,0 +1,7 @@
+# Pinned map engine review artifact
+
+`settlemaker/` is the immutable, attributed corresponding-source snapshot; its README describes the original macOS-only bootstrap checkpoint. The current repository also commits `settlemaker-runtime.canonical.tgz`, the original certified **engine-only** package encoding, alongside complete source, LICENSE, NOTICE and the locked build recipe. Generated `settlemaker/dist`, dependencies and the staged `settlemaker-runtime.tgz` remain ignored. No combined browser bundle is committed here.
+
+Use Node22.22.2/npm10.9.7, then run `npm run setup:map-source` before root `npm ci`. Setup always verifies all163 source payload hashes, installs the isolated locked compiler, builds and packs the engine. It requires the entire rebuilt uncompressed tar SHA to equal the pinned value, verifies the canonical gzip decompresses to that exact tar, and verifies the original compressed SHA-256/SHA-512 identities before staging it. This preserves consumed bytes across macOS zlib1.2.12 and Linux zlib1.3.1-e00f703; neither source nor object code can change without rejection.
+
+The raw tar SHA is `efd518d1f308fb86abf4ddfd892f3730a7dcd8c3c96c32d78edcb541cb824fed`; all identities are in `settlemaker.snapshot.json`. The canonical package retains GPL-3.0-only and attribution from its source snapshot. Combined application/browser distribution remains gated by the owner's decision; no license grant for Kriegsspiel or publication/deployment is implied.

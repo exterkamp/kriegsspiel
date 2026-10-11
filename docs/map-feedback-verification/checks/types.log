@@ -1,0 +1,28 @@
+
+> typecheck
+> npm run typecheck --workspaces --if-present
+
+
+> @kriegsspiel/engine@0.0.0 typecheck
+> tsc --noEmit
+
+
+> @kriegsspiel/protocol@0.0.0 typecheck
+> tsc --noEmit
+
+
+> @kriegsspiel/maps@0.1.0 typecheck
+> tsc --noEmit
+
+
+> @kriegsspiel/server@0.0.0 typecheck
+> tsc --noEmit
+
+
+> @kriegsspiel/client@0.0.0 typecheck
+> svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /Users/dominic/code/kriegsspiel/client
+Getting Svelte diagnostics...
+
+svelte-check found 0 errors and 0 warnings

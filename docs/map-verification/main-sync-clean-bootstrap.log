@@ -1,0 +1,19 @@
+
+> setup:map-source
+> node scripts/setup-map-source.mjs
+
+
+added 5 packages, and audited 6 packages in 563ms
+
+found 0 vulnerabilities
+npm notice
+npm notice New major version of npm available! 10.9.7 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice
+
+> @kriegsspiel/settlemaker-source@3.0.1-constrained.1 build
+> node ../../scripts/verify-map-source.mjs && tsc -p tsconfig.json
+
+{"revision":"e08ec2e09f9a15f9110a3048123a31a58d08c341","files":163,"bytes":3842340}
+{"packageSha256":"df41ca6e340f068f68600be702a74d3db74e165a4f61727916279ccfd3785f84","packageIntegrity":"sha512-zQ+OxvqIDirZ9TqYxgaOV/Wq1aw7Q+RKeJIsM6RrPlHuiVgo8NShoqQm689XTzZ7Kx2weVe5lAbJNiU/bgh0ww=="}
