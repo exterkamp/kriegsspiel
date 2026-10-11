@@ -1,5 +1,6 @@
 import { derived, get, writable } from 'svelte/store';
-import type { Coord, Dispatch } from '@kriegsspiel/protocol';
+import type { Coord, Dispatch, WindowAt } from '@kriegsspiel/protocol';
+import type { BeliefChoice } from '../window/model.js';
 import { initialState, withRead, type ClientState } from '../net/state.js';
 import { loadMarks, saveMarks, type TrayMarks } from './tray.js';
 import type { ViewId } from './views.js';
@@ -63,3 +64,12 @@ export function persistTray(key: string): () => void {
 }
 
 export const currentMarks = (): TrayMarks => get(trayMarks);
+
+/** The game this page is playing, once joined; the umpire's window reads its log. */
+export const gameId = writable<string | undefined>(undefined);
+
+/** Umpire's window (after the game): open, the replayed moment shown on the table, whose belief is overlaid, and the unit under the pointer. */
+export const windowOpen = writable(false);
+export const windowFrame = writable<WindowAt | undefined>(undefined);
+export const windowBelief = writable<BeliefChoice>('none');
+export const windowHover = writable<string | undefined>(undefined);

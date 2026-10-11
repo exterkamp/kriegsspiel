@@ -11,6 +11,8 @@
  *   POST /games/:id/join           signed in: take a free side, body `{ "side": string }` (the invite link is `/?game=<id>`)
  *   POST /games/:id/ready          signed in, seated: body `{ "ready": boolean }`
  *   POST /games/:id/start          the creator: start a lobby game once every side is taken and every player is ready
+ *   GET  /games/:id/window         seated, game over: the umpire's window timeline (403 `game_not_over` before the end)
+ *   GET  /games/:id/window/at?at=  seated, game over: true positions, beliefs, dice and rulings at a game time
  *   GET  /games/:id/ws             WebSocket for the side the signed-in user holds (`@kriegsspiel/protocol` messages);
  *                                  in hot-seat, `?side=` picks which of the creator's sides
  *   GET  /healthz                  liveness, `{ ok: true }`
@@ -39,6 +41,7 @@ import {
   type Timers,
 } from '../game/index.js';
 import { adminApi } from '../admin/adminApi.js';
+import { loadReplayInput } from '../admin/replayView.js';
 import { LogMailer, type Mailer } from '../auth/mailer.js';
 import { authRoutes, type Auth } from '../auth/routes.js';
 import { MemoryAuthStore, type AuthStore } from '../auth/store.js';
@@ -53,6 +56,7 @@ import {
 import type { PauseConfig } from '../pause.js';
 import type { OrderParser } from '../orders/index.js';
 import { Hub, type Socket } from './hub.js';
+import { windowAt, windowTimeline } from './umpireWindow.js';
 
 /** Fastest clock a client may ask for: 1 game day per wall second. */
 export const MAX_RATE = 86_400;
@@ -89,6 +93,8 @@ const CreateGame = z
 const JoinGame = z.object({ side: SideName }).strict();
 
 const Ready = z.object({ ready: z.boolean() }).strict();
+
+const WindowQuery = z.object({ at: z.coerce.number().finite().min(0), side: SideName.optional() });
 
 const WsQuery = z.object({ side: SideName.optional() });
 
@@ -447,6 +453,58 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (startError) return reply.code(500).send({ error: startError });
     return { id: rec.id, status: 'started', ws: `/games/${rec.id}/ws` };
   });
+
+  /**
+   * The umpire's window reveals master state, so it is the one route that checks the game is over
+   * on the server: a seat alone is not enough. A game still being played, or one that cannot be
+   * replayed, gets no data.
+   */
+  const windowFor = async (
+    id: string,
+    userId: string,
+    want: SideId | undefined,
+  ): Promise<
+    | { error: string; status: number }
+    | {
+        input: NonNullable<Awaited<ReturnType<typeof loadReplayInput>>>;
+        timeline: NonNullable<ReturnType<typeof windowTimeline>>;
+      }
+  > => {
+    const rec = recordOf(id);
+    if (!rec) return { status: 404, error: 'no_such_game' };
+    if (!sideFor(rec, userId, want)) return { status: 403, error: 'no_seat' };
+    if (rec.status !== 'started') return { status: 403, error: 'game_not_over' };
+    const live = host.get(id);
+    if (live && !live.state.world.outcome) return { status: 403, error: 'game_not_over' };
+    const input = await loadReplayInput(store, id).catch(() => null);
+    if (input === null) return { status: 422, error: 'cannot_replay' };
+    if (!input) return { status: 404, error: 'no_such_game' };
+    const timeline = windowTimeline(input, live?.state.time);
+    if (!timeline) return { status: 403, error: 'game_not_over' };
+    return { input, timeline };
+  };
+
+  server.get<{ Params: { id: string } }>('/games/:id/window', async (req, reply) => {
+    const user = auth.userOf(req);
+    if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+    const w = await windowFor(req.params.id, user.id, undefined);
+    if ('error' in w) return reply.code(w.status).send({ error: w.error });
+    return w.timeline;
+  });
+
+  server.get<{ Params: { id: string }; Querystring: Record<string, string> }>(
+    '/games/:id/window/at',
+    async (req, reply) => {
+      const user = auth.userOf(req);
+      if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+      const q = WindowQuery.safeParse(req.query);
+      if (!q.success)
+        return reply.code(400).send({ error: 'bad_request', message: q.error.message });
+      const w = await windowFor(req.params.id, user.id, q.data.side);
+      if ('error' in w) return reply.code(w.status).send({ error: w.error });
+      return windowAt(w.input, Math.min(q.data.at, w.timeline.endMs));
+    },
+  );
 
   server.get<{ Params: { id: string } }>(
     '/games/:id/ws',

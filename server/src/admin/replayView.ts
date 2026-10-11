@@ -16,8 +16,9 @@ import {
 } from '@kriegsspiel/engine';
 import type { SideView } from '@kriegsspiel/protocol';
 import { toSideView } from '../api/sideView.js';
+import { createRegistry, loadScenarioById, startingState } from '../game/registry.js';
 import { replayLog } from '../game/replay.js';
-import type { InputLogEntry, InputLogHeader } from '../game/store.js';
+import type { GameStore, InputLogEntry, InputLogHeader } from '../game/store.js';
 
 export type MarkKind = 'input' | 'event' | 'contact' | 'order' | 'llm';
 
@@ -31,6 +32,8 @@ export interface ReplayMark {
 export interface ReplayTimeline {
   /** Last game time the scrubber can reach. */
   endMs: number;
+  /** How the game ended, or null while it has not. */
+  outcome: GameState['outcome'];
   marks: ReplayMark[];
 }
 
@@ -51,6 +54,22 @@ export interface ReplayInput {
   entries: readonly InputLogEntry[];
   registry: EventRegistry<GameState>;
   init?: (state: EngineState<GameState>) => EngineState<GameState>;
+}
+
+/** The input log of a stored game, or undefined if it has none. Replay never touches a parser or umpire. */
+export async function loadReplayInput(
+  store: GameStore,
+  id: string,
+): Promise<ReplayInput | undefined> {
+  const header = await store.logHeader(id);
+  if (!header) return undefined;
+  return {
+    header,
+    world: loadScenarioById(header.scenarioId),
+    entries: await store.inputLog(id),
+    registry: createRegistry(),
+    init: startingState,
+  };
 }
 
 const EVENT_KIND: Record<string, MarkKind> = {
@@ -86,7 +105,7 @@ export function replayTimeline(input: ReplayInput, untilMs?: number): ReplayTime
     marks.push({ ms: ev.time, kind: EVENT_KIND[ev.type] ?? 'event', label: ev.type });
   }
   marks.sort((a, b) => a.ms - b.ms);
-  return { endMs: state.time, marks };
+  return { endMs: state.time, outcome: state.world.outcome, marks };
 }
 
 /** The game as it stood at `gameMs`: master state, each side's view and the events so far. */
