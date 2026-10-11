@@ -360,7 +360,7 @@ Keyboard users can disable letter shortcuts for the session, while Tab/Enter and
 
 **See.** [Authoring guide](map-authoring-guide.md), [verification report](map-verification-report.md), [execution log](map-execution-log.md).
 
-## D26: Saved public maps can be inspected on a separate flat table
+## D27: Saved public maps can be inspected on a separate flat table
 
 **Decision.** `/map-table.html` loads supported saved map JSON through D25's independent complete certification worker, without generation. Accepted immutable geography is drawn by the authoring cartographic renderer into a device-bounded whole-map raster and registered to a flat metre-based Three.js paper. Fractional content dimensions preserve rectangular bounds without a fit margin or tile scaling. This is an inspection path, not a playable scenario or live HQ adapter.
 
