@@ -25,6 +25,8 @@ export interface GameHostOptions {
   timers?: Timers;
   /** Called after each tick or command of a game, once its state is saved. */
   onUpdate?: (gameId: string) => void;
+  /** Called when a game is closed (evicted or shut down), after its actor has stopped. */
+  onClose?: (gameId: string) => void;
   /** Applied to a new game's state before it starts, e.g. to queue its first scheduled events. */
   init?: (state: EngineState<GameState>) => EngineState<GameState>;
   trace?: TraceSink;
@@ -197,6 +199,7 @@ export class GameHost {
     const actor = this.games.get(id);
     this.games.delete(id);
     await actor?.close();
+    this.options.onClose?.(id);
   }
 
   /** Close every game: no timers are left running. */

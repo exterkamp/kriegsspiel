@@ -11,8 +11,11 @@
  *   POST /games/:id/join           signed in: take a free side, body `{ "side": string }` (the invite link is `/?game=<id>`)
  *   POST /games/:id/ready          signed in, seated: body `{ "ready": boolean }`
  *   POST /games/:id/start          the creator: start a lobby game once every side is taken and every player is ready
+ *   GET  /games/:id/window         seated, game over: the umpire's window timeline (403 `game_not_over` before the end)
+ *   GET  /games/:id/window/at?at=  seated, game over: true positions, beliefs, dice and rulings at a game time
  *   GET  /games/:id/ws             WebSocket for the side the signed-in user holds (`@kriegsspiel/protocol` messages);
  *                                  in hot-seat, `?side=` picks which of the creator's sides
+ *   /notifications/*               signed in: notification preferences and web push subscriptions (see ../notify)
  *   GET  /healthz                  liveness, `{ ok: true }`
  *   /admin/api/*                   read-only debug API, only when `admin.enabled` (see ../admin)
  *   GET  /*                        the built client, when `staticDir` is set
@@ -40,6 +43,7 @@ import {
   type Timers,
 } from '../game/index.js';
 import { adminApi } from '../admin/adminApi.js';
+import { loadReplayInput } from '../admin/replayView.js';
 import { LogMailer, type Mailer } from '../auth/mailer.js';
 import { authRoutes, type Auth } from '../auth/routes.js';
 import { MemoryAuthStore, type AuthStore } from '../auth/store.js';
@@ -53,7 +57,15 @@ import {
 } from '../lobby/store.js';
 import type { PauseConfig } from '../pause.js';
 import type { OrderParser } from '../orders/index.js';
+import {
+  Notifier,
+  MemoryNotifyStore,
+  notifyRoutes,
+  type NotifyStore,
+  type PushSender,
+} from '../notify/index.js';
 import { Hub, type Socket } from './hub.js';
+import { windowAt, windowTimeline } from './umpireWindow.js';
 
 /** Fastest clock a client may ask for: 1 game day per wall second. */
 export const MAX_RATE = 86_400;
@@ -90,6 +102,8 @@ const CreateGame = z
 const JoinGame = z.object({ side: SideName }).strict();
 
 const Ready = z.object({ ready: z.boolean() }).strict();
+
+const WindowQuery = z.object({ at: z.coerce.number().finite().min(0), side: SideName.optional() });
 
 const WsQuery = z.object({ side: SideName.optional() });
 
@@ -133,6 +147,8 @@ export interface AppOptions {
    * so each player has their own bucket; off when the port is reachable directly, where the header can be forged.
    */
   trustProxy?: boolean;
+  /** Notifications (epic #5): preferences and push subscriptions (default in memory), and the web push sender (unset: no web push). */
+  notify?: { store?: NotifyStore; push?: PushSender; emailEveryMs?: number };
   onError?: (gameId: string, error: unknown) => void;
 }
 
@@ -140,6 +156,8 @@ export interface App {
   server: FastifyInstance;
   host: GameHost;
   hub: Hub;
+  notifier: Notifier;
+  notifyStore: NotifyStore;
   auth: Auth;
   authStore: AuthStore;
   lobby: LobbyStore;
@@ -214,7 +232,27 @@ export async function buildApp(options: AppOptions): Promise<App> {
       options.scriptedOpponents === true && recordOf(id)?.sessionType === 'co_op_vs_ai',
     aiAgents: options.aiAgents,
     trace,
-    onUpdate: (id) => hub.notify(id),
+    onUpdate: (id) => {
+      hub.notify(id);
+      notifier.observe(id);
+    },
+    onClose: (id) => notifier.forget(id),
+    onError,
+  });
+  const notifyStore = options.notify?.store ?? new MemoryNotifyStore();
+  const mailer = options.auth?.mailer ?? new LogMailer((line) => server.log.info(line));
+  const publicUrl = options.auth?.publicUrl ?? 'http://localhost:3000';
+  const wallNow = options.wallNow ?? Date.now;
+  const notifier = new Notifier({
+    auth: authStore,
+    store: notifyStore,
+    mailer,
+    push: options.notify?.push,
+    publicUrl,
+    lookup: (id) => host.get(id),
+    sendToUser: (id, userId, message, side) => hub.sendToUser(id, userId, message, side),
+    wallNow,
+    emailEveryMs: options.notify?.emailEveryMs,
     onError,
   });
 
@@ -231,17 +269,20 @@ export async function buildApp(options: AppOptions): Promise<App> {
 
   const auth = await authRoutes(server, {
     store: authStore,
-    mailer: options.auth?.mailer ?? new LogMailer((line) => server.log.info(line)),
-    publicUrl: options.auth?.publicUrl ?? 'http://localhost:3000',
+    mailer,
+    publicUrl,
     wallNow: options.wallNow,
     loginPerEmail: options.auth?.loginPerEmail,
     loginPerIp: options.auth?.loginPerIp,
     onAccountDeleted: (userId) => {
+      notifyStore.deleteUser(userId);
       lobby.forgetUser(userId);
       hub.disconnectUser(userId, 'account deleted');
     },
     onLogout: (userId) => hub.disconnectUser(userId),
   });
+
+  notifyRoutes(server, { auth, store: notifyStore, push: options.notify?.push });
 
   const aiPlays = options.scriptedOpponents === true;
 
@@ -457,6 +498,58 @@ export async function buildApp(options: AppOptions): Promise<App> {
     return { id: rec.id, status: 'started', ws: `/games/${rec.id}/ws` };
   });
 
+  /**
+   * The umpire's window reveals master state, so it is the one route that checks the game is over
+   * on the server: a seat alone is not enough. A game still being played, or one that cannot be
+   * replayed, gets no data.
+   */
+  const windowFor = async (
+    id: string,
+    userId: string,
+    want: SideId | undefined,
+  ): Promise<
+    | { error: string; status: number }
+    | {
+        input: NonNullable<Awaited<ReturnType<typeof loadReplayInput>>>;
+        timeline: NonNullable<ReturnType<typeof windowTimeline>>;
+      }
+  > => {
+    const rec = recordOf(id);
+    if (!rec) return { status: 404, error: 'no_such_game' };
+    if (!sideFor(rec, userId, want)) return { status: 403, error: 'no_seat' };
+    if (rec.status !== 'started') return { status: 403, error: 'game_not_over' };
+    const live = host.get(id);
+    if (live && !live.state.world.outcome) return { status: 403, error: 'game_not_over' };
+    const input = await loadReplayInput(store, id).catch(() => null);
+    if (input === null) return { status: 422, error: 'cannot_replay' };
+    if (!input) return { status: 404, error: 'no_such_game' };
+    const timeline = windowTimeline(input, live?.state.time);
+    if (!timeline) return { status: 403, error: 'game_not_over' };
+    return { input, timeline };
+  };
+
+  server.get<{ Params: { id: string } }>('/games/:id/window', async (req, reply) => {
+    const user = auth.userOf(req);
+    if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+    const w = await windowFor(req.params.id, user.id, undefined);
+    if ('error' in w) return reply.code(w.status).send({ error: w.error });
+    return w.timeline;
+  });
+
+  server.get<{ Params: { id: string }; Querystring: Record<string, string> }>(
+    '/games/:id/window/at',
+    async (req, reply) => {
+      const user = auth.userOf(req);
+      if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+      const q = WindowQuery.safeParse(req.query);
+      if (!q.success)
+        return reply.code(400).send({ error: 'bad_request', message: q.error.message });
+      const w = await windowFor(req.params.id, user.id, q.data.side);
+      if ('error' in w) return reply.code(w.status).send({ error: w.error });
+      return windowAt(w.input, q.data.at);
+    },
+  );
+
   server.get<{ Params: { id: string } }>(
     '/games/:id/ws',
     {
@@ -492,9 +585,11 @@ export async function buildApp(options: AppOptions): Promise<App> {
     hub.closeAll();
     await trace?.close();
     await host.shutdown();
+    await notifier.flush();
     if (!options.auth?.store) authStore.close();
     if (!options.lobby) lobby.close();
+    if (!options.notify?.store) notifyStore.close();
   });
 
-  return { server, host, hub, auth, authStore, lobby };
+  return { server, host, hub, notifier, notifyStore, auth, authStore, lobby };
 }

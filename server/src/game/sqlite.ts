@@ -11,7 +11,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { Mark } from '@kriegsspiel/protocol';
+import type { DraftSnapshot, Mark } from '@kriegsspiel/protocol';
 import type { ClockChange } from '../clock.js';
 import type { GameSnapshot, GameStore, InputLogEntry, InputLogHeader, SideViews } from './store.js';
 
@@ -64,6 +64,12 @@ export const MIGRATIONS: readonly string[] = [
      game_id TEXT NOT NULL,
      side TEXT NOT NULL,
      game_ms REAL NOT NULL,
+     PRIMARY KEY (game_id, side)
+   ) WITHOUT ROWID;`,
+  `CREATE TABLE side_drafts (
+     game_id TEXT NOT NULL,
+     side TEXT NOT NULL,
+     drafts TEXT NOT NULL,
      PRIMARY KEY (game_id, side)
    ) WITHOUT ROWID;`,
 ];
@@ -249,6 +255,19 @@ export class SqliteGameStore implements GameStore {
       .prepare('SELECT marks FROM side_marks WHERE game_id = ? AND side = ?')
       .get(gameId, side) as { marks: string } | undefined;
     return r ? (JSON.parse(r.marks) as Mark[]) : [];
+  }
+
+  async saveDrafts(gameId: string, side: string, drafts: readonly DraftSnapshot[]): Promise<void> {
+    this.db
+      .prepare('INSERT OR REPLACE INTO side_drafts (game_id, side, drafts) VALUES (?, ?, ?)')
+      .run(gameId, side, JSON.stringify(drafts));
+  }
+
+  async loadDrafts(gameId: string, side: string): Promise<DraftSnapshot[]> {
+    const r = this.db
+      .prepare('SELECT drafts FROM side_drafts WHERE game_id = ? AND side = ?')
+      .get(gameId, side) as { drafts: string } | undefined;
+    return r ? (JSON.parse(r.drafts) as DraftSnapshot[]) : [];
   }
 
   async saveSeen(gameId: string, side: string, gameMs: number): Promise<void> {

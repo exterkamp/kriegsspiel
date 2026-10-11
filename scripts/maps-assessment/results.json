@@ -1,0 +1,1904 @@
+{
+  "provenance": {
+    "revision": "d5cf3590cf59e1d382110d25a6910f12507299e2",
+    "tree": "ee7db196403a98c5a2ab2378fcaed7c757080250",
+    "lockSha256": "b4b573af49d188d144273d19662485290924d5558a7653c805dbe9d0bed34e01",
+    "node": "v22.22.2",
+    "platform": "darwin/arm64",
+    "versions": {
+      "typescript": "5.9.3",
+      "esbuild": "0.25.12",
+      "polygon-clipping": "0.15.7",
+      "splaytree": "3.2.3",
+      "robust-predicates": "3.0.3",
+      "@types/geojson": "7946.0.16"
+    },
+    "sourceStrategy": "pristine git archive; existing dependencies reused, no install or network"
+  },
+  "fixtures": {
+    "population": 300,
+    "seeds": [2, 7],
+    "base": {
+      "name": "Architecture fixture",
+      "population": 300,
+      "biome": "temperate",
+      "port": false,
+      "citadel": false,
+      "walls": false,
+      "plaza": true,
+      "temple": false,
+      "shanty": false,
+      "capital": false,
+      "roadBearings": [
+        {
+          "bearing_deg": 29.61670303311871,
+          "kind": "main",
+          "route_id": "north"
+        },
+        {
+          "bearing_deg": 129.34850511850237,
+          "kind": "main",
+          "route_id": "south-east"
+        },
+        {
+          "bearing_deg": 261.1392790621698,
+          "kind": "main",
+          "route_id": "west"
+        }
+      ]
+    },
+    "approaches": [
+      {
+        "id": "north",
+        "at": [137, -241],
+        "bearing": 29.61670303311871
+      },
+      {
+        "id": "south-east",
+        "at": [211, 173],
+        "bearing": 129.34850511850237
+      },
+      {
+        "id": "west",
+        "at": [-263, 41],
+        "bearing": 261.1392790621698
+      }
+    ],
+    "water": [
+      [45, -3000],
+      [3000, -3000],
+      [3000, 3000],
+      [45, 3000]
+    ],
+    "measuredWater": {
+      "version": 1,
+      "status": "measured",
+      "coordinateSpace": "burg-local-metres",
+      "surveyRadiusM": 6000,
+      "geometryErrorM": 0,
+      "bodies": [
+        {
+          "kind": "lake",
+          "featureId": "east-water",
+          "distanceM": 45,
+          "bearingDeg": 90,
+          "polygonIndices": [0]
+        }
+      ]
+    },
+    "exclusion": [
+      [-70, -30],
+      [-20, -30],
+      [-20, 60],
+      [-70, 60]
+    ],
+    "constrainedPlane": {
+      "datumM": 120,
+      "gradient": [0.12, 0.05],
+      "slope": 0.12999999999999998
+    },
+    "thresholds": {
+      "roadGrade": 0.1,
+      "buildingGradient": 0.08
+    },
+    "siteBoundsM": [-500, -500, 500, 500]
+  },
+  "checks": {
+    "edgeOnlyFootprintAndCorridorDetected": true,
+    "physical-village:scalarElevationIgnored": true,
+    "physical-city:scalarElevationIgnored": true,
+    "legacy-village:scalarElevationIgnored": true,
+    "legacy-city:scalarElevationIgnored": true,
+    "village:renderDoesNotMutateMetres": true,
+    "city:renderDoesNotMutateMetres": true,
+    "legacyCityMeasuredWaterRejected": true
+  },
+  "rows": [
+    {
+      "seed": 2,
+      "candidate": "physical-village",
+      "fixture": "flat",
+      "elapsedMs": 144.397292,
+      "work": "model + local export (no SVG)",
+      "canonicalGeojsonSha256": "d25008a7a7a3ce4f0f345f83033ed1881e5c8bd6667c252e9941b2a4e073622f",
+      "repeatEqual": true,
+      "metadata": {
+        "schema": "settlemaker/physical-plan",
+        "schema_version": 1,
+        "coordinate_system": "local_metres_y_down",
+        "coordinate_units": "metres",
+        "local_bounds": {
+          "min_x": -269.5114578993994,
+          "min_y": -243.2604031777555,
+          "max_x": 243.94733559930145,
+          "max_y": 223.9387344271722
+        },
+        "scale": {
+          "meters_per_unit": 1,
+          "source": "physical_layout_v1"
+        },
+        "residents": {
+          "requested": 300,
+          "capacity": 300,
+          "assigned": 300,
+          "unassigned": 0,
+          "insideWalls": {
+            "requested": 0,
+            "capacity": 0,
+            "assigned": 0,
+            "unassigned": 0
+          },
+          "outsideWalls": {
+            "requested": 300,
+            "capacity": 300,
+            "assigned": 300,
+            "unassigned": 0
+          }
+        },
+        "development": {
+          "preset": "village",
+          "centreOccupancy": 4,
+          "edgeOccupancy": 4,
+          "corePopulation": null
+        },
+        "seed": 2
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [
+        "growth: 6 additions accepted, 10 trials rejected, 0 fallback rounds",
+        "seating: 69% (75 of 109 deck-usable lots)"
+      ],
+      "residents": {
+        "requested": 300,
+        "capacity": 300,
+        "assigned": 300,
+        "unassigned": 0,
+        "insideWalls": {
+          "requested": 0,
+          "capacity": 0,
+          "assigned": 0,
+          "unassigned": 0
+        },
+        "outsideWalls": {
+          "requested": 300,
+          "capacity": 300,
+          "assigned": 300,
+          "unassigned": 0
+        }
+      },
+      "contractCircleGaps": null,
+      "assessment": {
+        "buildings": 75,
+        "streets": 13,
+        "roadSegments": 265,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 0,
+        "streetCorridorWaterOverlap": 0,
+        "streetCorridorExclusionOverlap": 0,
+        "streetsWithUnknownWidth": 0,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 0,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 0,
+        "roadGradeFailures": 0,
+        "maxRoadGrade": 0,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": [],
+        "firstRoadGradeFailureIds": [],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 2,
+            "nearestPathM": 7.218852503076409,
+            "nearestEndpointM": 7.218859269703006
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 2,
+            "nearestPathM": 11.471153774147972,
+            "nearestEndpointM": 55.121034407412935
+          },
+          {
+            "id": "west",
+            "matchingStreets": 2,
+            "nearestPathM": 1.6347685331358863,
+            "nearestEndpointM": 7.548923128120602
+          }
+        ]
+      }
+    },
+    {
+      "seed": 2,
+      "candidate": "physical-village",
+      "fixture": "constrained",
+      "elapsedMs": 1056.912625,
+      "work": "model + local export (no SVG)",
+      "canonicalGeojsonSha256": "19c2e01e2873f597a36acd103f3d99b11c21b876b24aa8f84dddfcb375c1f145",
+      "repeatEqual": true,
+      "metadata": {
+        "schema": "settlemaker/physical-plan",
+        "schema_version": 1,
+        "coordinate_system": "local_metres_y_down",
+        "coordinate_units": "metres",
+        "local_bounds": {
+          "min_x": -235.40626278650268,
+          "min_y": -209.73850004025485,
+          "max_x": 195.4201796369339,
+          "max_y": 219.99944316144226
+        },
+        "scale": {
+          "meters_per_unit": 1,
+          "source": "physical_layout_v1"
+        },
+        "residents": {
+          "requested": 300,
+          "capacity": 300,
+          "assigned": 300,
+          "unassigned": 0,
+          "insideWalls": {
+            "requested": 0,
+            "capacity": 0,
+            "assigned": 0,
+            "unassigned": 0
+          },
+          "outsideWalls": {
+            "requested": 300,
+            "capacity": 300,
+            "assigned": 300,
+            "unassigned": 0
+          }
+        },
+        "development": {
+          "preset": "village",
+          "centreOccupancy": 4,
+          "edgeOccupancy": 4,
+          "corePopulation": null
+        },
+        "seed": 2
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [
+        "water: trunk-main-north/a leaves the village from a contract entry that is itself in the water; its approach road goes ashore before following the coast",
+        "water: trunk-main-south-east/a leaves the village from a contract entry that is itself in the water; its approach road goes ashore before following the coast",
+        "growth: 22 additions accepted, 242 trials rejected, 12 fallback rounds",
+        "seating: 44% (75 of 171 deck-usable lots)",
+        "water: the site is hemmed in — 0.0k m2 of farmland, 0.00x the built area against 1.0x expected of a village with room"
+      ],
+      "residents": {
+        "requested": 300,
+        "capacity": 300,
+        "assigned": 300,
+        "unassigned": 0,
+        "insideWalls": {
+          "requested": 0,
+          "capacity": 0,
+          "assigned": 0,
+          "unassigned": 0
+        },
+        "outsideWalls": {
+          "requested": 300,
+          "capacity": 300,
+          "assigned": 300,
+          "unassigned": 0
+        }
+      },
+      "contractCircleGaps": null,
+      "assessment": {
+        "buildings": 75,
+        "streets": 35,
+        "roadSegments": 258,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 27,
+        "streetCorridorWaterOverlap": 4,
+        "streetCorridorExclusionOverlap": 13,
+        "streetsWithUnknownWidth": 0,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 0,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 75,
+        "roadGradeFailures": 129,
+        "maxRoadGrade": 0.12999101724247367,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": [
+          "bld:trunk-street-0:L2",
+          "bld:trunk-street-0:R2",
+          "bld:trunk-street-0:L3"
+        ],
+        "firstRoadGradeFailureIds": ["street:0:4", "street:0:5", "street:0:6"],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 3,
+            "nearestPathM": 106.56230445095946,
+            "nearestEndpointM": 106.56230445095946
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 3,
+            "nearestPathM": 124.0284748736826,
+            "nearestEndpointM": 124.0284748736826
+          },
+          {
+            "id": "west",
+            "matchingStreets": 3,
+            "nearestPathM": 28.523814312895315,
+            "nearestEndpointM": 28.523814312895315
+          }
+        ]
+      }
+    },
+    {
+      "seed": 2,
+      "candidate": "physical-city",
+      "fixture": "flat",
+      "elapsedMs": 30.747875000000022,
+      "work": "model + local export (no SVG)",
+      "canonicalGeojsonSha256": "f1bf6bc8affc02f202851efaa27147eada708e793776a77f0678a9b0ecc32003",
+      "repeatEqual": true,
+      "metadata": {
+        "schema": "settlemaker/physical-plan",
+        "schema_version": 1,
+        "coordinate_system": "local_metres_y_down",
+        "coordinate_units": "metres",
+        "local_bounds": {
+          "min_x": -249.01439570153804,
+          "min_y": -216.0944567022959,
+          "max_x": 238.96759755537732,
+          "max_y": 230.1623725215403
+        },
+        "scale": {
+          "meters_per_unit": 1,
+          "source": "physical_layout_v1"
+        },
+        "residents": {
+          "requested": 300,
+          "capacity": 316,
+          "assigned": 300,
+          "unassigned": 0,
+          "insideWalls": {
+            "requested": 0,
+            "capacity": 0,
+            "assigned": 0,
+            "unassigned": 0
+          },
+          "outsideWalls": {
+            "requested": 300,
+            "capacity": 316,
+            "assigned": 300,
+            "unassigned": 0
+          }
+        },
+        "development": {
+          "preset": "city",
+          "centreOccupancy": 8,
+          "edgeOccupancy": 4,
+          "corePopulation": null
+        },
+        "seed": 2
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [],
+      "residents": {
+        "requested": 300,
+        "capacity": 316,
+        "assigned": 300,
+        "unassigned": 0,
+        "insideWalls": {
+          "requested": 0,
+          "capacity": 0,
+          "assigned": 0,
+          "unassigned": 0
+        },
+        "outsideWalls": {
+          "requested": 300,
+          "capacity": 316,
+          "assigned": 300,
+          "unassigned": 0
+        }
+      },
+      "contractCircleGaps": null,
+      "assessment": {
+        "buildings": 45,
+        "streets": 39,
+        "roadSegments": 138,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 0,
+        "streetCorridorWaterOverlap": 0,
+        "streetCorridorExclusionOverlap": 0,
+        "streetsWithUnknownWidth": 0,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 0,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 0,
+        "roadGradeFailures": 0,
+        "maxRoadGrade": 0,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": [],
+        "firstRoadGradeFailureIds": [],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "west",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          }
+        ]
+      }
+    },
+    {
+      "seed": 2,
+      "candidate": "physical-city",
+      "fixture": "constrained",
+      "elapsedMs": 19.6118749999996,
+      "work": "model + local export (no SVG)",
+      "canonicalGeojsonSha256": "e44e6e3f449f5c1e8346418d8e205e281ff22b42f1af04fc37d2a62a03462807",
+      "repeatEqual": true,
+      "metadata": {
+        "schema": "settlemaker/physical-plan",
+        "schema_version": 1,
+        "coordinate_system": "local_metres_y_down",
+        "coordinate_units": "metres",
+        "local_bounds": {
+          "min_x": -209.84792351902362,
+          "min_y": -201.79298595671682,
+          "max_x": 194.35928726662684,
+          "max_y": 193.66492353164818
+        },
+        "scale": {
+          "meters_per_unit": 1,
+          "source": "physical_layout_v1"
+        },
+        "residents": {
+          "requested": 300,
+          "capacity": 316,
+          "assigned": 300,
+          "unassigned": 0,
+          "insideWalls": {
+            "requested": 0,
+            "capacity": 0,
+            "assigned": 0,
+            "unassigned": 0
+          },
+          "outsideWalls": {
+            "requested": 300,
+            "capacity": 316,
+            "assigned": 300,
+            "unassigned": 0
+          }
+        },
+        "development": {
+          "preset": "city",
+          "centreOccupancy": 8,
+          "edgeOccupancy": 4,
+          "corePopulation": null
+        },
+        "seed": 2
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [],
+      "residents": {
+        "requested": 300,
+        "capacity": 316,
+        "assigned": 300,
+        "unassigned": 0,
+        "insideWalls": {
+          "requested": 0,
+          "capacity": 0,
+          "assigned": 0,
+          "unassigned": 0
+        },
+        "outsideWalls": {
+          "requested": 300,
+          "capacity": 316,
+          "assigned": 300,
+          "unassigned": 0
+        }
+      },
+      "contractCircleGaps": null,
+      "assessment": {
+        "buildings": 45,
+        "streets": 39,
+        "roadSegments": 108,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 5,
+        "streetCorridorWaterOverlap": 0,
+        "streetCorridorExclusionOverlap": 4,
+        "streetsWithUnknownWidth": 0,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 0,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 45,
+        "roadGradeFailures": 28,
+        "maxRoadGrade": 0.1299885188826596,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": ["b29", "b30", "b31"],
+        "firstRoadGradeFailureIds": ["street:0:15", "street:0:16", "street:1:0"],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "west",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          }
+        ]
+      }
+    },
+    {
+      "seed": 2,
+      "candidate": "legacy-village",
+      "fixture": "flat",
+      "elapsedMs": 109.88516699999991,
+      "work": "model + local export (no SVG)",
+      "canonicalGeojsonSha256": "80fe763dfb888e236ee0045eff2becce15acfe64ebe3e07fb9a1c3003ee759fd",
+      "repeatEqual": true,
+      "metadata": {
+        "schema_version": 4,
+        "settlemaker_version": "3.0.1",
+        "settlement_generation_version": "village",
+        "coordinate_system": "burg_local_y_down",
+        "coordinate_units": "metres",
+        "generated_at": "2026-10-10T18:01:42.774Z",
+        "local_bounds": {
+          "min_x": -238.05394669102648,
+          "min_y": -273.1836664846495,
+          "max_x": 244.5660609270711,
+          "max_y": 274.4612325975459
+        },
+        "scale": {
+          "meters_per_unit": 1,
+          "diameter_meters": 507.6448990821954,
+          "diameter_local": 507.6448990821954,
+          "source": "village_metres"
+        },
+        "stable_ids": {
+          "prefixes": {
+            "building": "bld:",
+            "poi": "poi:",
+            "street": "<lane id>",
+            "crossing": "bridge:"
+          }
+        },
+        "poi_density": "town",
+        "degraded_flags": [],
+        "local_origin_shift": {
+          "dx": 0,
+          "dy": 0,
+          "source": "none"
+        },
+        "contract_radius_m": 148.82679811916248,
+        "green_relation": "astride",
+        "outline_m": [
+          [-0.5050568246612205, -16.429669309055043],
+          [5.4033062140167, -3.5754218169505982],
+          [-11.049293927026069, -1.7560692394116912]
+        ],
+        "diagnostics": [
+          "growth: 6 additions accepted, 10 trials rejected, 0 fallback rounds",
+          "seating: 69% (75 of 109 deck-usable lots)"
+        ]
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [
+        "growth: 6 additions accepted, 10 trials rejected, 0 fallback rounds",
+        "seating: 69% (75 of 109 deck-usable lots)"
+      ],
+      "residents": null,
+      "contractCircleGaps": [
+        {
+          "id": "north",
+          "gapM": 0
+        },
+        {
+          "id": "south-east",
+          "gapM": 0
+        },
+        {
+          "id": "west",
+          "gapM": 0
+        }
+      ],
+      "assessment": {
+        "buildings": 75,
+        "streets": 16,
+        "roadSegments": 264,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 0,
+        "streetCorridorWaterOverlap": 0,
+        "streetCorridorExclusionOverlap": 0,
+        "streetsWithUnknownWidth": 0,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 0,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 0,
+        "roadGradeFailures": 0,
+        "maxRoadGrade": 0,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": [],
+        "firstRoadGradeFailureIds": [],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 3,
+            "nearestPathM": 10.67208194470532,
+            "nearestEndpointM": 43.94351108729337
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 3,
+            "nearestPathM": 17.20571789325867,
+            "nearestEndpointM": 76.82517276769734
+          },
+          {
+            "id": "west",
+            "matchingStreets": 3,
+            "nearestPathM": 25.25772435430808,
+            "nearestEndpointM": 25.25772435430808
+          }
+        ]
+      }
+    },
+    {
+      "seed": 2,
+      "candidate": "legacy-village",
+      "fixture": "constrained",
+      "elapsedMs": 1002.009791,
+      "work": "model + local export (no SVG)",
+      "canonicalGeojsonSha256": "1004a182f577fff5cea338a1ee441d0712fa1a415af881cf8e7e2d71132466a8",
+      "repeatEqual": true,
+      "metadata": {
+        "schema_version": 4,
+        "settlemaker_version": "3.0.1",
+        "settlement_generation_version": "village",
+        "coordinate_system": "burg_local_y_down",
+        "coordinate_units": "metres",
+        "generated_at": "2026-10-10T18:01:43.885Z",
+        "local_bounds": {
+          "min_x": -266.7972009285289,
+          "min_y": -246.47776422105008,
+          "max_x": 155.08831791558129,
+          "max_y": 258.0564624611799
+        },
+        "scale": {
+          "meters_per_unit": 1,
+          "diameter_meters": 464.53422668223,
+          "diameter_local": 464.53422668223,
+          "source": "village_metres"
+        },
+        "stable_ids": {
+          "prefixes": {
+            "building": "bld:",
+            "poi": "poi:",
+            "street": "<lane id>",
+            "crossing": "bridge:"
+          }
+        },
+        "poi_density": "town",
+        "degraded_flags": [],
+        "local_origin_shift": {
+          "dx": 0,
+          "dy": 0,
+          "source": "none"
+        },
+        "contract_radius_m": 148.82679811916248,
+        "green_relation": "astride",
+        "outline_m": [
+          [0.6413867469579599, -15.989047444715446],
+          [5.04212564196752, -2.8283388519918065],
+          [-11.625668268986963, -2.653411164202814]
+        ],
+        "diagnostics": [
+          "water: trunk-main-north/a leaves the village from a contract entry that is itself in the water; its approach road goes ashore before following the coast",
+          "water: trunk-main-south-east/a leaves the village from a contract entry that is itself in the water; its approach road goes ashore before following the coast",
+          "growth: 22 additions accepted, 242 trials rejected, 12 fallback rounds",
+          "seating: 44% (75 of 171 deck-usable lots)"
+        ]
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [
+        "water: trunk-main-north/a leaves the village from a contract entry that is itself in the water; its approach road goes ashore before following the coast",
+        "water: trunk-main-south-east/a leaves the village from a contract entry that is itself in the water; its approach road goes ashore before following the coast",
+        "growth: 22 additions accepted, 242 trials rejected, 12 fallback rounds",
+        "seating: 44% (75 of 171 deck-usable lots)"
+      ],
+      "residents": null,
+      "contractCircleGaps": [
+        {
+          "id": "north",
+          "gapM": 0
+        },
+        {
+          "id": "south-east",
+          "gapM": 0
+        },
+        {
+          "id": "west",
+          "gapM": 0
+        }
+      ],
+      "assessment": {
+        "buildings": 75,
+        "streets": 35,
+        "roadSegments": 324,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 27,
+        "streetCorridorWaterOverlap": 4,
+        "streetCorridorExclusionOverlap": 13,
+        "streetsWithUnknownWidth": 0,
+        "crossingFeatures": 4,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 0,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 75,
+        "roadGradeFailures": 147,
+        "maxRoadGrade": 0.12999101724247367,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": [
+          "bld:trunk-street-0:L2",
+          "bld:trunk-street-0:R2",
+          "bld:trunk-street-0:L3"
+        ],
+        "firstRoadGradeFailureIds": ["trunk-street-0:4", "trunk-street-0:5", "trunk-street-0:6"],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 3,
+            "nearestPathM": 102,
+            "nearestEndpointM": 102.14698184900725
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 3,
+            "nearestPathM": 124.0284748736826,
+            "nearestEndpointM": 124.0284748736826
+          },
+          {
+            "id": "west",
+            "matchingStreets": 3,
+            "nearestPathM": 0.5066292545528545,
+            "nearestEndpointM": 3.9346874826933425
+          }
+        ]
+      }
+    },
+    {
+      "seed": 2,
+      "candidate": "legacy-city",
+      "fixture": "flat",
+      "elapsedMs": 13.163750000000618,
+      "work": "public generateFromBurg including SVG + local export",
+      "canonicalGeojsonSha256": "8df7084193cdab0ce04a492a8fec274cd57699a358b869d912872791831ff68b",
+      "repeatEqual": true,
+      "metadata": {
+        "building_capacity": {
+          "basis": "ordinary-building-budget",
+          "target": 75,
+          "placed": 75,
+          "shortfall": 0,
+          "corePlaced": 67,
+          "outerPlaced": 8,
+          "status": "met"
+        },
+        "schema_version": 4,
+        "settlemaker_version": "3.0.1",
+        "settlement_generation_version": "8v2bbl",
+        "coordinate_system": "local_origin_y_down",
+        "coordinate_units": "settlement_units",
+        "generated_at": "2000-01-01T00:00:00.000Z",
+        "local_bounds": {
+          "min_x": -63.62502143601364,
+          "min_y": -80.78624646692955,
+          "max_x": 63.72272455787722,
+          "max_y": 54.464831369544925
+        },
+        "scale": {
+          "meters_per_unit": 4.719453630771567,
+          "diameter_meters": 310.36911478307195,
+          "diameter_local": 65.76378095112904,
+          "source": "population_heuristic_v1"
+        },
+        "stable_ids": {
+          "prefixes": {
+            "entrance": "g",
+            "poi": "p",
+            "street": "s",
+            "building": "b"
+          }
+        },
+        "poi_density": "town",
+        "degraded_flags": [],
+        "local_origin_shift": {
+          "dx": 0,
+          "dy": 0,
+          "source": "none"
+        }
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [],
+      "residents": null,
+      "contractCircleGaps": null,
+      "assessment": {
+        "buildings": 75,
+        "streets": 31,
+        "roadSegments": 133,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 0,
+        "streetCorridorWaterOverlap": 0,
+        "streetCorridorExclusionOverlap": 0,
+        "streetsWithUnknownWidth": 7,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 6,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 0,
+        "roadGradeFailures": 0,
+        "maxRoadGrade": 0,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": [],
+        "firstRoadGradeFailureIds": [],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "west",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          }
+        ]
+      }
+    },
+    {
+      "seed": 2,
+      "candidate": "legacy-city",
+      "fixture": "constrained",
+      "elapsedMs": 12.221916999999848,
+      "work": "public generateFromBurg including SVG + local export",
+      "canonicalGeojsonSha256": "31b45c6009556be9150ca2c6418f4c7c42361225ca2c4da6e48ec82a01af9cf0",
+      "repeatEqual": true,
+      "metadata": {
+        "building_capacity": {
+          "basis": "ordinary-building-budget",
+          "target": 75,
+          "placed": 75,
+          "shortfall": 0,
+          "corePlaced": 67,
+          "outerPlaced": 8,
+          "status": "met"
+        },
+        "schema_version": 4,
+        "settlemaker_version": "3.0.1",
+        "settlement_generation_version": "tx8g7e",
+        "coordinate_system": "local_origin_y_down",
+        "coordinate_units": "settlement_units",
+        "generated_at": "2000-01-01T00:00:00.000Z",
+        "local_bounds": {
+          "min_x": -95.69276497813192,
+          "min_y": -64.8437598269631,
+          "max_x": 30.507456043951088,
+          "max_y": 50.09911372514509
+        },
+        "scale": {
+          "meters_per_unit": 3.537220417637505,
+          "diameter_meters": 310.36911478307195,
+          "diameter_local": 87.74378696772484,
+          "source": "population_heuristic_v1"
+        },
+        "stable_ids": {
+          "prefixes": {
+            "entrance": "g",
+            "poi": "p",
+            "street": "s",
+            "building": "b"
+          }
+        },
+        "poi_density": "town",
+        "degraded_flags": [],
+        "local_origin_shift": {
+          "dx": 0,
+          "dy": 0,
+          "source": "none"
+        }
+      },
+      "scaleDriftFromFlat": 0.749497864450724,
+      "diagnostics": [],
+      "residents": null,
+      "contractCircleGaps": null,
+      "assessment": {
+        "buildings": 75,
+        "streets": 27,
+        "roadSegments": 88,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 23,
+        "streetCorridorWaterOverlap": 0,
+        "streetCorridorExclusionOverlap": 6,
+        "streetsWithUnknownWidth": 5,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 4,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 75,
+        "roadGradeFailures": 48,
+        "maxRoadGrade": 0.1299994982564869,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": ["b0", "b1", "b2"],
+        "firstRoadGradeFailureIds": ["s0:2", "s0:3", "s0:4"],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "west",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          }
+        ]
+      }
+    },
+    {
+      "seed": 7,
+      "candidate": "physical-village",
+      "fixture": "flat",
+      "elapsedMs": 334.5764589999999,
+      "work": "model + local export (no SVG)",
+      "canonicalGeojsonSha256": "0edeae52714265872de4b429f6552cd99eede517d32daabfe0004b313c760538",
+      "repeatEqual": true,
+      "metadata": {
+        "schema": "settlemaker/physical-plan",
+        "schema_version": 1,
+        "coordinate_system": "local_metres_y_down",
+        "coordinate_units": "metres",
+        "local_bounds": {
+          "min_x": -220.24603724956236,
+          "min_y": -233.990333426236,
+          "max_x": 255.57276027785602,
+          "max_y": 235.03960737775094
+        },
+        "scale": {
+          "meters_per_unit": 1,
+          "source": "physical_layout_v1"
+        },
+        "residents": {
+          "requested": 300,
+          "capacity": 300,
+          "assigned": 300,
+          "unassigned": 0,
+          "insideWalls": {
+            "requested": 0,
+            "capacity": 0,
+            "assigned": 0,
+            "unassigned": 0
+          },
+          "outsideWalls": {
+            "requested": 300,
+            "capacity": 300,
+            "assigned": 300,
+            "unassigned": 0
+          }
+        },
+        "development": {
+          "preset": "village",
+          "centreOccupancy": 4,
+          "edgeOccupancy": 4,
+          "corePopulation": null
+        },
+        "seed": 7
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [
+        "growth: 12 additions accepted, 25 trials rejected, 2 fallback rounds",
+        "seating: 53% (75 of 142 deck-usable lots)"
+      ],
+      "residents": {
+        "requested": 300,
+        "capacity": 300,
+        "assigned": 300,
+        "unassigned": 0,
+        "insideWalls": {
+          "requested": 0,
+          "capacity": 0,
+          "assigned": 0,
+          "unassigned": 0
+        },
+        "outsideWalls": {
+          "requested": 300,
+          "capacity": 300,
+          "assigned": 300,
+          "unassigned": 0
+        }
+      },
+      "contractCircleGaps": null,
+      "assessment": {
+        "buildings": 75,
+        "streets": 18,
+        "roadSegments": 276,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 0,
+        "streetCorridorWaterOverlap": 0,
+        "streetCorridorExclusionOverlap": 0,
+        "streetsWithUnknownWidth": 0,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 0,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 0,
+        "roadGradeFailures": 0,
+        "maxRoadGrade": 0,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": [],
+        "firstRoadGradeFailureIds": [],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 2,
+            "nearestPathM": 12.105985467308582,
+            "nearestEndpointM": 12.105985467308582
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 3,
+            "nearestPathM": 0.6376819070959812,
+            "nearestEndpointM": 49.13218097537292
+          },
+          {
+            "id": "west",
+            "matchingStreets": 3,
+            "nearestPathM": 42.91692550147423,
+            "nearestEndpointM": 42.91692550147423
+          }
+        ]
+      }
+    },
+    {
+      "seed": 7,
+      "candidate": "physical-village",
+      "fixture": "constrained",
+      "elapsedMs": 1060.8089170000003,
+      "work": "model + local export (no SVG)",
+      "canonicalGeojsonSha256": "7d0a7b8f4797454dd803148432de82ec8e4c0c80f2c41efc7154166f59660af8",
+      "repeatEqual": true,
+      "metadata": {
+        "schema": "settlemaker/physical-plan",
+        "schema_version": 1,
+        "coordinate_system": "local_metres_y_down",
+        "coordinate_units": "metres",
+        "local_bounds": {
+          "min_x": -228.73471545818623,
+          "min_y": -217.43624291488922,
+          "max_x": 205.41643047362533,
+          "max_y": 231.45970433719245
+        },
+        "scale": {
+          "meters_per_unit": 1,
+          "source": "physical_layout_v1"
+        },
+        "residents": {
+          "requested": 300,
+          "capacity": 300,
+          "assigned": 300,
+          "unassigned": 0,
+          "insideWalls": {
+            "requested": 0,
+            "capacity": 0,
+            "assigned": 0,
+            "unassigned": 0
+          },
+          "outsideWalls": {
+            "requested": 300,
+            "capacity": 300,
+            "assigned": 300,
+            "unassigned": 0
+          }
+        },
+        "development": {
+          "preset": "village",
+          "centreOccupancy": 4,
+          "edgeOccupancy": 4,
+          "corePopulation": null
+        },
+        "seed": 7
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [
+        "water: trunk-main-north/a leaves the village from a contract entry that is itself in the water; its approach road goes ashore before following the coast",
+        "water: trunk-main-south-east/a leaves the village from a contract entry that is itself in the water; its approach road goes ashore before following the coast",
+        "growth: 19 additions accepted, 243 trials rejected, 11 fallback rounds",
+        "seating: 46% (75 of 163 deck-usable lots)",
+        "water: the site is hemmed in — 0.0k m2 of farmland, 0.00x the built area against 1.0x expected of a village with room"
+      ],
+      "residents": {
+        "requested": 300,
+        "capacity": 300,
+        "assigned": 300,
+        "unassigned": 0,
+        "insideWalls": {
+          "requested": 0,
+          "capacity": 0,
+          "assigned": 0,
+          "unassigned": 0
+        },
+        "outsideWalls": {
+          "requested": 300,
+          "capacity": 300,
+          "assigned": 300,
+          "unassigned": 0
+        }
+      },
+      "contractCircleGaps": null,
+      "assessment": {
+        "buildings": 75,
+        "streets": 32,
+        "roadSegments": 247,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 33,
+        "streetCorridorWaterOverlap": 4,
+        "streetCorridorExclusionOverlap": 15,
+        "streetsWithUnknownWidth": 0,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 0,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 75,
+        "roadGradeFailures": 122,
+        "maxRoadGrade": 0.12999906072285508,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": [
+          "bld:green:R3",
+          "bld:trunk-street-0:L2",
+          "bld:trunk-street-0:R0+r1"
+        ],
+        "firstRoadGradeFailureIds": ["street:0:0", "street:0:1", "street:0:2"],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 3,
+            "nearestPathM": 104.50178361150594,
+            "nearestEndpointM": 104.50178361150594
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 4,
+            "nearestPathM": 124.0284748736826,
+            "nearestEndpointM": 124.0284748736826
+          },
+          {
+            "id": "west",
+            "matchingStreets": 4,
+            "nearestPathM": 34.30352020338396,
+            "nearestEndpointM": 34.30352020338396
+          }
+        ]
+      }
+    },
+    {
+      "seed": 7,
+      "candidate": "physical-city",
+      "fixture": "flat",
+      "elapsedMs": 18.827291999999943,
+      "work": "model + local export (no SVG)",
+      "canonicalGeojsonSha256": "aeb5aeb91a6e9cc7a641ddf7c39bccb404924a09f484856a5bc3099bc87c9815",
+      "repeatEqual": true,
+      "metadata": {
+        "schema": "settlemaker/physical-plan",
+        "schema_version": 1,
+        "coordinate_system": "local_metres_y_down",
+        "coordinate_units": "metres",
+        "local_bounds": {
+          "min_x": -211.71946832113642,
+          "min_y": -231.15949358499586,
+          "max_x": 233.33288837050685,
+          "max_y": 217.13361356837842
+        },
+        "scale": {
+          "meters_per_unit": 1,
+          "source": "physical_layout_v1"
+        },
+        "residents": {
+          "requested": 300,
+          "capacity": 308,
+          "assigned": 300,
+          "unassigned": 0,
+          "insideWalls": {
+            "requested": 0,
+            "capacity": 0,
+            "assigned": 0,
+            "unassigned": 0
+          },
+          "outsideWalls": {
+            "requested": 300,
+            "capacity": 308,
+            "assigned": 300,
+            "unassigned": 0
+          }
+        },
+        "development": {
+          "preset": "city",
+          "centreOccupancy": 8,
+          "edgeOccupancy": 4,
+          "corePopulation": null
+        },
+        "seed": 7
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [],
+      "residents": {
+        "requested": 300,
+        "capacity": 308,
+        "assigned": 300,
+        "unassigned": 0,
+        "insideWalls": {
+          "requested": 0,
+          "capacity": 0,
+          "assigned": 0,
+          "unassigned": 0
+        },
+        "outsideWalls": {
+          "requested": 300,
+          "capacity": 308,
+          "assigned": 300,
+          "unassigned": 0
+        }
+      },
+      "contractCircleGaps": null,
+      "assessment": {
+        "buildings": 44,
+        "streets": 40,
+        "roadSegments": 133,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 0,
+        "streetCorridorWaterOverlap": 0,
+        "streetCorridorExclusionOverlap": 0,
+        "streetsWithUnknownWidth": 0,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 0,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 0,
+        "roadGradeFailures": 0,
+        "maxRoadGrade": 0,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": [],
+        "firstRoadGradeFailureIds": [],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "west",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          }
+        ]
+      }
+    },
+    {
+      "seed": 7,
+      "candidate": "physical-city",
+      "fixture": "constrained",
+      "elapsedMs": 18.21337499999936,
+      "work": "model + local export (no SVG)",
+      "canonicalGeojsonSha256": "758184d2433d321e9fcde7aa814d0ccd8d0233656d4c6846c3f518e4b0211934",
+      "repeatEqual": true,
+      "metadata": {
+        "schema": "settlemaker/physical-plan",
+        "schema_version": 1,
+        "coordinate_system": "local_metres_y_down",
+        "coordinate_units": "metres",
+        "local_bounds": {
+          "min_x": -212.31894041458327,
+          "min_y": -231.27325168752498,
+          "max_x": 204.25697042484754,
+          "max_y": 203.08857232522618
+        },
+        "scale": {
+          "meters_per_unit": 1,
+          "source": "physical_layout_v1"
+        },
+        "residents": {
+          "requested": 300,
+          "capacity": 308,
+          "assigned": 300,
+          "unassigned": 0,
+          "insideWalls": {
+            "requested": 0,
+            "capacity": 0,
+            "assigned": 0,
+            "unassigned": 0
+          },
+          "outsideWalls": {
+            "requested": 300,
+            "capacity": 308,
+            "assigned": 300,
+            "unassigned": 0
+          }
+        },
+        "development": {
+          "preset": "city",
+          "centreOccupancy": 8,
+          "edgeOccupancy": 4,
+          "corePopulation": null
+        },
+        "seed": 7
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [],
+      "residents": {
+        "requested": 300,
+        "capacity": 308,
+        "assigned": 300,
+        "unassigned": 0,
+        "insideWalls": {
+          "requested": 0,
+          "capacity": 0,
+          "assigned": 0,
+          "unassigned": 0
+        },
+        "outsideWalls": {
+          "requested": 300,
+          "capacity": 308,
+          "assigned": 300,
+          "unassigned": 0
+        }
+      },
+      "contractCircleGaps": null,
+      "assessment": {
+        "buildings": 44,
+        "streets": 40,
+        "roadSegments": 95,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 3,
+        "streetCorridorWaterOverlap": 2,
+        "streetCorridorExclusionOverlap": 7,
+        "streetsWithUnknownWidth": 0,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 0,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 44,
+        "roadGradeFailures": 27,
+        "maxRoadGrade": 0.12983981157587807,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": ["b18", "b19", "b42"],
+        "firstRoadGradeFailureIds": ["street:1:0", "street:1:1", "street:1:2"],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "west",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          }
+        ]
+      }
+    },
+    {
+      "seed": 7,
+      "candidate": "legacy-village",
+      "fixture": "flat",
+      "elapsedMs": 365.364458,
+      "work": "model + local export (no SVG)",
+      "canonicalGeojsonSha256": "541ecb84b87b55f9e72b2727fe296db63c1b976827cf2d36f3a0739438057925",
+      "repeatEqual": true,
+      "metadata": {
+        "schema_version": 4,
+        "settlemaker_version": "3.0.1",
+        "settlement_generation_version": "village",
+        "coordinate_system": "burg_local_y_down",
+        "coordinate_units": "metres",
+        "generated_at": "2026-10-10T18:01:48.838Z",
+        "local_bounds": {
+          "min_x": -255.43079499974792,
+          "min_y": -248.40182748681215,
+          "max_x": 258.76693420218254,
+          "max_y": 263.089347048339
+        },
+        "scale": {
+          "meters_per_unit": 1,
+          "diameter_meters": 474.19772920193043,
+          "diameter_local": 474.19772920193043,
+          "source": "village_metres"
+        },
+        "stable_ids": {
+          "prefixes": {
+            "building": "bld:",
+            "poi": "poi:",
+            "street": "<lane id>",
+            "crossing": "bridge:"
+          }
+        },
+        "poi_density": "town",
+        "degraded_flags": [],
+        "local_origin_shift": {
+          "dx": 0,
+          "dy": 0,
+          "source": "none"
+        },
+        "contract_radius_m": 148.82679811916248,
+        "green_relation": "astride",
+        "outline_m": [
+          [-5.1211898665010045, 1.8029262406377131],
+          [1.4758260604513025, 12.37583042893606],
+          [-17.277108353631828, 12.700331656055807]
+        ],
+        "diagnostics": [
+          "growth: 12 additions accepted, 25 trials rejected, 2 fallback rounds",
+          "seating: 53% (75 of 142 deck-usable lots)"
+        ]
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [
+        "growth: 12 additions accepted, 25 trials rejected, 2 fallback rounds",
+        "seating: 53% (75 of 142 deck-usable lots)"
+      ],
+      "residents": null,
+      "contractCircleGaps": [
+        {
+          "id": "north",
+          "gapM": 0
+        },
+        {
+          "id": "south-east",
+          "gapM": 0
+        },
+        {
+          "id": "west",
+          "gapM": 0
+        }
+      ],
+      "assessment": {
+        "buildings": 75,
+        "streets": 21,
+        "roadSegments": 279,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 0,
+        "streetCorridorWaterOverlap": 0,
+        "streetCorridorExclusionOverlap": 0,
+        "streetsWithUnknownWidth": 0,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 0,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 0,
+        "roadGradeFailures": 0,
+        "maxRoadGrade": 0,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": [],
+        "firstRoadGradeFailureIds": [],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 3,
+            "nearestPathM": 10.67208194470532,
+            "nearestEndpointM": 18.538549791518548
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 4,
+            "nearestPathM": 13.311830650260498,
+            "nearestEndpointM": 87.58330162843693
+          },
+          {
+            "id": "west",
+            "matchingStreets": 4,
+            "nearestPathM": 14.612549016526433,
+            "nearestEndpointM": 14.612549016526433
+          }
+        ]
+      }
+    },
+    {
+      "seed": 7,
+      "candidate": "legacy-village",
+      "fixture": "constrained",
+      "elapsedMs": 983.4247500000001,
+      "work": "model + local export (no SVG)",
+      "canonicalGeojsonSha256": "b8f9e7d5e35f232f5a9b81092183abe780b6a5e618af48113e334c038e91aa62",
+      "repeatEqual": true,
+      "metadata": {
+        "schema_version": 4,
+        "settlemaker_version": "3.0.1",
+        "settlement_generation_version": "village",
+        "coordinate_system": "burg_local_y_down",
+        "coordinate_units": "metres",
+        "generated_at": "2026-10-10T18:01:50.176Z",
+        "local_bounds": {
+          "min_x": -251.63058033022963,
+          "min_y": -212.0763601125963,
+          "max_x": 155.08831791558129,
+          "max_y": 276.319063439106
+        },
+        "scale": {
+          "meters_per_unit": 1,
+          "diameter_meters": 448.39542355170227,
+          "diameter_local": 448.39542355170227,
+          "source": "village_metres"
+        },
+        "stable_ids": {
+          "prefixes": {
+            "building": "bld:",
+            "poi": "poi:",
+            "street": "<lane id>",
+            "crossing": "bridge:"
+          }
+        },
+        "poi_density": "town",
+        "degraded_flags": [],
+        "local_origin_shift": {
+          "dx": 0,
+          "dy": 0,
+          "source": "none"
+        },
+        "contract_radius_m": 148.82679811916248,
+        "green_relation": "astride",
+        "outline_m": [
+          [-5.121189866501005, 1.8029262406377133],
+          [1.4163540192219428, 12.714609965718653],
+          [-17.280472714062714, 12.682779138368229]
+        ],
+        "diagnostics": [
+          "water: trunk-main-north/a leaves the village from a contract entry that is itself in the water; its approach road goes ashore before following the coast",
+          "water: trunk-main-south-east/a leaves the village from a contract entry that is itself in the water; its approach road goes ashore before following the coast",
+          "growth: 19 additions accepted, 243 trials rejected, 11 fallback rounds",
+          "seating: 46% (75 of 163 deck-usable lots)"
+        ]
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [
+        "water: trunk-main-north/a leaves the village from a contract entry that is itself in the water; its approach road goes ashore before following the coast",
+        "water: trunk-main-south-east/a leaves the village from a contract entry that is itself in the water; its approach road goes ashore before following the coast",
+        "growth: 19 additions accepted, 243 trials rejected, 11 fallback rounds",
+        "seating: 46% (75 of 163 deck-usable lots)"
+      ],
+      "residents": null,
+      "contractCircleGaps": [
+        {
+          "id": "north",
+          "gapM": 0
+        },
+        {
+          "id": "south-east",
+          "gapM": 0
+        },
+        {
+          "id": "west",
+          "gapM": 0
+        }
+      ],
+      "assessment": {
+        "buildings": 75,
+        "streets": 32,
+        "roadSegments": 305,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 33,
+        "streetCorridorWaterOverlap": 4,
+        "streetCorridorExclusionOverlap": 16,
+        "streetsWithUnknownWidth": 0,
+        "crossingFeatures": 4,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 0,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 75,
+        "roadGradeFailures": 126,
+        "maxRoadGrade": 0.12999906072285508,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": [
+          "bld:green:R3",
+          "bld:trunk-street-0:L2",
+          "bld:trunk-street-0:R0+r1"
+        ],
+        "firstRoadGradeFailureIds": ["trunk-street-0:0", "trunk-street-0:1", "trunk-street-0:2"],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 3,
+            "nearestPathM": 106.02158716193702,
+            "nearestEndpointM": 106.02158716193702
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 4,
+            "nearestPathM": 124.0284748736826,
+            "nearestEndpointM": 124.0284748736826
+          },
+          {
+            "id": "west",
+            "matchingStreets": 4,
+            "nearestPathM": 16.074200263272544,
+            "nearestEndpointM": 16.074200263272544
+          }
+        ]
+      }
+    },
+    {
+      "seed": 7,
+      "candidate": "legacy-city",
+      "fixture": "flat",
+      "elapsedMs": 12.80620799999997,
+      "work": "public generateFromBurg including SVG + local export",
+      "canonicalGeojsonSha256": "541294105a8b89e34d3578345291f2e7674912852d48561d9a7c6d9ed75035d0",
+      "repeatEqual": true,
+      "metadata": {
+        "building_capacity": {
+          "basis": "ordinary-building-budget",
+          "target": 75,
+          "placed": 75,
+          "shortfall": 0,
+          "corePlaced": 67,
+          "outerPlaced": 8,
+          "status": "met"
+        },
+        "schema_version": 4,
+        "settlemaker_version": "3.0.1",
+        "settlement_generation_version": "gxjpti",
+        "coordinate_system": "local_origin_y_down",
+        "coordinate_units": "settlement_units",
+        "generated_at": "2000-01-01T00:00:00.000Z",
+        "local_bounds": {
+          "min_x": -61.28744046444815,
+          "min_y": -81.35262531963275,
+          "max_x": 64.80088292357699,
+          "max_y": 63.71918104486841
+        },
+        "scale": {
+          "meters_per_unit": 4.478640863148331,
+          "diameter_meters": 310.36911478307195,
+          "diameter_local": 69.29984436503648,
+          "source": "population_heuristic_v1"
+        },
+        "stable_ids": {
+          "prefixes": {
+            "entrance": "g",
+            "poi": "p",
+            "street": "s",
+            "building": "b"
+          }
+        },
+        "poi_density": "town",
+        "degraded_flags": [],
+        "local_origin_shift": {
+          "dx": 0,
+          "dy": 0,
+          "source": "none"
+        }
+      },
+      "scaleDriftFromFlat": 1,
+      "diagnostics": [],
+      "residents": null,
+      "contractCircleGaps": null,
+      "assessment": {
+        "buildings": 75,
+        "streets": 32,
+        "roadSegments": 123,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 0,
+        "streetCorridorWaterOverlap": 0,
+        "streetCorridorExclusionOverlap": 0,
+        "streetsWithUnknownWidth": 7,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 6,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 0,
+        "roadGradeFailures": 0,
+        "maxRoadGrade": 0,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": [],
+        "firstRoadGradeFailureIds": [],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "west",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          }
+        ]
+      }
+    },
+    {
+      "seed": 7,
+      "candidate": "legacy-city",
+      "fixture": "constrained",
+      "elapsedMs": 11.15520800000013,
+      "work": "public generateFromBurg including SVG + local export",
+      "canonicalGeojsonSha256": "c89b193ed369ae1e22c82b66b053f9e803904579385f5c3f0da9cc70132c2bb9",
+      "repeatEqual": true,
+      "metadata": {
+        "building_capacity": {
+          "basis": "ordinary-building-budget",
+          "target": 75,
+          "placed": 75,
+          "shortfall": 0,
+          "corePlaced": 67,
+          "outerPlaced": 8,
+          "status": "met"
+        },
+        "schema_version": 4,
+        "settlemaker_version": "3.0.1",
+        "settlement_generation_version": "upjxmp",
+        "coordinate_system": "local_origin_y_down",
+        "coordinate_units": "settlement_units",
+        "generated_at": "2000-01-01T00:00:00.000Z",
+        "local_bounds": {
+          "min_x": -68.89146556377526,
+          "min_y": -71.26778238157979,
+          "max_x": 28.703887922628766,
+          "max_y": 69.00112502070847
+        },
+        "scale": {
+          "meters_per_unit": 3.5462479026520213,
+          "diameter_meters": 310.36911478307195,
+          "diameter_local": 87.52042251500971,
+          "source": "population_heuristic_v1"
+        },
+        "stable_ids": {
+          "prefixes": {
+            "entrance": "g",
+            "poi": "p",
+            "street": "s",
+            "building": "b"
+          }
+        },
+        "poi_density": "town",
+        "degraded_flags": [],
+        "local_origin_shift": {
+          "dx": 0,
+          "dy": 0,
+          "source": "none"
+        }
+      },
+      "scaleDriftFromFlat": 0.791813411928531,
+      "diagnostics": [],
+      "residents": null,
+      "contractCircleGaps": null,
+      "assessment": {
+        "buildings": 75,
+        "streets": 32,
+        "roadSegments": 96,
+        "buildingWaterOverlap": 0,
+        "buildingExclusionOverlap": 19,
+        "streetCorridorWaterOverlap": 0,
+        "streetCorridorExclusionOverlap": 6,
+        "streetsWithUnknownWidth": 8,
+        "crossingFeatures": 0,
+        "buildingsOutsideSiteBounds": 0,
+        "streetsOutsideSiteBounds": 4,
+        "streetCorridorsOutsideSiteBounds": 0,
+        "buildingGradeFailures": 75,
+        "roadGradeFailures": 40,
+        "maxRoadGrade": 0.12996921910135445,
+        "firstWaterOverlapIds": [],
+        "firstExclusionOverlapIds": ["b3", "b4", "b5"],
+        "firstRoadGradeFailureIds": ["s0:0", "s0:4", "s0:6"],
+        "routeJoins": [
+          {
+            "id": "north",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "south-east",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          },
+          {
+            "id": "west",
+            "matchingStreets": 0,
+            "nearestPathM": null,
+            "nearestEndpointM": null
+          }
+        ]
+      }
+    }
+  ],
+  "limitations": [
+    "Only water is supplied as a supported constraint. Plane and exclusions are independent diagnostics; no current API accepts numerical terrain or arbitrary excluded polygons.",
+    "Constant-plane grades are exact along straight segments and over every footprint. Corridor overlaps use full segment rectangles and conservative 32-gon caps/joins (at most 0.484% radial excess). Physical width is exported surface width, not the missing reserved corridor. Water corridor hits include legitimate crossings and are diagnostic, not automatic rejections.",
+    "Legacy city water was calibrated using flat-output heuristic scale; constrained-output scale drift and coast shift invalidate fixed metre alignment.",
+    "Timings are single warm-process observations, exclude module import, and differ in included work. No whole-map benchmark or preview measurement.",
+    "Dependencies were reused with six lock-entry checks; a network-fresh npm ci and remote source availability were not tested.",
+    "Same-process repeat hashes remove only legacy generated_at. Run in fresh processes to check replay across process state."
+  ]
+}

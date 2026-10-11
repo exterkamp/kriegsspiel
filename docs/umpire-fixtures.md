@@ -21,7 +21,7 @@ Add a `*.json` file to `server/src/umpire/fixtures/` (or append to one). Each fi
 
 | Field           | Meaning                                                                                      |
 | --------------- | -------------------------------------------------------------------------------------------- |
-| `stage`         | Required: `parse`, `judge` or `narrate`.                                                     |
+| `stage`         | Required: `parse`, `judge`, `narrate` or `staff`.                                                  |
 | `promptVersion` | Optional. Match only this prompt version.                                                    |
 | `input`         | Optional. Match only this exact input (object key order ignored). Omit to match any input.   |
 | `output`        | The structured output to return. It is validated against the request's schema.               |

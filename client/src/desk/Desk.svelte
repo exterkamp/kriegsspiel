@@ -1,13 +1,14 @@
 <script lang="ts">
-  import { activeView, gameState, trayMarks } from './store.js';
+  import { activeView, gameId, gameState, trayMarks, windowOpen } from './store.js';
+  import UmpireWindow from './UmpireWindow.svelte';
   import { unreadCount } from './tray.js';
   import InTray from './InTray.svelte';
   import OrdersDesk from './OrdersDesk.svelte';
-  import { deliveryStatus } from './orders.js';
+  import Journal from './Journal.svelte';
+  import Roster from './Roster.svelte';
   import DeskClock from './DeskClock.svelte';
   import PausePanel from './PausePanel.svelte';
   import { VIEWS, isDeskView, isTypingTarget, viewForKey, type ViewId } from './views.js';
-  import { formatGameTime, gameNowMs } from '../net/state.js';
 
   /** What to focus when a view opens, so keyboard users land inside it. */
   const FOCUS: Record<string, string> = {
@@ -32,35 +33,6 @@
     if (sel) queueMicrotask(() => document.querySelector<HTMLElement>(sel)?.focus());
   }
 
-  const units = $derived($gameState.view?.ownUnits ?? []);
-  // Delivery status is read against game time, so the journal re-reads it now and then.
-  let wall = $state(Date.now());
-  $effect(() => {
-    const t = setInterval(() => (wall = Date.now()), 1000);
-    return () => clearInterval(t);
-  });
-  const nowGame = $derived($gameState.clock ? gameNowMs($gameState.clock, wall) : 0);
-  const journal = $derived(
-    [
-      ...$gameState.pending.map((p) => {
-        const to = p.toName ? ` to ${p.toName}` : '';
-        const how = p.courier ? ` by ${p.courier === 'fast' ? 'fast rider' : 'steady courier'}` : '';
-        const status = deliveryStatus(p, nowGame);
-        return {
-          at: p.sentAtGame,
-          text: `Order sent${to}${how}: ${p.text}`,
-          progress: p.etaGame === undefined ? undefined : status.fraction,
-          status: status.label,
-        };
-      }),
-      ...$gameState.dispatches.map((d) => ({
-        at: d.receivedAtGame,
-        text: `${d.from}: ${d.text}`,
-        progress: undefined as number | undefined,
-        status: '',
-      })),
-    ].sort((a, b) => b.at - a.at),
-  );
   const unread = $derived(unreadCount($gameState.dispatches, $trayMarks));
 </script>
 
@@ -82,8 +54,17 @@
       {#if v.id === 'inTray' && unread > 0}<span class="badge" aria-label="{unread} unread">{unread}</span>{/if}
     </button>
   {/each}
+  {#if $gameState.gameOver && $gameId}
+    <button type="button" aria-pressed={$windowOpen} onclick={() => windowOpen.update((o) => !o)}>
+      Umpire's window
+    </button>
+  {/if}
 </nav>
 </div>
+
+{#if $windowOpen && $gameState.gameOver}
+  <UmpireWindow />
+{/if}
 
 <div class="fade" class:on={isDeskView($activeView)} aria-hidden="true"></div>
 
@@ -97,36 +78,11 @@
   </section>
 {:else if $activeView === 'roster'}
   <section id="view-roster" class="paper" tabindex="-1" aria-label="Order of battle">
-    <h2>Order of battle</h2>
-    {#if units.length === 0}
-      <p>No formations reported yet.</p>
-    {:else}
-      <ul>
-        {#each units as u (u.id)}<li>{u.name}</li>{/each}
-      </ul>
-    {/if}
+    <Roster />
   </section>
 {:else if $activeView === 'journal'}
   <section id="view-journal" class="paper" tabindex="-1" aria-label="Journal">
-    <h2>Journal</h2>
-    {#if journal.length === 0}
-      <p>Nothing recorded yet.</p>
-    {:else}
-      <ul>
-        {#each journal as j, i (i)}
-          <li>
-            <small>{formatGameTime(j.at)}</small>
-            {j.text}
-            {#if j.status}
-              <div class="delivery">
-                {#if j.progress !== undefined}<progress max="1" value={j.progress} aria-label="Delivery progress"></progress>{/if}
-                <small>{j.status}</small>
-              </div>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
+    <Journal />
   </section>
 {:else if $activeView === 'conference'}
   <section id="view-conference" class="paper" tabindex="-1" aria-label="Staff conference">
@@ -222,15 +178,6 @@
   }
   .paper h2 {
     margin: 0 0 8px;
-  }
-  .delivery {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 2px 0 6px;
-  }
-  .delivery progress {
-    width: 8em;
   }
   .paper ul {
     margin: 0;

@@ -3,7 +3,13 @@ import type { StructuredOutputSupport } from './provider.js';
 import type { GameLimits } from './gameLimits.js';
 import type { UmpireStage } from './umpireClient.js';
 
-export const UMPIRE_STAGES: readonly UmpireStage[] = ['parse', 'judge', 'narrate', 'command'];
+export const UMPIRE_STAGES: readonly UmpireStage[] = [
+  'parse',
+  'judge',
+  'narrate',
+  'staff',
+  'command',
+];
 
 /** One configured model server. `type` names a factory in the `ProviderRegistry`. */
 export interface ProviderSpec {
@@ -54,6 +60,7 @@ export const DEFAULT_UMPIRE_CONFIG: UmpireConfig = {
     parse: { provider: 'anthropic', model: 'claude-haiku-5-5' },
     judge: { provider: 'anthropic', model: 'claude-opus-5-5' },
     narrate: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
+    staff: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
     command: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
   },
   timeoutMs: 60_000,
@@ -112,7 +119,7 @@ function checkFile(file: UmpireConfigFile): void {
 
 /**
  * Builds the config: defaults, then the optional file, then env overrides. Env reads
- * `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|COMMAND`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE|COMMAND`, `UMPIRE_TIMEOUT_MS`,
+ * `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_TIMEOUT_MS`,
  * `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`,
  * `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS` and the per-game
  * `UMPIRE_GAME_BUDGET_USD`, `UMPIRE_GAME_BUDGET_TOKENS` and `UMPIRE_GAME_CALLS_PER_MINUTE`. Throws if a stage names

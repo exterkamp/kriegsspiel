@@ -10,10 +10,12 @@
  *   PUBLIC_URL          origin used in login links (default http://localhost:$PORT); https makes the session cookie Secure
  *   MAIL_WEBHOOK_URL    POST `{to, subject, text}` here to send the magic link; unset logs the link instead (dev only)
  *   MAIL_WEBHOOK_TOKEN  optional bearer token for the mail webhook
+ *   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT  enable web push (generate a pair with `npx web-push generate-vapid-keys`); unset: email and WebSocket only
  *   ADMIN_TOKEN         lets non-loopback callers use /admin/api with this bearer token
  */
 import { buildApp } from './api/app.js';
 import { adminFromEnv } from './admin/adminApi.js';
+import { SqliteNotifyStore, pushFromEnv } from './notify/index.js';
 import { SqliteAuthStore } from './auth/store.js';
 import { SqliteLobbyStore } from './lobby/store.js';
 import {
@@ -34,6 +36,7 @@ const store = process.env.DB_PATH ? new SqliteGameStore(process.env.DB_PATH) : u
 
 const authStore = process.env.DB_PATH ? new SqliteAuthStore(process.env.DB_PATH) : undefined;
 
+const notifyStore = process.env.DB_PATH ? new SqliteNotifyStore(process.env.DB_PATH) : undefined;
 const lobby = process.env.DB_PATH ? new SqliteLobbyStore(process.env.DB_PATH) : undefined;
 
 // The LLM commander, when asked for: one capped client per game over the shared one.
@@ -67,6 +70,7 @@ const { server } = await buildApp({
       : undefined,
   admin: adminFromEnv(process.env),
   trustProxy: trustProxyFromEnv(process.env),
+  notify: { store: notifyStore, push: pushFromEnv(process.env) },
   auth: { store: authStore, ...authFromEnv(process.env, port, (line) => server.log.warn(line)) },
 });
 
@@ -77,6 +81,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
       void server.close().then(() => {
         store?.close();
         authStore?.close();
+        notifyStore?.close();
         lobby?.close();
         process.exit(0);
       }),

@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { DraftBook } from '../drafts/book.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -155,6 +156,21 @@ describe('SqliteGameStore', () => {
     expect(await again.loadMarks('g2', 'red')).toEqual([]);
     await again.saveMarks('g1', 'blue', []);
     expect(await again.loadMarks('g1', 'blue')).toEqual([]);
+  });
+
+  it('stores drafts per game and side and keeps them across a reopen', async () => {
+    const path = tmpDb();
+    const book = new DraftBook();
+    book.create('d1', 'ann', { text: 'abc' });
+    book.edit('d1', 'bob', 5, { baseRev: 0, op: ['x', 3] });
+    const first = open(path);
+    expect(await first.loadDrafts('g1', 'blue')).toEqual([]);
+    await first.saveDrafts('g1', 'blue', book.toJSON());
+    first.close();
+    const again = open(path);
+    expect(await again.loadDrafts('g1', 'blue')).toEqual(book.toJSON());
+    expect(await again.loadDrafts('g1', 'red')).toEqual([]);
+    expect(await again.loadDrafts('g2', 'blue')).toEqual([]);
   });
 
   it('keeps the newest snapshots and loads the latest', async () => {

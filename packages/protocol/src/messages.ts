@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PROTOCOL_VERSION, ClockState, GameMs, Side } from './common.js';
+import { DraftEntry, DraftSnapshot, MAX_COMMENT, MAX_DRAFT_TEXT, TextOp } from './drafts.js';
 import { Mark } from './marks.js';
 import { Dispatch, SideView } from './view.js';
 
@@ -67,12 +68,83 @@ export const Command = z.discriminatedUnion('kind', [
   // Create or replace one of the side's marks (by `mark.id`). Not game input: it never reaches the engine.
   z.object({ ...Envelope, kind: z.literal('putMark'), mark: Mark }).strict(),
   z.object({ ...Envelope, kind: z.literal('deleteMark'), markId: Id }).strict(),
-  // Stub: edit ops are undefined until the drafting UI is designed.
+  // Shared order drafts (D6c). None of these reach the engine or the input log. Drafts belong to the
+  // sender's side; ids are chosen by the client and unique within a side.
   z
-    .object({ ...Envelope, kind: z.literal('draftEdit'), draft: Id, ops: z.array(z.unknown()) })
+    .object({
+      ...Envelope,
+      kind: z.literal('createDraft'),
+      draft: Id.max(64),
+      text: z.string().max(MAX_DRAFT_TEXT).optional(),
+      title: z.string().max(80).optional(),
+    })
     .strict(),
+  // An edit made on the draft as it stood at `baseRev` (the last rev the sender had applied).
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('draftEdit'),
+      draft: Id,
+      baseRev: z.number().int().nonnegative(),
+      op: TextOp,
+      /** Echoed on the entry that comes back, so the sender can tell it from other players' edits. */
+      opId: Id.max(64).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('draftComment'),
+      draft: Id,
+      baseRev: z.number().int().nonnegative(),
+      comment: z
+        .object({
+          id: Id.max(64),
+          from: z.number().int().nonnegative(),
+          to: z.number().int().nonnegative(),
+          body: z.string().min(1).max(MAX_COMMENT),
+          replyTo: Id.max(64).optional(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('resolveComment'),
+      draft: Id,
+      commentId: Id,
+      resolved: z.boolean(),
+    })
+    .strict(),
+  // "I have seen this draft up to `rev`": the read receipt.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('readDraft'),
+      draft: Id,
+      rev: z.number().int().nonnegative(),
+    })
+    .strict(),
+  // Copy a draft into a new one, to write an alternative plan.
+  z.object({ ...Envelope, kind: z.literal('forkDraft'), draft: Id, newDraft: Id.max(64) }).strict(),
+  // Fold a fork's edits back into the draft it came from.
+  z.object({ ...Envelope, kind: z.literal('mergeDraft'), draft: Id }).strict(),
 ]);
 export type Command = z.infer<typeof Command>;
+
+/** What a notification is about. Players pick which of these reach them (see the server's notifier). */
+export const NotifyEvent = z.enum([
+  'dispatch',
+  'contact',
+  'unitLost',
+  'pauseProposed',
+  'decision',
+  'paused',
+  'resumed',
+  'gameOver',
+]);
+export type NotifyEvent = z.infer<typeof NotifyEvent>;
 
 /** Server-to-player. Only fog-filtered data appears here. */
 export const ServerMessage = z.discriminatedUnion('kind', [
@@ -80,6 +152,24 @@ export const ServerMessage = z.discriminatedUnion('kind', [
   z.object({ ...Envelope, kind: z.literal('dispatch'), dispatch: Dispatch }).strict(),
   // Every mark the side has made, sent on connect and again after any change by either connection.
   z.object({ ...Envelope, kind: z.literal('marks'), marks: z.array(Mark) }).strict(),
+  // Every draft the side has, sent on connect. A player back after a while catches up from this.
+  z.object({ ...Envelope, kind: z.literal('drafts'), drafts: z.array(DraftSnapshot) }).strict(),
+  // One draft in full: sent when it is created or forked, and when a merge closes a fork.
+  z.object({ ...Envelope, kind: z.literal('draftState'), draft: DraftSnapshot }).strict(),
+  // The next step in a draft's history, to every connection of the side, the sender's included.
+  // Entries arrive in rev order with no gaps; `entry.op` is already moved past anything that landed first.
+  // A `drafts` snapshot sent on connect can already contain an entry that follows it, so a client
+  // ignores any entry with `rev` at or below the rev of the draft it holds.
+  z.object({ ...Envelope, kind: z.literal('draftEntry'), draft: Id, entry: DraftEntry }).strict(),
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('draftReceipt'),
+      draft: Id,
+      reader: Id,
+      rev: z.number().int().nonnegative(),
+    })
+    .strict(),
   z.object({ ...Envelope, kind: z.literal('clockState'), clock: ClockState }).strict(),
   // The pause vote. Sent on connect (only to a game that has voters) and whenever the phase or the
   // open proposal changes, including each vote. Absent `proposal` means nothing is being voted on.
@@ -144,6 +234,16 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       winner: Side.nullable(),
       reason: z.enum(['objective-taken', 'objective-held', 'eliminated', 'withdrawn']),
       atGame: GameMs,
+    })
+    .strict(),
+  // A heads-up for a player who has the game open: only a fixed title and line, never game content.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('notification'),
+      event: NotifyEvent,
+      title: z.string().min(1),
+      text: z.string().min(1),
     })
     .strict(),
   z
