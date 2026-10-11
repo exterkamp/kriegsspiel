@@ -54,7 +54,7 @@ describe('fixture roster', () => {
     expect(target.textContent).toContain('First formation');
     expect(target.textContent).not.toContain('Enemy contact');
     expect(target.textContent).toContain('Report dates unavailable');
-    expect(target.textContent).toContain('Snapshot at 60000 game ms');
+    expect(target.textContent).toContain('Snapshot at 00:01:00');
     expect(target.textContent).not.toContain('last-reported');
     expect(target.querySelectorAll('thead th')).toHaveLength(7);
     expect(target.querySelector('tbody th')?.getAttribute('scope')).toBe('row');
@@ -91,7 +91,7 @@ describe('fixture roster', () => {
     expect(focusButton('Unknown formation').disabled).toBe(true);
     expect(focusButton('Zero formation').disabled).toBe(false);
   });
-  it.each([1, 12])(
+  it.each([1, 4, 12])(
     'uses supplied display time for stale snapshot ages at rate %s',
     async (rate) => {
       const value = snapshot();
@@ -109,7 +109,7 @@ describe('fixture roster', () => {
         },
         { gameMs: display },
       );
-      expect(target.textContent).toContain(`${5 * rate} s old`);
+      expect(target.textContent).toContain(rate === 12 ? '1m ago' : `${5 * rate}s ago`);
       expect(target.querySelectorAll('.stale').length).toBeGreaterThan(0);
     },
   );
@@ -136,16 +136,77 @@ describe('fixture roster', () => {
       expect(target.textContent).toContain('current snapshot');
       await new Promise((resolve) => setTimeout(resolve, 5));
       await flush();
-      expect(target.textContent).not.toContain('s old');
+      expect(target.textContent).not.toContain('ago');
     },
   );
   it('keeps unavailable display ages honest and uses per-field snapshot times', async () => {
     const row = { ...formation(), strength: known(100, 10000) };
     await render(snapshot([row]), { gameMs: 60000 });
-    expect(target.textContent).toContain('Snapshot at 10000 game ms · 50 s old');
-    expect(provenance(60000, null)).toContain('age unavailable');
+    expect(target.textContent).toContain('Snapshot at 00:00:10 · 50s ago');
+    expect(provenance(60000, null)).toContain('Age unavailable');
     expect(snapshotAge(60000, 1)).toBeNull();
     expect(snapshotAge(60000, NaN)).toBeNull();
+  });
+  it('retains separately dated decimal positions and their stale provenance', async () => {
+    const point = { x: Number('1850.1234567890123'), y: Number('2450.9876543210987') };
+    await render(snapshot([{ ...formation(), position: known(point, 10000) }]));
+    const cell = target.querySelectorAll('tbody td')[4]!;
+    expect(cell.textContent).toContain(`${point.x} m east`);
+    expect(cell.textContent).toContain(`${point.y} m south`);
+    expect(cell.textContent).toContain('Snapshot at 00:00:10 · 50s ago');
+    expect(cell.classList.contains('stale')).toBe(true);
+  });
+  it('shares matching provenance once while retaining differing and invalid field times', async () => {
+    await render(
+      snapshot([
+        formation(),
+        {
+          ...formation('second', 'Second formation'),
+          strength: known(95, 10000),
+          supply: known(0.2, NaN),
+          position: unknown('Position not supplied'),
+        },
+      ]),
+    );
+    const caption = target.querySelector('caption')!;
+    expect(caption.textContent).toContain('Snapshot at 00:01:00');
+    expect(caption.textContent).toContain('unless separately');
+    const rows = target.querySelectorAll('tbody tr');
+    expect(rows[0]!.textContent).not.toContain('Snapshot at');
+    expect(rows[1]!.textContent).toContain('Snapshot at 00:00:10 · 50s ago');
+    expect(rows[1]!.textContent).toContain('Time unavailable · Age unavailable');
+    expect(rows[1]!.textContent).toContain('Position not supplied');
+    expect(rows[1]!.textContent).toContain('Commander not supplied');
+  });
+  it('keeps all columns and focus actions in the labelled keyboard scroll region with long prose', async () => {
+    const name = 'A very long supplied formation name with several ordinary words';
+    await render(
+      snapshot([
+        { ...formation(), name, strength: unknown('Strength not supplied by headquarters') },
+      ]),
+    );
+    const region = target.querySelector<HTMLElement>('[role="region"]')!;
+    expect(region.getAttribute('aria-label')).toContain('all seven columns');
+    region.focus();
+    expect(document.activeElement).toBe(region);
+    expect(region.querySelectorAll('thead th[scope="col"]')).toHaveLength(7);
+    expect(region.querySelector('caption')?.textContent).toContain('report dates unavailable');
+    expect(region.querySelector('tbody th[scope="row"]')?.textContent).toBe(name);
+    expect(region.textContent).toContain('350 m east,');
+    expect(region.textContent).toContain('250 m south');
+    expect(region.textContent).toContain('Strength not supplied by headquarters');
+    focusButton(name).focus();
+    expect(document.activeElement).toBe(focusButton(name));
+  });
+  it('shows shared elapsed timestamps at zero and beyond 24 hours without changing snapshot data', async () => {
+    const atGame = 90061000;
+    const row = { ...formation(), strength: known(100, 0) };
+    const value = { ...snapshot([row]), atGame };
+    await render(value, { gameMs: atGame });
+    expect(target.querySelector('caption')?.textContent).toContain('25:01:01');
+    expect(target.querySelector('tbody')?.textContent).toContain('00:00:00 · 1d ago');
+    expect(row.strength).toEqual(known(100, 0));
+    expect(value.atGame).toBe(atGame);
   });
   it('selects by scoped ID, waits for navigation, then focuses only the supplied position', async () => {
     const ports = await render();

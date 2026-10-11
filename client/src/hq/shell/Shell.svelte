@@ -14,6 +14,7 @@
     SourceState,
     ViewId,
   } from '../contracts';
+  import { formatGameDuration, formatGameTime } from '../presentation/gameTime';
   import { createHqNavigation, routes, sameScope } from './navigation';
   import type { ShellViewContext } from './types';
 
@@ -58,6 +59,21 @@
   let highContrast = $state(false);
   let reducedMotion = $state(false);
   let letterShortcuts = $state(true);
+  const settingsHeadingId = $props.id();
+  let settingsDialog: HTMLDialogElement;
+  let settingsButton: HTMLButtonElement;
+  let firstSetting: HTMLInputElement;
+  let settingsOpen = $state(false);
+  function openSettings() {
+    if (settingsDialog.open) return;
+    settingsDialog.showModal();
+    settingsOpen = true;
+    firstSetting.focus();
+  }
+  function settingsClosed() {
+    settingsOpen = false;
+    if (alive) settingsButton.focus({ preventScroll: true });
+  }
   let systemMotion = $state(false);
   let ready = $state(false);
   let busy = $state(false);
@@ -94,6 +110,7 @@
         }
       : null,
   );
+  const sourceSeparator = ' · ';
   const motion = () => reducedMotion || systemMotion;
   function report<T>(result: Result<T>): result is { ok: true; value: T } {
     if (result.ok === false && result.error.code !== 'aborted' && alive)
@@ -102,7 +119,7 @@
   }
   async function focus(viewId: ViewId, key: string | null, signal: AbortSignal) {
     await tick();
-    if (!alive || signal.aborted) return;
+    if (!alive || signal.aborted || settingsDialog?.open) return;
     const object = key
       ? Array.from(root.querySelectorAll<HTMLButtonElement>('[data-focus-key]')).find(
           (el) => el.dataset.focusKey === key,
@@ -317,6 +334,7 @@
   }
   function pick(event: MouseEvent) {
     if (
+      settingsOpen ||
       event.defaultPrevented ||
       interactionActive ||
       !ready ||
@@ -509,7 +527,12 @@
   aria-busy={busy}
 >
   <header>
-    <h1>Headquarters</h1>
+    <div class="header-title">
+      <h1>Headquarters</h1>
+      <button bind:this={settingsButton} aria-haspopup="dialog" onclick={openSettings}
+        >Settings</button
+      >
+    </div>
     {#if clock && context}{@render clock(context)}{/if}
     <p>
       {source.kind === 'fixture'
@@ -518,9 +541,13 @@
     </p>
 
     <p>
-      Source: {data.connection}{data.stale ? ' · stale snapshot' : ''}{data.snapshot
-        ? ` · snapshot at ${data.snapshot.atGame} game ms`
-        : ' · no snapshot available'}
+      Source: {data.connection}{data.stale ? ' · stale snapshot' : ''}{#if data.snapshot}
+        {sourceSeparator}snapshot at
+        <time datetime={formatGameDuration(data.snapshot.atGame)}
+          >{formatGameTime(data.snapshot.atGame)}</time
+        >
+      {:else}
+        {sourceSeparator}no snapshot available{/if}
     </p>
   </header>
   <nav class="desk" aria-label="Desk objects">
@@ -549,7 +576,7 @@
       aria-label="Fixture knowledge map; select own pieces using the list below"
     ></canvas>
   </div>
-  <main class:paper={shellState.view !== 'table'}>
+  <main class:paper={shellState.view !== 'table'} class:roster-paper={shellState.view === 'roster'}>
     <h2 tabindex="-1" data-heading={shellState.view}>
       {routes.find((route) => route.view === shellState.view)?.label}
     </h2>
@@ -605,18 +632,29 @@
   </main>
   {#if interaction && context && root && canvas}{@render interaction(context, root, canvas)}{/if}
   <footer>
-    <label
-      ><input type="checkbox" bind:checked={letterShortcuts} /> Enable letter shortcuts (this session)</label
-    >
-    <label
-      ><input type="checkbox" checked={highContrast} onchange={changeContrast} /> High contrast</label
-    >
-    <label
-      ><input type="checkbox" checked={reducedMotion} onchange={changeMotion} /> Reduce motion</label
-    >
     <p role="status" aria-live="polite">{storageStatus}</p>
     <p class="error" role="status" aria-live="polite">{error}</p>
   </footer>
+  <dialog
+    bind:this={settingsDialog}
+    class="settings"
+    aria-labelledby={settingsHeadingId}
+    onclose={settingsClosed}
+  >
+    <h2 id={settingsHeadingId}>Settings</h2>
+    <label>
+      <input bind:this={firstSetting} type="checkbox" bind:checked={letterShortcuts} />
+      Enable letter shortcuts (this session)
+    </label>
+    <label>
+      <input type="checkbox" checked={highContrast} onchange={changeContrast} /> High contrast
+    </label>
+    <label>
+      <input type="checkbox" checked={reducedMotion} onchange={changeMotion} /> Reduce motion
+    </label>
+    <p role="status" aria-live="polite">{storageStatus}</p>
+    <button onclick={() => settingsDialog.close()}>Close settings</button>
+  </dialog>
 </div>
 
 <style>
@@ -712,8 +750,7 @@
   [aria-current='page'] {
     outline: 3px solid #c1a361;
   }
-  :focus-visible,
-  h2:focus {
+  :focus-visible {
     outline: 3px solid #185f89;
     outline-offset: 4px;
   }
@@ -728,9 +765,60 @@
     max-width: 48rem;
     font-size: 1.15rem;
   }
-  footer label {
-    display: inline-block;
-    margin-right: 1rem;
+  .roster-paper {
+    max-width: 64rem;
+    min-width: 0;
+  }
+  main h2[data-heading] {
+    border-inline-start: 0.15em solid transparent;
+    padding-inline-start: 0.4em;
+  }
+  main h2[data-heading]:focus {
+    outline: none;
+  }
+  main h2[data-heading]:focus-visible {
+    border-inline-start-color: var(--ink);
+  }
+  .header-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+  }
+  .settings {
+    color: var(--ink);
+    background: var(--paper);
+    border: 2px solid currentColor;
+    padding: 1.4rem;
+    inline-size: 28rem;
+    max-inline-size: calc(100% - 2rem);
+    max-block-size: calc(100dvh - 2rem);
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+  }
+  .settings::backdrop {
+    background: #0009;
+  }
+  .settings label {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding-block: 0.75rem;
+    line-height: 1.5;
+  }
+  .settings input {
+    flex: none;
+    inline-size: 1.2rem;
+    block-size: 1.2rem;
+    accent-color: var(--ink);
+  }
+  .settings h2 {
+    font-size: 1.5rem;
+  }
+  .settings button {
+    margin-block-start: 0.75rem;
   }
   .error {
     font-weight: bold;
@@ -742,6 +830,7 @@
     --paper: #fff;
     --ink: #000;
   }
+  .high-contrast :focus-visible,
   .high-contrast [aria-current='page'] {
     outline-color: var(--ink);
   }

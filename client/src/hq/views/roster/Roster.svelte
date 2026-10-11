@@ -8,7 +8,8 @@
     Result,
     ShellState,
   } from '../../contracts';
-  import { numberValue, provenance, sameScope, snapshotAge } from './presentation';
+  import Table from '../../ui/Table.svelte';
+  import { numberValue, provenance, sameScope, sharesSnapshot, snapshotAge } from './presentation';
 
   // Borrowed ports: the coordinator owns their lifecycle and display clock.
   let {
@@ -201,83 +202,86 @@
     </p>
   {:else if snapshot === null}
     <p>No roster snapshot available. Waiting for a supplied snapshot.</p>
-  {:else}
+  {:else if rows.length === 0}
     <p class:stale={(snapshotAge(snapshot.atGame, gameMs) ?? 0) > 0}>
       {provenance(snapshot.atGame, gameMs)}
     </p>
-    {#if rows.length === 0}
-      <p>No own formations supplied in this snapshot.</p>
-    {:else}
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex (This scroll region needs keyboard focus so all columns can be read.) -->
-      <div
-        class="table-scroll"
-        role="region"
-        aria-label="Own formations; scroll to read all columns"
-        tabindex="0"
-      >
-        <table>
-          <caption>Own formations — snapshot values, report dates unavailable</caption>
-          <thead
-            ><tr
-              ><th scope="col">Formation</th><th scope="col">Commander</th><th scope="col"
-                >Strength</th
-              ><th scope="col">Morale</th><th scope="col">Supply</th><th scope="col">Position</th
-              ><th scope="col">Map table</th></tr
-            ></thead
-          >
-          <tbody>
-            {#each rows as row (row.unitId)}
-              <tr>
-                <th scope="row">{row.name}</th>
-                <td
-                  ><strong>Unknown</strong><small
-                    >{row.commander.kind === 'unknown'
-                      ? row.commander.reason
-                      : 'Commander information unavailable in this fixture projection.'}</small
-                  ></td
-                >
-                {#each [{ label: 'Strength', knowledge: row.strength, percent: false }, { label: 'Morale', knowledge: row.morale, percent: true }, { label: 'Supply', knowledge: row.supply, percent: true }] as field (field.label)}
-                  <td
-                    class:stale={field.knowledge.kind === 'snapshot' &&
-                      (snapshotAge(field.knowledge.atGame, gameMs) ?? 0) > 0}
-                  >
-                    <strong>{numberValue(field.knowledge, field.percent)}</strong>
-                    <small
-                      >{field.knowledge.kind === 'unknown'
-                        ? field.knowledge.reason
-                        : provenance(field.knowledge.atGame, gameMs)}</small
-                    >
-                  </td>
-                {/each}
-                <td
-                  class:stale={row.position.kind === 'snapshot' &&
-                    (snapshotAge(row.position.atGame, gameMs) ?? 0) > 0}
-                >
-                  {#if row.position.kind === 'unknown'}<strong>Unknown</strong><small
-                      >{row.position.reason}</small
-                    >{:else}<strong
-                      >{row.position.value.x} m east, {row.position.value.y} m south</strong
-                    ><small>{provenance(row.position.atGame, gameMs)}</small>{/if}
-                </td>
-                <td
-                  ><button
-                    disabled={row.position.kind === 'unknown' ||
-                      (!!onFocusUnit && pendingId !== null)}
-                    onclick={() => focusFormation(row)}
-                    aria-label={`Focus ${row.name} on map table`}
-                    >{pendingId === row.unitId
-                      ? 'Opening / focusing…'
-                      : 'Focus on map table'}</button
-                  >{#if row.position.kind === 'unknown'}<small
-                      >Focus unavailable: position unknown.</small
-                    >{/if}</td
-                >
-              </tr>
+    <p>No own formations supplied in this snapshot.</p>
+  {:else}
+    <Table label="Own formations; scroll to read all seven columns and map actions">
+      {#snippet caption()}
+        <strong>Own formations — snapshot values, report dates unavailable</strong>
+        <small class:stale={(snapshotAge(snapshot.atGame, gameMs) ?? 0) > 0}>
+          {provenance(snapshot.atGame, gameMs)}. Applies to supplied values unless separately
+          annotated below; unknown fields remain unavailable.
+        </small>
+      {/snippet}
+      {#snippet header()}
+        <tr>
+          <th scope="col" style="width: 20%">Formation</th>
+          <th scope="col" style="width: 15%">Commander</th>
+          <th scope="col" style="width: 9%">Strength</th>
+          <th scope="col" style="width: 9%">Morale</th>
+          <th scope="col" style="width: 9%">Supply</th>
+          <th scope="col" style="width: 22%">Position</th>
+          <th scope="col" style="width: 16%">Map table</th>
+        </tr>
+      {/snippet}
+      {#snippet body()}
+        {#each rows as row (row.unitId)}
+          <tr>
+            <th class="table-text" scope="row">{row.name}</th>
+            <td class="table-text">
+              <strong>Unknown</strong><small
+                >{row.commander.kind === 'unknown'
+                  ? row.commander.reason
+                  : 'Commander information unavailable in this fixture projection.'}</small
+              >
+            </td>
+            {#each [{ label: 'Strength', knowledge: row.strength, percent: false }, { label: 'Morale', knowledge: row.morale, percent: true }, { label: 'Supply', knowledge: row.supply, percent: true }] as field (field.label)}
+              <td
+                class="table-value"
+                class:stale={field.knowledge.kind === 'snapshot' &&
+                  (snapshotAge(field.knowledge.atGame, gameMs) ?? 0) > 0}
+              >
+                <strong>{numberValue(field.knowledge, field.percent)}</strong>
+                {#if field.knowledge.kind === 'unknown'}
+                  <small>{field.knowledge.reason}</small>
+                {:else if !sharesSnapshot(field.knowledge.atGame, snapshot.atGame)}
+                  <small>{provenance(field.knowledge.atGame, gameMs)}</small>
+                {/if}
+              </td>
             {/each}
-          </tbody>
-        </table>
-      </div>
-    {/if}
+            <td
+              class="table-value"
+              class:stale={row.position.kind === 'snapshot' &&
+                (snapshotAge(row.position.atGame, gameMs) ?? 0) > 0}
+            >
+              {#if row.position.kind === 'unknown'}<strong>Unknown</strong><small
+                  >{row.position.reason}</small
+                >{:else}<strong
+                  ><span class="coordinate">{row.position.value.x} m east,</span>
+                  <span class="coordinate">{row.position.value.y} m south</span></strong
+                >
+                {#if !sharesSnapshot(row.position.atGame, snapshot.atGame)}
+                  <small>{provenance(row.position.atGame, gameMs)}</small>
+                {/if}
+              {/if}
+            </td>
+            <td class="table-action"
+              ><button
+                disabled={row.position.kind === 'unknown' || (!!onFocusUnit && pendingId !== null)}
+                onclick={() => focusFormation(row)}
+                aria-label={`Focus ${row.name} on map table`}
+                >{pendingId === row.unitId ? 'Opening / focusing…' : 'Focus on map table'}</button
+              >{#if row.position.kind === 'unknown'}<small
+                  >Focus unavailable: position unknown.</small
+                >{/if}</td
+            >
+          </tr>
+        {/each}
+      {/snippet}
+    </Table>
   {/if}
   {#if pendingId !== null && !onFocusUnit}<button onclick={() => cancel()}
       >Cancel formation focus</button
@@ -290,6 +294,10 @@
     color: var(--ink, inherit);
     font-family: Georgia, 'Times New Roman', serif;
     line-height: 1.5;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: normal;
+    word-break: normal;
   }
   h3 {
     font-size: 1.3rem;
@@ -299,33 +307,12 @@
     border-left: 0.25rem solid currentColor;
     padding-left: 0.8rem;
   }
-  .table-scroll {
-    overflow-x: auto;
-    margin: 1rem 0;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    text-align: left;
-  }
-  caption {
-    text-align: left;
-    font-weight: bold;
-    margin-bottom: 0.6rem;
-  }
-  th,
-  td {
-    vertical-align: top;
-    border-bottom: 1px solid currentColor;
-    padding: 0.65rem;
-    min-width: 7rem;
-  }
-  th {
-    font-weight: bold;
-  }
   small {
     display: block;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+  }
+  .coordinate {
+    display: block;
   }
   td strong {
     font-weight: normal;

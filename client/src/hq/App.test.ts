@@ -68,9 +68,7 @@ it('shares the parent display time between the compact table clock and roster an
   sample = 1250;
   await vi.advanceTimersByTimeAsync(250);
   await flush();
-  expect(target.querySelector('[aria-label="HQ game clock"]')?.textContent).toContain(
-    '3010 game ms',
-  );
+  expect(target.querySelector('[aria-label="HQ game clock"]')?.textContent).toContain('00:00:03');
   Array.from(target.querySelectorAll('button'))
     .find((button) => button.textContent?.includes('Roster'))!
     .click();
@@ -78,7 +76,7 @@ it('shares the parent display time between the compact table clock and roster an
   expect(target.querySelector('[aria-label="HQ game clock"]')?.classList.contains('compact')).toBe(
     false,
   );
-  expect(target.textContent).toContain('3 s old');
+  expect(target.textContent).toContain('3s ago');
   const snapshot = {
     ...ports.snapshot,
     ordinal: 2,
@@ -86,7 +84,7 @@ it('shares the parent display time between the compact table clock and roster an
   };
   ports.emit({ connection: 'ready', stale: false, snapshot, error: null });
   await flush();
-  expect(target.querySelector('[aria-label="HQ game clock"]')?.textContent).toContain('10 game ms');
+  expect(target.querySelector('[aria-label="HQ game clock"]')?.textContent).toContain('00:00:00');
   expect(target.textContent).toContain('Staff at work');
 });
 it('focuses a formation after navigation unmounts the roster and cancels on HQ teardown', async () => {
@@ -449,6 +447,83 @@ async function mountPlottingApp(beforeMount?: (ports: ReturnType<typeof makePort
   await flush();
   return { ...ports, marksStorage };
 }
+it('lets Settings consume native Escape before a second Escape cancels coordinate placement', async () => {
+  const ports = await mountPlottingApp();
+  const button = (label: string) =>
+    Array.from(target.querySelectorAll('button')).find((el) => el.textContent?.trim() === label)!;
+  button('Choose report coordinates').click();
+  await flush();
+  const panel = target.querySelector('[aria-label="Report placement"]')!;
+  const east = panel.querySelector<HTMLInputElement>('input[name="east"]')!;
+  expect(document.activeElement).toBe(east);
+  east.value = '400.25';
+  east.dispatchEvent(new Event('input', { bubbles: true }));
+  await flush();
+  const dialog = target.querySelector('dialog')!;
+  // jsdom has no native modal lifecycle; emulate only open/close, not Escape handling.
+  Object.defineProperties(dialog, {
+    showModal: {
+      configurable: true,
+      value: vi.fn(() => {
+        dialog.open = true;
+      }),
+    },
+    close: {
+      configurable: true,
+      value: vi.fn(() => {
+        dialog.open = false;
+        dialog.dispatchEvent(new Event('close'));
+      }),
+    },
+  });
+  const settings = button('Settings');
+  settings.click();
+  await flush();
+  const firstSetting = dialog.querySelector('input')!;
+  expect(dialog.open).toBe(true);
+  expect(document.activeElement).toBe(firstSetting);
+  const firstEscape = new KeyboardEvent('keydown', {
+    key: 'Escape',
+    bubbles: true,
+    cancelable: true,
+  });
+  firstSetting.dispatchEvent(firstEscape);
+  await flush();
+  expect(firstEscape.defaultPrevented).toBe(false);
+  expect(dialog.open).toBe(true);
+  expect(panel.querySelector('form')).not.toBeNull();
+  expect(panel.textContent).not.toContain('Placement ended.');
+  expect(east.value).toBe('400.25');
+  // Native modal background controls are inert; even a synthetic background Escape must yield.
+  const inertEscape = new KeyboardEvent('keydown', {
+    key: 'Escape',
+    bubbles: true,
+    cancelable: true,
+  });
+  east.dispatchEvent(inertEscape);
+  await flush();
+  expect(inertEscape.defaultPrevented).toBe(false);
+  expect(panel.querySelector('form')).not.toBeNull();
+  // A real browser performs this default action after Escape; this stub is not browser evidence.
+  expect(dialog.dispatchEvent(new Event('cancel', { cancelable: true }))).toBe(true);
+  dialog.close();
+  await flush();
+  expect(dialog.open).toBe(false);
+  expect(document.activeElement).toBe(settings);
+  const secondEscape = new KeyboardEvent('keydown', {
+    key: 'Escape',
+    bubbles: true,
+    cancelable: true,
+  });
+  settings.dispatchEvent(secondEscape);
+  await flush();
+  expect(secondEscape.defaultPrevented).toBe(true);
+  expect(panel.querySelector('form')).toBeNull();
+  expect(panel.textContent).toContain('Placement ended.');
+  expect(vi.mocked(ports.surface.apply).mock.calls.at(-1)![0].marks).toHaveLength(0);
+  expect(ports.marksStorage.setItem).not.toHaveBeenCalled();
+});
+
 it('creates one report mark when subsequent navigation fails and explains the partial result persistently', async () => {
   const ports = await mountPlottingApp();
   vi.mocked(ports.surface.transitionTo).mockResolvedValueOnce({

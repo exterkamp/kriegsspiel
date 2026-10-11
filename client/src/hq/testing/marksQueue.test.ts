@@ -71,13 +71,13 @@ it('combines a pending newer source with current marks and ignores superseded co
   await flush();
   app!.setMarks([mark('Latest personal annotation')]);
   await flush();
-  expect(target.textContent).toContain('snapshot at 10 game ms');
+  expect(target.querySelector('header time')?.getAttribute('datetime')).toBe('PT0.01S');
   finish(ok(undefined));
   await flush();
   const last = vi.mocked(ports.surface.apply).mock.calls.at(-1)![0];
   expect(last.snapshot.ordinal).toBe(2);
   expect(last.marks[0]?.label).toBe('Latest personal annotation');
-  expect(target.textContent).toContain('snapshot at 20 game ms');
+  expect(target.querySelector('header time')?.getAttribute('datetime')).toBe('PT0.02S');
   expect(target.textContent).toContain('New source formation');
 });
 it.each(['offline', 'error'] as const)(

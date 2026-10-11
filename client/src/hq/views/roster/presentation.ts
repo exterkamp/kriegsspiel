@@ -1,3 +1,4 @@
+import { formatGameAge, formatGameTime } from '../../presentation/gameTime';
 import type { GameMs, Knowledge, Scope } from '../../contracts';
 
 export function sameScope(a: Scope, b: Scope): boolean {
@@ -18,9 +19,14 @@ export function snapshotAge(atGame: GameMs, gameMs: number | null): number | nul
 }
 export function provenance(atGame: GameMs, gameMs: number | null): string {
   const age = snapshotAge(atGame, gameMs);
-  return `Snapshot at ${atGame} game ms · ${age === null ? 'age unavailable' : age === 0 ? 'current snapshot' : `${Math.floor(age / 1000)} s old`}`;
+  return `Snapshot at ${formatGameTime(atGame)} · ${formatGameAge(age)}`;
 }
 export function numberValue(knowledge: Knowledge<number>, percent = false): string {
   if (knowledge.kind === 'unknown') return 'Unknown';
   return percent ? `${Math.round(knowledge.value * 1000) / 10}%` : String(knowledge.value);
+}
+
+/** Only valid identical snapshot times can share the caption's provenance. */
+export function sharesSnapshot(atGame: GameMs, snapshotAtGame: GameMs): boolean {
+  return Number.isSafeInteger(atGame) && atGame >= 0 && atGame === snapshotAtGame;
 }
