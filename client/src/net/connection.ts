@@ -82,6 +82,10 @@ export class GameConnection {
     return this.send({ v: PROTOCOL_VERSION, kind: 'deleteMark', markId });
   }
 
+  syncDrafts(): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'syncDrafts' });
+  }
+
   proposePause(reason?: string): boolean {
     const r = reason?.trim();
     return this.send({ v: PROTOCOL_VERSION, kind: 'proposePause', ...(r ? { reason: r } : {}) });
@@ -108,8 +112,11 @@ export class GameConnection {
     socket.onmessage = (e) => {
       if (typeof e.data !== 'string') return;
       const r = parseServerMessage(e.data);
-      if (r.ok) this.o.onMessage(r.value);
-      else this.o.onBadMessage?.(r.error);
+      if (r.ok) {
+        // An edit on a rev the server does not have (it lost it, or we missed one): start over from its snapshot.
+        if (r.value.kind === 'error' && r.value.code === 'bad_rev') this.syncDrafts();
+        this.o.onMessage(r.value);
+      } else this.o.onBadMessage?.(r.error);
     };
     // `close` follows `error`, so reconnecting only from `close` schedules one retry.
     socket.onerror = () => {};

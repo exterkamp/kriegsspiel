@@ -203,6 +203,22 @@ describe('GameConnection', () => {
     });
   });
 
+  it('asks for the drafts snapshot when an edit gets bad_rev', () => {
+    const { conn, sockets, messages } = setup();
+    conn.start();
+    sockets[0]!.open();
+    sockets[0]!.onmessage?.({
+      data: JSON.stringify({
+        v,
+        kind: 'error',
+        code: 'bad_rev',
+        message: 'rev 9 is not one of its',
+      }),
+    });
+    expect(messages).toHaveLength(1);
+    expect(sockets[0]!.sent.map((x) => JSON.parse(x))).toEqual([{ v, kind: 'syncDrafts' }]);
+  });
+
   it('reconnects with backoff after a drop and resets after opening', () => {
     const { conn, sockets, timers, statuses } = setup();
     conn.start();
