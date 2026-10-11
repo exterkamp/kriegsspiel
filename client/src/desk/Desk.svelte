@@ -5,6 +5,7 @@
   import OrdersDesk from './OrdersDesk.svelte';
   import Journal from './Journal.svelte';
   import DeskClock from './DeskClock.svelte';
+  import PausePanel from './PausePanel.svelte';
   import { VIEWS, isDeskView, isTypingTarget, viewForKey, type ViewId } from './views.js';
 
   /** What to focus when a view opens, so keyboard users land inside it. */
@@ -37,6 +38,7 @@
 <svelte:window onkeydown={onKey} />
 
 <div class="dock">
+<PausePanel />
 <DeskClock />
 <nav class="desk-bar" aria-label="Desk">
   {#each VIEWS as v (v.id)}
