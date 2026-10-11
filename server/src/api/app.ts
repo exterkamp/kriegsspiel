@@ -154,6 +154,12 @@ export interface AppOptions {
     publicUrl?: string;
     loginPerEmail?: number;
     loginPerIp?: number;
+    /** Guest play (D17c): `POST /auth/guest` starts a session with no email. Default off. */
+    guestPlay?: boolean;
+    /** Unused guests, and their games, are removed after this long (default 7 days). */
+    guestIdleMs?: number;
+    /** Guests created per client address per hour (default 10). */
+    guestPerIp?: number;
   };
   /**
    * Trust `X-Forwarded-For` for `req.ip`, which keys the login rate limits. On behind a reverse proxy,
@@ -306,12 +312,20 @@ export async function buildApp(options: AppOptions): Promise<App> {
     wallNow: options.wallNow,
     loginPerEmail: options.auth?.loginPerEmail,
     loginPerIp: options.auth?.loginPerIp,
+    guestPlay: options.auth?.guestPlay,
+    guestIdleMs: options.auth?.guestIdleMs,
+    guestPerIp: options.auth?.guestPerIp,
     onAccountDeleted: (userId) => {
       notifyStore.deleteUser(userId);
       lobby.forgetUser(userId);
       hub.disconnectUser(userId, 'account deleted');
     },
     onLogout: (userId) => hub.disconnectUser(userId),
+    onGuestAdopted: (guestId, userId) => {
+      lobby.reassignUser(guestId, userId);
+      notifyStore.deleteUser(guestId);
+      hub.disconnectUser(guestId, 'signed in');
+    },
   });
 
   notifyRoutes(server, { auth, store: notifyStore, push: options.notify?.push });
@@ -496,12 +510,16 @@ export async function buildApp(options: AppOptions): Promise<App> {
     return { games };
   });
 
+  /** A guest's game is theirs alone (D17c): to anyone else it does not exist, so an invite link to it fails. */
+  const isPrivateTo = (rec: LobbyGame, userId: string): boolean =>
+    rec.creator !== userId && authStore.getUser(rec.creator)?.guest === true;
+
   server.get<{ Params: { id: string } }>('/games/:id', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const { id } = req.params;
     const rec = recordOf(id);
-    if (!rec) return reply.code(404).send({ error: 'no_such_game' });
+    if (!rec || isPrivateTo(rec, user.id)) return reply.code(404).send({ error: 'no_such_game' });
     const seats = authStore.seatsOf(id);
     const hotSeat = rec.sessionType === 'hot_seat';
     return {
@@ -599,7 +617,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const { id } = req.params;
     const rec = recordOf(id);
-    if (!rec) return reply.code(404).send({ error: 'no_such_game' });
+    if (!rec || isPrivateTo(rec, user.id)) return reply.code(404).send({ error: 'no_such_game' });
     const body = JoinGame.safeParse(req.body);
     if (!body.success) {
       return reply.code(400).send({ error: 'bad_request', message: body.error.message });

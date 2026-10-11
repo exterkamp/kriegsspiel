@@ -23,6 +23,8 @@ import {
   aiCommanderBudgetWarning,
   aiCommanderFromEnv,
   authFromEnv,
+  guestIdleMsFromEnv,
+  guestPlayFromEnv,
   llmOrderParserEnabled,
   scriptedOpponentsFromEnv,
   trustProxyFromEnv,
@@ -106,7 +108,12 @@ const { server } = await buildApp({
   admin: adminFromEnv(process.env),
   trustProxy: trustProxyFromEnv(process.env),
   notify: { store: notifyStore, push: pushFromEnv(process.env) },
-  auth: { store: authStore, ...authFromEnv(process.env, port, (line) => server.log.warn(line)) },
+  auth: {
+    store: authStore,
+    ...authFromEnv(process.env, port, (line) => server.log.warn(line)),
+    guestPlay: guestPlayFromEnv(process.env),
+    guestIdleMs: guestIdleMsFromEnv(process.env),
+  },
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

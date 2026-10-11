@@ -9,8 +9,12 @@
     onNewGame: () => void;
     onContinue: (id: string) => void;
     onSignOut: () => void;
+    /** A guest session: no sign-out (it would orphan the games), a way to sign in and keep them instead. */
+    guest?: boolean;
+    onSignIn?: () => void;
   }
-  let { email, games, loadError, onNewGame, onContinue, onSignOut }: Props = $props();
+  let { email, games, loadError, onNewGame, onContinue, onSignOut, guest, onSignIn }: Props =
+    $props();
 </script>
 
 <div class="page">
@@ -51,8 +55,14 @@
 
     <section aria-labelledby="account-h" class="account">
       <h2 id="account-h">Account</h2>
-      <p>Signed in as <b>{email}</b></p>
-      <button type="button" onclick={onSignOut}>Sign out</button>
+      {#if guest}
+        <p>Playing as a guest. Your games stay in this browser.</p>
+        <button type="button" onclick={onSignIn}>Sign in to keep your games on other devices</button
+        >
+      {:else}
+        <p>Signed in as <b>{email}</b></p>
+        <button type="button" onclick={onSignOut}>Sign out</button>
+      {/if}
     </section>
 
     <section aria-labelledby="about-h">

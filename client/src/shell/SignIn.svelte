@@ -2,12 +2,24 @@
   interface Props {
     /** Asks for a login link; resolves to an error message, or undefined once it was sent. */
     onRequest: (email: string) => Promise<string | undefined>;
+    /** Starts a guest session; resolves to an error message, or undefined on success. Absent: no guest button. */
+    onGuest?: () => Promise<string | undefined>;
   }
-  let { onRequest }: Props = $props();
+  let { onRequest, onGuest }: Props = $props();
   let email = $state('');
   let message = $state('');
   let failed = $state(false);
   let busy = $state(false);
+
+  async function play(): Promise<void> {
+    busy = true;
+    const err = await onGuest!();
+    busy = false;
+    if (err !== undefined) {
+      failed = true;
+      message = err;
+    }
+  }
 
   async function submit(e: SubmitEvent): Promise<void> {
     e.preventDefault();
@@ -22,6 +34,12 @@
 <div class="page">
   <main class="signin">
     <h1>Kriegsspiel</h1>
+    {#if onGuest}
+      <p>
+        <button type="button" class="primary" disabled={busy} onclick={play}>Play as guest</button>
+      </p>
+      <p class="hint">No email needed. Sign in later to keep your games on other devices.</p>
+    {/if}
     <form onsubmit={submit} aria-labelledby="signin-h">
       <h2 id="signin-h">Sign in</h2>
       <label>Email <input type="email" required autocomplete="email" bind:value={email} /></label>
@@ -77,6 +95,14 @@
   button:focus-visible {
     outline: 3px solid #1f5fbf;
     outline-offset: 2px;
+  }
+  .primary {
+    font-weight: bold;
+    background: #e3d09a;
+  }
+  .hint {
+    margin-top: -4px;
+    font-size: 0.9rem;
   }
   .err {
     color: #8a1c10;

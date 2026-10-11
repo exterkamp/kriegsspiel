@@ -77,6 +77,23 @@ export function authFromEnv(
 }
 
 /**
+ * `GUEST_PLAY` of `1`, `true` or `on` lets a visitor start a guest session with no email; `0`, `false`
+ * or `off` turns it off. Unset: on outside production, off when `NODE_ENV=production` (D17c).
+ */
+export function guestPlayFromEnv(env: Record<string, string | undefined>): boolean {
+  const v = env.GUEST_PLAY?.trim().toLowerCase();
+  if (v === '1' || v === 'true' || v === 'on') return true;
+  if (v === '0' || v === 'false' || v === 'off') return false;
+  return env.NODE_ENV !== 'production';
+}
+
+/** `GUEST_IDLE_HOURS` (default 168): how long an unused guest and their games are kept. */
+export function guestIdleMsFromEnv(env: Record<string, string | undefined>): number {
+  const h = Number(env.GUEST_IDLE_HOURS);
+  return (Number.isFinite(h) && h > 0 ? h : 168) * 3_600_000;
+}
+
+/**
  * Whether orders are parsed by the LLM: the `parse` stage's provider is usable (Anthropic needs its
  * API key; any other configured provider counts) and `ORDER_PARSER` is not `stub`. Otherwise the
  * rule-based stub parses orders, as in tests and with no key. A non-Anthropic provider is not

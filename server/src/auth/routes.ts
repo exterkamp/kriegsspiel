@@ -4,6 +4,8 @@
  *   POST   /auth/login    `{ email }`  mail a one-time login link; always 202 so it does not reveal who has an account
  *   GET    /auth/verify   `?token=`    spend the link, start a session, redirect to `/`
  *   GET    /auth/me                    the signed-in user, or 401
+ *   GET    /auth/guest              `{ enabled }`: whether guest play is on
+ *   POST   /auth/guest              start a guest session with no email (only when `guestPlay` is on, else 404)
  *   POST   /auth/logout                end this session
  *   DELETE /auth/account               delete the user, their sessions and seats
  *
@@ -30,11 +32,23 @@ export interface AuthOptions {
   /** Magic links per email per hour (default 5) and per client address per hour (default 20). */
   loginPerEmail?: number;
   loginPerIp?: number;
+  /** Guest play (D17c): `POST /auth/guest` makes a guest user. Off by default here; `GUEST_PLAY` turns it on in `main.ts`. */
+  guestPlay?: boolean;
+  /** Guest sessions last this long unused before the guest and their games are removed (default 7 days). */
+  guestIdleMs?: number;
+  /** Guests created per client address per hour (default 10). */
+  guestPerIp?: number;
+  /** Called after a guest signs in with an email, with the games whose seats moved to the account. */
+  onGuestAdopted?: (guestId: string, userId: string, gameIds: string[]) => void;
   /** Called after an account is deleted, with the game ids it held seats in. */
   onAccountDeleted?: (userId: string, gameIds: string[]) => void;
   /** Called after a logout, so the server can drop that user's open sockets. */
   onLogout?: (userId: string) => void;
 }
+
+export const GUEST_IDLE_MS = 7 * 24 * 3_600_000;
+/** The guest cookie outlives any idle window: the server-side session row alone decides when a guest is idle. */
+export const GUEST_COOKIE_MAX_AGE_S = 400 * 24 * 3600;
 
 export interface Auth {
   /** The signed-in user for a request, from its session cookie. */
@@ -56,6 +70,8 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
   const secure = o.publicUrl.startsWith('https:');
   const perEmail = new RateLimiter(o.loginPerEmail ?? 5, 3_600_000, now);
   const perIp = new RateLimiter(o.loginPerIp ?? 20, 3_600_000, now);
+  const perGuestIp = new RateLimiter(o.guestPerIp ?? 10, 3_600_000, now);
+  const guestIdleMs = o.guestIdleMs ?? GUEST_IDLE_MS;
   const verifyPerIp = new RateLimiter(30, 15 * 60_000, now);
 
   const cookie = (value: string, maxAgeS: number) =>
@@ -69,12 +85,51 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
   const userOf = (req: FastifyRequest): User | undefined => {
     const hash = sessionHash(req);
     const userId = hash && o.store.getSession(hash, now());
-    return userId ? o.store.getUser(userId) : undefined;
+    const user = userId ? o.store.getUser(userId) : undefined;
+    // A guest session slides, so "idle" means unused; refreshed at most hourly to spare the store.
+    if (user?.guest && hash) {
+      const last = lastTouch.get(user.id) ?? 0;
+      if (now() - last > 3_600_000) {
+        lastTouch.set(user.id, now());
+        o.store.putSession(hash, user.id, now() + guestIdleMs);
+      }
+    }
+    return user;
   };
+  const lastTouch = new Map<string, number>();
 
-  const timer = setInterval(() => o.store.prune(now()), 10 * 60_000);
+  const sweep = (): void => {
+    o.store.prune(now());
+    for (const id of o.store.idleGuests(now())) {
+      const games = o.store.deleteUser(id);
+      lastTouch.delete(id);
+      o.onAccountDeleted?.(id, games);
+    }
+  };
+  const timer = setInterval(sweep, 10 * 60_000);
   timer.unref();
   server.addHook('onClose', async () => clearInterval(timer));
+
+  server.get('/auth/guest', async () => ({ enabled: o.guestPlay === true }));
+
+  server.post('/auth/guest', async (req, reply) => {
+    if (!o.guestPlay) return reply.code(404).send({ error: 'guest_play_disabled' });
+    // Already signed in (guest or not): keep that session rather than minting another account.
+    let user = userOf(req);
+    if (!user) {
+      // Only a request that creates a guest uses up a slot.
+      if (!perGuestIp.hit(req.ip)) {
+        return reply.code(429).header('retry-after', '3600').send({ error: 'rate_limited' });
+      }
+      user = o.store.createGuest(now());
+      const session = randomBytes(32).toString('base64url');
+      o.store.putSession(hashToken(session), user.id, now() + guestIdleMs);
+      reply.header('set-cookie', cookie(session, GUEST_COOKIE_MAX_AGE_S));
+    }
+    return reply
+      .header('cache-control', 'no-store')
+      .send({ id: user.id, email: user.email, guest: user.guest });
+  });
 
   server.post('/auth/login', async (req, reply) => {
     const body = Login.safeParse(req.body);
@@ -106,7 +161,12 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
         .type('text/plain')
         .send('This login link is invalid, expired or already used. Request a new one.');
     }
+    const guest = userOf(req);
     const user = o.store.upsertUser(email, now());
+    if (guest?.guest && guest.id !== user.id) {
+      const moved = o.store.adoptGuest(guest.id, user.id);
+      o.onGuestAdopted?.(guest.id, user.id, moved);
+    }
     const session = randomBytes(32).toString('base64url');
     o.store.putSession(hashToken(session), user.id, now() + SESSION_TTL_MS);
     return reply
@@ -118,7 +178,7 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
   server.get('/auth/me', async (req, reply) => {
     const user = userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-    return { id: user.id, email: user.email };
+    return { id: user.id, email: user.email, guest: user.guest };
   });
 
   server.post('/auth/logout', async (req, reply) => {
