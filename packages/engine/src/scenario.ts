@@ -202,6 +202,7 @@ function parseSides(raw: unknown, map: TerrainMap): Side[] {
 function parseUnits(raw: unknown, map: TerrainMap, sides: Side[]): Unit[] {
   const list = arr(raw, 'units');
   const ids = new Set<string>();
+  const names = new Set<string>();
   const sideIds = sides.map((s) => s.id);
   const units: Unit[] = [];
   list.forEach((u, i) => {
@@ -235,12 +236,17 @@ function parseUnits(raw: unknown, map: TerrainMap, sides: Side[]): Unit[] {
         o.frontage === undefined ? def.frontage : mm(num(o.frontage, `${p}.frontage`, 0.001)),
       depth: o.depth === undefined ? def.depth : mm(num(o.depth, `${p}.depth`, 0.001)),
     };
+    const side = oneOf(o.side, sideIds, `${p}.side`);
+    const name = str(o.name, `${p}.name`);
+    // Reports name their sender, so a role view matches them by name (docs/decisions.md, D6a).
+    if (names.has(`${side}/${name}`)) fail(`duplicate unit name "${name}" on side "${side}"`);
+    names.add(`${side}/${name}`);
     const unit: Unit = {
       id,
-      side: oneOf(o.side, sideIds, `${p}.side`),
+      side,
       kind,
       type: type.id,
-      name: str(o.name, `${p}.name`),
+      name,
       center,
       facing: (num(o.facingDeg, `${p}.facingDeg`) * Math.PI) / 180,
       formation,
