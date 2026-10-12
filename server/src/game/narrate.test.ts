@@ -184,6 +184,21 @@ describe('narrate stage in the actor', () => {
     expect(view.dispatches.length).toBeGreaterThan(0);
   });
 
+  it('clears the staff-overloaded notice once a later narration succeeds', async () => {
+    const umpire = new StubUmpire();
+    umpire.refuse = 'budget';
+    const { time, game } = await newGame(umpire);
+    const side = await runUntilReport(time, game);
+    await time.advance(NARRATE_WINDOW_BASE_MS);
+    expect(game.overloadedFor(side)).toBe(STAFF_OVERLOADED_NOTICE);
+    umpire.refuse = undefined;
+    await game.submit({ kind: 'order', side: side as 'blue', text: 'blue-1 march' });
+    for (let i = 0; i < 60 && game.overloadedFor(side); i++) {
+      await time.advance(NARRATE_WINDOW_BASE_MS);
+    }
+    expect(game.overloadedFor(side)).toBeUndefined();
+  });
+
   it('keeps template text when no umpire is set', async () => {
     const { time, game } = await newGame();
     const side = await runUntilReport(time, game);

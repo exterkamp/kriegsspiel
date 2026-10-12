@@ -266,12 +266,12 @@ export class GameActor {
     return this.narrations.get(side);
   }
 
-  /** `side`'s conference with its staff officers, for `sideViewOf`. */
   /** The in-fiction notice for a side whose latest narration the umpire's cap refused. */
   overloadedFor(side: string): string | undefined {
     return this.overloaded.has(side) ? STAFF_OVERLOADED_NOTICE : undefined;
   }
 
+  /** `side`'s conference with its staff officers, for `sideViewOf`. */
   staffHistoryFor(side: string): readonly StaffExchange[] {
     return this.staffHistory.get(side) ?? [];
   }
