@@ -126,3 +126,12 @@ excluded from successful performance statistics. Runners 1000002578–1000002582
 image/version unchanged. The application group took 122s (95s tests), maps 109s
 (81s tests), static/build 78s and effectiveness 33s. Artifact upload/post steps and
 aggregate scheduling are included in job/wall measurements.
+
+The first repaired candidate `559ddb2` was rejected before jobs started in
+[run 38200926270](https://github.com/exterkamp/kriegsspiel/actions/runs/38200926270):
+`cancelled()` is unavailable in step `env`. This is a workflow-authoring failure,
+not a performance run. Official actionlint 1.7.12 confirmed the restriction.
+The guard is now a `cancelled()` conditional failing step; the result evaluator
+runs with `always()` so prior failure cannot suppress it. Actionlint and all five
+CI controls pass after this correction. The unchanged full validation remains
+required; the rejected run clears no gate.

@@ -38,18 +38,17 @@ test('required check rejects failed, cancelled, skipped and unknown dependency r
   assert.match(gate, /VALIDATION_RESULT: \$\{\{ needs\.validation\.result }}/);
   assert.match(gate, /EFFECTIVENESS_RESULT: \$\{\{ needs\.test-effectiveness\.result }}/);
   const command = gate
+    .split('name: Require every validation group and effectiveness job')[1]
     .split('        run: |\n')[1]
     .split('\n')
     .map((line) => line.trim())
     .join('\n');
   assert.ok(command);
-  assert.match(gate, /RUN_CANCELLED: \$\{\{ cancelled\(\) }}/);
   for (const validation of ['success', 'failure', 'cancelled', 'skipped', '', 'unexpected']) {
     for (const effectiveness of ['success', 'failure', 'cancelled', 'skipped', '', 'unexpected']) {
       const run = spawnSync('bash', ['-e', '-c', command], {
         env: {
           ...process.env,
-          RUN_CANCELLED: 'false',
           VALIDATION_RESULT: validation,
           EFFECTIVENESS_RESULT: effectiveness,
         },
@@ -63,22 +62,17 @@ test('required check rejects failed, cancelled, skipped and unknown dependency r
   }
 });
 
-test('cancelled workflow cannot leave a successful aggregate', () => {
+test('cancelled workflow explicitly fails while the result evaluator still runs', () => {
   const gate = workflow.slice(workflow.indexOf('\n  check:\n'));
-  const command = gate
-    .split('        run: |\n')[1]
-    .split('\n')
-    .map((line) => line.trim())
-    .join('\n');
-  const run = spawnSync('bash', ['-e', '-c', command], {
-    env: {
-      ...process.env,
-      RUN_CANCELLED: 'true',
-      VALIDATION_RESULT: 'success',
-      EFFECTIVENESS_RESULT: 'success',
-    },
-  });
-  assert.notEqual(run.status, 0);
+  assert.match(
+    gate,
+    /name: Reject cancelled workflow\n        if: cancelled\(\)\n        run: exit 1/,
+  );
+  assert.match(
+    gate,
+    /name: Require every validation group and effectiveness job\n        if: always\(\)/,
+  );
+  assert.notEqual(spawnSync('bash', ['-e', '-c', 'exit 1']).status, 0);
 });
 
 test('all validation groups finish independently; only superseded PR runs cancel', () => {
@@ -94,7 +88,7 @@ test('all validation groups finish independently; only superseded PR runs cancel
   );
   assert.match(workflow, /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' }}/);
   assert.match(workflow, /name: hq-ordinary-\$\{\{ matrix\.group }}/);
-  assert.equal((workflow.match(/if: always\(\)/g) ?? []).length, 3);
+  assert.equal((workflow.match(/if: always\(\)/g) ?? []).length, 4);
   assert.equal((workflow.match(/retention-days: 30/g) ?? []).length, 2);
   assert.equal((workflow.match(/Checkout does not match candidate source/g) ?? []).length, 2);
 });

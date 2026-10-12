@@ -126,12 +126,14 @@ jobs:
     needs: [validation, test-effectiveness]
     runs-on: ubuntu-latest
     steps:
+      - name: Reject cancelled workflow
+        if: cancelled()
+        run: exit 1
       - name: Require every validation group and effectiveness job
+        if: always()
         env:
-          RUN_CANCELLED: ${{ cancelled() }}
           VALIDATION_RESULT: ${{ needs.validation.result }}
           EFFECTIVENESS_RESULT: ${{ needs.test-effectiveness.result }}
         run: |
-          test "$RUN_CANCELLED" = false
           test "$VALIDATION_RESULT" = success
           test "$EFFECTIVENESS_RESULT" = success
