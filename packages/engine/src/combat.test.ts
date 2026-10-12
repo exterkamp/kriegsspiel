@@ -998,13 +998,13 @@ describe('battle visibility (#320)', () => {
     expect(heavy(later.state)).toHaveLength(1);
   });
 
-  it('files no heavy-losses report for a unit that broke in the same tick', () => {
+  it('files the heavy-losses report as well as the broke report for a unit that broke in the same tick', () => {
     const { state } = run(worn(305, 1), 2);
     expect(unit(state, 'blue-1').strength).toBeLessThan(300);
     expect(unit(state, 'blue-1').status).toBe('withdrawn');
     const kinds = state.world.intel.blue.reports.map((r) => r.kind);
     expect(kinds).toContain('broke');
-    expect(kinds).not.toContain('heavyLosses');
+    expect(kinds.filter((k) => k === 'heavyLosses')).toHaveLength(1);
   });
 
   it('says engaged again only after the repeat window', () => {

@@ -645,10 +645,11 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     // The units in the fight send word to their own HQ: engaged, then heavy losses. These are
     // about the side's own units, so they carry nothing of the enemy's.
     for (const u of world.units) {
-      if (!engaged.has(u.id) || u.status !== 'active') continue;
+      if (!engaged.has(u.id) || (u.status !== 'active' && u.status !== 'withdrawn')) continue;
       const now = w.units.find((x) => x.id === u.id)!;
       const reports = w.intel[u.side].reports;
       if (
+        u.status === 'active' &&
         !reports.some(
           (r) =>
             r.kind === 'engaged' && r.from === u.name && r.observedAt > ev.time - ENGAGED_REPEAT_MS,
@@ -658,8 +659,10 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       }
       const start = world.startStrength?.[u.id] ?? u.strength;
       const heavy = HEAVY_LOSS_FRACTION * start;
-      const broke = now.status === 'active' && now.morale < unitTypeOf(now).breakMorale;
-      if (now.strength > 0 && u.strength >= heavy && now.strength < heavy && !broke) {
+      // Once per unit, as its strength first falls under the line. That may be in the same tick it
+      // breaks, or while it is being run down after: most of a beaten unit's men are lost in the
+      // pursuit, and the commander still wants to hear of it.
+      if (now.strength > 0 && u.strength >= heavy && now.strength < heavy) {
         w = fileReport(w, 'heavyLosses', now, ev.time, FIELD_REPORT_DELAY_MS);
       }
     }

@@ -269,6 +269,14 @@ describe('a battle is decided (#315)', () => {
       expect(engaged.length).toBeGreaterThan(0);
       expect(Math.min(...engaged.map((r) => r.observedAt))).toBeLessThan(ruling.time);
       expect(blue.some((r) => ['heavyLosses', 'broke', 'unitLost'].includes(r.kind))).toBe(true);
+      // #323: every Blue unit still alive under half its starting strength said so, exactly once, at every rate.
+      const heavy = blue.filter((r) => r.kind === 'heavyLosses');
+      for (const u of w.units.filter((x) => x.side === 'blue' && x.strength > 0)) {
+        const said = heavy.filter((r) => r.from === u.name).length;
+        const wasHeavy = u.strength < 0.5 * (w.startStrength?.[u.id] ?? u.strength);
+        expect(said, u.name).toBe(wasHeavy ? 1 : said);
+        expect(said, u.name).toBeLessThanOrEqual(1);
+      }
       // The ruling paper carries the ruling text and is not the umpire's "reports its situation".
       const paper = blue.find((r) => r.kind === 'battle')!;
       expect(paper.text).toBe(ruling.narrative);
