@@ -175,9 +175,15 @@ export class LlmOrderParser implements OrderParser {
     // other side's units (#44).
     const facts = proseFactsOf(parseOrdersInput(text, ctx));
     // An enemy id is fair only when the player wrote it in the order.
-    const hidden = ctx.units
-      .filter((u) => u.side !== ctx.side)
-      .flatMap((u) => [u.name, ...(text.toLowerCase().includes(u.id.toLowerCase()) ? [] : [u.id])]);
+    const hidden = [
+      ...ctx.units
+        .filter((u) => u.side !== ctx.side)
+        .flatMap((u) => [
+          u.name,
+          ...(text.toLowerCase().includes(u.id.toLowerCase()) ? [] : [u.id]),
+        ]),
+      ...(ctx.hidden ?? []),
+    ];
     const unfounded = (...words: Array<string | undefined>) =>
       words
         .flatMap((w) => (w ? [...checkProseAgainst(w, facts), ...hiddenIn(w, hidden)] : []))

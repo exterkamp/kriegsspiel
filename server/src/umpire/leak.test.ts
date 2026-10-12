@@ -98,6 +98,7 @@ function parseContext(side: SideId): ParseContext {
     },
     // As the actor builds it: every unit, both sides. The parser must keep the other side's out of its words.
     units: G.world.units.map((u) => ({ id: u.id, side: u.side, name: u.name, center: u.center })),
+    hidden: hiddenTerms(G.world, side),
   };
 }
 
@@ -234,12 +235,7 @@ describe('an adversarial model that names the other side’s units is stopped', 
               { kind: 'advice', text },
             ],
           }),
-          // The parser is not shown officers, so it cannot list a commander to refuse in lower case
-          // (a capitalised one is still caught by the proper-noun check). See decisions.md.
-          parse: () => ({
-            result: 'rejection',
-            reason: kind === 'commanderLower' ? 'Sir, that order is not clear.' : text,
-          }),
+          parse: () => ({ result: 'rejection', reason: text }),
         });
         const probe = new LeakProbe();
         const delivered = await runStages(probe.client(side, model), side);

@@ -212,6 +212,7 @@ export class TestProvider implements LlmProvider {
     const input = JSON.parse(req.messages[req.messages.length - 1]?.content ?? '{}') as Json;
     return {
       text: JSON.stringify(testReply(req.schema, input)),
+      canned: true,
       usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
     };
   }

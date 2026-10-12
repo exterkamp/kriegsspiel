@@ -9,7 +9,12 @@
  *   Words before the verb that fit no unit: refuse.
  * - The order is split into clauses at `and`, `then` and commas. Each clause has a verb (move,
  *   hold/defend/screen, withdraw/fall back, attack) and a place. `it`, `there` or no place in a
- *   later `hold` clause means the place before it; a first `hold` with no place holds `here`.
+ *   later `hold` clause means the place before it; a first `hold` with no place holds `here`. A
+ *   later clause with no verb but a place (`hold the bridge and the ford`) takes the verb before
+ *   it; with neither, the clause is not understood and the first part is offered on its own.
+ *   `from X to Y` means Y: the place after the last `to`/`toward`.
+ * - An order that names several units (`the 1st and 2nd battalions`) asks which one first, since
+ *   an answer carries one unit.
  * - A place is found by its name, or by its kind (`the wood`) narrowed by words in its name
  *   (`the northern wood`). Several fits: ask which. None: refuse.
  * - Conditions and times ("if pressed", "at noon") are ignored; the intents are the plain order.
@@ -273,6 +278,24 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
   }
   const rest = match.kind === 'one' ? removePhrase(text, match.phrase) : text;
 
+  if (match.kind === 'one') {
+    // Other units named before the verb ("the 1st and 2nd battalions hold ...") are an order to
+    // several units, which one answer cannot carry.
+    const lead = rest.slice(0, leftmostVerb(rest)?.index ?? 0);
+    const others = new Map<string, Unit>();
+    let more = findUnit(lead, input.units);
+    while (more.kind === 'one' && more.unit !== match.unit && !others.has(more.unit.id)) {
+      others.set(more.unit.id, more.unit);
+      more = findUnit(removePhrase(lead, more.phrase), input.units);
+    }
+    if (others.size > 0) {
+      return ask(
+        'That order names more than one unit, sir, and I can carry it to one at a time. Which first?',
+        [match.unit, ...others.values()].map((u) => u.name),
+      );
+    }
+  }
+
   if (match.kind === 'none') {
     const first = leftmostVerb(rest);
     const subject = words(rest.slice(0, first?.index ?? 0)).filter((w) => !FILLER.has(w));
@@ -286,30 +309,38 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
     .filter(Boolean);
   const intents: NonNullable<ParseOrdersOutput['intents']> = [];
   let previous: Place | undefined;
+  let lastKind: Kind | undefined;
   let nearestTo: Place | undefined;
   for (const [i, clause] of clauses.entries()) {
-    const verb = leftmostVerb(clause);
-    if (!verb) {
-      if (i === 0) return refuse('I cannot find an order in that, sir.');
-      continue;
-    }
+    const found = leftmostVerb(clause);
+    if (!found && !lastKind) return refuse('I cannot find an order in that, sir.');
+    // A clause with no verb of its own ("... and the ford") repeats the one before.
+    const verb = found ?? { kind: lastKind as Kind, end: 0 };
     // What follows the verb, without a trailing condition or time.
-    const object = clause
+    let object = clause
       .slice(verb.end)
       .replace(
         /\b(?:if|unless|once|when|until|at (?:dawn|dusk|noon|midnight)|in \d+ \w+|at all costs)\b.*$/,
         '',
       )
       .trim();
+    // "from the bridge to the ford": the place meant is the one after the last "to".
+    const ws = words(object);
+    if (ws.includes('from')) {
+      const to = ws.map((w) => w === 'to' || w === 'toward' || w === 'towards').lastIndexOf(true);
+      if (to >= 0) object = ws.slice(to + 1).join(' ');
+    }
     const phrase = words(object).filter((w) => !FILLER.has(w));
     const refersBack =
       phrase.length === 0 ||
       phrase.every((w) => ['it', 'there', 'them', 'here', 'position', 'ground'].includes(w));
+    if (!found && refersBack) continue;
     let place: Place | undefined;
     if (refersBack) {
       place = previous;
       if (!place && verb.kind === 'hold') {
         intents.push({ kind: 'hold', place: 'here' });
+        lastKind = 'hold';
         continue;
       }
       if (!place)
@@ -318,8 +349,8 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
           input.places.map(placeLabel),
         );
     } else {
-      const found = findPlace(object, input.places);
-      if (found.kind === 'none' && intents.length > 0) {
+      const hit = findPlace(object, input.places);
+      if (hit.kind === 'none' && intents.length > 0) {
         // The one option is the first part as a whole order, for the desk to send as it stands.
         // No commas: the desk splits a clarification's options at ", ".
         const first = clauses.slice(0, i).join(' and then ');
@@ -329,16 +360,17 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
           [whole],
         );
       }
-      if (found.kind === 'none')
+      if (hit.kind === 'none')
         return refuse(`I know of no place called "${phrase.join(' ')}", sir.`);
-      if (found.kind === 'many') {
-        const noun = found.noun || found.places[0]?.kind || 'place';
-        return ask(`Which ${noun}, sir?`, found.places.map(placeLabel));
+      if (hit.kind === 'many') {
+        const noun = hit.noun || hit.places[0]?.kind || 'place';
+        return ask(`Which ${noun}, sir?`, hit.places.map(placeLabel));
       }
-      place = found.place;
+      place = hit.place;
     }
     nearestTo ??= place;
     previous = place;
+    lastKind = verb.kind;
     intents.push({ kind: verb.kind, place: place.id });
   }
   if (intents.length === 0) return refuse('I cannot find an order in that, sir.');
