@@ -17,7 +17,7 @@ import { findPath, legCost } from './navigation.js';
 import { describePlace } from './place.js';
 import { schedule } from './queue.js';
 import { applyIntents, fireOnReceipt, registerStanding } from './standing.js';
-import { COURIER_DELAY_MS, REPORT_EVENT } from './visibility.js';
+import { COURIER_DELAY_MS, REPORT_EVENT, fileReport } from './visibility.js';
 import {
   MS_PER_MINUTE,
   type Courier,
@@ -153,6 +153,25 @@ const without = (world: GameState, id: string): GameState => ({
   ...world,
   couriers: world.couriers.filter((c) => c.id !== id),
 });
+/** A lost or taken courier is kept (see `Courier.lostAt`) so the sender's table does not show it go. */
+const markLost = (world: GameState, id: string, time: number): GameState => ({
+  ...world,
+  couriers: world.couriers.map((c) => (c.id === id ? { ...c, lostAt: time } : c)),
+});
+/** HQ's wait past a courier's due arrival, and the ride back with the news, before it is called lost. */
+export const COURIER_OVERDUE_MS = 15 * MS_PER_MINUTE;
+
+/**
+ * The sender hears of a lost or taken courier once its order is overdue, not when it is lost.
+ * The report is stamped with that moment (HQ giving the courier up), never the loss, so its
+ * written time is no tell either.
+ */
+function reportOverdue(world: GameState, c: Courier, time: number): GameState {
+  const unit = world.units.find((u) => u.id === c.order.to && u.side === c.side);
+  if (!unit || unit.strength <= 0) return world;
+  const due = Math.max(time, arrivalOf(c, c.order.issuedAt) + COURIER_OVERDUE_MS);
+  return fileReport(world, 'courierLost', unit, due, 0);
+}
 const arrivalOf = (c: Courier, issuedAt: number) => c.legs.at(-1)?.arriveAt ?? issuedAt;
 
 /**
@@ -226,13 +245,17 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
   registry.register(COURIER_LOST_EVENT, (world, ev) => {
     const c = courierOf(world, (ev.payload as { courierId?: unknown }).courierId);
     // Already taken or delivered: nothing left to lose.
-    if (!c) return { world };
-    return failed(without(world, c.id), c.order, 'courier lost');
+    if (!c || c.lostAt !== undefined) return { world };
+    return failed(
+      reportOverdue(markLost(world, c.id, ev.time), c, ev.time),
+      c.order,
+      'courier lost',
+    );
   });
 
   registry.register(COURIER_STEP_EVENT, (world, ev, rng) => {
     const c = courierOf(world, (ev.payload as { courierId?: unknown }).courierId);
-    if (!c) return { world };
+    if (!c || c.lostAt !== undefined) return { world };
     const at = courierPosition(c, ev.time);
     // One roll per enemy unit in reach, in unit order; the first to succeed takes the courier.
     // Rolls stop at the first success, so draws per step depend on who captured: still fixed by
@@ -255,7 +278,7 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       place: describePlace(world.map, at),
       text: c.order.text,
     };
-    const w = without(world, c.id);
+    const w = reportOverdue(markLost(world, c.id, ev.time), c, ev.time);
     return {
       world: {
         ...w,
@@ -282,6 +305,8 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     if (!c) return { world };
     const order = c.order;
     world = without(world, c.id);
+    // Lost or taken on the way: its paper ride ends here; the sender was told when it fell overdue.
+    if (c.lostAt !== undefined) return { world };
     // The unit may have been destroyed while the courier rode.
     const reason = undeliverable(world, order);
     if (reason) return failed(world, order, reason);

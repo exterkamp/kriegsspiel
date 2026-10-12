@@ -9,6 +9,7 @@ import {
   loadScenario,
   pointMm,
   registerOrders,
+  viewFor,
   type GameState,
   type ViewDocument,
 } from '@kriegsspiel/engine';
@@ -89,6 +90,52 @@ describe('sideViewOf orderRoutes (#203)', () => {
     expect(blue.orderRoutes?.map((o) => o.id).sort()).toEqual(['o1', 'route-blue-1']);
     expect(red.orderRoutes?.map((o) => o.id)).toEqual(['route-red-1']);
     expect(JSON.stringify(red.orderRoutes)).not.toContain('blue-1');
+  });
+});
+
+describe('sideViewOf couriers (#196)', () => {
+  const clock = { gameMsAtAnchor: 1, wallMsAtAnchor: 0, rate: 1, status: 'running' } as const;
+  const sent = () => {
+    const g = loadScenario(holdTheBridgeFarStart);
+    const reg = new EventRegistry<GameState>();
+    registerOrders(reg);
+    const order = {
+      id: 'o1',
+      side: 'blue' as const,
+      to: 'blue-1',
+      issuedAt: 0,
+      text: 'advance',
+      intents: [{ kind: 'move' as const, to: pointMm(2050, 2050) }],
+    };
+    return advanceTo(issueOrder(createState(g.seed, g, 0), order), 1, reg).state;
+  };
+
+  it('sends the sender its riding courier, mapped from the engine view', () => {
+    const s = sent();
+    const view = SideView.parse(sideViewOf(s, 'blue', clock));
+    const engine = viewFor(s.world, 'blue', s.time).couriers;
+    expect(engine).toHaveLength(1);
+    expect(view.couriers).toEqual(
+      engine.map((c) => ({
+        id: c.id,
+        unitId: c.unitId,
+        position: c.position,
+        to: c.to,
+        arriveAtGame: c.arriveAt,
+      })),
+    );
+    expect(view.couriers![0]!.arriveAtGame).toBeGreaterThan(0);
+  });
+
+  it('omits couriers when none ride', () => {
+    const g = loadScenario(holdTheBridgeFarStart);
+    expect(sideViewOf(createState(g.seed, g, 0), 'blue', clock).couriers).toBeUndefined();
+  });
+
+  it('sends the other side none', () => {
+    const view = sideViewOf(sent(), 'red', clock);
+    expect(view.couriers).toBeUndefined();
+    expect(JSON.stringify(view)).not.toContain('o1');
   });
 });
 

@@ -21,6 +21,7 @@ import {
   type GhostPiece,
   type Engagement,
   type OrderRoute,
+  type SceneCourier,
   type OwnPiece,
   type Overlays,
   type SceneState,
@@ -176,6 +177,7 @@ export class TableScene {
     const routes = (this.state?.orderRoutes ?? []).filter((r) =>
       r.kind === 'order' ? this.overlays.orders : this.overlays.routes,
     );
+    const couriers = this.overlays.orders ? (this.state?.couriers ?? []) : [];
     const fights = this.state?.engagements ?? [];
     const labelW = this.span * 0.07;
     const labels = this.state
@@ -186,11 +188,12 @@ export class TableScene {
           this.span * 0.02,
         )
       : new Map<string, Coord>();
-    const key = JSON.stringify([routes, fights, [...labels], this.mapKey]);
+    const key = JSON.stringify([routes, couriers, fights, [...labels], this.mapKey]);
     if (key === this.overlayKey) return;
     this.overlayKey = key;
     clearGroup(this.overlayRoot);
     for (const r of routes) this.overlayRoot.add(this.routeObject(r));
+    for (const c of couriers) this.overlayRoot.add(this.courierObject(c));
     for (const f of fights) this.overlayRoot.add(this.engagementObject(f, labels.get(f.id)!));
   }
 
@@ -207,6 +210,27 @@ export class TableScene {
       });
     }
     return out;
+  }
+
+  /** A small brass rider with "Courier, N min" over it: our own order on the road. */
+  private courierObject(c: SceneCourier): THREE.Group {
+    const map = this.state!.map;
+    const g = new THREE.Group();
+    const rider = new THREE.Mesh(
+      new THREE.ConeGeometry(this.span * 0.007, this.span * 0.02, 12),
+      new THREE.MeshBasicMaterial({ color: 0xb8892b }),
+    );
+    rider.position.copy(mapToWorld(map, c.position, this.span * 0.01));
+    g.add(rider);
+    const tag = labelSprite(
+      c.etaMin > 0 ? `Courier, ${c.etaMin} min` : 'Courier',
+      false,
+      this.span * 0.08,
+    );
+    tag.position.copy(mapToWorld(map, c.position, this.span * 0.035));
+    g.add(tag);
+    g.name = `courier:${c.id}`;
+    return g;
   }
 
   /** A red ring and the word "Fighting" where a fight is going on, drawn above the pieces. */

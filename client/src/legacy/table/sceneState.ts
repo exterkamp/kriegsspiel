@@ -104,6 +104,12 @@ export function buildSceneState(view: SideView, map: BaseMap): SceneState {
       kind: o.kind,
       points: o.points,
     })),
+    couriers: (view.couriers ?? []).map((c) => ({
+      id: c.id,
+      position: c.position,
+      to: c.to,
+      etaMin: Math.max(0, Math.ceil((c.arriveAtGame - view.atGame) / 60_000)),
+    })),
     engagements,
   };
 }

@@ -93,6 +93,14 @@ import { MarksService, type Picker } from './marks.service';
           }
         }
       }
+      @for (c of couriers(); track c.id) {
+        <g class="courier" [attr.data-courier]="c.id">
+          <circle [attr.cx]="c.position.x" [attr.cy]="c.position.y" [attr.r]="fontSize * 0.6" />
+          <text [attr.x]="c.position.x" [attr.y]="c.position.y - fontSize * 1">
+            {{ c.etaMin > 0 ? 'Courier, ' + c.etaMin + ' min' : 'Courier' }}
+          </text>
+        </g>
+      }
       @for (p of own(); track p.id) {
         <polygon class="piece own" [attr.points]="pts(corners(p))" />
         <line
@@ -225,6 +233,19 @@ import { MarksService, type Picker } from './marks.service';
     .order-head {
       fill: var(--ks-ink);
     }
+    .courier circle {
+      fill: var(--ks-brass-hi);
+      stroke: var(--ks-ink);
+      stroke-width: 4;
+    }
+    .courier text {
+      fill: var(--ks-ink);
+      stroke: var(--ks-paper);
+      stroke-width: 3;
+      paint-order: stroke;
+      text-anchor: middle;
+      font-size: inherit;
+    }
     .route {
       fill: none;
       stroke: var(--ks-map-route);
@@ -304,6 +325,9 @@ export class FlatBoardComponent {
       r.kind === 'order' ? o.orders : o.routes,
     );
   });
+  protected readonly couriers = computed(() =>
+    this.marks.overlays().orders ? (this.scene()?.couriers ?? []) : [],
+  );
   protected readonly markList = computed(() => {
     const now = this.marks.nowGame();
     return this.marks

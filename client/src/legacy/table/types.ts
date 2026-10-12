@@ -122,6 +122,16 @@ export interface OrderRoute {
   points: Coord[];
 }
 
+/** One of our own couriers on the road: where it is now and how long HQ expects the ride to take from here. Never an enemy's. */
+export interface SceneCourier {
+  id: string;
+  position: Coord;
+  /** The unit it rides to, in metres. */
+  to: Coord;
+  /** Whole minutes of game time until the planned arrival, 0 when due. */
+  etaMin: number;
+}
+
 export interface Overlays {
   orders: boolean;
   routes: boolean;
@@ -145,6 +155,8 @@ export interface SceneState {
   ghosts: GhostPiece[];
   /** Accepted live overlays; absent in the HQ fixture port. */
   orderRoutes?: OrderRoute[];
+  /** Own couriers riding; shown with the order arrows. */
+  couriers?: SceneCourier[];
   /** Where this side's units and a visible enemy are within fire of each other: drawn as a fight marker. */
   engagements?: Engagement[];
   /** Omission preserves the standalone client and renders no annotations. */
