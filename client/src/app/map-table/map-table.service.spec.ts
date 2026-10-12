@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
 import {
   DEFAULT_SETTINGS,
+  createReferenceAsset,
   assetIdentity,
   exportBattlefield,
   generateBattlefield,
@@ -369,6 +370,224 @@ describe('MapTableService scoped resource ownership', () => {
     expect(h.loader.dispose).toHaveBeenCalledOnce();
     expect(h.scene.dispose).toHaveBeenCalledOnce();
   });
+
+  it('retires all old ownership before replacement allocation and discards captured old callbacks', () => {
+    const h = setup();
+    const add = vi.spyOn(window, 'addEventListener');
+    h.service.mount(h.canvas);
+    h.ready();
+    const oldReport = h.sceneFactory.mock.calls[0]![1];
+    const oldPublish = h.loader.subscribe.mock.calls[0]![0];
+    const oldResize = h.observerFactory.mock.calls[0]![0];
+    const oldWindow = add.mock.calls.filter(([type]) =>
+      ['resize', 'pagehide', 'pageshow'].includes(type),
+    );
+    const oldSignal = (oldWindow[0]![2] as AddEventListenerOptions).signal!;
+    h.scene.dispose.mockImplementationOnce(() => {
+      h.service.mount(document.createElement('canvas')); // Release cannot reenter allocation.
+      throw new Error('release failed');
+    });
+    h.sceneFactory.mockImplementationOnce((_canvas, callback) => {
+      expect(oldSignal.aborted).toBe(true);
+      expect(h.scene.dispose).toHaveBeenCalledOnce();
+      expect(h.scene.stop).toHaveBeenCalledOnce();
+      expect(h.loader.dispose).toHaveBeenCalledOnce();
+      expect(h.unsubscribe).toHaveBeenCalledOnce();
+      expect(h.observer.disconnect).toHaveBeenCalledOnce();
+      expect(h.service.displayed()).toBeNull();
+      expect(h.service.state().phase).toBe('empty');
+      callback(new PreviewApplyError('new unavailable', 'unavailable'));
+      return h.scene;
+    });
+    const replacement = document.createElement('canvas');
+    h.service.mount(replacement);
+    expect(h.service.state().message).toContain('new unavailable');
+    expect(h.sceneFactory).toHaveBeenCalledTimes(2);
+    // Retry with another canvas after the failed replacement.
+    h.service.mount(document.createElement('canvas'));
+    h.ready();
+    const state = h.service.state();
+    const resizeCalls = h.scene.resize.mock.calls.length;
+    const starts = h.scene.start.mock.calls.length;
+    const stops = h.scene.stop.mock.calls.length;
+    const cancels = h.loader.cancel.mock.calls.length;
+    oldReport(new PreviewApplyError('old unavailable', 'unavailable'));
+    oldPublish({ phase: 'failed', message: 'old subscription', displayed: null, available: false });
+    oldResize([], h.observer as unknown as ResizeObserver);
+    for (const [type, listener] of oldWindow) {
+      (listener as EventListener)(new PageTransitionEvent(type, { persisted: true }));
+    }
+    h.service.unmount(h.canvas); // Captured old cleanup must not retire the replacement.
+    expect(h.service.state()).toBe(state);
+    expect(h.service.canLoad()).toBe(true);
+    expect(h.scene.resize).toHaveBeenCalledTimes(resizeCalls);
+    expect(h.scene.start).toHaveBeenCalledTimes(starts);
+    expect(h.scene.stop).toHaveBeenCalledTimes(stops);
+    expect(h.loader.cancel).toHaveBeenCalledTimes(cancels);
+    expect(h.loader.unavailable).not.toHaveBeenCalled();
+    TestBed.resetTestingModule();
+    expect(h.scene.dispose).toHaveBeenCalledTimes(3);
+    expect(h.loader.dispose).toHaveBeenCalledTimes(2);
+    expect(h.unsubscribe).toHaveBeenCalledTimes(2);
+    expect(h.observer.disconnect).toHaveBeenCalledTimes(2);
+    h.service.mount(document.createElement('canvas'));
+    expect(h.sceneFactory).toHaveBeenCalledTimes(3);
+  });
+
+  it('defers reentrant replacement allocation until the late acquired scene is retired', () => {
+    const h = setup();
+    const replacement = document.createElement('canvas');
+    h.sceneFactory.mockImplementationOnce(() => {
+      h.service.unmount(h.canvas);
+      h.service.mount(replacement);
+      expect(h.sceneFactory).toHaveBeenCalledOnce();
+      return h.scene;
+    });
+    h.service.mount(h.canvas);
+    expect(h.scene.dispose).toHaveBeenCalledOnce();
+    expect(h.loaderFactory).not.toHaveBeenCalled();
+    h.service.mount(replacement);
+    expect(h.sceneFactory).toHaveBeenCalledTimes(2);
+    expect(h.service.canLoad()).toBe(true);
+    TestBed.resetTestingModule();
+    expect(h.scene.dispose).toHaveBeenCalledTimes(2);
+    expect(h.loader.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('retires the real saved-map runtime and its in-flight worker on canvas replacement', async () => {
+    const h = setup();
+    const workers: ValidationWorker[] = [];
+    const runtimes: ReturnType<typeof createAuthoringRuntime>[] = [];
+    h.loaderFactory.mockImplementation(() => {
+      const runtime = createAuthoringRuntime({
+        generationWorkerFactory: () => {
+          throw new Error('Inspector never generates');
+        },
+        validationWorkerFactory: () => {
+          const worker: ValidationWorker = {
+            onmessage: null,
+            onerror: null,
+            onmessageerror: null,
+            postMessage: vi.fn(),
+            terminate: vi.fn(),
+          };
+          workers.push(worker);
+          return worker;
+        },
+      });
+      vi.spyOn(runtime, 'dispose');
+      runtimes.push(runtime);
+      return createSavedMapLoader(h.scene, {
+        runtime,
+        read: async () => JSON.stringify(createReferenceAsset()),
+      }) as unknown as typeof h.loader;
+    });
+    h.service.mount(h.canvas);
+    h.service.load(new File(['fixture'], 'old.json'));
+    await vi.waitFor(() => expect(workers).toHaveLength(1));
+    const oldMessage = workers[0]!.onmessage!;
+    expect(h.service.state().phase).toBe('validating');
+    h.service.mount(document.createElement('canvas'));
+    expect(runtimes[0]!.dispose).toHaveBeenCalledOnce();
+    expect(runtimes[0]!.controller.state.status).toBe('disposed');
+    expect(workers[0]!.terminate).toHaveBeenCalledOnce();
+    expect(workers[0]!.onmessage).toBeNull();
+    expect(h.service.state().phase).toBe('empty');
+    const empty = h.service.state();
+    oldMessage({ data: { type: 'invalid old reply' } } as MessageEvent);
+    await Promise.resolve();
+    expect(h.service.state()).toBe(empty);
+    h.service.load(new File(['fixture'], 'new.json'));
+    await vi.waitFor(() => expect(workers).toHaveLength(2));
+    TestBed.resetTestingModule();
+    expect(runtimes.every((runtime) => runtime.controller.state.status === 'disposed')).toBe(true);
+    for (const runtime of runtimes) expect(runtime.dispose).toHaveBeenCalledOnce();
+    for (const worker of workers) expect(worker.terminate).toHaveBeenCalledOnce();
+    expect(h.scene.dispose).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['scene', 'loader', 'subscribe', 'observer', 'observe', 'start'] as const)(
+    'cleans replacement resources after %s startup failure',
+    (step) => {
+      const h = setup();
+      h.service.mount(h.canvas);
+      const fail = () => {
+        throw new Error(`${step} replacement failed`);
+      };
+      if (step === 'scene') h.sceneFactory.mockImplementationOnce(fail);
+      if (step === 'loader') h.loaderFactory.mockImplementationOnce(fail);
+      if (step === 'subscribe') h.loader.subscribe.mockImplementationOnce(fail);
+      if (step === 'observer') h.observerFactory.mockImplementationOnce(fail);
+      if (step === 'observe') h.observer.observe.mockImplementationOnce(fail);
+      if (step === 'start') h.scene.start.mockImplementationOnce(fail);
+      const replacement = document.createElement('canvas');
+      h.service.mount(replacement);
+      expect(h.service.state().message).toContain(`${step} replacement failed`);
+      expect(h.service.canLoad()).toBe(false);
+      expect(h.scene.dispose).toHaveBeenCalledTimes(step === 'scene' ? 1 : 2);
+      expect(h.loader.dispose).toHaveBeenCalledTimes(['scene', 'loader'].includes(step) ? 1 : 2);
+      expect(h.unsubscribe).toHaveBeenCalledTimes(
+        ['observer', 'observe', 'start'].includes(step) ? 2 : 1,
+      );
+      expect(h.observer.disconnect).toHaveBeenCalledTimes(
+        ['observe', 'start'].includes(step) ? 2 : 1,
+      );
+      h.service.mount(replacement);
+      expect(h.sceneFactory).toHaveBeenCalledTimes(2);
+      TestBed.resetTestingModule();
+      expect(h.scene.dispose).toHaveBeenCalledTimes(step === 'scene' ? 1 : 2);
+    },
+  );
+
+  it.each(['scene', 'loader', 'subscribe', 'observer', 'observe', 'start'] as const)(
+    'releases late replacement resources when canvas cleanup reenters during %s acquisition',
+    (step) => {
+      const h = setup();
+      h.service.mount(h.canvas);
+      const replacement = document.createElement('canvas');
+      if (step === 'scene')
+        h.sceneFactory.mockImplementationOnce(() => {
+          h.service.unmount(replacement);
+          return h.scene;
+        });
+      if (step === 'loader')
+        h.loaderFactory.mockImplementationOnce(() => {
+          h.service.unmount(replacement);
+          return h.loader;
+        });
+      if (step === 'subscribe')
+        h.loader.subscribe.mockImplementationOnce(() => {
+          h.service.unmount(replacement);
+          return h.unsubscribe;
+        });
+      if (step === 'observer')
+        h.observerFactory.mockImplementationOnce(() => {
+          h.service.unmount(replacement);
+          return h.observer;
+        });
+      if (step === 'observe')
+        h.observer.observe.mockImplementationOnce(() => h.service.unmount(replacement));
+      if (step === 'start')
+        h.scene.start.mockImplementationOnce(() => h.service.unmount(replacement));
+      h.service.mount(replacement);
+      expect(h.scene.dispose).toHaveBeenCalledTimes(2);
+      expect(h.loader.dispose).toHaveBeenCalledTimes(step === 'scene' ? 1 : 2);
+      expect(h.unsubscribe).toHaveBeenCalledTimes(
+        ['subscribe', 'observer', 'observe', 'start'].includes(step) ? 2 : 1,
+      );
+      expect(h.observer.disconnect).toHaveBeenCalledTimes(
+        ['observer', 'observe', 'start'].includes(step) ? 2 : 1,
+      );
+      expect(h.service.canLoad()).toBe(false);
+      h.service.mount(document.createElement('canvas'));
+      expect(h.service.canLoad()).toBe(true);
+      TestBed.resetTestingModule();
+      expect(h.scene.dispose).toHaveBeenCalledTimes(3);
+      expect(h.loader.dispose).toHaveBeenCalledTimes(step === 'scene' ? 2 : 3);
+      h.service.mount(document.createElement('canvas'));
+      expect(h.sceneFactory).toHaveBeenCalledTimes(3);
+    },
+  );
 
   it('registers DestroyRef before mounting and suppresses post-destroy allocation', () => {
     const h = setup();

@@ -41,6 +41,16 @@ export const MAP_TABLE_OBSERVER_FACTORY = new InjectionToken<
   factory: () => (callback) => new ResizeObserver(callback),
 });
 
+interface MountLifetime {
+  readonly canvas: HTMLCanvasElement;
+  scene?: MapTableScene;
+  loader?: ReturnType<typeof createSavedMapLoader>;
+  unsubscribe?: () => void;
+  observer?: ResizeObserver;
+  listeners?: AbortController;
+  suspended: boolean;
+}
+
 /** Scoped to one inspector component. The pure loader owns certification and worker cancellation. */
 @Injectable()
 export class MapTableService {
@@ -90,106 +100,139 @@ export class MapTableService {
       : 'Table display unavailable. Reload the page and try again.',
   );
 
-  private scene: MapTableScene | undefined;
-  private loader: ReturnType<typeof createSavedMapLoader> | undefined;
-  private unsubscribe: (() => void) | undefined;
-  private observer: ResizeObserver | undefined;
-  private listeners: AbortController | undefined;
-  private started = false;
+  private lifetime: MountLifetime | undefined;
+  private canvas: HTMLCanvasElement | undefined;
   private disposed = false;
-  private suspended = false;
+  private releasing = false;
+  private allocating = false;
 
   constructor() {
-    // Registered before the component schedules afterNextRender or acquires any resource.
+    // Terminal lifetime is independent of replaceable canvas views.
     inject(DestroyRef).onDestroy(() => this.dispose());
   }
 
   mount(canvas: HTMLCanvasElement): void {
-    if (this.disposed || this.started) return;
-    this.started = true;
+    if (this.disposed || this.releasing || this.allocating || this.canvas === canvas) return;
+    if (this.lifetime) this.retire(this.lifetime);
+    if (this.disposed) return;
+    this.canvas = canvas;
+    this.current.set(this.emptyState());
+    const lifetime: MountLifetime = { canvas, suspended: false };
+    this.lifetime = lifetime;
+    const active = () => !this.disposed && this.lifetime === lifetime;
+    this.allocating = true;
     try {
-      const scene = this.makeScene(canvas, (error) =>
-        this.unavailable(
-          `Table rendering failed: ${error.message}. Reload the page to restore the display.`,
-        ),
-      );
-      if (this.disposed) {
+      const scene = this.makeScene(canvas, (error) => {
+        if (active())
+          this.unavailable(
+            `Table rendering failed: ${error.message}. Reload the page to restore the display.`,
+          );
+      });
+      if (!active()) {
         scene.dispose();
         return;
       }
-      this.scene = scene;
+      lifetime.scene = scene;
       if (!this.state().available) throw new Error(this.state().message);
       const loader = this.makeLoader(scene);
-      if (this.disposed) {
+      if (!active()) {
         loader.dispose();
         return;
       }
-      this.loader = loader;
+      lifetime.loader = loader;
       const unsubscribe = loader.subscribe((state) => {
-        if (!this.disposed) this.current.set(state);
+        if (active()) this.current.set(state);
       });
-      if (this.disposed) {
+      if (!active()) {
         unsubscribe();
         return;
       }
-      this.unsubscribe = unsubscribe;
-      const observer = this.makeObserver(() => this.resize());
-      if (this.disposed) {
+      lifetime.unsubscribe = unsubscribe;
+      const observer = this.makeObserver(() => {
+        if (active()) this.resize();
+      });
+      if (!active()) {
         observer.disconnect();
         return;
       }
-      this.observer = observer;
+      lifetime.observer = observer;
       observer.observe(canvas);
-      if (this.disposed) return;
+      if (!active()) return;
       const listeners = new AbortController();
-      this.listeners = listeners;
+      lifetime.listeners = listeners;
       const options = { signal: listeners.signal };
       const view = canvas.ownerDocument.defaultView;
-      view?.addEventListener('resize', () => this.resize(), options);
+      view?.addEventListener(
+        'resize',
+        () => {
+          if (active()) this.resize();
+        },
+        options,
+      );
       view?.addEventListener(
         'pagehide',
         (event) => {
-          if (this.disposed) return;
+          if (!active()) return;
           if (!event.persisted) {
             this.dispose();
             return;
           }
-          if (this.suspended) return;
-          this.suspended = true;
+          if (lifetime.suspended) return;
+          lifetime.suspended = true;
           scene.stop();
-          if (!this.disposed) loader.cancel();
+          if (active()) loader.cancel();
         },
         options,
       );
       view?.addEventListener(
         'pageshow',
         (event) => {
-          if (this.disposed || !event.persisted || !this.suspended) return;
-          this.suspended = false;
+          if (!active() || !event.persisted || !lifetime.suspended) return;
+          lifetime.suspended = false;
           this.resize();
-          if (!this.disposed && this.state().available) scene.start();
+          if (active() && this.state().available) scene.start();
         },
         options,
       );
       this.mounted.set(true);
       scene.start();
     } catch (error) {
+      if (!active()) return;
+      this.retire(lifetime);
       if (this.disposed) return;
-      this.dispose();
       this.current.update((state) => ({
         ...state,
         phase: 'failed',
         available: false,
         message: `Table unavailable: ${error instanceof Error ? error.message : 'initialization failed'}. Reload with WebGL enabled.`,
       }));
+    } finally {
+      this.allocating = false;
     }
   }
 
+  /** Canvas cleanup is resettable; a route/service destroy remains terminal. */
+  unmount(canvas: HTMLCanvasElement): void {
+    if (this.canvas !== canvas) return;
+    this.canvas = undefined;
+    if (this.lifetime) this.retire(this.lifetime);
+    this.current.set(this.emptyState());
+  }
+
+  private emptyState(): LoadState {
+    return {
+      phase: 'empty',
+      message: 'Load saved generated map JSON to inspect it here.',
+      displayed: null,
+      available: true,
+    };
+  }
+
   load(file: File): void {
-    if (!this.disposed && !this.suspended) void this.loader?.load(file);
+    if (!this.disposed && !this.lifetime?.suspended) void this.lifetime?.loader?.load(file);
   }
   cancel(): void {
-    if (!this.disposed && !this.suspended) this.loader?.cancel();
+    if (!this.disposed && !this.lifetime?.suspended) this.lifetime?.loader?.cancel();
   }
   fit(): void {
     this.inspect((scene) => scene.fitPreview());
@@ -201,25 +244,26 @@ export class MapTableService {
     this.inspect((scene) => scene.snapOblique());
   }
   private inspect(action: (scene: MapTableScene) => void): void {
-    if (!this.disposed && !this.suspended && this.canInspect() && this.scene) action(this.scene);
+    if (!this.disposed && !this.lifetime?.suspended && this.canInspect() && this.lifetime?.scene)
+      action(this.lifetime.scene);
   }
   contextLost(event: Event): void {
     if (this.disposed) return;
     event.preventDefault();
-    this.scene?.stop();
+    this.lifetime?.scene?.stop();
     this.unavailable('WebGL context was lost. Reload the page to restore the table.');
   }
   private unavailable(message: string): void {
     if (this.disposed) return;
-    if (this.loader) this.loader.unavailable(message);
+    if (this.lifetime?.loader) this.lifetime.loader.unavailable(message);
     else this.current.update((state) => ({ ...state, phase: 'failed', available: false, message }));
   }
   private resize(): void {
-    if (this.disposed || this.suspended) return;
+    if (this.disposed || this.lifetime?.suspended) return;
     try {
-      this.scene?.resize();
+      this.lifetime?.scene?.resize();
     } catch (error) {
-      this.scene?.stop();
+      this.lifetime?.scene?.stop();
       this.unavailable(error instanceof Error ? error.message : 'Table resize failed');
     }
   }
@@ -227,23 +271,33 @@ export class MapTableService {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    if (this.lifetime) this.retire(this.lifetime);
+  }
+
+  private retire(lifetime: MountLifetime): void {
+    if (this.lifetime !== lifetime) return;
+    // Invalidate all callbacks and detach ownership before any external release.
+    this.lifetime = undefined;
     this.mounted.set(false);
-    const { scene, loader, observer, unsubscribe, listeners } = this;
-    this.scene = this.loader = this.observer = this.unsubscribe = this.listeners = undefined;
-    // Detach ownership before callbacks. One failing release must not strand later resources.
-    for (const release of [
-      () => listeners?.abort(),
-      () => observer?.disconnect(),
-      () => unsubscribe?.(),
-      () => loader?.dispose(),
-      () => scene?.stop(),
-      () => scene?.dispose(),
-    ]) {
-      try {
-        release();
-      } catch {
-        /* Continue terminal resource cleanup. */
+    const { scene, loader, observer, unsubscribe, listeners } = lifetime;
+    this.releasing = true;
+    try {
+      for (const release of [
+        () => listeners?.abort(),
+        () => observer?.disconnect(),
+        () => unsubscribe?.(),
+        () => loader?.dispose(),
+        () => scene?.stop(),
+        () => scene?.dispose(),
+      ]) {
+        try {
+          release();
+        } catch {
+          /* One failing release must not strand later resources. */
+        }
       }
+    } finally {
+      this.releasing = false;
     }
   }
 }

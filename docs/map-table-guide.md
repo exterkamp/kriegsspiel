@@ -8,7 +8,7 @@ Use **Fit map**, **Top-down** and **Oblique** to inspect the paper. Scroll to zo
 
 The table is flat and shows public static geography. It has no armies, orders, marks, objectives or live game connection. Reload starts empty. Keep the exported JSON to load it again.
 
-The inspector is a standalone Angular page: template bindings and signals show load state, accepted metadata and controls. A component-scoped service owns its scene, certification loader, observer and window listeners. Leaving the route releases them; a browser back/forward-cache suspension stops rendering and cancels work, then restores the retained display on return. The route is independent of the main menu, guest login and live games.
+The inspector is a standalone Angular page: template bindings and signals show load state, accepted metadata and controls. A component-scoped service owns its scene, certification loader, observer and window listeners. Template HMR retires the old canvas and starts an empty inspector; load the saved file again. Leaving the route releases them; a browser back/forward-cache suspension stops rendering and cancels work, then restores the retained display on return. The route is independent of the main menu, guest login and live games.
 
 ## Detail limits
 

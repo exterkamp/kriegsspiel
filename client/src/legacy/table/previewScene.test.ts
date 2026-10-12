@@ -965,3 +965,31 @@ describe('local HQ board scene isolation', () => {
     },
   );
 });
+
+describe('detached canvas controls ownership', () => {
+  it.each(['public-map-preview', 'local-hq-board'] as const)(
+    'removes original document key listeners after detachment in %s',
+    (mode) => {
+      const canvas = document.createElement('canvas');
+      document.body.append(canvas);
+      const add = vi.spyOn(document, 'addEventListener');
+      const remove = vi.spyOn(document, 'removeEventListener');
+      const table = new TableScene(canvas, { mode });
+      tables.push(table);
+      const down = add.mock.calls.find(([type]) => type === 'keydown')![1];
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control' }));
+      const up = add.mock.calls.find(([type]) => type === 'keyup')![1];
+      canvas.remove();
+      expect(canvas.getRootNode()).toBe(canvas);
+      table.dispose();
+      expect(remove).toHaveBeenCalledWith('keydown', down, true);
+      expect(remove).toHaveBeenCalledWith('keyup', up, true);
+      const detachedAdd = vi.spyOn(canvas, 'addEventListener');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control' }));
+      expect(detachedAdd).not.toHaveBeenCalled();
+      add.mockRestore();
+      remove.mockRestore();
+      detachedAdd.mockRestore();
+    },
+  );
+});

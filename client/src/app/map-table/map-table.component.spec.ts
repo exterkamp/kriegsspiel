@@ -1,4 +1,4 @@
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as THREE from 'three';
@@ -399,6 +399,51 @@ describe('native MapTableComponent', () => {
     h.fixture.destroy();
     expect(dispose).toHaveBeenCalledOnce();
     expect(scene.scene.children).toHaveLength(0);
+  });
+
+  it('retires and remounts a recreated canvas while preserving the component and service', async () => {
+    const visible = signal(true);
+    TestBed.overrideComponent(MapTableComponent, {
+      set: {
+        template: `@if ($any(this).showCanvas()) { <canvas #canvas id="map-canvas"></canvas> }
+          <strong id="displayed-name">{{ table.displayed()?.name ?? 'No map displayed' }}</strong>
+          <button id="fit" [disabled]="!table.canInspect()">Fit</button>`,
+      },
+    });
+    const h = create();
+    Object.assign(h.fixture.componentInstance, { showCanvas: visible });
+    const component = h.fixture.componentInstance;
+    const table = h.table;
+    await h.fixture.whenStable();
+    const original = h.get('map-canvas');
+    await h.ready();
+    expect(h.factory).toHaveBeenCalledOnce(); // State changes must not rerun the render effect.
+    visible.set(false);
+    await h.fixture.whenStable();
+    expect(h.get('map-canvas')).toBeNull();
+    expect(h.scene.dispose).toHaveBeenCalledOnce();
+    expect(h.loader.dispose).toHaveBeenCalledOnce();
+    expect(h.unsubscribe).toHaveBeenCalledOnce();
+    expect(h.observer.disconnect).toHaveBeenCalledOnce();
+    expect(table.displayed()).toBeNull();
+    visible.set(true);
+    await h.fixture.whenStable();
+    expect(h.fixture.componentInstance).toBe(component);
+    expect(h.fixture.componentInstance.table).toBe(table);
+    expect(h.get('map-canvas')).not.toBe(original);
+    expect(h.factory).toHaveBeenCalledTimes(2);
+    expect(h.factory.mock.calls[1]![0]).toBe(h.get('map-canvas'));
+    expect(h.scene.start).toHaveBeenCalledTimes(2);
+    expect(table.canLoad()).toBe(true);
+    expect(h.get('displayed-name').textContent).toBe('No map displayed');
+    expect((h.get('fit') as HTMLButtonElement).disabled).toBe(true);
+    h.fixture.destroy();
+    expect(h.scene.dispose).toHaveBeenCalledTimes(2);
+    expect(h.loader.dispose).toHaveBeenCalledTimes(2);
+    expect(h.unsubscribe).toHaveBeenCalledTimes(2);
+    expect(h.observer.disconnect).toHaveBeenCalledTimes(2);
+    table.mount(document.createElement('canvas'));
+    expect(h.factory).toHaveBeenCalledTimes(2);
   });
 
   it('creates a fresh scoped service for a recreated route', async () => {

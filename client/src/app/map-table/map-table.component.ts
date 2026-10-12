@@ -3,7 +3,8 @@ import {
   Component,
   DestroyRef,
   ElementRef,
-  afterNextRender,
+  afterRenderEffect,
+  untracked,
   inject,
   viewChild,
 } from '@angular/core';
@@ -19,7 +20,7 @@ import { MapTableService } from './map-table.service';
 })
 export class MapTableComponent {
   readonly table = inject(MapTableService);
-  private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
+  private readonly canvas = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
 
   constructor() {
     const destroy = inject(DestroyRef);
@@ -28,8 +29,13 @@ export class MapTableComponent {
     destroy.onDestroy(() => {
       destroyed = true;
     });
-    const render = afterNextRender(() => {
-      if (!destroyed) this.table.mount(this.canvas().nativeElement);
+    const render = afterRenderEffect((onCleanup) => {
+      const canvas = this.canvas()?.nativeElement;
+      if (destroyed || !canvas) return;
+      // Register cleanup before allocation, including synchronous reentrant destruction.
+      onCleanup(() => untracked(() => this.table.unmount(canvas)));
+      // Only canvas identity participates in this effect, never loader/UI state.
+      untracked(() => this.table.mount(canvas));
     });
     destroy.onDestroy(() => render.destroy());
   }
