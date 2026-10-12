@@ -42,6 +42,23 @@ function sent() {
   return advanceTo(issueOrder(createState(g.seed, g, 0), signed('blue-1')), 1, registry()).state;
 }
 
+/** Puts a blue and a red unit mid-march (blue via a leg end) so both sides have a route. */
+function marching(world: GameState): GameState {
+  const mid = pointMm(1000, 1000);
+  return {
+    ...world,
+    units: world.units.map((u) => {
+      if (u.id !== 'blue-1' && u.id !== 'red-1') return u;
+      return {
+        ...u,
+        status: 'active' as const,
+        intent: { kind: 'move' as const, to: dest, startedAt: 0 },
+        leg: { from: u.center, to: mid, startedAt: 0, arriveAt: 1000 },
+      };
+    }),
+  };
+}
+
 describe('orderRoutes in a side view (#203)', () => {
   it('shows the sender an order in flight, from its unit to the destination', () => {
     const s = sent();
@@ -56,29 +73,34 @@ describe('orderRoutes in a side view (#203)', () => {
   it("never carries the other side's orders or routes (fog leak test)", () => {
     const s = sent();
     expect(viewFor(s.world, 'red', 1).orderRoutes).toEqual([]);
-    // Once delivered the blue unit marches; red still learns nothing of it.
-    const t = 90 * 60_000;
-    const later = advanceTo(s, t, registry()).state;
-    const blue = viewFor(later.world, 'blue', t).orderRoutes;
-    expect(blue.every((o) => o.unitId.startsWith('blue'))).toBe(true);
-    const red = viewFor(later.world, 'red', t).orderRoutes;
-    expect(red.every((o) => o.unitId.startsWith('red'))).toBe(true);
+    // Both sides have a unit marching, so neither list is empty and a cross-side leak can show.
+    const w = marching(s.world);
+    const blue = viewFor(w, 'blue', 1).orderRoutes;
+    const red = viewFor(w, 'red', 1).orderRoutes;
+    expect(blue.map((o) => o.id).sort()).toEqual(['o-blue-1', 'route-blue-1']);
+    expect(red.map((o) => o.id)).toEqual(['route-red-1']);
     expect(JSON.stringify(red)).not.toContain('blue-1');
+    expect(JSON.stringify(blue)).not.toContain('red-1');
   });
 
-  it('shows a marching own unit as a route and drops the order once it is delivered', () => {
-    const s = sent();
-    const g = advanceTo(s, 20 * 60_000, registry()).state;
-    const u = g.world.units.find((x) => x.id === 'blue-1')!;
-    const routes = viewFor(g.world, 'blue', g.time).orderRoutes.filter(
-      (o) => o.unitId === 'blue-1',
-    );
-    if (u.intent.kind === 'move') {
-      expect(routes.map((o) => o.kind)).toEqual(['route']);
-      expect(routes[0]!.points.at(-1)).toEqual({ x: dest.x / 1000, y: dest.y / 1000 });
-    } else {
-      expect(routes).toEqual([]);
-    }
+  it('shows a marching own unit as its leg end then its destination, dropping repeats', () => {
+    const w = marching(sent().world);
+    const mid = pointMm(1000, 1000);
+    const routes = viewFor(w, 'blue', 1).orderRoutes.filter((o) => o.kind === 'route');
+    expect(routes).toHaveLength(1);
+    const u = w.units.find((x) => x.id === 'blue-1')!;
+    expect(routes[0]!.points).toEqual([
+      { x: u.center.x / 1000, y: u.center.y / 1000 },
+      { x: mid.x / 1000, y: mid.y / 1000 },
+      { x: dest.x / 1000, y: dest.y / 1000 },
+    ]);
+    // A leg that ends on the destination adds no second point there.
+    const w2 = {
+      ...w,
+      units: w.units.map((x) => (x.id === 'blue-1' ? { ...x, leg: { ...x.leg!, to: dest } } : x)),
+    };
+    const r2 = viewFor(w2, 'blue', 1).orderRoutes.find((o) => o.kind === 'route')!;
+    expect(r2.points).toHaveLength(2);
   });
 
   it('cuts routes to the units a subordinate commands and hides them from intelligence', () => {

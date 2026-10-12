@@ -338,6 +338,7 @@ function orderRoutesOf(state: GameState, side: SideId): ViewOrderRoute[] {
       });
     }
   }
+  // Only units still in the fight get an arrow: a withdrawn or destroyed unit has no plan to show.
   for (const u of state.units) {
     if (u.side !== side || u.strength <= 0 || u.status !== 'active') continue;
     const i = u.intent;

@@ -71,4 +71,23 @@ describe('sideViewOf orderRoutes (#203)', () => {
     expect(view.orderRoutes).toBeUndefined();
     expect(JSON.stringify(view)).not.toContain('o1');
   });
+
+  it('sends a marching unit its own route and the other side nothing of it', () => {
+    const s = sent();
+    const to = pointMm(2050, 2050);
+    const world = {
+      ...s.world,
+      units: s.world.units.map((u) =>
+        u.id === 'blue-1' || u.id === 'red-1'
+          ? { ...u, intent: { kind: 'move' as const, to, startedAt: 0 } }
+          : u,
+      ),
+    };
+    const state = { ...s, world };
+    const blue = SideView.parse(sideViewOf(state, 'blue', clock));
+    const red = SideView.parse(sideViewOf(state, 'red', clock));
+    expect(blue.orderRoutes?.map((o) => o.id).sort()).toEqual(['o1', 'route-blue-1']);
+    expect(red.orderRoutes?.map((o) => o.id)).toEqual(['route-red-1']);
+    expect(JSON.stringify(red.orderRoutes)).not.toContain('blue-1');
+  });
 });
