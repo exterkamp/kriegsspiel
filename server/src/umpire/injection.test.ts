@@ -275,7 +275,7 @@ describe('text that came from the other side', () => {
     for (const ex of probe.exchanges) expect(ex.request.system).toBe(STAFF_ANSWER_SYSTEM);
   });
 
-    const { world } = setup();
+  it('a hostile captured dispatch (report text) is not forwarded to the narration prompt', async () => {
     const reports = blueReports().map((r) => ({ ...r, text: trick('Captured dispatch.') }));
     const probe = new LeakProbe();
     const model = new ScriptedModel({
