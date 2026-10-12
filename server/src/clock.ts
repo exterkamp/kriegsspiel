@@ -216,10 +216,19 @@ export class GameClock {
     this.reanchor('resume', { status: 'running' });
   }
 
-  /** Permanently freeze the clock (game over). */
-  stop(): void {
+  /**
+   * Permanently freeze the clock (game over). With `atGameMs`, freeze at that game time
+   * instead of wherever the wall clock has reached when the end is noticed: the actor passes
+   * the outcome's time, so the stopped reading matches the outcome time exactly. A time past
+   * the current reading is clamped to it, so the freeze never moves game time forward.
+   */
+  stop(atGameMs?: number): void {
     if (this.state.status === 'stopped') return;
-    this.reanchor('stop', { status: 'stopped' });
+    this.reanchor(
+      'stop',
+      { status: 'stopped' },
+      atGameMs === undefined ? undefined : Math.min(atGameMs, this.now()),
+    );
   }
 
   setMode(mode: ClockMode): void {
