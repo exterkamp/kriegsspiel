@@ -32,9 +32,10 @@ export interface AuthStore {
   getUser(id: string): User | undefined;
   /** Removes the user, their sessions, pending links and seats. Returns the game ids they held seats in. */
   deleteUser(id: string): string[];
-  putLoginToken(hash: string, email: string, expiresAtMs: number): void;
-  /** Single use: returns the email once, then nothing. Expired tokens are removed and refused. */
-  consumeLoginToken(hash: string, nowMs: number): string | undefined;
+  /** `guestId` is the guest session of the browser that asked for the link (adopted only if still the one at verify, #268). */
+  putLoginToken(hash: string, email: string, expiresAtMs: number, guestId?: string): void;
+  /** Single use: returns the link once, then nothing. Expired tokens are removed and refused. */
+  consumeLoginToken(hash: string, nowMs: number): { email: string; guestId?: string } | undefined;
   putSession(hash: string, userId: string, expiresAtMs: number): void;
   getSession(hash: string, nowMs: number): string | undefined;
   deleteSession(hash: string): void;
@@ -58,7 +59,7 @@ export const hashToken = (token: string): string =>
 
 export class MemoryAuthStore implements AuthStore {
   private readonly users = new Map<string, User>();
-  private readonly links = new Map<string, { email: string; exp: number }>();
+  private readonly links = new Map<string, { email: string; exp: number; guestId?: string }>();
   private readonly sessions = new Map<string, { userId: string; exp: number }>();
   /** gameId -> side -> userId */
   private readonly seats = new Map<string, Map<SideId, string>>();
@@ -116,14 +117,14 @@ export class MemoryAuthStore implements AuthStore {
     return games;
   }
 
-  putLoginToken(hash: string, email: string, expiresAtMs: number): void {
-    this.links.set(hash, { email, exp: expiresAtMs });
+  putLoginToken(hash: string, email: string, expiresAtMs: number, guestId?: string): void {
+    this.links.set(hash, { email, exp: expiresAtMs, guestId });
   }
 
-  consumeLoginToken(hash: string, nowMs: number): string | undefined {
+  consumeLoginToken(hash: string, nowMs: number): { email: string; guestId?: string } | undefined {
     const link = this.links.get(hash);
     this.links.delete(hash);
-    return link && link.exp > nowMs ? link.email : undefined;
+    return link && link.exp > nowMs ? { email: link.email, guestId: link.guestId } : undefined;
   }
 
   putSession(hash: string, userId: string, expiresAtMs: number): void {
@@ -193,7 +194,8 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS auth_login_tokens (
     hash TEXT PRIMARY KEY,
     email TEXT NOT NULL,
-    expires_at_ms INTEGER NOT NULL
+    expires_at_ms INTEGER NOT NULL,
+    guest_id TEXT
   );
   CREATE TABLE IF NOT EXISTS auth_sessions (
     hash TEXT PRIMARY KEY,
@@ -225,6 +227,10 @@ export class SqliteAuthStore implements AuthStore {
     const cols = this.db.prepare('PRAGMA table_info(auth_users)').all() as Row[];
     if (!cols.some((c) => c.name === 'guest')) {
       this.db.exec('ALTER TABLE auth_users ADD COLUMN guest INTEGER NOT NULL DEFAULT 0');
+    }
+    const linkCols = this.db.prepare('PRAGMA table_info(auth_login_tokens)').all() as Row[];
+    if (!linkCols.some((c) => c.name === 'guest_id')) {
+      this.db.exec('ALTER TABLE auth_login_tokens ADD COLUMN guest_id TEXT');
     }
   }
 
@@ -301,20 +307,26 @@ export class SqliteAuthStore implements AuthStore {
     return games;
   }
 
-  putLoginToken(hash: string, email: string, expiresAtMs: number): void {
+  putLoginToken(hash: string, email: string, expiresAtMs: number, guestId?: string): void {
     this.db
       .prepare(
-        'INSERT OR REPLACE INTO auth_login_tokens (hash, email, expires_at_ms) VALUES (?, ?, ?)',
+        'INSERT OR REPLACE INTO auth_login_tokens (hash, email, expires_at_ms, guest_id) VALUES (?, ?, ?, ?)',
       )
-      .run(hash, email, expiresAtMs);
+      .run(hash, email, expiresAtMs, guestId ?? null);
   }
 
-  consumeLoginToken(hash: string, nowMs: number): string | undefined {
+  consumeLoginToken(hash: string, nowMs: number): { email: string; guestId?: string } | undefined {
     // DELETE ... RETURNING is atomic, so two requests cannot both use one link.
     const row = this.db
-      .prepare('DELETE FROM auth_login_tokens WHERE hash = ? RETURNING email, expires_at_ms')
+      .prepare(
+        'DELETE FROM auth_login_tokens WHERE hash = ? RETURNING email, expires_at_ms, guest_id',
+      )
       .get(hash) as Row | undefined;
-    return row && Number(row.expires_at_ms) > nowMs ? String(row.email) : undefined;
+    if (!row || Number(row.expires_at_ms) <= nowMs) return undefined;
+    return {
+      email: String(row.email),
+      guestId: row.guest_id == null ? undefined : String(row.guest_id),
+    };
   }
 
   putSession(hash: string, userId: string, expiresAtMs: number): void {

@@ -56,6 +56,7 @@ async function emailSignIn(server: Server, email: string, cookie?: string) {
     method: 'POST',
     url: '/auth/login',
     payload: { email },
+    headers: cookie ? { cookie } : {},
     remoteAddress: '10.9.9.9',
   });
   expect(r.statusCode).toBe(202);
@@ -244,6 +245,57 @@ describe('signing in from a guest session', () => {
     expect(user.id).toBe(existing.id);
     expect(app!.authStore.seatOf(mine.id, user.id)).toBe('blue');
     expect(app!.authStore.seatOf(kept.id, user.id)).toBe('blue');
+  });
+
+  it("does not adopt a guest who opens someone else's login link (#268)", async () => {
+    const server = await start();
+    // The attacker asks for a link from a browser with no guest session, and sends it to the victim.
+    const r = await server.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email: 'attacker@example.test' },
+      remoteAddress: '10.9.9.9',
+    });
+    expect(r.statusCode).toBe(202);
+    const token = new URL(mailbox.at(-1)!.link).searchParams.get('token')!;
+    const victim = await guest(server);
+    const game = await createGame(server, victim.cookie!);
+    const res = await server.inject({
+      method: 'GET',
+      url: `/auth/verify?token=${token}`,
+      headers: { cookie: victim.cookie! },
+    });
+    const attacker = String(res.headers['set-cookie']).split(';')[0]!;
+    const account = (await me(server, attacker)).json();
+    expect(account.email).toBe('attacker@example.test');
+    expect(app!.authStore.seatOf(game.id, account.id)).toBeUndefined();
+    // The victim's guest session and game are untouched.
+    expect((await me(server, victim.cookie!)).statusCode).toBe(200);
+    expect(app!.authStore.seatOf(game.id, victim.res.json().id)).toBe('blue');
+  });
+
+  it('does not adopt a different guest than the one that asked for the link', async () => {
+    const server = await start();
+    const asker = await guest(server);
+    const other = await guest(server);
+    const game = await createGame(server, other.cookie!);
+    const r = await server.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email: 'p@example.test' },
+      headers: { cookie: asker.cookie! },
+      remoteAddress: '10.9.9.9',
+    });
+    expect(r.statusCode).toBe(202);
+    const token = new URL(mailbox.at(-1)!.link).searchParams.get('token')!;
+    const res = await server.inject({
+      method: 'GET',
+      url: `/auth/verify?token=${token}`,
+      headers: { cookie: other.cookie! },
+    });
+    const account = (await me(server, String(res.headers['set-cookie']).split(';')[0]!)).json();
+    expect(app!.authStore.seatOf(game.id, account.id)).toBeUndefined();
+    expect((await me(server, other.cookie!)).statusCode).toBe(200);
   });
 
   it('plain sign-in without a guest session is unchanged', async () => {

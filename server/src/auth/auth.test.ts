@@ -321,8 +321,10 @@ describe.each([
   it('spends a login token once and refuses it after expiry', () =>
     withStore((s) => {
       s.putLoginToken('h1', 'a@x.test', 100);
-      expect(s.consumeLoginToken('h1', 50)).toBe('a@x.test');
+      expect(s.consumeLoginToken('h1', 50)).toMatchObject({ email: 'a@x.test' });
       expect(s.consumeLoginToken('h1', 50)).toBeUndefined();
+      s.putLoginToken('h3', 'a@x.test', 100, 'g1');
+      expect(s.consumeLoginToken('h3', 50)).toEqual({ email: 'a@x.test', guestId: 'g1' });
       s.putLoginToken('h2', 'a@x.test', 100);
       expect(s.consumeLoginToken('h2', 100)).toBeUndefined();
     }));
@@ -416,5 +418,25 @@ describe('mailers and config', () => {
     expect(readCookie('a=1; ks_session=abc; b=2', 'ks_session')).toBe('abc');
     expect(readCookie(undefined, 'ks_session')).toBeUndefined();
     expect(readCookie('xks_session=1', 'ks_session')).toBeUndefined();
+  });
+});
+
+describe('SqliteAuthStore migration', () => {
+  it('adds guest_id to an existing auth_login_tokens table and round-trips it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ks-auth-'));
+    dirs.push(dir);
+    const path = join(dir, 'old.db');
+    const old = new DatabaseSync(path);
+    old.exec(
+      'CREATE TABLE auth_login_tokens (hash TEXT PRIMARY KEY, email TEXT NOT NULL, expires_at_ms INTEGER NOT NULL)',
+    );
+    old.close();
+    const store = new SqliteAuthStore(path);
+    try {
+      store.putLoginToken('h1', 'a@x.test', 100, 'g1');
+      expect(store.consumeLoginToken('h1', 50)).toEqual({ email: 'a@x.test', guestId: 'g1' });
+    } finally {
+      store.close();
+    }
   });
 });
