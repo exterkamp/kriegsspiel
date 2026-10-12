@@ -8,7 +8,7 @@ The local New game implementation is being restored as native Angular components
 
 Each operation owns its generation and validation resources. Cancellation, replacement and disposal invalidate late results. `dispose()` invalidates immediately but may retire an in-flight factory asynchronously: a consumer must retain and await its operation promise before acknowledging teardown or allocating through a new owner. Replacement within one preparation object already waits for that retirement. Consumers must register destruction cleanup before awaiting startup and must not publish after destruction.
 
-The minimal local contracts contain no simulation capabilities: fresh local scope, certified binding and fixed presentation time/rate, with empty pieces, roster and papers. Personal marks and notebook storage are separate future adapters.
+The minimal local contracts contain no simulation capabilities: fresh local scope, certified binding and fixed presentation time/rate, with empty pieces, roster and papers. Personal marks and notebook storage use the separate session-owned adapters described below.
 
 ## Development default and catalog
 
@@ -46,4 +46,15 @@ Angular canvas replacement recreates the preview and preserves setup state, draf
 
 `BoardHostComponent` is the native fixed-map rendering boundary. Supply a fresh local session key, detached CertifiedBoard and matching LocalPresentation; consume its keyed initialization and repeatable availability events. Await `teardown()` before replacing an owner. A retained host replaces its canvas safely and reuses its raster; mark-only updates never regenerate artwork. Camera and general interaction gates are independent so explicit manual placement can pick metres while camera movement is locked.
 
-The host paints only stopped, empty local presentation and validated render-only marks. It has no live GameService, MarksService, simulation or storage capability. The final development route, personal repository and session owner follow separately. Actual native-worker/WebGL desktop/narrow, picking/gates, canvas HMR and teardown evidence is in [fixed-board verification](game-initialization-verification/angular-local-board/README.md); full-parent HMR remains an integration requirement.
+The host paints only stopped, empty local presentation and validated render-only marks. It has no live GameService, MarksService, simulation or storage capability. The personal repository is described below; the final development route and session owner follow separately. Actual native-worker/WebGL desktop/narrow, picking/gates, canvas HMR and teardown evidence is in [fixed-board verification](game-initialization-verification/angular-local-board/README.md); full-parent HMR remains an integration requirement.
+
+
+## Personal marks and notebook
+
+`PersonalRepository` and `PersonalStore` belong to a fresh local scope and complete certified binding. The parent calls `initialize()` before allowing writes and awaits `dispose()` at session retirement; native tools/notebook components consume the store without initializing or disposing it during navigation. Storage uses a new versioned namespace and complete JSON tuple keys. A fresh session on the same map starts empty; retained old records have no resume pointer.
+
+Manual pin, symbol, ring, line and arrow tools support numeric metre coordinates, labels, edit/delete and explicit canvas placement. Drawing disables camera motion while accepting current-key points. Ordered lines/arrows require2–256 points and an explicit Finish. Escape stops drawing while retaining drafts, and shortcuts ignore editable inputs. General interaction gating blocks actions without discarding drafts. Scene projection contains only validated render marks; artwork is reused by the fixed board surface.
+
+Marks are limited to200, labels to256 characters, and complete serialized records to1,048,576 JavaScript string characters. Notebook text is limited to16,384 characters and its complete record to131,072. Search ignores surrounding query whitespace and case; selectable export includes the current unsaved text. There is no truncation or HTML interpretation.
+
+Loads preserve corrupt, unsupported, oversized or foreign records and block writes until a valid explicit reload. Observed raw-record/revision changes produce a visible conflict. Browser storage failures preserve dirty drafts for retry and never report memory as durable storage. Reloading a failed notebook record preserves its current dirty text for export; replacing the session constructs an entirely new store. These components provide no live/server integration, simulation or session resume. Actual browser and final acceptance evidence accompany the focused personal-feature packet; whole-session composition remains A5.

@@ -498,3 +498,14 @@ Removed with it: all `.svelte` and test files under `client/src/hq`, the `fixtur
 **Ownership.** The host exposes keyed initialization/availability and awaitable teardown, retires old canvas resources before a successor, and rejects late callbacks. Camera controls and full interaction use separate gates: manual placement can disable camera motion while preserving metre picking; a modal gate blocks both. Local pagehide retires terminally. Whole-session ownership, full-parent HMR, fresh scope recovery and the development route are composed in a subsequent packet.
 
 **See.** [Angular guide](game-initialization-angular-guide.md), [fixed-board browser verification](game-initialization-verification/angular-local-board/README.md).
+
+
+## D34: Personal local data belongs to a fresh certified session
+
+**Decision.** Native Angular marks tools and a personal notebook consume one explicitly initialized session-owned signal store. A fresh local UUID, fixed local player/side and full certified board binding identify storage under `kriegsspiel.local-board.personal.v1`. Old records remain retained without a resume pointer or selector. Live marks services, game state and server storage are not used. Manual mark provenance uses stopped game time, never wall-clock time.
+
+**Storage.** Load and validate before writing. Invalid, corrupt, oversized, future-version, foreign-scope or foreign-binding records are preserved and cannot be overwritten without a successful explicit reload. Writes compare observed raw records; this detects observed conflicts without claiming cross-tab atomicity. Cancellation and reentrant callbacks cannot publish stale work; a completed synchronous storage write remains committed. Quota/unavailable errors stay visible with dirty editable drafts and safe retry, without a durability fallback to memory. Marks allow at most200 records and1,048,576 serialized JavaScript string characters including the envelope. Notebook text allows16,384 characters, and its complete record131,072; neither is silently truncated.
+
+**Presentation.** Five manual tools support numeric coordinates, explicit camera-locked canvas placement and ordered line/arrow points. Editing retains IDs, scope, binding and provenance. Notebook navigation preserves unsaved drafts; search and selectable export operate on current text. Full interaction gates retain drafts while blocking actions. The parent owns initialization and retirement across component navigation; final development routing, replacement and parent HMR remain a separate integration packet.
+
+**See.** [Angular guide](game-initialization-angular-guide.md), [Angular landing plan](game-initialization-angular-landing-plan.md).
