@@ -806,29 +806,52 @@ describe('orders', () => {
 
 describe('catch-up on reconnect', () => {
   it('tells a returning side what arrived while away, once, without duplicating papers', async () => {
-    const { base, ws } = await start();
+    // Game time moves only when the test advances the fake wall clock, so how far it has moved
+    // when the player leaves and returns does not depend on how fast the machine is.
+    const time = new FakeTime(Date.now());
+    store = new MemoryGameStore();
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      store,
+      auth: { mailer },
+      wallNow: time.now,
+      timers: time,
+    });
+    const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+    const ws = base.replace('http', 'ws');
     const game = (await createGame(base)).json;
     const first = await join(ws, game, 'blue');
     const initial = await first.waitFor('viewUpdate');
+    const actor = app.host.get(game.id)!;
+    const deskCount = () =>
+      sideViewOf(actor.state, 'blue', actor.gameClock.snapshot()).dispatches.length;
+    /** Advance game hours, one at a time, until `done`; the report's arrival is a game-time event. */
+    const advanceUntil = async (done: () => boolean) => {
+      for (let i = 0; i < 100 && !done(); i++) await time.advance(1000);
+      expect(done()).toBe(true);
+    };
     // A first visit has nothing to catch up on.
     // One report reaches the desk while the player is here, so it is not new on return.
     first.send(order('blue-1 march to the bridge', 'o1'));
+    await advanceUntil(() => deskCount() > 0);
     const seenHere = await first.waitFor('viewUpdate', (m) => m.view.dispatches.length > 0);
     const before = seenHere.view.dispatches.map((d) => d.id);
-    first.send(order('blue-1 march to the bridge', 'o2'));
+    // Wait for the second order to be taken before leaving, rather than racing the close.
+    first.send(order('blue-1 hold at the bridge', 'o2'));
+    await vi.waitFor(async () =>
+      expect(
+        (await store.inputLog(game.id)).filter((e) => e.command.kind === 'order'),
+      ).toHaveLength(2),
+    );
     first.socket.close();
-    const actor = app!.host.get(game.id)!;
-    // Game hours pass with nobody connected until the second report reaches the desk.
-    const arrived = await vi.waitFor(() => {
-      const view = sideViewOf(actor.state, 'blue', actor.gameClock.snapshot());
-      if (view.dispatches.length <= before.length) throw new Error('not yet');
-      return view;
-    });
-    const newIds = arrived.dispatches.map((d) => d.id).filter((id) => !before.includes(id));
-    expect(newIds.length).toBeGreaterThan(0);
     await vi.waitFor(async () =>
       expect(await store.loadSeen(game.id, 'blue')).toBeGreaterThanOrEqual(initial.view.atGame),
     );
+    // Game hours pass with nobody connected until the second report reaches the desk.
+    await advanceUntil(() => deskCount() > before.length);
+    const arrived = sideViewOf(actor.state, 'blue', actor.gameClock.snapshot());
+    const newIds = arrived.dispatches.map((d) => d.id).filter((id) => !before.includes(id));
+    expect(newIds.length).toBeGreaterThan(0);
 
     const again = await join(ws, game, 'blue');
     const catchUp = await again.waitFor('catchUp');
