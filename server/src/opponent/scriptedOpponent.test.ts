@@ -219,9 +219,44 @@ describe('behaviour', () => {
     expect(outcomes.every((o) => (o.orders === 0) === !o.settled)).toBe(true);
     // Once it has been told to advance, a quiet decision is a settled one.
     const agent = new ScriptedOpponent({ ...CONFIG, seed: 1 });
-    for (let t = 0; t < 4; t++) agent.think(view({ time: FORM_UP_MS + t * THINK_INTERVAL_MS }));
-    expect(agent.think(view({ time: FORM_UP_MS + 5 * THINK_INTERVAL_MS }))).toEqual([]);
+    // (A unit that is marching, so it moves between decisions.)
+    const marching = (t: number) => {
+      const v = view({ time: FORM_UP_MS + t * THINK_INTERVAL_MS });
+      return { ...v, ownUnits: [{ ...v.ownUnits[0]!, position: { x: 1950, y: 450 + t * 100 } }] };
+    };
+    for (let t = 0; t < 4; t++) agent.think(marching(t));
+    expect(agent.think(marching(5))).toEqual([]);
     expect(agent.settled()).toBe(true);
+  });
+
+  it('orders a unit again when it has stopped short of the objective without being told to (#315)', () => {
+    const agent = new ScriptedOpponent({ ...CONFIG, seed: 1 });
+    const at = (t: number) => view({ time: FORM_UP_MS + t * THINK_INTERVAL_MS });
+    let first: unknown[] = [];
+    for (let t = 0; t < 3 && first.length === 0; t++) first = agent.think(at(t));
+    expect(first).toHaveLength(1);
+    // It has not moved: the order was lost on the way.
+    const later = [at(3), at(4), at(5)].flatMap((v) => agent.think(v));
+    expect(later.length).toBeGreaterThan(0);
+  });
+
+  it('sends cavalry at an enemy beyond infantry range (#315)', () => {
+    const agent = new ScriptedOpponent({ ...CONFIG, seed: 1 });
+    const v = view();
+    const horse = { ...v.ownUnits[0]!, id: 'red-3', name: 'Hussars', kind: 'cavalry' as const };
+    const orders = agent.think({
+      ...v,
+      ownUnits: [horse],
+      visibleEnemies: [
+        {
+          id: 'blue-1',
+          position: { x: 1950, y: 1450 },
+          facing: 0,
+          footprint: { frontage: 100, depth: 30 },
+        },
+      ] as never,
+    });
+    expect(orders[0]?.text).toMatch(/advance on the enemy/);
   });
 
   it('builds an agent for each scripted side only', () => {

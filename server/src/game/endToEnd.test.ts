@@ -22,7 +22,7 @@ import { FakeTime } from './testing.js';
 const MIN = 60_000;
 // Intents are in millimetres, like engine state.
 const BRIDGE = { x: 2_050_000, y: 1_500_000 };
-// Blue holds the bridge in this script, so the game runs to the 180-minute hold.
+// Blue holds the bridge in this script; the battle is decided long before the 50-minute hold.
 const HORIZON_MS = 200 * MIN;
 /** The staff's slowest answer (D-staff): a first game must outlast it. */
 const STAFF_ANSWER_MS = 15 * MIN;
@@ -231,6 +231,40 @@ describe('pacing of a first game (#178)', () => {
     expect(run.state.time).toBe(end);
     expect(run.state.world.units.every((u) => u.intent.kind === 'idle')).toBe(true);
   }, 60_000);
+});
+
+describe('a battle is decided (#315)', () => {
+  it.each([1, 4, 12] as const)(
+    'with both battalions at the bridge the game ends with a declared result at rate %i',
+    async (rate) => {
+      const run = await play(rate, HORIZON_MS);
+      const w = run.state.world;
+      const end = w.outcome!;
+      expect(end).toMatchObject({ winner: 'blue', reason: 'attack-broken' });
+      expect(end.time).toBeGreaterThanOrEqual(30 * MIN);
+      expect(end.time).toBeLessThanOrEqual(70 * MIN);
+      // A unit is destroyed, and both the event and the dispatches say so.
+      expect(run.events.filter((e) => e.type === 'unit.destroyed').length).toBeGreaterThan(0);
+      // The umpire's ruling is on record, was announced, and reaches both sides in the same words.
+      const rulings = w.rulings.filter((r) => 'kind' in r && r.kind === 'battle');
+      expect(rulings).toHaveLength(1);
+      expect(run.events.filter((e) => e.type === 'umpire.ruling')).toHaveLength(1);
+      const narrative = (rulings[0] as { narrative: string }).narrative;
+      for (const side of ['blue', 'red'] as const) {
+        const texts = viewFor(w, side, run.state.time).reports.map((r) => r.text);
+        expect(texts, side).toContain(narrative);
+        // Nothing a side could not know: no men counts or morale figures in the umpire's words.
+        expect(narrative).not.toMatch(/\d/);
+      }
+      const blueTexts = viewFor(w, 'blue', run.state.time).reports.map(toDispatch);
+      expect(blueTexts.some((d) => /destroyed/.test(d.text))).toBe(true);
+      const redLost = viewFor(w, 'red', run.state.time).reports.filter(
+        (r) => r.kind === 'unitLost',
+      );
+      expect(redLost.length).toBeGreaterThan(0);
+    },
+    60_000,
+  );
 });
 
 describe('end-to-end headless game', () => {

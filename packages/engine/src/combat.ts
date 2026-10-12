@@ -326,8 +326,20 @@ function finish(world: GameState, outcome: Outcome): HandlerResult<GameState> {
     delete stopped.leg;
     return stopped;
   });
+  // The game is over: reports still on the road are handed in, so the closing dispatches are read.
+  const intel = Object.fromEntries(
+    Object.entries(world.intel).map(([side, i]) => [
+      side,
+      {
+        ...i,
+        reports: i.reports.map((r) =>
+          r.deliverAt > outcome.time ? { ...r, deliverAt: outcome.time } : r,
+        ),
+      },
+    ]),
+  ) as GameState['intel'];
   return {
-    world: { ...world, units, time: outcome.time, combatActive: false, outcome },
+    world: { ...world, units, intel, time: outcome.time, combatActive: false, outcome },
     emit: [
       {
         type: 'game.end',
