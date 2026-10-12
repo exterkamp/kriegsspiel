@@ -94,9 +94,9 @@ export class Notifier {
     const user = this.o.auth.getUser(userId);
     if (prefs.email && user && !user.guest && this.o.mailer.sendNotification) {
       sends.push(
-        this.o.mailer.sendNotification(user.email, title, `${text}\n\n${url}`).catch((e) =>
-          this.o.onError(gameId, e),
-        ),
+        this.o.mailer
+          .sendNotification(user.email, title, `${text}\n\n${url}`)
+          .catch((e) => this.o.onError(gameId, e)),
       );
     }
     const p = Promise.all(sends).then(() => undefined);

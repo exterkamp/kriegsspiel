@@ -91,6 +91,8 @@ function api(over: Partial<ShellApi> = {}): ShellApi {
     fetchGame: async () => info(),
     joinSide: async () => undefined,
     setReady: async () => undefined,
+    leaveGame: async () => undefined,
+    kickPlayer: async () => undefined,
     startGame: async () => undefined,
     createQuickGame: async () => 'q1',
     ...over,
@@ -548,6 +550,69 @@ describe('lobby room', () => {
     el.querySelector<HTMLButtonElement>('#room-ready')!.click();
     await settle();
     expect(setReady).toHaveBeenCalledWith('g1', true);
+  });
+});
+
+describe('lobby room: leaving and removing', () => {
+  const button = (text: string) =>
+    [...el.querySelectorAll('button')].find((b) => b.textContent?.includes(text));
+
+  it('a seated guest can leave the seat and goes back to the menu', async () => {
+    const leaveGame = vi.fn(async () => undefined);
+    await open('/?game=g1', {
+      fetchGame: async () => info({ status: 'lobby', creator: false }),
+      leaveGame,
+    });
+    button('Leave seat')!.click();
+    await settle();
+    expect(leaveGame).toHaveBeenCalledWith('g1');
+    expect(assign).toHaveBeenCalledWith('/');
+  });
+
+  it('the host removes a player only after confirming, and never sees a button for themselves', async () => {
+    const kickPlayer = vi.fn(async () => undefined);
+    await open('/?game=g1', {
+      fetchGame: async () =>
+        info({
+          status: 'lobby',
+          creator: true,
+          sides: [
+            { side: 'blue', taken: true, ready: true },
+            {
+              side: 'red',
+              taken: true,
+              ready: false,
+              roles: [{ role: 'intelligence', you: false }],
+            },
+          ],
+        }),
+      kickPlayer,
+    });
+    expect(button('Leave seat')).toBeUndefined();
+    const removes = [...el.querySelectorAll('button')].filter((b) =>
+      b.textContent?.includes('Remove'),
+    );
+    expect(removes).toHaveLength(2);
+    removes[0]!.click();
+    await settle();
+    expect(kickPlayer).not.toHaveBeenCalled();
+    expect(el.querySelector('[role=dialog]')?.textContent).toContain('red');
+    button('Cancel')!.click();
+    await settle();
+    expect(el.querySelector('[role=dialog]')).toBeNull();
+    [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Remove'))!.click();
+    await settle();
+    button('Remove player')!.click();
+    await settle();
+    expect(kickPlayer).toHaveBeenCalledWith('g1', { side: 'red' });
+  });
+
+  it('a removed player is told and cannot take a seat', async () => {
+    await open('/?game=g1', {
+      fetchGame: async () => info({ status: 'lobby', creator: false, you: null, removed: true }),
+    });
+    expect(el.querySelector('#lobby-msg')?.textContent).toContain('removed you');
+    expect(button('Take red')).toBeUndefined();
   });
 });
 
