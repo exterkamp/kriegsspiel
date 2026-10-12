@@ -4,7 +4,7 @@ const KEY = 'ks-contrast';
 export function applyContrast(doc: Document = document): void {
   try {
     const v = localStorage.getItem(KEY);
-    if (v === 'high') doc.documentElement.dataset['contrast'] = 'high';
+    if (v === 'high' || v === 'normal') doc.documentElement.dataset['contrast'] = v;
   } catch {
     // Storage blocked: the OS setting still applies through CSS.
   }
@@ -15,11 +15,11 @@ export function isHighContrast(doc: Document = document): boolean {
 }
 
 export function setHighContrast(on: boolean, doc: Document = document): void {
-  if (on) doc.documentElement.dataset['contrast'] = 'high';
-  else delete doc.documentElement.dataset['contrast'];
+  // Off is stored as 'normal', not removed, so it overrides an OS `prefers-contrast: more`.
+  const v = on ? 'high' : 'normal';
+  doc.documentElement.dataset['contrast'] = v;
   try {
-    if (on) localStorage.setItem(KEY, 'high');
-    else localStorage.removeItem(KEY);
+    localStorage.setItem(KEY, v);
   } catch {
     // Not saved; it still applies to this page.
   }

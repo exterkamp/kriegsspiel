@@ -78,4 +78,10 @@ describe('contrast setting', () => {
     setHighContrast(false);
     expect(isHighContrast()).toBe(false);
   });
+
+  it('turning it off sets "normal" so it overrides an OS prefers-contrast setting', () => {
+    setHighContrast(true);
+    setHighContrast(false);
+    expect(document.documentElement.dataset['contrast']).toBe('normal');
+  });
 });

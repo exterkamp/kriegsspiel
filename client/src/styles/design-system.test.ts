@@ -39,11 +39,11 @@ describe('component styles use the design tokens (#327)', () => {
       text.split('\n').forEach((line, i) => {
         if (/^\s*(\/\*|\*|\/\/)/.test(line)) return;
         const code = line;
+        // An id selector line ends in `{` or `,` and has no `:`; a value line that starts with a hex does not.
+        const isSelector = /^\s*#[\w-]+[^:]*[{,]\s*$/.test(code);
         if (
-          /(?:[:\s,(]|^|['"])#[0-9a-fA-F]{3,8}(?![\w-])(?!\s*\{)/.test(
-            code.replace(/^\s*#[\w-]+[\s,{].*$/, ''),
-          ) ||
-          /\brgba?\(/.test(code) ||
+          (!isSelector && /(?:[:\s,(]|^|['"])#[0-9a-fA-F]{3,8}(?![\w-])(?!\s*\{)/.test(code)) ||
+          /\b(?:rgba?|hsla?)\(/.test(code) ||
           /font-family:(?!\s*var\()/.test(code)
         ) {
           bad.push(`${f.slice(SRC.length + 1)}:${i + 1}: ${line.trim()}`);
@@ -74,7 +74,12 @@ function variant(block: RegExp): Map<string, string> {
   const base = /:root \{([\s\S]*?)\n\}/.exec(tokens)![1]!;
   const extra = block.exec(tokens)?.[1] ?? '';
   for (const text of [base, extra]) {
-    for (const [, k, v] of text.matchAll(/(--ks-[\w-]+):\s*(#[0-9a-fA-F]{6})\s*;/g)) m.set(k!, v!);
+    for (const [, k, v] of text.matchAll(
+      /(--ks-[\w-]+):\s*(#[0-9a-fA-F]{3}|#[0-9a-fA-F]{6})\s*;/g,
+    )) {
+      const hex = v!;
+      m.set(k!, hex.length === 4 ? '#' + [...hex.slice(1)].map((c) => c + c).join('') : hex);
+    }
   }
   return m;
 }
@@ -117,6 +122,8 @@ describe('token text pairs meet WCAG AA (4.5:1)', () => {
   ] as const) {
     it(name, () => {
       const t = variant(block);
+      const missing = PAIRS.flat().filter((k) => !t.has(k));
+      expect([...new Set(missing)]).toEqual([]);
       const low = PAIRS.map(([f, b]) => ({ f, b, r: contrast(t.get(f)!, t.get(b)!) })).filter(
         (p) => p.r < 4.5,
       );

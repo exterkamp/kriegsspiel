@@ -65,9 +65,7 @@ const MISSES_BEFORE_WARNING = 3;
           Start game
         </button>
       }
-      <p id="lobby-msg" role="status" class="ks-status">
-        {{ error() ?? (info().creator ? (blocker() ?? '') : 'Waiting for the host to start.') }}
-      </p>
+      <p id="lobby-msg" role="status" [class.ks-status]="message() !== ''">{{ message() }}</p>
     </ks-page-frame>
   `,
 })
@@ -86,6 +84,10 @@ export class RoomComponent implements OnInit {
   protected readonly rate = () => rateLabel(this.info().rate);
   protected readonly invite = () => inviteLink(this.win.location.origin, this.info().id);
   protected readonly blocker = () => startBlocker(this.info());
+  /** The status line: an error, else what stops the host starting, else the guest's wait. Empty shows no bar. */
+  protected readonly message = (): string =>
+    this.error() ??
+    (this.info().creator ? (this.blocker() ?? '') : 'Waiting for the host to start.');
 
   private misses = 0;
 

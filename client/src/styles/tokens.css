@@ -2,7 +2,7 @@
  * Design tokens (#327). The only place colours and font families are written down: components use `var(--ks-*)`
  * (a test greps component styles for hex colours and font-family). Period look: aged paper, ink, sealing wax,
  * brass. `html[data-contrast='high']` (or the OS setting) swaps in the plain high-contrast variant.
- * Text pairs meet WCAG AA (checked by `scripts/check-contrast.mjs` through `src/app/ui/contrast.spec.ts`).
+ * Text pairs meet WCAG AA (checked by `src/styles/design-system.test.ts`).
  */
 :root {
   /* Colour: paper and ink */
