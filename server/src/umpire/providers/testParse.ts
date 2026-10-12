@@ -265,7 +265,7 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
       match.units.map((u) => u.name),
     );
   }
-  let rest = match.kind === 'one' ? removePhrase(text, match.phrase) : text;
+  const rest = match.kind === 'one' ? removePhrase(text, match.phrase) : text;
 
   if (match.kind === 'none') {
     const first = leftmostVerb(rest);

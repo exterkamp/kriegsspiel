@@ -12,6 +12,7 @@ import { StaffRoster, checkStaffOutput, runStaff, staffInput, staffOfficer } fro
 import { TestProvider } from './providers/test.js';
 import { defaultProviderRegistry } from './providers/index.js';
 import type { UmpireCallRecord } from './umpireClient.js';
+import { TraceStore, traceUmpire } from '../debug/index.js';
 import { viewForRole } from '@kriegsspiel/engine';
 
 const at = (x: number, y: number) => ({ x: x * 1000, y: y * 1000 });
@@ -308,17 +309,32 @@ describe('test provider: staff, judge and command', () => {
   });
 
   it('has no transport: it answers without fetch', async () => {
-    const res = await new TestProvider().generate(
-      {
-        model: 'test',
-        system: '',
-        messages: [{ role: 'user', content: JSON.stringify({ reports: [] }) }],
-        schema: NARRATE_SCHEMA,
-        structured: 'native',
-        maxTokens: 10,
-      },
-      new AbortController().signal,
-    );
+    const res = await new TestProvider().generate({
+      model: 'test',
+      system: '',
+      messages: [{ role: 'user', content: JSON.stringify({ reports: [] }) }],
+      schema: NARRATE_SCHEMA,
+      structured: 'native',
+      maxTokens: 10,
+    });
     expect(JSON.parse(res.text)).toEqual({ dispatches: [] });
+  });
+});
+
+describe('test provider: admin trace', () => {
+  it('traces its calls as test, with the test provider and zero cost', async () => {
+    const trace = new TraceStore();
+    const traced = traceUmpire(client(), { trace, gameId: 'g1', mode: 'live' });
+    await new LlmOrderParser(traced).parse('Hold the bridge at all costs.', WORLD);
+    const [entry] = trace.entries('g1', { kind: 'llm' });
+    expect(entry!.data).toMatchObject({
+      mode: 'test',
+      provider: 'test',
+      model: 'test',
+      stage: 'parse',
+      costUsd: 0,
+      ok: true,
+    });
+    await trace.close();
   });
 });

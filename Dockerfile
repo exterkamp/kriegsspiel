@@ -22,7 +22,8 @@ ENV NODE_ENV=production \
     PORT=3000 \
     DB_PATH=/data/games.db \
     STATIC_DIR=/app/client/dist \
-    NODE_NO_WARNINGS=1
+    NODE_NO_WARNINGS=1 \
+    UMPIRE_KEYLESS_PROVIDER=test
 WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
