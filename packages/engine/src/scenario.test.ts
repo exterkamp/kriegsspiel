@@ -189,8 +189,20 @@ describe('unit commander', () => {
     const d = clone();
     unit(d).commander = 'Col. Aubry';
     expect(loadScenario(d).units.find((u) => u.id === unit(d).id)!.commander).toBe('Col. Aubry');
-    const none = loadScenario(clone()).units.find((u) => u.id === unit(d).id)!;
+    delete unit(d).commander;
+    const none = loadScenario(d).units.find((u) => u.id === unit(d).id)!;
     expect('commander' in none).toBe(false);
+  });
+
+  it('names a commander and a trait for every unit of both sides in the shipped scenarios', () => {
+    for (const sc of [holdTheBridge, holdTheBridgeFarStart]) {
+      const units = loadScenario(JSON.parse(JSON.stringify(sc))).units;
+      expect(new Set(units.map((u) => u.side))).toEqual(new Set(['blue', 'red']));
+      for (const u of units) {
+        expect(u.commander, u.id).toBeTruthy();
+        expect(u.trait, u.id).toBeTruthy();
+      }
+    }
   });
 
   it.each(['', 7])('rejects a commander of %j', (bad) => {

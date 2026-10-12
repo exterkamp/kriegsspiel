@@ -177,6 +177,8 @@ export interface Unit {
   name: string;
   /** Who commands it, as the scenario names them. Absent when the scenario does not say. */
   commander?: string;
+  /** A short note on the commander's manner, for the roster tooltip. */
+  trait?: string;
   /** Centre of the unit's footprint. */
   center: Point;
   /** Compass bearing in radians the unit faces: 0 is north (-y), growing clockwise (east is pi/2). */

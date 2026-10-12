@@ -157,6 +157,7 @@ export function toSideView(
       footprint: u.footprint,
       ...('shape' in u && u.shape ? { shape: u.shape } : {}),
       ...('commander' in u && u.commander !== undefined ? { commander: u.commander } : {}),
+      ...('trait' in u && u.trait !== undefined ? { trait: u.trait } : {}),
       ...condition(u, view.time),
     })),
     ...(view.orderRoutes.length === 0

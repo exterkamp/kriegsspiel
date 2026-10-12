@@ -154,6 +154,7 @@ export interface ViewUnit {
   id: string;
   name: string;
   commander?: string;
+  trait?: string;
   kind: UnitKind;
   /** Centre of the footprint, in metres. */
   position: Point;
@@ -427,6 +428,7 @@ export function viewFor(
         id: u.id,
         name: u.name,
         ...(u.commander === undefined ? {} : { commander: u.commander }),
+        ...(u.trait === undefined ? {} : { trait: u.trait }),
         kind: u.kind,
         position: viewPoint(u.center),
         facing: u.facing,

@@ -153,11 +153,16 @@ describe('sideViewOf commander and report date (#223)', () => {
       commander: 'Col. Aubry',
       reportedAt: view.atGame,
     });
-    expect(view.ownUnits.find((u) => u.id === 'blue-2')!.commander).toBeUndefined();
+    // The shipped scenario names every commander, with a trait for the roster tooltip.
+    expect(view.ownUnits.find((u) => u.id === 'blue-2')).toMatchObject({
+      commander: 'Col. Delacroix',
+      trait: expect.any(String),
+    });
   });
 
   it('never sends it to the other side', () => {
     const view = JSON.stringify(sideViewOf(named(), 'red', clock));
     expect(view).not.toContain('Aubry');
+    expect(view).not.toContain('Delacroix');
   });
 });

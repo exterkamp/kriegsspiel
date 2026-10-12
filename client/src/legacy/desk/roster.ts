@@ -11,6 +11,7 @@ export interface RosterRow {
   name: string;
   /** Who commands it, when the scenario names one. */
   commander: string | undefined;
+  trait: string | undefined;
   /** Men, as reported (not a percent), or undefined when the report gives no usable figure. */
   strength: number | undefined;
   supply: number | undefined;
@@ -57,6 +58,7 @@ export function rosterRows(view: SideView | undefined, nowGame: number): RosterR
       id: u.id,
       name: u.name,
       commander: u.commander,
+      trait: u.trait,
       strength: known(u.strength) ? Math.round(u.strength) : undefined,
       supply: pct(u.supply),
       morale: pct(u.morale),

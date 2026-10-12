@@ -64,6 +64,8 @@ export const holdTheBridge = {
   units: [
     {
       id: 'blue-1',
+      commander: 'Col. Aubry',
+      trait: 'steady and methodical; holds a line under fire',
       side: 'blue',
       type: 'line_infantry',
       name: '1st Battalion',
@@ -75,6 +77,8 @@ export const holdTheBridge = {
     },
     {
       id: 'blue-2',
+      commander: 'Col. Delacroix',
+      trait: 'cautious; slow to commit his reserve',
       side: 'blue',
       type: 'line_infantry',
       name: '2nd Battalion',
@@ -86,6 +90,8 @@ export const holdTheBridge = {
     },
     {
       id: 'blue-3',
+      commander: 'Maj. Verneuil',
+      trait: 'bold and impatient; apt to charge early',
       side: 'blue',
       type: 'cavalry',
       name: 'Cavalry Squadron',
@@ -97,6 +103,8 @@ export const holdTheBridge = {
     },
     {
       id: 'red-1',
+      commander: 'Col. Brandt',
+      trait: 'aggressive; presses the attack hard',
       side: 'red',
       type: 'line_infantry',
       name: 'Vanguard Battalion',
@@ -108,6 +116,8 @@ export const holdTheBridge = {
     },
     {
       id: 'red-2',
+      commander: 'Col. Hartmann',
+      trait: 'by the book; waits for orders',
       side: 'red',
       type: 'line_infantry',
       name: 'Line Battalion',
@@ -119,6 +129,8 @@ export const holdTheBridge = {
     },
     {
       id: 'red-3',
+      commander: 'Maj. von Reiter',
+      trait: 'dashing scout; prone to over-reach',
       side: 'red',
       type: 'cavalry',
       name: 'Hussar Squadron',

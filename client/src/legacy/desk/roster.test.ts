@@ -38,9 +38,9 @@ describe('rosterRows', () => {
   });
 
   it('shows the commander and dates each unit by its own report', () => {
-    const u = { ...view.ownUnits[0]!, commander: 'Gen. Ney', reportedAt: view.atGame - 3_600_000 };
+    const u = { ...view.ownUnits[0]!, commander: 'Gen. Ney', trait: 'bold', reportedAt: view.atGame - 3_600_000 };
     const r = rosterRows({ ...view, ownUnits: [u] }, view.atGame)[0]!;
-    expect(r).toMatchObject({ commander: 'Gen. Ney', reportedAt: u.reportedAt, ageMs: 3_600_000 });
+    expect(r).toMatchObject({ commander: 'Gen. Ney', trait: 'bold', reportedAt: u.reportedAt, ageMs: 3_600_000 });
     expect(rosterRows(view, view.atGame)[0]!.commander).toBeUndefined();
   });
 });
