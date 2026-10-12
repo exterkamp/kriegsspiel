@@ -271,6 +271,8 @@ export function renderReport(r: Report, ageMs: number): string {
       return `${r.from} is exhausted ${where}, ${when}.`;
     case 'destroyed':
       return `${r.from} reports ${r.sizeEstimate ?? 'enemy troops'} destroyed ${where}, ${when}.`;
+    case 'battle':
+      return r.text ?? `The umpire has decided the battle ${where}.`;
   }
 }
 

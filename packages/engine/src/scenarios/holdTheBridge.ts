@@ -138,6 +138,6 @@ export const holdTheBridge = {
     ],
     defender: 'blue',
     attacker: 'red',
-    holdMinutes: 180,
+    holdMinutes: 50,
   },
 };

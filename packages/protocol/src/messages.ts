@@ -268,7 +268,14 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       ...Envelope,
       kind: z.literal('gameOver'),
       winner: Side.nullable(),
-      reason: z.enum(['objective-taken', 'objective-held', 'eliminated', 'withdrawn']),
+      reason: z.enum([
+        'objective-taken',
+        'objective-held',
+        'eliminated',
+        'withdrawn',
+        'attack-broken',
+        'defence-broken',
+      ]),
       atGame: GameMs,
     })
     .strict(),

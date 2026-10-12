@@ -13,6 +13,8 @@ const REASON_TEXT = {
   'objective-held': 'the objective was held',
   eliminated: 'the opposing force was eliminated',
   withdrawn: 'the opposing force withdrew',
+  'attack-broken': 'the attack was broken',
+  'defence-broken': 'the defence was broken',
 };
 
 /** Text for the end-of-game panel, or undefined while the game runs. Pure, so it can be tested without a DOM. */

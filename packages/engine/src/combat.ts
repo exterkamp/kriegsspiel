@@ -7,7 +7,10 @@ import {
   VICTORY_DEADLINE_EVENT,
   aspectOf,
   bearingTo,
+  PURSUIT_MS,
   canReach,
+  isRouted,
+  pursuable,
   distanceMm,
   inMelee,
   onObjective,
@@ -15,6 +18,9 @@ import {
   type Aspect,
 } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
+import { mm, polygonCentroid } from './geometry.js';
+import { fileReport } from './visibility.js';
+import { describePlace } from './place.js';
 import { positionAt, rejectOrder, startMarch } from './movement.js';
 import { FATIGUE_PER_FIGHT_TICK } from './fatigue.js';
 import { schedule } from './queue.js';
@@ -31,8 +37,10 @@ import { FORMATION_RULES, unitTypeOf } from './unitTypes.js';
 import {
   DEFAULT_TAKE_MS,
   MS_PER_MINUTE,
+  type BattleRuling,
   type GameState,
   type Outcome,
+  type Report,
   type SideId,
   type Unit,
   type UnitKind,
@@ -63,6 +71,19 @@ export function coverFactor(cover: number): number {
 export const MORALE_PER_LOSS_PERCENT = 2;
 /** The morale below which a default-type unit breaks and withdraws; each type has its own. */
 export const BREAK_MORALE = unitTypeOf('infantry').breakMorale;
+
+/**
+ * A force is broken (D13) when the fighting strength it has left, its men weighted by morale,
+ * falls below this share of the men it started with, once at least one of its units has been
+ * broken or destroyed. Red's last cavalry squadron alone is about 12% of Red's start.
+ */
+export const BROKEN_FORCE_FRACTION = 0.25;
+/** Game time between the umpire declaring a battle and the game closing: the pursuit is played out. */
+export const BATTLE_CLOSE_MS = 20 * MS_PER_MINUTE;
+/** Casualty multiplier on fire or steel against a routed unit, which cannot form to answer. */
+export const ROUT_FACTOR = 3;
+/** Cavalry that is idle or holding rides after a routed enemy this close (metres) to it. */
+export const PURSUIT_RANGE_M = 1500;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -96,22 +117,50 @@ function activeUnits(world: GameState): Unit[] {
 }
 
 /** Every pair (in unit order) where at least one side can hit the other. */
-function contactPairs(world: GameState): Array<[Unit, Unit]> {
+function contactPairs(world: GameState, time: number): Array<[Unit, Unit]> {
   const active = activeUnits(world);
+  const targets = world.units.filter((u) => pursuable(u, time));
   const pairs: Array<[Unit, Unit]> = [];
+  const seen = new Set<string>();
   for (const a of active) {
-    for (const b of active) {
-      if (a.side !== b.side && a.id < b.id && (canReach(a, b) || canReach(b, a)))
-        pairs.push([a, b]);
+    for (const b of targets) {
+      if (a.side === b.side || (!canReach(a, b) && !(b.status === 'active' && canReach(b, a))))
+        continue;
+      const [x, y] = a.id < b.id ? [a, b] : [b, a];
+      const key = `${x.id}|${y.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pairs.push([x, y]);
     }
   }
-  return pairs;
+  return pairs.sort((p, q) => (p[0].id + p[1].id < q[0].id + q[1].id ? -1 : 1));
 }
 
 function sideOut(world: GameState, side: SideId): 'eliminated' | 'withdrawn' | null {
   const mine = world.units.filter((u) => u.side === side);
   if (mine.some((u) => u.status === 'active')) return null;
   return mine.every((u) => u.status === 'destroyed') ? 'eliminated' : 'withdrawn';
+}
+
+/** Men that can still fight, weighted by morale, as a share of the men the side started with. */
+function fightingShare(world: GameState, side: SideId): number | null {
+  const start = world.startStrength;
+  if (!start) return null;
+  const mine = world.units.filter((u) => u.side === side);
+  const total = mine.reduce((n, u) => n + (start[u.id] ?? u.strength), 0);
+  if (total <= 0) return null;
+  const fit = mine
+    .filter((u) => u.status === 'active')
+    .reduce((n, u) => n + (u.strength * u.morale) / 100, 0);
+  return fit / total;
+}
+
+/** True when the side has lost units and what is left is below `BROKEN_FORCE_FRACTION`. */
+export function forceBroken(world: GameState, side: SideId): boolean {
+  const share = fightingShare(world, side);
+  if (share === null) return false;
+  const lostSome = world.units.some((u) => u.side === side && u.status !== 'active');
+  return lostSome && share < BROKEN_FORCE_FRACTION;
 }
 
 /** True while only the attacker's active units have their centres on the objective. */
@@ -141,6 +190,13 @@ function trackHold(world: GameState, time: number): { world: GameState; schedule
 /** The result of the game as of `time`, or null if it goes on. Exported for tests only. */
 export function evaluateVictory(world: GameState, time: number): Outcome | null {
   const { attacker } = world.victory;
+  const battle = world.battle;
+  if (battle) {
+    // A declared battle plays out its pursuit, then closes.
+    return time >= battle.declaredAt + BATTLE_CLOSE_MS
+      ? { winner: battle.winner, reason: battle.reason, time }
+      : null;
+  }
   const out = new Map<SideId, 'eliminated' | 'withdrawn'>();
   for (const s of world.sides) {
     const o = sideOut(world, s.id);
@@ -152,7 +208,9 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
   }
   for (const s of world.sides) {
     const reason = out.get(s.id);
-    if (reason) {
+    // A side that is out because it broke is a decided battle, declared by `declareBattle`
+    // (which also lets the pursuit play out); without start strengths it ends at once.
+    if (reason && !world.startStrength) {
       return { winner: world.sides.find((o) => o.id !== s.id)!.id, reason, time };
     }
   }
@@ -165,6 +223,84 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
     return { winner: attacker, reason: 'objective-taken', time };
   }
   return null;
+}
+
+/**
+ * Declare the battle if one side's force is broken and the other's is not (D13): record the
+ * umpire's ruling, file it as a report to both sides (no figures, so nothing hidden leaks) and
+ * queue the check that closes the game once the pursuit has played out. Pure.
+ */
+function declareBattle(
+  world: GameState,
+  time: number,
+): {
+  world: GameState;
+  schedule: NewEvent[];
+  emit: Array<{ type: string; payload?: Json }>;
+} | null {
+  if (world.battle || world.outcome || !world.startStrength) return null;
+  const { attacker, defender } = world.victory;
+  const brokenA = forceBroken(world, attacker) || sideOut(world, attacker) !== null;
+  const brokenD = forceBroken(world, defender) || sideOut(world, defender) !== null;
+  if (brokenA === brokenD) return null;
+  const loser = brokenA ? attacker : defender;
+  const winner = brokenA ? defender : attacker;
+  const reason = brokenA ? 'attack-broken' : 'defence-broken';
+  const name = (id: SideId) => world.sides.find((s) => s.id === id)?.name ?? id;
+  const where = describePlace(world.map, polygonCentroid(world.victory.objective));
+  const narrative = brokenA
+    ? `${name(loser)}'s attack on ${where} has been broken; ${name(winner)} holds the field.`
+    : `${name(loser)}'s defence of ${where} has been broken; ${name(winner)} holds the field.`;
+  const rationale =
+    `${name(loser)} has lost its fighting strength (units broken or destroyed, the rest below ` +
+    `${Math.round(BROKEN_FORCE_FRACTION * 100)}% of its start, morale counted) while ${name(winner)} is still in the fight.`;
+  const ruling: BattleRuling = {
+    id: `ruling-${world.rulings.length + 1}`,
+    time,
+    kind: 'battle',
+    winner,
+    loser,
+    reason,
+    rationale,
+    narrative,
+  };
+  let w: GameState = {
+    ...world,
+    rulings: [...world.rulings, ruling],
+    battle: { winner, reason, declaredAt: time },
+  };
+  const centre = polygonCentroid(world.victory.objective);
+  for (const side of world.sides) {
+    const report: Report = {
+      id: `${side.id}-r${w.intel[side.id].reports.length + 1}`,
+      kind: 'battle',
+      observedAt: time,
+      deliverAt: time,
+      from: 'Umpire',
+      location: { ...centre },
+      place: where,
+      uncertainty: 0,
+      confidence: 'high',
+      text: narrative,
+    };
+    w = {
+      ...w,
+      intel: {
+        ...w.intel,
+        [side.id]: { ...w.intel[side.id], reports: [...w.intel[side.id].reports, report] },
+      },
+    };
+  }
+  return {
+    world: w,
+    schedule: [{ time: time + BATTLE_CLOSE_MS, type: COMBAT_CHECK_EVENT }],
+    emit: [
+      {
+        type: 'umpire.ruling',
+        payload: { rulingId: ruling.id, kind: 'battle', winner, reason },
+      },
+    ],
+  };
 }
 
 function finish(world: GameState, outcome: Outcome): HandlerResult<GameState> {
@@ -199,7 +335,10 @@ interface Shot {
 
 /** Whom `shooter` fires at: its attack target if reachable, else the nearest enemy (ties: lowest id). */
 function chooseTarget(shooter: Unit, enemies: Unit[]): Unit | undefined {
-  const reachable = enemies.filter((e) => canReach(shooter, e));
+  const inReach = enemies.filter((e) => canReach(shooter, e));
+  // Fighting units come first; a routed one is fired on only when nothing else is in reach.
+  const standing = inReach.filter((e) => e.status === 'active');
+  const reachable = standing.length > 0 ? standing : inReach;
   if (shooter.intent.kind === 'attack') {
     const wanted = shooter.intent.target;
     const t = reachable.find((e) => e.id === wanted);
@@ -251,7 +390,10 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     const target = world.units.find((u) => u.id === targetId);
     if (!target) return rejectOrder(world, unitId, 'unknown target');
     if (target.side === unit.side) return rejectOrder(world, unitId, 'target is friendly');
-    if (target.status !== 'active') return rejectOrder(world, unitId, 'target not active');
+    if (target.status === 'destroyed') return rejectOrder(world, unitId, 'target not active');
+    if (target.status === 'withdrawn' && !isRouted(target, ev.time)) {
+      return rejectOrder(world, unitId, 'target not active');
+    }
     const check: NewEvent = { time: ev.time, type: COMBAT_CHECK_EVENT };
     if (canReach(unit, target)) {
       return {
@@ -299,6 +441,8 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     world = held.world;
     const outcome = evaluateVictory(world, ev.time);
     if (outcome) return finish(world, outcome);
+    const declared = declareBattle(world, ev.time);
+    if (declared) world = declared.world;
     // An attacker that stopped in reach (its `to` is where it stands) and whose target
     // has since moved out of reach gives chase again.
     const chase: NewEvent[] = [];
@@ -306,7 +450,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       if (u.intent.kind !== 'attack') continue;
       if (u.intent.to.x !== u.center.x || u.intent.to.y !== u.center.y) continue;
       const foe = world.units.find((x) => x.id === (u.intent as { target: string }).target);
-      if (foe && foe.status === 'active' && !canReach(u, foe)) {
+      if (foe && pursuable(foe, ev.time) && !canReach(u, foe)) {
         chase.push({
           time: ev.time,
           type: ATTACK_INTENT_EVENT,
@@ -314,10 +458,11 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
         });
       }
     }
-    chase.push(...held.schedule);
-    if (world.combatActive) return { world, schedule: chase };
-    const pairs = contactPairs(world);
-    if (pairs.length === 0) return { world, schedule: chase };
+    chase.push(...held.schedule, ...(declared?.schedule ?? []));
+    const declaredEmit = declared?.emit ?? [];
+    if (world.combatActive) return { world, schedule: chase, emit: declaredEmit };
+    const pairs = contactPairs(world, ev.time);
+    if (pairs.length === 0) return { world, schedule: chase, emit: declaredEmit };
     return {
       world: { ...world, time: ev.time, combatActive: true },
       schedule: [{ time: ev.time + COMBAT_TICK_MS, type: COMBAT_TICK_EVENT }, ...chase],
@@ -326,6 +471,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
           type: 'contact.begin',
           payload: { pairs: pairs.map(([a, b]) => [a.id, b.id]) },
         },
+        ...declaredEmit,
       ],
     };
   });
@@ -347,14 +493,16 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     for (const shooter of active) {
       const target = chooseTarget(
         shooter,
-        active.filter((u) => u.side !== shooter.side),
+        world.units.filter((u) => u.side !== shooter.side && pursuable(u, ev.time)),
       );
       if (!target) continue;
       const die = rng.die(6);
       const cover = coverFactor(terrainAt(world.map, target.center)?.attrs.cover ?? 0);
       const moraleFactor = 0.5 + shooter.morale / 200;
       const aspect = aspectOf(shooter, target);
-      const melee = inMelee(shooter, target);
+      // Cavalry on a routed unit rides it down: a sabre blow in the back, not a volley.
+      const melee =
+        inMelee(shooter, target) || (shooter.kind === 'cavalry' && target.status === 'withdrawn');
       // Melee is a blow at arm's length: no range falloff, but a heavier one than fire.
       const reach = melee ? MELEE_FACTOR : rangeFactor(shooter, target);
       const casualties = round2(
@@ -370,7 +518,8 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
           reach *
           // A shooter with no cartridges left is nearly harmless; steel in melee is not fired.
           (!melee && shooter.ammo <= 0 ? OUT_OF_AMMO_FACTOR : 1) *
-          ASPECT_FACTOR[aspect],
+          ASPECT_FACTOR[aspect] *
+          (target.status === 'withdrawn' ? ROUT_FACTOR : 1),
       );
       shots.push({
         shooter,
@@ -464,18 +613,47 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       if (!fate.has(u.id)) continue;
       if (u.status === 'destroyed') {
         emit.push({ type: 'unit.destroyed', payload: { unitId: u.id } });
+        // The survivors' own side is told it has lost the unit.
+        w = fileReport(w, 'unitLost', u, ev.time);
         w = {
           ...w,
-          units: w.units.map((x) => (x.id === u.id ? { ...x, intent: { kind: 'idle' } } : x)),
+          units: w.units.map((x) => {
+            if (x.id !== u.id) return x;
+            // The dead stop where they fell, not at the end of the road they were fleeing along.
+            const fallen: Unit = {
+              ...x,
+              center: positionAt(w.map, x, ev.time),
+              intent: { kind: 'idle' },
+            };
+            delete fallen.leg;
+            return fallen;
+          }),
         };
       } else if (u.status === 'active' && u.morale < unitTypeOf(u).breakMorale) {
-        const broken: Unit = { ...u, status: 'withdrawn', intent: { kind: 'idle' } };
+        const broken: Unit = {
+          ...u,
+          status: 'withdrawn',
+          intent: { kind: 'idle' },
+          brokenAt: ev.time,
+        };
         w = { ...w, units: w.units.map((x) => (x.id === u.id ? broken : x)) };
         const res = startMarch(w, broken, u.home, ev.time);
         w = res.world;
         next.push(...(res.schedule ?? []));
         emit.push({ type: 'unit.broken', payload: { unitId: u.id, morale: u.morale } });
         emit.push(...(res.emit ?? []));
+        // Cavalry that is free to move rides down the unit that broke, if it is near.
+        for (const rider of w.units) {
+          if (rider.side === u.side || rider.status !== 'active' || rider.kind !== 'cavalry')
+            continue;
+          if (rider.intent.kind !== 'idle' && rider.intent.kind !== 'hold') continue;
+          if (distanceMm(rider.center, u.center) > mm(PURSUIT_RANGE_M)) continue;
+          next.push({
+            time: ev.time,
+            type: ATTACK_INTENT_EVENT,
+            payload: { unitId: rider.id, target: u.id },
+          });
+        }
       }
     }
     // Anyone chasing a unit that is gone has nothing left to chase.
@@ -484,13 +662,19 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       units: w.units.map((u) => {
         if (u.intent.kind !== 'attack') return u;
         const t = w.units.find((x) => x.id === (u.intent as { target: string }).target);
-        return t && t.status === 'active' ? u : { ...u, intent: { kind: 'idle' } };
+        return t && pursuable(t, ev.time) ? u : { ...u, intent: { kind: 'idle' } };
       }),
     };
 
     const held = trackHold(w, ev.time);
     w = held.world;
     next.push(...held.schedule);
+    const declared = declareBattle(w, ev.time);
+    if (declared) {
+      w = declared.world;
+      next.push(...declared.schedule);
+      emit.push(...declared.emit);
+    }
     const outcome = evaluateVictory(w, ev.time);
     if (outcome) {
       const end = finish(w, outcome);

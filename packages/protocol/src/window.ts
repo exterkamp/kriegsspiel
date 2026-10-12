@@ -64,7 +64,8 @@ export const WindowRuling = z
   .object({
     id: z.string(),
     time: GameMs,
-    unitId: z.string(),
+    /** The unit a placement ruling is about; a battle ruling is about the whole field and has none. */
+    unitId: z.string().optional(),
     rationale: z.string(),
     narrative: z.string(),
   })

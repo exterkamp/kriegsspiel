@@ -25,6 +25,7 @@ const CATEGORY: Record<ViewReport['kind'], Dispatch['category']> = {
   lowAmmo: 'staff',
   exhausted: 'subordinates',
   destroyed: 'intelligence',
+  battle: 'staff',
 };
 
 export function toDispatch(r: ViewReport): Dispatch {
