@@ -5,6 +5,7 @@ import {
   mergeStaffHistory,
   busy,
   fixtureAnswer,
+  sirFirst,
   newExchange,
   nextExchangeId,
   reconcileExchanges,
@@ -62,6 +63,24 @@ describe('fixtureAnswer', () => {
     expect(fixtureAnswer(req('intelligence'), empty).text).toContain(
       'nothing of their whereabouts',
     );
+  });
+  it('every officer opens with "Sir," and the name, whatever the role (#325)', () => {
+    for (const role of ['chiefOfStaff', 'intelligence', 'quartermaster', 'engineer'] as const) {
+      const name = staffFor(role).name;
+      expect(fixtureAnswer(req(role), fixtureView).text, role).toMatch(
+        new RegExp(`^${name}: Sir, `),
+      );
+      expect(fixtureAnswer(req(role), undefined).text, role).toContain(`${name}: Sir, we have no`);
+    }
+  });
+  it('sirFirst adds the opening once and leaves a spoken one alone (#325)', () => {
+    expect(sirFirst('No enemy is in sight now.')).toBe('Sir, no enemy is in sight now.');
+    expect(sirFirst('I cannot judge roads.')).toBe('Sir, I cannot judge roads.');
+    expect(sirFirst('Sir, as I read it: all quiet.')).toBe('Sir, as I read it: all quiet.');
+    expect(sirFirst('Our Cavalry is at the bridge.')).toBe('Sir, our Cavalry is at the bridge.');
+    expect(sirFirst('Enemy Infantry sighted')).toBe('Sir, enemy Infantry sighted');
+    expect(sirFirst('')).toBe('');
+    expect(sirFirst('   ')).toBe('');
   });
   it('engineer does not make up terrain', () => {
     expect(fixtureAnswer(req('engineer'), fixtureView).text).toContain('cannot judge');
@@ -186,7 +205,7 @@ describe('the conference the server kept (#323)', () => {
       questionId: 'q1',
       answerAtGame: 960_000,
       officer,
-      answer: { text: 'Major Dessau: At the bridge.', basedOnGame: 60_000 },
+      answer: { text: 'Major Dessau: Sir, at the bridge.', basedOnGame: 60_000 },
     });
     expect(log[1]).toMatchObject({ questionId: 'q2', textless: true });
     expect(log[1]!.answer).toBeUndefined();
@@ -206,7 +225,7 @@ describe('the conference the server kept (#323)', () => {
     const due = mergeStaffHistory(early, [kept('q1', 'At the bridge.')]);
     expect(due).toHaveLength(1);
     expect(due[0]!.answer).toEqual({
-      text: 'Major Dessau: At the bridge.',
+      text: 'Major Dessau: Sir, at the bridge.',
       basedOnGame: 60_000,
     });
     expect(mergeStaffHistory(due, [kept('q1', 'At the bridge.')])).toBe(due);

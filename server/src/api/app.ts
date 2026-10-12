@@ -553,7 +553,13 @@ export async function buildApp(options: AppOptions): Promise<App> {
   /** Where a started game stands: over or not, its game time and when it was last played (wall time). */
   const progressOf = async (
     rec: LobbyGame,
-  ): Promise<{ finished: boolean; gameTimeMs: number; lastPlayedMs: number }> => {
+  ): Promise<{
+    finished: boolean;
+    gameTimeMs: number;
+    lastPlayedMs: number;
+    /** Set once the game is over: the winning side, or null when both were put out together. */
+    winner?: string | null;
+  }> => {
     const none = { finished: false, gameTimeMs: 0, lastPlayedMs: rec.createdAtMs };
     if (rec.status !== 'started') return none;
     const input = await loadReplayInput(store, rec.id).catch(() => undefined);
@@ -562,6 +568,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (live) {
       return {
         finished: Boolean(live.state.world.outcome),
+        ...(live.state.world.outcome ? { winner: live.state.world.outcome.winner } : {}),
         gameTimeMs: live.state.time,
         lastPlayedMs: lastPlayedMs ?? rec.createdAtMs,
       };
@@ -571,6 +578,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
       const tl = replayTimeline(input);
       return {
         finished: Boolean(tl.outcome),
+        ...(tl.outcome ? { winner: tl.outcome.winner } : {}),
         gameTimeMs: tl.endMs,
         lastPlayedMs: lastPlayedMs ?? rec.createdAtMs,
       };

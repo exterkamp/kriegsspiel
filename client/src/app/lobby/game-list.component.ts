@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import type { GameSummary } from '@legacy/lobby/api';
+import type { PlayedGame } from '@legacy/shell/continueList';
+import { gameStatus } from '@legacy/shell/continueList';
 import { SESSION_LABELS, rateLabel } from '@legacy/lobby/model';
 import { SHELL_API } from '../shell/shell-api';
 
@@ -52,10 +54,10 @@ export class GameListComponent implements OnInit {
     Promise.all([this.api.fetchGames(), this.api.fetchScenarios().catch(() => [])]).then(
       ([games, scenarios]) =>
         this.rows.set(
-          (games as GameSummary[]).map((g) => ({
+          (games as Array<GameSummary | PlayedGame>).map((g) => ({
             id: g.id,
             title: `${scenarios.find((s) => s.id === g.scenario)?.name ?? g.scenario}, ${SESSION_LABELS[g.sessionType]}, ${rateLabel(g.rate)}`,
-            state: `${g.status === 'lobby' ? 'in the lobby' : 'started'}${g.side ? `, you are ${g.side}` : ''}`,
+            state: gameStatus(g),
           })),
         ),
       (e: unknown) => this.error.set(e instanceof Error ? e.message : String(e)),
