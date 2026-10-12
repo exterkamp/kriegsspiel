@@ -34,7 +34,9 @@ import { TableService } from '../game/table.service';
       flex-wrap: wrap;
       max-width: calc(100% - 16px);
     }
-    /* The Menu button sits at the right on a phone; the HUD wraps in the room that is left (#344). */
+    /* The Menu button sits at the right on a phone; the HUD wraps in the room that is left (#344).
+       128px is the Menu button's width plus gutters; the umpire window offsets in
+       umpire-window.component.css assume the HUD wraps to two rows here. Change them together. */
     @media (max-width: 600px) {
       #hud {
         max-width: calc(100% - 128px);
