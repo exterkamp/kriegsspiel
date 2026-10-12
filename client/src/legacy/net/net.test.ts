@@ -119,9 +119,8 @@ describe('order clarification', () => {
     );
     expect(s.pending).toEqual([]);
     // The notice keeps the id so the desk can find the order's outcome; noticeText hides it.
-    expect(noticeText(s.notices[0]!, s.outcomes)).toContain(
-      'Which wood do you mean? (Northern wood)',
-    );
+    expect(noticeText(s.notices[0]!, s.outcomes)).toContain('Which wood do you mean?');
+    expect(s.outcomes['o-lq3-1']?.reason).toContain('(Northern wood)');
     expect(noticeText(s.notices[0]!, s.outcomes)).not.toMatch(/o-lq3-1/);
   });
 
@@ -182,6 +181,23 @@ describe('staff questions', () => {
       costMs: 1_200_000,
     });
   });
+  it('quotes the player’s own words in a refusal, not the addressee prefix added to the text', () => {
+    let s = withPendingOrder(initialState, {
+      orderId: 'o-1',
+      text: '1st Battalion, Move to the bridge.',
+      words: 'Move to the bridge.',
+      sentAtGame: 0,
+    });
+    s = applyServerMessage(
+      s,
+      { v, kind: 'error', code: 'order_rejected', message: 'o-1: No such place.' },
+      0,
+    );
+    expect(s.outcomes['o-1']?.text).toBe('Move to the bridge.');
+    expect(noticeText(s.notices[0]!, s.outcomes)).toContain('"Move to the bridge."');
+    expect(noticeText(s.notices[0]!, s.outcomes)).not.toContain('1st Battalion, Move');
+  });
+
   it('marks a refused question, by the id prefixing the error', () => {
     for (const code of ['staff_busy', 'game_over']) {
       const s = applyServerMessage(

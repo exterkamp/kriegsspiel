@@ -148,17 +148,50 @@ export const ORDER_EXAMPLES: readonly string[] = [
 ];
 
 /**
+ * A clarification reads "<question> (<option>, <option>)". Splits it into the question and its options;
+ * a comma inside brackets, as in "the wood at (1, 2) m", does not separate two options.
+ */
+export function splitOptions(reason: string): { question: string; options: string[] } {
+  const m = /^(.*?)\s*\((.*)\)\s*$/s.exec(reason.trim());
+  if (!m) return { question: reason.trim(), options: [] };
+  const options: string[] = [];
+  let open = 0;
+  for (const part of (m[2] as string).split(', ')) {
+    if (open > 0) options[options.length - 1] += `, ${part}`;
+    else options.push(part);
+    open += (part.match(/\(/g)?.length ?? 0) - (part.match(/\)/g)?.length ?? 0);
+  }
+  return { question: m[1] as string, options: options.map((o) => o.trim()).filter(Boolean) };
+}
+
+/**
+ * The player's words with the chosen option filled in. "Which wood, sir?" swaps the wood named in the
+ * order for the option; any other question puts the option in front (a unit) or after (a place).
+ */
+export function orderWithOption(words: string, question: string, option: string): string {
+  const noun = /^\s*which\s+([a-z]+)/i.exec(question)?.[1];
+  if (noun && !/^(one|unit)$/i.test(noun)) {
+    const re = new RegExp(`(?:\\bthe\\s+)?\\b${noun}s?\\b(?![\\s\\S]*\\b${noun}s?\\b)`, 'i');
+    if (re.test(words)) return words.replace(re, /^the\s/i.test(option) ? option : `the ${option}`);
+  }
+  if (/\b(one|unit)\b/i.test(question)) return `${option}, ${words}`;
+  return `${words.replace(/[.\s]+$/, '')}, ${option}`;
+}
+
+/**
  * What the desk tells the player when the staff could not carry out an order: their own words, the
  * staff's reason without the internal order id, and a hint with two example orders.
  */
 export function refusalText(o: { text: string; reason: string; code?: string }): string {
-  const bare = o.reason.replace(/^\s*o-[\w-]+:\s*/, '').trim();
+  const clarify = o.code === 'order_clarification';
+  const bare = (clarify ? splitOptions(o.reason).question : o.reason)
+    .replace(/^\s*o-[\w-]+:\s*/, '')
+    .trim();
   const reason = /[.?!)]$/.test(bare) ? bare : `${bare}.`;
   const examples = ORDER_EXAMPLES.map((e) => `"${e}"`).join(' or ');
-  const lead =
-    o.code === 'order_clarification'
-      ? `The staff need more to act on your order "${o.text.trim()}". ${reason}`
-      : `Your order "${o.text.trim()}" could not be carried out. ${reason}`;
+  const lead = clarify
+    ? `The staff need more to act on your order "${o.text.trim()}". ${reason}`
+    : `Your order "${o.text.trim()}" could not be carried out. ${reason}`;
   return `${lead} The staff understand orders such as ${examples}.`;
 }
 

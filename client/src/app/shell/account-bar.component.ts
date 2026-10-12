@@ -2,36 +2,33 @@ import { ChangeDetectionStrategy, Component, inject, input, output } from '@angu
 import type { Me } from '@legacy/auth';
 import { SHELL_API } from './shell-api';
 
-/** A small bar with the user's address, a link to their games, sign-out and delete-account. */
+/** Who is playing ("Guest" for a guest), a link to their games and delete-account; it sits in the in-game menu, off the map. */
 @Component({
   selector: 'ks-account-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div id="account">
-      <span>{{ me().email }}</span>
+      <span>{{ me().guest ? 'Guest' : me().email }}</span>
       <a href="/?lobby=1">Games</a>
-      <button type="button" (click)="signOut()">Sign out</button>
       <button type="button" (click)="remove()">Delete account</button>
     </div>
   `,
   styles: `
     #account {
-      position: fixed;
-      top: 8px;
-      right: 8px;
-      z-index: 20;
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       align-items: center;
-      padding: 6px 8px;
-      background: rgba(42, 33, 24, 0.95);
-      color: #efe6c8;
       font:
         13px Georgia,
         serif;
     }
+    span {
+      flex: 1 0 100%;
+      overflow-wrap: anywhere;
+    }
     a {
-      color: #efe6c8;
+      color: inherit;
     }
     button {
       font: inherit;

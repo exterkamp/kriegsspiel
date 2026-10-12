@@ -16,6 +16,8 @@ export interface PendingOrder {
   text: string;
   /** Game time when it was sent, as best the client knows. */
   sentAtGame: number;
+  /** What the player wrote, without the addressee's name or annex added to `text`. */
+  words?: string;
   /** Who it was addressed to, when sent from the orders desk. */
   toName?: string;
   courier?: 'fast' | 'safe';
@@ -257,7 +259,7 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
             ...s.outcomes,
             [refused.orderId]: {
               kind: 'refused',
-              text: refused.text,
+              text: refused.words ?? refused.text,
               ...(refused.toName ? { toName: refused.toName } : {}),
               sentAtGame: refused.sentAtGame,
               reason: m.message.slice(m.message.indexOf(': ') + 2),

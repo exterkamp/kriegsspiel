@@ -87,6 +87,12 @@ export function guestPlayFromEnv(env: Record<string, string | undefined>): boole
   return env.NODE_ENV !== 'production';
 }
 
+/** `GUEST_PER_HOUR` (default 60): guests one client address may create per hour. */
+export function guestPerHourFromEnv(env: Record<string, string | undefined>): number {
+  const n = Math.floor(Number(env.GUEST_PER_HOUR));
+  return Number.isFinite(n) && n > 0 ? n : 60;
+}
+
 /** `GUEST_IDLE_HOURS` (default 168): how long an unused guest and their games are kept. */
 export function guestIdleMsFromEnv(env: Record<string, string | undefined>): number {
   const h = Number(env.GUEST_IDLE_HOURS);

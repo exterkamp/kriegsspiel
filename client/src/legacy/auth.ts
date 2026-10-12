@@ -43,7 +43,17 @@ export async function guestEnabled(fetchFn: typeof fetch = fetch): Promise<boole
 export async function startGuest(fetchFn: typeof fetch = fetch): Promise<string | undefined> {
   const res = await fetchFn('/auth/guest', { method: 'POST', credentials: 'same-origin' });
   if (res.ok) return undefined;
-  if (res.status === 429) return 'Too many guests from this address. Try again later.';
+  if (res.status === 429) {
+    const body = (await res.json().catch(() => ({}))) as { retryAt?: number };
+    const at = body.retryAt === undefined ? undefined : new Date(body.retryAt);
+    const hhmm =
+      at && !Number.isNaN(at.getTime())
+        ? at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : undefined;
+    return hhmm
+      ? `Too many guests have started from this address. Try again at ${hhmm}.`
+      : 'Too many guests have started from this address. Try again later.';
+  }
   if (res.status === 404) return 'Guest play is turned off on this server.';
   return `Could not start a guest session (${res.status}).`;
 }

@@ -313,6 +313,10 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
         );
     } else {
       const found = findPlace(object, input.places);
+      if (found.kind === 'none' && intents.length > 0)
+        return ask(
+          `I know of no place called "${phrase.join(' ')}", sir. I can carry out the first part, "${clauses.slice(0, i).join(', ')}", if you send just that.`,
+        );
       if (found.kind === 'none')
         return refuse(`I know of no place called "${phrase.join(' ')}", sir.`);
       if (found.kind === 'many') {

@@ -29,6 +29,7 @@ export class InTrayComponent {
   private readonly injector = inject(Injector);
   private readonly viewer = viewChild<ElementRef<HTMLElement>>('viewer');
 
+  /** The pile on view: the first with something unread when the tray opens, else Urgent. */
   protected readonly pile = signal<Pile>('urgent');
   protected readonly openId = signal<string | undefined>(undefined);
   protected readonly showFiled = signal(false);
@@ -51,6 +52,8 @@ export class InTrayComponent {
   protected readonly formatGameTime = formatGameTime;
 
   constructor() {
+    const unread = this.sorted().piles.find((p) => p.unread > 0);
+    if (unread) this.pile.set(unread.id);
     effect(() => {
       const open = this.open();
       untracked(() => this.desk.viewedDispatch.set(open));
