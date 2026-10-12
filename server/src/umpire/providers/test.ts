@@ -53,12 +53,15 @@ function narrate(input: Json) {
                 : r.kind === 'exhausted'
                   ? `${from} is exhausted${where}, ${when}`
                   : `${from} reports its situation${where}, ${when}`;
+      // Only what the staff saw for themselves is hedged or vouched for.
       const sure =
-        r.confidence === 'low'
-          ? ' It is thought so, though I would not swear to it'
-          : r.confidence === 'high'
-            ? ' There is no doubt of it'
-            : '';
+        r.kind !== 'contact' && r.kind !== 'situation'
+          ? ''
+          : r.confidence === 'low'
+            ? ' It is thought so, though I would not swear to it'
+            : r.confidence === 'high'
+              ? ' There is no doubt of it'
+              : '';
       const reach = radius > 0 ? ` The ground is good to within ${radius} metres.` : '';
       return {
         reportIds: [str(r.id)],

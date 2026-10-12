@@ -17,9 +17,8 @@ import { ChangeDetectionStrategy, Component, OnInit, signal } from '@angular/cor
   styles: `
     .test-umpire {
       position: fixed;
-      top: 8px;
-      left: 50%;
-      transform: translateX(-50%);
+      top: 48px;
+      right: 8px;
       z-index: 5;
       white-space: nowrap;
       background: #efe6c8;
@@ -28,6 +27,15 @@ import { ChangeDetectionStrategy, Component, OnInit, signal } from '@angular/cor
       border-radius: 3px;
       padding: 2px 8px;
       font-size: 12px;
+    }
+    /* Narrow screens: the account bar wraps over the top corner, so sit above the desk buttons. */
+    @media (max-width: 600px) {
+      .test-umpire {
+        top: auto;
+        bottom: 128px;
+        right: 50%;
+        transform: translateX(50%);
+      }
     }
   `,
 })
