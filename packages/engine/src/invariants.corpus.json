@@ -1,0 +1,58 @@
+{
+  "comment": "Counterexamples found by invariants.test.ts, as command lists (see invariants.testkit.ts Cmd). Add one when a property fails. The first entry is a hand-written seed that also proves the replay path. An entry may carry stops (ms) to replay the exact advance points that failed.",
+  "entries": [
+    {
+      "name": "seed: opposing marches into contact, then a withdraw order",
+      "scenario": "hold-the-bridge-far-start",
+      "hours": 3,
+      "note": "hand-written, not a found bug",
+      "cmds": [
+        {
+          "kind": "move",
+          "at": 0,
+          "unit": "red-1",
+          "to": [2050, 1500]
+        },
+        {
+          "kind": "move",
+          "at": 0,
+          "unit": "blue-1",
+          "to": [2050, 1500]
+        },
+        {
+          "kind": "attack",
+          "at": 600000,
+          "unit": "blue-2",
+          "target": "red-1"
+        },
+        {
+          "kind": "order",
+          "at": 5400000,
+          "unit": "blue-1",
+          "side": "blue",
+          "intent": "withdraw",
+          "to": [2050, 2900],
+          "courier": "fast"
+        }
+      ]
+    },
+    {
+      "name": "order delivered after the game ended must not start a march",
+      "scenario": "hold-the-bridge",
+      "hours": 3,
+      "note": "found by the fuzz runner: the delivered intent set a leg on a frozen unit, so positionAt moved it with no step events",
+      "cmds": [
+        {
+          "kind": "order",
+          "at": 10536300,
+          "unit": "blue-1",
+          "side": "blue",
+          "intent": "move",
+          "to": [599, 2310],
+          "courier": "safe"
+        }
+      ],
+      "stops": [5399991, 10799982, 10799991, 10800000]
+    }
+  ]
+}
