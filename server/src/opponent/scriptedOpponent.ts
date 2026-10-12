@@ -100,6 +100,7 @@ const VIEW_KEYS = [
   'mapHeight',
   'hq',
   'ownUnits',
+  'orderRoutes',
   'visibleEnemies',
   'lastKnownContacts',
   'reports',
