@@ -1,3 +1,4 @@
+import { dashPolyline } from './dash';
 import * as THREE from 'three';
 import type { Coord, Mark } from '@kriegsspiel/protocol';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -211,17 +212,16 @@ export class TableScene {
   private routeObject(r: OrderRoute): THREE.Group {
     const map = this.state!.map;
     const g = new THREE.Group();
-    const colour = r.kind === 'order' ? 0x1f1a12 : 0x6b5a3a;
+    const colour = r.kind === 'order' ? 0x1f1a12 : 0x8a3b12;
     const pts = r.points;
-    g.add(
-      this.ribbon(
-        pts,
-        this.span / (r.kind === 'order' ? 450 : 700),
-        colour,
-        r.kind === 'order' ? 0.8 : 0.5,
-        0.0015,
-      ),
-    );
+    if (r.kind === 'order') {
+      g.add(this.ribbon(pts, this.span / 450, colour, 0.8, 0.0015));
+    } else {
+      // A planned route is dotted, so it reads apart from the order arrow drawn over the same ground (#343).
+      for (const d of dashPolyline(pts, this.span / 120, this.span / 160)) {
+        g.add(this.ribbon(d, this.span / 380, colour, 0.9, 0.0015));
+      }
+    }
     if (r.kind === 'order' && pts.length >= 2) {
       const a = pts[pts.length - 2]!;
       const b = pts[pts.length - 1]!;
