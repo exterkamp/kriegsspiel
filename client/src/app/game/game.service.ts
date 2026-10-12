@@ -53,6 +53,11 @@ export class GameService {
     this.listenForPageCache();
   }
 
+  /** The player's manual retry after the connection gave up. */
+  retry(): void {
+    this.conn?.retry();
+  }
+
   /** Stop the connection and the page listeners. */
   disconnect(): void {
     this.stopPageEvents?.();

@@ -133,7 +133,12 @@ const MAX_NOTICES = 20;
  * A fresh anchor, unless the clock was running and had already passed it (a view built a moment before the
  * old anchor's extrapolation): then game time holds its place instead of stepping back.
  */
-function reanchor(old: ClockAnchor | undefined, gameMs: number, clock: ClockState, nowWall: number): ClockAnchor {
+function reanchor(
+  old: ClockAnchor | undefined,
+  gameMs: number,
+  clock: ClockState,
+  nowWall: number,
+): ClockAnchor {
   const fresh = anchorOf(gameMs, clock, nowWall);
   if (old?.status !== 'running' || clock.status !== 'running') return fresh;
   const ahead = gameNowMs(old, nowWall);

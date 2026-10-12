@@ -28,6 +28,13 @@
     <span class="staff" data-testid="clock-staff" role="status">Staff at work…</span>
   }
   @if (linkText()) {
-    <span class="link">{{ linkText() }}</span>
+    <span class="link" [class.failed]="game.state().link === 'failed'" role="status">{{
+      linkText()
+    }}</span>
+  }
+  @if (game.state().link === 'failed') {
+    <button type="button" class="ks-quiet" data-testid="clock-retry" (click)="retry()">
+      Retry
+    </button>
   }
 </section>

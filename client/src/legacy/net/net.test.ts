@@ -437,7 +437,7 @@ describe('GameConnection', () => {
 
 describe('clock anchors', () => {
   const running = (gameMsAtAnchor: number) => ({
-    v,
+    v: PROTOCOL_VERSION as 1,
     kind: 'clockState' as const,
     clock: { gameMsAtAnchor, wallMsAtAnchor: 1, rate: 10, status: 'running' as const },
   });
