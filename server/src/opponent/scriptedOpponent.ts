@@ -59,6 +59,8 @@ export const WITHDRAW_STRENGTH_FRACTION = 0.5;
 export const HESITATE_CHANCE = 0.15;
 /** Each unit aims this far (metres, either way) off the objective's centre. */
 export const AIM_SPREAD_M = 60;
+/** A unit this close (metres) to the objective's centre needs no final order onto it. */
+const CENTRE_TOLERANCE_M = 5;
 /** A target that moved less than this (metres) since the last order is not worth a new one. */
 const RETARGET_M = 150;
 /**
@@ -117,6 +119,7 @@ export function assertFogOnly(view: unknown, side: string): asserts view is Engi
 
 const mmPoint = (p: Point): Point => ({ x: Math.round(p.x * 1000), y: Math.round(p.y * 1000) });
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
 const fmt = (p: Point) => `(${Math.round(p.x)}, ${Math.round(p.y)})`;
 
 function hashSide(side: string): number {
@@ -148,6 +151,7 @@ export class ScriptedOpponent implements SideAgent {
     if (this.hesitated) return [];
     const tick = Math.floor(view.time / this.intervalMs);
     const rng = new Rng(seedRng(this.config.seed + hashSide(this.side) + tick * 7919));
+    const objective = this.config.objective;
     const threats: { id: string; position: Point }[] = [
       ...view.visibleEnemies,
       ...view.lastKnownContacts.filter((c) => c.ageMs <= CONTACT_FRESH_MS),
@@ -168,13 +172,15 @@ export class ScriptedOpponent implements SideAgent {
       let next: Standing | undefined;
       if (weak) next = { kind: 'withdraw', target: this.config.fallbackTo };
       else if (dist(unit.position, this.config.objective) <= HOLD_RADIUS_M) {
-        // Already on the ground it was sent to take: nothing to order (this also covers a
-        // restart that has lost its memory of earlier orders).
-        if (!standing || standing.kind === 'advance') {
-          this.standing.set(unit.id, standing ?? { kind: 'advance', target: unit.position });
+        // Close enough to the objective: the spread would leave a unit a few metres outside a
+        // 60 m square that has to be held, so the last order goes to the exact centre, once.
+        // (A unit already at the centre, e.g. after a restart that lost its memory, gets none.)
+        const onCentre = standing?.kind === 'advance' && samePoint(standing.target, objective);
+        if (onCentre || dist(unit.position, objective) <= CENTRE_TOLERANCE_M) {
+          this.standing.set(unit.id, { kind: 'advance', target: objective });
           continue;
         }
-        next = this.advanceOrder(rng);
+        next = { kind: 'advance', target: objective };
       } else if (near && near.d <= ENGAGE_RANGE_M)
         next = { kind: 'attack', target: near.t.position };
       else if (rng.next() >= HESITATE_CHANCE || standing) next = this.advanceOrder(rng);
@@ -201,7 +207,12 @@ export class ScriptedOpponent implements SideAgent {
   /** Whether `next` differs enough from what the unit was last told to be worth an order. */
   private changes(standing: Standing | undefined, next: Standing): boolean {
     if (!standing || standing.kind !== next.kind) return true;
-    // An advance is aimed once; an attack follows its target; a withdrawal is one-way.
+    // An advance is aimed once, then corrected once onto the exact centre; an attack follows its target; a withdrawal is one-way.
+    if (next.kind === 'advance') {
+      return (
+        samePoint(next.target, this.config.objective) && !samePoint(standing.target, next.target)
+      );
+    }
     return next.kind === 'attack' && dist(standing.target, next.target) > RETARGET_M;
   }
 

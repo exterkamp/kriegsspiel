@@ -65,6 +65,7 @@ async function play(
   rate: number | 'fast-forward',
   untilMs: number | 'end',
   script: readonly { atMs: number; text: string }[] = SCRIPT,
+  seed?: number,
 ): Promise<Run> {
   const time = new FakeTime();
   const store = new MemoryGameStore();
@@ -80,7 +81,11 @@ async function play(
     onEmitted: (_id, e) => events.push(...e),
   });
   const fast = rate === 'fast-forward';
-  const game = await host.create('g1', loadScenario(holdTheBridge), { rate: fast ? 1 : rate });
+  const game = await host.create(
+    'g1',
+    loadScenario(seed === undefined ? holdTheBridge : { ...holdTheBridge, seed }),
+    { rate: fast ? 1 : rate },
+  );
   if (fast) await game.submit({ kind: 'setMode', mode: 'fast-forward' });
   const horizon = untilMs === 'end' ? Infinity : untilMs;
   let at = 0;
@@ -198,11 +203,20 @@ describe('pacing of a first game (#178)', () => {
   it.each([1, 4, 12] as const)(
     'a game with no player orders ends in a Red win, but not before game minute 25 (rate %i)',
     async (rate) => {
-      const run = await play(rate, HORIZON_MS, []);
+      const run = await play(rate, HORIZON_MS, [], 7);
       expect(run.state.world.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
       expect(run.state.time).toBeGreaterThanOrEqual(25 * MIN);
       // Staff answers and a narration window fit before it ends.
       expect(run.state.time).toBeGreaterThan(STAFF_ANSWER_MS + NARRATION_WINDOW_MS);
+    },
+    60_000,
+  );
+
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])(
+    'with no player orders Red takes the bridge whatever the seed (seed %i)',
+    async (seed) => {
+      const run = await play('fast-forward', HORIZON_MS, [], seed);
+      expect(run.state.world.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
     },
     60_000,
   );

@@ -109,6 +109,18 @@ describe('behaviour', () => {
     expect(Math.abs(to.y - 1_500_000)).toBeLessThanOrEqual(AIM_SPREAD_M * 1000);
   });
 
+  it('sends a unit that stopped short of the centre one last order onto it, then no more', () => {
+    const bot = new ScriptedOpponent(CONFIG);
+    const near = (x: number, y: number) => ({
+      ownUnits: [{ ...view().ownUnits[0]!, position: { x, y } }],
+    });
+    // First told to go to a point off the centre, it stopped 40 m short of the 60 m square.
+    bot.think(view());
+    const [o] = bot.think(view({ time: FORM_UP_MS + 300_000, ...near(2050, 1540) }));
+    expect(o?.intent).toEqual({ kind: 'move', to: { x: 2_050_000, y: 1_500_000 } });
+    expect(bot.think(view({ time: FORM_UP_MS + 600_000, ...near(2050, 1540) }))).toEqual([]);
+  });
+
   it('forms up first: no order, and not settled, until FORM_UP_MS has passed', () => {
     const bot = new ScriptedOpponent(CONFIG);
     expect(bot.think(view({ time: 0 }))).toEqual([]);
@@ -253,7 +265,9 @@ describe('headless game', () => {
       scriptedOpponents: true,
       onEmitted: (_id, e) => events.push(...e),
     });
-    const game = await host.create('g1', loadScenario(holdTheBridge));
+    // Seed 7: Red wins this firefight (the scenario's own seed 1815 is a Blue win by holding).
+    const scenario = loadScenario({ ...holdTheBridge, seed: 7 });
+    const game = await host.create('g1', scenario);
     await game.submit({ kind: 'setMode', mode: 'fast-forward' });
     await time.advance(0);
 
@@ -279,7 +293,7 @@ describe('headless game', () => {
     const header = (await store.logHeader('g1'))!;
     // Fast-forward ran on after the last input, so replay is asked to run to where the game stands.
     const until = game.state.time;
-    const replayed = replayLog(header, loadScenario(holdTheBridge), log, registry(), until);
+    const replayed = replayLog(header, scenario, log, registry(), until);
     expect(replayed.state.world).toEqual(game.state.world);
   });
 

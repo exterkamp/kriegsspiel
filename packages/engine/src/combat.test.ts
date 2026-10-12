@@ -17,6 +17,7 @@ import {
   issueMove,
   loadScenario,
   pointMm,
+  positionAt,
   registerCombat,
   registerMovement,
   serialize,
@@ -445,14 +446,28 @@ describe('victory conditions', () => {
     let s = field([
       { id: 'blue-1', side: 'blue', x: 9, y: 4 },
       { id: 'red-1', side: 'red', x: 3, y: 2 },
-      { id: 'red-2', side: 'red', x: 0, y: 4 },
+      { id: 'red-2', side: 'red', kind: 'artillery', x: 1, y: 4 },
     ]);
     s = issueMove(s, 'red-1', T(5, 2));
-    s = issueMove(s, 'red-2', T(8, 0)); // still marching when red-1 wins
+    s = issueMove(s, 'red-2', T(9, 0)); // a slow gun on a long leg: still marching when red-1 wins
+    // The same march with red-1 left idle, so the game does not end: where red-2 is at minute 12.
+    const noWin = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'red-1', side: 'red', x: 3, y: 2 },
+      { id: 'red-2', side: 'red', kind: 'artillery', x: 1, y: 4 },
+    ]);
+    const marching = run(issueMove(noWin, 'red-2', T(9, 0)), 12).state;
+    expect(unit(marching, 'red-2').leg).toBeTruthy();
     const end = run(s, 30);
-    expect(end.state.world.outcome).toMatchObject({ reason: 'objective-taken' });
-    const frozen = end.state.world.units.map((u) => [u.id, u.center, u.intent]);
+    const outcome = end.state.world.outcome!;
+    expect(outcome).toMatchObject({ reason: 'objective-taken', time: 12 * MS_PER_MINUTE });
+    // red-2 was mid-leg at minute 12, so it is frozen where it was then, not at its destination.
+    const red2 = unit(end.state, 'red-2');
+    const expected = positionAt(marching.world.map, unit(marching, 'red-2'), outcome.time);
+    expect(red2.center).toEqual(expected);
+    expect(red2.center).not.toEqual(T(9, 0));
     expect(end.state.world.units.every((u) => u.intent.kind === 'idle' && !u.leg)).toBe(true);
+    const frozen = end.state.world.units.map((u) => [u.id, u.center, u.intent]);
     const later = run(issueMove(end.state, 'red-2', T(9, 4)), 60);
     expect(later.state.world.units.map((u) => [u.id, u.center, u.intent])).toEqual(frozen);
     expect(later.emitted).toEqual([]);
