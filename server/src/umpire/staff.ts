@@ -12,7 +12,8 @@ import { MS_PER_MINUTE, ROLES, mayDraft, viewForRole } from '@kriegsspiel/engine
 import type { EngineRoleView, GameState, Role, Seat, SideId } from '@kriegsspiel/engine';
 import type { JsonSchema, UmpireCallRecord, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
-import { narrateWindowMs } from './narrate.js';
+import { hiddenIn, hiddenTerms } from './leakGuard.js';
+import { checkProseAgainst, narrateWindowMs, proseFactsOf } from './narrate.js';
 
 export const STAFF_PROMPT_VERSION = 'staff-officer-v1';
 
@@ -217,6 +218,8 @@ export function checkStaffOutput(
     (JSON.stringify(input.view).match(ID_PATTERN) ?? []).map((s) => s.toLowerCase()),
   );
   const own = new Set(input.view.ownUnits.map((u) => u.id));
+  const facts = proseFactsOf(input);
+  const hidden = hiddenTerms(world, side);
   const problems: string[] = [];
   for (const m of output.messages) {
     if (m.text.trim() === '') problems.push('empty message');
@@ -226,6 +229,8 @@ export function checkStaffOutput(
     for (const id of m.text.match(ID_PATTERN) ?? []) {
       if (!known.has(id.toLowerCase())) problems.push(`unknown entity "${id}"`);
     }
+    // Names and figures too (#44): an officer who was not shown the enemy's colonel cannot name him.
+    problems.push(...checkProseAgainst(m.text, facts), ...hiddenIn(m.text, hidden));
     if (m.kind === 'suggestion') {
       if (!m.unitId) problems.push('suggestion without a unitId');
       else if (!own.has(m.unitId) || !mayDraft(world, side, seat, m.unitId)) {

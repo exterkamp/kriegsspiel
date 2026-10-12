@@ -170,6 +170,12 @@ function spelledNumbers(text: string): { value: number; words: string[] }[] {
 /** Words that may be capitalised mid-sentence in period prose without naming anything. */
 const COMMON_CAPITALISED = new Set([
   'i',
+  'we',
+  'blue',
+  'red',
+  'our',
+  'my',
+  'they',
   'sir',
   'general',
   'monsieur',
@@ -264,6 +270,8 @@ const SENTENCE_OPENERS = new Set([
   'us',
   'was',
   'we',
+  'blue',
+  'red',
   'were',
   'what',
   'when',
@@ -306,18 +314,61 @@ export function checkProse(text: string, input: Input): string[] {
   // Only the fields the model is meant to draw on: ids and JSON keys are not facts to cite.
   const facts = input.reports.flatMap((r) => [r.from, r.place, r.sizeEstimate ?? '']);
   const factText = facts.join('\n');
-  const knownNumbers = new Set<number>([
-    ...numbersIn(factText),
-    ...input.reports.flatMap((r) => [r.minutesAgo, r.radiusM]),
-  ]);
-  const knownWords = new Set([...wordsIn(factText), input.side]);
-  const knownIds = new Set(
-    (JSON.stringify(input).match(ID_PATTERN) ?? []).map((s) => s.toLowerCase()),
-  );
+  return checkProseAgainst(text, {
+    numbers: [...numbersIn(factText), ...input.reports.flatMap((r) => [r.minutesAgo, r.radiusM])],
+    words: [...wordsIn(factText), input.side],
+    ids: JSON.stringify(input).match(ID_PATTERN) ?? [],
+  });
+}
+
+/** What a stage's prose may cite: the numbers, words and ids its own input holds. Nothing else is a fact. */
+export interface ProseFacts {
+  numbers: readonly number[];
+  /** Lower-case or not; compared lower-case. */
+  words: readonly string[];
+  /** Absent when the caller checks ids itself: hyphenated ordinary words (`counter-attack`) are not then taken for ids. */
+  ids?: readonly string[];
+  /**
+   * Any word that opens a sentence passes, as in free prose where an imperative or a pronoun may
+   * open one ("Send the reserve."). Capitalised words elsewhere must still be known. Default false.
+   */
+  lenientOpeners?: boolean;
+}
+
+/**
+ * The facts a JSON input holds, for `checkProseAgainst`: every number, every word of every string
+ * value (never a key), and every id. Used by the stages whose prose is free (staff, parse), so a
+ * name or figure the model was never shown cannot reach a player.
+ */
+export function proseFactsOf(input: unknown): ProseFacts {
+  const strings: string[] = [];
+  const numbers: number[] = [];
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') strings.push(v);
+    else if (typeof v === 'number') numbers.push(v, Math.round(v));
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v !== null && typeof v === 'object') Object.values(v).forEach(walk);
+  };
+  walk(input);
+  const text = strings.join('\n');
+  return {
+    numbers: [...numbers, ...numbersIn(text)],
+    words: wordsIn(text),
+    lenientOpeners: true,
+  };
+}
+
+/** The same checks as `checkProse`, against any facts. */
+export function checkProseAgainst(text: string, facts: ProseFacts): string[] {
+  const knownNumbers = new Set<number>(facts.numbers);
+  const knownWords = new Set(facts.words.map((w) => w.toLowerCase()));
+  const knownIds = facts.ids && new Set(facts.ids.map((s) => s.toLowerCase()));
   const problems: string[] = [];
 
-  for (const id of text.match(ID_PATTERN) ?? []) {
-    if (!knownIds.has(id.toLowerCase())) problems.push(`unknown entity "${id}"`);
+  if (knownIds) {
+    for (const id of text.match(ID_PATTERN) ?? []) {
+      if (!knownIds.has(id.toLowerCase())) problems.push(`unknown entity "${id}"`);
+    }
   }
   // Digits inside an id are covered above; the rest must be numbers the input contains.
   const withoutIds = text.replace(ID_PATTERN, ' ');
@@ -333,12 +384,19 @@ export function checkProse(text: string, input: Input): string[] {
   }
 
   // Capitalised words are proper nouns (units, officers, places) unless they open a sentence.
-  const opensSentence = /(^|[.!?]["')\]]*\s+|[\n"“(]\s*)$/;
+  const opensSentence = facts.lenientOpeners
+    ? /(^\s*|[.!?:;]["')\]]*\s+|[\n"“(]\s*)$/
+    : /(^\s*|[.!?]["')\]]*\s+|[\n"“(]\s*)$/;
   for (const m of withoutIds.matchAll(/\p{Lu}[\p{L}'’-]*/gu)) {
     const word = m[0].toLowerCase();
     if (knownWords.has(word) || COMMON_CAPITALISED.has(word)) continue;
     if (NUMBER_WORDS[word] !== undefined || NUMBER_SCALES[word] !== undefined) continue;
-    if (SENTENCE_OPENERS.has(word) && opensSentence.test(withoutIds.slice(0, m.index))) continue;
+    if (
+      (facts.lenientOpeners || SENTENCE_OPENERS.has(word)) &&
+      opensSentence.test(withoutIds.slice(0, m.index))
+    ) {
+      continue;
+    }
     problems.push(`unknown name "${m[0]}"`);
   }
   return [...new Set(problems)];
