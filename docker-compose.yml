@@ -22,6 +22,7 @@ services:
       # The demo lets visitors play as a guest; set GUEST_PLAY=0 on a public deployment that needs accounts.
       GUEST_PLAY: ${GUEST_PLAY:-1}
       # The demo shows the menu's Developer tools section; set DEV_TOOLS=0 on a public deployment.
+      # The menu's Admin view link also needs ADMIN_ENABLED=1 (and a token); without it the admin page reports itself disabled.
       DEV_TOOLS: ${DEV_TOOLS:-1}
       GUEST_PER_HOUR: ${GUEST_PER_HOUR:-}
       GUEST_IDLE_HOURS: ${GUEST_IDLE_HOURS:-}

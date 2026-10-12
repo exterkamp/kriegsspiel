@@ -44,7 +44,7 @@ With no `ANTHROPIC_API_KEY` the image and compose file run every umpire stage on
 
 ### Client build
 
-The image serves the Angular client (`client/dist/browser`, since the Svelte client was removed in #279). `SPA_FALLBACK` is on by default whenever `STATIC_DIR` is set: the server answers `/admin`, `/map-authoring`, `/map-benchmark` and anything below them (except `/admin/api`) with `index.html`, and redirects the old `/map-authoring.html`, `/map-benchmark.html`, `/table-benchmark.html`, `/admin/index.html` and `/map-table.html` to the new routes, keeping the query. Set `SPA_FALLBACK=0` to turn it off. `/games`, `/scenarios`, `/auth` and `/admin/api` stay API routes.
+The image serves the Angular client (`client/dist/browser`, since the Svelte client was removed in #279). `SPA_FALLBACK` is on by default whenever `STATIC_DIR` is set: the server answers `/admin`, `/map-authoring`, `/map-benchmark`, `/table-benchmark`, `/map-table` and anything below them (except `/admin/api`) with `index.html`, and redirects the old `/map-authoring.html`, `/map-benchmark.html`, `/table-benchmark.html`, `/admin/index.html` and `/map-table.html` to the new routes, keeping the query. Set `SPA_FALLBACK=0` to turn it off. `/games`, `/scenarios`, `/auth` and `/admin/api` stay API routes.
 
 ## Data and logs
 
