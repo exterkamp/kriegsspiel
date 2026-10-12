@@ -656,6 +656,28 @@ describe('fire by range', () => {
     expect(close.casualties / far.casualties).toBeCloseTo(0.625 / 0.25, 1);
   });
 
+  it('hits a routed unit three times as hard as one standing', () => {
+    const standing = firstVolley(at(1))['blue-1>red-1']!;
+    // A second red unit stays active, far off, so the routed one's side has not simply left the field.
+    const fleeing = field([
+      { id: 'blue-1', side: 'blue', x: 0, y: 4, facingDeg: facing.blue },
+      { id: 'red-1', side: 'red', x: 1, y: 4, facingDeg: facing.red },
+      { id: 'red-2', side: 'red', x: 9, y: 0 },
+    ]);
+    const routedWorld = {
+      ...fleeing,
+      world: {
+        ...fleeing.world,
+        units: fleeing.world.units.map((u) =>
+          u.id === 'red-1' ? { ...u, status: 'withdrawn' as const, brokenAt: 0 } : u,
+        ),
+      },
+    };
+    const run2 = firstVolley(routedWorld)['blue-1>red-1']!;
+    expect(run2.die).toBe(standing.die);
+    expect(run2.casualties / standing.casualties).toBeCloseTo(3, 1);
+  });
+
   it('reports the distance in metres', () => {
     expect(firstVolley(at(2))['blue-1>red-1']!.distance).toBe(200);
   });
@@ -867,6 +889,33 @@ describe('a decided battle (#315)', () => {
     expect(forceBroken(hurt.world, 'red')).toBe(false);
     const oneGone = quiet((u) => (u.id === 'red-1' ? routed(u) : u));
     expect(forceBroken(oneGone.world, 'red')).toBe(false);
+  });
+
+  it('needs a lost unit as well as a low share: a tired line that is all still fighting is not broken', () => {
+    const tired = quiet((u) => (u.side === 'red' ? { ...u, strength: 60, morale: 40 } : u));
+    // Every red unit is active, but the morale-weighted share is far under a quarter.
+    expect(
+      tired.world.units.filter((u) => u.side === 'red').every((u) => u.status === 'active'),
+    ).toBe(true);
+    expect(forceBroken(tired.world, 'red')).toBe(false);
+    const oneRouted = {
+      ...tired,
+      world: {
+        ...tired.world,
+        units: tired.world.units.map((u) => (u.id === 'red-1' ? routed(u) : u)),
+      },
+    };
+    expect(forceBroken(oneRouted.world, 'red')).toBe(true);
+    const oneDestroyed = {
+      ...tired,
+      world: {
+        ...tired.world,
+        units: tired.world.units.map((u) =>
+          u.id === 'red-1' ? { ...u, status: 'destroyed' as const } : u,
+        ),
+      },
+    };
+    expect(forceBroken(oneDestroyed.world, 'red')).toBe(true);
   });
 
   it('sends free cavalry after a unit that breaks, and rides it down', () => {
