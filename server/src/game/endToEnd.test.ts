@@ -262,6 +262,21 @@ describe('a battle is decided (#315)', () => {
         (r) => r.kind === 'unitLost',
       );
       expect(redLost.length).toBeGreaterThan(0);
+      // #320: Blue was told it was engaged before the ruling, and of a unit breaking or lost.
+      const ruling = rulings[0] as { time: number; narrative: string };
+      const blue = viewFor(w, 'blue', run.state.time).reports;
+      const engaged = blue.filter((r) => r.kind === 'engaged');
+      expect(engaged.length).toBeGreaterThan(0);
+      expect(Math.min(...engaged.map((r) => r.observedAt))).toBeLessThan(ruling.time);
+      expect(blue.some((r) => ['heavyLosses', 'broke', 'unitLost'].includes(r.kind))).toBe(true);
+      // The ruling paper carries the ruling text and is not the umpire's "reports its situation".
+      const paper = blue.find((r) => r.kind === 'battle')!;
+      expect(paper.text).toBe(ruling.narrative);
+      expect(paper.text).toMatch(/has been broken/);
+      // No report names the other side's units.
+      for (const r of blue.filter((x) => x.kind !== 'contact' && x.kind !== 'destroyed')) {
+        expect(r.text, r.kind).not.toMatch(/red-/i);
+      }
     },
     60_000,
   );
