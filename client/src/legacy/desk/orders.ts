@@ -195,6 +195,8 @@ export function refusalText(o: { text: string; reason: string; code?: string }):
   const lead = clarify
     ? `The staff need more to act on your order "${o.text.trim()}". ${reason}`
     : `Your order "${o.text.trim()}" could not be carried out. ${reason}`;
+  // A rate limit or a repeat is not about wording, so the hint would only mislead (#343).
+  if (o.code === 'rate_limited' || o.code === 'duplicate_text') return lead;
   return `${lead} The staff understand orders such as ${examples}.`;
 }
 

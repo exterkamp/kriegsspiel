@@ -90,6 +90,9 @@ const error = (code: string, message: string): ServerMessage => ({
   message,
 });
 
+/** An order with the same words as the side's last one, sent again within this long, is refused (#343). */
+const DUPLICATE_TEXT_MS = 5000;
+
 export class Hub {
   private readonly conns = new Map<string, Set<Connection>>();
   /** When each side's staff officers are next free (game time). */
@@ -105,13 +108,15 @@ export class Hub {
   private readonly saves = new Map<string, Promise<void>>();
   /** Order ids each side has submitted (`gameId:side`) that were accepted or are still parsing. */
   private readonly orderIds = new Map<string, Set<string>>();
+  /** The last order text each side sent and when, to refuse an identical order sent again at once. */
+  private readonly lastOrderText = new Map<string, { words: string; at: number }>();
 
   constructor(
     private readonly lookup: (gameId: string) => GameActor | undefined,
     private readonly onError: (gameId: string, e: unknown) => void,
     private readonly store?: Pick<
       GameStore,
-      'saveMarks' | 'loadMarks' | 'saveDrafts' | 'loadDrafts' | 'saveSeen' | 'loadSeen'
+      'saveMarks' | 'loadMarks' | 'saveDrafts' | 'loadDrafts' | 'saveSeen' | 'loadSeen' | 'inputLog'
     >,
     /** The side a signed-in user sits on in a game, to name who asked for a pause. */
     private readonly sideOf: (gameId: string, userId: string) => SideId | undefined = () =>
@@ -429,6 +434,32 @@ export class Hub {
     void this.marksOf(gameId, side)
       .then((marks) => this.send(conn, { v: PROTOCOL_VERSION, kind: 'marks', marks: [...marks] }))
       .catch((e) => this.onError(gameId, e));
+    void this.sentOrdersOf(gameId, conn)
+      .then((orders) => this.send(conn, { v: PROTOCOL_VERSION, kind: 'sentOrders', orders }))
+      .catch((e) => this.onError(gameId, e));
+  }
+
+  /** The orders this side sent and the staff understood, from the game's input log (not the client's memory). */
+  private async sentOrdersOf(gameId: string, conn: Connection) {
+    const game = this.lookup(gameId);
+    // Staff officers do not see the commander's orders.
+    if (!game || !this.store || conn.seat?.role === 'intelligence') return [];
+    const names = new Map(this.viewOf(gameId, game, conn).ownUnits.map((u) => [u.id, u.name]));
+    const out = [];
+    for (const e of await this.store.inputLog(gameId)) {
+      const c = e.command;
+      if (c.kind !== 'order' || c.side !== conn.side || e.agent || e.error) continue;
+      if (e.parse?.kind !== 'intents') continue;
+      const toName = names.get(e.parse.unitId);
+      out.push({
+        id: c.orderId ?? `log-${e.seq}`,
+        text: c.text,
+        sentAtGame: e.gameMs,
+        ...(toName ? { toName } : {}),
+        ...(c.courier ? { courier: c.courier } : {}),
+      });
+    }
+    return out;
   }
 
   /** Tell a returning side what arrived while it was away: dispatches delivered after its last visit. */
@@ -458,6 +489,8 @@ export class Hub {
     this.conns.delete(gameId);
     for (const k of [...this.orderIds.keys()])
       if (k.startsWith(`${gameId}:`)) this.orderIds.delete(k);
+    for (const k of [...this.lastOrderText.keys()])
+      if (k.startsWith(`${gameId}:`)) this.lastOrderText.delete(k);
   }
 
   /** Save the seen time of every side that still has a connection, so a restart does not lose it. */
@@ -876,6 +909,17 @@ export class Hub {
       this.send(conn, error('duplicate_order', `${command.orderId}: that order was already sent`));
       return;
     }
+    // The same words again within a few seconds are a double click or a retry under a new id: say so, send nothing (#343).
+    const words = `${command.courier ?? ''}|${command.text.trim().replace(/\s+/g, ' ').toLowerCase()}`;
+    const last = this.lastOrderText.get(idKey);
+    if (last && last.words === words && now - last.at < DUPLICATE_TEXT_MS) {
+      this.send(
+        conn,
+        error('duplicate_text', `${command.orderId}: that order was just sent; it was not sent again`),
+      );
+      return;
+    }
+    this.lastOrderText.set(idKey, { words, at: now });
     ids.add(command.orderId);
     conn.orderTimes.push(now);
     conn.ordersInFlight++;
@@ -885,11 +929,13 @@ export class Hub {
         kind: 'order',
         side: conn.side,
         text: command.text,
+        orderId: command.orderId,
         ...(conn.seat ? { signer: conn.seat } : {}),
         ...(command.courier ? { courier: command.courier } : {}),
       });
     } catch (e) {
       ids.delete(command.orderId);
+      this.lastOrderText.delete(idKey);
       this.send(conn, error('game_closed', e instanceof Error ? e.message : 'game is closed'));
       return;
     } finally {
@@ -898,6 +944,7 @@ export class Hub {
     if (result.ok) return;
     // Nothing was issued, so the player may send the id again after fixing the text.
     ids.delete(command.orderId);
+    this.lastOrderText.delete(idKey);
     if (result.kind === 'clarification') {
       const options = result.options?.length ? ` (${result.options.join(', ')})` : '';
       this.send(
