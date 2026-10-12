@@ -490,3 +490,11 @@ Removed with it: all `.svelte` and test files under `client/src/hq`, the `fixtur
 **Boundary.** This packet provides the isolated component and tests, without an application route, session replacement or personal storage. The forthcoming development route composes it with a certified board and scoped personal state. Existing menu/auth/guest/scenario/live flows remain upstream-owned; simulation, production storage, conversion and resume remain excluded.
 
 **See.** [Angular initialization guide](game-initialization-angular-guide.md), [Angular landing plan](game-initialization-angular-landing-plan.md).
+
+## D33: Local board hosts borrow a fixed certified rendering surface
+
+**Decision.** The native Angular local board host renders certified public geography in metres, with stopped time, no pieces and validated render-only personal marks. A full asset identity, canonical bytes, rectangular bounds and north-west registration must agree before scene allocation. Initialization succeeds only after framing and a real rendered frame. Mark edits and retained-host canvas replacement reuse one session raster.
+
+**Ownership.** The host exposes keyed initialization/availability and awaitable teardown, retires old canvas resources before a successor, and rejects late callbacks. Camera controls and full interaction use separate gates: manual placement can disable camera motion while preserving metre picking; a modal gate blocks both. Local pagehide retires terminally. Whole-session ownership, full-parent HMR, fresh scope recovery and the development route are composed in a subsequent packet.
+
+**See.** [Angular guide](game-initialization-angular-guide.md), [fixed-board browser verification](game-initialization-verification/angular-local-board/README.md).
