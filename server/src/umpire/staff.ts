@@ -345,6 +345,12 @@ const SEAT_FOR: Readonly<Record<string, Role>> = {
   engineer: 'chiefOfStaff',
 };
 
+/** The officer who stands in for `conferenceRole` when the staff stage gave nothing: the same one `answerStaffQuestion` would name. */
+export function staffOfficerFor(seed: number, side: SideId, conferenceRole: string): StaffOfficer {
+  const role = SEAT_FOR[conferenceRole] ?? 'chiefOfStaff';
+  return staffOfficer(seed, side, role, conferenceRole === 'engineer' ? 1 : 0);
+}
+
 export interface StaffAnswer {
   text: string;
   officer: StaffOfficer;
@@ -368,7 +374,7 @@ export async function answerStaffQuestion(
 ): Promise<StaffAnswer | undefined> {
   const role = SEAT_FOR[conferenceRole] ?? 'chiefOfStaff';
   const seat: Seat = { role };
-  const officer = staffOfficer(world.seed, side, role, conferenceRole === 'engineer' ? 1 : 0);
+  const officer = staffOfficerFor(world.seed, side, conferenceRole);
   const view = viewForRole(world, side, seat, now);
   const input = { ...staffInput(officer, view, now), question };
   // The answer rests on the newest paper the side holds, which may be older than the moment of asking.

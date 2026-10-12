@@ -168,19 +168,34 @@ export function applyServerAnswers(
 /**
  * Take in the conference the server kept (`SideView.staffHistory`), so a reload or a reconnect
  * does not lose it. An exchange already in the log (by its question id) is left alone; the rest
- * are added with their officer and answer, or text-less when the server had no words. Returns the
+ * are added with their officer and answer, or text-less when the stage gave no words (`textless`). One whose words were still withheld stays open and takes them from a later view. Returns the
  * same array when nothing changed.
  */
 export function mergeStaffHistory(
   log: readonly Exchange[],
   history: readonly StaffExchange[] | undefined,
 ): readonly Exchange[] {
+  const byId = new Map((history ?? []).map((h) => [h.questionId, h]));
+  let changed = false;
+  // An exchange kept before its answer was due carries no words yet; a later view brings them.
+  const filled = log.map((e) => {
+    const h = e.questionId === undefined ? undefined : byId.get(e.questionId);
+    if (!h || h.text === undefined || e.answer || e.failed) return e;
+    changed = true;
+    const open = { ...e };
+    delete open.textless;
+    return {
+      ...open,
+      answer: { text: `${h.officer.name}: ${h.text}`, basedOnGame: h.basedOnGame ?? h.askedAtGame },
+      officer: h.officer,
+    };
+  });
   const known = new Set(log.flatMap((e) => (e.questionId === undefined ? [] : [e.questionId])));
   const fresh = (history ?? []).filter((h) => !known.has(h.questionId));
-  if (fresh.length === 0) return log;
+  if (fresh.length === 0) return changed ? filled : log;
   let id = nextExchangeId(log);
   return [
-    ...log,
+    ...filled,
     ...fresh.map((h): Exchange => ({
       id: id++,
       role: h.role,
@@ -189,14 +204,17 @@ export function mergeStaffHistory(
       answerAtGame: h.answerAtGame,
       questionId: h.questionId,
       officer: h.officer,
-      ...(h.text === undefined
-        ? { textless: true }
-        : {
+      // Words withheld until due leave the exchange open; only a stage that gave none is text-less.
+      ...(h.text !== undefined
+        ? {
             answer: {
               text: `${h.officer.name}: ${h.text}`,
               basedOnGame: h.basedOnGame ?? h.askedAtGame,
             },
-          }),
+          }
+        : h.textless
+          ? { textless: true }
+          : {}),
     })),
   ];
 }

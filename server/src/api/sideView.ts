@@ -64,6 +64,21 @@ export function documentToDispatch(d: ViewDocument): Dispatch {
  */
 export type Narration = ReadonlyMap<string, string | null>;
 
+/** Who a staff exchange belongs to: a seat's role and, for a subordinate, the formations it commands. */
+export function seatKey(seat: Seat): string {
+  return seat.role === 'subordinate'
+    ? `subordinate:${[...(seat.units ?? [])].sort().join(',')}`
+    : seat.role;
+}
+
+/**
+ * The conference exchanges a seat may see: only those it asked, since the answers are written from
+ * the officer's view, not the reader's. Without a seat (shared-HQ play, the admin view) all of them.
+ */
+function staffFor(seat: Seat | undefined, staff: readonly StaffExchange[]): StaffExchange[] {
+  return staff.filter((x) => seat === undefined || x.askedBy === seatKey(seat));
+}
+
 /** An officer's answer, once it is due, is a paper in the Staff pile. It is filed once, under the question's id. */
 function staffDispatch(x: StaffExchange, now: number): Dispatch[] {
   if (x.text === undefined || now < x.answerAtGame) return [];
@@ -81,8 +96,9 @@ function staffDispatch(x: StaffExchange, now: number): Dispatch[] {
 
 /** The answer's words are withheld until the officer's time has passed. */
 function staffExchangeAt(x: StaffExchange, now: number): StaffExchange {
-  if (now >= x.answerAtGame) return x;
   const early = { ...x };
+  delete early.askedBy;
+  if (now >= x.answerAtGame) return early;
   delete early.text;
   delete early.basedOnGame;
   return early;
@@ -176,7 +192,7 @@ export function sideViewOf(
       viewForRole(state.world, side, seat, state.time, forwarded),
       clock,
       narration,
-      staff,
+      staffFor(seat, staff),
     );
   }
   return toSideView(viewFor(state.world, side, state.time), clock, narration, staff);

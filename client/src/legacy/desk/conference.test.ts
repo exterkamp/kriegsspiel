@@ -176,7 +176,10 @@ describe('the conference the server kept (#323)', () => {
   });
 
   it('restores answered and text-less exchanges after a reload, once', () => {
-    const log = mergeStaffHistory([], [kept('q1', 'At the bridge.'), kept('q2')]);
+    const log = mergeStaffHistory(
+      [],
+      [kept('q1', 'At the bridge.'), { ...kept('q2'), textless: true }],
+    );
     expect(log).toHaveLength(2);
     expect(log[0]).toMatchObject({
       role: 'intelligence',
@@ -186,9 +189,31 @@ describe('the conference the server kept (#323)', () => {
       answer: { text: 'Major Dessau: At the bridge.', basedOnGame: 60_000 },
     });
     expect(log[1]).toMatchObject({ questionId: 'q2', textless: true });
+    expect(log[1]!.answer).toBeUndefined();
     expect(new Set(log.map((e) => e.id)).size).toBe(2);
     // Merging again changes nothing, and an exchange already held is not doubled.
     expect(mergeStaffHistory(log, [kept('q1', 'At the bridge.')])).toBe(log);
     expect(mergeStaffHistory(log, undefined)).toBe(log);
+  });
+
+  it('keeps an exchange reloaded before it was due open, then takes the real words', () => {
+    // The server withholds the words until due, so there is no text and no `textless` flag.
+    const early = mergeStaffHistory([], [kept('q1')]);
+    expect(early[0]).not.toHaveProperty('textless');
+    expect(early[0]!.answer).toBeUndefined();
+    // Nothing settles it from the client's own view in the meantime.
+    expect(settleTextless(early, 960_000, fixtureView)).toBe(early);
+    const due = mergeStaffHistory(early, [kept('q1', 'At the bridge.')]);
+    expect(due).toHaveLength(1);
+    expect(due[0]!.answer).toEqual({
+      text: 'Major Dessau: At the bridge.',
+      basedOnGame: 60_000,
+    });
+    expect(mergeStaffHistory(due, [kept('q1', 'At the bridge.')])).toBe(due);
+  });
+
+  it('marks only a stage that gave no words as text-less', () => {
+    const [x] = mergeStaffHistory([], [{ ...kept('q2'), textless: true }]);
+    expect(x).toMatchObject({ questionId: 'q2', textless: true });
   });
 });

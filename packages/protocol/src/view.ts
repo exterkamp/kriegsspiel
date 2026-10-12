@@ -18,6 +18,10 @@ export const StaffExchange = z
     answerAtGame: GameMs,
     text: z.string().optional(),
     basedOnGame: GameMs.optional(),
+    /** The staff stage gave no words, so `text` will never come (as opposed to being withheld until due). */
+    textless: z.boolean().optional(),
+    /** Which seat asked (server-side only; `toSideView` filters on it and never sends it). */
+    askedBy: z.string().optional(),
     officer: z.object({ name: z.string(), traits: z.array(z.string()) }).strict(),
   })
   .strict();

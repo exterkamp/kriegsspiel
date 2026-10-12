@@ -8,12 +8,13 @@ import {
   registerVisibility,
   viewFor,
   type GameState,
+  type Seat,
 } from '@kriegsspiel/engine';
 import { afterEach, describe, expect, it } from 'vitest';
-import { sideViewOf } from '../api/sideView.js';
+import { seatKey, sideViewOf } from '../api/sideView.js';
 import type { OrderParser } from '../orders/index.js';
 import type { UmpireClient, UmpireRequest, UmpireResponse } from '../umpire/index.js';
-import { NARRATE_WINDOW_BASE_MS } from '../umpire/index.js';
+import { NARRATE_WINDOW_BASE_MS, staffOfficerFor } from '../umpire/index.js';
 import { GameHost, MemoryGameStore } from './index.js';
 import { FakeTime } from './testing.js';
 
@@ -249,6 +250,46 @@ describe('staff answers in the actor', () => {
     expect(await game.answerStaff('blue', 'engineer', 'Status?', asked('q2'))).toBeUndefined();
     const entry = (await store.inputLog('g1')).find((e) => e.command.kind === 'staffAnswer');
     expect(entry?.error).toBeDefined();
+    // The kept exchange says the stage gave no words, and names the officer who was asked.
+    const [kept] = game.staffHistoryFor('blue');
+    expect(kept).toMatchObject({ questionId: 'q2', role: 'engineer', textless: true });
+    expect(kept!.officer).toEqual(
+      (({ name, traits }) => ({ name, traits }))(
+        staffOfficerFor(game.state.world.seed, 'blue', 'engineer'),
+      ),
+    );
+    expect(kept!.officer.name).not.toBe(
+      staffOfficerFor(game.state.world.seed, 'blue', 'chiefOfStaff').name,
+    );
+  });
+
+  it('shows a seat only the exchanges it asked, and never the asker key', async () => {
+    const umpire = new StubUmpire();
+    const { game } = await newGame(umpire);
+    const hq = { ...asked('q-hq'), askedBy: 'commander' };
+    const sub = { ...asked('q-sub'), askedBy: seatKey({ role: 'subordinate', units: ['blue-1'] }) };
+    await game.answerStaff('blue', 'intelligence', 'Where is the enemy?', hq);
+    await game.answerStaff('blue', 'chiefOfStaff', 'Status?', sub);
+    const at = (seat?: Seat) => {
+      const v = sideViewOf(
+        game.state,
+        'blue',
+        game.gameClock.snapshot(),
+        seat,
+        [],
+        undefined,
+        game.staffHistoryFor('blue'),
+      );
+      return v;
+    };
+    const ids = (v: ReturnType<typeof at>) => (v.staffHistory ?? []).map((x) => x.questionId);
+    expect(ids(at({ role: 'commander' }))).toEqual(['q-hq']);
+    expect(ids(at({ role: 'subordinate', units: ['blue-1'] }))).toEqual(['q-sub']);
+    expect(at({ role: 'quartermaster' }).staffHistory).toBeUndefined();
+    expect(at({ role: 'subordinate', units: ['blue-2'] }).staffHistory).toBeUndefined();
+    expect(ids(at())).toEqual(['q-hq', 'q-sub']);
+    expect(JSON.stringify(at({ role: 'commander' }))).not.toContain('askedBy');
+    expect(JSON.stringify(at())).not.toContain('askedBy');
   });
 
   it('returns nothing and logs nothing without an umpire', async () => {

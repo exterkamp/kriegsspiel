@@ -45,7 +45,7 @@ import {
   narrateReports,
   narrateWindowMs,
   reportsDueForNarration,
-  staffOfficer,
+  staffOfficerFor,
   type StaffAnswer,
   type UmpireCallRecord,
   type UmpireRequest,
@@ -527,7 +527,7 @@ export class GameActor {
     side: SideId,
     role: string,
     question: string,
-    asked: { questionId: string; askedAtGame: number; answerAtGame: number },
+    asked: { questionId: string; askedAtGame: number; answerAtGame: number; askedBy?: string },
   ): Promise<StaffAnswer | undefined> {
     const umpire = this.umpire;
     if (!umpire || this.closed || this.engine.world.outcome) return undefined;
@@ -550,12 +550,12 @@ export class GameActor {
       ...asked,
       role: role as StaffExchange['role'],
       question,
-      ...(answer ? { text: answer.text, basedOnGame: answer.basedOnGame } : {}),
-      officer: answer
-        ? { name: answer.officer.name, traits: answer.officer.traits }
-        : (({ name, traits }) => ({ name, traits }))(
-            staffOfficer(this.engine.world.seed, side as SideId, 'chiefOfStaff'),
-          ),
+      ...(answer
+        ? { text: answer.text, basedOnGame: answer.basedOnGame }
+        : { textless: true as const }),
+      officer: (({ name, traits }) => ({ name, traits }))(
+        answer?.officer ?? staffOfficerFor(this.engine.world.seed, side as SideId, role),
+      ),
     };
     await this.enqueueCompletion(async () => {
       this.staffHistory.set(side, [...(this.staffHistory.get(side) ?? []), exchange]);
