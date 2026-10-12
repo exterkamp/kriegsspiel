@@ -387,7 +387,6 @@ describe('staff answers in the actor', () => {
     }
     await time.advance(31_000);
     expect(game.staffAtWork.working).toBe(false);
-    expect(game.narrationFor('blue')).toBeUndefined();
     const entry = (await store.inputLog('g1')).find((e) => e.command.kind === 'narrate');
     expect(entry?.error).toMatch(/timed out/);
   });

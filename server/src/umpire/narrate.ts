@@ -434,8 +434,36 @@ export interface NarrateOptions {
    * own short call, which a 0.5b model manages far more often than a long batch, but the calls add up (#359).
    */
   maxReports?: number;
+  /**
+   * Aborted when the window's time is up. The call in flight is abandoned, and it and every report not yet
+   * narrated keep their template text (reason "timed out"); the reports already narrated keep the model's prose.
+   */
+  signal?: AbortSignal;
   /** Names the side must not read (`hiddenTerms`): a dispatch that carries one, in any case or spacing, is rejected. */
   hidden?: readonly string[];
+}
+
+const TIMED_OUT = 'timed out';
+const ABORTED = Symbol('aborted');
+
+/** `work`, or a rejection with `ABORTED` as soon as `signal` fires. */
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (!signal) return work;
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(ABORTED);
+    if (signal.aborted) return onAbort();
+    signal.addEventListener('abort', onAbort, { once: true });
+    work.then(
+      (v) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(v);
+      },
+      (e) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(e);
+      },
+    );
+  });
 }
 
 /** Reports narrated per window by default; the newest are kept when there are more. */
@@ -468,6 +496,8 @@ export async function narrateReports(
   };
   if (reports.length === 0) return result;
 
+  // The newest are kept, so put them in delivery order whatever order the view lists them in.
+  reports.sort((a, b) => a.deliveredAt - b.deliveredAt);
   const toNarrate = reports.slice(-maxReports);
   const skipped = new Set(reports.slice(0, reports.length - toNarrate.length).map((r) => r.id));
   let stopped: string | undefined;
@@ -484,6 +514,12 @@ export async function narrateReports(
       result.fallbacks.push({ reportId: r.id, reason: stopped });
       continue;
     }
+    if (opts.signal?.aborted) {
+      stopped = TIMED_OUT;
+      result.dispatches.push(template);
+      result.fallbacks.push({ reportId: r.id, reason: stopped });
+      continue;
+    }
     const input = narrateInput(side, [r]);
     const rejections: string[][] = [];
     let narrated: NarratedDispatch | undefined;
@@ -495,14 +531,21 @@ export async function narrateReports(
       const retry = rejections.at(-1);
       let output: NarrateOutput;
       try {
-        ({ output } = await client.call<NarrateOutput>({
-          stage: 'narrate',
-          promptVersion: NARRATE_PROMPT_VERSION,
-          system: NARRATE_SYSTEM,
-          input: retry ? { ...input, rejected: retry } : input,
-          schema: NARRATE_SCHEMA,
-        }));
+        ({ output } = await untilAborted(
+          client.call<NarrateOutput>({
+            stage: 'narrate',
+            promptVersion: NARRATE_PROMPT_VERSION,
+            system: NARRATE_SYSTEM,
+            input: retry ? { ...input, rejected: retry } : input,
+            schema: NARRATE_SCHEMA,
+          }),
+          opts.signal,
+        ));
       } catch (e) {
+        if (e === ABORTED) {
+          stopped = TIMED_OUT;
+          break;
+        }
         if (!(e instanceof UmpireError)) throw e;
         const overloaded = e.kind === 'budget' || e.kind === 'rate-limit';
         // A refused call was never sent, so it is not a model call.

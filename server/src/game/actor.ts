@@ -444,15 +444,19 @@ export class GameActor {
           return res;
         },
       };
-      const work = this.withTimeout(
-        narrateReports(client, side.id as SideId, due, {
-          hidden: hiddenTerms(this.engine.world, side.id as SideId),
-        }),
-        this.narrateTimeoutMs,
-        'narration',
-      ).then(
-        (result) => result,
+      // At the deadline the reports already narrated are kept and the rest fall back to template text.
+      const abort = new AbortController();
+      const deadline = this.parseTimer(() => abort.abort(), this.narrateTimeoutMs);
+      const work = narrateReports(client, side.id as SideId, due, {
+        hidden: hiddenTerms(this.engine.world, side.id as SideId),
+        signal: abort.signal,
+      }).then(
+        (result) => {
+          this.clearParseTimer(deadline);
+          return result;
+        },
         (e) => {
+          this.clearParseTimer(deadline);
           if (this.trace.enabled) {
             this.trace.record(this.id, 'error', { source: 'narrate', error: e });
           }

@@ -298,7 +298,9 @@ export function answerFacts(view: unknown): string[] {
 
 /**
  * Whether an answer says something: no sentence or long phrase twice, no stock filler, and at least one
- * concrete fact from the officer's view (a unit or place name, an id, or a count).
+ * concrete fact from the officer's view (a unit or place name, an id, or a count). The count is loose on
+ * purpose: any bare number passes, not only one from the view, so this gate catches an empty answer and
+ * not a wrong one; `checkProseAgainst` and the retry deal with invented figures.
  */
 export function checkAnswerQuality(text: string, facts: readonly string[]): string[] {
   const problems: string[] = [];

@@ -210,6 +210,42 @@ describe('narrateReports', () => {
     expect(r.dispatches[0]!.text).toBe(many[0]!.text);
   });
 
+  it('takes the newest reports by delivery time, whatever order the view lists them in', async () => {
+    const many = [3, 1, 4, 2].map((n) => report({ id: `blue-r${n}`, deliveredAt: n * 1000 }));
+    const client = fakeModel([
+      one('blue-r3', 'Sir, the 2nd Hussars report about 400 men near the mill.'),
+      one('blue-r4', 'Sir, the 2nd Hussars report about 400 men near the mill.'),
+    ]);
+    const r = await narrateReports(client as never, 'blue', many, { maxReports: 2 });
+    expect(client.calls.map((c) => c.reports[0].id)).toEqual(['blue-r3', 'blue-r4']);
+    expect(r.fallbacks.map((f) => f.reportId)).toEqual(['blue-r1', 'blue-r2']);
+  });
+
+  it('keeps the prose of the reports done when time runs out, and the rest keep their text (#359)', async () => {
+    const abort = new AbortController();
+    let n = 0;
+    const client = {
+      async call(req: { input: unknown }) {
+        if (++n === 1) {
+          const id = (req.input as { reports: { id: string }[] }).reports[0]!.id;
+          return { output: one(id, good.dispatches[0]!.text), record: {} as never };
+        }
+        return new Promise<never>(() => undefined); // hangs until the deadline
+      },
+    };
+    const run = narrateReports(client as never, 'blue', reports, { signal: abort.signal });
+    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    abort.abort();
+    const r = await run;
+    expect(r.dispatches).toEqual([
+      { reportIds: ['blue-r1'], text: good.dispatches[0]!.text },
+      { reportIds: ['blue-r2'], text: reports[1]!.text },
+    ]);
+    expect(r.fallbacks).toEqual([{ reportId: 'blue-r2', reason: 'timed out' }]);
+    expect(r.fellBack).toBe(true);
+  });
+
   it('leaves the umpire’s ruling in its own words, out of the model’s hands (#320)', async () => {
     const ruling = report({
       id: 'blue-r3',
