@@ -30,7 +30,7 @@ Epic 1 (the playable vertical slice) is done: you can start a game, write orders
 3. Open `/?new=1&side=blue&rate=12` to create a game and take Blue, or `/?lobby=1` for the lobby, or `/?game=<id>` to join a game. With none of these the page shows the main menu.
 4. Read the opening report in the in-tray (I), write orders at the orders desk (O), for example "1st Battalion march to the bridge and hold", choose a courier and sign. Hold the bridge for 50 game minutes; Red wins by taking it.
 
-How long it takes: at 12:1 a game with orders ends at about game minute 40 (about 3 to 4 minutes of real time), and a game nobody breaks runs the full 50 minute hold (about 4 minutes at 12:1, 12.5 at 4:1). See D35 in [docs/decisions.md](docs/decisions.md).
+How long it takes: with orders a game ends at about game minute 40 (measured: 3.4 real minutes at 12:1, 10 at 4:1, same outcome), and a game nobody breaks runs the full 50 minute hold (4.2 real minutes at 12:1, 12.5 at 4:1). See D35 in [docs/decisions.md](docs/decisions.md).
 
 Replay a finished game from its log with no model calls: `npm run replay -w server -- <log>` (see `server/src/game/replayCli.ts`).
 
