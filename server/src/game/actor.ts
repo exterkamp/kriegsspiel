@@ -490,8 +490,10 @@ export class GameActor {
       }
       step(target);
     } finally {
-      // A finished game does not run on.
-      if (this.engine.world.outcome && this.clock.status !== 'stopped') this.clock.stop();
+      // A finished game does not run on. Freeze the clock at the outcome's own time, not at
+      // this tick's later reading, so the stopped clock agrees with the end panel.
+      const outcome = this.engine.world.outcome;
+      if (outcome && this.clock.status !== 'stopped') this.clock.stop(outcome.time);
       if (emitted.length > 0) {
         if (this.trace.enabled) {
           for (const event of emitted) this.trace.record(this.id, 'engine', event);

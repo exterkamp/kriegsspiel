@@ -52,6 +52,8 @@ type ClockState = {
 
 Changing the rate or pausing **re-anchors** the clock at the current game time, so game time never jumps. Every clock change is logged with its wall time.
 
+At game over the actor stops the clock at the outcome's own game time, not at the reading of the tick that noticed the end. In manual and fast-forward modes that tick has usually already advanced past the outcome, so the logged clock history can end with an `advance` entry whose game time is *later* than the final `stop` entry's: the history is not monotonic in game time at game over, and no reader should assume it is.
+
 Implemented in `server/src/clock.ts` (`GameClock`, with an injected wall-time source). `wallDueFor(gameMs)` and `gameMsAtWall(wallMs)` convert in both directions for the scheduler. `wallDueFor` is `Infinity` when paused or manual, and "now" in fast-forward.
 
 Clock modes (all required, since tests need them):

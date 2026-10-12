@@ -26,12 +26,13 @@
  * A seat (one user on one side of one game) is the only way into a game; the session cookie is checked
  * before the WebSocket upgrade.
  */
+import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import { holdTheBridge, loadScenario, type Seat, type SideId } from '@kriegsspiel/engine';
-import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { spaFallback } from './spaFallback.js';
 import { z } from 'zod';
 import type { WallClock } from '../clock.js';
@@ -51,7 +52,7 @@ import { loadReplayInput, replayTimeline } from '../admin/replayView.js';
 import { LogMailer, type Mailer } from '../auth/mailer.js';
 import { authRoutes, type Auth } from '../auth/routes.js';
 import { MemoryAuthStore, type AuthStore } from '../auth/store.js';
-import { TraceStore } from '../debug/trace.js';
+import { NOOP_TRACE, TraceStore, traceRequest } from '../debug/trace.js';
 import {
   MemoryLobbyStore,
   SESSION_TYPES,
@@ -120,6 +121,25 @@ const WsQuery = z.object({ side: SideName.optional() });
 
 /** Largest message a client may send. Orders are a few lines of prose. */
 const MAX_PAYLOAD_BYTES = 16 * 1024;
+
+/** Byte size of a JSON-ish payload for a trace entry; undefined when it cannot be measured. */
+function byteSizeOf(value: unknown): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'string') return Buffer.byteLength(value);
+  if (Buffer.isBuffer(value)) return value.length;
+  if (typeof value === 'object') {
+    // A Fastify reply is not a payload; its size is captured through `send` instead.
+    if ('raw' in value && typeof (value as { send?: unknown }).send === 'function') {
+      return undefined;
+    }
+    try {
+      return Buffer.byteLength(JSON.stringify(value));
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
 
 export interface AppOptions {
   /** One parser for every game, or one per game. See `GameHostOptions.parser`. */
@@ -205,6 +225,50 @@ export async function buildApp(options: AppOptions): Promise<App> {
       : false,
   });
   const trace = options.admin?.enabled ? (options.admin.trace ?? new TraceStore()) : undefined;
+  /**
+   * Run one game-scoped HTTP handler inside `traceRequest` (#198), so the admin Requests panel
+   * has a row for it and the commands, events and LLM calls it causes share its correlation id.
+   * Only routes that belong to a game are wrapped: trace entries are stored per game, and a
+   * synthetic bucket for /healthz, /auth or /scenarios would surface as a phantom game in the
+   * admin game picker. Callers wrap only the part of a handler that runs once the caller is
+   * signed in and the game is known to exist: a rejected request (401, 400, 404) leaves no
+   * trace row, so a failed create cannot mint a phantom game id for the picker and an
+   * unauthenticated caller cannot grow the store by inventing ids. The response size is what
+   * the handler passes to `reply.send`, or the JSON size of a returned value.
+   */
+  const tracedHttp = async <T>(
+    gameId: string,
+    req: FastifyRequest,
+    reply: FastifyReply | undefined,
+    fn: () => Promise<T>,
+  ): Promise<T> => {
+    if (!trace) return fn();
+    let sentBytes: number | undefined;
+    if (reply) {
+      const raw = reply as FastifyReply & { send: (payload?: unknown) => FastifyReply };
+      const send = raw.send.bind(reply);
+      raw.send = (payload?: unknown) => {
+        sentBytes = byteSizeOf(payload) ?? sentBytes;
+        return send(payload);
+      };
+    }
+    const contentLength = Number(req.headers['content-length']);
+    return traceRequest(
+      trace,
+      gameId,
+      {
+        transport: 'http',
+        method: req.method,
+        // The query can carry secrets (the magic-link token); the panel needs the route only.
+        path: req.url.split('?')[0] ?? req.url,
+        ...(Number.isFinite(contentLength) ? { bytes: contentLength } : {}),
+      },
+      fn,
+      // Every wrapped handler either sends through `reply.send` or returns a measurable
+      // value, so the fallback is unreachable in practice.
+      { responseBytes: (result) => sentBytes ?? byteSizeOf(result) ?? 0 },
+    );
+  };
   const onError = (gameId: string, e: unknown) => {
     server.log.error({ err: e, gameId }, 'game error');
     options.onError?.(gameId, e);
@@ -229,6 +293,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
         if (rec) lobby.put({ ...rec, forwards: [...(rec.forwards ?? []), f] });
       },
     },
+    trace ?? NOOP_TRACE,
   );
   const lobby = options.lobby ?? new MemoryLobbyStore();
   const authStore = options.auth?.store ?? new MemoryAuthStore();
@@ -410,6 +475,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
   }));
 
   server.post('/games', async (req, reply) => {
+    // Sign-in and every 400 are settled before any tracing: a failed create must not leave
+    // a trace row under the would-be id, or the admin picker fills with phantom games.
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const body = CreateGame.safeParse(req.body ?? {});
@@ -426,8 +493,9 @@ export async function buildApp(options: AppOptions): Promise<App> {
         .code(400)
         .send({ error: 'no_ai_opponent', message: 'this server has no AI opponent' });
     }
+    const createdId = randomUUID();
     const rec: LobbyGame = {
-      id: randomUUID(),
+      id: createdId,
       scenario,
       rate: body.data.rate ?? 1,
       sessionType,
@@ -445,22 +513,25 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (!side || !playable.includes(side)) {
       return reply.code(400).send({ error: 'bad_side', message: `no playable side "${side}"` });
     }
-    if (sessionType !== 'hot_seat' && !authStore.claimSeat(rec.id, side, user.id)) {
-      return reply.code(500).send({ error: 'seat_failed' });
-    }
-    lobby.put(rec);
-    const result = {
-      id: rec.id,
-      scenario,
-      rate: rec.rate,
-      sessionType,
-      side: sessionType === 'hot_seat' ? playable[0]! : side,
-      ws: `/games/${rec.id}/ws`,
-    };
-    if (body.data.lobby) return reply.code(201).send({ ...result, status: 'lobby' });
-    const startError = await startGame(rec);
-    if (startError) return reply.code(500).send({ error: startError });
-    return reply.code(201).send({ ...result, status: 'started' });
+    // The request is accepted from here, so the creation itself is traced under the new id.
+    return tracedHttp(createdId, req, reply, async () => {
+      if (sessionType !== 'hot_seat' && !authStore.claimSeat(rec.id, side, user.id)) {
+        return reply.code(500).send({ error: 'seat_failed' });
+      }
+      lobby.put(rec);
+      const result = {
+        id: rec.id,
+        scenario,
+        rate: rec.rate,
+        sessionType,
+        side: sessionType === 'hot_seat' ? playable[0]! : side,
+        ws: `/games/${rec.id}/ws`,
+      };
+      if (body.data.lobby) return reply.code(201).send({ ...result, status: 'lobby' });
+      const startError = await startGame(rec);
+      if (startError) return reply.code(500).send({ error: startError });
+      return reply.code(201).send({ ...result, status: 'started' });
+    });
   });
 
   /** Ids of games whose `/start` is in flight, so a second request gets 409 rather than a failed create. */
@@ -534,35 +605,37 @@ export async function buildApp(options: AppOptions): Promise<App> {
     const { id } = req.params;
     const rec = recordOf(id);
     if (!rec || isPrivateTo(rec, user.id)) return reply.code(404).send({ error: 'no_such_game' });
-    const seats = authStore.seatsOf(id);
-    const hotSeat = rec.sessionType === 'hot_seat';
-    return {
-      ...summary(rec, user.id),
-      you: sideFor(rec, user.id) ?? null,
-      ready: rec.ready.includes(user.id) || (rec.creator === user.id && !hotSeat),
-      role: seatFor(rec, user.id)?.role ?? null,
-      pause: rec.pause ?? null,
-      sides: humanSides(rec).map((side) => {
-        const seat = seats.find((s) => s.side === side);
-        return {
-          side,
-          taken: hotSeat || seat !== undefined,
-          // Who sits where is not told, only which jobs are filled and which of them is yours.
-          roles: (rec.roles ?? [])
-            .filter((r) => r.side === side)
-            .map((r) => ({
-              role: r.role,
-              ...(r.units ? { units: r.units } : {}),
-              you: r.userId === user.id,
-            })),
-          // The creator starts the game, so they count as ready.
-          ready:
-            hotSeat ||
-            (seat !== undefined &&
-              (seat.userId === rec.creator || rec.ready.includes(seat.userId))),
-        };
-      }),
-    };
+    return tracedHttp(id, req, reply, async () => {
+      const seats = authStore.seatsOf(id);
+      const hotSeat = rec.sessionType === 'hot_seat';
+      return {
+        ...summary(rec, user.id),
+        you: sideFor(rec, user.id) ?? null,
+        ready: rec.ready.includes(user.id) || (rec.creator === user.id && !hotSeat),
+        role: seatFor(rec, user.id)?.role ?? null,
+        pause: rec.pause ?? null,
+        sides: humanSides(rec).map((side) => {
+          const seat = seats.find((s) => s.side === side);
+          return {
+            side,
+            taken: hotSeat || seat !== undefined,
+            // Who sits where is not told, only which jobs are filled and which of them is yours.
+            roles: (rec.roles ?? [])
+              .filter((r) => r.side === side)
+              .map((r) => ({
+                role: r.role,
+                ...(r.units ? { units: r.units } : {}),
+                you: r.userId === user.id,
+              })),
+            // The creator starts the game, so they count as ready.
+            ready:
+              hotSeat ||
+              (seat !== undefined &&
+                (seat.userId === rec.creator || rec.ready.includes(seat.userId))),
+          };
+        }),
+      };
+    });
   });
 
   /**
@@ -615,15 +688,17 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const rec = recordOf(req.params.id);
     if (!rec) return reply.code(404).send({ error: 'no_such_game' });
-    if (rec.status !== 'lobby' || starting.has(rec.id))
-      return reply.code(409).send({ error: 'already_started' });
-    if (!roleOf(rec, user.id)) return reply.code(404).send({ error: 'no_role' });
-    lobby.put({
-      ...rec,
-      roles: (rec.roles ?? []).filter((r) => r.userId !== user.id),
-      ready: rec.ready.filter((u) => u !== user.id),
+    return tracedHttp(req.params.id, req, reply, async () => {
+      if (rec.status !== 'lobby' || starting.has(rec.id))
+        return reply.code(409).send({ error: 'already_started' });
+      if (!roleOf(rec, user.id)) return reply.code(404).send({ error: 'no_role' });
+      lobby.put({
+        ...rec,
+        roles: (rec.roles ?? []).filter((r) => r.userId !== user.id),
+        ready: rec.ready.filter((u) => u !== user.id),
+      });
+      return { left: true };
     });
-    return { left: true };
   });
 
   server.post<{ Params: { id: string } }>('/games/:id/join', async (req, reply) => {
@@ -632,20 +707,23 @@ export async function buildApp(options: AppOptions): Promise<App> {
     const { id } = req.params;
     const rec = recordOf(id);
     if (!rec || isPrivateTo(rec, user.id)) return reply.code(404).send({ error: 'no_such_game' });
-    const body = JoinGame.safeParse(req.body);
-    if (!body.success) {
-      return reply.code(400).send({ error: 'bad_request', message: body.error.message });
-    }
-    const { side } = body.data;
-    if (rec.sessionType === 'hot_seat') return reply.code(400).send({ error: 'hot_seat_game' });
-    if (!humanSides(rec).includes(side)) return reply.code(400).send({ error: 'bad_side' });
-    if (body.data.role) return joinRole(rec, user.id, side, body.data.role, body.data.units, reply);
-    if (body.data.units) return reply.code(400).send({ error: 'bad_role' });
-    if (roleOf(rec, user.id)) return reply.code(409).send({ error: 'seat_unavailable' });
-    if (!authStore.claimSeat(id, side, user.id)) {
-      return reply.code(409).send({ error: 'seat_unavailable' });
-    }
-    return { id, side, ws: `/games/${id}/ws` };
+    return tracedHttp(id, req, reply, async () => {
+      const body = JoinGame.safeParse(req.body);
+      if (!body.success) {
+        return reply.code(400).send({ error: 'bad_request', message: body.error.message });
+      }
+      const { side } = body.data;
+      if (rec.sessionType === 'hot_seat') return reply.code(400).send({ error: 'hot_seat_game' });
+      if (!humanSides(rec).includes(side)) return reply.code(400).send({ error: 'bad_side' });
+      if (body.data.role)
+        return joinRole(rec, user.id, side, body.data.role, body.data.units, reply);
+      if (body.data.units) return reply.code(400).send({ error: 'bad_role' });
+      if (roleOf(rec, user.id)) return reply.code(409).send({ error: 'seat_unavailable' });
+      if (!authStore.claimSeat(id, side, user.id)) {
+        return reply.code(409).send({ error: 'seat_unavailable' });
+      }
+      return { id, side, ws: `/games/${id}/ws` };
+    });
   });
 
   server.post<{ Params: { id: string } }>('/games/:id/ready', async (req, reply) => {
@@ -653,18 +731,20 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const rec = recordOf(req.params.id);
     if (!rec) return reply.code(404).send({ error: 'no_such_game' });
-    const body = Ready.safeParse(req.body);
-    if (!body.success) {
-      return reply.code(400).send({ error: 'bad_request', message: body.error.message });
-    }
-    if (rec.status !== 'lobby' || starting.has(rec.id))
-      return reply.code(409).send({ error: 'already_started' });
-    if (!authStore.seatOf(rec.id, user.id) && !roleOf(rec, user.id)) {
-      return reply.code(403).send({ error: 'no_seat' });
-    }
-    const others = rec.ready.filter((u) => u !== user.id);
-    lobby.put({ ...rec, ready: body.data.ready ? [...others, user.id] : others });
-    return { ready: body.data.ready };
+    return tracedHttp(req.params.id, req, reply, async () => {
+      const body = Ready.safeParse(req.body);
+      if (!body.success) {
+        return reply.code(400).send({ error: 'bad_request', message: body.error.message });
+      }
+      if (rec.status !== 'lobby' || starting.has(rec.id))
+        return reply.code(409).send({ error: 'already_started' });
+      if (!authStore.seatOf(rec.id, user.id) && !roleOf(rec, user.id)) {
+        return reply.code(403).send({ error: 'no_seat' });
+      }
+      const others = rec.ready.filter((u) => u !== user.id);
+      lobby.put({ ...rec, ready: body.data.ready ? [...others, user.id] : others });
+      return { ready: body.data.ready };
+    });
   });
 
   server.post<{ Params: { id: string } }>('/games/:id/start', async (req, reply) => {
@@ -672,28 +752,30 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const rec = recordOf(req.params.id);
     if (!rec) return reply.code(404).send({ error: 'no_such_game' });
-    if (rec.creator !== user.id) return reply.code(403).send({ error: 'not_creator' });
-    if (rec.status !== 'lobby' || starting.has(rec.id)) {
-      return reply.code(409).send({ error: 'already_started' });
-    }
-    if (rec.sessionType !== 'hot_seat') {
-      const seats = authStore.seatsOf(rec.id);
-      const open = humanSides(rec).filter((side) => !seats.some((s) => s.side === side));
-      if (open.length > 0) return reply.code(409).send({ error: 'sides_open', sides: open });
-      const waiting = [
-        ...seats,
-        ...(rec.roles ?? []).map((r) => ({ side: r.side as SideId, userId: r.userId })),
-      ].filter((s) => s.userId !== rec.creator && !rec.ready.includes(s.userId));
-      if (waiting.length > 0) {
-        return reply
-          .code(409)
-          .send({ error: 'not_ready', sides: [...new Set(waiting.map((s) => s.side))] });
+    return tracedHttp(req.params.id, req, reply, async () => {
+      if (rec.creator !== user.id) return reply.code(403).send({ error: 'not_creator' });
+      if (rec.status !== 'lobby' || starting.has(rec.id)) {
+        return reply.code(409).send({ error: 'already_started' });
       }
-    }
-    starting.add(rec.id);
-    const startError = await startGame(rec).finally(() => starting.delete(rec.id));
-    if (startError) return reply.code(500).send({ error: startError });
-    return { id: rec.id, status: 'started', ws: `/games/${rec.id}/ws` };
+      if (rec.sessionType !== 'hot_seat') {
+        const seats = authStore.seatsOf(rec.id);
+        const open = humanSides(rec).filter((side) => !seats.some((s) => s.side === side));
+        if (open.length > 0) return reply.code(409).send({ error: 'sides_open', sides: open });
+        const waiting = [
+          ...seats,
+          ...(rec.roles ?? []).map((r) => ({ side: r.side as SideId, userId: r.userId })),
+        ].filter((s) => s.userId !== rec.creator && !rec.ready.includes(s.userId));
+        if (waiting.length > 0) {
+          return reply
+            .code(409)
+            .send({ error: 'not_ready', sides: [...new Set(waiting.map((s) => s.side))] });
+        }
+      }
+      starting.add(rec.id);
+      const startError = await startGame(rec).finally(() => starting.delete(rec.id));
+      if (startError) return reply.code(500).send({ error: startError });
+      return { id: rec.id, status: 'started', ws: `/games/${rec.id}/ws` };
+    });
   });
 
   /**
@@ -729,9 +811,12 @@ export async function buildApp(options: AppOptions): Promise<App> {
   server.get<{ Params: { id: string } }>('/games/:id/window', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-    const w = await windowFor(req.params.id, user.id, undefined);
-    if ('error' in w) return reply.code(w.status).send({ error: w.error });
-    return w.timeline;
+    if (!recordOf(req.params.id)) return reply.code(404).send({ error: 'no_such_game' });
+    return tracedHttp(req.params.id, req, reply, async () => {
+      const w = await windowFor(req.params.id, user.id, undefined);
+      if ('error' in w) return reply.code(w.status).send({ error: w.error });
+      return w.timeline;
+    });
   });
 
   server.get<{ Params: { id: string }; Querystring: Record<string, string> }>(
@@ -739,12 +824,15 @@ export async function buildApp(options: AppOptions): Promise<App> {
     async (req, reply) => {
       const user = auth.userOf(req);
       if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-      const q = WindowQuery.safeParse(req.query);
-      if (!q.success)
-        return reply.code(400).send({ error: 'bad_request', message: q.error.message });
-      const w = await windowFor(req.params.id, user.id, q.data.side);
-      if ('error' in w) return reply.code(w.status).send({ error: w.error });
-      return windowAt(w.input, q.data.at);
+      if (!recordOf(req.params.id)) return reply.code(404).send({ error: 'no_such_game' });
+      return tracedHttp(req.params.id, req, reply, async () => {
+        const q = WindowQuery.safeParse(req.query);
+        if (!q.success)
+          return reply.code(400).send({ error: 'bad_request', message: q.error.message });
+        const w = await windowFor(req.params.id, user.id, q.data.side);
+        if ('error' in w) return reply.code(w.status).send({ error: w.error });
+        return windowAt(w.input, q.data.at);
+      });
     },
   );
 
@@ -774,7 +862,15 @@ export async function buildApp(options: AppOptions): Promise<App> {
       const want = WsQuery.safeParse(req.query);
       const side = user && rec && want.success && sideFor(rec, user.id, want.data.side);
       if (!user || !side) return socket.close(1008, 'no seat');
-      hub.attach(req.params.id, side, socket as unknown as Socket, user.id, seatFor(rec, user.id));
+      void tracedHttp(req.params.id, req, undefined, async () => {
+        hub.attach(
+          req.params.id,
+          side,
+          socket as unknown as Socket,
+          user.id,
+          seatFor(rec, user.id),
+        );
+      });
     },
   );
 

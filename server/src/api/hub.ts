@@ -17,7 +17,9 @@ import {
   type PauseProposal,
   type ServerMessage,
 } from '@kriegsspiel/protocol';
+import { Buffer } from 'node:buffer';
 import type { GameActor, GameStore } from '../game/index.js';
+import { NOOP_TRACE, traceRequest, type TraceSink } from '../debug/trace.js';
 import type { PauseTransition } from '../pause.js';
 import { DraftBook, DraftError } from '../drafts/book.js';
 import { StaffDesk } from './conference.js';
@@ -50,6 +52,8 @@ interface Connection {
   lastPause: string;
   /** The newest pause step this connection has been told about. */
   pauseSeen: number;
+  /** Total bytes sent on this connection, counted in `Hub.send`; the trace reads deltas of it. */
+  sentBytes: number;
 }
 
 type PauseResult = Extract<ServerMessage, { kind: 'pauseResult' }>;
@@ -107,6 +111,9 @@ export class Hub {
       list(gameId: string): readonly Forward[];
       add(gameId: string, forward: Forward): void;
     } = { list: () => [], add: () => undefined },
+    /** Debug trace (#198): each message is handled inside `traceRequest`, so the commands and
+     * LLM calls it causes share its correlation id and the admin Requests panel has rows. */
+    private readonly trace: TraceSink = NOOP_TRACE,
   ) {}
 
   /** Forwards per game, read from the lobby record once and kept in step by `handleForward`. */
@@ -359,6 +366,7 @@ export class Hub {
       gameOverSent: false,
       lastPause: '',
       pauseSeen: this.lookup(gameId)?.pauseSteps.at(-1)?.n ?? 0,
+      sentBytes: 0,
     };
     const set = this.conns.get(gameId) ?? new Set();
     // A side with a connection already open is not away, so it gets no catch-up.
@@ -455,7 +463,12 @@ export class Hub {
 
   private send(conn: Connection, message: ServerMessage): void {
     if (conn.socket.readyState !== OPEN) return;
-    conn.socket.send(serializeServerMessage(message));
+    const data = serializeServerMessage(message);
+    // Count here, on the connection, rather than by wrapping the socket: a trace handler
+    // reads the delta of this counter, so concurrent handlers cannot corrupt each other's
+    // counting or leave a stale wrapper installed on the socket.
+    conn.sentBytes += Buffer.byteLength(data);
+    conn.socket.send(data);
   }
 
   private push(gameId: string, conn: Connection): void {
@@ -639,7 +652,41 @@ export class Hub {
     }
   }
 
+  /**
+   * Handle one inbound message inside `traceRequest` (#198), so the admin Requests panel has a
+   * row for it and everything it causes (commands, engine events, LLM calls) shares its
+   * correlation id. Response bytes are the delta of the connection's `sentBytes` counter over
+   * the handling: messages are not serialized, so the socket itself is never patched (an
+   * early-finishing handler would restore the original `send` out from under a later one and
+   * leave its stale wrapper installed permanently). The counter total is exact; when two
+   * handlers overlap, a send in the overlap counts toward both windows.
+   */
   private async handle(
+    gameId: string,
+    conn: Connection,
+    data: unknown,
+    isBinary: boolean,
+  ): Promise<void> {
+    if (!this.trace.enabled) return this.handleMessage(gameId, conn, data, isBinary);
+    const text = isBinary ? '' : String(data);
+    const parsed = isBinary ? undefined : parseCommand(text);
+    const method = isBinary ? 'binary' : parsed?.ok ? parsed.value.kind : 'bad_message';
+    const sentBefore = conn.sentBytes;
+    await traceRequest(
+      this.trace,
+      gameId,
+      {
+        transport: 'ws',
+        method,
+        path: `/games/${gameId}/ws`,
+        ...(isBinary ? {} : { bytes: Buffer.byteLength(text) }),
+      },
+      async () => this.handleMessage(gameId, conn, data, isBinary),
+      { responseBytes: () => conn.sentBytes - sentBefore },
+    );
+  }
+
+  private async handleMessage(
     gameId: string,
     conn: Connection,
     data: unknown,
