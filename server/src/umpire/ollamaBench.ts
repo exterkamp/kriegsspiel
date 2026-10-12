@@ -6,7 +6,7 @@ import { LlmOrderParser } from '../orders/llmParser.js';
 import { umpireConfigFromEnv } from './config.js';
 import { createUmpireClient } from './createUmpireClient.js';
 import { narrateReports } from './narrate.js';
-import { StaffRoster, runStaff } from './staff.js';
+import { StaffRoster, answerStaffQuestion, runStaff } from './staff.js';
 import type { UmpireClient, UmpireRequest, UmpireResponse } from './umpireClient.js';
 
 /**
@@ -72,10 +72,40 @@ function world(): GameState {
 const parse = await runEval('ollama', new LlmOrderParser(timed), GOLDEN_ORDERS, CORPUS_CONTEXT);
 
 let narratePass = 0;
+let narrateRetried = 0;
+let narrateFellBack = 0;
 const narrateSizes = [1, 2, 4, 1, 2, 4];
 for (const n of narrateSizes) {
   const r = await narrateReports(timed, 'blue', reports(n));
-  if (!r.fellBack && r.calls === 1) narratePass++;
+  if (r.fellBack) narrateFellBack++;
+  else if (r.calls === 1) narratePass++;
+  else narrateRetried++;
+}
+
+// The conference: a question to each officer, as `GameActor.answerStaff` asks it. An answer that
+// needed the second call is "retried"; none (the canned answer is used) is a "fallback" (#342).
+const questions = [
+  ['chiefOfStaff', 'What should we do next?'],
+  ['intelligence', 'Where is the enemy?'],
+  ['quartermaster', 'How is our ammunition?'],
+  ['engineer', 'Can we hold the bridge?'],
+] as const;
+let answerPass = 0;
+let answerRetried = 0;
+let answerFellBack = 0;
+const answerWorld = world();
+for (const [role, q] of [...questions, ...questions]) {
+  const a = await answerStaffQuestion(
+    timed,
+    answerWorld,
+    'blue',
+    role,
+    q,
+    answerWorld.time + 60 * MS_PER_MINUTE,
+  );
+  if (!a) answerFellBack++;
+  else if (a.records.length === 1) answerPass++;
+  else answerRetried++;
 }
 
 let staffPass = 0;
@@ -92,6 +122,10 @@ for (let round = 0; round < 2; round++) {
   }
 }
 
+const outcomes = {
+  narrate: { firstTry: narratePass, retried: narrateRetried, fallback: narrateFellBack },
+  answer: { firstTry: answerPass, retried: answerRetried, fallback: answerFellBack },
+};
 const rows = [
   { stage: 'parse', pass: parse.passed, total: parse.total },
   { stage: 'narrate', pass: narratePass, total: narrateSizes.length },
@@ -108,10 +142,12 @@ const out = {
   model: config.stages.parse.model,
   parseUnsafe: parse.unsafe,
   parseCategories: parse.categories,
+  outcomes,
   rows,
 };
 if (process.argv.includes('--json')) console.log(JSON.stringify(out, null, 2));
 else {
+  console.log(`outcomes ${JSON.stringify(outcomes)}`);
   console.log(`model ${out.model}  (parse unsafe: ${out.parseUnsafe})`);
   for (const r of rows) {
     console.log(
