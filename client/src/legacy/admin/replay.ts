@@ -44,7 +44,7 @@ export class ReplayPanel {
 
   constructor(
     private readonly root: HTMLElement,
-    private readonly token: string | undefined,
+    private readonly token: () => string | undefined,
     private readonly fetchFn: typeof fetch,
   ) {
     root.innerHTML = `
@@ -100,7 +100,9 @@ export class ReplayPanel {
     this.status.textContent = 'Loading timeline…';
     const ticket = ++this.request;
     try {
-      const res = await this.fetchFn(apiUrl(`games/${encodeURIComponent(id)}/replay`, this.token));
+      const res = await this.fetchFn(
+        apiUrl(`games/${encodeURIComponent(id)}/replay`, this.token()),
+      );
       if (!res.ok) throw new Error(String(res.status));
       const tl = (await res.json()) as Timeline;
       if (ticket !== this.request) return;
@@ -130,7 +132,7 @@ export class ReplayPanel {
     const ticket = ++this.request;
     try {
       const res = await this.fetchFn(
-        apiUrl(`games/${encodeURIComponent(id)}/replay/at`, this.token, { at: String(ms) }),
+        apiUrl(`games/${encodeURIComponent(id)}/replay/at`, this.token(), { at: String(ms) }),
       );
       if (!res.ok) throw new Error(String(res.status));
       const body = (await res.json()) as AtResult;

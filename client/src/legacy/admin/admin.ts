@@ -24,6 +24,24 @@ import {
 import { StatePanel, type AdminState } from './state.js';
 
 const POLL_MS = 3000;
+const TOKEN_KEY = 'ks-admin-token';
+
+// Storage can throw (private windows, blocked site data); the page works without it.
+function storedToken(): string | undefined {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+function storeToken(token: string): void {
+  try {
+    sessionStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    // Kept in memory for this page only.
+  }
+}
+
 const STATE_DEBOUNCE_MS = 250;
 
 export class AdminPage {
@@ -38,7 +56,9 @@ export class AdminPage {
   private statePanel!: StatePanel;
   private stateReq = 0;
   private stateTimer: ReturnType<typeof setTimeout> | undefined;
-  private readonly token: string | undefined;
+  /** From `?token=`, else the one typed in this session (kept in sessionStorage), else none. */
+  private token: string | undefined;
+  private readonly tokenForm: HTMLFormElement;
 
   private readonly picker: HTMLSelectElement;
   private readonly indicator: HTMLElement;
@@ -56,13 +76,17 @@ export class AdminPage {
     search: string,
     private readonly fetchFn: typeof fetch = (...a) => fetch(...a),
   ) {
-    this.token = adminToken(search);
+    this.token = adminToken(search) ?? storedToken();
     root.innerHTML = `
       <header>
         <h1>kriegsspiel admin</h1>
         <label>game <select id="game" aria-label="Game"></select></label>
         <span id="live" role="status" aria-live="polite"><i></i><b></b></span>
         <small id="note"></small>
+        <form id="tokenform" hidden>
+          <label>admin token <input id="token" type="password" autocomplete="off" aria-label="Admin token" /></label>
+          <button type="submit">Connect</button>
+        </form>
       </header>
       <nav role="tablist" aria-label="Panels"></nav>
       <div id="filterbar">
@@ -74,6 +98,18 @@ export class AdminPage {
     this.indicator = root.querySelector('#live')!;
     this.filter = root.querySelector('#filter')!;
     this.note = root.querySelector('#note')!;
+    this.tokenForm = root.querySelector('#tokenform')!;
+    this.tokenForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const value = root.querySelector<HTMLInputElement>('#token')!.value.trim();
+      if (!value) return;
+      this.token = value;
+      storeToken(value);
+      this.status = 'connecting';
+      this.render();
+      clearTimeout(this.timer);
+      void this.poll();
+    });
     const nav = root.querySelector('nav')!;
     const main = root.querySelector('main')!;
     for (const id of PANELS) {
@@ -95,7 +131,7 @@ export class AdminPage {
       else if (id !== 'Replay')
         sec.innerHTML = `<p class="empty">${id} panel — not implemented yet.</p>`;
       this.panels.set(id, sec);
-      if (id === 'Replay') this.replay = new ReplayPanel(sec, this.token, this.fetchFn);
+      if (id === 'Replay') this.replay = new ReplayPanel(sec, () => this.token, this.fetchFn);
     }
     this.statePanel = new StatePanel(this.panels.get('State')!);
     this.llm = new LlmPanel(this.panels.get('LLM')!);
@@ -195,7 +231,7 @@ export class AdminPage {
     this.status = status;
     this.closeStream();
     this.render();
-    // 404 may be a proxy blip or a restart with the API enabled; 401 needs a reload with a new token.
+    // 404 may be a proxy blip or a restart with the API enabled; 401 waits for a token typed into the form.
     if (retry) this.timer = setTimeout(() => void this.poll(), backoffMs(Infinity));
   }
 
@@ -292,6 +328,7 @@ export class AdminPage {
         : [new Option('no games', '')]),
     );
     this.picker.value = this.gameId ?? current;
+    this.tokenForm.hidden = this.status !== 'unauthorized';
     this.indicator.dataset.status = this.status;
     this.indicator.querySelector('b')!.textContent = linkLabel(this.status);
     this.note.textContent = this.gameId ? `${this.streamCount} live entries this session` : '';
