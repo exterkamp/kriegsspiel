@@ -1,7 +1,14 @@
 /** #161: a cap on unfinished games per account, and eviction of idle games from memory. */
 import { describe, expect, it, vi } from 'vitest';
 import * as replayView from '../admin/replayView.js';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { MemoryAuthStore } from '../auth/store.js';
 import { MemoryGameStore } from '../game/index.js';
+import { SqliteGameStore } from '../game/sqlite.js';
+import { MemoryLobbyStore } from '../lobby/store.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { buildApp, type AppOptions } from './app.js';
 
@@ -138,25 +145,78 @@ describe('game limits', () => {
     await app.server.close();
   }, 60_000);
 
-  it('replays a closed game once per log length for GET /games', async () => {
+  it('lists games from the stored standing, never replaying (#262)', async () => {
     const { app, base, post, signIn } = await boot({ limits: { sweepEveryMs: 0 } });
     const cookie = await signIn('replay@example.test');
     const game = (await (await post('/games', cookie)).json()) as { id: string };
+    const list = async () =>
+      (
+        (await (await fetch(`${base}/games`, { headers: { cookie } })).json()) as {
+          games: Array<{ id: string; gameTimeMs: number; lastPlayedMs: number; finished: boolean }>;
+        }
+      ).games;
+    const spy = vi.mocked(replayView.replayTimeline);
+    const load = vi.spyOn(replayView, 'loadReplayInput');
+    spy.mockClear();
+    load.mockClear();
+
+    const actor = app.host.get(game.id)!;
+    await actor.submit({ kind: 'setMode', mode: 'fast-forward' });
+    await actor.submit({ kind: 'advanceTo', gameMs: 60_000 });
     await app.host.close(game.id);
-    const list = () => fetch(`${base}/games`, { headers: { cookie } });
+    const first = (await list())[0]!;
+    await list();
+    expect(first.gameTimeMs).toBeGreaterThanOrEqual(60_000);
+    expect(first.lastPlayedMs).toBeGreaterThan(0);
+    expect(spy).not.toHaveBeenCalled();
+    expect(load).not.toHaveBeenCalled();
+    await app.server.close();
+  });
+
+  it('keeps the standing across a restart and backfills an older game once', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ks-262-'));
+    const path = join(dir, 'games.db');
+    const authStore = new MemoryAuthStore();
+    const lobby = new MemoryLobbyStore();
+    const shared = { lobby, auth: { mailer, store: authStore }, limits: { sweepEveryMs: 0 } };
+    const first = await boot({ ...shared, store: new SqliteGameStore(path) });
+    const cookie = await first.signIn('restart@example.test');
+    const game = (await (await first.post('/games', cookie)).json()) as { id: string };
+    const actor = first.app.host.get(game.id)!;
+    await actor.submit({ kind: 'setMode', mode: 'fast-forward' });
+    await actor.submit({ kind: 'advanceTo', gameMs: 90_000 });
+    await first.app.server.close();
+
+    const second = await boot({ ...shared, store: new SqliteGameStore(path) });
+    const list = async () =>
+      (
+        (await (await fetch(`${second.base}/games`, { headers: { cookie } })).json()) as {
+          games: Array<{ gameTimeMs: number; lastPlayedMs: number }>;
+        }
+      ).games[0]!;
     const spy = vi.mocked(replayView.replayTimeline);
     spy.mockClear();
+    const before = await list();
+    expect(before.gameTimeMs).toBeGreaterThanOrEqual(90_000);
+    expect(spy).not.toHaveBeenCalled();
+    await second.app.server.close();
 
-    await list();
-    await list();
+    // A game stored before the standing was kept is replayed once, then read like any other.
+    const raw = new DatabaseSync(path);
+    raw.exec('UPDATE games SET summarized = 0, last_played_ms = NULL, finished = 0');
+    raw.close();
+    const third = await boot({ ...shared, store: new SqliteGameStore(path) });
+    const list3 = async () =>
+      (
+        (await (await fetch(`${third.base}/games`, { headers: { cookie } })).json()) as {
+          games: Array<{ gameTimeMs: number; lastPlayedMs: number }>;
+        }
+      ).games[0]!;
+    spy.mockClear();
+    const filled = await list3();
+    await list3();
     expect(spy).toHaveBeenCalledTimes(1);
-
-    // The log grows when the game is reopened and played, so the next listing replays again.
-    const actor = await app.host.open(game.id);
-    await actor.submit({ kind: 'setMode', mode: 'fast-forward' });
-    await app.host.close(game.id);
-    await list();
-    expect(spy).toHaveBeenCalledTimes(2);
-    await app.server.close();
+    expect(filled.lastPlayedMs).toBe(before.lastPlayedMs);
+    await third.app.server.close();
   });
 });

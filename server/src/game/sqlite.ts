@@ -13,7 +13,14 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { DraftSnapshot, Mark } from '@kriegsspiel/protocol';
 import type { ClockChange } from '../clock.js';
-import type { GameSnapshot, GameStore, InputLogEntry, InputLogHeader, SideViews } from './store.js';
+import type {
+  GameSnapshot,
+  GameStore,
+  GameSummary,
+  InputLogEntry,
+  InputLogHeader,
+  SideViews,
+} from './store.js';
 
 /**
  * Schema migrations, applied in order. `PRAGMA user_version` is the count applied. Never edit
@@ -72,6 +79,13 @@ export const MIGRATIONS: readonly string[] = [
      drafts TEXT NOT NULL,
      PRIMARY KEY (game_id, side)
    ) WITHOUT ROWID;`,
+  // The standing GET /games lists, so it needs no replay (#262). `summarized` is 0 for games
+  // stored before these columns existed; the server replays those once and backfills them.
+  `ALTER TABLE games ADD COLUMN last_played_ms REAL;
+   ALTER TABLE games ADD COLUMN finished INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE games ADD COLUMN winner TEXT;
+   ALTER TABLE games ADD COLUMN summarized INTEGER NOT NULL DEFAULT 0;
+   UPDATE games SET summarized = 0;`,
 ];
 
 /** Older snapshots kept besides the newest (not yet used as a fallback: recovery reads the newest). */
@@ -132,7 +146,7 @@ export class SqliteGameStore implements GameStore {
   async saveLogHeader(header: InputLogHeader): Promise<void> {
     // Plain INSERT: never overwrite the record of an existing game.
     this.db
-      .prepare('INSERT INTO games (game_id, scenario_id, seed) VALUES (?, ?, ?)')
+      .prepare('INSERT INTO games (game_id, scenario_id, seed, summarized) VALUES (?, ?, ?, 1)')
       .run(header.gameId, header.scenarioId, header.seed);
   }
 
@@ -147,6 +161,12 @@ export class SqliteGameStore implements GameStore {
     this.db
       .prepare('INSERT INTO input_log (game_id, seq, entry) VALUES (?, ?, ?)')
       .run(gameId, entry.seq, JSON.stringify(entry));
+    // Only a game with a known standing keeps it current; an older one is backfilled by replay.
+    this.db
+      .prepare(
+        'UPDATE games SET last_played_ms = max(coalesce(last_played_ms, ?1), ?1) WHERE game_id = ?2 AND summarized = 1',
+      )
+      .run(entry.wallMs, gameId);
   }
 
   async inputLog(gameId: string, afterSeq = 0): Promise<readonly InputLogEntry[]> {
@@ -193,6 +213,52 @@ export class SqliteGameStore implements GameStore {
     const r = this.db.prepare('SELECT progress_ms FROM games WHERE game_id = ?').get(gameId) as
       { progress_ms: number | null } | undefined;
     return r?.progress_ms ?? undefined;
+  }
+
+  async saveOutcome(gameId: string, winner: string | null): Promise<void> {
+    this.db
+      .prepare('UPDATE games SET finished = 1, winner = ?1 WHERE game_id = ?2')
+      .run(winner, gameId);
+  }
+
+  async loadSummary(gameId: string): Promise<GameSummary | undefined> {
+    const r = this.db
+      .prepare(
+        'SELECT progress_ms, last_played_ms, finished, winner, summarized FROM games WHERE game_id = ?',
+      )
+      .get(gameId) as
+      | {
+          progress_ms: number | null;
+          last_played_ms: number | null;
+          finished: number;
+          winner: string | null;
+          summarized: number;
+        }
+      | undefined;
+    if (!r) return undefined;
+    return {
+      known: r.summarized === 1,
+      gameMs: r.progress_ms ?? 0,
+      ...(r.last_played_ms === null ? {} : { lastPlayedMs: r.last_played_ms }),
+      finished: r.finished === 1,
+      ...(r.finished === 1 ? { winner: r.winner } : {}),
+    };
+  }
+
+  async backfillSummary(
+    gameId: string,
+    summary: { lastPlayedMs?: number; outcome?: { winner: string | null } },
+  ): Promise<void> {
+    this.db
+      .prepare(
+        'UPDATE games SET summarized = 1, last_played_ms = ?1, finished = ?2, winner = ?3 WHERE game_id = ?4',
+      )
+      .run(
+        summary.lastPlayedMs ?? null,
+        summary.outcome ? 1 : 0,
+        summary.outcome?.winner ?? null,
+        gameId,
+      );
   }
 
   async saveHeartbeat(gameId: string, wallMs: number): Promise<void> {

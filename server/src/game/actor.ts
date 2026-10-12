@@ -788,6 +788,8 @@ export class GameActor {
     // Agents think on ticks with no command to carry their orders into the log.
     await this.flushAgentLog();
     await this.store.saveProgress(this.id, this.engine.time);
+    const outcome = this.engine.world.outcome;
+    if (outcome) await this.store.saveOutcome(this.id, outcome.winner);
     await this.store.saveHeartbeat(this.id, this.wallNow());
     const history = this.clock.history();
     if (history.length > this.historySaved) {
