@@ -21,7 +21,7 @@ import {
   type GhostPiece,
   type Engagement,
   type OrderRoute,
-  SceneCourier,
+  type SceneCourier,
   type OwnPiece,
   type Overlays,
   type SceneState,

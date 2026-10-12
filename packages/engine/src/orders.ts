@@ -161,12 +161,16 @@ const markLost = (world: GameState, id: string, time: number): GameState => ({
 /** HQ's wait past a courier's due arrival, and the ride back with the news, before it is called lost. */
 export const COURIER_OVERDUE_MS = 15 * MS_PER_MINUTE;
 
-/** The sender hears of a lost or taken courier once its order is overdue, not when it is lost. */
+/**
+ * The sender hears of a lost or taken courier once its order is overdue, not when it is lost.
+ * The report is stamped with that moment (HQ giving the courier up), never the loss, so its
+ * written time is no tell either.
+ */
 function reportOverdue(world: GameState, c: Courier, time: number): GameState {
   const unit = world.units.find((u) => u.id === c.order.to && u.side === c.side);
   if (!unit || unit.strength <= 0) return world;
   const due = Math.max(time, arrivalOf(c, c.order.issuedAt) + COURIER_OVERDUE_MS);
-  return fileReport(world, 'courierLost', unit, time, due - time);
+  return fileReport(world, 'courierLost', unit, due, 0);
 }
 const arrivalOf = (c: Courier, issuedAt: number) => c.legs.at(-1)?.arriveAt ?? issuedAt;
 

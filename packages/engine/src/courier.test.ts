@@ -335,10 +335,14 @@ describe('couriers on the table (#196)', () => {
     expect(view.reports.some((x) => x.kind === 'courierLost')).toBe(false);
     const overdue = mid.world.intel.blue.reports.find((x) => x.kind === 'courierLost')!;
     expect(overdue.deliverAt).toBeGreaterThanOrEqual(view.couriers[0]!.arriveAt);
+    // The written time is when HQ gave the courier up, not when it fell (no timing tell).
+    expect(overdue.observedAt).toBeGreaterThanOrEqual(view.couriers[0]!.arriveAt);
+    expect(overdue.observedAt).toBeGreaterThan(lostAt);
     const later = advanceTo(foggy(seed), overdue.deliverAt, registry()).state;
     const told = viewFor(later.world, 'blue', later.time);
     const report = told.reports.find((x) => x.kind === 'courierLost')!;
     expect(report.text).toMatch(/^Sir, no word from Unit|^Sir, no word from /);
+    expect(report.observedAt).toBeGreaterThanOrEqual(view.couriers[0]!.arriveAt);
     expect(told.couriers).toEqual([]);
     expect(
       viewFor(later.world, 'red', later.time).reports.some((x) => x.kind === 'courierLost'),
