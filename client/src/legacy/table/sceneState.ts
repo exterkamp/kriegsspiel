@@ -81,12 +81,25 @@ export function buildSceneState(view: SideView, map: BaseMap): SceneState {
     uncertaintyRadius: c.uncertaintyRadius,
     ...(c.sizeEstimate !== undefined ? { sizeEstimate: c.sizeEstimate } : {}),
   }));
+  const engagements = engagementsOf(view);
+  // An enemy in sight and in a fight is already named by that fight's marker: its own "just now" tag only piles onto it (#323).
+  for (const g of live) {
+    if (
+      engagements.some(
+        (f) =>
+          Math.hypot(f.position.x - g.position.x, f.position.y - g.position.y) <=
+          ENGAGE_RANGE_M / 2,
+      )
+    ) {
+      g.ageTag = '';
+    }
+  }
   return {
     side: view.side,
     map,
     own,
     ghosts: [...live, ...stale],
     orderRoutes: [],
-    engagements: engagementsOf(view),
+    engagements,
   };
 }

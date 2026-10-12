@@ -177,6 +177,8 @@ export class TableScene {
     const labelW = this.span * 0.07;
     const tag = labelSprite('Fighting', false, labelW);
     tag.position.copy(mapToWorld(map, f.position, this.span * 0.03));
+    // North of the ring: the unit tags hang on the south edge of their pieces.
+    tag.position.z -= radius + labelW / 8;
     g.add(tag);
     g.name = `engagement:${f.id}`;
     return g;
@@ -647,10 +649,13 @@ export class TableScene {
     if (p.kind === 'ghost' && p.uncertaintyRadius > 0) {
       g.add(this.uncertaintyCircle(p.uncertaintyRadius));
     }
-    const labelW = span * 0.07;
-    const tag = labelSprite(own ? p.label : p.ageTag, !own, labelW);
-    tag.position.set(0, height + labelW / 8, reach + labelW / 8);
-    g.add(tag);
+    const text = own ? p.label : p.ageTag;
+    if (text !== '') {
+      const labelW = span * 0.07;
+      const tag = labelSprite(text, !own, labelW);
+      tag.position.set(0, height + labelW / 8, reach + labelW / 8);
+      g.add(tag);
+    }
     return g;
   }
 

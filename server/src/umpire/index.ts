@@ -88,6 +88,7 @@ export {
   runStaff,
   staffInput,
   staffOfficer,
+  staffOfficerFor,
 } from './staff.js';
 export type {
   StaffAnswer,

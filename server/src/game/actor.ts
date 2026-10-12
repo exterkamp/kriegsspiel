@@ -45,11 +45,13 @@ import {
   narrateReports,
   narrateWindowMs,
   reportsDueForNarration,
+  staffOfficerFor,
   type StaffAnswer,
   type UmpireCallRecord,
   type UmpireRequest,
   type UmpireClient,
 } from '../umpire/index.js';
+import type { StaffExchange } from '@kriegsspiel/protocol';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
 /** Timer functions, injectable so tests can run on a fake clock. */
@@ -106,6 +108,8 @@ export interface GameActorOptions {
   onError?: (error: unknown) => void;
   /** Called when the set of pending LLM dependencies changes. */
   onStaffAtWork?: (state: StaffAtWork) => void;
+  /** The conference records of a reopened game, from its input log (D6b). */
+  staffHistory?: ReadonlyMap<string, readonly StaffExchange[]>;
   /** Extra parse attempts after a failure or timeout, before the fallback. Default 2. */
   parseRetries?: number;
   /** Wall ms to wait for one parse attempt. Default 60,000. */
@@ -194,6 +198,8 @@ export class GameActor {
   private readonly narratedUntil = new Map<string, number>();
   private readonly narrations = new Map<string, SideNarration>();
   private readonly narrating = new Set<string>();
+  /** Each side's questions to its staff officers and their answers (D6b), oldest first. */
+  private readonly staffHistory = new Map<string, StaffExchange[]>();
 
   /** The pause state machine; absent when the game has no voters configured. */
   private readonly pauseVoting: PauseVoting | undefined;
@@ -229,6 +235,7 @@ export class GameActor {
     this.parseRetryDelayMs = options.parseRetryDelayMs ?? DEFAULT_PARSE_RETRY_DELAY_MS;
     this.seq = options.seq ?? 0;
     this.umpire = options.umpire;
+    for (const [side, list] of options.staffHistory ?? []) this.staffHistory.set(side, [...list]);
     // Reports from before this actor started (a reopened game) keep their template text.
     for (const side of this.engine.world.sides) this.narratedUntil.set(side.id, this.engine.time);
     this.restartInfo = options.restart;
@@ -254,6 +261,11 @@ export class GameActor {
   /** What `side` is shown in place of template text: pass to `sideViewOf`. */
   narrationFor(side: string): ReadonlyMap<string, string | null> | undefined {
     return this.narrations.get(side);
+  }
+
+  /** `side`'s conference with its staff officers, for `sideViewOf`. */
+  staffHistoryFor(side: string): readonly StaffExchange[] {
+    return this.staffHistory.get(side) ?? [];
   }
 
   /** Whether the game is waiting on the umpire. */
@@ -515,6 +527,7 @@ export class GameActor {
     side: SideId,
     role: string,
     question: string,
+    asked: { questionId: string; askedAtGame: number; answerAtGame: number; askedBy?: string },
   ): Promise<StaffAnswer | undefined> {
     const umpire = this.umpire;
     if (!umpire || this.closed || this.engine.world.outcome) return undefined;
@@ -533,18 +546,31 @@ export class GameActor {
       failure = e instanceof Error ? e.message : 'staff stage failed';
     }
     if (this.closed) return undefined;
+    const exchange: StaffExchange = {
+      ...asked,
+      role: role as StaffExchange['role'],
+      question,
+      ...(answer
+        ? { text: answer.text, basedOnGame: answer.basedOnGame }
+        : { textless: true as const }),
+      officer: (({ name, traits }) => ({ name, traits }))(
+        answer?.officer ?? staffOfficerFor(this.engine.world.seed, side as SideId, role),
+      ),
+    };
     await this.enqueueCompletion(async () => {
+      this.staffHistory.set(side, [...(this.staffHistory.get(side) ?? []), exchange]);
       const entry: InputLogEntry = {
         seq: ++this.seq,
         wallMs: this.wallNow(),
         gameMs: this.engine.time,
         endGameMs: this.engine.time,
-        command: { kind: 'staffAnswer', side, role, question },
+        command: { kind: 'staffAnswer', side, role, question, exchange },
         calls: answer?.records ?? [],
         ...(answer === undefined ? { error: failure ?? 'staff answer unusable' } : {}),
       };
       if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
       await this.commit(entry);
+      this.notify();
     });
     return answer;
   }

@@ -1,6 +1,32 @@
 import { z } from 'zod';
 import { ClockState, Coord, Facing, Footprint, Formation, GameMs, Side, UnitId } from './common.js';
 
+/** The officers a player can put a question to in the staff conference (docs/staff-conference.md). */
+export const StaffRole = z.enum(['chiefOfStaff', 'intelligence', 'quartermaster', 'engineer']);
+export type StaffRole = z.infer<typeof StaffRole>;
+
+/**
+ * One question put to a staff officer and the officer's answer, kept by the server so a reload or a
+ * reconnect does not lose the conference (D6b). `text` is withheld until game time reaches `answerAtGame`.
+ */
+export const StaffExchange = z
+  .object({
+    questionId: z.string().min(1),
+    role: StaffRole,
+    question: z.string(),
+    askedAtGame: GameMs,
+    answerAtGame: GameMs,
+    text: z.string().optional(),
+    basedOnGame: GameMs.optional(),
+    /** The staff stage gave no words, so `text` will never come (as opposed to being withheld until due). */
+    textless: z.boolean().optional(),
+    /** Which seat asked (server-side only; `toSideView` filters on it and never sends it). */
+    askedBy: z.string().optional(),
+    officer: z.object({ name: z.string(), traits: z.array(z.string()) }).strict(),
+  })
+  .strict();
+export type StaffExchange = z.infer<typeof StaffExchange>;
+
 /** Structured facts beside the prose, so the UI can place pins (see docs/hq-interface.md). */
 export const Dispatch = z
   .object({
@@ -98,6 +124,8 @@ export const SideView = z
     visibleEnemies: z.array(VisibleEnemyUnit),
     lastKnownContacts: z.array(LastKnownContact),
     dispatches: z.array(Dispatch),
+    /** The side's conference with its staff officers, oldest first. Absent when nobody has asked. */
+    staffHistory: z.array(StaffExchange).optional(),
     clock: ClockState,
   })
   .strict();

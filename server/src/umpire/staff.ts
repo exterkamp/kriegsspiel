@@ -345,10 +345,16 @@ const SEAT_FOR: Readonly<Record<string, Role>> = {
   engineer: 'chiefOfStaff',
 };
 
+/** The officer who stands in for `conferenceRole` when the staff stage gave nothing: the same one `answerStaffQuestion` would name. */
+export function staffOfficerFor(seed: number, side: SideId, conferenceRole: string): StaffOfficer {
+  const role = SEAT_FOR[conferenceRole] ?? 'chiefOfStaff';
+  return staffOfficer(seed, side, role, conferenceRole === 'engineer' ? 1 : 0);
+}
+
 export interface StaffAnswer {
   text: string;
   officer: StaffOfficer;
-  /** Game ms of the view the officer answered from. */
+  /** Game ms of the newest report the officer had in the view, else of the view itself (#323). */
   basedOnGame: number;
   records: UmpireCallRecord[];
 }
@@ -368,8 +374,15 @@ export async function answerStaffQuestion(
 ): Promise<StaffAnswer | undefined> {
   const role = SEAT_FOR[conferenceRole] ?? 'chiefOfStaff';
   const seat: Seat = { role };
-  const officer = staffOfficer(world.seed, side, role, conferenceRole === 'engineer' ? 1 : 0);
-  const input = { ...staffInput(officer, viewForRole(world, side, seat, now), now), question };
+  const officer = staffOfficerFor(world.seed, side, conferenceRole);
+  const view = viewForRole(world, side, seat, now);
+  const input = { ...staffInput(officer, view, now), question };
+  // The answer rests on the newest paper the side holds, which may be older than the moment of asking.
+  const newest = view.reports.reduce(
+    (m, r) => Math.max(m, r.deliveredAt),
+    Number.NEGATIVE_INFINITY,
+  );
+  const basedOnGame = Number.isFinite(newest) ? Math.min(now, newest) : now;
   const records: UmpireCallRecord[] = [];
   let rejected: string[] | undefined;
   for (let call = 0; call < maxCalls; call++) {
@@ -393,7 +406,7 @@ export async function answerStaffQuestion(
     };
     const problems = checkStaffOutput(usable, world, side, seat, input);
     if (usable.messages.length > 0 && problems.length === 0) {
-      return { text: usable.messages[0]!.text.trim(), officer, basedOnGame: now, records };
+      return { text: usable.messages[0]!.text.trim(), officer, basedOnGame, records };
     }
     rejected = usable.messages.length === 0 ? ['no answer given'] : problems;
   }

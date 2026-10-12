@@ -285,6 +285,28 @@ describe('answerStaffQuestion', () => {
     expect((client.calls[0]!.input as { now: number }).now).toBe(10);
   });
 
+  it('dates the answer by the newest report the side holds, not by the moment of asking (#323)', async () => {
+    const w = world();
+    const report = {
+      id: 'blue-r1',
+      kind: 'contact' as const,
+      observedAt: 60_000,
+      deliverAt: 180_000,
+      from: 'blue-1',
+      location: { x: 0, y: 0 },
+      place: 'near the bridge',
+      uncertainty: 0,
+      confidence: 'high' as const,
+    };
+    const held = {
+      ...w,
+      intel: { ...w.intel, blue: { ...w.intel.blue, reports: [report] } },
+    };
+    const client = new MockUmpireClient([answerFixture({ messages: [note('advice', 'Hold.')] })]);
+    const a = await answerStaffQuestion(client, held, 'blue', 'intelligence', 'Status?', 600_000);
+    expect(a?.basedOnGame).toBe(180_000);
+  });
+
   it('is undefined when the model only cites entities outside the view', async () => {
     const client = new MockUmpireClient([
       answerFixture({ messages: [note('advice', 'See blue-99.')] }),

@@ -36,7 +36,9 @@
           </p>
         } @else if (e.answer) {
           <p class="a">{{ e.answer.text }}</p>
-          <small>Based on reports as of {{ formatGameTime(e.answer.basedOnGame) }}.</small>
+          <small
+            >Based on the newest report, as of {{ formatGameTime(e.answer.basedOnGame) }}.</small
+          >
         }
       </li>
     }

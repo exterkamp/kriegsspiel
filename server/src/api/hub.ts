@@ -23,8 +23,8 @@ import { NOOP_TRACE, traceRequest, type TraceSink } from '../debug/trace.js';
 import type { PauseTransition } from '../pause.js';
 import { DraftBook, DraftError } from '../drafts/book.js';
 import { StaffDesk } from './conference.js';
-import { sideViewOf } from './sideView.js';
-import { staffOfficer } from '../umpire/index.js';
+import { seatKey, sideViewOf } from './sideView.js';
+import { staffOfficerFor } from '../umpire/index.js';
 import { mayForward, viewForRole, type Seat, type SideId } from '@kriegsspiel/engine';
 import type { Forward } from '../lobby/store.js';
 
@@ -145,6 +145,7 @@ export class Hub {
       conn.seat,
       conn.seat ? this.forwardedTo(gameId, conn) : [],
       game.narrationFor(conn.side),
+      game.staffHistoryFor(conn.side),
     );
   }
 
@@ -582,15 +583,16 @@ export class Hub {
     game: GameActor,
     conn: Connection,
     command: Extract<Command, { kind: 'askStaff' }>,
+    asked: { questionId: string; askedAtGame: number; answerAtGame: number; askedBy?: string },
   ): Promise<void> {
     let answer;
     try {
-      answer = await game.answerStaff(conn.side, command.role, command.question);
+      answer = await game.answerStaff(conn.side, command.role, command.question, asked);
     } catch (e) {
       answer = undefined;
       this.onError(game.id, e);
     }
-    const fallback = staffOfficer(game.state.world.seed, conn.side, 'chiefOfStaff');
+    const fallback = staffOfficerFor(game.state.world.seed, conn.side, command.role);
     this.send(conn, {
       v: PROTOCOL_VERSION,
       kind: 'staffAnswer',
@@ -788,6 +790,13 @@ export class Hub {
         this.send(conn, error('game_over', `${command.questionId}: the game has ended`));
         return;
       }
+      if (game.staffHistoryFor(conn.side).some((x) => x.questionId === command.questionId)) {
+        this.send(
+          conn,
+          error('bad_question', `${command.questionId}: that question id is already used`),
+        );
+        return;
+      }
       const charge = this.staffDesk.ask(gameId, conn.side, command.role, game.gameClock.now());
       if (charge.ok) {
         this.send(conn, {
@@ -799,7 +808,12 @@ export class Hub {
           answerAtGame: charge.answerAtGame,
           costMs: charge.costMs,
         });
-        void this.answerStaff(game, conn, command);
+        void this.answerStaff(game, conn, command, {
+          questionId: command.questionId,
+          askedAtGame: charge.askedAtGame,
+          answerAtGame: charge.answerAtGame,
+          ...(conn.seat ? { askedBy: seatKey(conn.seat) } : {}),
+        });
       } else {
         this.send(
           conn,
