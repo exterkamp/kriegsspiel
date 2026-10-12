@@ -135,3 +135,39 @@ The guard is now a `cancelled()` conditional failing step; the result evaluator
 runs with `always()` so prior failure cannot suppress it. Actionlint and all five
 CI controls pass after this correction. The unchanged full validation remains
 required; the rejected run clears no gate.
+
+
+## Complete negative controls and matched baseline
+
+The first live cancellation attempt (38201092426, H `9ca6b92`) also had a lint
+failure from two test regular expressions; it is mixed failure/cancellation
+ evidence, not isolated cancellation proof. The regexes were corrected without
+relaxing lint. Full lint, actionlint and the five controls pass afterward.
+
+[Isolated cancellation run 38201259553](https://github.com/exterkamp/kriegsspiel/actions/runs/38201259553)
+at H `15a4fb9e328d69cd6ec07163f9d5231758fbe28d` started every workload without a
+failure, then was deliberately cancelled. All four workload jobs concluded
+cancelled; `check` ran with both dependency results `cancelled` and failed.
+
+[Skipped dependency run 38201349259](https://github.com/exterkamp/kriegsspiel/actions/runs/38201349259)
+at H `d33ee0ea3e4676b91fc415f661eea57dfb6dba95` temporarily disabled the ordinary
+matrix. `validation` concluded skipped, effectiveness passed and `check` failed
+with `VALIDATION_RESULT=skipped`. Actionlint correctly warns about the diagnostic
+constant-false condition. It is removed from the measured candidate, where
+ actionlint passes. Neither diagnostic counts as a successful validation or timing
+sample. All deliberate failing/skipping steps are removed before final review.
+
+The refreshed comparable baseline repeats exactly the same accepted source
+`d15d21b5b4ed7c923c6c8f1161e34105b0f448a6`, run 38200188722:
+
+| Attempt | Wall to green | Runner seconds | Calculated rounded job minutes | Test step |
+| --- | ---: | ---: | ---: | ---: |
+| [1](https://github.com/exterkamp/kriegsspiel/actions/runs/38200188722/attempts/1) | 299s | 334s | 6 | 185s |
+| [2](https://github.com/exterkamp/kriegsspiel/actions/runs/38200188722/attempts/2) | 300s | 332s | 6 | 188s |
+| [3](https://github.com/exterkamp/kriegsspiel/actions/runs/38200188722/attempts/3) | 300s | 333s | 6 | 183s |
+
+Rerun wall time starts at the attempt's `run_started_at`, rather than the original
+run creation timestamp. Original-attempt wall time starts at the event/run start;
+job completion includes artifact/post steps. Rounded minutes are estimates from
+per-job ceilings, not an inspected invoice. Raw logs/JSON remain task-owned local
+staging; run links and retained GitHub logs/artifacts are collaborator-accessible.
