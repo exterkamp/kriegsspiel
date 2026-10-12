@@ -350,6 +350,7 @@ export function loadScenario(raw: unknown): GameState {
           ? DEFAULT_TAKE_MS
           : int(v.takeMinutes, 'victory.takeMinutes', 0) * MS_PER_MINUTE,
     },
+    startStrength: Object.fromEntries(units.map((u) => [u.id, u.strength])),
     combatActive: false,
     outcome: null,
     couriers: [],

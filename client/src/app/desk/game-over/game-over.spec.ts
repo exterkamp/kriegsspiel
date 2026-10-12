@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { lossesBetween, reasonText, replayRequest, resultFor, summaryLines } from './game-over';
 
 describe('game over logic (from held PR #266)', () => {
+  it('states a broken attack or defence as the reason (#315)', () => {
+    expect(reasonText({ winner: 'blue', reason: 'attack-broken', atGame: 2_400_000 })).toMatch(
+      /attack on the objective was broken; Blue holds the field/,
+    );
+    expect(reasonText({ winner: 'red', reason: 'defence-broken', atGame: 2_400_000 })).toMatch(
+      /defence of the objective was broken; Red holds the field/,
+    );
+  });
+
   it('maps the winner to a result for each side', () => {
     expect(resultFor({ winner: 'blue' }, 'blue')).toBe('victory');
     expect(resultFor({ winner: 'blue' }, 'red')).toBe('defeat');

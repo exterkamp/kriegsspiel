@@ -1,4 +1,4 @@
-import { ATTACK_INTENT_EVENT, COMBAT_CHECK_EVENT, canReach } from './contact.js';
+import { ATTACK_INTENT_EVENT, COMBAT_CHECK_EVENT, canReach, pursuable } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { distance } from './geometry.js';
 import { FATIGUE_PER_MARCH_MINUTE, type Pace } from './fatigue.js';
@@ -424,7 +424,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     const check: NewEvent = { time: ev.time, type: COMBAT_CHECK_EVENT };
     if (i.kind === 'attack') {
       const foe = world.units.find((u) => u.id === i.target);
-      if (!foe || foe.status !== 'active') {
+      if (!foe || !pursuable(foe, ev.time)) {
         return {
           world: updateUnit(
             world,

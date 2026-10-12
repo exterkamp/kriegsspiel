@@ -1187,13 +1187,13 @@ describe('SPA fallback for the Angular client', () => {
 describe('pause voting over the WebSocket', () => {
   const cmd = (body: object) => JSON.stringify({ v, ...body });
   /** Blue and red players in a started lobby game with pause voting (voters are the seats taken at the start). */
-  async function votingGame(pause: object = { rule: 'unanimous' }) {
+  async function votingGame(pause: object = { rule: 'unanimous' }, rate = RATE) {
     const { base, ws } = await start();
     const bluePlayer = await signIn(base, 'vote-blue@example.test');
     const redPlayer = await signIn(base, 'vote-red@example.test');
     const res = await fetch(
       `${base}/games`,
-      json(bluePlayer, { lobby: true, rate: RATE, side: 'blue', pause }),
+      json(bluePlayer, { lobby: true, rate, side: 'blue', pause }),
     );
     const game = (await res.json()) as Created;
     game.cookies = { blue: bluePlayer, red: redPlayer };
@@ -1264,10 +1264,14 @@ describe('pause voting over the WebSocket', () => {
       blue,
       red: first,
       ws,
-    } = await votingGame({
-      rule: 'unanimous',
-      voteTimeoutMs: 1000,
-    });
+    } = await votingGame(
+      {
+        rule: 'unanimous',
+        voteTimeoutMs: 1000,
+      },
+      // Slow enough that the 50-minute hold does not end the game while the vote runs out.
+      240,
+    );
     first.socket.close();
     blue.send(cmd({ kind: 'proposePause' }));
     await blue.waitFor('pauseState', (m) => m.phase === 'pause_proposed');

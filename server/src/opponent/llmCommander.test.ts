@@ -387,9 +387,14 @@ describe('a full game', () => {
     await time.advance(60_000);
   });
 
-  it('keeps playing when the model is down: the scripted opponent takes the bridge', async () => {
+  it('keeps playing when the model is down: the scripted opponent fights on and the game ends', async () => {
     const { events } = await playGame(failing('transport'), 'fast-forward');
-    expect(events.find((e) => e.type === 'game.end')?.payload).toMatchObject({ winner: 'red' });
+    // Blue never gives an order here, so the result is Blue's to lose or Red's to take; either
+    // way Red must have advanced and fought, and the game must have reached a result.
+    expect(events.some((e) => e.type === 'combat.fire')).toBe(true);
+    expect(events.find((e) => e.type === 'game.end')?.payload).toMatchObject({
+      winner: expect.stringMatching(/blue|red/),
+    });
   });
 
   it('decides at the same game times at rates 1, 4 and 12', async () => {

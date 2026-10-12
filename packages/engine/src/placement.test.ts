@@ -19,6 +19,7 @@ import {
   validatePlacement,
   type GameState,
   type Point,
+  type Ruling,
 } from './index.js';
 import { bridge, miniWorld, river, holdTheBridgeFarStart } from './scenario.testkit.js';
 
@@ -276,7 +277,7 @@ describe('registerPlacement', () => {
     const a = state.world.units.find((u) => u.id === 'a')!;
     expect(a).toMatchObject({ center: P(500, 600), facing: 0.5, formation: 'loose', shape: arc });
     expect(a.intent).toEqual({ kind: 'idle' });
-    const [ruling] = state.world.rulings;
+    const [ruling] = state.world.rulings as Ruling[];
     expect(ruling).toMatchObject({
       id: 'ruling-1',
       rationale: 'because',
@@ -291,7 +292,7 @@ describe('registerPlacement', () => {
     const a = state.world.units.find((u) => u.id === 'a')!;
     expect(a.center.x).toBeLessThan(P(700, 0).x);
     expect(a.center.x).toBeGreaterThan(P(500, 0).x);
-    const [ruling] = state.world.rulings;
+    const [ruling] = state.world.rulings as Ruling[];
     expect(ruling!.verdict.verdict).toBe('clamp');
     expect(ruling!.verdict.reasons.join()).toMatch(/too far/);
   });
@@ -300,7 +301,7 @@ describe('registerPlacement', () => {
     const before = world().units.find((u) => u.id === 'a')!;
     const { state } = ruled({ unitId: 'a', center: P(300, 1000), elapsedMs: 1e9 });
     expect(state.world.units.find((u) => u.id === 'a')).toEqual(before);
-    expect(state.world.rulings[0]!.verdict.verdict).toBe('reject');
+    expect((state.world.rulings as Ruling[])[0]!.verdict.verdict).toBe('reject');
   });
 
   it('ends a march in progress: the old steps go stale', () => {
