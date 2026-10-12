@@ -69,12 +69,6 @@ function hiddenFrom(side: SideId): Secret[] {
     ...G.ids.filter((i) => i.hiddenFrom === side && !seen.has(i.value) && !contacts.has(i.value)),
   ];
 }
-console.log(
-  G.world.units.map((u) => u.id + ' ' + JSON.stringify(u.center)),
-  JSON.stringify(viewFor(G.world, 'blue', G.now).visibleEnemies.map((e) => e.id)),
-  JSON.stringify(viewFor(G.world, 'blue', G.now).lastKnownContacts.map((e) => e.id)),
-  JSON.stringify(viewFor(G.world, 'red', G.now).visibleEnemies.map((e) => e.id)),
-);
 const SECRETS = [
   ...new Map(
     [...hiddenFrom('blue'), ...hiddenFrom('red')].map((s) => [s.what + s.hiddenFrom, s]),
@@ -214,6 +208,11 @@ describe('an adversarial model that names the other side’s units is stopped', 
     return {
       name: `Sir, the ${e.name} are at the ford.`,
       commander: `Sir, ${e.commander} is leading them.`,
+      nameFirst: `${e.name} are at the ford.`,
+      commanderFirst: `${e.commander} is leading them.`,
+      // Lower case escapes the capital-letter check, so only the name list (`hiddenIn`) stops these.
+      nameLower: `${e.name.toLowerCase()} are at the ford.`,
+      commanderLower: `${e.commander.toLowerCase()} is leading them.`,
       id: `Sir, ${e.id} is marching on the bridge.`,
       strength: `Sir, they have ${e.strength} men.`,
       all: `Sir, the ${e.name} under ${e.commander}, ${e.id}, number ${e.strength} men.`,
@@ -232,7 +231,12 @@ describe('an adversarial model that names the other side’s units is stopped', 
               { kind: 'advice', text },
             ],
           }),
-          parse: () => ({ result: 'rejection', reason: text }),
+          // The parser is not shown officers, so it cannot list a commander to refuse in lower case
+          // (a capitalised one is still caught by the proper-noun check). See decisions.md.
+          parse: () => ({
+            result: 'rejection',
+            reason: kind === 'commanderLower' ? 'Sir, that order is not clear.' : text,
+          }),
         });
         const probe = new LeakProbe();
         const delivered = await runStages(probe.client(side, model), side);

@@ -9,10 +9,21 @@ import type { GameState, SideId } from '@kriegsspiel/engine';
  * against the ids its input holds.
  */
 export function hiddenTerms(world: GameState, side: SideId): string[] {
+  const termsOf = (u: GameState['units'][number]) => [
+    u.name,
+    ...(u.commander ? [u.commander] : []),
+  ];
+  // A term the side's own units also bear is the side's own wording, so it is not a leak.
+  const own = new Set(
+    world.units
+      .filter((u) => u.side === side)
+      .flatMap(termsOf)
+      .map((t) => t.toLowerCase()),
+  );
   return world.units
     .filter((u) => u.side !== side)
-    .flatMap((u) => [u.name, ...(u.commander ? [u.commander] : [])])
-    .filter((t) => t.trim() !== '');
+    .flatMap(termsOf)
+    .filter((t) => t.trim() !== '' && !own.has(t.toLowerCase()));
 }
 
 /** The terms found in `text`, as problems. Names match as whole words, ignoring case. */
