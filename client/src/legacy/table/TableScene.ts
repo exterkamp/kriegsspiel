@@ -142,7 +142,8 @@ export class TableScene {
    * one over the other, so each tag that would overlap an earlier one is moved down the table until it is clear (#343).
    */
   private separateTags(): void {
-    const tags: Array<{ id: string; at: Coord; w: number; sprite: THREE.Sprite; baseZ: number }> = [];
+    const tags: Array<{ id: string; at: Coord; w: number; sprite: THREE.Sprite; baseZ: number }> =
+      [];
     let h = 0;
     for (const [id, p] of this.pieces) {
       const sprite = p.group.children.find((c): c is THREE.Sprite => c instanceof THREE.Sprite);

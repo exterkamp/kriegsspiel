@@ -915,7 +915,10 @@ export class Hub {
     if (last && last.words === words && now - last.at < DUPLICATE_TEXT_MS) {
       this.send(
         conn,
-        error('duplicate_text', `${command.orderId}: that order was just sent; it was not sent again`),
+        error(
+          'duplicate_text',
+          `${command.orderId}: that order was just sent; it was not sent again`,
+        ),
       );
       return;
     }

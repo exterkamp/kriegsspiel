@@ -117,7 +117,11 @@ import { MarksService, type Picker } from './marks.service';
         />
       }
       @for (m of markList(); track m.mark.id) {
-        <g class="mark" [class.selected]="m.mark.id === marks.selectedId()" [style.opacity]="m.fade">
+        <g
+          class="mark"
+          [class.selected]="m.mark.id === marks.selectedId()"
+          [style.opacity]="m.fade"
+        >
           @switch (m.mark.kind) {
             @case ('pin') {
               <circle [attr.cx]="m.mark.at.x" [attr.cy]="m.mark.at.y" [attr.r]="stroke * 5" />
@@ -297,15 +301,24 @@ export class FlatBoardComponent {
   protected readonly fights = computed(() => this.scene()?.engagements ?? []);
   protected readonly routes = computed(() => {
     const o = this.marks.overlays();
-    return (this.scene()?.orderRoutes ?? []).filter((r) => (r.kind === 'order' ? o.orders : o.routes));
+    return (this.scene()?.orderRoutes ?? []).filter((r) =>
+      r.kind === 'order' ? o.orders : o.routes,
+    );
   });
   protected readonly markList = computed(() => {
     const now = this.marks.nowGame();
-    return this.marks.shown().map((mark: Mark) => ({ mark, fade: markAgeFactor(mark.madeAtGame, now) }));
+    return this.marks
+      .shown()
+      .map((mark: Mark) => ({ mark, fade: markAgeFactor(mark.madeAtGame, now) }));
   });
   protected readonly tags = computed(() => {
     const h = this.fontSize * 1.2;
-    const below = (p: { position: { x: number; y: number } }, id: string, text: string, enemy: boolean) => ({
+    const below = (
+      p: { position: { x: number; y: number } },
+      id: string,
+      text: string,
+      enemy: boolean,
+    ) => ({
       id,
       text,
       enemy,

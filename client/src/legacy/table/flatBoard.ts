@@ -35,7 +35,11 @@ export function arrowHead(from: Coord, to: Coord, size: number): Coord[] {
   const uy = (to.y - from.y) / len;
   const bx = to.x - ux * size;
   const by = to.y - uy * size;
-  return [to, { x: bx - uy * size * 0.4, y: by + ux * size * 0.4 }, { x: bx + uy * size * 0.4, y: by - ux * size * 0.4 }];
+  return [
+    to,
+    { x: bx - uy * size * 0.4, y: by + ux * size * 0.4 },
+    { x: bx + uy * size * 0.4, y: by - ux * size * 0.4 },
+  ];
 }
 
 export function pointsAttr(points: readonly Coord[]): string {

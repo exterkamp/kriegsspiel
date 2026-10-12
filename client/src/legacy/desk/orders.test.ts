@@ -130,9 +130,9 @@ describe('clarification options', () => {
       expect(t).toContain('too many orders; wait a moment.');
       expect(t).not.toContain('The staff understand');
     }
-    expect(refusalText({ text: 'Hold.', reason: 'no such unit', code: 'order_rejected' })).toContain(
-      'The staff understand',
-    );
+    expect(
+      refusalText({ text: 'Hold.', reason: 'no such unit', code: 'order_rejected' }),
+    ).toContain('The staff understand');
   });
 
   it('leaves the options out of the refusal text', () => {

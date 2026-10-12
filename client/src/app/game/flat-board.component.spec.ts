@@ -78,4 +78,3 @@ describe('FlatBoardComponent (#343)', () => {
     expect(marks.draft()).toMatchObject({ kind: 'pin', at: { x: 2000, y: 1500 } });
   });
 });
-

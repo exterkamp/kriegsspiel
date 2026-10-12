@@ -376,7 +376,8 @@ describe('TableScene marks and overlays', () => {
         .reduce((n, c) => n + c.children.length, 0);
     expect(overlay()).toBe(2);
     // A planned route is dotted (many dashes); the order arrow is one strip and a head (#343).
-    const strips = (id: string): number => t.scene.getObjectByName(`overlay:${id}`)!.children.length;
+    const strips = (id: string): number =>
+      t.scene.getObjectByName(`overlay:${id}`)!.children.length;
     expect(strips('r1')).toBeGreaterThan(strips('o1'));
     t.setOverlays({ orders: false, routes: true, lastKnown: true });
     expect(overlay()).toBe(1);
