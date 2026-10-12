@@ -171,7 +171,7 @@ copying must preserve bytes and production must omit copied defaults.
 2. Every async boundary checks captured generation/session identity, aborted signal and destroyed state **before and after** await: default fetch, catalog list/read/save, certification/export/hash,
    repository open, render initialization, callback and error/finally paths. Late rejection cannot set error/status/focus on a stopped route. Register cleanup for any handle that resolves late and
    dispose it immediately if ownership expired.
-3. Host allocates once in `afterNextRender`, checks destroyed/session identity before allocation, catches partial construction and disposes owned resources. Effects/listeners/ResizeObserver/pointer
+3. Host tracks canvas identity with `afterRenderEffect` over a signal query, registers cleanup before allocation, and reads service state untracked. Angular template HMR can recreate a view while retaining its component/service; fully retire the old canvas mount before allocating the replacement, reject old callbacks by mount token, and clear historical readiness until the replacement renders. Check destroyed/session identity before allocation, catch partial construction and dispose owned resources. Effects/listeners/ResizeObserver/pointer
    capture/RAF/timers/worker subscriptions belong to that host/session and are removed exactly once. Angular signals hold plain snapshots, never proxy or mutable Three.js ownership.
 4. Setup is a full-size modal over the existing board. Its preview/runtime has separate ownership, not shared GPU resources. Board mount and personal state stay alive; its input/shortcuts are gated.
    Cancel/Escape abort setup operations, terminate workers, dispose preview, close dialog and restore focus to its original trigger if still connected. During committed Start, repeat Start and Cancel
@@ -183,7 +183,7 @@ copying must preserve bytes and production must omit copied defaults.
    board, invalidates setup callbacks, destroys old session completely, removes keyed host, and waits for Angular render/destruction acknowledgement before allocating the next scope/host. Use keyed
    `@for (...; track session.key)` or equivalent explicit component lifecycle; replacing an input alone is insufficient.
 7. Before replacement commit, failure leaves old board intact. After commit, old session is disposed permanently; failed initialization offers Retry same certified board or Return to default board.
-   Both allocate a fresh key/scope and rerun binding checks/render acknowledgement. No rollback/staging second board, resume pointer or production repository. Late success/error from replaced host
+   Both allocate a fresh key/scope and rerun binding checks/render acknowledgement. Cancelling preparation invalidates immediately, while operation settlement follows deferred retirement; retain and await the cancelled operation promise before successor allocation/teardown acknowledgement. No rollback/staging second board, resume pointer or production repository. Late success/error from replaced host
    cannot affect new one.
 8. Navigation away destroys route/startup/setup/session; back creates the canonical default. Reload likewise creates default. For bfcache, pagehide disposes local work and pageshow-persisted starts a
    fresh default; no hidden live reconnect. Listener registration and restart tokens are idempotent.

@@ -1,0 +1,66 @@
+{
+  "narrow": {
+    "canvases": 1,
+    "height": 844,
+    "scrollWidth": 390,
+    "width": 390
+  },
+  "desktop": {
+    "canvases": 1,
+    "height": 1000,
+    "scrollWidth": 1440,
+    "width": 1440
+  },
+  "inspection": {
+    "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+    "textureLimitPx": 4096,
+    "deviceMaxTextureSizePx": 16384,
+    "textureWidthPx": 4096,
+    "textureHeightPx": 2458,
+    "contentWidthPx": 4096,
+    "contentHeightPx": 2457.6,
+    "readMs": 4.600000023841858,
+    "parseAndDispatchMs": 118.39999997615814,
+    "certificationWaitMs": 899.8999999761581,
+    "identityMs": 139.80000001192093,
+    "rasterMs": 24.69999998807907,
+    "applyAndRetireMs": 14.300000011920929,
+    "resources": {
+      "textures": 1,
+      "geometries": 12
+    }
+  },
+  "filePicker": "Actual supported browser file chooser, pinned JSON bytes",
+  "workers": "Actual independent certification worker",
+  "renderer": "Actual WebGL; no raster or worker doubles",
+  "baseline": "1e265105aee43b131961d91b59f393ccd604291d",
+  "sourceBinding": "SHA256 file contents; reconciled to frozen PR candidate in independent review",
+  "sourceSha256": {
+    "client/angular.json": "d3fd8bc0ba95563a4d8ed029b260cac589857a53d663610fff7dce22f635e7f4",
+    "client/src/app/app.routes.ts": "0ec7ccd0dc1f62edce78a2751b6a324ae8d8c917cf130fba12a74bd5a3cf50aa",
+    "client/src/app/map-table/map-table.component.ts": "b5a7439f3f271e82f85c6d9153473c30ff183f7168ddda5dc649b6eae255aa00",
+    "client/src/app/map-table/map-table.component.html": "a03fca071690cc25e0ad5e6ae98a1af08f42446701939d932b5cba5bc4a59248",
+    "client/src/app/map-table/map-table.component.css": "ad29277956e274f30dbfa0ac651166f96969b0bbd82e73991b40d9a6d1aa1aad",
+    "client/src/app/map-table/map-table.component.spec.ts": "b5cceb1de9ba8730fb30bd348ec970de56feb4f7a055d11021dadd09d0e1efc5",
+    "client/src/app/map-table/map-table.service.ts": "2a2f7c137d4fbc4933a222c89f8ef97b37f8be0f12cc9a5c04905afdb4653013",
+    "client/src/app/map-table/map-table.service.spec.ts": "bee11160659ec851a462f1e9481066cb7e9ca9a49d4fdff085279c1147613066",
+    "client/src/shared/map-table/loader.ts": "089a09c452b8eb2638d38d41f0164be90db93f05a20e472ca5a2a5309ed65dd3",
+    "client/src/shared/map-table/loader.test.ts": "4c653cb35cff6e8a29d95f7356deac9ef30a180f18a80b032cd3def988aab988",
+    "client/src/shared/map-table/raster.ts": "a3f0075574d679ca5c3a5bdb1b1a3c6bf4eddf01c0a02478355c0e454723c2b7",
+    "client/src/shared/map-table/raster.test.ts": "4aaae4a842d9d2c11e391cc6d9e5016bd8430ff4f7877f7a36cfe731f9b00464",
+    "client/src/legacy/table/FixtureTableScene.ts": "6bf8a009b29512d56c49111fbff33b6e93e2d5058bb3573308be280e399e556b",
+    "client/src/legacy/table/previewScene.test.ts": "103d6d37cb4512eb5330ff2113291c5bbe3429eca035332ff17a341757221f79"
+  },
+  "checks": {
+    "invalidReplacement": "Unsupported schema JSON retains accepted rectangle and enabled inspection controls",
+    "cancel": "Real river-valley file load cancelled; rectangle/identity retained",
+    "controls": "Top-down, oblique, fit and focused ArrowRight exercised",
+    "templateHMR": "Temporary header edit and restoration each retire/recreate canvas; stale identity/controls cleared; real file load works afterward",
+    "consoleErrors": []
+  },
+  "limits": [
+    "Desktop/narrow Chrome on macOS; not an exhaustive device survey",
+    "Worker cancellation/listener/RAF cleanup also relies on focused deterministic source tests",
+    "No local New game UI/session acceptance in this inspector packet"
+  ]
+}

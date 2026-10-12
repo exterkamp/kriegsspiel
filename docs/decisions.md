@@ -450,3 +450,13 @@ Removed with it: all `.svelte` and test files under `client/src/hq`, the `fixtur
 **Why.** The owner chose to convert the whole client (D26). Nothing in the protocol, engine, visibility filter or server changed.
 **Consequence.** The framework-free modules (`net`, `table`, `window`, `desk/*.ts` logic, `shell/*Api.ts`, `map-authoring`, `admin`) now live in `client/src/legacy/` and are imported as `@legacy/*`; their `*.test.ts` run under plain Vitest (`client/vitest.config.ts`), the components' `*.spec.ts` under `ng test`. Dropped with Svelte: the mount-and-query cases of the old desk tests (ported to the `*.spec.ts` of each component, see `docs/angular-migration.md`), the Svelte store persistence tests (covered by `desk.store.spec.ts`), the `/map-table.html` dev page and its dev catalog plugin, `game-setup/` and `lobby/lobby.ts` (only the old imperative shell used them). The image always serves the Angular build and `SPA_FALLBACK` is on by default; the old `*.html` URLs redirect. The `hq-mutations.json` effectiveness probes now point at `client/src/legacy/table`.
 **See.** [angular-migration.md](angular-migration.md), [deployment.md](deployment.md)
+
+## D30: Saved-map inspection returns as a native Angular route
+
+**Decision.** Restore D25's independently certified saved-map inspection at `/map-table`, with `/map-table.html` redirected there while preserving queries. Angular `OnPush` components, signal-driven template bindings and a component-scoped service own the UI and resource lifetime. The old imperative page mount and document-wide UI queries are not restored. Reuse framework-free file certification, raster preparation and Three.js rendering algorithms; `legacy/` continues to serve the existing live-game and authoring applications under D29.
+
+**Why.** The owner requests fresh Angular implementation for local New game and the map inspector, with the rest of the application outside this packet. The Angular cutover removed the saved-map page; its accepted certification, cancellation, rectangular geometry and lifecycle behavior remain requirements.
+
+**Boundaries.** This file-only inspection route has no catalog dependency, personal marks, simulation, live-game state, production storage or session resume. `/` remains the upstream menu/auth/guest/scenario/live flow and D28's fixture retirement stays in force. Local New game setup and session replacement follow in separate development-only Angular packets.
+
+**See.** [Map table guide](map-table-guide.md), [Angular landing plan](game-initialization-angular-landing-plan.md).
