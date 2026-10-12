@@ -29,8 +29,8 @@ import { TableService } from '../game/table.service';
       display: flex;
       gap: 8px;
       align-items: center;
-      color: #efe6c8;
-      font-size: 13px;
+      color: var(--ks-on-overlay);
+      font-size: var(--ks-text-sm);
       flex-wrap: wrap;
       max-width: calc(100% - 16px);
     }

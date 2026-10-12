@@ -1,5 +1,5 @@
 <div
-  class="over"
+  class="over ks-paper"
   [class.victory]="result() === 'victory'"
   aria-labelledby="over-h"
   aria-modal="true"
@@ -24,6 +24,6 @@
     <button type="button" (click)="menu.emit()">Main menu</button>
   </div>
   @if (error()) {
-    <p role="alert" class="err">{{ error() }}</p>
+    <p role="alert" class="err ks-error">{{ error() }}</p>
   }
 </div>

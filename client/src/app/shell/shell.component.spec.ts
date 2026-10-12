@@ -179,6 +179,7 @@ describe('main menu', () => {
       ['Map editor', '/map-authoring'],
       ['Map benchmark', '/map-benchmark'],
       ['Table benchmark', '/table-benchmark'],
+      ['Style guide', '/style-guide'],
       ['Admin view', '/admin/'],
     ]);
     expect(el.querySelector('section.dev')?.textContent).toContain('admin token');

@@ -1,74 +1,44 @@
 import { ChangeDetectionStrategy, Component, input, signal } from '@angular/core';
-import { PAGE_CSS } from './page-styles';
+import { PageFrameComponent } from '../ui/page-frame.component';
 
 /** Guest start and the emailed-link form. */
 @Component({
   selector: 'ks-sign-in',
+  imports: [PageFrameComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="page">
-      <main>
-        <h1>Kriegsspiel</h1>
-        @if (onGuest()) {
-          <p>
-            <button type="button" class="primary" [disabled]="busy()" (click)="play()">
-              Play as guest
-            </button>
-          </p>
-          <p class="hint">No email needed. Sign in later to keep your games on other devices.</p>
-        }
-        <form (submit)="submit($event)" aria-labelledby="signin-h">
-          <h2 id="signin-h">Sign in</h2>
-          <label
-            >Email
-            <input
-              type="email"
-              required
-              autocomplete="email"
-              [value]="email()"
-              (input)="email.set($any($event.target).value)"
-          /></label>
-          <button type="submit" [disabled]="busy()">Send me a login link</button>
-          <p role="status" [class.err]="failed()">{{ message() }}</p>
-        </form>
-      </main>
-    </div>
+    <ks-page-frame heading="Kriegsspiel" [narrow]="true">
+      @if (onGuest()) {
+        <p>
+          <button type="button" class="ks-primary" [disabled]="busy()" (click)="play()">
+            Play as guest
+          </button>
+        </p>
+        <p class="ks-muted">No email needed. Sign in later to keep your games on other devices.</p>
+      }
+      <form (submit)="submit($event)" aria-labelledby="signin-h">
+        <h2 id="signin-h">Sign in</h2>
+        <label class="ks-field"
+          >Email
+          <input
+            type="email"
+            required
+            autocomplete="email"
+            [value]="email()"
+            (input)="email.set($any($event.target).value)"
+        /></label>
+        <button type="submit" [disabled]="busy()">Send me a login link</button>
+        <p role="status" class="ks-status" [class.ks-error]="failed()" [class.err]="failed()" [hidden]="!message()">
+          {{ message() }}
+        </p>
+      </form>
+    </ks-page-frame>
   `,
-  styles: [
-    PAGE_CSS,
-    `
-      main {
-        max-width: 420px;
-      }
-      label {
-        display: block;
-        margin-bottom: 12px;
-      }
-      input {
-        display: block;
-        width: 100%;
-        box-sizing: border-box;
-        font: inherit;
-        padding: 6px;
-        margin-top: 4px;
-      }
-      h2 {
-        border: 0;
-        margin: 0 0 8px;
-      }
-      .hint {
-        margin-top: -4px;
-        font-size: 0.9rem;
-      }
-      .primary {
-        font-weight: bold;
-        background: #e3d09a;
-        color: #2a2118;
-        font-size: inherit;
-        padding: 8px 14px;
-      }
-    `,
-  ],
+  styles: `
+    h2 {
+      margin: 0 0 var(--ks-space-2);
+    }
+  `,
 })
 export class SignInComponent {
   /** Asks for a login link; resolves to an error message, or undefined once it was sent. */

@@ -24,7 +24,12 @@ const OVERLAYS: ReadonlyArray<readonly [keyof Overlays, string]> = [
   selector: 'ks-marks-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section id="marks" aria-label="Map marks" [hidden]="marks.deskOpen() || marks.windowShown()">
+    <section
+      id="marks"
+      class="ks-overlay"
+      aria-label="Map marks"
+      [hidden]="marks.deskOpen() || marks.windowShown()"
+    >
       <button
         id="marks-toggle"
         type="button"
@@ -100,12 +105,6 @@ const OVERLAYS: ReadonlyArray<readonly [keyof Overlays, string]> = [
       left: 8px;
       top: 44px;
       width: min(300px, calc(100% - 16px));
-      background: rgba(42, 33, 24, 0.88);
-      color: #efe6c8;
-      font-size: 13px;
-      padding: 8px;
-      border-radius: 4px;
-      box-sizing: border-box;
     }
     #marks:has(#marks-body[hidden]) {
       width: auto;
@@ -121,9 +120,6 @@ const OVERLAYS: ReadonlyArray<readonly [keyof Overlays, string]> = [
       flex-wrap: wrap;
       gap: 4px;
       margin-bottom: 4px;
-    }
-    #marks button[aria-pressed='true'] {
-      background: #e8b923;
     }
     #mark-label {
       width: 100%;

@@ -13,45 +13,23 @@
 }
 .desk-bar {
   display: flex;
-  gap: 6px;
+  gap: var(--ks-space-2);
   flex-wrap: wrap;
   justify-content: center;
 }
-button {
-  background: #efe6c8;
-  color: #2a2118;
-  border: 1px solid #5a4a36;
-  border-radius: 3px;
-  padding: 6px 10px;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-button[aria-pressed='true'] {
-  background: #c9a95c;
-  font-weight: bold;
-}
-button:focus-visible {
-  outline: 3px solid #ffd76a;
-  outline-offset: 2px;
-}
 kbd {
-  font-size: 10px;
-  opacity: 0.65;
-  margin-left: 4px;
+  font: inherit;
+  font-size: var(--ks-text-xs);
+  opacity: 0.8;
+  margin-left: var(--ks-space-1);
 }
 .badge {
-  background: #a83232;
-  color: #fff;
-  border-radius: 8px;
-  padding: 0 5px;
-  margin-left: 4px;
-  font-size: 11px;
+  margin-left: var(--ks-space-1);
 }
 .fade {
   position: fixed;
   inset: 0;
-  background: #2a2118;
+  background: var(--ks-table);
   opacity: 0;
   pointer-events: none;
   transition: opacity 600ms ease-in-out;
@@ -68,19 +46,11 @@ kbd {
   max-height: 70%;
   overflow: auto;
   box-sizing: border-box;
-  padding: 16px 20px;
-  background: #f4eedb;
-  color: #2a2014;
-  border-radius: 2px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
   z-index: 3;
-  animation: slide-in 450ms ease-out;
+  animation: slide-in var(--ks-move);
 }
 .paper.wide {
   width: min(760px, calc(100% - 16px));
-}
-.paper:focus-visible {
-  outline: 3px solid #ffd76a;
 }
 .paper h2 {
   margin: 0 0 8px;

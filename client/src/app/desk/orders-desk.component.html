@@ -16,7 +16,7 @@
       }
     </select>
   </div>
-  <div class="err" id="order-err-to" role="alert">{{ errorFor('to') }}</div>
+  <div class="err ks-error" id="order-err-to" role="alert">{{ errorFor('to') }}</div>
 
   <div class="field">
     <label for="desk-order-text">Order</label>
@@ -33,7 +33,7 @@
       [attr.aria-describedby]="error()?.field === 'text' ? 'order-err-text' : null"
     ></textarea>
   </div>
-  <div class="err" id="order-err-text" role="alert">{{ errorFor('text') }}</div>
+  <div class="err ks-error" id="order-err-text" role="alert">{{ errorFor('text') }}</div>
   <p class="hint">The staff understand orders such as {{ examples }}.</p>
 
   <fieldset class="annex">
@@ -88,7 +88,7 @@
       Sign and send
     </button>
   </div>
-  <div class="err" id="order-err-send" role="alert">{{ errorFor('send') }}</div>
+  <div class="err ks-error" id="order-err-send" role="alert">{{ errorFor('send') }}</div>
   @if (confirmation()) {
     <p class="confirmation" role="status">{{ confirmation() }}</p>
   }
@@ -108,5 +108,5 @@
   @if (stamping()) {
     <div class="stamp" aria-hidden="true">SENT</div>
   }
-  <div class="sr" aria-live="polite">{{ stamping() ? 'Order signed and sent.' : '' }}</div>
+  <div class="ks-sr-only" aria-live="polite">{{ stamping() ? 'Order signed and sent.' : '' }}</div>
 </div>

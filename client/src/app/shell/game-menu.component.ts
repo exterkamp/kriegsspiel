@@ -12,79 +12,44 @@ import {
 } from '@angular/core';
 import { isTypingTarget } from '@legacy/desk/views';
 import { DeskStore } from '../desk/desk.store';
+import { ModalComponent } from '../ui/modal.component';
 
 /** The in-game menu: Esc at the table opens it; resume, leave to the main menu, or sign out. */
 @Component({
   selector: 'ks-game-menu',
+  imports: [ModalComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <button #opener type="button" class="open" aria-haspopup="dialog" (click)="setOpen(true)">
       Menu (Esc)
     </button>
     @if (open()) {
-      <div class="scrim">
-        <div #panel class="panel" role="dialog" aria-modal="true" aria-labelledby="gm-h">
-          <h2 id="gm-h">Menu</h2>
+      <div #panel>
+        <ks-modal heading="Menu" labelId="gm-h">
           <button #resume type="button" (click)="setOpen(false)">Resume</button>
           <button type="button" (click)="leave.emit()">Leave to main menu</button>
-          <button type="button" (click)="signOut.emit()">Sign out</button>
+          <button type="button" class="ks-danger" (click)="signOut.emit()">Sign out</button>
           <ng-content />
-          <p class="note">Leaving does not end the game. It keeps running on the server.</p>
-        </div>
+          <p class="note ks-muted">
+            Leaving does not end the game. It keeps running on the server.
+          </p>
+        </ks-modal>
       </div>
     }
   `,
   styles: `
     .open {
       position: fixed;
-      top: 8px;
+      top: var(--ks-space-2);
       left: 50%;
       transform: translateX(-50%);
       z-index: 30;
-    }
-    button {
-      font:
-        13px/1.2 Georgia,
-        serif;
+      font-size: var(--ks-text-sm);
       padding: 6px 12px;
-      background: #2a2118;
-      color: #efe6c8;
-      border: 1px solid #8a7a52;
-      border-radius: 3px;
-      cursor: pointer;
-    }
-    button:focus-visible {
-      outline: 3px solid #f2c94c;
-      outline-offset: 2px;
-    }
-    .scrim {
-      position: fixed;
-      inset: 0;
-      z-index: 40;
-      background: rgba(0, 0, 0, 0.5);
-      display: grid;
-      place-items: center;
-    }
-    .panel {
-      display: grid;
-      gap: 8px;
-      width: min(320px, calc(100% - 32px));
-      padding: 16px;
-      background: #f3e9c9;
-      color: #2a2118;
-      border: 1px solid #5a4c33;
-      font-family: Georgia, serif;
-    }
-    .panel button {
-      font-size: 15px;
-    }
-    h2 {
-      margin: 0;
     }
     .note {
       margin: 0;
-      font-size: 13px;
-      color: #5a4c33;
+      font-size: var(--ks-text-sm);
     }
   `,
 })

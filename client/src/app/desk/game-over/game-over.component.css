@@ -5,11 +5,6 @@
   transform: translateX(-50%);
   width: min(460px, calc(100% - 16px));
   box-sizing: border-box;
-  padding: 18px 22px;
-  background: #f4eedb;
-  color: #2a2014;
-  border-radius: 2px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
   z-index: 6;
   text-align: center;
 }
@@ -18,7 +13,7 @@ h2 {
   font-size: 28px;
 }
 .victory h2 {
-  color: #2f6b2f;
+  color: var(--ks-ok);
 }
 ul {
   list-style: none;
@@ -26,25 +21,11 @@ ul {
 }
 .row {
   display: flex;
-  gap: 6px;
+  gap: var(--ks-space-2);
   flex-wrap: wrap;
   justify-content: center;
   margin-top: 8px;
 }
-button {
-  background: #efe6c8;
-  color: #2a2118;
-  border: 1px solid #5a4a36;
-  border-radius: 3px;
-  padding: 6px 10px;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-button:focus-visible {
-  outline: 3px solid #ffd76a;
-  outline-offset: 2px;
-}
 .err {
-  color: #a83232;
+  color: var(--ks-danger);
 }

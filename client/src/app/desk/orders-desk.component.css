@@ -15,24 +15,14 @@
 select,
 textarea {
   flex: 1;
-  font: inherit;
-  background: #fbf7e8;
-  border: 1px solid #8a7a5c;
-  padding: 4px 6px;
-  box-sizing: border-box;
 }
 textarea {
   resize: vertical;
   min-height: 6em;
 }
-fieldset {
-  border: 1px solid #b9a97f;
-  margin: 0 0 8px;
-  padding: 6px 10px;
-}
 legend {
   font-variant: small-caps;
-  padding: 0 4px;
+  font-weight: normal;
 }
 .check,
 .courier {
@@ -50,8 +40,8 @@ legend {
 }
 small,
 .hint {
-  font-size: 12px;
-  opacity: 0.8;
+  font-size: var(--ks-text-xs);
+  color: var(--ks-text-muted);
   margin: 2px 0;
 }
 .sign {
@@ -62,33 +52,17 @@ small,
   min-height: 2.4em;
 }
 .signature {
-  font-family: 'Brush Script MT', cursive;
+  font-family: var(--ks-font-hand);
   font-size: 22px;
-  border-bottom: 1px solid #5a4a36;
+  border-bottom: 1px solid var(--ks-rule);
   flex: 1;
   min-height: 1.4em;
   animation: write 700ms steps(20, end);
   overflow: hidden;
   white-space: nowrap;
 }
-button {
-  background: #efe6c8;
-  color: #2a2118;
-  border: 1px solid #5a4a36;
-  border-radius: 3px;
-  padding: 6px 12px;
-  font: inherit;
-  cursor: pointer;
-}
-button:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-input:focus-visible {
-  outline: 3px solid #ffd76a;
-  outline-offset: 2px;
-}
 .err {
-  color: #a83232;
+  color: var(--ks-danger);
   min-height: 1.2em;
   margin-top: 4px;
 }
@@ -108,25 +82,16 @@ input:focus-visible {
   position: absolute;
   right: 8%;
   bottom: 18%;
-  border: 4px solid #a83232;
-  color: #a83232;
+  border: 4px solid var(--ks-danger);
+  color: var(--ks-danger);
   padding: 2px 14px;
-  font:
-    bold 36px/1.2 'Courier New',
-    monospace;
+  font: bold 36px/1.2 var(--ks-font-stamp);
   letter-spacing: 4px;
-  border-radius: 4px;
+  border-radius: var(--ks-radius);
   transform: rotate(-12deg);
   opacity: 0.85;
   pointer-events: none;
   animation: stamp 1400ms ease-out forwards;
-}
-.sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
 }
 @keyframes stamp {
   0% {

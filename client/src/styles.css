@@ -2,6 +2,6 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: #2a2118;
-  font-family: serif;
+  background: var(--ks-table);
+  font-family: var(--ks-font);
 }

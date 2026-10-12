@@ -12,7 +12,9 @@
         {{ v.label }}
         <kbd>{{ v.key.toUpperCase() }}</kbd>
         @if (v.id === 'inTray' && unread() > 0) {
-          <span class="badge" [attr.aria-label]="unread() + ' unread'">{{ unread() }}</span>
+          <span class="badge ks-badge" [attr.aria-label]="unread() + ' unread'">{{
+            unread()
+          }}</span>
         }
       </button>
     }
@@ -42,27 +44,32 @@
 
 @switch (desk.activeView()) {
   @case ('inTray') {
-    <section id="tray" class="paper wide" tabindex="-1" aria-label="In-tray">
+    <section id="tray" class="paper wide ks-paper" tabindex="-1" aria-label="In-tray">
       <ks-in-tray />
     </section>
   }
   @case ('orders') {
-    <section id="view-orders" class="paper" tabindex="-1" aria-label="Orders desk">
+    <section id="view-orders" class="paper ks-paper" tabindex="-1" aria-label="Orders desk">
       <ks-orders-desk />
     </section>
   }
   @case ('roster') {
-    <section id="view-roster" class="paper" tabindex="-1" aria-label="Order of battle">
+    <section id="view-roster" class="paper ks-paper" tabindex="-1" aria-label="Order of battle">
       <ks-roster />
     </section>
   }
   @case ('journal') {
-    <section id="view-journal" class="paper" tabindex="-1" aria-label="Journal">
+    <section id="view-journal" class="paper ks-paper" tabindex="-1" aria-label="Journal">
       <ks-journal />
     </section>
   }
   @case ('conference') {
-    <section id="view-conference" class="paper" tabindex="-1" aria-label="Staff conference">
+    <section
+      id="view-conference"
+      class="paper ks-paper"
+      tabindex="-1"
+      aria-label="Staff conference"
+    >
       <ks-conference />
     </section>
   }

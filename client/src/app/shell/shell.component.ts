@@ -55,6 +55,7 @@ type Prep =
     AccountBarComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'ks-theme' },
   template: `
     @if (state(); as st) {
       @switch (st.screen.name) {
@@ -98,10 +99,10 @@ type Prep =
               </ks-game-menu>
             }
             @case ('room') {
-              <ks-room [first]="roomInfo()!" (started)="enter()" />
+              <ks-room [first]="roomInfo()!" (started)="enter()" (left)="go({ name: 'menu' })" />
             }
             @case ('failed') {
-              <p id="pick" role="alert" class="failed">{{ failure() }}</p>
+              <p id="pick" role="alert" class="failed ks-status ks-error">{{ failure() }}</p>
             }
             @default {
               <p role="status" class="failed">Opening the game…</p>
@@ -119,15 +120,18 @@ type Prep =
       height: 100%;
     }
     .failed {
-      color: #efe6c8;
-      font-family: Georgia, serif;
-      padding: 16px;
+      color: var(--ks-on-overlay);
+      padding: var(--ks-space-4);
+    }
+    p.ks-status {
+      color: var(--ks-ink);
+      margin: var(--ks-space-4);
     }
     /* One scroller holds the form and "Your games" in turn, so the list never lies over the form's end (#318). */
     .screen {
       height: 100%;
       overflow: auto;
-      background: #e9dcb8 radial-gradient(circle at 30% 20%, #f3e9c9, #d9c795);
+      background: var(--ks-page-bg);
     }
     .screen ks-new-game {
       height: auto;
@@ -135,9 +139,8 @@ type Prep =
     .games {
       max-width: 560px;
       margin: 0 auto;
-      padding: 0 16px 32px;
-      font-family: Georgia, serif;
-      color: #2a2118;
+      padding: 0 var(--ks-space-4) var(--ks-space-6);
+      color: var(--ks-text);
     }
   `,
 })

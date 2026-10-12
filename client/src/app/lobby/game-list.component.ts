@@ -16,13 +16,13 @@ interface Row {
   template: `
     <h2>Your games</h2>
     @if (error()) {
-      <p role="alert" class="err">{{ error() }}</p>
+      <p role="alert" class="ks-status ks-error">{{ error() }}</p>
     } @else if (rows() === undefined) {
-      <p role="status">Loading your games…</p>
+      <p role="status" class="ks-muted">Loading your games…</p>
     } @else {
-      <ul id="game-list">
+      <ul id="game-list" class="ks-stack">
         @for (g of rows(); track g.id) {
-          <li>
+          <li class="ks-row">
             <a [href]="'/?game=' + enc(g.id)">{{ g.title }}</a> — {{ g.state }}
           </li>
         } @empty {
@@ -34,29 +34,11 @@ interface Row {
   styles: `
     :host {
       display: block;
-      margin-top: 24px;
+      margin-top: var(--ks-space-5);
     }
     h2 {
-      font-size: 1.1rem;
-      margin: 0 0 8px;
-      border-bottom: 1px solid #8a7a52;
-    }
-    ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: grid;
-      gap: 6px;
-    }
-    a {
-      color: #6b1d12;
-    }
-    a:focus-visible {
-      outline: 3px solid #1f5fbf;
-      outline-offset: 2px;
-    }
-    .err {
-      color: #8a1c10;
+      margin: 0 0 var(--ks-space-2);
+      border-bottom: 1px solid var(--ks-rule);
     }
   `,
 })

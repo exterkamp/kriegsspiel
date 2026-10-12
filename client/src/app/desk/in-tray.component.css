@@ -4,41 +4,15 @@ h2 {
 .piles {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--ks-space-1);
   margin-bottom: 8px;
 }
-button {
-  background: #efe6c8;
-  color: #2a2118;
-  border: 1px solid #5a4a36;
-  border-radius: 3px;
-  padding: 4px 8px;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-button[aria-pressed='true'] {
-  background: #c9a95c;
-  font-weight: bold;
-}
-button:focus-visible {
-  outline: 3px solid #ffd76a;
-  outline-offset: 2px;
-}
 .n {
-  opacity: 0.65;
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  opacity: 0.8;
 }
 .unread-dot {
-  color: #a83232;
-  font-size: 11px;
+  color: var(--ks-wax);
+  font-size: var(--ks-text-xs);
   margin-left: 2px;
 }
 .cols {
@@ -62,11 +36,13 @@ button:focus-visible {
   overflow: auto;
 }
 .row {
+  display: block;
+  min-height: 0;
   width: 100%;
   text-align: left;
   background: none;
   border: 0;
-  border-top: 1px solid #cbbf9b;
+  border-top: 1px solid var(--ks-rule-soft);
   border-radius: 0;
   padding: 4px 2px;
   color: inherit;
@@ -75,11 +51,11 @@ button:focus-visible {
   font-weight: bold;
 }
 .row[aria-current='true'] {
-  background: #e7dcb4;
+  background: var(--ks-paper-sunk);
 }
 .row small {
   display: block;
-  opacity: 0.75;
+  opacity: 0.85;
   font-weight: normal;
 }
 .viewer h3 {
@@ -93,7 +69,7 @@ dl {
   font-size: 13px;
 }
 dt {
-  opacity: 0.7;
+  opacity: 0.85;
 }
 dd {
   margin: 0;
@@ -107,7 +83,7 @@ dd {
   flex-wrap: wrap;
   gap: 4px 12px;
   align-items: center;
-  border: 1px dashed #5a4a36;
+  border: 1px dashed var(--ks-rule);
   padding: 6px;
   margin-bottom: 8px;
   font-size: 13px;
@@ -117,7 +93,7 @@ dd {
   gap: 6px;
 }
 .empty {
-  opacity: 0.6;
+  opacity: 0.85;
   font-style: italic;
   list-style: none;
 }

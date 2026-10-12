@@ -21,12 +21,12 @@ import { ChangeDetectionStrategy, Component, OnInit, signal } from '@angular/cor
       right: 8px;
       z-index: 5;
       white-space: nowrap;
-      background: #efe6c8;
-      color: #5a4a36;
-      border: 1px dashed #5a4a36;
-      border-radius: 3px;
+      background: var(--ks-paper-control);
+      color: var(--ks-ink-muted);
+      border: 1px dashed var(--ks-rule);
+      border-radius: var(--ks-radius);
       padding: 2px 8px;
-      font-size: 12px;
+      font-size: var(--ks-text-xs);
     }
     /* Narrow screens: the account bar wraps over the top corner, so sit above the desk buttons. */
     @media (max-width: 600px) {

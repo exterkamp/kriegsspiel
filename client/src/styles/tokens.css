@@ -1,0 +1,121 @@
+/*
+ * Design tokens (#327). The only place colours and font families are written down: components use `var(--ks-*)`
+ * (a test greps component styles for hex colours and font-family). Period look: aged paper, ink, sealing wax,
+ * brass. `html[data-contrast='high']` (or the OS setting) swaps in the plain high-contrast variant.
+ * Text pairs meet WCAG AA (checked by `scripts/check-contrast.mjs` through `src/app/ui/contrast.spec.ts`).
+ */
+:root {
+  /* Colour: paper and ink */
+  --ks-ink: #2a2118;
+  --ks-ink-muted: #51442c;
+  --ks-paper: #f4eedb;
+  --ks-paper-raised: #fbf7e8;
+  --ks-paper-control: #efe6c8;
+  --ks-paper-sunk: #e7dcb4;
+  --ks-paper-page: #e9dcb8;
+  --ks-paper-page-hi: #f3e9c9;
+  --ks-paper-page-lo: #d9c795;
+  --ks-rule: #6f6038;
+  --ks-rule-soft: #cbbf9b;
+  /* Colour: accents */
+  --ks-brass: #c9a95c;
+  --ks-brass-hi: #ffd76a;
+  --ks-wax: #8a1c10;
+  --ks-wax-on-dark: #ff9a8a;
+  --ks-ok: #2f6b2f;
+  --ks-warn: #7a5200;
+  --ks-info: #1f5fbf;
+  /* Colour: the dark table and overlays that sit on it */
+  --ks-table: #2a2118;
+  --ks-overlay: rgb(42 33 24 / 92%);
+  --ks-on-overlay: #efe6c8;
+  --ks-scrim: rgb(0 0 0 / 50%);
+  --ks-night-panel: #3a2e22;
+  --ks-night-line: #6f5f45;
+  --ks-night-dim: #c9bb94;
+  --ks-night-select: #4a3a28;
+  --ks-ok-on-dark: #7fd17f;
+  --ks-warn-on-dark: #f2c94c;
+  --ks-info-on-dark: #9cc4ff;
+  /* Semantic roles */
+  --ks-text: var(--ks-ink);
+  --ks-text-muted: var(--ks-ink-muted);
+  --ks-surface: var(--ks-paper);
+  --ks-control: var(--ks-paper-control);
+  --ks-control-selected: var(--ks-brass);
+  --ks-primary: var(--ks-ink);
+  --ks-on-primary: var(--ks-paper-control);
+  --ks-danger: var(--ks-wax);
+  --ks-link: var(--ks-wax);
+  --ks-focus: var(--ks-info);
+  --ks-focus-on-dark: var(--ks-brass-hi);
+  --ks-page-bg: var(--ks-paper-page)
+    radial-gradient(circle at 30% 20%, var(--ks-paper-page-hi), var(--ks-paper-page-lo));
+  /* Type */
+  --ks-font: Georgia, 'Times New Roman', serif;
+  --ks-font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --ks-font-hand: 'Brush Script MT', cursive;
+  --ks-font-stamp: 'Courier New', monospace;
+  --ks-text-xs: 0.75rem;
+  --ks-text-sm: 0.8125rem;
+  --ks-text-md: 1rem;
+  --ks-text-lg: 1.15rem;
+  --ks-text-xl: 1.75rem;
+  --ks-text-title: 2.4rem;
+  /* Space, shape, elevation, motion */
+  --ks-space-1: 4px;
+  --ks-space-2: 8px;
+  --ks-space-3: 12px;
+  --ks-space-4: 16px;
+  --ks-space-5: 24px;
+  --ks-space-6: 32px;
+  --ks-radius: 3px;
+  --ks-radius-pill: 999px;
+  --ks-shadow-paper: 0 6px 24px rgb(0 0 0 / 50%);
+  --ks-shadow-small: 0 2px 6px rgb(0 0 0 / 30%);
+  --ks-focus-ring: 3px solid var(--ks-focus);
+  --ks-move: 450ms ease-out;
+  --ks-move-fast: 120ms ease-out;
+}
+
+/* Plain high contrast: black on white, one strong focus colour, no texture. */
+:root[data-contrast='high'] {
+  --ks-ink: #000;
+  --ks-ink-muted: #000;
+  --ks-paper: #fff;
+  --ks-paper-raised: #fff;
+  --ks-paper-control: #fff;
+  --ks-paper-sunk: #d8d8d8;
+  --ks-paper-page: #fff;
+  --ks-paper-page-hi: #fff;
+  --ks-paper-page-lo: #fff;
+  --ks-rule: #000;
+  --ks-rule-soft: #595959;
+  --ks-brass: #ffd400;
+  --ks-brass-hi: #ffd400;
+  --ks-wax: #a00000;
+  --ks-wax-on-dark: #ffb3a8;
+  --ks-ok: #006400;
+  --ks-warn: #6b4500;
+  --ks-info: #0030c0;
+  --ks-table: #000;
+  --ks-overlay: rgb(0 0 0 / 96%);
+  --ks-on-overlay: #fff;
+  --ks-scrim: rgb(0 0 0 / 75%);
+  --ks-night-panel: #111;
+  --ks-night-line: #fff;
+  --ks-night-dim: #e0e0e0;
+  --ks-night-select: #333;
+  --ks-ok-on-dark: #7dff7d;
+  --ks-warn-on-dark: #ffd400;
+  --ks-info-on-dark: #a8c8ff;
+  --ks-shadow-paper: 0 0 0 2px #000;
+  --ks-shadow-small: 0 0 0 1px #000;
+}
+
+@media (prefers-contrast: more) {
+  :root:not([data-contrast='normal']) {
+    --ks-ink-muted: var(--ks-ink);
+    --ks-rule: var(--ks-ink);
+  }
+}

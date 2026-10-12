@@ -11,6 +11,7 @@ import {
 import type { GameInfo } from '@legacy/lobby/api';
 import { SESSION_LABELS, inviteLink, rateLabel, startBlocker } from '@legacy/lobby/model';
 import { SHELL_API, SHELL_WINDOW } from '../shell/shell-api';
+import { PageFrameComponent } from '../ui/page-frame.component';
 
 /**
  * The room of a game that has not started: who sits where, who is ready, the invite link, and the start button for
@@ -21,94 +22,60 @@ const MISSES_BEFORE_WARNING = 3;
 
 @Component({
   selector: 'ks-room',
+  imports: [PageFrameComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="page">
-      <main>
-        <h2>Lobby: {{ labels[info().sessionType] }}, {{ rate() }}</h2>
-        <ul id="room-sides">
-          @for (s of info().sides; track s.side) {
-            <li>
-              {{ s.side }}: {{ s.taken ? (s.ready ? 'ready' : 'seated') : 'open' }}
-              {{ info().you === s.side ? '(you)' : '' }}
-              @if (!s.taken && !info().you && !hot()) {
-                <button type="button" (click)="take(s.side)">Take {{ s.side }}</button>
-              }
-            </li>
-          }
-        </ul>
-        @if (!hot()) {
-          <p>
-            <label
-              >Invite link:
-              <input id="invite" readonly size="40" [value]="invite()" />
-            </label>
-          </p>
+    <ks-page-frame
+      [heading]="'Lobby: ' + labels[info().sessionType] + ', ' + rate()"
+      [back]="true"
+      (backClick)="leave()"
+    >
+      <ul id="room-sides" class="ks-stack">
+        @for (s of info().sides; track s.side) {
+          <li class="ks-row">
+            {{ s.side }}: {{ s.taken ? (s.ready ? 'ready' : 'seated') : 'open' }}
+            {{ info().you === s.side ? '(you)' : '' }}
+            @if (!s.taken && !info().you && !hot()) {
+              <button type="button" (click)="take(s.side)">Take {{ s.side }}</button>
+            }
+          </li>
         }
-        @if (info().you && !info().creator) {
-          <button id="room-ready" type="button" (click)="ready()">
-            {{ info().ready ? 'Not ready' : 'Ready' }}
-          </button>
-        }
-        @if (info().creator) {
-          <button
-            id="room-start"
-            type="button"
-            [disabled]="blocker() !== undefined"
-            (click)="start()"
-          >
-            Start game
-          </button>
-        }
-        <p id="lobby-msg" role="status">
-          {{ error() ?? (info().creator ? (blocker() ?? '') : 'Waiting for the host to start.') }}
+      </ul>
+      @if (!hot()) {
+        <p>
+          <label class="ks-field"
+            >Invite link:
+            <input id="invite" readonly size="40" [value]="invite()" />
+          </label>
         </p>
-      </main>
-    </div>
-  `,
-  styles: `
-    :host {
-      display: block;
-      height: 100%;
-    }
-    .page {
-      min-height: 100%;
-      background: #e9dcb8 radial-gradient(circle at 30% 20%, #f3e9c9, #d9c795);
-    }
-    main {
-      box-sizing: border-box;
-      padding: 32px 16px;
-      max-width: 560px;
-      margin: 0 auto;
-      color: #2a2118;
-      font-family: Georgia, serif;
-    }
-    ul {
-      list-style: none;
-      padding: 0;
-      display: grid;
-      gap: 8px;
-    }
-    button {
-      font: inherit;
-      padding: 6px 12px;
-      border: 1px solid #5a4c33;
-      border-radius: 3px;
-      background: #f6edd0;
-      color: #2a2118;
-      cursor: pointer;
-    }
-    button:focus-visible,
-    input:focus-visible {
-      outline: 3px solid #1f5fbf;
-      outline-offset: 2px;
-    }
+      }
+      @if (info().you && !info().creator) {
+        <button id="room-ready" type="button" (click)="ready()">
+          {{ info().ready ? 'Not ready' : 'Ready' }}
+        </button>
+      }
+      @if (info().creator) {
+        <button
+          id="room-start"
+          type="button"
+          class="ks-primary"
+          [disabled]="blocker() !== undefined"
+          (click)="start()"
+        >
+          Start game
+        </button>
+      }
+      <p id="lobby-msg" role="status" class="ks-status">
+        {{ error() ?? (info().creator ? (blocker() ?? '') : 'Waiting for the host to start.') }}
+      </p>
+    </ks-page-frame>
   `,
 })
 export class RoomComponent implements OnInit {
   /** The game as last read; the room keeps it fresh by polling. */
   readonly first = input.required<GameInfo>();
   readonly started = output();
+  readonly left = output();
   private readonly api = inject(SHELL_API);
   private readonly win = inject(SHELL_WINDOW);
   private readonly destroyRef = inject(DestroyRef);
@@ -156,6 +123,10 @@ export class RoomComponent implements OnInit {
       () => this.poll(),
       (e: unknown) => this.error.set(e instanceof Error ? e.message : String(e)),
     );
+  }
+
+  protected leave(): void {
+    this.left.emit();
   }
 
   protected take(side: string): void {

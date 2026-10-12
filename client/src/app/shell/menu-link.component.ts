@@ -8,27 +8,25 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   styles: `
     :host {
       position: fixed;
-      right: 8px;
-      bottom: 8px;
+      right: var(--ks-space-2);
+      bottom: var(--ks-space-2);
       z-index: 1000;
     }
     a {
       display: inline-block;
       padding: 6px 12px;
-      font:
-        14px/1.2 Georgia,
-        serif;
-      color: #2a2118;
-      background: #f6edd0;
-      border: 1px solid #8a7a52;
-      border-radius: 4px;
+      font: var(--ks-text-sm) / 1.2 var(--ks-font);
+      color: var(--ks-ink);
+      background: var(--ks-paper-control);
+      border: 1px solid var(--ks-rule);
+      border-radius: var(--ks-radius);
       text-decoration: none;
     }
     a:hover {
-      background: #fff6da;
+      background: var(--ks-paper-sunk);
     }
     a:focus-visible {
-      outline: 3px solid #1a5fb4;
+      outline: var(--ks-focus-ring);
       outline-offset: 2px;
     }
   `,
