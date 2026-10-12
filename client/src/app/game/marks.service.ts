@@ -12,6 +12,9 @@ import { DeskStore } from '../desk/desk.store';
 import { GameService } from './game.service';
 import { TableService } from './table.service';
 
+/** What the marks code needs of a board: the map point (and piece) under a screen position. The 3D table and the flat board both do this. */
+export type Picker = Pick<TableScene, 'pickAt'>;
+
 /** The pointer state the table needs to turn drags into marks. */
 export interface PointerLike {
   clientX: number;
@@ -108,12 +111,12 @@ export class MarksService {
       );
   }
 
-  private mapPoint(scene: TableScene, e: PointerLike) {
+  private mapPoint(scene: Picker, e: PointerLike) {
     const r = scene.pickAt(e.clientX, e.clientY);
     return r.type === 'none' ? undefined : r.coord;
   }
 
-  pointerDown(scene: TableScene, canvas: HTMLElement, e: PointerLike): void {
+  pointerDown(scene: Picker, canvas: HTMLElement, e: PointerLike): void {
     this.down = { x: e.clientX, y: e.clientY };
     const tool = this.tool();
     if (this.deskOpen() || this.windowShown() || tool === 'view' || e.button !== 0) return;
@@ -133,7 +136,7 @@ export class MarksService {
     this.draft.set(this.gesture.draft());
   }
 
-  pointerMove(scene: TableScene, e: PointerLike): void {
+  pointerMove(scene: Picker, e: PointerLike): void {
     if (this.windowShown()) {
       const r = scene.pickAt(e.clientX, e.clientY);
       this.desk.windowHover.set(r.type === 'piece' && r.pieceKind === 'own' ? r.id : undefined);
@@ -146,7 +149,7 @@ export class MarksService {
     this.draft.set(this.gesture.draft());
   }
 
-  pointerUp(scene: TableScene, e: PointerLike): void {
+  pointerUp(scene: Picker, e: PointerLike): void {
     if (this.gesture) {
       const c = this.mapPoint(scene, e);
       const made = c ? this.gesture.finish(c) : this.gesture.draft();

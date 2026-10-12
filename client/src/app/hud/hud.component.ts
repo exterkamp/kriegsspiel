@@ -13,8 +13,10 @@ import { TableService } from '../game/table.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div id="hud">
-      <button id="top" type="button" (click)="table.scene()?.snapTopDown()">Top-down</button>
-      <button id="obl" type="button" (click)="table.scene()?.snapOblique()">Oblique</button>
+      @if (!table.unavailable()) {
+        <button id="top" type="button" (click)="table.scene()?.snapTopDown()">Top-down</button>
+        <button id="obl" type="button" (click)="table.scene()?.snapOblique()">Oblique</button>
+      }
       <span id="pick">{{ table.status() }}</span>
     </div>
     <section id="gameover" aria-label="Game over" role="status" [hidden]="over() === undefined">

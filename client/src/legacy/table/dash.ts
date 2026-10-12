@@ -1,4 +1,4 @@
-import type { Coord } from './types';
+import type { Coord } from '@kriegsspiel/protocol';
 
 /**
  * Cuts a polyline into dashes `dash` long with `gap` between them, measured along the line (units are the caller's).

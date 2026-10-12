@@ -167,6 +167,11 @@ describe('GameComponent without WebGL (#259)', () => {
     expect(el.querySelector('ks-webgl-fallback li')).not.toBeNull();
     expect(el.querySelector('nav[aria-label=Desk]')).not.toBeNull();
     expect(TestBed.inject(TableService).scene()).toBeUndefined();
+    // A flat board stands in for the table; camera buttons that do nothing are gone and no error text leaks (#343).
+    expect(el.querySelector('ks-webgl-fallback ks-flat-board svg')).not.toBeNull();
+    expect(el.querySelector('#top')).toBeNull();
+    expect(el.querySelector('#obl')).toBeNull();
+    expect(el.querySelector('#pick')?.textContent).not.toMatch(/WebGL/);
   });
 
   it('disposes a half-built scene when start() throws', async () => {
