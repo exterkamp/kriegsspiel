@@ -108,3 +108,5 @@ export function miniWorld(opts: {
     },
   });
 }
+
+export { holdTheBridgeFarStart } from './scenarios/holdTheBridgeFarStart.js';

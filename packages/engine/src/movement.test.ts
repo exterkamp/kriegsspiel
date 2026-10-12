@@ -6,7 +6,6 @@ import {
   advanceTo,
   createState,
   findPath,
-  holdTheBridge,
   issueFormation,
   issueHalt,
   issueMove,
@@ -24,7 +23,7 @@ import {
   type GameState,
   type Point,
 } from './index.js';
-import { bridge, miniWorld, river, road, wood } from './scenario.testkit.js';
+import { bridge, miniWorld, river, road, wood, holdTheBridgeFarStart } from './scenario.testkit.js';
 
 const P = (x: number, y: number): Point => pointMm(x, y);
 
@@ -36,7 +35,7 @@ function registry() {
 }
 
 function game() {
-  const g = loadScenario(holdTheBridge);
+  const g = loadScenario(holdTheBridgeFarStart);
   return createState(g.seed, g, 0);
 }
 
@@ -114,7 +113,7 @@ describe('findPath', () => {
   });
 
   it('crosses the real scenario map only over the bridge', () => {
-    const g = loadScenario(holdTheBridge);
+    const g = loadScenario(holdTheBridgeFarStart);
     const p = findPath(g.map, P(1850, 2450), P(1950, 450))!;
     expect(p.waypoints.length).toBeGreaterThan(2);
     let crossedAt: number | undefined;
@@ -130,7 +129,7 @@ describe('findPath', () => {
   });
 
   it('is deterministic', () => {
-    const g = loadScenario(holdTheBridge);
+    const g = loadScenario(holdTheBridgeFarStart);
     expect(findPath(g.map, P(0, 0), P(3900, 2900))).toEqual(
       findPath(g.map, P(0, 0), P(3900, 2900)),
     );
