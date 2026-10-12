@@ -42,9 +42,10 @@ export function formatAge(ms: number): string {
 }
 
 /**
- * One row per formation in the SideView, and nothing else. The figures are as of `view.atGame`,
- * (or the unit's own `reportedAt`), so they age as game time runs on past it (a lost link, a slow umpire). `nowGame` is the local
- * game time, which is the same arithmetic at 1:1 and 12:1.
+ * One row per formation in the SideView, and nothing else. The figures are as of the unit's own
+ * `reportedAt` when the server sends one, else `view.atGame`, so they age as game time runs on past
+ * it (a lost link, a slow umpire). `nowGame` is the local game time, which is the same arithmetic
+ * at 1:1 and 12:1.
  */
 export function rosterRows(view: SideView | undefined, nowGame: number): RosterRow[] {
   if (!view) return [];

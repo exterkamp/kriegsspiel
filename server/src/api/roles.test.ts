@@ -238,7 +238,7 @@ describe('role views over the WebSocket', () => {
       expect(u.morale).toBeUndefined();
       expect(u.supply).toBeUndefined();
       expect(u.reportedAt).toBeUndefined();
-      expect(u.commander).toBeUndefined();
+      // The commander's absence from the outline is pinned in engine roles.test.ts (this scenario names none).
     }
 
     expect(subV!.role).toBe('subordinate');
