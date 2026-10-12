@@ -321,7 +321,7 @@ describe.each([
   it('spends a login token once and refuses it after expiry', () =>
     withStore((s) => {
       s.putLoginToken('h1', 'a@x.test', 100);
-      expect(s.consumeLoginToken('h1', 50)).toBe('a@x.test');
+      expect(s.consumeLoginToken('h1', 50)).toMatchObject({ email: 'a@x.test' });
       expect(s.consumeLoginToken('h1', 50)).toBeUndefined();
       s.putLoginToken('h2', 'a@x.test', 100);
       expect(s.consumeLoginToken('h2', 100)).toBeUndefined();

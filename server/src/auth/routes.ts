@@ -156,7 +156,14 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
       return reply.code(429).header('retry-after', '3600').send({ error: 'rate_limited' });
     }
     const token = randomBytes(32).toString('base64url');
-    o.store.putLoginToken(hashToken(token), email, now() + LOGIN_LINK_TTL_MS);
+    // The guest session of the browser that asks for the link is the only one the link may adopt (#268).
+    const asker = userOf(req);
+    o.store.putLoginToken(
+      hashToken(token),
+      email,
+      now() + LOGIN_LINK_TTL_MS,
+      asker?.guest ? asker.id : undefined,
+    );
     const link = `${o.publicUrl.replace(/\/$/, '')}/auth/verify?token=${token}${next ? `&next=${encodeURIComponent(next)}` : ''}`;
     try {
       await o.mailer.sendLoginLink(email, link);
@@ -172,17 +179,18 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
     async (req, reply) => {
       if (!verifyPerIp.hit(req.ip)) return reply.code(429).send({ error: 'rate_limited' });
       const token = req.query.token;
-      const email =
+      const link =
         typeof token === 'string' ? o.store.consumeLoginToken(hashToken(token), now()) : undefined;
-      if (!email) {
+      if (!link) {
         return reply
           .code(400)
           .type('text/plain')
           .send('This login link is invalid, expired or already used. Request a new one.');
       }
       const guest = userOf(req);
-      const user = o.store.upsertUser(email, now());
-      if (guest?.guest && guest.id !== user.id) {
+      const user = o.store.upsertUser(link.email, now());
+      // Adopt only the guest that requested this link, so a link sent to someone else's browser cannot take their games.
+      if (guest?.guest && guest.id === link.guestId && guest.id !== user.id) {
         const moved = o.store.adoptGuest(guest.id, user.id);
         o.onGuestAdopted?.(guest.id, user.id, moved);
       }
