@@ -169,6 +169,8 @@ export function splitOptions(reason: string): { question: string; options: strin
  * order for the option; any other question puts the option in front (a unit) or after (a place).
  */
 export function orderWithOption(words: string, question: string, option: string): string {
+  // "Shall I send just the first part?" offers the part itself, a whole order.
+  if (/^\s*i know of no place/i.test(question)) return option;
   const noun = /^\s*which\s+([a-z]+)/i.exec(question)?.[1];
   if (noun && !/^(one|unit)$/i.test(noun)) {
     const re = new RegExp(`(?:\\bthe\\s+)?\\b${noun}s?\\b(?![\\s\\S]*\\b${noun}s?\\b)`, 'i');
@@ -218,4 +220,11 @@ export function deliveredBy(
   return [...dispatches]
     .sort((a, b) => a.writtenAtGame - b.writtenAtGame)
     .find((d) => d.from === p.toName && d.writtenAtGame >= p.sentAtGame);
+}
+
+/** What the desk says once an order is signed: to whom, by which courier and, if known, when it should arrive. */
+export function sentLine(toName: string, courier: Courier, etaGame: number | undefined): string {
+  const how = courier === 'fast' ? 'fast rider' : 'steady courier';
+  const when = etaGame === undefined ? '' : `; expected to arrive ${formatGameTime(etaGame)}`;
+  return `Sent to ${toName} by ${how}${when}`;
 }

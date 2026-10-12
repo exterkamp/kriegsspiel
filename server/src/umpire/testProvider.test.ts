@@ -132,7 +132,7 @@ describe('test provider: parse', () => {
     });
     // The offer is one option: the first part, as a whole order the desk can send as it stands.
     expect((r as { options: string[] }).options).toEqual([
-      expect.stringMatching(/^[\w ]+, screen the northern wood$/),
+      expect.stringMatching(/^[\w ]+ screen the northern wood$/),
     ]);
   });
 

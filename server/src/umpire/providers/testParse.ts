@@ -319,11 +319,11 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
         );
     } else {
       const found = findPlace(object, input.places);
-      if (found.kind === 'none' && intents.length > 0)
-      {
+      if (found.kind === 'none' && intents.length > 0) {
         // The one option is the first part as a whole order, for the desk to send as it stands.
-        const first = clauses.slice(0, i).join(', ');
-        const whole = match.kind === 'one' ? `${match.unit.name}, ${first}` : first;
+        // No commas: the desk splits a clarification's options at ", ".
+        const first = clauses.slice(0, i).join(' and then ');
+        const whole = match.kind === 'one' ? `${match.unit.name} ${first}` : first;
         return ask(
           `I know of no place called "${phrase.join(' ')}", sir. Shall I send just the first part?`,
           [whole],

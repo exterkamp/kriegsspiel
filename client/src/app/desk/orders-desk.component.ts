@@ -21,6 +21,7 @@ import {
   estimateRideMs,
   formatEstimate,
   noticeText,
+  sentLine,
   orderWithOption,
   splitOptions,
   withAnnex,
@@ -90,6 +91,8 @@ export class OrdersDeskComponent {
   /** Which control the message belongs to, so it sits beside it and is tied to it for assistive technology. */
   protected readonly error = signal<{ field: Field; message: string } | undefined>(undefined);
   protected readonly stamping = signal(false);
+  /** Word that the last order went, with its courier and expected arrival; it stays until the next action. */
+  protected readonly confirmation = signal('');
 
   /** The notice that was showing when the player signed again, so an old refusal does not sit beside a new order. */
   private readonly dismissed = signal<unknown>(undefined);
@@ -126,6 +129,7 @@ export class OrdersDeskComponent {
   private refuse(words: string): void {
     clearTimeout(this.stampTimer);
     this.stamping.set(false);
+    this.confirmation.set('');
     const sent = this.lastSent;
     if (!sent || sent.words !== words.trim()) return;
     this.lastSent = undefined;
@@ -150,6 +154,7 @@ export class OrdersDeskComponent {
   }
 
   protected patch(p: Partial<OrderDraft>): void {
+    if ('to' in p || 'text' in p || 'courier' in p) this.confirmation.set('');
     // Editing the control an error names settles it.
     const e = this.error();
     if (e && (('to' in p && e.field === 'to') || ('text' in p && e.field === 'text')))
@@ -174,6 +179,7 @@ export class OrdersDeskComponent {
     const view = state.view;
     const addressee = this.addressee();
     this.error.set(undefined);
+    this.confirmation.set('');
     if (this.over()) return;
     if (!addressee) {
       this.error.set({ field: 'to', message: 'Address the order to one of your commanders.' });
@@ -212,6 +218,9 @@ export class OrdersDeskComponent {
     this.stampTimer = setTimeout(() => this.stamping.set(false), 1400);
     // The addressee and courier stay for the next order; the words and annex are cleared.
     this.patch({ text: '', annex: [] });
+    this.confirmation.set(
+      sentLine(addressee.name, d.courier, ride === undefined ? undefined : sentAt + ride),
+    );
   }
 
   protected readonly annexLine = annexLine;

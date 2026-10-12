@@ -201,6 +201,49 @@ describe('OrdersDeskComponent', () => {
     },
   });
 
+  it('confirms an accepted order with its courier and expected arrival, until the next action', async () => {
+    const t = await open();
+    await t.fill();
+    expect(t.el.querySelector('.confirmation')).toBeNull();
+    t.q('#order-sign').click();
+    await t.settle();
+    const text = t.q('.confirmation').textContent!;
+    expect(text).toMatch(/^Sent to .+ by steady courier; expected to arrive Day 1 \d\d:\d\d$/);
+    // The journal's pending entry names the same addressee and courier.
+    expect(text).toContain(unit.name);
+    t.desk.orderDraft.update((d) => ({ ...d, text: 'Next' }));
+    t.q<HTMLTextAreaElement>('#desk-order-text').dispatchEvent(new Event('input'));
+    t.q<HTMLTextAreaElement>('#desk-order-text').value = 'Next order';
+    t.q<HTMLTextAreaElement>('#desk-order-text').dispatchEvent(new Event('input'));
+    await t.settle();
+    expect(t.el.querySelector('.confirmation')).toBeNull();
+  });
+
+  it('offers the first part of an order as a button that sends exactly that part', async () => {
+    const t = await open();
+    await t.fill();
+    t.desk.orderDraft.update((d) => ({
+      ...d,
+      text: 'Screen the wood, then fall back to the mill.',
+    }));
+    t.q('#order-sign').click();
+    await t.settle();
+    t.game.set(
+      refusal(
+        'Screen the wood, then fall back to the mill.',
+        'order_clarification',
+        'I know of no place called "mill", sir. Shall I send just the first part? (Cavalry screen the wood)',
+      ),
+    );
+    await t.settle();
+    const buttons = [...t.el.querySelectorAll<HTMLButtonElement>('.options button')];
+    expect(buttons.map((b) => b.textContent)).toEqual(['Cavalry screen the wood']);
+    buttons[0]!.click();
+    await t.settle();
+    expect(t.sender).toHaveBeenCalledTimes(2);
+    expect(t.sender.mock.calls[1]![0].words).toBe('Cavalry screen the wood');
+  });
+
   it('takes the stamp back and puts the words back when the order is refused', async () => {
     const t = await open();
     await t.fill();
