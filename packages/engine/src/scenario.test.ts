@@ -103,7 +103,9 @@ describe('Hold the Bridge scenario', () => {
   });
 
   it('is loaded identically every time', () => {
-    expect(loadScenario(holdTheBridge)).toEqual(loadScenario(JSON.parse(JSON.stringify(holdTheBridge))));
+    expect(loadScenario(holdTheBridge)).toEqual(
+      loadScenario(JSON.parse(JSON.stringify(holdTheBridge))),
+    );
   });
 });
 

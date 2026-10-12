@@ -3,7 +3,7 @@ import {
   MS_PER_MINUTE,
   advanceTo,
   createState,
-  holdTheBridge,
+  holdTheBridgeFarStart,
   issuePlacement,
   loadScenario,
   mm,
@@ -19,7 +19,7 @@ const THREE_MIN = 3 * MS_PER_MINUTE;
 
 /** Judge, then queue every proposal and let the engine rule on it. */
 async function judgeAndApply(client: MockUmpireClient, elapsedMs = THREE_MIN) {
-  const world = loadScenario(holdTheBridge);
+  const world = loadScenario(holdTheBridgeFarStart);
   const rulings = await judgePlacements(
     client,
     world,
@@ -33,7 +33,7 @@ async function judgeAndApply(client: MockUmpireClient, elapsedMs = THREE_MIN) {
 
 describe('judge placement', () => {
   it('describes the map as vector features in metres', () => {
-    const world = loadScenario(holdTheBridge);
+    const world = loadScenario(holdTheBridgeFarStart);
     const input = judgePlacementInput(world, 'x', THREE_MIN);
     expect(input.map).toMatchObject({ widthM: 4000, heightM: 3000 });
     const bridge = input.map.features.find((f) => f.id === 'bridge')!;
@@ -74,7 +74,7 @@ describe('judge placement', () => {
         ],
       },
     };
-    const before = loadScenario(holdTheBridge);
+    const before = loadScenario(holdTheBridgeFarStart);
     const world = await judgeAndApply(new MockUmpireClient([wild]));
     const [far, wet, ghost] = world.rulings;
     expect(far!.verdict.verdict).toBe('clamp');
@@ -101,7 +101,7 @@ describe('judge placement', () => {
     const live = await judgeAndApply(client);
     expect(client.calls).toHaveLength(1);
     // Replay: queue the logged proposals again, with no client at all.
-    const world = loadScenario(holdTheBridge);
+    const world = loadScenario(holdTheBridgeFarStart);
     let state = createState(world.seed, world, 0);
     for (const r of live.rulings) {
       state = issuePlacement(
