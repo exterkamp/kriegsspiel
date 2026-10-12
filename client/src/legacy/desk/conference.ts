@@ -1,5 +1,6 @@
 import type { SideView } from '@kriegsspiel/protocol';
 import type { LinkStatus, StaffCharge, StaffServerAnswer } from '../net/state.js';
+import { formatGameTime } from '../net/state.js';
 import { formatAge, pct } from './roster.js';
 
 /** The four officers the player can consult (docs/hq-interface.md, "Staff conference"). */
@@ -234,7 +235,15 @@ export function fixtureAnswer(
           `A contact seen ${formatAge(c.ageMs)} ago${c.sizeEstimate ? `, ${c.sizeEstimate}` : ''}, may be anywhere within ${Math.round(c.uncertaintyRadius)} m of where it was seen.`,
         );
       }
-      if (!seen && view.lastKnownContacts.length === 0)
+      // A scout's report is word the side has received even when no contact stands in the tables.
+      const scouts = view.dispatches
+        .filter((d) => d.category === 'scouts' && d.sizeEstimate !== undefined)
+        .sort((a, b) => b.receivedAtGame - a.receivedAtGame);
+      if (scouts[0])
+        lines.push(
+          `The latest scouting word, received ${formatGameTime(scouts[0].receivedAtGame)}, is from ${scouts[0].from}: ${scouts[0].text}`,
+        );
+      if (!seen && view.lastKnownContacts.length === 0 && scouts.length === 0)
         lines.push('We know nothing of their whereabouts.');
       caveat = 'Old sightings are only as good as the men who made them.';
       break;

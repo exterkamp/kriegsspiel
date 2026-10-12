@@ -31,6 +31,28 @@ describe('fixtureAnswer', () => {
     for (const u of fixtureView.ownUnits)
       expect(a.text).toContain(`${u.name}: supply ${Math.round((u.supply ?? 0) * 100)}%`);
   });
+  it('cites the newest scouting word received, even with no contact in the tables (#318)', () => {
+    const empty = {
+      ...fixtureView,
+      visibleEnemies: [],
+      lastKnownContacts: [],
+      dispatches: [
+        {
+          id: 'd1',
+          from: 'Scouts',
+          writtenAtGame: 60_000,
+          receivedAtGame: 480_000,
+          category: 'scouts' as const,
+          sizeEstimate: 'a battalion',
+          text: 'Scouts sighted a battalion at the bridge.',
+        },
+      ],
+    };
+    const text = fixtureAnswer(req('intelligence'), empty).text;
+    expect(text).toContain('received Day 1 00:08');
+    expect(text).toContain('a battalion at the bridge');
+    expect(text).not.toContain('nothing of their whereabouts');
+  });
   it('admits ignorance with no view or no contacts', () => {
     expect(fixtureAnswer(req('intelligence'), undefined).text).toContain('no reports');
     const empty = { ...fixtureView, visibleEnemies: [], lastKnownContacts: [] };
