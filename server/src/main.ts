@@ -108,7 +108,11 @@ const { server } = await buildApp({
     cannedParser,
     onFallback: (gameId, reason) => server.log.warn({ gameId, reason }, 'order parser fallback'),
   }),
-  onGameDone: (gameId) => gameClients.evict(gameId),
+  onGameDone: (gameId) => {
+    const report = gameClients.peek(gameId)?.report();
+    if (report) server.log.info({ gameId, umpire: report }, 'umpire cost for game');
+    gameClients.evict(gameId);
+  },
   store,
   lobby,
   staticDir: process.env.STATIC_DIR,
@@ -131,12 +135,8 @@ const { server } = await buildApp({
       : undefined,
   narrator:
     umpire && umpireConfig
-      ? (gameId) =>
-          createGameUmpire(tracedUmpire(umpire, gameId), {
-            gameId,
-            limits: umpireConfig.gameBudget,
-            onMetric: (m) => server.log.info({ umpire: m }, 'umpire call'),
-          })
+      ? // The same client as the parser's, so one game has one budget.
+        (gameId) => gameUmpire(gameId)
       : undefined,
   admin: { ...admin, trace },
   testUmpire: umpireConfig ? usesTestUmpire(umpireConfig) : false,

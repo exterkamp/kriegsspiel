@@ -25,6 +25,16 @@ describe('GameClients', () => {
     clients.get('b');
     expect(made).toBe(3);
   });
+
+  it('peek returns an existing client without making one', () => {
+    let made = 0;
+    const clients = new GameClients(() => (made++, new MockUmpireClient([])));
+    expect(clients.peek('a')).toBeUndefined();
+    expect(made).toBe(0);
+    expect(clients.peek('a')).toBeUndefined();
+    const a = clients.get('a');
+    expect(clients.peek('a')).toBe(a);
+  });
 });
 
 describe('orderParserFor', () => {

@@ -1,6 +1,10 @@
 h2 {
   margin: 0 0 8px;
 }
+.overloaded {
+  margin: 0 0 8px;
+  font-style: italic;
+}
 .piles {
   display: flex;
   flex-wrap: wrap;

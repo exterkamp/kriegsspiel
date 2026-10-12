@@ -138,6 +138,7 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
             [],
             actor.narrationFor(s.id),
             actor.staffHistoryFor(s.id),
+            actor.overloadedFor(s.id),
           ),
         ]),
       ),

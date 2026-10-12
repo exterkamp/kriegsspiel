@@ -22,6 +22,11 @@ export class GameClients<C extends UmpireClient> {
     return client;
   }
 
+  /** The game's client if one was made; never makes one. */
+  peek(gameId: string): C | undefined {
+    return this.clients.get(gameId);
+  }
+
   /** Forget a game's client. Safe to call twice or for a game that never had one. */
   evict(gameId: string): void {
     this.clients.delete(gameId);

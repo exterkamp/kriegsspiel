@@ -14,7 +14,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { seatKey, sideViewOf } from '../api/sideView.js';
 import type { OrderParser } from '../orders/index.js';
 import type { UmpireClient, UmpireRequest, UmpireResponse } from '../umpire/index.js';
-import { NARRATE_WINDOW_BASE_MS, staffOfficerFor } from '../umpire/index.js';
+import {
+  NARRATE_WINDOW_BASE_MS,
+  STAFF_OVERLOADED_NOTICE,
+  UmpireError,
+  staffOfficerFor,
+} from '../umpire/index.js';
 import { GameHost, MemoryGameStore } from './index.js';
 import { FakeTime } from './testing.js';
 
@@ -43,8 +48,13 @@ class StubUmpire implements UmpireClient {
   gate: Promise<void> | undefined;
   /** What the staff stage says in answer to a question; undefined makes it give nothing usable. */
   staffText: string | undefined = 'The bridge holds, sir.';
+  /** Refuse every narrate call the way a capped `GameUmpireClient` does. */
+  refuse: 'budget' | 'rate-limit' | undefined;
   async call<T>(request: UmpireRequest): Promise<UmpireResponse<T>> {
     this.requests.push(request);
+    if (this.refuse && request.stage === 'narrate') {
+      throw new UmpireError('capped', this.refuse, 0);
+    }
     await this.gate;
     let output: unknown;
     if (request.stage === 'staff') {
@@ -149,6 +159,29 @@ describe('narrate stage in the actor', () => {
     open();
     await time.flush();
     expect(game.staffAtWork.working).toBe(false);
+  });
+
+  it('shows the staff-overloaded notice, with no figures, once the game cap refuses narration', async () => {
+    const umpire = new StubUmpire();
+    umpire.refuse = 'budget';
+    const { time, game } = await newGame(umpire);
+    const side = await runUntilReport(time, game);
+    await time.advance(NARRATE_WINDOW_BASE_MS);
+    expect(umpire.requests.length).toBeGreaterThan(0);
+    const view = sideViewOf(
+      game.state,
+      side as 'blue',
+      game.gameClock.snapshot(),
+      undefined,
+      [],
+      game.narrationFor(side),
+      [],
+      game.overloadedFor(side),
+    );
+    expect(view.staffOverloaded).toBe(STAFF_OVERLOADED_NOTICE);
+    expect(JSON.stringify(view)).not.toMatch(/budget|usd|token/i);
+    // Reports still arrive as the engine wrote them.
+    expect(view.dispatches.length).toBeGreaterThan(0);
   });
 
   it('keeps template text when no umpire is set', async () => {

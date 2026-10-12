@@ -33,6 +33,8 @@ export class InTrayComponent {
   protected readonly pile = signal<Pile>('urgent');
   protected readonly openId = signal<string | undefined>(undefined);
   protected readonly showFiled = signal(false);
+  /** The in-fiction notice while the staff are over their cap (the server sends no figures). */
+  protected readonly overloaded = computed(() => this.game.state().view?.staffOverloaded);
   protected readonly read = computed(() => this.game.state().read);
 
   protected readonly sorted = computed(() =>
