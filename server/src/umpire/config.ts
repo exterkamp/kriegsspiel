@@ -82,7 +82,7 @@ function ollamaStages(env: Env): readonly UmpireStage[] {
 }
 export const OLLAMA_DEFAULT_MODEL = 'qwen2.5:0.5b';
 /** A CPU model answers in seconds to a minute, so the call timeout is generous. */
-export const OLLAMA_DEFAULT_TIMEOUT_MS = 120_000;
+export const OLLAMA_DEFAULT_TIMEOUT_MS = 60_000;
 export const OLLAMA_DEFAULT_NUM_CTX = 4096;
 
 export const DEFAULT_UMPIRE_CONFIG: UmpireConfig = {

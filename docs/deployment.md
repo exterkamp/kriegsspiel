@@ -48,7 +48,7 @@ Inside the container the server uses `HOST`, `PORT`, `DB_PATH` (`/data/games.db`
 | `OLLAMA_STAGES` | `narrate,staff` | Stages the model serves; any of `parse`, `narrate`, `staff` |
 | `OLLAMA_URL` | `http://ollama:11434` | Where the server reaches Ollama |
 | `OLLAMA_NUM_CTX` | `4096` | Context window sent to Ollama |
-| `OLLAMA_TIMEOUT_MS` | `120000` | Per-attempt timeout (two attempts). Slower than this and the call falls back |
+| `OLLAMA_TIMEOUT_MS` | `60000` | Per-attempt timeout (two attempts, so a hung model costs up to about 2 minutes plus backoff before the call falls back; later calls skip the model for 30 s). Slower than this and the call falls back |
 | `OLLAMA_KEEP_ALIVE` | `30m` | How long Ollama keeps the model in memory |
 | `OLLAMA_PORT`, `OLLAMA_BIND` | `11434`, `127.0.0.1` | The published port of the `ollama` service |
 

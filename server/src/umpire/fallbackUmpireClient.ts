@@ -22,8 +22,8 @@ export interface FallbackUmpireOptions {
    * cost every call its full timeout. 0 turns it off. Default 30 s.
    */
   cooldownMs?: number;
-  provider?: string;
-  model?: string;
+  /** The provider and model a stage uses, reported as what failed. */
+  routeFor?: (stage: UmpireStage) => { provider: string; model: string };
   onFallback?: (f: UmpireFallback) => void;
   now?: () => number;
 }
@@ -69,10 +69,10 @@ export class FallbackUmpireClient implements UmpireClient {
   }
 
   private async answer<T>(request: UmpireRequest, f: UmpireFallback): Promise<UmpireResponse<T>> {
+    const route = this.o.routeFor?.(request.stage);
     const info: UmpireFallback = {
       ...f,
-      ...(this.o.provider ? { provider: this.o.provider } : {}),
-      ...(this.o.model ? { model: this.o.model } : {}),
+      ...(route ? { provider: route.provider, model: route.model } : {}),
     };
     this.fallbackCount++;
     this.last = { ...info, at: this.now() };

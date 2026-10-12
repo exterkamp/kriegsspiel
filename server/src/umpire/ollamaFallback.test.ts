@@ -73,7 +73,7 @@ describe('keyless Ollama configuration', () => {
       baseUrl: 'http://ollama:11434',
       numCtx: 4096,
     });
-    expect(config.timeoutMs).toBe(120_000);
+    expect(config.timeoutMs).toBe(60_000);
     expect(config.rateLimit).toEqual({ maxConcurrent: 1 });
     expect(config.fallbackProvider).toBe('test');
     expect(llmOrderParserEnabled(ENV, config)).toBe(true);
@@ -205,5 +205,41 @@ describe('Ollama failures fall back to the test provider', () => {
     vi.unstubAllGlobals();
     expect(replayed).toEqual(original);
     expect(noNetwork).not.toHaveBeenCalled();
+  });
+});
+
+describe('the one-at-a-time limit guards the model only', () => {
+  const hang = (_url: unknown, init?: { signal?: AbortSignal }) =>
+    new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new TypeError('aborted')));
+    });
+  const request = {
+    stage: 'narrate' as const,
+    promptVersion: 'x',
+    system: 'x',
+    input: narrateInput('blue', reports()),
+    schema: NARRATE_SCHEMA,
+  };
+
+  it('a parse on the test provider answers while a narrate call is stuck on a hung model', async () => {
+    const { client } = setup(hang as never, {
+      OLLAMA_STAGES: 'narrate,staff',
+      OLLAMA_TIMEOUT_MS: '1500',
+    });
+    const t0 = Date.now();
+    const narrate = client.call(request).then(() => Date.now() - t0);
+    await new Promise((r) => setTimeout(r, 30));
+    const parsed = await new LlmOrderParser(client).parse(ORDER, CORPUS_CONTEXT);
+    const parseMs = Date.now() - t0;
+    expect(parsed.kind).toBe('intents');
+    expect(parseMs).toBeLessThan(1000);
+    expect(await narrate).toBeGreaterThanOrEqual(1500);
+  });
+
+  it('reports the model of the stage that failed', async () => {
+    const down = () => Promise.reject(new TypeError('fetch failed'));
+    const { client } = setup(down as never, { UMPIRE_MODEL_STAFF: 'other:7b' });
+    const res = await client.call({ ...request, stage: 'staff' as const });
+    expect(res.record.fallbackFor).toMatchObject({ provider: 'ollama', model: 'other:7b' });
   });
 });

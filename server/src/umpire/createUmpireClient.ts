@@ -44,13 +44,21 @@ export function createUmpireClient(opts: CreateUmpireClientOptions): UmpireClien
       ...(opts.fetch ? { fetch: opts.fetch } : {}),
     });
   }
-  let client: UmpireClient = new ProviderUmpireClient({
+  const limit = (c: UmpireClient): UmpireClient =>
+    config.rateLimit
+      ? new RateLimitedUmpireClient(c, {
+          ...config.rateLimit,
+          ...(opts.sleep ? { sleep: opts.sleep } : {}),
+        })
+      : c;
+  const primary: UmpireClient = new ProviderUmpireClient({
     providers,
     config,
     ...(opts.recorder ? { recorder: opts.recorder } : {}),
     ...(opts.sleep ? { sleep: opts.sleep } : {}),
     ...(opts.random ? { random: opts.random } : {}),
   });
+  let client: UmpireClient;
   if (config.fallbackProvider) {
     const fb = config.fallbackProvider;
     const spec = config.providers[fb];
@@ -60,25 +68,21 @@ export function createUmpireClient(opts: CreateUmpireClientOptions): UmpireClien
       UMPIRE_STAGES.map((s) => [s, { provider: fb, model: TEST_MODEL }]),
     ) as UmpireConfig['stages'];
     const local = UMPIRE_STAGES.filter((s) => config.stages[s].provider !== fb);
-    const first = config.stages[local[0] ?? 'parse'];
+    // The limiter guards the local model only: fallback answers and `test`-routed stages are instant and must
+    // never queue behind a slow model call.
     client = new FallbackUmpireClient({
-      primary: client,
+      primary: limit(primary),
       fallback: new ProviderUmpireClient({
         providers: { [fb]: fbProvider },
         config: { ...config, stages: fbStages, maxAttempts: 1 },
         ...(opts.recorder ? { recorder: opts.recorder } : {}),
       }),
       stages: local,
-      provider: first.provider,
-      model: first.model,
+      routeFor: (stage) => config.stages[stage],
       ...(opts.onFallback ? { onFallback: opts.onFallback } : {}),
     });
-  }
-  if (config.rateLimit) {
-    client = new RateLimitedUmpireClient(client, {
-      ...config.rateLimit,
-      ...(opts.sleep ? { sleep: opts.sleep } : {}),
-    });
+  } else {
+    client = limit(primary);
   }
   if (config.budget) client = new BudgetedUmpireClient(client, config.budget);
   return client;
