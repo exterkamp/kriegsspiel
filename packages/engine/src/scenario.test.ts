@@ -182,6 +182,25 @@ describe('free placement', () => {
   });
 });
 
+describe('unit commander', () => {
+  const unit = (d: any) => d.units.find((u: any) => u.side === 'blue');
+
+  it('is carried onto the unit when named, and absent otherwise', () => {
+    const d = clone();
+    unit(d).commander = 'Col. Aubry';
+    expect(loadScenario(d).units.find((u) => u.id === unit(d).id)!.commander).toBe('Col. Aubry');
+    const none = loadScenario(clone()).units.find((u) => u.id === unit(d).id)!;
+    expect('commander' in none).toBe(false);
+  });
+
+  it.each(['', 7])('rejects a commander of %j', (bad) => {
+    const d = clone();
+    unit(d).commander = bad;
+    expect(() => loadScenario(d)).toThrow(ScenarioError);
+    expect(() => loadScenario(d)).toThrow(/commander/);
+  });
+});
+
 describe('loader validation', () => {
   const bad = (mutate: (d: any) => void, message: RegExp) => {
     const d = clone();

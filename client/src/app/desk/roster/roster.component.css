@@ -39,3 +39,7 @@ tr.stale .unknown {
 tr.stale .age {
   font-weight: bold;
 }
+.commander {
+  display: block;
+  color: var(--ks-text-muted);
+}

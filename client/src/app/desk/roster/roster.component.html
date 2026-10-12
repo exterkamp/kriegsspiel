@@ -23,6 +23,9 @@
             >
               {{ r.name }}
             </button>
+            @if (r.commander) {
+              <small class="commander">{{ r.commander }}</small>
+            }
           </th>
           <td [class.unknown]="r.strength === undefined">{{ r.strength ?? 'unknown' }}</td>
           <td [class.unknown]="r.supply === undefined">

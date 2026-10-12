@@ -9,6 +9,8 @@ export type Freshness = 'fresh' | 'aging' | 'stale';
 export interface RosterRow {
   id: string;
   name: string;
+  /** Who commands it, when the scenario names one. */
+  commander: string | undefined;
   /** Men, as reported (not a percent), or undefined when the report gives no usable figure. */
   strength: number | undefined;
   supply: number | undefined;
@@ -40,23 +42,28 @@ export function formatAge(ms: number): string {
 }
 
 /**
- * One row per formation in the SideView, and nothing else. The figures are as of `view.atGame`,
- * so they age as game time runs on past it (a lost link, a slow umpire). `nowGame` is the local
- * game time, which is the same arithmetic at 1:1 and 12:1.
+ * One row per formation in the SideView, and nothing else. The figures are as of the unit's own
+ * `reportedAt` when the server sends one, else `view.atGame`, so they age as game time runs on past
+ * it (a lost link, a slow umpire). `nowGame` is the local game time, which is the same arithmetic
+ * at 1:1 and 12:1.
  */
 export function rosterRows(view: SideView | undefined, nowGame: number): RosterRow[] {
   if (!view) return [];
-  const reportedAt = view.atGame;
-  const ageMs = Math.max(0, nowGame - reportedAt);
-  return view.ownUnits.map((u: OwnUnit) => ({
-    id: u.id,
-    name: u.name,
-    strength: known(u.strength) ? Math.round(u.strength) : undefined,
-    supply: pct(u.supply),
-    morale: pct(u.morale),
-    reportedAt,
-    ageMs,
-    freshness: freshness(ageMs),
-    position: u.position,
-  }));
+  return view.ownUnits.map((u: OwnUnit) => {
+    // Each unit's figures carry their own report date; older servers date them to the view.
+    const reportedAt = u.reportedAt ?? view.atGame;
+    const ageMs = Math.max(0, nowGame - reportedAt);
+    return {
+      id: u.id,
+      name: u.name,
+      commander: u.commander,
+      strength: known(u.strength) ? Math.round(u.strength) : undefined,
+      supply: pct(u.supply),
+      morale: pct(u.morale),
+      reportedAt,
+      ageMs,
+      freshness: freshness(ageMs),
+      position: u.position,
+    };
+  });
 }

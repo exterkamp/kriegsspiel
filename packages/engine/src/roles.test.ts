@@ -82,6 +82,16 @@ describe('viewForRole', () => {
     }
   });
 
+  it('never sends intelligence the commander, but the commander seat gets it', () => {
+    const w = played();
+    const named = {
+      ...w,
+      units: w.units.map((u) => (u.id === 'b1' ? { ...u, commander: 'Col. Aubry' } : u)),
+    };
+    expect(JSON.stringify(viewForRole(named, 'blue', seats.intelligence!))).not.toContain('Aubry');
+    expect(JSON.stringify(viewForRole(named, 'blue', seats.commander!))).toContain('Aubry');
+  });
+
   it('does not let intelligence recover our strength from footprint or shape', () => {
     const viewWith = (strength: number) => {
       const w = played();
