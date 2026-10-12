@@ -37,9 +37,8 @@
           <td>
             {{ formatGameTime(r.reportedAt) }}
             <small class="age"
-              >{{ formatAge(r.ageMs) }} old{{
-                r.freshness === 'fresh' ? '' : ' (' + r.freshness + ')'
-              }}</small
+              >{{ formatAgeOld(r.ageMs)
+              }}{{ r.freshness === 'fresh' ? '' : ' (' + r.freshness + ')' }}</small
             >
           </td>
         </tr>

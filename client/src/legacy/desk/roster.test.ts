@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import type { SideView } from '@kriegsspiel/protocol';
-import { AGING_MS, STALE_MS, formatAge, freshness, pct, rosterRows } from './roster.js';
+import {
+  AGING_MS,
+  STALE_MS,
+  formatAge,
+  formatAgeOld,
+  freshness,
+  pct,
+  rosterRows,
+} from './roster.js';
 import { fixtureView } from '../table/fixture.js';
 
 const view: SideView = { ...fixtureView, atGame: 3_600_000 };
@@ -35,6 +43,18 @@ describe('rosterRows', () => {
     expect(formatAge(45 * 60_000)).toBe('45 min');
     expect(formatAge(190 * 60_000)).toBe('3 h 10 min');
     expect(formatAge(26 * 3_600_000)).toBe('1 d 2 h');
+  });
+
+  it('says "just now", never "just now old" (#359)', () => {
+    expect(formatAgeOld(0)).toBe('just now');
+    expect(formatAgeOld(45 * 60_000)).toBe('45 min old');
+  });
+
+  it('never dates a figure after the clock', () => {
+    const u = { ...view.ownUnits[0]!, reportedAt: view.atGame + 60_000 };
+    const r = rosterRows({ ...view, ownUnits: [u] }, view.atGame)[0]!;
+    expect(r.reportedAt).toBe(view.atGame);
+    expect(r.ageMs).toBe(0);
   });
 
   it('shows the commander and dates each unit by its own report', () => {

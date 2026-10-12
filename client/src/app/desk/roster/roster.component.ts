@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { formatGameTime, gameNowMs } from '@legacy/net/state';
-import { formatAge, rosterRows, type RosterRow } from '@legacy/desk/roster';
+import { formatAgeOld, rosterRows, type RosterRow } from '@legacy/desk/roster';
 import { GameService } from '../../game/game.service';
 import { DeskStore } from '../desk.store';
 
@@ -29,7 +29,7 @@ export class RosterComponent {
     const nowGame = s.clock ? gameNowMs(s.clock, this.wall()) : (s.view?.atGame ?? 0);
     return rosterRows(s.view, nowGame);
   });
-  protected readonly formatAge = formatAge;
+  protected readonly formatAgeOld = formatAgeOld;
   protected readonly formatGameTime = formatGameTime;
 
   constructor() {
