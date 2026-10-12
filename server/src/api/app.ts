@@ -146,6 +146,8 @@ export interface AppOptions {
   /** One parser for every game, or one per game. See `GameHostOptions.parser`. */
   parser: GameHostOptions['parser'];
   store?: GameStore;
+  /** A game ended or was closed: drop per-game resources such as its umpire client. May be called more than once. */
+  onGameDone?: (gameId: string) => void;
   /** Lobby records. Defaults to memory; `main.ts` supplies the SQLite store. */
   lobby?: LobbyStore;
   wallNow?: WallClock;
@@ -351,8 +353,12 @@ export async function buildApp(options: AppOptions): Promise<App> {
     onUpdate: (id) => {
       hub.notify(id);
       notifier.observe(id);
+      if (host.get(id)?.state.world.outcome) options.onGameDone?.(id);
     },
-    onClose: (id) => notifier.forget(id),
+    onClose: (id) => {
+      notifier.forget(id);
+      options.onGameDone?.(id);
+    },
     onError,
   });
   const notifyStore = options.notify?.store ?? new MemoryNotifyStore();
