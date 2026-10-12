@@ -147,7 +147,12 @@ describe('guest play', () => {
     const server = await start({ guestPerIp: 2 });
     expect((await guest(server)).res.statusCode).toBe(200);
     expect((await guest(server)).res.statusCode).toBe(200);
-    expect((await guest(server)).res.statusCode).toBe(429);
+    const limited = (await guest(server)).res;
+    expect(limited.statusCode).toBe(429);
+    // The body says when the window ends, so the client can show a time.
+    expect(limited.json()).toEqual({ error: 'rate_limited', retryAt: expect.any(Number) });
+    expect(limited.json().retryAt).toBeGreaterThan(wall);
+    expect(limited.json().retryAt).toBeLessThanOrEqual(wall + HOUR);
     expect((await guest(server, '10.0.0.2')).res.statusCode).toBe(200);
     wall += HOUR + 1;
     expect((await guest(server)).res.statusCode).toBe(200);

@@ -25,6 +25,7 @@ import {
   aiCommanderFromEnv,
   authFromEnv,
   guestIdleMsFromEnv,
+  guestPerHourFromEnv,
   guestPlayFromEnv,
   llmOrderParserEnabled,
   scriptedOpponentsFromEnv,
@@ -124,6 +125,7 @@ const { server } = await buildApp({
     ...authFromEnv(process.env, port, (line) => server.log.warn(line)),
     guestPlay: guestPlayFromEnv(process.env),
     guestIdleMs: guestIdleMsFromEnv(process.env),
+    guestPerIp: guestPerHourFromEnv(process.env),
   },
 });
 

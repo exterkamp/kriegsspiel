@@ -122,6 +122,17 @@ describe('test provider: parse', () => {
     });
   });
 
+  it('carries out the first clause and says which later place it does not know', async () => {
+    const r = await parse(
+      'Cavalry screen the northern wood, then fall back to the mill if pressed.',
+    );
+    expect(r.kind).toBe('clarification');
+    expect(r).toMatchObject({
+      question: expect.stringContaining('know of no place called "mill"'),
+    });
+    expect((r as { question: string }).question).toContain('screen the northern wood');
+  });
+
   it('holds a place with no unit named: the nearest unit goes', async () => {
     const r = await parse('Hold the bridge at all costs.');
     expect(r).toMatchObject({

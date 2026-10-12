@@ -22,4 +22,10 @@ export class RateLimiter {
     w.count += 1;
     return w.count <= this.limit;
   }
+
+  /** When the key's current window ends (ms), or undefined if it has none open. */
+  resetAt(key: string): number | undefined {
+    const w = this.windows.get(key);
+    return w && this.now() - w.start < this.windowMs ? w.start + this.windowMs : undefined;
+  }
 }
