@@ -191,12 +191,6 @@ function trackHold(world: GameState, time: number): { world: GameState; schedule
 export function evaluateVictory(world: GameState, time: number): Outcome | null {
   const { attacker } = world.victory;
   const battle = world.battle;
-  if (battle) {
-    // A declared battle plays out its pursuit, then closes.
-    return time >= battle.declaredAt + BATTLE_CLOSE_MS
-      ? { winner: battle.winner, reason: battle.reason, time }
-      : null;
-  }
   const out = new Map<SideId, 'eliminated' | 'withdrawn'>();
   for (const s of world.sides) {
     const o = sideOut(world, s.id);
@@ -208,11 +202,16 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
   }
   for (const s of world.sides) {
     const reason = out.get(s.id);
-    // A side that is out because it broke is a decided battle, declared by `declareBattle`
-    // (which also lets the pursuit play out); without start strengths it ends at once.
-    if (reason && !world.startStrength) {
+    if (reason) {
       return { winner: world.sides.find((o) => o.id !== s.id)!.id, reason, time };
     }
+  }
+  // A side with nobody left ends the game at once; one whose force broke closes after the pursuit.
+  if (battle) {
+    // A declared battle plays out its pursuit, then closes.
+    return time >= battle.declaredAt + BATTLE_CLOSE_MS
+      ? { winner: battle.winner, reason: battle.reason, time }
+      : null;
   }
   const since = world.heldSince ?? null;
   if (
@@ -238,7 +237,7 @@ function declareBattle(
   schedule: NewEvent[];
   emit: Array<{ type: string; payload?: Json }>;
 } | null {
-  if (world.battle || world.outcome || !world.startStrength) return null;
+  if (world.battle || world.outcome) return null;
   const { attacker, defender } = world.victory;
   const brokenA = forceBroken(world, attacker) || sideOut(world, attacker) !== null;
   const brokenD = forceBroken(world, defender) || sideOut(world, defender) !== null;
@@ -301,6 +300,22 @@ function declareBattle(
       },
     ],
   };
+}
+
+/**
+ * End the game. A decided battle always has the umpire's ruling on record, also when a side
+ * left the field altogether and there is no pursuit left to play out.
+ */
+function conclude(world: GameState, outcome: Outcome): HandlerResult<GameState> {
+  const declared = outcome.winner === null ? null : declareBattle(world, outcome.time);
+  const battle = declared?.world.battle ?? world.battle;
+  // A side that left the field after its force broke lost the battle: say so, not just that it left.
+  const said: Outcome =
+    battle && (outcome.reason === 'withdrawn' || outcome.reason === 'eliminated')
+      ? { ...outcome, reason: battle.reason }
+      : outcome;
+  const end = finish(declared?.world ?? world, said);
+  return { ...end, emit: [...(declared?.emit ?? []), ...(end.emit ?? [])] };
 }
 
 function finish(world: GameState, outcome: Outcome): HandlerResult<GameState> {
@@ -440,7 +455,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     const held = trackHold(world, ev.time);
     world = held.world;
     const outcome = evaluateVictory(world, ev.time);
-    if (outcome) return finish(world, outcome);
+    if (outcome) return conclude(world, outcome);
     const declared = declareBattle(world, ev.time);
     if (declared) world = declared.world;
     // An attacker that stopped in reach (its `to` is where it stands) and whose target
@@ -483,7 +498,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       reason: 'objective-held' as const,
       time: ev.time,
     };
-    return finish(world, outcome);
+    return conclude(world, outcome);
   });
 
   registry.register(COMBAT_TICK_EVENT, (world, ev, rng) => {
@@ -677,7 +692,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     }
     const outcome = evaluateVictory(w, ev.time);
     if (outcome) {
-      const end = finish(w, outcome);
+      const end = conclude(w, outcome);
       return { world: end.world, emit: [...emit, ...(end.emit ?? [])] };
     }
     return { world: w, schedule: next, emit };

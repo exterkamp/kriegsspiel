@@ -26,7 +26,9 @@ import {
   type EngineState,
   type GameState,
 } from './index.js';
-import { evaluateVictory } from './combat.js';
+import { BATTLE_CLOSE_MS, forceBroken, evaluateVictory } from './combat.js';
+import { viewFor } from './index.js';
+import type { BattleRuling } from './types.js';
 import { polygonCentroid } from './geometry.js';
 import { river, wood } from './scenario.testkit.js';
 
@@ -375,8 +377,12 @@ describe('morale and withdrawal', () => {
     expect(blue.status).toBe('withdrawn');
     expect(blue.morale).toBeLessThan(BREAK_MORALE);
     expect(blue.center).toEqual(T(0, 4));
-    // No more shooting once it has broken.
-    expect(ofType(emitted, 'combat.fire').filter((e) => e.time > COMBAT_TICK_MS)).toEqual([]);
+    // It does not shoot once it has broken (the enemy may still fire on it as it runs).
+    expect(
+      ofType(emitted, 'combat.fire').filter(
+        (e) => e.time > COMBAT_TICK_MS && (e.payload as { attacker: string }).attacker === 'blue-1',
+      ),
+    ).toEqual([]);
   });
 
   it('refuses orders for a withdrawn unit', () => {
@@ -517,7 +523,7 @@ describe('victory conditions', () => {
     expect(ofType(emitted, 'unit.destroyed')).toHaveLength(1);
     expect(ofType(emitted, 'game.end')[0]!.payload).toEqual({
       winner: 'red',
-      reason: 'eliminated',
+      reason: 'defence-broken',
     });
   });
 
@@ -529,7 +535,10 @@ describe('victory conditions', () => {
       ]),
       10,
     );
-    expect(ofType(emitted, 'game.end')[0]!.payload).toEqual({ winner: 'red', reason: 'withdrawn' });
+    expect(ofType(emitted, 'game.end')[0]!.payload).toEqual({
+      winner: 'red',
+      reason: 'defence-broken',
+    });
   });
 
   it('a side already past its hold time fires the deadline at once instead of throwing', () => {
@@ -593,7 +602,8 @@ describe('Hold the Bridge', () => {
       return run(s, 200);
     };
     const a = play();
-    expect(a.state.world.outcome).toMatchObject({ winner: 'blue', reason: 'objective-held' });
+    expect(a.state.world.outcome).toMatchObject({ winner: 'blue', reason: 'attack-broken' });
+    expect(a.state.world.rulings).toHaveLength(1);
     expect(ofType(a.emitted, 'game.end')).toHaveLength(1);
     expect(ofType(a.emitted, 'combat.fire').length).toBeGreaterThan(0);
     expect(a.emitted).toEqual(play().emitted);
@@ -790,5 +800,105 @@ describe('objective area', () => {
       units: w.units.map((u) => (u.id === 'blue-1' ? { ...u, center: pointMm(560, 250) } : u)),
     };
     expect(evaluateVictory(both, TAKEN)).toBeNull();
+  });
+});
+
+describe('a decided battle (#315)', () => {
+  /** A field with Red's units spread far from Blue's, then `edit` applied to the units. */
+  function quiet(edit: (u: GameState['units'][number]) => GameState['units'][number]) {
+    const s = field([
+      { id: 'blue-1', side: 'blue', x: 1, y: 4 },
+      { id: 'red-1', side: 'red', x: 9, y: 0 },
+      { id: 'red-2', side: 'red', x: 8, y: 0 },
+    ]);
+    return { ...s, world: { ...s.world, units: s.world.units.map(edit) } };
+  }
+  const routed = (u: GameState['units'][number]) => ({
+    ...u,
+    status: 'withdrawn' as const,
+    brokenAt: 0,
+  });
+
+  it('declares a broken attack, tells both sides, and closes the game after the pursuit', () => {
+    const s = quiet((u) =>
+      u.id === 'red-1' ? routed(u) : u.id === 'red-2' ? { ...u, strength: 90, morale: 50 } : u,
+    );
+    expect(forceBroken(s.world, 'red')).toBe(true);
+    expect(forceBroken(s.world, 'blue')).toBe(false);
+    const early = run(s, 5);
+    expect(early.state.world.outcome).toBeNull();
+    const rulings = early.state.world.rulings as BattleRuling[];
+    expect(rulings).toHaveLength(1);
+    expect(rulings[0]).toMatchObject({ kind: 'battle', winner: 'blue', loser: 'red' });
+    expect(ofType(early.emitted, 'umpire.ruling')).toHaveLength(1);
+    // Both sides hear it, in the same words, with no figure in them.
+    for (const side of ['blue', 'red'] as const) {
+      const note = viewFor(early.state.world, side, early.state.time).reports.find(
+        (r) => r.kind === 'battle',
+      );
+      expect(note?.text).toBe(rulings[0]!.narrative);
+      expect(note?.text).not.toMatch(/\d/);
+    }
+    const end = run(early.state, BATTLE_CLOSE_MS / MS_PER_MINUTE);
+    expect(end.state.world.outcome).toMatchObject({ winner: 'blue', reason: 'attack-broken' });
+    expect(ofType(end.emitted, 'game.end')).toHaveLength(1);
+  });
+
+  it('declares a broken defence as a win for the attacker', () => {
+    const s = field([
+      { id: 'blue-1', side: 'blue', x: 1, y: 4, strength: 40 },
+      { id: 'blue-2', side: 'blue', x: 1, y: 3 },
+      { id: 'red-1', side: 'red', x: 9, y: 0 },
+    ]);
+    const w = {
+      ...s.world,
+      units: s.world.units.map((u) => (u.id === 'blue-2' ? routed(u) : u)),
+    };
+    const { state } = run({ ...s, world: w }, 2);
+    expect((state.world.rulings[0] as BattleRuling).reason).toBe('defence-broken');
+    expect(state.world.battle?.winner).toBe('red');
+  });
+
+  it('does not declare while the force still has its strength, or before anyone has broken', () => {
+    const fresh = quiet((u) => u);
+    expect(run(fresh, 30).state.world.rulings).toHaveLength(0);
+    const hurt = quiet((u) => (u.id === 'red-2' ? { ...u, strength: 30, morale: 30 } : u));
+    // Nothing has broken or been destroyed yet: a thin line is still a line.
+    expect(forceBroken(hurt.world, 'red')).toBe(false);
+    const oneGone = quiet((u) => (u.id === 'red-1' ? routed(u) : u));
+    expect(forceBroken(oneGone.world, 'red')).toBe(false);
+  });
+
+  it('sends free cavalry after a unit that breaks, and rides it down', () => {
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 1, y: 4, strength: 100, morale: 30 },
+      { id: 'red-1', side: 'red', x: 2, y: 4 },
+      { id: 'red-3', side: 'red', kind: 'cavalry', x: 4, y: 3, strength: 300 },
+      { id: 'blue-2', side: 'blue', x: 9, y: 4 },
+    ]);
+    s = {
+      ...s,
+      world: {
+        ...s.world,
+        units: s.world.units.map((u) => (u.id === 'blue-1' ? { ...u, home: T(0, 0) } : u)),
+      },
+    };
+    const { state, emitted } = run(s, 40);
+    const broke = ofType(emitted, 'unit.broken').find(
+      (e) => (e.payload as { unitId: string }).unitId === 'blue-1',
+    )!;
+    const after = ofType(emitted, 'combat.fire').filter(
+      (e) =>
+        e.time > broke.time &&
+        (e.payload as { target: string; attacker: string }).target === 'blue-1' &&
+        (e.payload as { attacker: string }).attacker === 'red-3',
+    );
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.every((e) => (e.payload as { melee: boolean }).melee)).toBe(true);
+    expect(unit(state, 'blue-1').status).toBe('destroyed');
+    expect(ofType(emitted, 'unit.destroyed').length).toBeGreaterThan(0);
+    // The side that lost it is told.
+    const blueView = viewFor(state.world, 'blue', state.time);
+    expect(blueView.reports.some((r) => r.kind === 'unitLost')).toBe(true);
   });
 });

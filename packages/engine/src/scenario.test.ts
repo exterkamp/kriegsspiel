@@ -29,7 +29,7 @@ describe('Hold the Bridge scenario', () => {
     expect(s.map.height).toBe(3_000_000);
     expect(s.units.filter((u) => u.side === 'blue')).toHaveLength(3);
     expect(s.units.filter((u) => u.side === 'red')).toHaveLength(3);
-    expect(s.victory.holdMs).toBe(180 * MS_PER_MINUTE);
+    expect(s.victory.holdMs).toBe(50 * MS_PER_MINUTE);
     const kinds = new Set(s.map.features.map((f) => f.kind));
     for (const k of ['wood', 'river', 'road', 'bridge']) expect(kinds).toContain(k);
     expect(terrainAt(s.map, polygonCentroid(s.victory.objective))!.featureIds).toContain('bridge');
