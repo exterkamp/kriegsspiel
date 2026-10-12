@@ -1,12 +1,13 @@
 import type { TraceSink } from './trace.js';
 import type { UmpireClient, UmpireRequest, UmpireResponse } from '../umpire/umpireClient.js';
 import { UmpireError } from '../umpire/umpireClient.js';
+import { TEST_MODEL } from '../umpire/providers/test.js';
 
 export interface TracedUmpireOptions {
   inner: UmpireClient;
   trace: TraceSink;
   gameId: string;
-  /** `playback` for replays served from recordings, `live` for real model calls. */
+  /** `playback` for replays served from recordings, `live` for real model calls. A call the test provider served is traced as `test`. */
   mode: 'live' | 'playback';
   /** Fallback label when a call's record or error carries no provider (playback, failures). */
   provider?: string;
@@ -41,6 +42,7 @@ export class TracedUmpireClient implements UmpireClient {
       const r = res.record;
       this.o.trace.record(this.o.gameId, 'llm', {
         ...base,
+        mode: r.model === TEST_MODEL ? 'test' : base.mode,
         provider: r.provider ?? this.o.provider ?? 'unknown',
         model: r.model,
         response: r.rawOutput,
