@@ -257,6 +257,7 @@ type Ruling = {                          // an umpire judgment call, always reco
 ## Testing strategy
 
 - **Engine**: ordinary unit tests plus property tests (no teleporting, strength never negative, determinism under identical input).
+  Implemented with fast-check in `packages/engine/src/invariants.test.ts` (a few seconds): chunked `advanceTo` equals one call, a serialise/restore at a random point carries on identically, and a fuzz runner throws random orders (including refused ones) at each scenario for six game-hours while checking no teleporting, strength never created, values in range and a sorted queue. Counterexamples are saved as command lists (with the advance points that failed) in `invariants.corpus.json` and replay as regression tests.
 - **Clock and scheduler**: tests on the manual and fast-forward clocks. Property tests that the outcome is identical at rates 1, 4, 12 and 1000, and that pause and resume do not alter results.
   Implemented in `server/src/game/clockInvariance.test.ts`: seeded random pause, resume and rate-change schedules (signing some orders while paused) must match an uninterrupted run; seeds and hand-written schedules live in `clockInvariance.corpus.json`, add a seed there when one finds a bug.
 - **LLM barrier**: tests with a deliberately slow mock umpire to confirm game time stalls and the result is unchanged.
