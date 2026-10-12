@@ -16,6 +16,19 @@ import {
   type ViewReport,
 } from '@kriegsspiel/engine';
 import type { ClockState, Dispatch, OwnUnit, SideView, StaffExchange } from '@kriegsspiel/protocol';
+import { staffOfficerFor } from '../umpire/staff.js';
+
+const CONFERENCE_ROLES = ['chiefOfStaff', 'intelligence', 'quartermaster', 'engineer'] as const;
+
+/** The conference officers of `side`, fixed by the game seed, so the page shows the same ones before the first question and after a reload (#342). */
+function conferenceOfficers(seed: number, side: SideId): NonNullable<SideView['staffOfficers']> {
+  return Object.fromEntries(
+    CONFERENCE_ROLES.map((role) => {
+      const { name, traits } = staffOfficerFor(seed, side, role);
+      return [role, { name, traits }];
+    }),
+  ) as NonNullable<SideView['staffOfficers']>;
+}
 
 const CATEGORY: Record<ViewReport['kind'], Dispatch['category']> = {
   situation: 'staff',
@@ -125,10 +138,12 @@ export function toSideView(
   clock: ClockState,
   narration?: Narration,
   staff: readonly StaffExchange[] = [],
+  seed?: number,
   overloaded?: string,
 ): SideView {
   return {
     side: view.side,
+    ...(seed === undefined ? {} : { staffOfficers: conferenceOfficers(seed, view.side) }),
     ...('role' in view ? { role: view.role } : {}),
     atGame: view.time,
     ...(view.hq ? { hq: view.hq } : {}),
@@ -209,8 +224,16 @@ export function sideViewOf(
       clock,
       narration,
       staffFor(seat, staff),
+      state.world.seed,
       overloaded,
     );
   }
-  return toSideView(viewFor(state.world, side, state.time), clock, narration, staff, overloaded);
+  return toSideView(
+    viewFor(state.world, side, state.time),
+    clock,
+    narration,
+    staff,
+    state.world.seed,
+    overloaded,
+  );
 }

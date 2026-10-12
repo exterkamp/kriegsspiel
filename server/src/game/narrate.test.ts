@@ -20,6 +20,8 @@ import {
   UmpireError,
   staffOfficerFor,
 } from '../umpire/index.js';
+import { umpireConfigFromEnv } from '../umpire/config.js';
+import { createUmpireClient } from '../umpire/createUmpireClient.js';
 import { GameHost, MemoryGameStore } from './index.js';
 import { FakeTime } from './testing.js';
 
@@ -90,7 +92,7 @@ afterEach(async () => {
   host = undefined;
 });
 
-async function newGame(umpire?: StubUmpire) {
+async function newGame(umpire?: UmpireClient, extra: { narrateTimeoutMs?: number } = {}) {
   const time = new FakeTime();
   const store = new MemoryGameStore();
   host = new GameHost({
@@ -100,6 +102,7 @@ async function newGame(umpire?: StubUmpire) {
     wallNow: time.now,
     timers: time,
     narrator: umpire && (() => umpire),
+    ...extra,
   });
   const game = await host.create('g1', loadScenario(holdTheBridge), { rate: 1 });
   return { time, store, game };
@@ -344,5 +347,107 @@ describe('staff answers in the actor', () => {
     const { store, game } = await newGame();
     expect(await game.answerStaff('blue', 'engineer', 'Status?', asked('q2'))).toBeUndefined();
     expect((await store.inputLog('g1')).some((e) => e.command.kind === 'staffAnswer')).toBe(false);
+  });
+
+  it('shows a narration that took longer than the parse timeout (#342)', async () => {
+    // The root cause of "dispatches are never model-written": narration shared the 60 s parse
+    // timeout, and a small local model answers in 55 to 107 s, so good replies were thrown away.
+    const umpire = new StubUmpire();
+    let open!: () => void;
+    umpire.gate = new Promise((r) => (open = r));
+    const { time, game } = await newGame(umpire);
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' });
+    for (let i = 0; i < 60 && !game.staffAtWork.working; i++) {
+      await time.advance(NARRATE_WINDOW_BASE_MS);
+    }
+    expect(game.staffAtWork.working).toBe(true);
+    await time.advance(90_000);
+    expect(game.staffAtWork.working).toBe(true);
+    open();
+    await time.flush();
+    expect(game.staffAtWork.working).toBe(false);
+    const view = sideViewOf(
+      game.state,
+      'blue',
+      game.gameClock.snapshot(),
+      undefined,
+      [],
+      game.narrationFor('blue'),
+    );
+    expect(view.dispatches.some((d) => d.text.startsWith('Sir, '))).toBe(true);
+  });
+
+  it('gives up after the narrate timeout and keeps the template text, logging why', async () => {
+    const umpire = new StubUmpire();
+    umpire.gate = new Promise(() => undefined);
+    const { time, store, game } = await newGame(umpire, { narrateTimeoutMs: 30_000 });
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' });
+    for (let i = 0; i < 60 && !game.staffAtWork.working; i++) {
+      await time.advance(NARRATE_WINDOW_BASE_MS);
+    }
+    await time.advance(31_000);
+    expect(game.staffAtWork.working).toBe(false);
+    expect(game.narrationFor('blue')).toBeUndefined();
+    const entry = (await store.inputLog('g1')).find((e) => e.command.kind === 'narrate');
+    expect(entry?.error).toMatch(/timed out/);
+  });
+
+  it('shows text from a model served by a fake Ollama (#342)', async () => {
+    const seen: string[] = [];
+    const fakeOllama = async (_url: unknown, init: { body?: string }) => {
+      const body = JSON.parse(init.body!) as {
+        model: string;
+        messages: { role: string; content: string }[];
+      };
+      seen.push(body.model);
+      const { reports } = JSON.parse(body.messages.at(-1)!.content) as {
+        reports: { id: string; from: string }[];
+      };
+      const content = JSON.stringify({
+        dispatches: reports.map((r) => ({ reportIds: [r.id], text: `Sir, ${r.from} writes.` })),
+      });
+      return new Response(JSON.stringify({ message: { content }, eval_count: 9 }));
+    };
+    const client = createUmpireClient({
+      config: umpireConfigFromEnv({
+        UMPIRE_KEYLESS_PROVIDER: 'ollama',
+        OLLAMA_URL: 'http://ollama:11434',
+        OLLAMA_STAGES: 'narrate,staff',
+      }),
+      env: {},
+      fetch: fakeOllama as never,
+    });
+    const { time, game } = await newGame(client);
+    const side = await runUntilReport(time, game);
+    await time.advance(NARRATE_WINDOW_BASE_MS);
+    expect(seen.length).toBeGreaterThan(0);
+    const view = sideViewOf(
+      game.state,
+      side as 'blue',
+      game.gameClock.snapshot(),
+      undefined,
+      [],
+      game.narrationFor(side),
+    );
+    expect(view.dispatches.filter((d) => d.text.startsWith('Sir, ')).length).toBeGreaterThan(0);
+    // The in-tray shows the officer's name in the dispatch, not the engine's template.
+    expect(view.dispatches.some((d) => d.text === 'Sir, 2nd Battalion writes.')).toBe(false);
+  });
+
+  it('names the same conference officers in every view of a game (#342)', async () => {
+    const { game } = await newGame();
+    const view = () => sideViewOf(game.state, 'blue', game.gameClock.snapshot());
+    const officers = view().staffOfficers!;
+    expect(officers.chiefOfStaff).toEqual({
+      name: staffOfficerFor(game.state.world.seed, 'blue', 'chiefOfStaff').name,
+      traits: staffOfficerFor(game.state.world.seed, 'blue', 'chiefOfStaff').traits,
+    });
+    expect(Object.keys(officers).sort()).toEqual([
+      'chiefOfStaff',
+      'engineer',
+      'intelligence',
+      'quartermaster',
+    ]);
+    expect(view().staffOfficers).toEqual(officers);
   });
 });

@@ -62,7 +62,9 @@ export class ConferenceComponent {
       ? gameNowMs(s.clock, this.wall())
       : (s.view?.atGame ?? 0) + (this.wall() - this.opened);
   });
-  protected readonly officer = computed(() => officerFor(this.desk.conferenceLog(), this.role()));
+  protected readonly officer = computed(() =>
+    officerFor(this.desk.conferenceLog(), this.role(), this.game.state().view?.staffOfficers),
+  );
   protected readonly log = computed(() =>
     this.desk.conferenceLog().filter((e) => e.role === this.role()),
   );

@@ -238,6 +238,36 @@ export function checkStaffOutput(
   return [...new Set(problems)];
 }
 
+/** Shortest answer worth showing, in words. A small model sometimes returns the first few words of a reply. */
+const ANSWER_MIN_WORDS = 3;
+
+const ROLE_TITLE: Partial<Record<Role, string>> = {
+  chiefOfStaff: 'chief of staff',
+  intelligence: 'intelligence officer',
+  quartermaster: 'quartermaster',
+};
+
+/**
+ * The problems with the words of an answer to a commander's question (#342): a fragment (too short,
+ * or not ending in a full stop, `!`, `?` or a closing quote, as when output is cut mid-word), or an
+ * officer sending the commander to himself ("report to the chief of staff" from the chief of staff).
+ */
+export function checkAnswerText(text: string, role: Role): string[] {
+  const t = text.trim();
+  const problems: string[] = [];
+  if ((t.match(/\S+/g) ?? []).length < ANSWER_MIN_WORDS) problems.push('answer is a fragment');
+  else if (!/[.!?]["'”’)\]]*$/.test(t)) problems.push('answer is cut off before the end');
+  const title = ROLE_TITLE[role];
+  if (title) {
+    const toSelf = new RegExp(
+      `\\b(?:report(?:s|ed)? to|consult|ask|inform|tell)\\s+the\\s+${title}\\b`,
+      'i',
+    );
+    if (toSelf.test(t)) problems.push(`answer refers the commander to the ${title}, who is you`);
+  }
+  return problems;
+}
+
 export interface StaffOptions {
   /** Model calls allowed per officer per turn, the first included. Default 2. */
   maxCalls?: number;
@@ -331,11 +361,11 @@ export async function runStaff(
 }
 
 /** The staff stage when a player puts a question to an officer (the conference screen, D6b). */
-export const STAFF_ANSWER_PROMPT_VERSION = 'staff-answer-v1';
+export const STAFF_ANSWER_PROMPT_VERSION = 'staff-answer-v2';
 
 export const STAFF_ANSWER_SYSTEM = `${STAFF_SYSTEM}
 
-The commander has put you a question, in "question". Answer it in one "advice" message in your own voice. Use the newest reports and sightings in "view" and quote their times as clock times, never as "n minutes ago", since the note is read later. If "view" does not settle the question, say what you do not know.`;
+The commander has put you a question, in "question". Answer it in one "advice" message in your own voice: two or three complete sentences, ending with a full stop. You are the officer named in "officer", so never tell the commander to report to or consult your own post. Use the newest reports and sightings in "view" and quote their times as clock times, never as "n minutes ago", since the note is read later. If "view" does not settle the question, say what you do not know.`;
 
 /** The engine seat that answers for a conference officer. The engineer has no seat of their own and sees what the chief of staff sees. */
 const SEAT_FOR: Readonly<Record<string, Role>> = {
@@ -404,7 +434,10 @@ export async function answerStaffQuestion(
     const usable = {
       messages: output.messages.filter((m) => m.kind !== 'suggestion').slice(0, 1),
     };
-    const problems = checkStaffOutput(usable, world, side, seat, input);
+    const problems = [
+      ...checkStaffOutput(usable, world, side, seat, input),
+      ...usable.messages.flatMap((m) => checkAnswerText(m.text, role)),
+    ];
     if (usable.messages.length > 0 && problems.length === 0) {
       return { text: usable.messages[0]!.text.trim(), officer, basedOnGame, records };
     }
