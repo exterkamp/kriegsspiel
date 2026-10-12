@@ -25,12 +25,12 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
   styles: `
     :host {
       display: block;
-      min-height: 100%;
     }
+    /* The paper fills the viewport (100vh first for browsers without dvh), so it never stops part way down (#344). */
     .page {
       box-sizing: border-box;
-      min-height: 100%;
-      overflow: auto;
+      min-height: 100vh;
+      min-height: 100dvh;
       background: var(--ks-page-bg);
       color: var(--ks-text);
       font-family: var(--ks-font);

@@ -9,8 +9,8 @@
 }
 .field label {
   width: 3.5em;
-  padding-top: 4px;
-  font-variant: small-caps;
+  padding-top: 8px;
+  font-weight: bold;
 }
 select,
 textarea {
@@ -19,10 +19,6 @@ textarea {
 textarea {
   resize: vertical;
   min-height: 6em;
-}
-legend {
-  font-variant: small-caps;
-  font-weight: normal;
 }
 .check,
 .courier {

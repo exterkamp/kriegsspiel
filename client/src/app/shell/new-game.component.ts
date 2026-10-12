@@ -21,12 +21,13 @@ import {
   type Form,
   type ScenarioOptions,
 } from '@legacy/shell/newGame';
+import { GameListComponent } from '../lobby/game-list.component';
 import { PageFrameComponent } from '../ui/page-frame.component';
 
 /** Scenario, side and clock rate, then Start. The rules (defaults, validation, the request) are `shell/newGame.ts`. */
 @Component({
   selector: 'ks-new-game',
-  imports: [PageFrameComponent],
+  imports: [PageFrameComponent, GameListComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <ks-page-frame heading="New game" [back]="true" (backClick)="back.emit()">
@@ -39,7 +40,7 @@ import { PageFrameComponent } from '../ui/page-frame.component';
           <fieldset>
             <legend>Scenario</legend>
             @for (s of options()!.scenarios; track s.id) {
-              <label class="choice">
+              <label class="ks-choice">
                 <input
                   type="radio"
                   name="scenario"
@@ -60,7 +61,7 @@ import { PageFrameComponent } from '../ui/page-frame.component';
               <p class="side-only">{{ sides()[0]!.name }}</p>
             } @else {
               @for (s of sides(); track s.id) {
-                <label class="choice">
+                <label class="ks-choice">
                   <input
                     type="radio"
                     name="side"
@@ -80,7 +81,7 @@ import { PageFrameComponent } from '../ui/page-frame.component';
           <fieldset>
             <legend>Clock rate</legend>
             @for (r of presets; track r) {
-              <label class="choice">
+              <label class="ks-choice">
                 <input
                   type="radio"
                   name="rate"
@@ -91,7 +92,7 @@ import { PageFrameComponent } from '../ui/page-frame.component';
                 {{ r }}:1
               </label>
             }
-            <label class="choice">
+            <label class="ks-choice">
               <input
                 type="radio"
                 name="rate"
@@ -123,7 +124,7 @@ import { PageFrameComponent } from '../ui/page-frame.component';
             <p class="ks-muted" role="status">Starting the game…</p>
           }
 
-          <div class="actions">
+          <div class="ks-actions actions">
             <button type="submit" class="ks-primary" [attr.aria-disabled]="starting()">
               {{ starting() ? 'Starting…' : 'Start' }}
             </button>
@@ -131,8 +132,9 @@ import { PageFrameComponent } from '../ui/page-frame.component';
           </div>
         </form>
       }
+      <ks-game-list class="ks-panel games" />
       @if (loadError()) {
-        <div class="actions"><button type="button" (click)="back.emit()">Back</button></div>
+        <div class="ks-actions"><button type="button" (click)="back.emit()">Back</button></div>
       }
     </ks-page-frame>
   `,
@@ -140,25 +142,20 @@ import { PageFrameComponent } from '../ui/page-frame.component';
     :host {
       display: block;
     }
-    .choice {
-      display: block;
-      padding: 6px 0;
+    .games {
+      margin-top: var(--ks-space-5);
     }
     input[type='text'] {
       display: block;
       margin-top: 4px;
       width: 8em;
     }
-    .actions {
-      display: flex;
-      gap: var(--ks-space-3);
-    }
     /* Start stays in view while the form is longer than the window (#323). */
     form .actions {
       position: sticky;
       bottom: 0;
       padding: 10px 0;
-      background: var(--ks-paper-page);
+      background: var(--ks-paper-page-lo);
       border-top: 1px solid var(--ks-rule);
     }
   `,

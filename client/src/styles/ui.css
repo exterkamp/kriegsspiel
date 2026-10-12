@@ -3,7 +3,8 @@
  * host, so the map tools (#308) and the benchmarks are untouched until they opt in by adding the class.
  * Variants are classes: `.ks-primary`, `.ks-quiet`, `.ks-danger`; a pressed or selected button is `aria-pressed`
  * or `aria-selected`. Layout helpers: `.ks-panel`, `.ks-paper`, `.ks-overlay`, `.ks-field`, `.ks-row`, `.ks-badge`,
- * `.ks-status`, `.ks-tabs`, `.ks-stack`, `.ks-cluster`. The living style guide (`/style-guide`) shows each one.
+ * `.ks-status`, `.ks-tabs`, `.ks-stack`, `.ks-cluster`, `.ks-actions`, `.ks-choice`, `.ks-link`, `.ks-dense`. Radios,
+ * checkboxes, selects and range sliders are restyled from their element selectors. The living style guide (`/style-guide`) shows each one.
  */
 :where(.ks-theme) {
   color: var(--ks-text);
@@ -88,6 +89,7 @@
   color: var(--ks-on-primary);
   font-size: var(--ks-text-lg);
   padding: 10px 24px;
+  min-height: 44px;
 }
 :where(.ks-theme) .ks-primary:hover:not(:disabled) {
   background: var(--ks-primary);
@@ -144,6 +146,157 @@
 :where(.ks-theme) legend {
   font-weight: bold;
   padding: 0 var(--ks-space-1);
+}
+
+/* Choice controls: native radios and checkboxes and selects are redrawn on the paper palette (#344). */
+:where(.ks-theme) input[type='radio'],
+:where(.ks-theme) input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  display: inline-grid;
+  place-content: center;
+  box-sizing: border-box;
+  width: 1.15em;
+  height: 1.15em;
+  margin: 0;
+  vertical-align: -0.2em;
+  border: 2px solid var(--ks-rule);
+  background: var(--ks-paper-raised);
+  color: var(--ks-ink);
+  cursor: pointer;
+}
+:where(.ks-theme) input[type='radio'] {
+  border-radius: 50%;
+}
+:where(.ks-theme) input[type='checkbox'] {
+  border-radius: var(--ks-radius);
+}
+:where(.ks-theme) input[type='radio']:checked::before {
+  content: '';
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: currentcolor;
+}
+:where(.ks-theme) input[type='checkbox']:checked::before {
+  content: '';
+  width: 0.7em;
+  height: 0.7em;
+  background: currentcolor;
+  clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 22%, 86% 8%, 38% 72%);
+}
+:where(.ks-theme) input[type='radio']:disabled,
+:where(.ks-theme) input[type='checkbox']:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+:where(.ks-theme) .ks-overlay input[type='radio'],
+:where(.ks-theme) .ks-overlay input[type='checkbox'] {
+  border-color: var(--ks-on-overlay);
+  background: transparent;
+  color: var(--ks-brass-hi);
+}
+:where(.ks-theme) select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2em;
+  background-color: var(--ks-paper-raised);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ks-ink) 50%),
+    linear-gradient(135deg, var(--ks-ink) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) 55%,
+    calc(100% - 10px) 55%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+:where(.ks-theme) input[type='range'] {
+  accent-color: var(--ks-ink);
+}
+:where(.ks-theme) .ks-choice {
+  display: flex;
+  gap: var(--ks-space-2);
+  align-items: flex-start;
+  padding: var(--ks-space-1) 0;
+  cursor: pointer;
+}
+:where(.ks-theme) .ks-choice > input {
+  margin-top: 0.2em;
+}
+
+/* One row of buttons: every button the same size, so a primary and a secondary action line up. */
+:where(.ks-theme) .ks-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ks-space-3);
+}
+:where(.ks-theme) .ks-actions > button,
+:where(.ks-theme) .ks-actions > .ks-btn {
+  min-height: 44px;
+  padding: 10px 24px;
+  font-size: var(--ks-text-md);
+}
+
+/* A whole row that is a link or button: a bold title and a line of explanation under it. */
+:where(.ks-theme) .ks-row.ks-link {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  justify-content: stretch;
+  align-items: start;
+  min-height: 44px;
+  color: var(--ks-ink);
+  text-decoration: none;
+  font-size: inherit;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+:where(.ks-theme) a.ks-row.ks-link:hover,
+:where(.ks-theme) button.ks-row.ks-link:hover:not(:disabled) {
+  background: var(--ks-paper-sunk);
+}
+
+/* Section heading with a rule under it, for the screens built of several sections. */
+:where(.ks-theme) .ks-section-h {
+  border-bottom: 1px solid var(--ks-rule);
+  margin: 0 0 var(--ks-space-2);
+}
+
+/* The dense layout of the operator console: smaller type and controls, same tokens. */
+:where(.ks-theme) .ks-dense {
+  font-size: var(--ks-text-sm);
+  line-height: 1.35;
+}
+:where(.ks-theme) .ks-dense button {
+  min-height: 26px;
+  padding: 2px 10px;
+  font-size: var(--ks-text-sm);
+}
+:where(.ks-theme) .ks-dense input:not([type='radio'], [type='checkbox'], [type='range']),
+:where(.ks-theme) .ks-dense select {
+  padding: 3px 6px;
+  font-size: var(--ks-text-sm);
+}
+:where(.ks-theme) .ks-dense select {
+  padding-right: 2em;
+}
+:where(.ks-theme) .ks-dense h1 {
+  font-size: var(--ks-text-lg);
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+:where(.ks-theme) .ks-dense h2 {
+  font-size: var(--ks-text-md);
+  margin: var(--ks-space-2) 0 var(--ks-space-1);
+}
+:where(.ks-theme) .ks-dense h3 {
+  font-size: var(--ks-text-sm);
+  margin: var(--ks-space-1) 0;
+}
+:where(.ks-theme) .ks-mono {
+  font-family: var(--ks-font-mono);
 }
 
 /* Surfaces */

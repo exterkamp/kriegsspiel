@@ -5,7 +5,7 @@ export const RATE_PRESETS = [1, 4, 12] as const;
 
 export const SESSION_LABELS: Record<SessionType, string> = {
   team_vs_team: 'Team vs team',
-  co_op_vs_ai: 'Co-op vs AI commander',
+  co_op_vs_ai: 'Co-op vs computer opponent',
   hot_seat: 'Hot-seat (one machine)',
 };
 

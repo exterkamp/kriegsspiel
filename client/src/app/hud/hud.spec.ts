@@ -69,6 +69,17 @@ describe('MarksBarComponent', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe(String(!expanded));
   });
 
+  it('hides the Tools panel while the game-over paper is up (#344)', async () => {
+    const g = configure();
+    const f = TestBed.createComponent(MarksBarComponent);
+    await f.whenStable();
+    const marks = (f.nativeElement as HTMLElement).querySelector<HTMLElement>('#marks')!;
+    expect(marks.hidden).toBe(false);
+    g.fake.set({ gameOver: { winner: 'blue', reason: 'eliminated', atGame: 0 } });
+    await f.whenStable();
+    expect(marks.hidden).toBe(true);
+  });
+
   it('presses one tool at a time and sets the service tool', async () => {
     const { f, el, marks } = await open();
     const btn = (t: string) => el.querySelector<HTMLButtonElement>(`[data-tool=${t}]`)!;

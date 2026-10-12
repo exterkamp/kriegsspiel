@@ -1,9 +1,9 @@
 .window {
   position: fixed;
   left: 8px;
-  top: 8px;
+  top: 52px;
   width: min(360px, calc(100% - 16px));
-  max-height: 60%;
+  max-height: calc(100% - 140px);
   overflow: auto;
   box-sizing: border-box;
   z-index: 6;
@@ -57,4 +57,12 @@ ul {
 }
 .rulings h3 {
   margin: 0.25rem 0;
+}
+
+/* The HUD wraps to two rows on a phone, so the window starts lower than on a desktop. */
+@media (max-width: 600px) {
+  .window {
+    top: 84px;
+    max-height: calc(100% - 200px);
+  }
 }

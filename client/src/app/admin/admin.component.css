@@ -1,44 +1,50 @@
 /* Scoped under the host element: the old page owned html/body, the route must not leak into other pages. */
 ks-admin {
-  display: block;
+  display: grid;
+  grid-template-rows: auto 1fr;
   height: 100vh;
-  --bg: var(--ks-table);
-  --panel: var(--ks-night-panel);
-  --line: var(--ks-night-line);
-  --fg: var(--ks-on-overlay);
-  --dim: var(--ks-night-dim);
-  --accent: var(--ks-brass-hi);
+  height: 100dvh;
+  /* The paper palette, in the dense layout (#344); the data blocks keep the monospace face. */
+  --bg: var(--ks-paper);
+  --panel: var(--ks-paper-sunk);
+  --line: var(--ks-rule-soft);
+  --fg: var(--ks-ink);
+  --dim: var(--ks-ink-muted);
+  --accent: var(--ks-wax);
+  background: var(--ks-page-bg);
+  color: var(--fg);
 
-  &,
-  #app {
+  .admin-bar {
     margin: 0;
-    height: 100%;
-    background: var(--bg);
-    color: var(--fg);
-    font: var(--ks-text-sm) / 1.4 var(--ks-font-mono);
+    padding: var(--ks-space-1) var(--ks-space-3);
   }
   #app {
     display: grid;
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
     grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    margin: 0 var(--ks-space-3) var(--ks-space-3);
+    background: var(--bg);
+    border: 1px solid var(--ks-rule);
+    border-radius: var(--ks-radius);
+    overflow: hidden;
   }
   header {
     display: flex;
     flex-wrap: wrap;
-    gap: 16px;
+    gap: var(--ks-space-1) var(--ks-space-4);
     align-items: center;
-    padding: 6px 12px;
+    padding: var(--ks-space-2) var(--ks-space-3);
     background: var(--panel);
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--ks-rule);
+  }
+  header label {
+    display: inline-flex;
+    gap: var(--ks-space-2);
+    align-items: center;
   }
   h1 {
-    font-size: 13px;
     margin: 0;
-    color: var(--accent);
-  }
-  :focus-visible {
-    outline: 2px solid var(--ks-focus-on-dark);
-    outline-offset: 1px;
   }
   #live {
     display: inline-flex;
@@ -52,22 +58,23 @@ ks-admin {
     background: var(--dim);
   }
   #live[data-status='live'] i {
-    background: var(--ks-ok-on-dark);
+    background: var(--ks-ok);
   }
   #live[data-status='reconnecting'] i,
   #live[data-status='connecting'] i {
-    background: var(--ks-warn-on-dark);
+    background: var(--ks-warn);
   }
   #live[data-status='disabled'] i,
   #live[data-status='unauthorized'] i {
-    background: var(--ks-wax-on-dark);
+    background: var(--ks-wax);
   }
   small {
     color: var(--dim);
   }
   nav {
     display: flex;
-    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    border-bottom: 1px solid var(--ks-rule);
   }
   nav button {
     background: transparent;
@@ -76,14 +83,16 @@ ks-admin {
     border-bottom: 2px solid transparent;
     border-radius: 0;
     padding: 6px 14px;
+    flex: none;
   }
   nav button:hover:not(:disabled) {
-    background: var(--ks-night-select);
+    background: var(--panel);
   }
   nav button[aria-selected='true'] {
     background: transparent;
     border-bottom-color: var(--accent);
     color: var(--accent);
+    font-weight: bold;
   }
   #filterbar {
     display: flex;
@@ -92,8 +101,18 @@ ks-admin {
     padding: 4px 12px;
     border-bottom: 1px solid var(--line);
   }
+  #filterbar {
+    flex-wrap: wrap;
+  }
   #filter {
     width: 280px;
+    max-width: 100%;
+  }
+  pre,
+  .v,
+  .lp-row,
+  .llm-table {
+    font-family: var(--ks-font-mono);
   }
   main {
     overflow: auto;
@@ -142,20 +161,20 @@ ks-admin {
     background: var(--panel);
   }
   .bad {
-    color: var(--ks-wax-on-dark);
+    color: var(--ks-wax);
   }
   .badge {
     padding: 0 6px;
     border: 1px solid var(--line);
   }
   .badge.live {
-    color: var(--ks-ok-on-dark);
+    color: var(--ks-ok);
   }
   .badge.playback {
-    color: var(--ks-warn-on-dark);
+    color: var(--ks-warn);
   }
   .badge.fallback {
-    color: var(--ks-wax-on-dark);
+    color: var(--ks-wax);
   }
   .llm-detail details {
     margin: 6px 0;
@@ -204,17 +223,17 @@ ks-admin {
     color: var(--dim);
   }
   .master-only {
-    background: var(--ks-night-select);
-    border-left: 3px solid var(--ks-warn-on-dark);
+    background: var(--ks-paper-sunk);
+    border-left: 3px solid var(--ks-warn);
   }
   .master-only .vis {
-    color: var(--ks-warn-on-dark);
+    color: var(--ks-warn);
   }
   .state-badge {
     margin-left: 8px;
     padding: 0 6px;
-    border: 1px solid var(--ks-warn-on-dark);
-    color: var(--ks-warn-on-dark);
+    border: 1px solid var(--ks-warn);
+    color: var(--ks-warn);
     font-size: var(--ks-text-xs);
     border-radius: 3px;
   }
@@ -224,10 +243,10 @@ ks-admin {
     padding: 2px 6px;
   }
   .unit[data-side='blue'] > summary {
-    color: var(--ks-info-on-dark);
+    color: var(--ks-info);
   }
   .unit[data-side='red'] > summary {
-    color: var(--ks-wax-on-dark);
+    color: var(--ks-wax);
   }
   .queue li {
     word-break: break-all;
@@ -312,7 +331,7 @@ ks-admin {
     background: var(--panel);
   }
   .lp-row[aria-selected='true'] {
-    background: var(--ks-night-select);
+    background: var(--ks-paper-sunk);
   }
   .lp-row > span {
     overflow: hidden;
@@ -323,7 +342,7 @@ ks-admin {
     flex: 1;
   }
   .lp-row[data-kind='error'] {
-    color: var(--ks-wax-on-dark);
+    color: var(--ks-wax);
   }
   .lp-detail {
     overflow: auto;
@@ -359,9 +378,5 @@ ks-admin {
       grid-template-columns: 1fr;
       grid-template-rows: 1fr 1fr;
     }
-  }
-
-  & {
-    height: 100vh;
   }
 }

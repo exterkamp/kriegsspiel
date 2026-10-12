@@ -172,7 +172,7 @@ describe('main menu', () => {
     await open('/', { devToolsEnabled: async () => true });
     expect(el.querySelector('#dev-h')?.textContent).toBe('Developer tools');
     const links = [...el.querySelectorAll('section.dev a')].map((a) => [
-      a.textContent,
+      a.querySelector('b')?.textContent,
       a.getAttribute('href'),
     ]);
     expect(links).toEqual([
@@ -339,11 +339,11 @@ describe('moving between screens', () => {
     expect(rows.slice(0, 2).join(' ')).not.toContain('started');
   });
 
-  it('puts the form and your games in one scroller, so the list cannot cover Start (#318)', async () => {
+  it('puts the form and your games on one page, the list in its own panel (#318, #344)', async () => {
     await open('/?lobby=1');
-    const screen = el.querySelector('.screen')!;
-    expect(screen.contains(el.querySelector('form[aria-label="New game"]'))).toBe(true);
-    expect(screen.contains(el.querySelector('#game-list'))).toBe(true);
+    const frame = el.querySelector('ks-page-frame')!;
+    expect(frame.contains(el.querySelector('form[aria-label="New game"]'))).toBe(true);
+    expect(frame.querySelector('ks-game-list.ks-panel #game-list')).not.toBeNull();
   });
 
   it('offers the side as a choice when there are two to pick from', async () => {

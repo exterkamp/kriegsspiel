@@ -120,7 +120,7 @@ export function toRequest(f: Form, o: ScenarioOptions): CreateRequest {
 }
 
 export const OPPONENT_LABEL: Record<NonNullable<Opponent>, string> = {
-  scripted: 'Scripted opponent plays the other side.',
+  scripted: 'A computer opponent plays the other side.',
   ai_commander: 'An AI commander plays the other side.',
 };
 
