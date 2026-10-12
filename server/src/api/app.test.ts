@@ -1258,9 +1258,11 @@ describe('SPA fallback for the Angular client', () => {
 
   it('serves the app shell for every top-level route in the Angular router', async () => {
     const routesFile = new URL('../../../client/src/app/app.routes.ts', import.meta.url);
-    const paths = [...readFileSync(routesFile, 'utf8').matchAll(/^\s*path: '([^']*)'/gm)]
+    // Assumes top-level, non-parameterised paths; `path:` may sit anywhere on a line because
+    // Prettier keeps short route objects on one line.
+    const paths = [...readFileSync(routesFile, 'utf8').matchAll(/\bpath:\s*'([^']*)'/g)]
       .map((m) => m[1]!)
-      .filter((p) => p && p !== '**' && !p.endsWith('.html'));
+      .filter((p) => p && p !== '**' && !p.endsWith('.html') && !p.includes(':'));
     expect(paths).toContain('style-guide');
     const { server, done } = await spaApp(true);
     try {
