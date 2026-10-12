@@ -2,6 +2,7 @@ import type { EventRegistry, NewEvent } from './events.js';
 import { schedule } from './queue.js';
 import type { EngineState } from './events.js';
 import { destinationOf } from './courier.js';
+import { findPath } from './navigation.js';
 import { distance, metres } from './geometry.js';
 import { describePlace } from './place.js';
 import { evaluateStanding } from './standing.js';
@@ -350,7 +351,10 @@ function orderRoutesOf(state: GameState, side: SideId): ViewOrderRoute[] {
           ? i.toward
           : undefined;
     if (!to) continue;
-    const points = [u.center, ...(u.leg ? [u.leg.to] : []), to].filter(
+    // The path the unit will take: the leg under way, then the planned route (the visibility graph, #343) from its end.
+    const from = u.leg ? u.leg.to : u.center;
+    const ahead = findPath(state.map, from, to, { width: u.footprint.frontage })?.waypoints ?? [to];
+    const points = [u.center, ...(u.leg ? [u.leg.to] : []), ...ahead.slice(1), to].filter(
       (p, n, all) => n === 0 || p.x !== all[n - 1]!.x || p.y !== all[n - 1]!.y,
     );
     if (points.length > 1) {
