@@ -223,7 +223,6 @@ describe('an adversarial model that names the other side’s units is stopped', 
   for (const side of SIDES) {
     for (const [kind, text] of Object.entries(variants(side))) {
       it(`${side}: ${kind} in narration, staff messages, answers and parse replies is not delivered`, async () => {
-        const own = G.world.units.find((u) => u.side === side)!.id;
         const reportIds = viewFor(G.world, side, G.now).reports.map((r) => r.id);
         const model = new ScriptedModel({
           narrate: () => ({ dispatches: [{ reportIds: [reportIds[0]!], text }] }),
