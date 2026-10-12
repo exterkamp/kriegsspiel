@@ -261,6 +261,27 @@ describe('OrdersDeskComponent', () => {
     expect(t.sender.mock.calls[1]![0].words).toBe('Hold the Southern wood.');
   });
 
+  it('does not sign over a draft the player has started when an option is chosen', async () => {
+    const t = await open();
+    await t.fill();
+    t.desk.orderDraft.update((d) => ({ ...d, text: 'Hold the wood.' }));
+    t.q('#order-sign').click();
+    await t.settle();
+    t.desk.orderDraft.update((d) => ({ ...d, text: 'Something else' }));
+    t.game.set(
+      refusal(
+        'Hold the wood.',
+        'order_clarification',
+        'Which wood, sir? (Northern wood, Southern wood)',
+      ),
+    );
+    await t.settle();
+    t.el.querySelectorAll<HTMLButtonElement>('.options button')[1]!.click();
+    await t.settle();
+    expect(t.sender).toHaveBeenCalledTimes(1);
+    expect(t.q<HTMLTextAreaElement>('#desk-order-text').value).toBe('Hold the Southern wood.');
+  });
+
   it('hides an old refusal once the player signs another order', async () => {
     const t = await open(undefined, refusal('Advance to the ford.'));
     expect(t.el.querySelector('.notices')).not.toBeNull();

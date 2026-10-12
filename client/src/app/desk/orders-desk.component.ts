@@ -137,8 +137,11 @@ export class OrdersDeskComponent {
   protected choose(option: string): void {
     const n = this.notice();
     if (!n || n.words === '') return;
-    this.patch({ text: orderWithOption(n.words, n.question, option) });
-    this.sign();
+    const resolved = orderWithOption(n.words, n.question, option);
+    const typed = this.draft().text.trim();
+    this.patch({ text: resolved });
+    // Words the player has started on since are theirs: leave the resolved order in the draft to sign.
+    if (typed === '' || typed === n.words.trim()) this.sign();
   }
 
   protected errorFor(field: Field): string {
