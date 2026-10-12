@@ -63,6 +63,9 @@ const KIND_WORDS: Record<string, string[]> = {
   farm: ['farm', 'farmhouse'],
 };
 
+/** Kinds of ground that carry a road over water; a player may use either word for the other. */
+const CROSSINGS = ['bridge', 'ford'];
+
 /** Words that name a branch of the army, mapped to words in a unit's name. */
 const UNIT_ALIASES: Record<string, string[]> = {
   cavalry: [
@@ -206,7 +209,10 @@ function findPlace(clause: string, places: Place[]): PlaceMatch {
       Object.keys(KIND_WORDS).find((k) => nounsOf(k).includes(w)) ??
       (places.some((p) => p.kind === w) ? w : undefined);
     if (!kind) continue;
-    const ofKind = places.filter((p) => p.kind === kind);
+    let ofKind = places.filter((p) => p.kind === kind);
+    // A scenario with no ford still has its crossing, and the other way about.
+    const alike = CROSSINGS.includes(kind) ? CROSSINGS : [];
+    if (ofKind.length === 0) ofKind = places.filter((p) => alike.includes(p.kind));
     if (ofKind.length === 0) return { kind: 'none' };
     const narrowed = ofKind.filter((p) => {
       const qualifiers = words(normalize(p.name ?? '')).filter(
@@ -314,9 +320,15 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
     } else {
       const found = findPlace(object, input.places);
       if (found.kind === 'none' && intents.length > 0)
+      {
+        // The one option is the first part as a whole order, for the desk to send as it stands.
+        const first = clauses.slice(0, i).join(', ');
+        const whole = match.kind === 'one' ? `${match.unit.name}, ${first}` : first;
         return ask(
-          `I know of no place called "${phrase.join(' ')}", sir. I can carry out the first part, "${clauses.slice(0, i).join(', ')}", if you send just that.`,
+          `I know of no place called "${phrase.join(' ')}", sir. Shall I send just the first part?`,
+          [whole],
         );
+      }
       if (found.kind === 'none')
         return refuse(`I know of no place called "${phrase.join(' ')}", sir.`);
       if (found.kind === 'many') {
