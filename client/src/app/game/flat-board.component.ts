@@ -89,8 +89,14 @@ import { MarksService, type Picker } from './marks.service';
           <polygon class="order-head" [attr.points]="pts(head(r.points))" />
         } @else {
           @for (d of dashes(r.points); track $index) {
-            <polyline class="route" [attr.points]="pts(d)" [attr.stroke-width]="stroke * 2.5" />
+            <polyline class="route" [attr.points]="pts(d)" [attr.stroke-width]="stroke * 5" />
           }
+          <circle
+            class="route-end"
+            [attr.cx]="r.points[r.points.length - 1]!.x"
+            [attr.cy]="r.points[r.points.length - 1]!.y"
+            [attr.r]="fontSize * 0.45"
+          />
         }
       }
       @for (c of couriers(); track c.id) {
@@ -246,6 +252,11 @@ import { MarksService, type Picker } from './marks.service';
       text-anchor: middle;
       font-size: inherit;
     }
+    .route-end {
+      fill: var(--ks-map-route);
+      stroke: var(--ks-paper);
+      stroke-width: 4;
+    }
     .route {
       fill: none;
       stroke: var(--ks-map-route);
@@ -376,6 +387,6 @@ export class FlatBoardComponent {
     return arrowHead(points[points.length - 2]!, points[points.length - 1]!, this.fontSize * 1.2);
   }
   protected dashes(points: readonly { x: number; y: number }[]) {
-    return dashPolyline(points, this.fontSize * 1.1, this.fontSize * 0.8);
+    return dashPolyline(points, this.fontSize * 1.6, this.fontSize * 0.9);
   }
 }
