@@ -10,6 +10,9 @@ h2 {
 .n {
   opacity: 0.8;
 }
+:host [aria-pressed='true'] .unread-dot {
+  color: var(--ks-ink);
+}
 .unread-dot {
   color: var(--ks-wax);
   font-size: var(--ks-text-xs);

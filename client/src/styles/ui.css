@@ -279,6 +279,9 @@
   padding: 3px 6px;
   font-size: var(--ks-text-sm);
 }
+:where(.ks-theme) .ks-dense select {
+  padding-right: 2em;
+}
 :where(.ks-theme) .ks-dense h1 {
   font-size: var(--ks-text-lg);
   letter-spacing: 0.02em;
