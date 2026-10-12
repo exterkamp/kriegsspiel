@@ -90,6 +90,23 @@ const TOPICS: [Topic, RegExp][] = [
   ['orders', /\b(?:order|orders|plan|advance|attack|hold|withdraw|should|next)\b/i],
 ];
 
+/** How each role opens, so two officers asked the same thing do not give the same sentence (#323). The officer's name picks one. */
+const OPENERS: Record<string, string[]> = {
+  chiefOfStaff: ['Sir, as I read the whole picture:', 'Sir, taking the staff view:'],
+  intelligence: [
+    'Sir, from what the scouts and sightings give me:',
+    'Sir, weighing the enemy reports:',
+  ],
+  quartermaster: [
+    'Sir, by the returns and the road:',
+    'Sir, on the wagons and the cartridge boxes:',
+  ],
+  subordinate: ['Sir, from my own line:'],
+};
+
+const nameHash = (name: string): number =>
+  [...name].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7);
+
 /** Short in-character advice from the officer's role and the topic keywords of a question, if any. */
 function staff(input: Json) {
   const officer = (input.officer ?? {}) as Json;
@@ -136,7 +153,11 @@ function staff(input: Json) {
       : 'Give each unit one clear order and one clear place, sir, and let the couriers ride before the enemy moves.',
     general: `${enemy} Our ${plural(own.length, 'unit', 'units')} await your orders.`,
   };
-  return { messages: [{ kind: 'advice', text: text[topic] }] };
+  const choices = OPENERS[role] ?? OPENERS.chiefOfStaff!;
+  const opener = traits.includes('terse')
+    ? ''
+    : `${choices[nameHash(str(officer.name)) % choices.length]} `;
+  return { messages: [{ kind: 'advice', text: `${opener}${text[topic]}` }] };
 }
 
 /** A hold-and-react plan: every unit holds the place nearest the objective, in plain words the parser knows. */

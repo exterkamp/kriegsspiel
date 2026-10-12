@@ -337,6 +337,33 @@ describe('test provider: staff, judge and command', () => {
     );
   });
 
+  it('does not give two officers the same sentence for the same question (#323)', async () => {
+    const w = world();
+    const ask = async (role: 'chiefOfStaff' | 'intelligence' | 'quartermaster') => {
+      const seat = { role };
+      const input = staffInput(
+        staffOfficer(w.seed, 'blue', role),
+        viewForRole(w, 'blue', seat, w.time),
+        w.time,
+      );
+      const res = await client().call<{ messages: { text: string }[] }>({
+        stage: 'staff',
+        promptVersion: 'x',
+        system: 'x',
+        input: { ...input, question: 'What is our situation?' },
+        schema: (await import('./staff.js')).STAFF_SCHEMA,
+      });
+      expect(checkStaffOutput(res.output as never, w, 'blue', seat, input)).toEqual([]);
+      return res.output.messages[0]!.text;
+    };
+    const texts = [
+      await ask('chiefOfStaff'),
+      await ask('intelligence'),
+      await ask('quartermaster'),
+    ];
+    expect(new Set(texts).size).toBe(3);
+  });
+
   it('cites the newest contact report the side has received, not only standing contacts (#318)', async () => {
     const res = await client().call<{ messages: { text: string }[] }>({
       stage: 'staff',
