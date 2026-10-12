@@ -6,6 +6,8 @@ export interface PlayedGame extends GameSummary {
   finished: boolean;
   gameTimeMs: number;
   lastPlayedMs: number;
+  /** Once finished: the winning side, or null when both sides were put out together. */
+  winner?: string | null;
 }
 
 export interface ContinueRow {
@@ -18,6 +20,17 @@ export interface ContinueRow {
 }
 
 const isPlayed = (g: GameSummary | PlayedGame): g is PlayedGame => 'finished' in g;
+
+/** How a game stands in "Your games": in the lobby, started, or over with its result from the player's side (#325). */
+export function gameStatus(g: GameSummary | PlayedGame): string {
+  const seat = g.side ? `, you are ${g.side}` : '';
+  if (g.status === 'lobby') return `in the lobby${seat}`;
+  if (!isPlayed(g) || !g.finished) return `started${seat}`;
+  if (g.winner === undefined) return `ended${seat}`;
+  if (g.winner === null) return `ended, both sides broken${seat}`;
+  if (!g.side) return `ended, ${g.winner} won`;
+  return `${g.winner === g.side ? 'won' : 'lost'}${seat}`;
+}
 
 /** Started games that are not over. Lobby games have not begun and finished games have nothing to continue. */
 export const unfinished = (games: Array<GameSummary | PlayedGame>): PlayedGame[] =>

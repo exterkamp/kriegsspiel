@@ -12,6 +12,7 @@ import {
 } from './picking.js';
 import { facingToRotationY, fitDistance } from './framing.js';
 import { formatAge } from './sceneState.js';
+import { placeFightLabels, type LabelRect } from './fightLabels.js';
 import { markAgeFactor } from './marks.js';
 import {
   ALL_OVERLAYS,
@@ -148,16 +149,40 @@ export class TableScene {
       r.kind === 'order' ? this.overlays.orders : this.overlays.routes,
     );
     const fights = this.state?.engagements ?? [];
-    const key = JSON.stringify([routes, fights, this.mapKey]);
+    const labelW = this.span * 0.07;
+    const labels = this.state
+      ? placeFightLabels(
+          fights,
+          this.pieceLabelRects(),
+          { w: labelW, h: labelW / 4 },
+          this.span * 0.02,
+        )
+      : new Map<string, Coord>();
+    const key = JSON.stringify([routes, fights, [...labels], this.mapKey]);
     if (key === this.overlayKey) return;
     this.overlayKey = key;
     clearGroup(this.overlayRoot);
     for (const r of routes) this.overlayRoot.add(this.routeObject(r));
-    for (const f of fights) this.overlayRoot.add(this.engagementObject(f));
+    for (const f of fights) this.overlayRoot.add(this.engagementObject(f, labels.get(f.id)!));
+  }
+
+  /** Where every unit and sighting tag sits on the table, in metres, so a fight label can keep clear of them. */
+  pieceLabelRects(): LabelRect[] {
+    const map = this.state!.map;
+    const out: LabelRect[] = [];
+    for (const p of this.pieces.values()) {
+      p.group.updateWorldMatrix(true, true);
+      p.group.traverse((o) => {
+        if (!(o instanceof THREE.Sprite)) return;
+        const at = worldToMap(map, o.getWorldPosition(new THREE.Vector3()));
+        out.push({ ...at, w: o.scale.x, h: o.scale.y });
+      });
+    }
+    return out;
   }
 
   /** A red ring and the word "Fighting" where a fight is going on, drawn above the pieces. */
-  private engagementObject(f: Engagement): THREE.Group {
+  private engagementObject(f: Engagement, labelAt: Coord): THREE.Group {
     const map = this.state!.map;
     const g = new THREE.Group();
     const radius = this.span * 0.02;
@@ -176,9 +201,8 @@ export class TableScene {
     g.add(ring);
     const labelW = this.span * 0.07;
     const tag = labelSprite('Fighting', false, labelW);
-    tag.position.copy(mapToWorld(map, f.position, this.span * 0.03));
-    // North of the ring: the unit tags hang on the south edge of their pieces.
-    tag.position.z -= radius + labelW / 8;
+    // Placed clear of the unit tags and the other fight labels (placeFightLabels).
+    tag.position.copy(mapToWorld(map, labelAt, this.span * 0.03));
     g.add(tag);
     g.name = `engagement:${f.id}`;
     return g;

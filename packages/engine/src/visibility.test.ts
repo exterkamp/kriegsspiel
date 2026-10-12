@@ -819,7 +819,7 @@ describe('places in reports', () => {
     const r = viewFor(s.world, 'blue', s.time).reports.find((x) => x.kind === 'contact');
     expect(r).toMatchObject({ place: 'near the mill, east of the road', uncertaintyRadius: 60 });
     expect(r!.text).toBe(
-      'Sir, Unit b sighted about a battalion near the mill, east of the road, 10 minutes before it reached us (medium confidence).',
+      'Sir, Unit b sighted about a battalion near the mill, east of the road, about 10 minutes ago (medium confidence).',
     );
     expect(r!.text).not.toMatch(/\d+, \d+/);
   });
@@ -850,10 +850,10 @@ describe('places in reports', () => {
       expect(renderReport({ ...base, kind }, 60_000), kind).toMatch(/^Sir, /);
       const text = renderReport({ ...base, kind }, 120_000);
       expect(text, kind).not.toMatch(/\bmin\b/);
-      if (kind !== 'situation') expect(text, kind).toContain('2 minutes before it reached us');
+      if (kind !== 'situation') expect(text, kind).toContain('about 2 minutes ago');
     }
-    expect(renderReport({ ...base, kind: 'engaged' }, 60_000)).toContain('1 minute before');
-    expect(renderReport({ ...base, kind: 'engaged' }, 0)).toContain('as it reached us');
+    expect(renderReport({ ...base, kind: 'engaged' }, 60_000)).toContain('about 1 minute ago');
+    expect(renderReport({ ...base, kind: 'engaged' }, 0)).toContain('just now');
     expect(renderReport({ ...base, kind: 'battle', text: 'The umpire says.' }, 0)).toBe(
       'The umpire says.',
     );

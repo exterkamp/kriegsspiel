@@ -158,7 +158,7 @@ export function applyServerAnswers(
     if (a.text === undefined) return { ...e, textless: true };
     return {
       ...e,
-      answer: { text: `${a.officer.name}: ${a.text}`, basedOnGame: a.basedOnGame },
+      answer: { text: `${a.officer.name}: ${sirFirst(a.text)}`, basedOnGame: a.basedOnGame },
       officer: a.officer,
     };
   });
@@ -186,7 +186,10 @@ export function mergeStaffHistory(
     delete open.textless;
     return {
       ...open,
-      answer: { text: `${h.officer.name}: ${h.text}`, basedOnGame: h.basedOnGame ?? h.askedAtGame },
+      answer: {
+        text: `${h.officer.name}: ${sirFirst(h.text)}`,
+        basedOnGame: h.basedOnGame ?? h.askedAtGame,
+      },
       officer: h.officer,
     };
   });
@@ -208,7 +211,7 @@ export function mergeStaffHistory(
       ...(h.text !== undefined
         ? {
             answer: {
-              text: `${h.officer.name}: ${h.text}`,
+              text: `${h.officer.name}: ${sirFirst(h.text)}`,
               basedOnGame: h.basedOnGame ?? h.askedAtGame,
             },
           }
@@ -269,6 +272,18 @@ export const formatCost = (ms: number): string => formatAge(ms);
 const list = (xs: string[]): string =>
   xs.length <= 2 ? xs.join(' and ') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`;
 
+/**
+ * Every officer addresses the commander the same way (#325): an answer opens "Sir, ...". An answer that already
+ * does is left alone; otherwise the opening is added and the first word is lowered to fit.
+ * Only "I" (and "I'm", "I'd"...) keeps its capital; an empty answer is returned as it is.
+ */
+export function sirFirst(text: string): string {
+  const t = text.trim();
+  if (!t || /^sir\b/i.test(t)) return t;
+  const lower = /^I\b/.test(t) ? t : t[0]!.toLowerCase() + t.slice(1);
+  return `Sir, ${lower}`;
+}
+
 /** Terse officers say less; the rest add a note of caution or confidence. */
 function voice(s: StaffMember, body: string, caveat: string): string {
   if (s.traits.includes('terse')) return body;
@@ -291,7 +306,7 @@ export function fixtureAnswer(
   const s = staffFor(req.role, staff);
   if (!view)
     return {
-      text: `${s.name}: We have no reports to go on yet, sir.`,
+      text: `${s.name}: ${sirFirst('We have no reports to go on yet.')}`,
       basedOnGame: req.askedAtGame,
     };
   const own = view.ownUnits;
@@ -366,7 +381,7 @@ export function fixtureAnswer(
       break;
     }
   }
-  const text = `${s.name}: ${voice(s, lines.join(' '), caveat)}`;
+  const text = `${s.name}: ${sirFirst(voice(s, lines.join(' '), caveat))}`;
   return { text, basedOnGame: view.atGame };
 }
 

@@ -254,17 +254,15 @@ export interface EngineSideView {
 }
 
 /**
- * Plain template prose for a report. The LLM replaces this later. `leadMs` is how long before the
- * report reached HQ the thing happened, so the text is the same whenever it is read and agrees with
- * the "received" time shown beside it (#318); never an age measured against the clock at read time.
+ * Plain template prose for a report. The LLM replaces this later. `leadMs` is the report's age when
+ * it reached HQ (not travel time), so the text is the same whenever it is read and agrees with the
+ * "received" time shown beside it (#318); never an age measured against the clock at read time.
+ * Every kind says it one way: "about N minutes ago", or "just now" (#325).
  */
 export function renderReport(r: Report, leadMs: number): string {
   const mins = Math.round(leadMs / MS_PER_MINUTE);
   const where = r.place;
-  const when =
-    mins === 0
-      ? 'as it reached us'
-      : `${mins} ${mins === 1 ? 'minute' : 'minutes'} before it reached us`;
+  const when = mins === 0 ? 'just now' : `about ${mins} ${mins === 1 ? 'minute' : 'minutes'} ago`;
   // Every report opens the same way, and says its age the same way (#323). The umpire's own words stand as written.
   const sir = (text: string) => `Sir, ${text}`;
   switch (r.kind) {
