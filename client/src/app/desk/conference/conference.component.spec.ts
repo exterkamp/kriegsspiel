@@ -87,16 +87,25 @@ describe('ConferenceComponent', () => {
     await f.whenStable();
     await ask('And now?');
     const [id2] = sender.mock.calls[0] as unknown as [string];
+    // The reply carries no text: the exchange is marked, not answered, while the answer is not due.
     game.update((s) => ({
       ...s,
-      view: { ...fixtureView, atGame: 999_000 },
+      staffCharges: {
+        ...s.staffCharges,
+        [id2]: { askedAtGame: 1_000, answerAtGame: 4_000_000, costMs: 3_999_000 },
+      },
       staffAnswers: {
         ...s.staffAnswers,
         [id2]: { basedOnGame: 1, officer: { name: 'Major Dessau', traits: [] } },
       },
     }));
     await f.whenStable();
-    expect(desk.conferenceLog()[1]!.answer?.basedOnGame).toBe(999_000);
+    expect(desk.conferenceLog()[1]!.textless).toBe(true);
+    expect(desk.conferenceLog()[1]!.answer).toBeUndefined();
+    // A report reaches HQ before the answer is due; the answer cites it.
+    game.update((s) => ({ ...s, view: { ...fixtureView, atGame: 4_500_000 } }));
+    await f.whenStable();
+    expect(desk.conferenceLog()[1]!.answer?.basedOnGame).toBe(4_500_000);
   });
 
   it('shows the officer traits and cost, and holds an answer until game time reaches it', async () => {

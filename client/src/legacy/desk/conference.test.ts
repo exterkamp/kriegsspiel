@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import {
+  applyServerAnswers,
   busy,
   fixtureAnswer,
   newExchange,
   nextExchangeId,
   reconcileExchanges,
+  settleTextless,
   SERVER_REPLY_TIMEOUT_MS,
   type Exchange,
   questionProblem,
@@ -134,5 +136,28 @@ describe('reconcileExchanges', () => {
   it('leaves a healthy wait, answered exchanges and unchanged logs alone', () => {
     const log = [waiting(1), newExchange(2, req('intelligence'))];
     expect(reconcileExchanges(log, server())).toBe(log);
+  });
+});
+
+describe('text-less server replies', () => {
+  const ex: Exchange = {
+    ...newExchange(1, req('engineer', 0)),
+    answerAtGame: 600_000,
+    questionId: 'q-1',
+  };
+  const reply = { 'q-1': { basedOnGame: 0, officer: { name: 'Major X', traits: [] } } };
+
+  it('marks the exchange without answering it', () => {
+    const [e] = applyServerAnswers([ex], reply);
+    expect(e).toMatchObject({ textless: true });
+    expect(e!.answer).toBeUndefined();
+  });
+
+  it('answers from the view held when the answer falls due', () => {
+    const [marked] = applyServerAnswers([ex], reply);
+    const early = settleTextless([marked!], 599_999, { ...fixtureView, atGame: 100 });
+    expect(early[0]!.answer).toBeUndefined();
+    const [done] = settleTextless([marked!], 600_000, { ...fixtureView, atGame: 555_000 });
+    expect(done!.answer?.basedOnGame).toBe(555_000);
   });
 });

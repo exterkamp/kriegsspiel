@@ -86,6 +86,8 @@ export interface Exchange {
   /** Set when the server is charging the cost: the id its reply carries, and the wall time it was sent. */
   questionId?: string;
   sentAtWall?: number;
+  /** The server replied with no text: the fixture answers from the newest view once `answerAtGame` is reached. */
+  textless?: boolean;
 }
 
 export const MAX_QUESTION_LENGTH = 400;
@@ -139,26 +141,50 @@ export function reconcileExchanges(
 
 /**
  * Give each exchange its answer from the umpire's reply (`staffAnswer`). A reply with no text (the
- * staff stage is off or failed) is answered from the view the page holds now, not the one it held
- * when the question went out, so a late answer cites the newest reports. Returns the same array
- * when nothing changed.
+ * staff stage is off or failed) only marks the exchange `textless`: `settleTextless` builds its
+ * answer once the answer is due, so it cites the newest reports. Returns the same array when
+ * nothing changed.
  */
 export function applyServerAnswers(
   log: readonly Exchange[],
   answers: Readonly<Record<string, StaffServerAnswer>>,
+): readonly Exchange[] {
+  let changed = false;
+  const next = log.map((e) => {
+    if (e.answer || e.textless || e.failed || e.questionId === undefined) return e;
+    const a = answers[e.questionId];
+    if (!a) return e;
+    changed = true;
+    if (a.text === undefined) return { ...e, textless: true };
+    return {
+      ...e,
+      answer: { text: `${a.officer.name}: ${a.text}`, basedOnGame: a.basedOnGame },
+      officer: a.officer,
+    };
+  });
+  return changed ? next : log;
+}
+
+/**
+ * Answer the text-less exchanges that are now due, from the view the page holds at `nowGame`, not
+ * the one it held when the question went out. Returns the same array when nothing changed.
+ */
+export function settleTextless(
+  log: readonly Exchange[],
+  nowGame: number,
   view: SideView | undefined,
 ): readonly Exchange[] {
   let changed = false;
   const next = log.map((e) => {
-    if (e.answer || e.failed || e.questionId === undefined) return e;
-    const a = answers[e.questionId];
-    if (!a) return e;
+    if (!e.textless || e.answer || e.failed || nowGame < e.answerAtGame) return e;
     changed = true;
-    const answer =
-      a.text === undefined
-        ? fixtureAnswer({ role: e.role, question: e.question, askedAtGame: e.askedAtGame }, view)
-        : { text: `${a.officer.name}: ${a.text}`, basedOnGame: a.basedOnGame };
-    return { ...e, answer, ...(a.text === undefined ? {} : { officer: a.officer }) };
+    return {
+      ...e,
+      answer: fixtureAnswer(
+        { role: e.role, question: e.question, askedAtGame: e.askedAtGame },
+        view,
+      ),
+    };
   });
   return changed ? next : log;
 }

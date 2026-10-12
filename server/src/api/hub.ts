@@ -559,7 +559,6 @@ export class Hub {
     });
   }
 
-  /** HQ passes a paper in its own view on to the subordinate commanding `unit`. */
   /**
    * Have the staff stage write the answer to a question the desk just accepted. The client holds it
    * back until the officer's cost has elapsed. With no umpire, or no usable reply, the message carries
@@ -591,6 +590,7 @@ export class Hub {
     });
   }
 
+  /** HQ passes a paper in its own view on to the subordinate commanding `unit`. */
   private handleForward(
     gameId: string,
     game: GameActor,

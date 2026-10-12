@@ -19,6 +19,7 @@ import {
   officerFor,
   nextExchangeId,
   applyServerAnswers,
+  settleTextless,
   questionProblem,
   reconcileExchanges,
   staffFor,
@@ -83,8 +84,15 @@ export class ConferenceComponent {
 
     // The umpire writes the answer; it is shown once game time reaches the exchange's answer time.
     effect(() => {
-      const { staffAnswers: answers, view } = this.game.state();
-      untracked(() => this.desk.conferenceLog.update((l) => applyServerAnswers(l, answers, view)));
+      const { staffAnswers: answers } = this.game.state();
+      untracked(() => this.desk.conferenceLog.update((l) => applyServerAnswers(l, answers)));
+    });
+
+    // A reply with no text is answered from the newest view when the answer falls due.
+    effect(() => {
+      const nowGame = this.nowGame();
+      const { view } = this.game.state();
+      untracked(() => this.desk.conferenceLog.update((l) => settleTextless(l, nowGame, view)));
     });
   }
 
