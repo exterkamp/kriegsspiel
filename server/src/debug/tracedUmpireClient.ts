@@ -42,7 +42,8 @@ export class TracedUmpireClient implements UmpireClient {
       const r = res.record;
       this.o.trace.record(this.o.gameId, 'llm', {
         ...base,
-        mode: r.model === TEST_MODEL ? 'test' : base.mode,
+        mode: r.fallbackFor ? 'fallback' : r.model === TEST_MODEL ? 'test' : base.mode,
+        ...(r.fallbackFor ? { fallbackFor: r.fallbackFor } : {}),
         provider: r.provider ?? this.o.provider ?? 'unknown',
         model: r.model,
         response: r.rawOutput,

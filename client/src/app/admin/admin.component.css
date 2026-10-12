@@ -163,6 +163,9 @@ ks-admin {
   .badge.playback {
     color: #d29922;
   }
+  .badge.fallback {
+    color: #f85149;
+  }
   .llm-detail details {
     margin: 6px 0;
   }

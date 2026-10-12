@@ -53,7 +53,19 @@ export interface UmpireConfig {
   budget?: { maxCostUsd?: number; maxTotalTokens?: number };
   /** Caps for each game (see `GameUmpireClient`). Absent: no per-game cap. */
   gameBudget?: GameLimits;
+  /**
+   * Provider id (a `test` provider) that answers when a stage's own provider fails, so the game continues. Set when
+   * `UMPIRE_KEYLESS_PROVIDER=ollama`; `createUmpireClient` wraps the stages that use a local model.
+   */
+  fallbackProvider?: string;
 }
+
+/** The stages `UMPIRE_KEYLESS_PROVIDER=ollama` hands to the local model; judging and the AI commander stay on `test`. */
+export const OLLAMA_STAGES: readonly UmpireStage[] = ['parse', 'narrate', 'staff'];
+export const OLLAMA_DEFAULT_MODEL = 'qwen2.5:0.5b';
+/** A CPU model answers in seconds to a minute, so the call timeout is generous. */
+export const OLLAMA_DEFAULT_TIMEOUT_MS = 120_000;
+export const OLLAMA_DEFAULT_NUM_CTX = 4096;
 
 export const DEFAULT_UMPIRE_CONFIG: UmpireConfig = {
   providers: { anthropic: { type: 'anthropic' }, test: { type: 'test' } },
@@ -121,7 +133,8 @@ function checkFile(file: UmpireConfigFile): void {
 /**
  * Builds the config: defaults, then the optional file, then env overrides. Env reads `UMPIRE_PROVIDER` (every
  * stage; `test` answers with canned responses), `UMPIRE_KEYLESS_PROVIDER` (the provider for stages that would use
- * Anthropic with no API key), `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_TIMEOUT_MS`,
+ * Anthropic with no API key; `ollama` serves parse, narrate and staff from a local model with `test` as the fallback, configured by
+ * `OLLAMA_URL`, `OLLAMA_MODEL`, `OLLAMA_NUM_CTX` and `OLLAMA_TIMEOUT_MS`), `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_TIMEOUT_MS`,
  * `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`,
  * `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS` and the per-game
  * `UMPIRE_GAME_BUDGET_USD`, `UMPIRE_GAME_BUDGET_TOKENS` and `UMPIRE_GAME_CALLS_PER_MINUTE`. Throws if a stage names
@@ -134,6 +147,15 @@ export function umpireConfigFromEnv(
   checkFile(file);
   const d = DEFAULT_UMPIRE_CONFIG;
   const providers = { ...d.providers, ...file.providers };
+  const keylessOllama = env.UMPIRE_KEYLESS_PROVIDER === 'ollama';
+  if (keylessOllama && !file.providers?.ollama) {
+    providers.ollama = {
+      type: 'ollama',
+      ...(env.OLLAMA_URL ? { baseUrl: env.OLLAMA_URL } : {}),
+      numCtx: positiveInt(env, 'OLLAMA_NUM_CTX', OLLAMA_DEFAULT_NUM_CTX),
+    };
+  }
+  let usesOllama = false;
   const stages = { ...d.stages, ...file.stages } as Record<UmpireStage, StageRoute>;
   for (const stage of UMPIRE_STAGES) {
     const key = stage.toUpperCase();
@@ -147,14 +169,27 @@ export function umpireConfigFromEnv(
       env.UMPIRE_KEYLESS_PROVIDER &&
       spec?.type === 'anthropic' &&
       !env[spec.apiKeyEnv ?? 'ANTHROPIC_API_KEY'];
-    const chosen = keyless ? (env.UMPIRE_KEYLESS_PROVIDER as string) : provider;
+    // The local model serves the stages it can; the others run on the canned provider.
+    const chosen = keyless
+      ? keylessOllama && !OLLAMA_STAGES.includes(stage)
+        ? 'test'
+        : (env.UMPIRE_KEYLESS_PROVIDER as string)
+      : provider;
+    const local = Boolean(keyless) && chosen === 'ollama';
+    usesOllama ||= local;
     stages[stage] = {
       ...route,
       provider: chosen,
       // The test provider has one model name; other providers keep the route's unless env overrides it.
       model:
         env[`UMPIRE_MODEL_${key}`] ||
-        (providers[chosen]?.type === 'test' ? TEST_MODEL : route.model),
+        (providers[chosen]?.type === 'test'
+          ? TEST_MODEL
+          : local
+            ? env.OLLAMA_MODEL || OLLAMA_DEFAULT_MODEL
+            : route.model),
+      // Low temperature and short outputs suit a tiny model.
+      ...(local ? { params: { temperature: 0.2, maxTokens: stage === 'parse' ? 400 : 700 } } : {}),
     };
     if (!providers[stages[stage].provider]) {
       throw new Error(
@@ -163,10 +198,11 @@ export function umpireConfigFromEnv(
     }
   }
 
+  // One CPU model answers one call at a time; queueing more only makes every call slower.
   const maxConcurrent = positiveInt(
     env,
     'UMPIRE_MAX_CONCURRENT',
-    file.rateLimit?.maxConcurrent ?? 0,
+    file.rateLimit?.maxConcurrent ?? (usesOllama ? 1 : 0),
   );
   const minIntervalMs = positiveInt(
     env,
@@ -185,8 +221,20 @@ export function umpireConfigFromEnv(
   return {
     providers,
     stages,
-    timeoutMs: positiveInt(env, 'UMPIRE_TIMEOUT_MS', file.timeoutMs ?? d.timeoutMs),
-    maxAttempts: positiveInt(env, 'UMPIRE_MAX_ATTEMPTS', file.maxAttempts ?? d.maxAttempts),
+    timeoutMs: positiveInt(
+      env,
+      'UMPIRE_TIMEOUT_MS',
+      file.timeoutMs ??
+        (usesOllama
+          ? positiveInt(env, 'OLLAMA_TIMEOUT_MS', OLLAMA_DEFAULT_TIMEOUT_MS)
+          : d.timeoutMs),
+    ),
+    maxAttempts: positiveInt(
+      env,
+      'UMPIRE_MAX_ATTEMPTS',
+      file.maxAttempts ?? (usesOllama ? 2 : d.maxAttempts),
+    ),
+    ...(usesOllama ? { fallbackProvider: 'test' } : {}),
     baseBackoffMs: positiveInt(
       env,
       'UMPIRE_BASE_BACKOFF_MS',

@@ -63,7 +63,16 @@ if (ai && umpireConfig) {
 // Test-provider calls are traced as such, so the admin LLM panel labels them.
 const admin = adminFromEnv(process.env);
 const trace = admin.enabled ? new TraceStore() : undefined;
-const umpire = umpireConfig ? createUmpireClient({ config: umpireConfig }) : undefined;
+const umpire = umpireConfig
+  ? createUmpireClient({
+      config: umpireConfig,
+      onFallback: (f) =>
+        server.log.warn(
+          { stage: f.stage, kind: f.kind, reason: f.reason },
+          'umpire fallback to test provider',
+        ),
+    })
+  : undefined;
 const tracedUmpire = (client: UmpireClient, gameId: string): UmpireClient =>
   trace ? traceUmpire(client, { trace, gameId, mode: 'live' }) : client;
 const gameClients = new Map<string, ReturnType<typeof createGameUmpire>>();

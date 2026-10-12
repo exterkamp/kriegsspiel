@@ -5,7 +5,8 @@ import {
   type Difficulty,
   type Personality,
 } from './opponent/llmCommander.js';
-import type { UmpireConfig } from './umpire/index.js';
+import { UMPIRE_STAGES } from './umpire/index.js';
+import type { UmpireConfig, UmpireStage } from './umpire/index.js';
 import { COMMANDER_BUDGET_SHARE, type GameLimits } from './umpire/gameLimits.js';
 import { LogMailer, WebhookMailer, type Mailer } from './auth/mailer.js';
 
@@ -129,5 +130,8 @@ export function llmOrderParserEnabled(
 
 /** Whether any stage runs on the test provider (canned responses), so the game can say so. */
 export function usesTestUmpire(config: UmpireConfig): boolean {
-  return Object.values(config.stages).some((r) => config.providers[r.provider]?.type === 'test');
+  const served: UmpireStage[] = config.fallbackProvider
+    ? ['parse', 'narrate', 'staff']
+    : [...UMPIRE_STAGES];
+  return served.some((s) => config.providers[config.stages[s].provider]?.type === 'test');
 }
