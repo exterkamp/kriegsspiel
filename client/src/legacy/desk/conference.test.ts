@@ -5,6 +5,7 @@ import {
   mergeStaffHistory,
   busy,
   fixtureAnswer,
+  officerFor,
   sirFirst,
   newExchange,
   nextExchangeId,
@@ -234,5 +235,28 @@ describe('the conference the server kept (#323)', () => {
   it('marks only a stage that gave no words as text-less', () => {
     const [x] = mergeStaffHistory([], [{ ...kept('q2'), textless: true }]);
     expect(x).toMatchObject({ questionId: 'q2', textless: true });
+  });
+});
+
+describe('officerFor with the server staff (#342)', () => {
+  const officers = { chiefOfStaff: { name: 'Captain Evrard', traits: ['cautious', 'meticulous'] } };
+
+  it('shows the real officer before any answer, not the fixture', () => {
+    expect(officerFor([], 'chiefOfStaff', officers).name).toBe('Captain Evrard');
+    expect(officerFor([], 'chiefOfStaff').name).toBe('Colonel Fonteyn');
+  });
+
+  it('keeps the same officer once an answer names them', () => {
+    const log = [
+      {
+        id: 1,
+        role: 'chiefOfStaff',
+        question: 'q',
+        askedAtGame: 0,
+        answerAtGame: 1,
+        officer: officers.chiefOfStaff,
+      },
+    ] as never;
+    expect(officerFor(log, 'chiefOfStaff', officers).name).toBe('Captain Evrard');
   });
 });

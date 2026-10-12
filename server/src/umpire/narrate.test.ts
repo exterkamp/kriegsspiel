@@ -6,6 +6,7 @@ import type { UmpireFixture } from './mockUmpireClient.js';
 import {
   NARRATE_PROMPT_VERSION,
   NARRATE_WINDOW_BASE_MS,
+  NARRATE_WINDOW_MAX_MS,
   checkNarration,
   checkProse,
   narrateInput,
@@ -222,8 +223,11 @@ describe('narrateReports', () => {
 describe('narration windows', () => {
   it('scales the window with the clock rate', () => {
     expect(narrateWindowMs(1)).toBe(NARRATE_WINDOW_BASE_MS);
+    expect(narrateWindowMs(2)).toBe(2 * NARRATE_WINDOW_BASE_MS);
     expect(narrateWindowMs(4)).toBe(4 * NARRATE_WINDOW_BASE_MS);
-    expect(narrateWindowMs(12)).toBe(12 * NARRATE_WINDOW_BASE_MS);
+    // Capped in game time: at 12:1 a 50-minute game still gets windows (#342).
+    expect(narrateWindowMs(12)).toBe(NARRATE_WINDOW_MAX_MS);
+    expect(narrateWindowMs(12)).toBeLessThan(50 * MS_PER_MINUTE);
     expect(() => narrateWindowMs(0)).toThrow(RangeError);
   });
 
@@ -241,7 +245,10 @@ describe('narration windows', () => {
     expect(
       reportsDueForNarration(rs, 5 * MS_PER_MINUTE, 10 * MS_PER_MINUTE, 1).map((r) => r.id),
     ).toEqual(['c']);
-    // At rate 12 the same five minutes is not yet a window.
+    // At rates 4 and 12 the same five minutes is not yet a window, but twenty game minutes is.
+    expect(reportsDueForNarration(rs, 0, 5 * MS_PER_MINUTE, 4)).toEqual([]);
     expect(reportsDueForNarration(rs, 0, 5 * MS_PER_MINUTE, 12)).toEqual([]);
+    expect(reportsDueForNarration(rs, 0, 20 * MS_PER_MINUTE, 4)).toHaveLength(3);
+    expect(reportsDueForNarration(rs, 0, 20 * MS_PER_MINUTE, 12)).toHaveLength(3);
   });
 });

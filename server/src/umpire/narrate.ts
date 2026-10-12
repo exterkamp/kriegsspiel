@@ -362,7 +362,7 @@ export function checkNarration(output: NarrateOutput, input: Input): string[] {
 }
 
 export interface NarrateOptions {
-  /** Model calls allowed per window, the first included. Default 3. */
+  /** Model calls allowed per window, the first included. Default 2: one retry, so a fallback is never three timeouts long. */
   maxCalls?: number;
 }
 
@@ -386,7 +386,7 @@ export async function narrateReports(
   if (reports.length === 0) return { dispatches: [], fellBack: false, calls: 0, rejections: [] };
 
   const input = narrateInput(side, reports);
-  const maxCalls = opts.maxCalls ?? 3;
+  const maxCalls = opts.maxCalls ?? 2;
   const rejections: string[][] = [];
   let calls = 0;
   while (calls < maxCalls) {
@@ -434,12 +434,21 @@ export async function narrateReports(
 export const NARRATE_WINDOW_BASE_MS = 5 * MS_PER_MINUTE;
 
 /**
- * Game-time length of one narration window at `rate`. Wall-clock latency of a call is fixed, so
- * a faster clock needs a longer game-time window to keep calls per wall-clock minute steady.
+ * The longest narration window in game time. A call holds game time (the LLM barrier) for as long
+ * as the model takes, so at a fast clock the window must not shrink in wall time without limit,
+ * but it must not grow with the rate either: at 12:1 a 5-wall-minute window is an hour of game
+ * time and a 50-minute game never reaches one (#342).
+ */
+export const NARRATE_WINDOW_MAX_MS = 20 * MS_PER_MINUTE;
+
+/**
+ * Game-time length of one narration window at `rate`: 5 game minutes at 1:1, growing with the rate
+ * (so wall time between calls stays 5 minutes) up to `NARRATE_WINDOW_MAX_MS`, which is reached at
+ * 4:1 and holds at 12:1 (about 100 wall seconds between calls).
  */
 export function narrateWindowMs(rate: number): number {
   if (!Number.isFinite(rate) || rate <= 0) throw new RangeError(`bad clock rate ${rate}`);
-  return Math.round(NARRATE_WINDOW_BASE_MS * rate);
+  return Math.min(NARRATE_WINDOW_MAX_MS, Math.round(NARRATE_WINDOW_BASE_MS * rate));
 }
 
 /**

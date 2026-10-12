@@ -10,12 +10,14 @@ import {
   STAFF_TEXT_MAX_LENGTH,
   StaffRoster,
   answerStaffQuestion,
+  checkAnswerText,
   checkStaffOutput,
   runStaff,
   staffInput,
   staffOfficer,
 } from './staff.js';
 import { UmpireError } from './umpireClient.js';
+import type { UmpireClient, UmpireRequest } from './umpireClient.js';
 
 /** Blue's first battalion with a red battalion close enough to see, so roles have something to differ on. */
 function world(): GameState {
@@ -257,12 +259,66 @@ const answerFixture = (output: unknown): UmpireFixture => ({
   promptVersion: STAFF_ANSWER_PROMPT_VERSION,
 });
 
+describe('checkAnswerText', () => {
+  it('passes a complete answer', () => {
+    expect(checkAnswerText('Sir, the bridge holds. Watch the mill.', 'intelligence')).toEqual([]);
+    expect(checkAnswerText('"Hold the bridge," he said.”', 'intelligence')).toEqual([]);
+  });
+
+  it('rejects the fragments seen from the small model (#342)', () => {
+    expect(checkAnswerText('Sir, we should consider moving a', 'chiefOfStaff')).toEqual([
+      'answer is cut off before the end',
+    ]);
+    expect(
+      checkAnswerText('Sir, the commander has put you a question, in', 'intelligence'),
+    ).toHaveLength(1);
+    expect(checkAnswerText('Hold.', 'quartermaster')).toEqual(['answer is a fragment']);
+  });
+
+  it('rejects an officer who sends the commander to his own post', () => {
+    const text = 'Sir, you should report to the chief of staff for the latest.';
+    expect(checkAnswerText(text, 'chiefOfStaff')).toHaveLength(1);
+    expect(checkAnswerText(text, 'intelligence')).toEqual([]);
+  });
+});
+
 describe('answerStaffQuestion', () => {
+  it('retries a fragment once, then gives up so the canned answer is used (#342)', async () => {
+    const frag = answerFixture({ messages: [note('advice', 'Sir, we should consider moving a')] });
+    const client = new MockUmpireClient([frag, frag, frag]);
+    const a = await answerStaffQuestion(client, world(), 'blue', 'chiefOfStaff', 'Status?', 0);
+    expect(a).toBeUndefined();
+    expect(client.calls).toHaveLength(2);
+    expect((client.calls[1]!.input as { rejected?: string[] }).rejected).toEqual([
+      'answer is cut off before the end',
+    ]);
+  });
+
+  it('accepts the retry when the second reply is whole', async () => {
+    const replies = ['Sir, we should consider moving a', 'Sir, I would hold the bridge for now.'];
+    const inner = new MockUmpireClient([answerFixture({ messages: [note('advice', 'x y z.')] })]);
+    const calls: unknown[] = [];
+    const client: UmpireClient = {
+      call: async <T>(req: UmpireRequest) => {
+        calls.push(req.input);
+        const res = await inner.call<T>(req);
+        const output = { messages: [note('advice', replies[calls.length - 1]!)] } as T;
+        return { ...res, output };
+      },
+    };
+    const a = await answerStaffQuestion(client, world(), 'blue', 'chiefOfStaff', 'Status?', 0);
+    expect(a?.text).toBe('Sir, I would hold the bridge for now.');
+    expect(calls).toHaveLength(2);
+  });
+
   it('asks the staff stage with the question and the newest view, and returns the first non-suggestion', async () => {
     const w = world();
     const client = new MockUmpireClient([
       answerFixture({
-        messages: [note('suggestion', 'Hold.', 'blue-1'), note('advice', ' Watch the bridge. ')],
+        messages: [
+          note('suggestion', 'Hold.', 'blue-1'),
+          note('advice', ' Watch the bridge, sir. '),
+        ],
       }),
     ]);
     const a = await answerStaffQuestion(
@@ -273,7 +329,7 @@ describe('answerStaffQuestion', () => {
       'Where is the enemy?',
       600_000,
     );
-    expect(a?.text).toBe('Watch the bridge.');
+    expect(a?.text).toBe('Watch the bridge, sir.');
     expect(a?.basedOnGame).toBe(600_000);
     expect(a?.officer.role).toBe('intelligence');
     expect(a?.records).toHaveLength(1);
@@ -302,7 +358,9 @@ describe('answerStaffQuestion', () => {
       ...w,
       intel: { ...w.intel, blue: { ...w.intel.blue, reports: [report] } },
     };
-    const client = new MockUmpireClient([answerFixture({ messages: [note('advice', 'Hold.')] })]);
+    const client = new MockUmpireClient([
+      answerFixture({ messages: [note('advice', 'Hold the bridge, sir.')] }),
+    ]);
     const a = await answerStaffQuestion(client, held, 'blue', 'intelligence', 'Status?', 600_000);
     expect(a?.basedOnGame).toBe(180_000);
   });

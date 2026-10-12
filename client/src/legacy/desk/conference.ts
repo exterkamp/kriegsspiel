@@ -246,9 +246,18 @@ export function settleTextless(
   return changed ? next : log;
 }
 
-/** The officer for `role`: the one the umpire last named, else the fixture. */
-export function officerFor(log: readonly Exchange[], role: ConferenceRole): StaffMember {
-  const named = [...log].reverse().find((e) => e.role === role && e.officer)?.officer;
+/**
+ * The officer for `role`: the one the umpire last named, else the one the server reports for the side
+ * (`SideView.staffOfficers`, fixed per game), else the fixture. The fixture only shows offline, so the
+ * name and traits do not change when the first answer or a reload brings the real ones (#342).
+ */
+export function officerFor(
+  log: readonly Exchange[],
+  role: ConferenceRole,
+  officers?: Readonly<Partial<Record<ConferenceRole, { name: string; traits: readonly string[] }>>>,
+): StaffMember {
+  const named =
+    [...log].reverse().find((e) => e.role === role && e.officer)?.officer ?? officers?.[role];
   return named ? { ...staffFor(role), ...named } : staffFor(role);
 }
 

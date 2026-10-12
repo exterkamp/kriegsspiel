@@ -143,6 +143,10 @@ export const SideView = z
     dispatches: z.array(Dispatch),
     /** The side's conference with its staff officers, oldest first. Absent when nobody has asked. */
     staffHistory: z.array(StaffExchange).optional(),
+    /** The side's conference officers by role. Fixed per game (from the seed), so they do not change on a reload. */
+    staffOfficers: z
+      .record(StaffRole, z.object({ name: z.string(), traits: z.array(z.string()) }).strict())
+      .optional(),
     clock: ClockState,
   })
   .strict();

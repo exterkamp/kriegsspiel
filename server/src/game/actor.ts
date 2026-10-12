@@ -78,6 +78,12 @@ export interface StaffAtWork {
 /** Defaults for the parse retry policy. */
 export const DEFAULT_PARSE_RETRIES = 2;
 export const DEFAULT_PARSE_TIMEOUT_MS = 60_000;
+/**
+ * How long the narrate stage may hold game time. Longer than a parse: narration covers a whole window
+ * and a local model takes 55 to 107 s under load, so the parse timeout threw good replies away and
+ * left the template text (#342).
+ */
+export const DEFAULT_NARRATE_TIMEOUT_MS = 150_000;
 export const DEFAULT_PARSE_RETRY_DELAY_MS = 1_000;
 
 export type CommandResult =
@@ -114,6 +120,8 @@ export interface GameActorOptions {
   parseRetries?: number;
   /** Wall ms to wait for one parse attempt. Default 60,000. */
   parseTimeoutMs?: number;
+  /** How long the narrate stage may hold game time before the template text stays. Default `DEFAULT_NARRATE_TIMEOUT_MS`. */
+  narrateTimeoutMs?: number;
   /** Wall ms between parse attempts. Default 1,000. */
   parseRetryDelayMs?: number;
   /** Starting value for the input counter when resuming a game. */
@@ -155,6 +163,13 @@ interface Dependency {
   abandoned: boolean;
 }
 
+/** Why a narration used the template text, for the log and the admin LLM panel; the rejected replies are in `calls`. */
+function narrationFallbackReason(result: Awaited<ReturnType<typeof narrateReports>>): string {
+  if (result.overloaded) return 'umpire budget or rate limit';
+  if (result.rejections.length === 0) return 'the model call failed';
+  return result.rejections.map((p, i) => `reply ${i + 1} rejected (${p.join('; ')})`).join(', ');
+}
+
 /** Narrated text by report id for one side; `null` marks a report folded into another's dispatch. */
 type SideNarration = Map<string, string | null>;
 
@@ -180,6 +195,7 @@ export class GameActor {
   private readonly onStaffAtWork?: (state: StaffAtWork) => void;
   private readonly parseRetries: number;
   private readonly parseTimeoutMs: number;
+  private readonly narrateTimeoutMs: number;
   private readonly parseRetryDelayMs: number;
   private seq: number;
   private readonly agents: AgentSlot[];
@@ -232,6 +248,7 @@ export class GameActor {
     this.onStaffAtWork = options.onStaffAtWork;
     this.parseRetries = options.parseRetries ?? DEFAULT_PARSE_RETRIES;
     this.parseTimeoutMs = options.parseTimeoutMs ?? DEFAULT_PARSE_TIMEOUT_MS;
+    this.narrateTimeoutMs = options.narrateTimeoutMs ?? DEFAULT_NARRATE_TIMEOUT_MS;
     this.parseRetryDelayMs = options.parseRetryDelayMs ?? DEFAULT_PARSE_RETRY_DELAY_MS;
     this.seq = options.seq ?? 0;
     this.umpire = options.umpire;
@@ -418,7 +435,11 @@ export class GameActor {
           return res;
         },
       };
-      const work = this.withTimeout(narrateReports(client, side.id as SideId, due)).then(
+      const work = this.withTimeout(
+        narrateReports(client, side.id as SideId, due),
+        this.narrateTimeoutMs,
+        'narration',
+      ).then(
         (result) => result,
         (e) => {
           if (this.trace.enabled) {
@@ -467,8 +488,12 @@ export class GameActor {
         endGameMs: this.engine.time,
         command: { kind: 'narrate', side, windowEndMs },
         calls,
-        ...(result?.fellBack ? { error: 'narration fell back to template text' } : {}),
-        ...(result === undefined ? { error: 'narration failed' } : {}),
+        ...(result?.fellBack
+          ? {
+              error: `narration fell back to template text: ${narrationFallbackReason(result)}`,
+            }
+          : {}),
+        ...(result === undefined ? { error: 'narration failed or timed out' } : {}),
       };
       if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
       await this.commit(entry);
@@ -1121,11 +1146,15 @@ export class GameActor {
     return new Promise((r) => this.parseTimer(r, ms));
   }
 
-  private withTimeout<T>(work: Promise<T>): Promise<T> {
+  private withTimeout<T>(
+    work: Promise<T>,
+    timeoutMs = this.parseTimeoutMs,
+    what = 'parse',
+  ): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const handle = this.parseTimer(
-        () => reject(new Error(`parse timed out after ${this.parseTimeoutMs} ms`)),
-        this.parseTimeoutMs,
+        () => reject(new Error(`${what} timed out after ${timeoutMs} ms`)),
+        timeoutMs,
       );
       work.then(
         (v) => {

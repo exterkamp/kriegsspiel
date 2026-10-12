@@ -42,6 +42,7 @@ export interface GameHostOptions {
   onStaffAtWork?: (gameId: string, state: StaffAtWork) => void;
   parseRetries?: number;
   parseTimeoutMs?: number;
+  narrateTimeoutMs?: number;
   parseRetryDelayMs?: number;
   /** Play every side the scenario marks `scripted` with the built-in opponent: always, never, or per game. Default off. */
   scriptedOpponents?: boolean | ((gameId: string) => boolean);
@@ -91,6 +92,7 @@ export class GameHost {
       umpire: o.narrator?.(id),
       parseRetries: o.parseRetries,
       parseTimeoutMs: o.parseTimeoutMs,
+      narrateTimeoutMs: o.narrateTimeoutMs,
       parseRetryDelayMs: o.parseRetryDelayMs,
     };
   }
