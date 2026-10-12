@@ -43,10 +43,16 @@ test('required check rejects failed, cancelled, skipped and unknown dependency r
     .map((line) => line.trim())
     .join('\n');
   assert.ok(command);
+  assert.match(gate, /RUN_CANCELLED: \$\{\{ cancelled\(\) }}/);
   for (const validation of ['success', 'failure', 'cancelled', 'skipped', '', 'unexpected']) {
     for (const effectiveness of ['success', 'failure', 'cancelled', 'skipped', '', 'unexpected']) {
       const run = spawnSync('bash', ['-e', '-c', command], {
-        env: { ...process.env, VALIDATION_RESULT: validation, EFFECTIVENESS_RESULT: effectiveness },
+        env: {
+          ...process.env,
+          RUN_CANCELLED: 'false',
+          VALIDATION_RESULT: validation,
+          EFFECTIVENESS_RESULT: effectiveness,
+        },
       });
       assert.equal(
         run.status === 0,
@@ -57,10 +63,30 @@ test('required check rejects failed, cancelled, skipped and unknown dependency r
   }
 });
 
+test('cancelled workflow cannot leave a successful aggregate', () => {
+  const gate = workflow.slice(workflow.indexOf('\n  check:\n'));
+  const command = gate
+    .split('        run: |\n')[1]
+    .split('\n')
+    .map((line) => line.trim())
+    .join('\n');
+  const run = spawnSync('bash', ['-e', '-c', command], {
+    env: {
+      ...process.env,
+      RUN_CANCELLED: 'true',
+      VALIDATION_RESULT: 'success',
+      EFFECTIVENESS_RESULT: 'success',
+    },
+  });
+  assert.notEqual(run.status, 0);
+});
+
 test('all validation groups finish independently; only superseded PR runs cancel', () => {
   assert.match(workflow, /fail-fast: false/);
   assert.match(workflow, /group: \[static-build, maps, application\]/);
   assert.match(workflow, /merge_group:/);
+  assert.match(workflow, /HQ_REVIEW_HEAD: .*github\.event\.merge_group\.head_sha/);
+  assert.match(workflow, /HQ_REVIEW_BASE: .*github\.event\.merge_group\.base_sha/);
   assert.match(workflow, /branches: \[main\]/);
   assert.match(
     workflow,
@@ -71,4 +97,36 @@ test('all validation groups finish independently; only superseded PR runs cancel
   assert.equal((workflow.match(/if: always\(\)/g) ?? []).length, 3);
   assert.equal((workflow.match(/retention-days: 30/g) ?? []).length, 2);
   assert.equal((workflow.match(/Checkout does not match candidate source/g) ?? []).length, 2);
+});
+
+test('source selection retains distinct PR and merge-queue head/base provenance', () => {
+  const select = (key, github) => {
+    const expression = workflow.match(new RegExp(`^  ${key}: \\$\\{\\{ (.+) }}$`, 'm'))?.[1];
+    assert.ok(expression);
+    // These source expressions use property selection and || only. Empty
+    // event objects model GitHub's missing-property fallback for other events.
+    assert.match(expression, /^[\w. |]+$/);
+    return Function('github', `return ${expression}`)(github);
+  };
+  for (const kind of ['pull_request', 'merge_group', 'push']) {
+    const github = {
+      sha: 'event-head',
+      event: {
+        pull_request: { head: {}, base: {} },
+        merge_group: {},
+      },
+    };
+    if (kind === 'pull_request')
+      github.event.pull_request = { head: { sha: 'pr-head' }, base: { sha: 'pr-base' } };
+    if (kind === 'merge_group')
+      github.event.merge_group = { head_sha: 'queue-head', base_sha: 'queue-base' };
+    assert.equal(
+      select('HQ_REVIEW_HEAD', github),
+      kind === 'push' ? 'event-head' : kind === 'pull_request' ? 'pr-head' : 'queue-head',
+    );
+    assert.equal(
+      select('HQ_REVIEW_BASE', github),
+      kind === 'push' ? 'event-head' : kind === 'pull_request' ? 'pr-base' : 'queue-base',
+    );
+  }
 });

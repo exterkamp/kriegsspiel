@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  HQ_REVIEW_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-  HQ_REVIEW_BASE: ${{ github.event.pull_request.base.sha || github.sha }}
+  HQ_REVIEW_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+  HQ_REVIEW_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.sha }}
 
 jobs:
   validation:
@@ -66,9 +66,6 @@ jobs:
         if: matrix.group == 'maps'
       - run: npm run test:ci-application
         if: matrix.group == 'application'
-      - name: Controlled aggregate failure probe (temporary)
-        if: matrix.group == 'application'
-        run: exit 1
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -131,8 +128,10 @@ jobs:
     steps:
       - name: Require every validation group and effectiveness job
         env:
+          RUN_CANCELLED: ${{ cancelled() }}
           VALIDATION_RESULT: ${{ needs.validation.result }}
           EFFECTIVENESS_RESULT: ${{ needs.test-effectiveness.result }}
         run: |
+          test "$RUN_CANCELLED" = false
           test "$VALIDATION_RESULT" = success
           test "$EFFECTIVENESS_RESULT" = success
