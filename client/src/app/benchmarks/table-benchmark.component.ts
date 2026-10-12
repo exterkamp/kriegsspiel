@@ -5,6 +5,7 @@ import {
   ViewEncapsulation,
   afterNextRender,
 } from '@angular/core';
+import { MenuLinkComponent } from '../shell/menu-link.component';
 
 /**
  * Hosts the dev-only table performance harness (`table/benchmark.ts`, query `?seconds=` and `?orbit=1`). That module
@@ -17,6 +18,7 @@ import {
   selector: 'ks-table-benchmark',
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
+  imports: [MenuLinkComponent],
   styles: `
     ks-table-benchmark {
       display: block;
@@ -41,7 +43,8 @@ import {
     }
   `,
   template: `<canvas id="table"></canvas>
-    <pre id="result">sampling…</pre>`,
+    <pre id="result">sampling…</pre>
+    <ks-menu-link />`,
 })
 export class TableBenchmarkComponent implements OnDestroy {
   constructor() {

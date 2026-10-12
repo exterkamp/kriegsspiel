@@ -4,6 +4,7 @@
  *   POST   /auth/login    `{ email }`  mail a one-time login link; always 202 so it does not reveal who has an account
  *   GET    /auth/verify   `?token=`    spend the link, start a session, redirect to `/`
  *   GET    /auth/me                    the signed-in user, or 401
+ *   GET    /auth/features           `{ devTools }`: whether the menu shows its Developer tools section
  *   GET    /auth/guest              `{ enabled }`: whether guest play is on
  *   POST   /auth/guest              start a guest session with no email (only when `guestPlay` is on, else 404)
  *   POST   /auth/logout                end this session
@@ -34,9 +35,11 @@ export interface AuthOptions {
   loginPerIp?: number;
   /** Guest play (D17c): `POST /auth/guest` makes a guest user. Off by default here; `GUEST_PLAY` turns it on in `main.ts`. */
   guestPlay?: boolean;
+  /** Show the main menu's Developer tools section (`DEV_TOOLS`, default on outside production). Routes work either way. */
+  devTools?: boolean;
   /** Guest sessions last this long unused before the guest and their games are removed (default 7 days). */
   guestIdleMs?: number;
-  /** Guests created per client address per hour (default 10). */
+  /** Guests created per client address per hour (default 60; `GUEST_PER_HOUR`). */
   guestPerIp?: number;
   /** Called after a guest signs in with an email, with the games whose seats moved to the account. */
   onGuestAdopted?: (guestId: string, userId: string, gameIds: string[]) => void;
@@ -70,7 +73,7 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
   const secure = o.publicUrl.startsWith('https:');
   const perEmail = new RateLimiter(o.loginPerEmail ?? 5, 3_600_000, now);
   const perIp = new RateLimiter(o.loginPerIp ?? 20, 3_600_000, now);
-  const perGuestIp = new RateLimiter(o.guestPerIp ?? 10, 3_600_000, now);
+  const perGuestIp = new RateLimiter(o.guestPerIp ?? 60, 3_600_000, now);
   const guestIdleMs = o.guestIdleMs ?? GUEST_IDLE_MS;
   const verifyPerIp = new RateLimiter(30, 15 * 60_000, now);
 
@@ -110,6 +113,8 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
   timer.unref();
   server.addHook('onClose', async () => clearInterval(timer));
 
+  server.get('/auth/features', async () => ({ devTools: o.devTools === true }));
+
   server.get('/auth/guest', async () => ({ enabled: o.guestPlay === true }));
 
   server.post('/auth/guest', async (req, reply) => {
@@ -119,7 +124,12 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
     if (!user) {
       // Only a request that creates a guest uses up a slot.
       if (!perGuestIp.hit(req.ip)) {
-        return reply.code(429).header('retry-after', '3600').send({ error: 'rate_limited' });
+        const retryAt = perGuestIp.resetAt(req.ip) ?? now() + 3_600_000;
+        const wait = Math.max(1, Math.ceil((retryAt - now()) / 1000));
+        return reply
+          .code(429)
+          .header('retry-after', String(wait))
+          .send({ error: 'rate_limited', retryAt });
       }
       user = o.store.createGuest(now());
       const session = randomBytes(32).toString('base64url');

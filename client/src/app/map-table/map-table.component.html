@@ -1,0 +1,64 @@
+<main>
+  <header>
+    <h1>Saved map table</h1>
+    <a href="/map-authoring.html" target="_blank" rel="noopener">Open map authoring</a>
+  </header>
+  <nav aria-label="Map inspection controls">
+    <label class="load"
+      >Load saved JSON
+      <input
+        #savedMap
+        id="saved-map"
+        type="file"
+        accept=".json,application/json"
+        [disabled]="!table.canLoad()"
+        (change)="selectFile(savedMap)"
+      />
+    </label>
+    <button id="cancel" [disabled]="!table.busy()" (click)="table.cancel()">Cancel load</button>
+    <button id="fit" [disabled]="!table.canInspect()" (click)="table.fit()">Fit map</button>
+    <button id="top-down" [disabled]="!table.canInspect()" (click)="table.topDown()">
+      Top-down
+    </button>
+    <button id="oblique" [disabled]="!table.canInspect()" (click)="table.oblique()">Oblique</button>
+  </nav>
+  <section class="metadata" aria-label="Displayed map">
+    <strong id="displayed-name">{{ table.displayed()?.name ?? 'No map displayed' }}</strong>
+    <span id="displayed-extent">{{ table.extent() }}</span>
+    <details id="identity-details" [hidden]="!table.displayed()">
+      <summary>Full asset identity</summary>
+      <code id="displayed-identity" [attr.data-inspection]="table.inspection()">{{
+        table.displayed()?.sourceKey ?? ''
+      }}</code>
+    </details>
+  </section>
+  <p
+    id="load-status"
+    role="status"
+    aria-live="polite"
+    [attr.data-error]="table.state().phase === 'failed'"
+  >
+    {{ table.state().message }}
+  </p>
+  <progress
+    id="load-progress"
+    aria-label="Map load in progress"
+    [hidden]="!table.busy()"
+  ></progress>
+  <p id="retained-display" [hidden]="!table.retained()">{{ table.retainedMessage() }}</p>
+  <div class="viewport">
+    <canvas
+      #canvas
+      id="map-canvas"
+      tabindex="0"
+      (webglcontextlost)="table.contextLost($event)"
+      aria-label="Flat map table; focus the map and use plain arrow keys to pan; use mouse to zoom and orbit"
+    ></canvas>
+    <p id="empty-table" [hidden]="!!table.displayed()">{{ table.emptyMessage() }}</p>
+  </div>
+  <p class="help">
+    Drag to orbit · right-drag to pan · scroll to zoom. Focus the map, then use plain arrow keys to
+    pan. Touch: one finger orbits, two fingers pan and zoom. The flat paper uses metres. Whole-map
+    raster detail is limited by the device texture cap.
+  </p>
+</main>

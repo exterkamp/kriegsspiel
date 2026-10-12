@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { StructuredOutputSupport } from './provider.js';
 import type { GameLimits } from './gameLimits.js';
 import type { UmpireStage } from './umpireClient.js';
+import { TEST_MODEL } from './providers/test.js';
 
 export const UMPIRE_STAGES: readonly UmpireStage[] = [
   'parse',
@@ -55,7 +56,7 @@ export interface UmpireConfig {
 }
 
 export const DEFAULT_UMPIRE_CONFIG: UmpireConfig = {
-  providers: { anthropic: { type: 'anthropic' } },
+  providers: { anthropic: { type: 'anthropic' }, test: { type: 'test' } },
   stages: {
     parse: { provider: 'anthropic', model: 'claude-haiku-5-5' },
     judge: { provider: 'anthropic', model: 'claude-opus-5-5' },
@@ -118,8 +119,9 @@ function checkFile(file: UmpireConfigFile): void {
 }
 
 /**
- * Builds the config: defaults, then the optional file, then env overrides. Env reads
- * `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_TIMEOUT_MS`,
+ * Builds the config: defaults, then the optional file, then env overrides. Env reads `UMPIRE_PROVIDER` (every
+ * stage; `test` answers with canned responses), `UMPIRE_KEYLESS_PROVIDER` (the provider for stages that would use
+ * Anthropic with no API key), `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_TIMEOUT_MS`,
  * `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`,
  * `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS` and the per-game
  * `UMPIRE_GAME_BUDGET_USD`, `UMPIRE_GAME_BUDGET_TOKENS` and `UMPIRE_GAME_CALLS_PER_MINUTE`. Throws if a stage names
@@ -136,10 +138,23 @@ export function umpireConfigFromEnv(
   for (const stage of UMPIRE_STAGES) {
     const key = stage.toUpperCase();
     const route = stages[stage];
+    const provider = env[`UMPIRE_PROVIDER_${key}`] || env.UMPIRE_PROVIDER || route.provider;
+    const spec = providers[provider];
+    // A keyless Anthropic stage runs on the fallback provider, if one is named (the Docker demo names `test`).
+    const keyless =
+      !env[`UMPIRE_PROVIDER_${key}`] &&
+      !env.UMPIRE_PROVIDER &&
+      env.UMPIRE_KEYLESS_PROVIDER &&
+      spec?.type === 'anthropic' &&
+      !env[spec.apiKeyEnv ?? 'ANTHROPIC_API_KEY'];
+    const chosen = keyless ? (env.UMPIRE_KEYLESS_PROVIDER as string) : provider;
     stages[stage] = {
       ...route,
-      provider: env[`UMPIRE_PROVIDER_${key}`] || route.provider,
-      model: env[`UMPIRE_MODEL_${key}`] || route.model,
+      provider: chosen,
+      // The test provider has one model name; other providers keep the route's unless env overrides it.
+      model:
+        env[`UMPIRE_MODEL_${key}`] ||
+        (providers[chosen]?.type === 'test' ? TEST_MODEL : route.model),
     };
     if (!providers[stages[stage].provider]) {
       throw new Error(

@@ -2,7 +2,7 @@ import {
   COURIER_MS_PER_METRE,
   findPath,
   EventRegistry,
-  holdTheBridge,
+  holdTheBridgeFarStart,
   loadScenario,
   registerCombat,
   registerMovement,
@@ -20,7 +20,7 @@ import { FakeTime } from './testing.js';
 const BRIDGE = { x: 2_050_000, y: 1_500_000 };
 
 // A courier rides from blue HQ to blue-1 along the planned route.
-const START = loadScenario(holdTheBridge);
+const START = loadScenario(holdTheBridgeFarStart);
 const ROUTE = findPath(
   START.map,
   START.sides.find((s) => s.id === 'blue')!.hq,
@@ -87,7 +87,7 @@ async function newGame(rate = 1) {
   const s = setup();
   host = s.host;
   const events: EmittedEvent[] = [];
-  const game = await s.host.create('g1', loadScenario(holdTheBridge), { rate });
+  const game = await s.host.create('g1', loadScenario(holdTheBridgeFarStart), { rate });
   return { ...s, game, events };
 }
 
@@ -132,7 +132,7 @@ describe('order delivery on a fake clock', () => {
       onEmitted: (_id, e) => events.push(...e),
     });
     host = h;
-    const game = await h.create('g1', loadScenario(holdTheBridge));
+    const game = await h.create('g1', loadScenario(holdTheBridgeFarStart));
     await game.submit(order);
     await s.time.advance(DELIVERY_MS);
     expect(events.map((e) => e.type)).toContain('order_delivered');
@@ -142,7 +142,7 @@ describe('order delivery on a fake clock', () => {
 describe('clean stop', () => {
   it('measures downtime from the close, not from the last tick', async () => {
     const { time, store, host: h } = setup();
-    await h.create('g1', loadScenario(holdTheBridge));
+    await h.create('g1', loadScenario(holdTheBridgeFarStart));
     // A quiet stretch with no events, then a clean close.
     await time.advance(10 * 60_000);
     await h.close('g1');
@@ -317,7 +317,7 @@ describe('order parsing', () => {
       onStaffAtWork: (_id, st) => seen.push(st),
     });
     host = h;
-    const game = await h.create('g1', loadScenario(holdTheBridge));
+    const game = await h.create('g1', loadScenario(holdTheBridgeFarStart));
     let release!: () => void;
     s.parser.gate = new Promise((r) => (release = r));
     const pending = game.submit(order);
@@ -356,7 +356,7 @@ describe('order parsing', () => {
         timers: time,
       });
       host = h;
-      const game = await h.create('g1', loadScenario(holdTheBridge), { rate });
+      const game = await h.create('g1', loadScenario(holdTheBridgeFarStart), { rate });
       await time.advance(2_000);
       expect(await game.submit(order)).toEqual({ ok: true, orderId: 'g1-o1' });
       const signedAt = (await store.inputLog('g1')).find((e) => e.command.kind === 'order')!.gameMs;
@@ -500,8 +500,8 @@ describe('many games, restore and shutdown', () => {
   it('keeps games independent in one process', async () => {
     const s = setup();
     host = s.host;
-    const a = await s.host.create('a', loadScenario(holdTheBridge), { rate: 1 });
-    const b = await s.host.create('b', loadScenario(holdTheBridge), { rate: 12 });
+    const a = await s.host.create('a', loadScenario(holdTheBridgeFarStart), { rate: 1 });
+    const b = await s.host.create('b', loadScenario(holdTheBridgeFarStart), { rate: 12 });
     await a.submit(order);
     await b.submit(order);
     await s.time.advance(WALL_AT_12);
@@ -511,7 +511,9 @@ describe('many games, restore and shutdown', () => {
 
   it('rejects a duplicate game id', async () => {
     const { host: h } = await newGame();
-    await expect(h.create('g1', loadScenario(holdTheBridge))).rejects.toThrow(/already exists/);
+    await expect(h.create('g1', loadScenario(holdTheBridgeFarStart))).rejects.toThrow(
+      /already exists/,
+    );
   });
 
   it('returns one actor for concurrent opens of the same game', async () => {
@@ -536,8 +538,8 @@ describe('many games, restore and shutdown', () => {
     const s = setup();
     host = s.host;
     const results = await Promise.allSettled([
-      s.host.create('g', loadScenario(holdTheBridge)),
-      s.host.create('g', loadScenario(holdTheBridge)),
+      s.host.create('g', loadScenario(holdTheBridgeFarStart)),
+      s.host.create('g', loadScenario(holdTheBridgeFarStart)),
     ]);
     expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
     expect(s.host.size).toBe(1);

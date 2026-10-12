@@ -1,0 +1,82 @@
+<section aria-label="Personal notebook">
+  <h2>Personal notebook</h2>
+  <p role="status" aria-live="polite">
+    @if (store().notebook().busy) {
+      Saving or reloading notebook…
+    } @else if (store().notebook().dirty) {
+      Unsaved notebook changes
+    } @else {
+      No unsaved notebook changes
+    }
+    @if (!store().notebook().writable) {
+      · Read-only; reload to recover.
+    }
+    @if (!store().interactionEnabled()) {
+      · Interaction paused
+    }
+  </p>
+  @if (store().notebook().error; as error) {
+    <p role="alert" class="error">{{ error.message }}</p>
+  }
+  <label
+    >Notebook text
+    <textarea
+      name="notebook-text"
+      rows="12"
+      maxlength="16384"
+      [value]="store().notebook().draft"
+      [readOnly]="!editable()"
+      (input)="text($event)"
+      aria-describedby="notebook-limit"
+    ></textarea>
+  </label>
+  <p id="notebook-limit">
+    {{ store().notebook().draft.length }} / 16,384 characters. Save explicitly to browser storage.
+  </p>
+  <div class="actions">
+    <button type="button" (click)="save()" [disabled]="!editable() || !store().notebook().dirty">
+      Save notebook
+    </button>
+    <button type="button" (click)="reload()" [disabled]="!actionable()">Reload notebook</button>
+    <button
+      type="button"
+      (click)="back()"
+      [disabled]="!store().interactionEnabled() || store().disposed()"
+    >
+      Return to table
+    </button>
+  </div>
+  <p class="hint">
+    A successful reload replaces your text with the stored notebook. A failed reload retains it for
+    selection and export.
+  </p>
+  <label
+    >Search notebook
+    <input
+      name="notebook-search"
+      type="search"
+      [value]="store().notebookQuery()"
+      (input)="search($event)"
+    />
+  </label>
+  <p role="status">{{ store().notebookMatches().length }} matches in the current draft.</p>
+  <ul aria-label="Notebook search matches">
+    @for (match of store().notebookMatches(); track match.line) {
+      <li>Line {{ match.line }}: {{ match.text }}</li>
+    }
+  </ul>
+  <h3>Plain-text export</h3>
+  <p>
+    {{
+      store().notebook().dirty
+        ? 'Includes unsaved notebook changes.'
+        : 'Includes current notebook text.'
+    }}
+    Select and copy the complete text below.
+  </p>
+  <pre
+    tabindex="0"
+    aria-label="Selectable notebook export"
+    [textContent]="store().notebookExport()"
+  ></pre>
+</section>

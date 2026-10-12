@@ -1,11 +1,11 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createState, loadScenario, holdTheBridge, type EmittedEvent } from '@kriegsspiel/engine';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser, ParseResult } from '../orders/index.js';
 import { GameHost, FileGameStore, MemoryGameStore, parseInputLog, replayLog } from './index.js';
-import type { GameStore } from './index.js';
+import type { GameStore, InputLogEntry } from './index.js';
 import { createRegistry, loadScenarioById } from './registry.js';
 import { advanceUntilOver } from './replay.js';
 import { FakeTime } from './testing.js';
@@ -279,6 +279,36 @@ describe('FileGameStore', () => {
     );
     expect(replayed.state).toEqual(final);
     expect(await new FileGameStore(dir).inputLog('g1')).toEqual(entries);
+  });
+
+  it('appends after a truncated tail without gluing the next entry to it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kriegsspiel-log-'));
+    dirs.push(dir);
+    const header = { gameId: 'g', scenarioId: 'hold-the-bridge', seed: 1815 };
+    const first: InputLogEntry = {
+      seq: 1,
+      wallMs: 0,
+      gameMs: 0,
+      command: { kind: 'pause' },
+      endGameMs: 0,
+    };
+    const store = new FileGameStore(dir);
+    await store.saveLogHeader(header);
+    await store.appendInput('g', first);
+
+    // A crash cut the second entry's write short, mid-line.
+    await appendFile(join(dir, 'g.jsonl'), '{"seq":2,"wal');
+
+    // A new store (a new process) appends the next entry: the partial tail must not swallow it.
+    const second: InputLogEntry = { ...first, seq: 3 };
+    const reopened = new FileGameStore(dir);
+    await reopened.appendInput('g', second);
+
+    const text = await readFile(join(dir, 'g.jsonl'), 'utf8');
+    const parsed = parseInputLog(text);
+    expect(parsed.header).toEqual(header);
+    expect(parsed.entries).toEqual([first, second]);
+    expect(await reopened.inputLog('g')).toEqual([first, second]);
   });
 
   it('ignores a line cut short by a crash and rejects unsafe ids', async () => {

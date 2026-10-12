@@ -24,16 +24,21 @@ import {
   aiCommanderBudgetWarning,
   aiCommanderFromEnv,
   authFromEnv,
+  devToolsFromEnv,
   guestIdleMsFromEnv,
+  guestPerHourFromEnv,
   guestPlayFromEnv,
   llmOrderParserEnabled,
   scriptedOpponentsFromEnv,
   trustProxyFromEnv,
+  usesTestUmpire,
 } from './config.js';
 import { SqliteGameStore } from './game/index.js';
 import { llmAgents } from './opponent/index.js';
 import { LlmOrderParser } from './orders/llmParser.js';
 import { StubOrderParser } from './orders/stubParser.js';
+import { TraceStore, traceUmpire } from './debug/index.js';
+import type { UmpireClient } from './umpire/index.js';
 import { createGameUmpire, createUmpireClient, loadUmpireConfig } from './umpire/index.js';
 
 const port = Number(process.env.PORT ?? 3000);
@@ -55,12 +60,17 @@ if (ai && umpireConfig) {
   const warning = aiCommanderBudgetWarning(umpireConfig.gameBudget);
   if (warning) console.warn(warning);
 }
+// Test-provider calls are traced as such, so the admin LLM panel labels them.
+const admin = adminFromEnv(process.env);
+const trace = admin.enabled ? new TraceStore() : undefined;
 const umpire = umpireConfig ? createUmpireClient({ config: umpireConfig }) : undefined;
+const tracedUmpire = (client: UmpireClient, gameId: string): UmpireClient =>
+  trace ? traceUmpire(client, { trace, gameId, mode: 'live' }) : client;
 const gameClients = new Map<string, ReturnType<typeof createGameUmpire>>();
 const gameUmpire = (gameId: string) => {
   let client = gameClients.get(gameId);
   if (!client) {
-    client = createGameUmpire(umpire!, {
+    client = createGameUmpire(tracedUmpire(umpire!, gameId), {
       gameId,
       limits: umpireConfig?.gameBudget,
       onMetric: (m) => server.log.info({ umpire: m }, 'umpire call'),
@@ -101,20 +111,23 @@ const { server } = await buildApp({
   narrator:
     umpire && umpireConfig
       ? (gameId) =>
-          createGameUmpire(umpire, {
+          createGameUmpire(tracedUmpire(umpire, gameId), {
             gameId,
             limits: umpireConfig.gameBudget,
             onMetric: (m) => server.log.info({ umpire: m }, 'umpire call'),
           })
       : undefined,
-  admin: adminFromEnv(process.env),
+  admin: { ...admin, trace },
+  testUmpire: umpireConfig ? usesTestUmpire(umpireConfig) : false,
   trustProxy: trustProxyFromEnv(process.env),
   notify: { store: notifyStore, push: pushFromEnv(process.env) },
   auth: {
     store: authStore,
     ...authFromEnv(process.env, port, (line) => server.log.warn(line)),
     guestPlay: guestPlayFromEnv(process.env),
+    devTools: devToolsFromEnv(process.env),
     guestIdleMs: guestIdleMsFromEnv(process.env),
+    guestPerIp: guestPerHourFromEnv(process.env),
   },
 });
 

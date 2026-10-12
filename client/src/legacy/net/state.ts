@@ -16,6 +16,8 @@ export interface PendingOrder {
   text: string;
   /** Game time when it was sent, as best the client knows. */
   sentAtGame: number;
+  /** What the player wrote, without the addressee's name or annex added to `text`. */
+  words?: string;
   /** Who it was addressed to, when sent from the orders desk. */
   toName?: string;
   courier?: 'fast' | 'safe';
@@ -120,10 +122,20 @@ function anchorOf(gameMs: number, clock: ClockState, localWallMs: number): Clock
   return { gameMs, localWallMs, rate: clock.rate, status: clock.status };
 }
 
+/**
+ * New dispatches go on top. One we already have is replaced when its text changed: the umpire's
+ * narration of a report arrives after the template text was first delivered, under the same id.
+ */
 function withDispatches(have: Dispatch[], incoming: readonly Dispatch[]): Dispatch[] {
+  const latest = new Map(incoming.map((d) => [d.id, d]));
   const ids = new Set(have.map((d) => d.id));
   const fresh = incoming.filter((d) => !ids.has(d.id));
-  return fresh.length === 0 ? have : [...fresh, ...have];
+  const revised = (d: Dispatch): Dispatch | undefined => {
+    const next = latest.get(d.id);
+    return next && next.text !== d.text ? next : undefined;
+  };
+  if (fresh.length === 0 && !have.some(revised)) return have;
+  return [...fresh, ...have.map((d) => revised(d) ?? d)];
 }
 
 const sideName = (side: string | undefined): string =>
@@ -247,7 +259,7 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
             ...s.outcomes,
             [refused.orderId]: {
               kind: 'refused',
-              text: refused.text,
+              text: refused.words ?? refused.text,
               ...(refused.toName ? { toName: refused.toName } : {}),
               sentAtGame: refused.sentAtGame,
               reason: m.message.slice(m.message.indexOf(': ') + 2),

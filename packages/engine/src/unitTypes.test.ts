@@ -9,7 +9,6 @@ import {
   advanceTo,
   canReach,
   createState,
-  holdTheBridge,
   issueAttack,
   issueFormation,
   issueMove,
@@ -26,7 +25,7 @@ import {
   unitTypeOf,
   type GameState,
 } from './index.js';
-import { miniWorld, type RawUnit } from './scenario.testkit.js';
+import { miniWorld, type RawUnit, holdTheBridgeFarStart } from './scenario.testkit.js';
 
 const registry = () => {
   const r = new EventRegistry<GameState>();
@@ -71,7 +70,7 @@ describe('unit data loader', () => {
 
 describe('scenario unit types', () => {
   it('the shipped scenario names data-driven types', () => {
-    const w = loadScenario(holdTheBridge);
+    const w = loadScenario(holdTheBridgeFarStart);
     expect(w.units.map((u) => u.type)).toEqual(w.units.map((u) => unitTypeOf(u).id));
     expect(w.units.every((u) => u.type in UNIT_TYPES)).toBe(true);
   });
@@ -102,8 +101,11 @@ describe('scenario unit types', () => {
 });
 
 function loadWith(u: Record<string, unknown>) {
-  const w = holdTheBridge as unknown as { units: Array<Record<string, unknown>> };
-  return loadScenario({ ...holdTheBridge, units: [{ ...w.units[0], ...u }, ...w.units.slice(1)] });
+  const w = holdTheBridgeFarStart as unknown as { units: Array<Record<string, unknown>> };
+  return loadScenario({
+    ...holdTheBridgeFarStart,
+    units: [{ ...w.units[0], ...u }, ...w.units.slice(1)],
+  });
 }
 
 describe('type and formation effects', () => {

@@ -10,6 +10,8 @@ services:
     # Values come from the shell or a git-ignored .env next to this file (see .env.example).
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # With no key the umpire answers with canned responses (the `test` provider). Set a key to use the real model.
+      UMPIRE_KEYLESS_PROVIDER: ${UMPIRE_KEYLESS_PROVIDER:-test}
       PUBLIC_URL: ${PUBLIC_URL:-}
       MAIL_WEBHOOK_URL: ${MAIL_WEBHOOK_URL:-}
       MAIL_WEBHOOK_TOKEN: ${MAIL_WEBHOOK_TOKEN:-}
@@ -19,6 +21,10 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-}
       # The demo lets visitors play as a guest; set GUEST_PLAY=0 on a public deployment that needs accounts.
       GUEST_PLAY: ${GUEST_PLAY:-1}
+      # The demo shows the menu's Developer tools section; set DEV_TOOLS=0 on a public deployment.
+      # The menu's Admin view link also needs ADMIN_ENABLED=1 (and a token); without it the admin page reports itself disabled.
+      DEV_TOOLS: ${DEV_TOOLS:-1}
+      GUEST_PER_HOUR: ${GUEST_PER_HOUR:-}
       GUEST_IDLE_HOURS: ${GUEST_IDLE_HOURS:-}
     volumes:
       - data:/data

@@ -3,12 +3,14 @@ import { ProviderRegistry } from '../registry.js';
 import { AnthropicProvider } from './anthropic.js';
 import { OllamaProvider } from './ollama.js';
 import { OpenAiCompatibleProvider } from './openaiCompatible.js';
+import { TestProvider } from './test.js';
 
 export { AnthropicProvider } from './anthropic.js';
 export { OllamaProvider, OLLAMA_DEFAULT_URL } from './ollama.js';
 export { OpenAiCompatibleProvider } from './openaiCompatible.js';
+export { TEST_MODEL, TestProvider } from './test.js';
 
-/** The registry with the built-in adapters: `anthropic`, `openai-compatible` and `ollama`. */
+/** The registry with the built-in adapters: `anthropic`, `openai-compatible`, `ollama` and `test`. */
 export function defaultProviderRegistry(): ProviderRegistry {
   return new ProviderRegistry()
     .register('anthropic', ({ spec, env, fetch }) => {
@@ -33,6 +35,7 @@ export function defaultProviderRegistry(): ProviderRegistry {
         ...(fetch ? { fetch } : {}),
       });
     })
+    .register('test', ({ id }) => new TestProvider({ id }))
     .register(
       'ollama',
       ({ id, spec, fetch }) =>

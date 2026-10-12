@@ -104,3 +104,16 @@ export function bearingTo(from: Point, to: Point): number {
 export function onObjective(unit: Unit, objective: readonly Point[]): boolean {
   return pointInPolygon(unit.center, objective);
 }
+
+/** A pursuit is given up this long after the unit it chases broke. */
+export const PURSUIT_MS = 20 * 60_000;
+
+/** A unit that broke lately and is still running: it cannot fight back but can be run down. */
+export function isRouted(u: Unit, time: number): boolean {
+  return u.status === 'withdrawn' && u.brokenAt !== undefined && time - u.brokenAt <= PURSUIT_MS;
+}
+
+/** Whether an enemy can still be fought: standing, or running and not yet out of the pursuit. */
+export function pursuable(u: Unit, time: number): boolean {
+  return u.status === 'active' || isRouted(u, time);
+}

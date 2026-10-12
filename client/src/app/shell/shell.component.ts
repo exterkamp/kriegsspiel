@@ -69,6 +69,7 @@ type Prep =
             [email]="me()?.email ?? ''"
             [guest]="me()?.guest === true"
             [load]="loadRows"
+            [devTools]="devTools()"
             (newGame)="go({ name: 'new-game' })"
             (continueGame)="go({ name: 'game', game: $event })"
             (signOut)="signedOut()"
@@ -88,10 +89,11 @@ type Prep =
           @switch (prep().step) {
             @case ('ready') {
               <ks-game />
-              <ks-game-menu (leave)="go({ name: 'menu' })" (signOut)="signedOut()" />
-              @if (me(); as m) {
-                <ks-account-bar [me]="m" (gone)="goHome()" />
-              }
+              <ks-game-menu (leave)="go({ name: 'menu' })" (signOut)="signedOut()">
+                @if (me(); as m) {
+                  <ks-account-bar [me]="m" (gone)="goHome()" />
+                }
+              </ks-game-menu>
             }
             @case ('room') {
               <ks-room [first]="roomInfo()!" (started)="enter()" />
@@ -137,6 +139,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   protected readonly state = signal<ShellState | undefined>(undefined);
   protected readonly me = signal<Me | undefined>(undefined);
   protected readonly guestOn = signal(false);
+  protected readonly devTools = signal(false);
   protected readonly prep = signal<Prep>({ step: 'working' });
   protected readonly roomInfo = signal<GameInfo | undefined>(undefined);
   protected readonly failure = signal('');
@@ -160,6 +163,10 @@ export class ShellComponent implements OnInit, OnDestroy {
     const me = await this.api.fetchMe().catch(() => undefined);
     if (this.stopped) return;
     this.me.set(me);
+    this.api.devToolsEnabled().then(
+      (on) => this.devTools.set(on),
+      () => undefined,
+    );
     if (me === undefined) this.guestOn.set(await this.api.guestEnabled().catch(() => false));
     this.show(initialShell(this.win.location.search, me !== undefined));
   }
@@ -179,13 +186,11 @@ export class ShellComponent implements OnInit, OnDestroy {
     return continueRows(games, names, this.now());
   };
 
-  /** With the guest cookie set, a fresh page load starts a game from the plain menu URL, or reopens the URL asked for. */
+  /** With the guest cookie set, a fresh page load opens the main menu from the plain URL, or reopens the URL asked for. */
   protected readonly playAsGuest = async (): Promise<string | undefined> => {
     const err = await this.api.startGuest();
     if (err !== undefined) return err;
-    const plain = this.state()?.screen.name === 'sign-in' && this.win.location.search === '';
-    if (plain) this.win.location.assign(urlFor({ name: 'game', create: {} }));
-    else this.win.location.reload();
+    this.win.location.reload();
     return undefined;
   };
 

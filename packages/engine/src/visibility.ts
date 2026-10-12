@@ -55,6 +55,21 @@ export const UNCERTAINTY_MM_PER_MINUTE = 100_000;
 /** A sighting report is good to a tenth of the range, but never tighter than 20 m. */
 const MIN_REPORT_UNCERTAINTY_MM = 20_000;
 
+/**
+ * Whether a last-known contact has aged out (#110). Its uncertainty radius grows 100 m a
+ * minute and is capped at the map's longer side; once the uncapped radius would pass that
+ * cap, the sighting no longer says where the enemy might be, only that it once was there.
+ */
+export function contactAgedOut(world: GameState, c: Contact, now: GameTime): boolean {
+  const capMm = Math.max(world.map.width, world.map.height);
+  return Math.ceil((now - c.seenAt) / MS_PER_MINUTE) * UNCERTAINTY_MM_PER_MINUTE > capMm;
+}
+
+/** Whether a delivered report has told this side that enemy `unitId` is destroyed (#110). */
+function destructionDelivered(reports: Report[], unitId: string, now: GameTime): boolean {
+  return reports.some((r) => r.kind === 'destroyed' && r.subject === unitId && r.deliverAt <= now);
+}
+
 /** How often (game time) the engine rescans who sees whom. */
 export const SCAN_INTERVAL_MS = MS_PER_MINUTE;
 
@@ -254,6 +269,10 @@ export function renderReport(r: Report, ageMs: number): string {
       return `${r.from} is running short of ammunition ${where}, ${when}.`;
     case 'exhausted':
       return `${r.from} is exhausted ${where}, ${when}.`;
+    case 'destroyed':
+      return `${r.from} reports ${r.sizeEstimate ?? 'enemy troops'} destroyed ${where}, ${when}.`;
+    case 'battle':
+      return r.text ?? `The umpire has decided the battle ${where}.`;
   }
 }
 
@@ -311,6 +330,12 @@ export function viewFor(
     })),
     lastKnownContacts: intel.contacts
       .filter((c) => !seenIds.has(c.id))
+      // Aged out, or the enemy is destroyed and the side has been told so (#110).
+      .filter((c) => !contactAgedOut(state, c, state.time))
+      .filter((c) => {
+        const u = state.units.find((x) => x.id === c.id);
+        return u?.status !== 'destroyed' || !destructionDelivered(intel.reports, c.id, state.time);
+      })
       .map((c) => {
         const ageMs = state.time - c.seenAt;
         return {
@@ -405,8 +430,44 @@ function scan(world: GameState, time: GameTime): GameState {
         subject: u.id,
       });
     }
+    // Prune last-known contacts (#110). One that has aged out no longer says where the enemy
+    // might be. One for a destroyed enemy goes only once the side has been told of the
+    // destruction: a scan that finds a contacted enemy destroyed files that report when one
+    // of the side's units can see the wreck, and until the report's courier delay has passed
+    // the contact stays, so the view never leaks a death nobody witnessed.
+    const kept: Contact[] = [];
+    for (const c of contacts.values()) {
+      if (contactAgedOut(w, c, time)) continue;
+      const u = w.units.find((x) => x.id === c.id);
+      if (u?.status === 'destroyed') {
+        if (destructionDelivered(reports, c.id, time)) continue;
+        if (!reports.some((r) => r.kind === 'destroyed' && r.subject === c.id)) {
+          const observer = mine.find((m) => canSee(w, m, u));
+          if (observer) {
+            const dist = distance(observer.center, u.center);
+            reports.push({
+              id: `${side}-r${reports.length + 1}`,
+              kind: 'destroyed',
+              observedAt: time,
+              deliverAt: time + COURIER_DELAY_MS,
+              from: observer.name,
+              location: { ...u.center },
+              place: describePlace(w.map, u.center),
+              uncertainty: Math.max(
+                MIN_REPORT_UNCERTAINTY_MM,
+                Math.ceil(dist / 10 / 10_000) * 10_000,
+              ),
+              sizeEstimate: c.sizeEstimate,
+              confidence: dist <= sightRangeMm(w, observer) / 2 ? 'high' : 'medium',
+              subject: u.id,
+            });
+          }
+        }
+      }
+      kept.push(c);
+    }
     w = withIntel(w, side, {
-      contacts: [...contacts.values()].sort((a, b) => (a.id < b.id ? -1 : 1)),
+      contacts: kept.sort((a, b) => (a.id < b.id ? -1 : 1)),
       inSight: seen.map((u) => u.id),
       reports,
     });

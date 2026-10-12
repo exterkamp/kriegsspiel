@@ -22,7 +22,7 @@ import type { GameActor } from './actor.js';
 
 const MIN = 60_000;
 const BRIDGE = { x: 2_050_000, y: 1_500_000 };
-const HORIZON_MS = 60 * MIN;
+const HORIZON_MS = 200 * MIN;
 const RATES = [1, 4, 12, 1000];
 
 const SCRIPT: { atMs: number; text: string }[] = [

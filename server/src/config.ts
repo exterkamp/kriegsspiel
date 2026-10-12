@@ -87,6 +87,23 @@ export function guestPlayFromEnv(env: Record<string, string | undefined>): boole
   return env.NODE_ENV !== 'production';
 }
 
+/**
+ * `DEV_TOOLS` of `1`, `true` or `on` shows the main menu's Developer tools section (map editor, benchmarks, admin);
+ * `0`, `false` or `off` hides it. Unset: shown outside production, hidden when `NODE_ENV=production`. The routes work either way.
+ */
+export function devToolsFromEnv(env: Record<string, string | undefined>): boolean {
+  const v = env.DEV_TOOLS?.trim().toLowerCase();
+  if (v === '1' || v === 'true' || v === 'on') return true;
+  if (v === '0' || v === 'false' || v === 'off') return false;
+  return env.NODE_ENV !== 'production';
+}
+
+/** `GUEST_PER_HOUR` (default 60): guests one client address may create per hour. */
+export function guestPerHourFromEnv(env: Record<string, string | undefined>): number {
+  const n = Math.floor(Number(env.GUEST_PER_HOUR));
+  return Number.isFinite(n) && n > 0 ? n : 60;
+}
+
 /** `GUEST_IDLE_HOURS` (default 168): how long an unused guest and their games are kept. */
 export function guestIdleMsFromEnv(env: Record<string, string | undefined>): number {
   const h = Number(env.GUEST_IDLE_HOURS);
@@ -108,4 +125,9 @@ export function llmOrderParserEnabled(
   const spec = config.providers[config.stages.parse.provider];
   if (!spec) return false;
   return spec.type === 'anthropic' ? Boolean(env[spec.apiKeyEnv ?? 'ANTHROPIC_API_KEY']) : true;
+}
+
+/** Whether any stage runs on the test provider (canned responses), so the game can say so. */
+export function usesTestUmpire(config: UmpireConfig): boolean {
+  return Object.values(config.stages).some((r) => config.providers[r.provider]?.type === 'test');
 }

@@ -18,7 +18,7 @@ export interface LlmCall {
   stage: string;
   provider: string;
   model?: string;
-  mode: 'live' | 'playback';
+  mode: 'live' | 'playback' | 'test';
   latencyMs?: number;
   inputTokens: number;
   outputTokens: number;
@@ -55,7 +55,7 @@ export function toLlmCall(entry: TraceEntryLike): LlmCall | undefined {
     stage: str(d.stage) ?? '?',
     provider: str(d.provider) ?? 'unknown',
     model: str(d.model),
-    mode: d.mode === 'playback' ? 'playback' : 'live',
+    mode: d.mode === 'playback' || d.mode === 'test' ? d.mode : 'live',
     latencyMs: typeof d.latencyMs === 'number' ? d.latencyMs : undefined,
     inputTokens: num(usage.inputTokens),
     outputTokens: num(usage.outputTokens),

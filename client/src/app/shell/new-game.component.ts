@@ -57,17 +57,21 @@ import { PAGE_CSS } from './page-styles';
 
             <fieldset>
               <legend>Your side</legend>
-              @for (s of sides(); track s.id) {
-                <label class="choice">
-                  <input
-                    type="radio"
-                    name="side"
-                    [value]="s.id"
-                    [checked]="form()!.side === s.id"
-                    (change)="patch({ side: s.id })"
-                  />
-                  {{ s.name }}
-                </label>
+              @if (sides().length === 1) {
+                <p class="side-only">{{ sides()[0]!.name }}</p>
+              } @else {
+                @for (s of sides(); track s.id) {
+                  <label class="choice">
+                    <input
+                      type="radio"
+                      name="side"
+                      [value]="s.id"
+                      [checked]="form()!.side === s.id"
+                      (change)="patch({ side: s.id })"
+                    />
+                    {{ s.name }}
+                  </label>
+                }
               }
               @if (opponentLabel()) {
                 <p class="muted">{{ opponentLabel() }}</p>

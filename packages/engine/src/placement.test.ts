@@ -13,15 +13,15 @@ import {
   MS_PER_MINUTE,
   OVERLAP_TOLERANCE_MM,
   footprintCorners,
-  holdTheBridge,
   loadScenario,
   mm,
   pointMm,
   validatePlacement,
   type GameState,
   type Point,
+  type Ruling,
 } from './index.js';
-import { bridge, miniWorld, river } from './scenario.testkit.js';
+import { bridge, miniWorld, river, holdTheBridgeFarStart } from './scenario.testkit.js';
 
 const P = (x: number, y: number): Point => pointMm(x, y);
 
@@ -177,7 +177,7 @@ describe('validatePlacement', () => {
   });
 
   it('works on the real scenario map', () => {
-    const g = loadScenario(holdTheBridge);
+    const g = loadScenario(holdTheBridgeFarStart);
     const u = g.units.find((x) => x.id === 'blue-1')!;
     const r = validatePlacement(g, { unitId: 'blue-1', center: u.center, elapsedMs: 0 });
     expect(r.verdict).toBe('accept');
@@ -277,7 +277,7 @@ describe('registerPlacement', () => {
     const a = state.world.units.find((u) => u.id === 'a')!;
     expect(a).toMatchObject({ center: P(500, 600), facing: 0.5, formation: 'loose', shape: arc });
     expect(a.intent).toEqual({ kind: 'idle' });
-    const [ruling] = state.world.rulings;
+    const [ruling] = state.world.rulings as Ruling[];
     expect(ruling).toMatchObject({
       id: 'ruling-1',
       rationale: 'because',
@@ -292,7 +292,7 @@ describe('registerPlacement', () => {
     const a = state.world.units.find((u) => u.id === 'a')!;
     expect(a.center.x).toBeLessThan(P(700, 0).x);
     expect(a.center.x).toBeGreaterThan(P(500, 0).x);
-    const [ruling] = state.world.rulings;
+    const [ruling] = state.world.rulings as Ruling[];
     expect(ruling!.verdict.verdict).toBe('clamp');
     expect(ruling!.verdict.reasons.join()).toMatch(/too far/);
   });
@@ -301,7 +301,7 @@ describe('registerPlacement', () => {
     const before = world().units.find((u) => u.id === 'a')!;
     const { state } = ruled({ unitId: 'a', center: P(300, 1000), elapsedMs: 1e9 });
     expect(state.world.units.find((u) => u.id === 'a')).toEqual(before);
-    expect(state.world.rulings[0]!.verdict.verdict).toBe('reject');
+    expect((state.world.rulings as Ruling[])[0]!.verdict.verdict).toBe('reject');
   });
 
   it('ends a march in progress: the old steps go stale', () => {

@@ -197,6 +197,8 @@ export interface Unit {
   /** How hard the current march is pushed. Only matters while marching. */
   pace: Pace;
   intent: Intent;
+  /** Game time the unit broke and fled, while it is a routed unit that can still be run down. */
+  brokenAt?: GameTime;
   /** Conditional and timed orders waiting on their trigger. Absent when there are none. */
   standing?: StandingOrder[];
   /** Set while the unit is marching along a leg, so a new order can stop it mid-leg. */
@@ -218,7 +220,7 @@ export interface Side {
 }
 
 /**
- * The `attacker` wins the moment its units alone hold `objective`, an area (a closed polygon
+ * The `attacker` wins once its units alone have held `objective` for `takeMs`, an area (a closed polygon
  * of at least three points); a unit holds it when its centre is inside. The `defender` wins if
  * the game clock reaches `holdMs` with the attacker not having taken it.
  */
@@ -227,9 +229,22 @@ export interface VictoryCondition {
   defender: SideId;
   attacker: SideId;
   holdMs: GameTime;
+  /** How long the attacker must hold the objective alone for it to count as taken. Default 10 game minutes. */
+  takeMs?: GameTime;
 }
 
-export type VictoryReason = 'objective-taken' | 'objective-held' | 'eliminated' | 'withdrawn';
+/** Game time the attacker must hold the objective, alone, before it counts as taken (D13). */
+export const DEFAULT_TAKE_MS = 10 * 60_000;
+
+export type VictoryReason =
+  | 'objective-taken'
+  | 'objective-held'
+  | 'eliminated'
+  | 'withdrawn'
+  /** The attacker's force was broken before it took the objective (D13). */
+  | 'attack-broken'
+  /** The defender's force was broken, so the attacker holds the field (D13). */
+  | 'defence-broken';
 
 /** How the game ended. `winner` is null if both sides were put out of the fight together. */
 export interface Outcome {
@@ -241,7 +256,15 @@ export interface Outcome {
 /** A report waiting for, or already past, its courier delay. Belongs to one side's intel. */
 export interface Report {
   id: string;
-  kind: 'situation' | 'contact' | 'unitLost' | 'orderDelivered' | 'lowAmmo' | 'exhausted';
+  kind:
+    | 'situation'
+    | 'contact'
+    | 'unitLost'
+    | 'orderDelivered'
+    | 'lowAmmo'
+    | 'exhausted'
+    | 'destroyed'
+    | 'battle';
   /** Game time of the thing reported. */
   observedAt: GameTime;
   /** Game time the report reaches HQ (observedAt plus courier delay). */
@@ -250,15 +273,17 @@ export interface Report {
   from: string;
   /** Where it happened; for a contact, where the enemy was seen. */
   location: Point;
-  /** Coarse size of the enemy force; only for contacts. */
+  /** Coarse size of the enemy force; only for contacts and destroyed reports. */
   sizeEstimate?: string;
   confidence: 'low' | 'medium' | 'high';
   /** Plain-language place of `location`, from the named features near it. */
   place: string;
   /** Radius in mm around `location` the report is good to. */
   uncertainty: number;
-  /** Enemy unit id; only for contacts. */
+  /** Enemy unit id; only for contacts and destroyed reports. */
   subject?: string;
+  /** The wording itself, for a report that is the umpire's own (`battle`). */
+  text?: string;
 }
 
 /**
@@ -330,13 +355,36 @@ export interface GameState {
   combatActive: boolean;
   /** Set once, when the game ends. Nothing happens in combat or victory handlers after that. */
   outcome: Outcome | null;
+  /** Since when the attacker alone has held the objective, or null (D13). Absent counts as null. */
+  heldSince?: GameTime | null;
   intel: Record<SideId, SideIntel>;
   /** Couriers riding now, both sides. Master state only: never sent to a client. */
   couriers: Courier[];
   /** Weather hook: multiplies every unit's sight range (1 when absent, 0.5 in fog). */
   sightFactor?: number;
   /** Every umpire placement ruling so far, in order. Master state only: never sent to a client. */
-  rulings: Ruling[];
+  rulings: Array<Ruling | BattleRuling>;
+  /** Men each unit started with, the yardstick for a broken force (D13). Absent: no unit counts as broken. */
+  startStrength?: Record<string, number>;
+  /** Set once, when the umpire has declared one side's force broken; the game closes soon after (D13). */
+  battle?: { winner: SideId; reason: 'attack-broken' | 'defence-broken'; declaredAt: GameTime };
+}
+
+/**
+ * The umpire's declaration that a battle is decided: whose force broke and who holds the field.
+ * Worded without any figure a side could not know, so both sides may be told it (D13).
+ */
+export interface BattleRuling {
+  id: string;
+  time: GameTime;
+  kind: 'battle';
+  winner: SideId;
+  loser: SideId;
+  reason: 'attack-broken' | 'defence-broken';
+  /** The umpire's reasoning, for the record and the post-game window. */
+  rationale: string;
+  /** What the table is told. */
+  narrative: string;
 }
 
 /**

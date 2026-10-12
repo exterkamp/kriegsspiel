@@ -463,6 +463,20 @@ describe('game over', () => {
       expect(c.messages.filter((m) => m.kind === 'gameOver')).toHaveLength(1);
     }
   });
+
+  it('rejects an order sent after the game is over and queues nothing', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    await blue.waitFor('gameOver');
+
+    blue.send(JSON.stringify({ v, kind: 'issueOrder', orderId: 'too-late', text: 'hold' }));
+    const err = await blue.waitFor('error', (m) => m.code === 'game_over');
+    expect(err.message.startsWith('too-late: ')).toBe(true);
+    // Nothing was submitted: no order entry reached the game's input log.
+    const orders = (await store.inputLog(game.id)).filter((e) => e.command.kind === 'order');
+    expect(orders).toHaveLength(0);
+  });
 });
 
 describe('staff questions', () => {
@@ -1092,7 +1106,11 @@ describe('SPA fallback for the Angular client', () => {
         '/admin/games/3',
         '/admin/apix',
         '/map-authoring',
+        '/map-table',
+        '/map-table?x=1',
         '/map-benchmark?x=1',
+        '/table-benchmark',
+        '/table-benchmark?seconds=10',
       ]) {
         const res = await server.inject(url);
         expect(res.statusCode, url).toBe(200);
@@ -1106,6 +1124,8 @@ describe('SPA fallback for the Angular client', () => {
         '/auth/nope',
         '/other',
         '/administrator',
+        '/map-table-other',
+        '/__local/maps',
       ]) {
         const res = await server.inject(url);
         expect(res.statusCode, url).toBe(404);
@@ -1126,10 +1146,19 @@ describe('SPA fallback for the Angular client', () => {
       const map = await server.inject('/map-authoring.html?a=1');
       expect(map.statusCode).toBe(301);
       expect(map.headers.location).toBe('/map-authoring?a=1');
+      const inspector = await server.inject('/map-table.html?inspection=1');
+      expect(inspector.statusCode).toBe(301);
+      expect(inspector.headers.location).toBe('/map-table?inspection=1');
+      expect(
+        (await server.inject({ method: 'HEAD', url: '/map-table.html?x=1' })).headers.location,
+      ).toBe('/map-table?x=1');
+      expect(
+        (await server.inject({ method: 'POST', url: '/map-table.html', payload: {} })).statusCode,
+      ).toBe(404);
       expect((await server.inject('/map-benchmark.html')).headers.location).toBe('/map-benchmark');
       expect((await server.inject('/admin/index.html?x=1')).headers.location).toBe('/admin?x=1');
       expect((await server.inject('/table-benchmark.html')).headers.location).toBe(
-        '/map-benchmark',
+        '/table-benchmark',
       );
       expect((await server.inject({ method: 'HEAD', url: '/map-authoring.html' })).statusCode).toBe(
         301,
@@ -1158,13 +1187,13 @@ describe('SPA fallback for the Angular client', () => {
 describe('pause voting over the WebSocket', () => {
   const cmd = (body: object) => JSON.stringify({ v, ...body });
   /** Blue and red players in a started lobby game with pause voting (voters are the seats taken at the start). */
-  async function votingGame(pause: object = { rule: 'unanimous' }) {
+  async function votingGame(pause: object = { rule: 'unanimous' }, rate = RATE) {
     const { base, ws } = await start();
     const bluePlayer = await signIn(base, 'vote-blue@example.test');
     const redPlayer = await signIn(base, 'vote-red@example.test');
     const res = await fetch(
       `${base}/games`,
-      json(bluePlayer, { lobby: true, rate: RATE, side: 'blue', pause }),
+      json(bluePlayer, { lobby: true, rate, side: 'blue', pause }),
     );
     const game = (await res.json()) as Created;
     game.cookies = { blue: bluePlayer, red: redPlayer };
@@ -1235,10 +1264,14 @@ describe('pause voting over the WebSocket', () => {
       blue,
       red: first,
       ws,
-    } = await votingGame({
-      rule: 'unanimous',
-      voteTimeoutMs: 1000,
-    });
+    } = await votingGame(
+      {
+        rule: 'unanimous',
+        voteTimeoutMs: 1000,
+      },
+      // Slow enough that the 50-minute hold does not end the game while the vote runs out.
+      240,
+    );
     first.socket.close();
     blue.send(cmd({ kind: 'proposePause' }));
     await blue.waitFor('pauseState', (m) => m.phase === 'pause_proposed');

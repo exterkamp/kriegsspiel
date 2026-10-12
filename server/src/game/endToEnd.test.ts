@@ -13,6 +13,7 @@ import {
 } from '@kriegsspiel/engine';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser, ParseResult } from '../orders/index.js';
+import { NARRATE_WINDOW_BASE_MS as NARRATION_WINDOW_MS } from '../umpire/index.js';
 import { toDispatch } from '../api/sideView.js';
 import { GameHost, MemoryGameStore, replayLog, type GameStore } from './index.js';
 import { createRegistry, startingState } from './registry.js';
@@ -21,7 +22,10 @@ import { FakeTime } from './testing.js';
 const MIN = 60_000;
 // Intents are in millimetres, like engine state.
 const BRIDGE = { x: 2_050_000, y: 1_500_000 };
-const HORIZON_MS = 60 * MIN;
+// Blue holds the bridge in this script; the battle is decided long before the 50-minute hold.
+const HORIZON_MS = 200 * MIN;
+/** The staff's slowest answer (D-staff): a first game must outlast it. */
+const STAFF_ANSWER_MS = 15 * MIN;
 
 /** Blue's script: what it signs, at which game time. Wording picks the parse result. */
 const SCRIPT: { atMs: number; text: string }[] = [
@@ -57,7 +61,12 @@ afterEach(async () => {
   host = undefined;
 });
 
-async function play(rate: number | 'fast-forward', untilMs: number | 'end'): Promise<Run> {
+async function play(
+  rate: number | 'fast-forward',
+  untilMs: number | 'end',
+  script: readonly { atMs: number; text: string }[] = SCRIPT,
+  seed?: number,
+): Promise<Run> {
   const time = new FakeTime();
   const store = new MemoryGameStore();
   const events: EmittedEvent[] = [];
@@ -72,11 +81,15 @@ async function play(rate: number | 'fast-forward', untilMs: number | 'end'): Pro
     onEmitted: (_id, e) => events.push(...e),
   });
   const fast = rate === 'fast-forward';
-  const game = await host.create('g1', loadScenario(holdTheBridge), { rate: fast ? 1 : rate });
+  const game = await host.create(
+    'g1',
+    loadScenario(seed === undefined ? holdTheBridge : { ...holdTheBridge, seed }),
+    { rate: fast ? 1 : rate },
+  );
   if (fast) await game.submit({ kind: 'setMode', mode: 'fast-forward' });
   const horizon = untilMs === 'end' ? Infinity : untilMs;
   let at = 0;
-  for (const step of SCRIPT) {
+  for (const step of script) {
     if (step.atMs > horizon || game.state.world.outcome) break;
     if (fast) await game.submit({ kind: 'advanceTo', gameMs: step.atMs });
     else await time.advance((step.atMs - at) / (rate as number));
@@ -181,6 +194,74 @@ describe('the in-tray of a live game', () => {
       expect(ack!.receivedAtGame).toBeLessThanOrEqual(10 * MIN);
       // Red's own opening report never reaches Blue.
       expect(blue.filter((d) => d.text.includes('no enemy yet in sight'))).toHaveLength(1);
+    },
+    60_000,
+  );
+});
+
+describe('pacing of a first game (#178)', () => {
+  it.each([1, 4, 12] as const)(
+    'a game with no player orders ends in a Red win, but not before game minute 25 (rate %i)',
+    async (rate) => {
+      const run = await play(rate, HORIZON_MS, [], 7);
+      expect(run.state.world.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
+      expect(run.state.time).toBeGreaterThanOrEqual(25 * MIN);
+      // Staff answers and a narration window fit before it ends.
+      expect(run.state.time).toBeGreaterThan(STAFF_ANSWER_MS + NARRATION_WINDOW_MS);
+    },
+    60_000,
+  );
+
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])(
+    'with no player orders Red takes the bridge in seeds 1 to 12 (seed %i)',
+    async (seed) => {
+      const run = await play('fast-forward', HORIZON_MS, [], seed);
+      expect(run.state.world.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
+    },
+    60_000,
+  );
+
+  it('Blue sending 1st and 2nd Battalion to the bridge at once is not lost: there is a fight', async () => {
+    const run = await play(12, HORIZON_MS);
+    expect(run.events.some((e) => e.type === 'combat.fire')).toBe(true);
+    expect(run.state.world.outcome?.winner).not.toBe('red');
+    // Nothing moves once the game is over.
+    const end = run.state.world.outcome!.time;
+    expect(run.events.filter((e) => e.type === 'game.end')).toHaveLength(1);
+    expect(run.state.time).toBe(end);
+    expect(run.state.world.units.every((u) => u.intent.kind === 'idle')).toBe(true);
+  }, 60_000);
+});
+
+describe('a battle is decided (#315)', () => {
+  it.each([1, 4, 12] as const)(
+    'with both battalions at the bridge the game ends with a declared result at rate %i',
+    async (rate) => {
+      const run = await play(rate, HORIZON_MS);
+      const w = run.state.world;
+      const end = w.outcome!;
+      expect(end).toMatchObject({ winner: 'blue', reason: 'attack-broken' });
+      expect(end.time).toBeGreaterThanOrEqual(30 * MIN);
+      expect(end.time).toBeLessThanOrEqual(70 * MIN);
+      // A unit is destroyed, and both the event and the dispatches say so.
+      expect(run.events.filter((e) => e.type === 'unit.destroyed').length).toBeGreaterThan(0);
+      // The umpire's ruling is on record, was announced, and reaches both sides in the same words.
+      const rulings = w.rulings.filter((r) => 'kind' in r && r.kind === 'battle');
+      expect(rulings).toHaveLength(1);
+      expect(run.events.filter((e) => e.type === 'umpire.ruling')).toHaveLength(1);
+      const narrative = (rulings[0] as { narrative: string }).narrative;
+      for (const side of ['blue', 'red'] as const) {
+        const texts = viewFor(w, side, run.state.time).reports.map((r) => r.text);
+        expect(texts, side).toContain(narrative);
+        // Nothing a side could not know: no men counts or morale figures in the umpire's words.
+        expect(narrative).not.toMatch(/\d/);
+      }
+      const blueTexts = viewFor(w, 'blue', run.state.time).reports.map(toDispatch);
+      expect(blueTexts.some((d) => /destroyed/.test(d.text))).toBe(true);
+      const redLost = viewFor(w, 'red', run.state.time).reports.filter(
+        (r) => r.kind === 'unitLost',
+      );
+      expect(redLost.length).toBeGreaterThan(0);
     },
     60_000,
   );

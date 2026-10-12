@@ -1,0 +1,177 @@
+{
+  "sourceHead": "79a3c4daeb4f06b6464017d0529bcc029e0d32f7",
+  "base": "6d85099a9e0b44a3113c1e4ede2a833e601675c9",
+  "sourceHashes": {
+    "client/src/app/local-board/setup/setup-state.spec.ts": "40b76d78677d08d777b526b30fc02de618e0ef3183b077737cb27842aa596e86",
+    "client/src/app/local-board/setup/setup-state.ts": "eb0e32051fecae026985559c908aa9c8692069520b241afe923d7f3b2d761d43",
+    "client/src/app/local-board/setup/setup.component.css": "f317589b7923af8fb492756edd6f7d7f3a448c973ba7c0f8214917d79580c6d7",
+    "client/src/app/local-board/setup/setup.component.html": "07e32f72b99b97c920bacc749f85baf7f94fdf02001ad8e77e6c89c3b88465c0",
+    "client/src/app/local-board/setup/setup.component.spec.ts": "e4f2889a5f4c1f3c11144bce4e4f5f6600a3601fa8490d20992216454c0bc93a",
+    "client/src/app/local-board/setup/setup.component.ts": "9242d6a2957879ebfedb925d2a10832b3be4c55b8a80f0b06331d6f9c77e850f"
+  },
+  "snapshot": "/tmp/kriegsspiel-angular-a4-proof",
+  "preview": "http://127.0.0.1:41067/dev/setup-proof",
+  "harnessSha256": "e797482f7fd452730ea5e37b976bd1a052730a257e5b3639fa4d88199d9b8194",
+  "browser": "Chrome on macOS",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "nativeWorkers": true,
+  "nativeCanvas2D": true,
+  "savedCanonicalReadbackEqual": true,
+  "startedBoard": {
+    "identity": "ecce44a083ff6f5a616d9ffc6946b5ffa53023092396ba5230836f221c59f4ed",
+    "ref": {
+      "kind": "generated",
+      "id": "eb9729c0-9e6e-4607-a75b-00db8da96b3a"
+    },
+    "canonicalBytes": 2350746,
+    "call": 1
+  },
+  "start": {
+    "visible": false,
+    "retiring": false,
+    "reopening": false,
+    "destroyed": false,
+    "openings": 1,
+    "workers": {
+      "generation": {
+        "created": 1,
+        "terminateCalls": 1,
+        "terminated": 1,
+        "live": 0
+      },
+      "validation": {
+        "created": 2,
+        "terminateCalls": 2,
+        "terminated": 2,
+        "live": 0
+      }
+    },
+    "liveWorkers": 0,
+    "previews": {
+      "created": 3,
+      "disposeCalls": 3,
+      "disposed": 3,
+      "live": 0,
+      "loadCalls": 5
+    },
+    "startCalls": 1,
+    "startRetired": 1,
+    "cancelCalls": 0,
+    "lastStart": {
+      "identity": "ecce44a083ff6f5a616d9ffc6946b5ffa53023092396ba5230836f221c59f4ed",
+      "ref": {
+        "kind": "generated",
+        "id": "eb9729c0-9e6e-4607-a75b-00db8da96b3a"
+      },
+      "canonicalBytes": 2350746,
+      "call": 1
+    },
+    "exactCanonicalJson": "#setup-proof-canonical",
+    "setup": null,
+    "error": ""
+  },
+  "cancel": {
+    "visible": false,
+    "retiring": false,
+    "reopening": false,
+    "destroyed": false,
+    "openings": 2,
+    "workers": {
+      "generation": {
+        "created": 2,
+        "terminateCalls": 2,
+        "terminated": 2,
+        "live": 0
+      },
+      "validation": {
+        "created": 3,
+        "terminateCalls": 3,
+        "terminated": 3,
+        "live": 0
+      }
+    },
+    "liveWorkers": 0,
+    "previews": {
+      "created": 4,
+      "disposeCalls": 4,
+      "disposed": 4,
+      "live": 0,
+      "loadCalls": 6
+    },
+    "startCalls": 1,
+    "startRetired": 1,
+    "cancelCalls": 1,
+    "lastStart": {
+      "identity": "ecce44a083ff6f5a616d9ffc6946b5ffa53023092396ba5230836f221c59f4ed",
+      "ref": {
+        "kind": "generated",
+        "id": "eb9729c0-9e6e-4607-a75b-00db8da96b3a"
+      },
+      "canonicalBytes": 2350746,
+      "call": 1
+    },
+    "exactCanonicalJson": "#setup-proof-canonical",
+    "setup": null,
+    "error": ""
+  },
+  "hmrRestored": {
+    "visible": true,
+    "retiring": false,
+    "reopening": false,
+    "destroyed": false,
+    "openings": 1,
+    "workers": {
+      "generation": {
+        "created": 1,
+        "terminateCalls": 1,
+        "terminated": 1,
+        "live": 0
+      },
+      "validation": {
+        "created": 2,
+        "terminateCalls": 2,
+        "terminated": 2,
+        "live": 0
+      }
+    },
+    "liveWorkers": 0,
+    "previews": {
+      "created": 3,
+      "disposeCalls": 2,
+      "disposed": 2,
+      "live": 1,
+      "loadCalls": 5
+    },
+    "startCalls": 0,
+    "startRetired": 0,
+    "cancelCalls": 0,
+    "lastStart": null,
+    "exactCanonicalJson": null,
+    "setup": {
+      "phase": "Saved map ready.",
+      "busy": false,
+      "starting": false,
+      "closed": false,
+      "selectedKey": "generated:eb9729c0-9e6e-4607-a75b-00db8da96b3a",
+      "canStart": true
+    },
+    "error": ""
+  },
+  "invalidSeedObserved": "-1 disables Generate/Save/Start and shows alert; recipe corrected before generation",
+  "hmr": "two actual setup HTML edits/replacements, six canonical source hashes restored",
+  "limitations": [
+    "Isolated temporary wrapper; not A5 app route or whole-session replacement acceptance",
+    "Counters describe wrapper-owned resources only, not all browser workers",
+    "Focus, F-to-fit and native buttons tested; modal focus trap belongs A5",
+    "Targeted effectiveness has two assertion detections; Start-lock recipe unmatched and not executed"
+  ]
+}

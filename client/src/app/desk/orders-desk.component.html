@@ -89,12 +89,20 @@
     </button>
   </div>
   <div class="err" id="order-err-send" role="alert">{{ errorFor('send') }}</div>
-  @if (notices().length > 0) {
-    <ul class="notices">
-      @for (n of notices(); track $index) {
-        <li role="status">{{ n }}</li>
+  @if (confirmation()) {
+    <p class="confirmation" role="status">{{ confirmation() }}</p>
+  }
+  @if (notice(); as n) {
+    <div class="notices" role="status">
+      <p>{{ n.text }}</p>
+      @if (n.options.length > 0) {
+        <div class="options" role="group" aria-label="Choose one">
+          @for (o of n.options; track o) {
+            <button type="button" (click)="choose(o)" [disabled]="over()">{{ o }}</button>
+          }
+        </div>
       }
-    </ul>
+    </div>
   }
 
   @if (stamping()) {

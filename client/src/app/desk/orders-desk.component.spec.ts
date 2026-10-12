@@ -194,6 +194,146 @@ describe('OrdersDeskComponent', () => {
     expect(t.q('.notices').textContent).toContain('no such unit');
   });
 
+  const refusal = (words: string, code = 'order_rejected', reason = 'No such place.') => ({
+    notices: [{ code, message: `o1: ${reason}` }],
+    outcomes: {
+      o1: { kind: 'refused' as const, text: words, sentAtGame: 0, reason, code },
+    },
+  });
+
+  it('confirms an accepted order with its courier and expected arrival, until the next action', async () => {
+    const t = await open();
+    await t.fill();
+    expect(t.el.querySelector('.confirmation')).toBeNull();
+    t.q('#order-sign').click();
+    await t.settle();
+    const text = t.q('.confirmation').textContent!;
+    expect(text).toMatch(/^Sent to .+ by steady courier; expected to arrive Day 1 \d\d:\d\d$/);
+    // The journal's pending entry names the same addressee and courier.
+    expect(text).toContain(unit.name);
+    t.desk.orderDraft.update((d) => ({ ...d, text: 'Next' }));
+    t.q<HTMLTextAreaElement>('#desk-order-text').dispatchEvent(new Event('input'));
+    t.q<HTMLTextAreaElement>('#desk-order-text').value = 'Next order';
+    t.q<HTMLTextAreaElement>('#desk-order-text').dispatchEvent(new Event('input'));
+    await t.settle();
+    expect(t.el.querySelector('.confirmation')).toBeNull();
+  });
+
+  it('offers the first part of an order as a button that sends exactly that part', async () => {
+    const t = await open();
+    await t.fill();
+    t.desk.orderDraft.update((d) => ({
+      ...d,
+      text: 'Screen the wood, then fall back to the mill.',
+    }));
+    t.q('#order-sign').click();
+    await t.settle();
+    t.game.set(
+      refusal(
+        'Screen the wood, then fall back to the mill.',
+        'order_clarification',
+        'I know of no place called "mill", sir. Shall I send just the first part? (Cavalry screen the wood)',
+      ),
+    );
+    await t.settle();
+    const buttons = [...t.el.querySelectorAll<HTMLButtonElement>('.options button')];
+    expect(buttons.map((b) => b.textContent)).toEqual(['Cavalry screen the wood']);
+    buttons[0]!.click();
+    await t.settle();
+    expect(t.sender).toHaveBeenCalledTimes(2);
+    expect(t.sender.mock.calls[1]![0].words).toBe('Cavalry screen the wood');
+  });
+
+  it('takes the stamp back and puts the words back when the order is refused', async () => {
+    const t = await open();
+    await t.fill();
+    t.q('#order-sign').click();
+    await t.settle();
+    expect(t.q('.stamp')).not.toBeNull();
+    expect(t.q<HTMLTextAreaElement>('#desk-order-text').value).toBe('');
+    t.game.set(refusal('Advance to the ford.'));
+    await t.settle();
+    expect(t.el.querySelector('.stamp')).toBeNull();
+    expect(t.q('.sr').textContent?.trim()).toBe('');
+    expect(t.q<HTMLTextAreaElement>('#desk-order-text').value).toBe('Advance to the ford.');
+    expect(t.q('.notices').textContent).toContain('"Advance to the ford."');
+  });
+
+  it('does not overwrite words the player has started on again', async () => {
+    const t = await open();
+    await t.fill();
+    t.q('#order-sign').click();
+    await t.settle();
+    t.desk.orderDraft.update((d) => ({ ...d, text: 'Something else' }));
+    t.game.set(refusal('Advance to the ford.'));
+    await t.settle();
+    expect(t.q<HTMLTextAreaElement>('#desk-order-text').value).toBe('Something else');
+  });
+
+  it('shows only the latest word from the staff, with the hint once', async () => {
+    const t = await open(undefined, {
+      notices: [
+        { code: 'order_rejected', message: 'o1: first refusal' },
+        { code: 'order_rejected', message: 'o2: second refusal' },
+      ],
+    });
+    const text = t.q('.notices').textContent!;
+    expect(text).toContain('second refusal');
+    expect(text).not.toContain('first refusal');
+  });
+
+  it('offers a clarification’s options as buttons and resends with the choice filled in', async () => {
+    const t = await open();
+    await t.fill();
+    t.desk.orderDraft.update((d) => ({ ...d, text: 'Hold the wood.' }));
+    t.q('#order-sign').click();
+    await t.settle();
+    t.game.set(
+      refusal(
+        'Hold the wood.',
+        'order_clarification',
+        'Which wood, sir? (Northern wood, Southern wood)',
+      ),
+    );
+    await t.settle();
+    const buttons = [...t.el.querySelectorAll<HTMLButtonElement>('.options button')];
+    expect(buttons.map((b) => b.textContent)).toEqual(['Northern wood', 'Southern wood']);
+    buttons[1]!.click();
+    await t.settle();
+    expect(t.sender).toHaveBeenCalledTimes(2);
+    expect(t.sender.mock.calls[1]![0].words).toBe('Hold the Southern wood.');
+  });
+
+  it('does not sign over a draft the player has started when an option is chosen', async () => {
+    const t = await open();
+    await t.fill();
+    t.desk.orderDraft.update((d) => ({ ...d, text: 'Hold the wood.' }));
+    t.q('#order-sign').click();
+    await t.settle();
+    t.desk.orderDraft.update((d) => ({ ...d, text: 'Something else' }));
+    t.game.set(
+      refusal(
+        'Hold the wood.',
+        'order_clarification',
+        'Which wood, sir? (Northern wood, Southern wood)',
+      ),
+    );
+    await t.settle();
+    t.el.querySelectorAll<HTMLButtonElement>('.options button')[1]!.click();
+    await t.settle();
+    expect(t.sender).toHaveBeenCalledTimes(1);
+    expect(t.q<HTMLTextAreaElement>('#desk-order-text').value).toBe('Hold the Southern wood.');
+  });
+
+  it('hides an old refusal once the player signs another order', async () => {
+    const t = await open(undefined, refusal('Advance to the ford.'));
+    expect(t.el.querySelector('.notices')).not.toBeNull();
+    await t.fill();
+    t.q('#order-sign').click();
+    await t.settle();
+    expect(t.el.querySelector('.notices')).toBeNull();
+  });
+
   it('disables the form once the game is over and signs nothing', async () => {
     const t = await open(undefined, { gameOver: { winner: 'blue', reason: 'x', atGame: 1 } });
     expect(t.q<HTMLButtonElement>('#order-sign').disabled).toBe(true);

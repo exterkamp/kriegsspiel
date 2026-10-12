@@ -1,6 +1,7 @@
 import { InjectionToken } from '@angular/core';
 import {
   deleteAccount,
+  devToolsEnabled,
   fetchMe,
   guestEnabled,
   requestLink,
@@ -33,6 +34,7 @@ export interface ShellApi {
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<boolean>;
   guestEnabled: () => Promise<boolean>;
+  devToolsEnabled: () => Promise<boolean>;
   startGuest: () => Promise<string | undefined>;
   fetchGame: (id: string) => Promise<GameInfo>;
   joinSide: (id: string, side: string) => Promise<void>;
@@ -64,6 +66,7 @@ export const SHELL_API = new InjectionToken<ShellApi>('SHELL_API', {
     signOut: () => signOut(),
     deleteAccount: () => deleteAccount(),
     guestEnabled: () => guestEnabled(),
+    devToolsEnabled: () => devToolsEnabled(),
     startGuest: () => startGuest(),
     fetchGame: (id) => fetchGame(id),
     joinSide: (id, side) => joinSide(id, side),
