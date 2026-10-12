@@ -23,7 +23,22 @@ export interface GameInfo extends GameSummary {
   you: string | null;
   ready: boolean;
   pause: PauseSettings | null;
-  sides: Array<{ side: string; taken: boolean; ready: boolean }>;
+  /** The host took you out of this room; you cannot rejoin. */
+  removed?: boolean;
+  sides: Array<{
+    side: string;
+    taken: boolean;
+    ready: boolean;
+    /** Staff and subordinates at this side's table (never who they are). */
+    roles?: Array<{ role: string; units?: string[]; you: boolean }>;
+  }>;
+}
+
+/** Who the host removes: a side's seat holder, or one of its role holders (a subordinate by one of their units). */
+export interface KickTarget {
+  side: string;
+  role?: string;
+  unit?: string;
 }
 
 export interface NewGame {
@@ -100,4 +115,16 @@ export async function startGame(id: string, f: Fetch = fetch): Promise<void> {
     );
   }
   if (!res.ok) throw await failure(res, 'could not start');
+}
+
+/** Gives up your seat or role in a game that has not started. */
+export async function leaveGame(id: string, f: Fetch = fetch): Promise<void> {
+  const res = await f(`/games/${encodeURIComponent(id)}/leave`, jsonInit({}));
+  if (!res.ok) throw await failure(res, 'could not leave');
+}
+
+/** The host removes another player from a game that has not started. */
+export async function kickPlayer(id: string, who: KickTarget, f: Fetch = fetch): Promise<void> {
+  const res = await f(`/games/${encodeURIComponent(id)}/kick`, jsonInit(who));
+  if (!res.ok) throw await failure(res, 'could not remove the player');
 }
