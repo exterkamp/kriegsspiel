@@ -17,13 +17,22 @@ A deterministic engine owns the world: terrain, movement, line of sight, combat,
 - [docs/hq-interface.md](docs/hq-interface.md): the general's-HQ desk: historical map table, in-tray of dispatches, orders desk, staff
 - [docs/hq-getting-started.md](docs/hq-getting-started.md): current HQ features, user instructions and hands-on validation checklist
 - [docs/architecture.md](docs/architecture.md): server/engine/umpire design, tech choices, testing
-- [docs/roadmap.md](docs/roadmap.md): milestones and next steps
+- [docs/roadmap.md](docs/roadmap.md): milestones and what is done
 
 ## Current state
 
-The engine, filtered game API and live client are implemented. The client page opens the main menu, sign-in, new-game form and the live Three.js map table with its desk (in-tray, orders, order of battle, journal, staff conference). The earlier fixture-only HQ demonstration was retired in D28.
+Epic 1 (the playable vertical slice) is done: you can start a game, write orders, wait for couriers and reports, and play "Hold the Bridge" to a win or loss in a browser, and the same game replays identically from its log. Since then the project has gained an Angular 22 client over a Three.js map table (with the desk: in-tray, orders, order of battle, journal, staff conference), accounts, guest play and a lobby, pause and ratio voting, notifications, an LLM umpire that runs on Anthropic, OpenAI-compatible or local Ollama providers (the rule-based parser remains the fallback), an LLM or scripted opposing commander, a post-game umpire's window, and a visual design system. See [docs/roadmap.md](docs/roadmap.md) for what is done and what is next.
 
-The accepted live client remains available at `/?new=1&side=blue&rate=12` to create a game, or `/?game=<id>` to join. `/?lobby=1` opens the accepted lobby/game list. Sign in using the emailed magic link; the session cookie and game seat authenticate access. The Angular dev server proxies `/auth`, `/scenarios`, `/games` and `/admin/api` (HTTP and WebSocket) to `API_URL` (default `http://localhost:3000`).
+### Play it
+
+1. Start the API and the client (see Dev servers below), or `docker compose up` (see [docs/deployment.md](docs/deployment.md)).
+2. Open the client. Choose **Play as guest** (turned on with `GUEST_PLAY=1` on the server) or sign in with an emailed magic link. With no `MAIL_WEBHOOK_URL` the link is printed in the server log.
+3. Open `/?new=1&side=blue&rate=12` to create a game and take Blue, or `/?lobby=1` for the lobby, or `/?game=<id>` to join a game. With none of these the page shows the main menu.
+4. Read the opening report in the in-tray (I), write orders at the orders desk (O), for example "1st Battalion march to the bridge and hold", choose a courier and sign. Hold the bridge for 50 game minutes; Red wins by taking it.
+
+How long it takes: with orders a game ends at about game minute 40 (measured: 3.4 real minutes at 12:1, 10 at 4:1, same outcome), and a game nobody breaks runs the full 50 minute hold (4.2 real minutes at 12:1, 12.5 at 4:1). See D35 in [docs/decisions.md](docs/decisions.md).
+
+Replay a finished game from its log with no model calls: `npm run replay -w server -- <log>` (see `server/src/game/replayCli.ts`).
 
 ## Development
 
@@ -67,7 +76,8 @@ The server reads `PORT` (default 3000), `HOST` (default 127.0.0.1) and `SCRIPTED
 Start dev servers with `devrun`, not a bare `npm run dev`:
 
 ```bash
-devrun up --name web --port-env PORT -- npm run dev -w client
+devrun up --name api --port-env PORT -- env GUEST_PLAY=1 npm run dev -w server
+devrun up --name web --port-env PORT -- sh -c 'API_URL=$(devrun url api) npm run dev -w client'
 devrun url web
 devrun logs web -n 50
 devrun stop web
