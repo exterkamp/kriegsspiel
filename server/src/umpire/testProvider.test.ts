@@ -130,7 +130,53 @@ describe('test provider: parse', () => {
     expect(r).toMatchObject({
       question: expect.stringContaining('know of no place called "mill"'),
     });
-    expect((r as { question: string }).question).toContain('screen the northern wood');
+    // The offer is one option: the first part, as a whole order the desk can send as it stands.
+    expect((r as { options: string[] }).options).toEqual([
+      expect.stringMatching(/^[\w ]+ screen the northern wood$/),
+    ]);
+  });
+
+  it('takes the ford for the crossing of a scenario that has no ford, from its own places', async () => {
+    const noFord: ParseContext = {
+      ...WORLD,
+      map: { features: WORLD.map.features.filter((f) => f.id !== 'ford') },
+    };
+    const text = 'Cavalry screen the northern wood, then fall back to the ford if pressed.';
+    const r = await parser().parse(text, noFord);
+    const bridge = noFord.map.features.find((f) => f.kind === 'bridge');
+    expect(r).toMatchObject({
+      kind: 'intents',
+      intents: [{ kind: 'hold' }, { kind: 'withdraw', toward: bridge?.anchor }],
+    });
+  });
+
+  it('takes the ford for the bridge of a scenario that has no bridge', async () => {
+    const noBridge: ParseContext = {
+      ...WORLD,
+      map: {
+        features: [
+          ...WORLD.map.features.filter((f) => f.kind !== 'bridge'),
+          { id: 'real-ford', kind: 'ford', name: 'The shallows', anchor: at(300, 300) },
+        ],
+      },
+    };
+    const r = await parser().parse('Cavalry hold the bridge.', noBridge);
+    const ford = noBridge.map.features.find((f) => f.id === 'real-ford');
+    expect(r).toMatchObject({ kind: 'intents', intents: [{ kind: 'hold', at: ford?.anchor }] });
+  });
+
+  it('reads place names from the scenario it is given, whatever they are', async () => {
+    const other: ParseContext = {
+      ...WORLD,
+      map: {
+        features: [
+          ...WORLD.map.features.filter((f) => f.kind !== 'wood'),
+          { id: 'w1', kind: 'wood', name: 'Raven copse', anchor: at(100, 100) },
+        ],
+      },
+    };
+    const r = await parser().parse('Cavalry hold the Raven copse.', other);
+    expect(r).toMatchObject({ kind: 'intents', intents: [{ kind: 'hold', at: at(100, 100) }] });
   });
 
   it('holds a place with no unit named: the nearest unit goes', async () => {

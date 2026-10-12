@@ -163,3 +163,9 @@ input:focus-visible {
     opacity: 0.85;
   }
 }
+
+.confirmation {
+  margin: 6px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
