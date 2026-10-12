@@ -77,6 +77,10 @@ describe('fixtureAnswer', () => {
     expect(sirFirst('No enemy is in sight now.')).toBe('Sir, no enemy is in sight now.');
     expect(sirFirst('I cannot judge roads.')).toBe('Sir, I cannot judge roads.');
     expect(sirFirst('Sir, as I read it: all quiet.')).toBe('Sir, as I read it: all quiet.');
+    expect(sirFirst('Our Cavalry is at the bridge.')).toBe('Sir, our Cavalry is at the bridge.');
+    expect(sirFirst('Enemy Infantry sighted')).toBe('Sir, enemy Infantry sighted');
+    expect(sirFirst('')).toBe('');
+    expect(sirFirst('   ')).toBe('');
   });
   it('engineer does not make up terrain', () => {
     expect(fixtureAnswer(req('engineer'), fixtureView).text).toContain('cannot judge');

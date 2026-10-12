@@ -275,12 +275,12 @@ const list = (xs: string[]): string =>
 /**
  * Every officer addresses the commander the same way (#325): an answer opens "Sir, ...". An answer that already
  * does is left alone; otherwise the opening is added and the first word is lowered to fit.
- * "I" and a name (a capitalised word before another capital or a number) keep their capital.
+ * Only "I" (and "I'm", "I'd"...) keeps its capital; an empty answer is returned as it is.
  */
 export function sirFirst(text: string): string {
   const t = text.trim();
-  if (/^sir\b/i.test(t)) return t;
-  const lower = /^(I\b|[A-Z][a-z]+ [A-Z0-9])/.test(t) ? t : t[0]!.toLowerCase() + t.slice(1);
+  if (!t || /^sir\b/i.test(t)) return t;
+  const lower = /^I\b/.test(t) ? t : t[0]!.toLowerCase() + t.slice(1);
   return `Sir, ${lower}`;
 }
 

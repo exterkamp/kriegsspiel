@@ -43,6 +43,7 @@ export function placeFightLabels(
       const r = { ...c, ...size };
       return !obstacles.some((o) => overlaps(r, o)) && !placed.some((o) => overlaps(r, o));
     };
+    // Last resort when every spot is taken: the first candidate, overlapping.
     const at = candidates.find(free) ?? candidates[0]!;
     placed.push({ ...at, ...size });
     out.set(f.id, at);

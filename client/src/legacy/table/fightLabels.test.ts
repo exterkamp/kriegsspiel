@@ -48,8 +48,14 @@ describe('placeFightLabels (#325)', () => {
     const placed = placeFightLabels(fights, tags, size, 40);
     const rects = [...placed.values()].map((c) => ({ ...c, ...size }));
     expect(rects).toHaveLength(3);
-    expect(noneOverlap([...rects, ...tags.slice(0, 0)])).toBe(true);
+    expect(noneOverlap(rects)).toBe(true);
     for (const r of rects) for (const t of tags) expect(overlaps(r, t)).toBe(false);
+  });
+
+  it('falls back to the first candidate when every spot is taken', () => {
+    const wall: LabelRect = { x: 1000, y: 1000, w: 4000, h: 4000 };
+    const at = placeFightLabels([fight('a', 1000, 1000)], [{ ...wall }], size, 40).get('a')!;
+    expect(at).toEqual({ x: 1000, y: 1000 - (40 + size.h / 2) });
   });
 
   it('is deterministic', () => {
