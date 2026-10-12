@@ -157,11 +157,83 @@ describe('narrate stage in the actor', () => {
   });
 });
 
+const asked = (questionId: string, askedAtGame = 0) => ({
+  questionId,
+  askedAtGame,
+  answerAtGame: askedAtGame + 10 * 60_000,
+});
+
 describe('staff answers in the actor', () => {
+  it('keeps the conference per side, files one dispatch when due, and restores both after a restart', async () => {
+    const umpire = new StubUmpire();
+    const { time, store, game } = await newGame(umpire);
+    await game.answerStaff('blue', 'intelligence', 'Where is the enemy?', asked('q1'));
+    const history = game.staffHistoryFor('blue');
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({
+      questionId: 'q1',
+      role: 'intelligence',
+      text: 'The bridge holds, sir.',
+    });
+    expect(game.staffHistoryFor('red')).toEqual([]);
+
+    const viewAt = (g: typeof game, side: 'blue' | 'red') =>
+      sideViewOf(
+        g.state,
+        side,
+        g.gameClock.snapshot(),
+        undefined,
+        [],
+        undefined,
+        g.staffHistoryFor(side),
+      );
+    const staffPapers = (v: ReturnType<typeof viewAt>) =>
+      v.dispatches.filter((d) => d.category === 'staff' && d.id === 'staff-q1');
+    // Not yet due: the exchange is listed without its words and no paper is filed.
+    const early = viewAt(game, 'blue');
+    expect(early.staffHistory?.[0]?.text).toBeUndefined();
+    expect(staffPapers(early)).toHaveLength(0);
+    // Due: the words and one paper, in the officer's name. The other side sees neither.
+    await game.submit({ kind: 'advanceTo', gameMs: 11 * 60_000 }).catch(() => undefined);
+    const due = sideViewOf(
+      { ...game.state, time: 11 * 60_000 },
+      'blue',
+      game.gameClock.snapshot(),
+      undefined,
+      [],
+      undefined,
+      game.staffHistoryFor('blue'),
+    );
+    expect(due.staffHistory?.[0]?.text).toBe('The bridge holds, sir.');
+    expect(staffPapers(due)).toHaveLength(1);
+    expect(staffPapers(due)[0]!.from).toBe(history[0]!.officer.name);
+    expect(viewAt(game, 'red').staffHistory).toBeUndefined();
+
+    // A restart: the conference comes back from the input log.
+    await host!.close('g1');
+    const h2 = new GameHost({
+      store,
+      parser,
+      registry: registry(),
+      wallNow: time.now,
+      timers: time,
+      narrator: () => umpire,
+    });
+    host = h2;
+    const reopened = await h2.open('g1');
+    expect(reopened.staffHistoryFor('blue')).toEqual(history);
+    expect(reopened.staffHistoryFor('red')).toEqual([]);
+  });
+
   it('writes the answer on the staff stage and logs it as a journal-only entry with its calls', async () => {
     const umpire = new StubUmpire();
     const { store, game } = await newGame(umpire);
-    const answer = await game.answerStaff('blue', 'intelligence', 'Where is the enemy?');
+    const answer = await game.answerStaff(
+      'blue',
+      'intelligence',
+      'Where is the enemy?',
+      asked('q1'),
+    );
     expect(answer?.text).toBe('The bridge holds, sir.');
     const entry = (await store.inputLog('g1')).find((e) => e.command.kind === 'staffAnswer');
     expect(entry).toBeDefined();
@@ -174,14 +246,14 @@ describe('staff answers in the actor', () => {
     const umpire = new StubUmpire();
     umpire.staffText = undefined;
     const { store, game } = await newGame(umpire);
-    expect(await game.answerStaff('blue', 'engineer', 'Status?')).toBeUndefined();
+    expect(await game.answerStaff('blue', 'engineer', 'Status?', asked('q2'))).toBeUndefined();
     const entry = (await store.inputLog('g1')).find((e) => e.command.kind === 'staffAnswer');
     expect(entry?.error).toBeDefined();
   });
 
   it('returns nothing and logs nothing without an umpire', async () => {
     const { store, game } = await newGame();
-    expect(await game.answerStaff('blue', 'engineer', 'Status?')).toBeUndefined();
+    expect(await game.answerStaff('blue', 'engineer', 'Status?', asked('q2'))).toBeUndefined();
     expect((await store.inputLog('g1')).some((e) => e.command.kind === 'staffAnswer')).toBe(false);
   });
 });

@@ -15,7 +15,7 @@ import {
   type ViewDocument,
   type ViewReport,
 } from '@kriegsspiel/engine';
-import type { ClockState, Dispatch, OwnUnit, SideView } from '@kriegsspiel/protocol';
+import type { ClockState, Dispatch, OwnUnit, SideView, StaffExchange } from '@kriegsspiel/protocol';
 
 const CATEGORY: Record<ViewReport['kind'], Dispatch['category']> = {
   situation: 'staff',
@@ -64,6 +64,28 @@ export function documentToDispatch(d: ViewDocument): Dispatch {
  */
 export type Narration = ReadonlyMap<string, string | null>;
 
+/** An officer's answer, once it is due, is a paper in the Staff pile. It is filed once, under the question's id. */
+function staffDispatch(x: StaffExchange, now: number): Dispatch[] {
+  if (x.text === undefined || now < x.answerAtGame) return [];
+  return [
+    {
+      id: `staff-${x.questionId}`,
+      from: x.officer.name,
+      writtenAtGame: x.answerAtGame,
+      receivedAtGame: x.answerAtGame,
+      category: 'staff',
+      text: x.text,
+    },
+  ];
+}
+
+/** The answer's words are withheld until the officer's time has passed. */
+function staffExchangeAt(x: StaffExchange, now: number): StaffExchange {
+  if (now >= x.answerAtGame) return x;
+  const { text: _text, basedOnGame: _based, ...rest } = x;
+  return rest;
+}
+
 /** A unit's condition on the wire; a role that may not know it (an outline) leaves the fields out. */
 function condition(
   u: EngineRoleView['ownUnits'][number],
@@ -82,6 +104,7 @@ export function toSideView(
   view: EngineSideView | EngineRoleView,
   clock: ClockState,
   narration?: Narration,
+  staff: readonly StaffExchange[] = [],
 ): SideView {
   return {
     side: view.side,
@@ -122,7 +145,9 @@ export function toSideView(
         return [text === undefined ? toDispatch(r) : { ...toDispatch(r), text }];
       }),
       ...view.documents.map(documentToDispatch),
+      ...staff.flatMap((x) => staffDispatch(x, view.time)),
     ],
+    ...(staff.length === 0 ? {} : { staffHistory: staff.map((x) => staffExchangeAt(x, view.time)) }),
     clock,
   };
 }
@@ -139,6 +164,7 @@ export function sideViewOf(
   seat?: Seat,
   forwarded: readonly string[] = [],
   narration?: Narration,
+  staff: readonly StaffExchange[] = [],
 ): SideView {
   // `world.time` only moves when an event fires; the engine's own time is the real "now".
   if (seat) {
@@ -146,7 +172,8 @@ export function sideViewOf(
       viewForRole(state.world, side, seat, state.time, forwarded),
       clock,
       narration,
+      staff,
     );
   }
-  return toSideView(viewFor(state.world, side, state.time), clock, narration);
+  return toSideView(viewFor(state.world, side, state.time), clock, narration, staff);
 }

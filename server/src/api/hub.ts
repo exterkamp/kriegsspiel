@@ -145,6 +145,7 @@ export class Hub {
       conn.seat,
       conn.seat ? this.forwardedTo(gameId, conn) : [],
       game.narrationFor(conn.side),
+      game.staffHistoryFor(conn.side),
     );
   }
 
@@ -582,10 +583,11 @@ export class Hub {
     game: GameActor,
     conn: Connection,
     command: Extract<Command, { kind: 'askStaff' }>,
+    asked: { questionId: string; askedAtGame: number; answerAtGame: number },
   ): Promise<void> {
     let answer;
     try {
-      answer = await game.answerStaff(conn.side, command.role, command.question);
+      answer = await game.answerStaff(conn.side, command.role, command.question, asked);
     } catch (e) {
       answer = undefined;
       this.onError(game.id, e);
@@ -799,7 +801,11 @@ export class Hub {
           answerAtGame: charge.answerAtGame,
           costMs: charge.costMs,
         });
-        void this.answerStaff(game, conn, command);
+        void this.answerStaff(game, conn, command, {
+          questionId: command.questionId,
+          askedAtGame: charge.askedAtGame,
+          answerAtGame: charge.answerAtGame,
+        });
       } else {
         this.send(
           conn,

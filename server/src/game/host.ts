@@ -16,6 +16,7 @@ import { GameActor, type GameActorOptions, type StaffAtWork, type Timers } from 
 import type { UmpireClient } from '../umpire/index.js';
 import type { TraceSink } from '../debug/trace.js';
 import { replayFrom } from './replay.js';
+import type { StaffExchange } from '@kriegsspiel/protocol';
 import type { GameStore } from './store.js';
 
 export interface GameHostOptions {
@@ -185,9 +186,17 @@ export class GameHost {
       mode,
       status: snap.clock.status === 'stopped' ? 'stopped' : 'paused',
     });
+    // The conference is not in a snapshot, so it comes from the whole log.
+    const staffHistory = new Map<string, StaffExchange[]>();
+    for (const e of await store.inputLog(id)) {
+      const c = e.command;
+      if (c.kind !== 'staffAnswer' || !c.exchange) continue;
+      staffHistory.set(c.side, [...(staffHistory.get(c.side) ?? []), c.exchange]);
+    }
     const actor = new GameActor({
       ...this.actorOptions(id),
       state,
+      staffHistory,
       clock,
       agents: this.agentsFor(id, state.world),
       pause: this.options.pause?.(id, state.world),

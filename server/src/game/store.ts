@@ -8,7 +8,7 @@
 import { appendFile, mkdir, readFile, truncate, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Seat } from '@kriegsspiel/engine';
-import type { DraftSnapshot, Mark } from '@kriegsspiel/protocol';
+import type { DraftSnapshot, Mark, StaffExchange } from '@kriegsspiel/protocol';
 import type { UmpireCallRecord } from '../umpire/umpireClient.js';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
@@ -65,7 +65,14 @@ export type GameCommand =
    * A staff officer answered a player's question on the `staff` stage. Journal only: the answer is
    * advice text and never changes the engine; the model calls are on the entry (`calls`).
    */
-  | { kind: 'staffAnswer'; side: string; role: string; question: string };
+  | {
+      kind: 'staffAnswer';
+      side: string;
+      role: string;
+      question: string;
+      /** The conference record, so a restart restores it (D6b). Absent in entries from before it was kept. */
+      exchange?: StaffExchange;
+    };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {

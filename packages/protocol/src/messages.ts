@@ -2,17 +2,13 @@ import { z } from 'zod';
 import { PROTOCOL_VERSION, ClockState, GameMs, Side } from './common.js';
 import { DraftEntry, DraftSnapshot, MAX_COMMENT, MAX_DRAFT_TEXT, TextOp } from './drafts.js';
 import { Mark } from './marks.js';
-import { Dispatch, SideView } from './view.js';
+import { Dispatch, SideView, StaffRole } from './view.js';
 
 const Id = z.string().min(1);
 const Envelope = { v: z.literal(PROTOCOL_VERSION) };
 
 /** Longest reason a player may give for a pause request. */
 export const MAX_PAUSE_REASON = 200;
-
-/** The officers a player can put a question to in the staff conference (docs/staff-conference.md). */
-export const StaffRole = z.enum(['chiefOfStaff', 'intelligence', 'quartermaster', 'engineer']);
-export type StaffRole = z.infer<typeof StaffRole>;
 
 /** Longest question put to a staff officer. */
 export const MAX_STAFF_QUESTION = 400;
