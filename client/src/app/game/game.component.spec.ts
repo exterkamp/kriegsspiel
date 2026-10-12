@@ -146,3 +146,49 @@ describe('GameComponent', () => {
     expect(labels).toEqual(['Switch to blue', 'Playing red']);
   });
 });
+
+describe('GameComponent without WebGL (#259)', () => {
+  it('shows how to fix it and keeps the desk', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        {
+          provide: TABLE_SCENE_FACTORY,
+          useValue: () => {
+            throw new Error('Error creating WebGL context.');
+          },
+        },
+      ],
+    });
+    const f = TestBed.createComponent(GameComponent);
+    await f.whenStable();
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector('ks-webgl-fallback')?.textContent).toContain('hardware acceleration');
+    expect(el.querySelector('ks-webgl-fallback li')).not.toBeNull();
+    expect(el.querySelector('nav[aria-label=Desk]')).not.toBeNull();
+    expect(TestBed.inject(TableService).scene()).toBeUndefined();
+  });
+
+  it('disposes a half-built scene when start() throws', async () => {
+    const dispose = vi.fn();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        {
+          provide: TABLE_SCENE_FACTORY,
+          useValue: () => ({
+            start: () => {
+              throw new Error('Error creating WebGL context.');
+            },
+            dispose,
+          }),
+        },
+      ],
+    });
+    const f = TestBed.createComponent(GameComponent);
+    await f.whenStable();
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(f.nativeElement.querySelector('ks-webgl-fallback')).not.toBeNull();
+    expect(TestBed.inject(TableService).scene()).toBeUndefined();
+  });
+});
