@@ -804,25 +804,36 @@ describe('orders', () => {
   });
 });
 
+/**
+ * Starts the app on a fake wall clock, so game time moves only when the test advances it and
+ * nothing waits on the real clock or the machine's load. Returns the clock and the base URL.
+ */
+async function startWithFakeTime(extra: Partial<Parameters<typeof buildApp>[0]> = {}) {
+  const time = new FakeTime(Date.now());
+  store = new MemoryGameStore();
+  const built = await buildApp({
+    parser: new StubOrderParser(),
+    store,
+    auth: { mailer },
+    wallNow: time.now,
+    timers: time,
+    ...extra,
+  });
+  app = built;
+  const base = await built.server.listen({ port: 0, host: '127.0.0.1' });
+  return { time, base };
+}
+
 describe('catch-up on reconnect', () => {
   it('tells a returning side what arrived while away, once, without duplicating papers', async () => {
     // Game time moves only when the test advances the fake wall clock, so how far it has moved
     // when the player leaves and returns does not depend on how fast the machine is.
-    const time = new FakeTime(Date.now());
-    store = new MemoryGameStore();
-    app = await buildApp({
-      parser: new StubOrderParser(),
-      store,
-      auth: { mailer },
-      wallNow: time.now,
-      timers: time,
-    });
-    const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+    const { time, base } = await startWithFakeTime();
     const ws = base.replace('http', 'ws');
     const game = (await createGame(base)).json;
     const first = await join(ws, game, 'blue');
     const initial = await first.waitFor('viewUpdate');
-    const actor = app.host.get(game.id)!;
+    const actor = app!.host.get(game.id)!;
     const deskCount = () =>
       sideViewOf(actor.state, 'blue', actor.gameClock.snapshot()).dispatches.length;
     /** Advance game hours, one at a time, until `done`; the report's arrival is a game-time event. */
@@ -1143,18 +1154,9 @@ describe('scripted opponent', () => {
 
   /** Starts the app with the settings `main.ts` derives from the given environment. */
   async function startLikeMain(env: Record<string, string | undefined>) {
-    store = new MemoryGameStore();
-    time = new FakeTime(Date.now());
-    app = await buildApp({
-      parser: new StubOrderParser(),
-      store,
-      scriptedOpponents: scriptedOpponentsFromEnv(env),
-      auth: { mailer },
-      wallNow: time.now,
-      timers: time,
-    });
-    const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
-    return base;
+    const started = await startWithFakeTime({ scriptedOpponents: scriptedOpponentsFromEnv(env) });
+    time = started.time;
+    return started.base;
   }
 
   const redUnits = (id: string) =>
