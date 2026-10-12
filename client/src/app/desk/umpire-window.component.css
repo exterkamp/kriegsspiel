@@ -6,13 +6,8 @@
   max-height: 60%;
   overflow: auto;
   box-sizing: border-box;
-  padding: 10px 14px;
-  background: #f4eedb;
-  color: #2a2014;
-  border-radius: 2px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   z-index: 6;
-  font-size: 13px;
+  font-size: var(--ks-text-sm);
 }
 header {
   display: flex;
@@ -25,7 +20,7 @@ h2 {
 }
 .scrub {
   display: flex;
-  gap: 6px;
+  gap: var(--ks-space-2);
   align-items: center;
 }
 .scrub input {
@@ -47,18 +42,6 @@ ul {
   margin: 4px 0 0;
   padding-left: 16px;
 }
-button {
-  background: #efe6c8;
-  color: #2a2118;
-  border: 1px solid #5a4a36;
-  border-radius: 3px;
-  padding: 4px 8px;
-  font: inherit;
-  cursor: pointer;
-}
-button:focus-visible {
-  outline: 3px solid #ffd76a;
-}
 
 .rulings ol {
   margin: 0;
@@ -66,7 +49,7 @@ button:focus-visible {
 }
 .rulings .why {
   display: block;
-  opacity: 0.7;
+  opacity: 0.85;
   font-size: 0.85em;
 }
 .rulings {

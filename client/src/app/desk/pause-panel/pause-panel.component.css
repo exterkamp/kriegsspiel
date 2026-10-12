@@ -1,14 +1,9 @@
 .pause {
   box-sizing: border-box;
-  padding: 8px 10px;
-  border-radius: 4px;
-  background: rgba(42, 33, 24, 0.92);
-  color: #efe6c8;
-  font-size: 13px;
   max-width: 100%;
 }
 .vote {
-  border: 2px solid #ffd76a;
+  border: 2px solid var(--ks-brass-hi);
 }
 p {
   margin: 0 0 4px;
@@ -22,7 +17,7 @@ p {
 .buttons,
 form {
   display: flex;
-  gap: 6px;
+  gap: var(--ks-space-2);
   flex-wrap: wrap;
   align-items: end;
 }
@@ -30,28 +25,9 @@ label {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 12px;
-}
-input {
-  font: inherit;
-  padding: 4px;
-}
-button {
-  background: #efe6c8;
-  color: #2a2118;
-  border: 1px solid #5a4a36;
-  border-radius: 3px;
-  padding: 6px 10px;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-button:focus-visible,
-input:focus-visible {
-  outline: 3px solid #ffd76a;
-  outline-offset: 2px;
+  font-size: var(--ks-text-xs);
 }
 .problem {
-  color: #ff9a8a;
+  color: var(--ks-wax-on-dark);
   margin-left: 6px;
 }

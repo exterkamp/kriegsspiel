@@ -254,7 +254,7 @@ describe('OrdersDeskComponent', () => {
     t.game.set(refusal('Advance to the ford.'));
     await t.settle();
     expect(t.el.querySelector('.stamp')).toBeNull();
-    expect(t.q('.sr').textContent?.trim()).toBe('');
+    expect(t.q('.ks-sr-only').textContent?.trim()).toBe('');
     expect(t.q<HTMLTextAreaElement>('#desk-order-text').value).toBe('Advance to the ford.');
     expect(t.q('.notices').textContent).toContain('"Advance to the ford."');
   });

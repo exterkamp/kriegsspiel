@@ -12,6 +12,12 @@ export const routes: Routes = [
     loadComponent: () => import('./shell/shell.component').then((m) => m.ShellComponent),
   },
   {
+    path: 'style-guide',
+    title: 'Style guide · Kriegsspiel',
+    loadComponent: () =>
+      import('./style-guide/style-guide.component').then((m) => m.StyleGuideComponent),
+  },
+  {
     path: 'admin',
     title: 'Kriegsspiel admin',
     loadComponent: () => import('./admin/admin.component').then((m) => m.AdminComponent),

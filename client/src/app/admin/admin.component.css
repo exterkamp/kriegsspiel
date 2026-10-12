@@ -2,13 +2,12 @@
 ks-admin {
   display: block;
   height: 100vh;
-  color-scheme: dark;
-  --bg: #14161a;
-  --panel: #1b1e24;
-  --line: #2c313a;
-  --fg: #d6dae0;
-  --dim: #8a929e;
-  --accent: #6cb6ff;
+  --bg: var(--ks-table);
+  --panel: var(--ks-night-panel);
+  --line: var(--ks-night-line);
+  --fg: var(--ks-on-overlay);
+  --dim: var(--ks-night-dim);
+  --accent: var(--ks-brass-hi);
 
   &,
   #app {
@@ -16,12 +15,7 @@ ks-admin {
     height: 100%;
     background: var(--bg);
     color: var(--fg);
-    font:
-      13px/1.4 ui-monospace,
-      'SF Mono',
-      Menlo,
-      Consolas,
-      monospace;
+    font: var(--ks-text-sm) / 1.4 var(--ks-font-mono);
   }
   #app {
     display: grid;
@@ -42,17 +36,8 @@ ks-admin {
     margin: 0;
     color: var(--accent);
   }
-  select,
-  input,
-  button {
-    background: var(--bg);
-    color: var(--fg);
-    border: 1px solid var(--line);
-    font: inherit;
-    padding: 2px 6px;
-  }
   :focus-visible {
-    outline: 1px solid var(--accent);
+    outline: 2px solid var(--ks-focus-on-dark);
     outline-offset: 1px;
   }
   #live {
@@ -67,15 +52,15 @@ ks-admin {
     background: var(--dim);
   }
   #live[data-status='live'] i {
-    background: #3fb950;
+    background: var(--ks-ok-on-dark);
   }
   #live[data-status='reconnecting'] i,
   #live[data-status='connecting'] i {
-    background: #d29922;
+    background: var(--ks-warn-on-dark);
   }
   #live[data-status='disabled'] i,
   #live[data-status='unauthorized'] i {
-    background: #f85149;
+    background: var(--ks-wax-on-dark);
   }
   small {
     color: var(--dim);
@@ -85,12 +70,18 @@ ks-admin {
     border-bottom: 1px solid var(--line);
   }
   nav button {
+    background: transparent;
+    color: var(--fg);
     border: 0;
     border-bottom: 2px solid transparent;
+    border-radius: 0;
     padding: 6px 14px;
-    cursor: pointer;
+  }
+  nav button:hover:not(:disabled) {
+    background: var(--ks-night-select);
   }
   nav button[aria-selected='true'] {
+    background: transparent;
     border-bottom-color: var(--accent);
     color: var(--accent);
   }
@@ -151,17 +142,17 @@ ks-admin {
     background: var(--panel);
   }
   .bad {
-    color: #f85149;
+    color: var(--ks-wax-on-dark);
   }
   .badge {
     padding: 0 6px;
     border: 1px solid var(--line);
   }
   .badge.live {
-    color: #3fb950;
+    color: var(--ks-ok-on-dark);
   }
   .badge.playback {
-    color: #d29922;
+    color: var(--ks-warn-on-dark);
   }
   .llm-detail details {
     margin: 6px 0;
@@ -210,18 +201,18 @@ ks-admin {
     color: var(--dim);
   }
   .master-only {
-    background: rgba(210, 153, 34, 0.16);
-    border-left: 3px solid #d29922;
+    background: var(--ks-night-select);
+    border-left: 3px solid var(--ks-warn-on-dark);
   }
   .master-only .vis {
-    color: #d29922;
+    color: var(--ks-warn-on-dark);
   }
   .state-badge {
     margin-left: 8px;
     padding: 0 6px;
-    border: 1px solid #d29922;
-    color: #d29922;
-    font-size: 11px;
+    border: 1px solid var(--ks-warn-on-dark);
+    color: var(--ks-warn-on-dark);
+    font-size: var(--ks-text-xs);
     border-radius: 3px;
   }
   .unit {
@@ -230,10 +221,10 @@ ks-admin {
     padding: 2px 6px;
   }
   .unit[data-side='blue'] > summary {
-    color: #6cb6ff;
+    color: var(--ks-info-on-dark);
   }
   .unit[data-side='red'] > summary {
-    color: #ff7b72;
+    color: var(--ks-wax-on-dark);
   }
   .queue li {
     word-break: break-all;
@@ -286,7 +277,7 @@ ks-admin {
   .lp-chip button {
     border: 0;
     padding: 0 2px;
-    cursor: pointer;
+    min-height: 0;
   }
   .lp-body {
     flex: 1;
@@ -318,7 +309,7 @@ ks-admin {
     background: var(--panel);
   }
   .lp-row[aria-selected='true'] {
-    background: #243247;
+    background: var(--ks-night-select);
   }
   .lp-row > span {
     overflow: hidden;
@@ -329,7 +320,7 @@ ks-admin {
     flex: 1;
   }
   .lp-row[data-kind='error'] {
-    color: #f85149;
+    color: var(--ks-wax-on-dark);
   }
   .lp-detail {
     overflow: auto;
@@ -347,9 +338,11 @@ ks-admin {
   }
   .lp-chain button {
     border: 0;
+    background: transparent;
     padding: 0;
+    min-height: 0;
+    justify-content: flex-start;
     text-align: left;
-    cursor: pointer;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;

@@ -1,14 +1,9 @@
 #clock {
   display: flex;
-  gap: 8px;
+  gap: var(--ks-space-2);
   align-items: baseline;
   flex-wrap: wrap;
   box-sizing: border-box;
-  padding: 8px 10px;
-  border-radius: 4px;
-  background: rgba(42, 33, 24, 0.88);
-  color: #efe6c8;
-  font-size: 13px;
 }
 .time {
   font-variant-numeric: tabular-nums;
@@ -18,19 +13,19 @@
 }
 #clock[data-status='paused'] .status,
 #clock[data-status='stopped'] .status {
-  background: #c9a95c;
-  color: #2a2118;
-  border-radius: 3px;
+  background: var(--ks-brass);
+  color: var(--ks-ink);
+  border-radius: var(--ks-radius);
   padding: 0 5px;
   font-weight: bold;
 }
 .vote {
   font-weight: bold;
-  color: #ffd76a;
+  color: var(--ks-brass-hi);
 }
 .staff {
   font-style: italic;
-  color: #ffd76a;
+  color: var(--ks-brass-hi);
 }
 .link {
   opacity: 0.7;

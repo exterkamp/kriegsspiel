@@ -20,6 +20,7 @@ import { MenuLinkComponent } from '../shell/menu-link.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
   styleUrl: './admin.component.css',
+  host: { class: 'ks-theme' },
   imports: [MenuLinkComponent],
   template: `<div id="app" #root></div>
     <ks-menu-link />`,

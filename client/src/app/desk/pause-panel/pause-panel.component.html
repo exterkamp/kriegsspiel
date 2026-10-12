@@ -1,6 +1,6 @@
 @let v = view();
 @if (v.kind === 'idle') {
-  <section class="pause idle" aria-label="Pause">
+  <section class="pause idle ks-overlay" aria-label="Pause">
     @if (v.action === 'resume') {
       <button type="button" data-testid="propose-resume" (click)="propose('resume')">
         Ask to resume
@@ -28,7 +28,7 @@
     }
   </section>
 } @else if (v.kind === 'vote') {
-  <section class="pause vote" aria-label="Pause vote" data-testid="pause-vote">
+  <section class="pause vote ks-overlay" aria-label="Pause vote" data-testid="pause-vote">
     <p class="headline" role="status">
       <b>{{ v.headline }}</b>
       @if (v.reason) {

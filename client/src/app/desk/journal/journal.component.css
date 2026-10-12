@@ -8,31 +8,6 @@
 }
 .note textarea {
   flex: 1 1 100%;
-  font: inherit;
-}
-button {
-  font: inherit;
-  font-size: 13px;
-  padding: 3px 8px;
-  border: 1px solid #5a4a36;
-  border-radius: 3px;
-  background: #efe6c8;
-  color: #2a2118;
-  cursor: pointer;
-}
-button[aria-pressed='true'] {
-  background: #c9a95c;
-  font-weight: bold;
-}
-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible {
-  outline: 3px solid #ffd76a;
-  outline-offset: 2px;
 }
 .delivery {
   display: flex;

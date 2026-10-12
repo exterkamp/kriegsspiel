@@ -1,0 +1,246 @@
+/*
+ * Shared controls (#327). Everything is scoped under `.ks-theme`, which the shell and the admin view put on their
+ * host, so the map tools (#308) and the benchmarks are untouched until they opt in by adding the class.
+ * Variants are classes: `.ks-primary`, `.ks-quiet`, `.ks-danger`; a pressed or selected button is `aria-pressed`
+ * or `aria-selected`. Layout helpers: `.ks-panel`, `.ks-paper`, `.ks-overlay`, `.ks-field`, `.ks-row`, `.ks-badge`,
+ * `.ks-status`, `.ks-tabs`, `.ks-stack`, `.ks-cluster`. The living style guide (`/style-guide`) shows each one.
+ */
+:where(.ks-theme) {
+  color: var(--ks-text);
+  font-family: var(--ks-font);
+  font-size: var(--ks-text-md);
+  line-height: 1.4;
+}
+:where(.ks-theme) *:focus-visible {
+  outline: var(--ks-focus-ring);
+  outline-offset: 2px;
+}
+:where(.ks-theme) .ks-overlay *:focus-visible,
+:where(.ks-theme) .ks-dark *:focus-visible {
+  outline-color: var(--ks-focus-on-dark);
+}
+:where(.ks-theme) a {
+  color: var(--ks-link);
+}
+:where(.ks-theme) h1,
+:where(.ks-theme) h2,
+:where(.ks-theme) h3 {
+  font-family: var(--ks-font);
+  line-height: 1.2;
+}
+:where(.ks-theme) h1 {
+  font-size: var(--ks-text-title);
+  letter-spacing: 0.04em;
+  margin: 0 0 var(--ks-space-4);
+}
+:where(.ks-theme) h2 {
+  font-size: var(--ks-text-lg);
+  margin: var(--ks-space-5) 0 var(--ks-space-2);
+}
+:where(.ks-theme) .ks-muted {
+  color: var(--ks-text-muted);
+}
+:where(.ks-theme) .ks-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Buttons */
+:where(.ks-theme) button,
+:where(.ks-theme) .ks-btn {
+  font: inherit;
+  font-size: var(--ks-text-sm);
+  line-height: 1.2;
+  cursor: pointer;
+  padding: 6px 12px;
+  min-height: 32px;
+  border: 1px solid var(--ks-rule);
+  border-radius: var(--ks-radius);
+  background: var(--ks-control);
+  color: var(--ks-ink);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ks-space-1);
+  box-sizing: border-box;
+}
+:where(.ks-theme) button:hover:not(:disabled),
+:where(.ks-theme) .ks-btn:hover {
+  background: var(--ks-paper-sunk);
+}
+:where(.ks-theme) button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+:where(.ks-theme) button[aria-pressed='true'],
+:where(.ks-theme) button[aria-selected='true'] {
+  background: var(--ks-control-selected);
+  color: var(--ks-ink);
+  font-weight: bold;
+}
+:where(.ks-theme) .ks-primary {
+  background: var(--ks-primary);
+  color: var(--ks-on-primary);
+  font-size: var(--ks-text-lg);
+  padding: 10px 24px;
+}
+:where(.ks-theme) .ks-primary:hover:not(:disabled) {
+  background: var(--ks-primary);
+  filter: brightness(1.25);
+}
+:where(.ks-theme) .ks-quiet {
+  background: transparent;
+  border-color: transparent;
+  text-decoration: underline;
+  padding: 2px 4px;
+  min-height: 0;
+}
+:where(.ks-theme) .ks-danger {
+  color: var(--ks-danger);
+  border-color: var(--ks-danger);
+}
+
+/* Fields */
+:where(.ks-theme) .ks-field {
+  display: grid;
+  gap: var(--ks-space-1);
+  margin: 0 0 var(--ks-space-3);
+}
+:where(.ks-theme) .ks-field > .ks-hint {
+  font-size: var(--ks-text-sm);
+  color: var(--ks-text-muted);
+}
+:where(.ks-theme) .ks-field > .ks-error,
+:where(.ks-theme) .ks-error {
+  font-size: var(--ks-text-sm);
+  color: var(--ks-danger);
+}
+:where(.ks-theme) input:not([type='radio'], [type='checkbox'], [type='range']),
+:where(.ks-theme) select,
+:where(.ks-theme) textarea {
+  font: inherit;
+  color: var(--ks-ink);
+  background: var(--ks-paper-raised);
+  border: 1px solid var(--ks-rule);
+  border-radius: var(--ks-radius);
+  padding: 6px;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+:where(.ks-theme) textarea {
+  resize: vertical;
+}
+:where(.ks-theme) fieldset {
+  border: 1px solid var(--ks-rule);
+  border-radius: var(--ks-radius);
+  margin: 0 0 var(--ks-space-4);
+  padding: var(--ks-space-2) var(--ks-space-3) var(--ks-space-3);
+}
+:where(.ks-theme) legend {
+  font-weight: bold;
+  padding: 0 var(--ks-space-1);
+}
+
+/* Surfaces */
+:where(.ks-theme) .ks-panel {
+  background: var(--ks-surface);
+  color: var(--ks-ink);
+  border: 1px solid var(--ks-rule);
+  border-radius: var(--ks-radius);
+  padding: var(--ks-space-3) var(--ks-space-4);
+}
+:where(.ks-theme) .ks-paper {
+  background: var(--ks-surface);
+  color: var(--ks-ink);
+  border-radius: var(--ks-radius);
+  box-shadow: var(--ks-shadow-paper);
+  padding: var(--ks-space-4) var(--ks-space-5);
+  box-sizing: border-box;
+}
+:where(.ks-theme) .ks-overlay {
+  background: var(--ks-overlay);
+  color: var(--ks-on-overlay);
+  border-radius: var(--ks-radius);
+  padding: var(--ks-space-2) var(--ks-space-3);
+  box-sizing: border-box;
+  font-size: var(--ks-text-sm);
+}
+:where(.ks-theme) .ks-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ks-space-1) var(--ks-space-4);
+  align-items: baseline;
+  padding: var(--ks-space-2) var(--ks-space-3);
+  background: var(--ks-paper-control);
+  border: 1px solid var(--ks-rule);
+  border-radius: var(--ks-radius);
+}
+:where(.ks-theme) .ks-badge {
+  display: inline-block;
+  background: var(--ks-wax);
+  color: var(--ks-paper-raised);
+  border-radius: var(--ks-radius-pill);
+  padding: 0 6px;
+  font-size: var(--ks-text-xs);
+  font-style: normal;
+  font-weight: normal;
+}
+:where(.ks-theme) .ks-badge.ks-quiet-badge {
+  background: transparent;
+  color: var(--ks-ink);
+  border: 1px solid var(--ks-rule);
+}
+:where(.ks-theme) .ks-status {
+  margin: var(--ks-space-2) 0;
+  padding: var(--ks-space-1) var(--ks-space-3);
+  border-left: 4px solid var(--ks-info);
+  background: var(--ks-paper-raised);
+  color: var(--ks-ink);
+}
+:where(.ks-theme) .ks-status.ks-ok {
+  border-left-color: var(--ks-ok);
+}
+:where(.ks-theme) .ks-status.ks-warn {
+  border-left-color: var(--ks-warn);
+}
+:where(.ks-theme) .ks-status.ks-error {
+  border-left-color: var(--ks-danger);
+}
+:where(.ks-theme) .ks-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ks-space-1);
+}
+:where(.ks-theme) .ks-stack {
+  display: grid;
+  gap: var(--ks-space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+:where(.ks-theme) .ks-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ks-space-2);
+  align-items: center;
+}
+:where(.ks-theme) .ks-modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--ks-scrim);
+  display: grid;
+  place-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ks-theme * {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

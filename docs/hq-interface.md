@@ -95,6 +95,20 @@ Reports should carry structured data beside the prose (location, unit, size esti
 
 Period style, not a fantasy skin: aged paper, ink, sealing wax, pencil, brass instruments, with restrained animation (a courier arrival, a stamp). The text must stay readable. Serif for dispatches, handwriting-style only for short marginalia. Offer a plain high-contrast mode. Fixture asset sources and the pending visual review are recorded in [HQ assets](hq-assets.md).
 
+### Design system (#327)
+
+One look for every page of the Angular client. The audit that led to it is in [visual-audit.md](visual-audit.md).
+
+- **Tokens** are CSS custom properties in `client/src/styles/tokens.css`, the only file where colours and font families are written: paper and ink (`--ks-ink`, `--ks-paper*`, `--ks-rule*`), accents (`--ks-brass`, `--ks-wax`, `--ks-ok`, `--ks-warn`, `--ks-info`, and `*-on-dark` variants for the dark table), type (`--ks-font`, `--ks-font-mono`, `--ks-font-hand`, `--ks-text-*`), space (`--ks-space-1..6`), shape and elevation (`--ks-radius`, `--ks-shadow-*`) and motion (`--ks-move*`). Semantic roles (`--ks-text`, `--ks-surface`, `--ks-control`, `--ks-primary`, `--ks-danger`, `--ks-focus`) point at them.
+- **High contrast** is `html[data-contrast='high']`: black on white, a yellow brass, no gradient. The main menu and the style guide have a toggle, saved in `localStorage`; `prefers-contrast: more` darkens the muted text and rules without a toggle. `src/styles/design-system.test.ts` checks every text pair for 4.5:1 in both variants.
+- **Controls** are in `client/src/styles/ui.css`, scoped under a `.ks-theme` element (the shell, admin view and style guide put it on their host, so the map tools are untouched until they add it): buttons (default, `.ks-primary`, `.ks-quiet`, `.ks-danger`, `aria-pressed` for a selected one and for tabs), fields (`.ks-field` with `.ks-hint` and `.ks-error`; bare `input`, `select`, `textarea`, `fieldset` are styled too), `.ks-panel`, `.ks-paper`, `.ks-overlay` (dark strip over the table), `.ks-row`, `.ks-badge`, `.ks-status` (info, `.ks-ok`, `.ks-warn`, `.ks-error`), `.ks-tabs`, `.ks-stack`, `.ks-cluster`, `.ks-muted`, `.ks-sr-only`. Element rules sit under `:where()`, so a component's own selector always wins.
+- **Components** in `client/src/app/ui`: `ks-page-frame` (the page, a title and an optional "← Main menu" back control) and `ks-modal` (scrim, labelled dialog, focus moved in, Tab trapped).
+- **Style guide** at `/style-guide` (linked from Developer tools) shows the tokens and every control in each state.
+- **Adopting it** (the map tools, #308): put `class="ks-theme"` on the page's host, use `ks-page-frame` or the tokens for the page, and replace local hex colours and `font-family` with `var(--ks-*)`. `design-system.test.ts` lists the exempt folders (map authoring, benchmarks, map table, local board); remove a folder from `EXEMPT` once it is converted.
+- **The Three.js table** and its in-canvas labels keep their own look (map textures, piece colours) but use the paper and ink palette.
+- Rule: no hex colours, `rgb()` or `font-family` in component styles; the test fails on them.
+
+
 ## Rendering decision: hybrid 3D table + 2D desk
 
 **Decided:** Three.js for the map table, and a DOM UI for the desk. Phaser is dropped.

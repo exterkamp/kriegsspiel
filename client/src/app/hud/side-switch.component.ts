@@ -5,7 +5,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   selector: 'ks-side-switch',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div id="sides">
+    <div id="sides" class="ks-overlay">
       @for (s of sides(); track s) {
         <button type="button" [disabled]="s === current()" (click)="go(s)">
           {{ s === current() ? 'Playing ' + s : 'Switch to ' + s }}
@@ -20,11 +20,6 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
       bottom: 8px;
       display: flex;
       gap: 8px;
-      padding: 8px;
-      box-sizing: border-box;
-      background: rgba(42, 33, 24, 0.95);
-      color: #efe6c8;
-      font-size: 14px;
     }
   `,
 })

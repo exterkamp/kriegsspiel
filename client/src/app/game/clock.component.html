@@ -1,4 +1,10 @@
-<section id="clock" [attr.data-status]="v().status" aria-label="Clock" [title]="summary()">
+<section
+  id="clock"
+  class="ks-overlay"
+  [attr.data-status]="v().status"
+  aria-label="Clock"
+  [title]="summary()"
+>
   <b class="time">{{ v().time }}</b>
   <span class="rate" data-testid="clock-rate">{{ v().rate }}</span>
   <span class="status" data-testid="clock-status">

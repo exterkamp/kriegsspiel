@@ -10,34 +10,20 @@ import { SHELL_API } from './shell-api';
     <div id="account">
       <span>{{ me().guest ? 'Guest' : me().email }}</span>
       <a href="/?lobby=1">Games</a>
-      <button type="button" (click)="remove()">Delete account</button>
+      <button type="button" class="ks-danger" (click)="remove()">Delete account</button>
     </div>
   `,
   styles: `
     #account {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: var(--ks-space-2);
       align-items: center;
-      font:
-        13px Georgia,
-        serif;
+      font-size: var(--ks-text-sm);
     }
     span {
       flex: 1 0 100%;
       overflow-wrap: anywhere;
-    }
-    a {
-      color: inherit;
-    }
-    button {
-      font: inherit;
-      cursor: pointer;
-    }
-    a:focus-visible,
-    button:focus-visible {
-      outline: 3px solid #f2c94c;
-      outline-offset: 2px;
     }
   `,
 })
