@@ -51,6 +51,8 @@ export interface LobbyGame {
   status: 'lobby' | 'started';
   /** Accounts that have said they are ready to start. */
   ready: string[];
+  /** Accounts the creator removed from the room; they cannot take a seat again. */
+  removed?: string[];
   /** Players holding a staff or subordinate role beside the side's commander. None: shared HQ. */
   roles?: RoleSeat[];
   /** Papers HQ forwarded to subordinates. */

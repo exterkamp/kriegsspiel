@@ -40,6 +40,8 @@ export interface AuthStore {
   deleteSession(hash: string): void;
   /** Takes a seat. False when another user holds that side, or this user already sits on another side. */
   claimSeat(gameId: string, side: SideId, userId: string): boolean;
+  /** Gives up this user's seat in the game. False when they hold none. */
+  releaseSeat(gameId: string, userId: string): boolean;
   seatOf(gameId: string, userId: string): SideId | undefined;
   seatsOf(gameId: string): Array<{ side: SideId; userId: string }>;
   /** Ids of the games this user holds a seat in. */
@@ -149,6 +151,13 @@ export class MemoryAuthStore implements AuthStore {
     for (const u of bySide.values()) if (u === userId) return false;
     bySide.set(side, userId);
     this.seats.set(gameId, bySide);
+    return true;
+  }
+
+  releaseSeat(gameId: string, userId: string): boolean {
+    const side = this.seatOf(gameId, userId);
+    if (side === undefined) return false;
+    this.seats.get(gameId)?.delete(side);
     return true;
   }
 
@@ -342,6 +351,13 @@ export class SqliteAuthStore implements AuthStore {
       .prepare('INSERT INTO auth_seats (game_id, side, user_id) VALUES (?, ?, ?)')
       .run(gameId, side, userId);
     return true;
+  }
+
+  releaseSeat(gameId: string, userId: string): boolean {
+    const r = this.db
+      .prepare('DELETE FROM auth_seats WHERE game_id = ? AND user_id = ?')
+      .run(gameId, userId);
+    return Number(r.changes) > 0;
   }
 
   seatOf(gameId: string, userId: string): SideId | undefined {

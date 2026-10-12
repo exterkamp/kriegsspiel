@@ -12,6 +12,9 @@
  *                                  with a `role` (chiefOfStaff, intelligence, quartermaster, or subordinate with `units`) join
  *                                  the table of a side that already has its commander, while the game is in the lobby
  *   POST /games/:id/leave-role     signed in: give up the role you joined in the lobby
+ *   POST /games/:id/leave          signed in: give up your seat (or role) in a game still in the lobby; the creator cannot
+ *   POST /games/:id/kick           the creator: remove another player from a lobby game, body `{ side, role?, unit? }`
+ *                                  (no `role`: the side's seat holder; a subordinate is named by one of their `unit`s)
  *   POST /games/:id/ready          signed in, seated or holding a role: body `{ "ready": boolean }`
  *   POST /games/:id/start          the creator: start a lobby game once every side is taken and every player is ready
  *   GET  /games/:id/window         seated, game over: the umpire's window timeline (403 `game_not_over` before the end)
@@ -694,6 +697,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
       return {
         ...summary(rec, user.id),
         you: sideFor(rec, user.id) ?? null,
+        removed: rec.removed?.includes(user.id) ?? false,
         ready: rec.ready.includes(user.id) || (rec.creator === user.id && !hotSeat),
         role: seatFor(rec, user.id)?.role ?? null,
         pause: rec.pause ?? null,
@@ -784,6 +788,76 @@ export async function buildApp(options: AppOptions): Promise<App> {
     });
   });
 
+  const Kick = z.object({
+    side: z.string().min(1),
+    role: z.enum(['chiefOfStaff', 'intelligence', 'quartermaster', 'subordinate']).optional(),
+    unit: z.string().min(1).optional(),
+  });
+
+  /** Takes `userId` out of a lobby game: their seat or role and their ready mark. */
+  const vacate = (rec: LobbyGame, userId: string, removed: boolean): void => {
+    authStore.releaseSeat(rec.id, userId);
+    lobby.put({
+      ...rec,
+      roles: (rec.roles ?? []).filter((r) => r.userId !== userId),
+      ready: rec.ready.filter((u) => u !== userId),
+      ...(removed ? { removed: [...new Set([...(rec.removed ?? []), userId])] } : {}),
+    });
+  };
+
+  server.post<{ Params: { id: string } }>('/games/:id/leave', async (req, reply) => {
+    const user = auth.userOf(req);
+    if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+    const rec = recordOf(req.params.id);
+    if (!rec) return reply.code(404).send({ error: 'no_such_game' });
+    return tracedHttp(req.params.id, req, reply, async () => {
+      if (rec.status !== 'lobby' || starting.has(rec.id))
+        return reply.code(409).send({ error: 'already_started' });
+      if (rec.creator === user.id) return reply.code(409).send({ error: 'creator_cannot_leave' });
+      if (!authStore.seatOf(rec.id, user.id) && !roleOf(rec, user.id))
+        return reply.code(404).send({ error: 'no_seat' });
+      vacate(rec, user.id, false);
+      return { left: true };
+    });
+  });
+
+  server.post<{ Params: { id: string } }>('/games/:id/kick', async (req, reply) => {
+    const user = auth.userOf(req);
+    if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+    const rec = recordOf(req.params.id);
+    if (!rec) return reply.code(404).send({ error: 'no_such_game' });
+    return tracedHttp(req.params.id, req, reply, async () => {
+      if (rec.creator !== user.id) return reply.code(403).send({ error: 'not_creator' });
+      const body = Kick.safeParse(req.body);
+      if (!body.success) {
+        return reply.code(400).send({ error: 'bad_request', message: body.error.message });
+      }
+      if (rec.status !== 'lobby' || starting.has(rec.id))
+        return reply.code(409).send({ error: 'already_started' });
+      const { side, role, unit } = body.data;
+      const target = role
+        ? (rec.roles ?? []).find(
+            (r) =>
+              r.side === side &&
+              r.role === role &&
+              (role !== 'subordinate' || (unit !== undefined && r.units?.includes(unit))),
+          )?.userId
+        : authStore.seatsOf(rec.id).find((s) => s.side === side)?.userId;
+      if (!target) return reply.code(404).send({ error: 'no_such_player' });
+      if (target === user.id) return reply.code(400).send({ error: 'cannot_kick_self' });
+      vacate(rec, target, true);
+      void notifier
+        .notifyUser(
+          rec.id,
+          target,
+          'Removed from the game',
+          'The host removed you from the room before the game started.',
+        )
+        .catch((e) => onError(rec.id, e));
+      return { removed: true };
+    });
+  });
+
   server.post<{ Params: { id: string } }>('/games/:id/join', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
@@ -796,6 +870,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
         return reply.code(400).send({ error: 'bad_request', message: body.error.message });
       }
       const { side } = body.data;
+      if (rec.removed?.includes(user.id)) return reply.code(403).send({ error: 'removed' });
       if (rec.sessionType === 'hot_seat') return reply.code(400).send({ error: 'hot_seat_game' });
       if (!humanSides(rec).includes(side)) return reply.code(400).send({ error: 'bad_side' });
       if (body.data.role)

@@ -14,10 +14,13 @@ import {
   fetchGames,
   fetchScenarios,
   joinSide,
+  kickPlayer,
+  leaveGame,
   setReady,
   startGame,
   type GameInfo,
   type GameSummary,
+  type KickTarget,
 } from '@legacy/lobby/api';
 import type { PlayedGame } from '@legacy/shell/continueList';
 import type { CreateRequest, ScenarioOptions } from '@legacy/shell/newGame';
@@ -39,6 +42,8 @@ export interface ShellApi {
   fetchGame: (id: string) => Promise<GameInfo>;
   joinSide: (id: string, side: string) => Promise<void>;
   setReady: (id: string, ready: boolean) => Promise<void>;
+  leaveGame: (id: string) => Promise<void>;
+  kickPlayer: (id: string, who: KickTarget) => Promise<void>;
   startGame: (id: string) => Promise<void>;
   /** Makes a game for `?new=1`, taking `side` (the server picks one when unset). */
   createQuickGame: (side?: string, rate?: number) => Promise<string>;
@@ -71,6 +76,8 @@ export const SHELL_API = new InjectionToken<ShellApi>('SHELL_API', {
     fetchGame: (id) => fetchGame(id),
     joinSide: (id, side) => joinSide(id, side),
     setReady: (id, ready) => setReady(id, ready),
+    leaveGame: (id) => leaveGame(id),
+    kickPlayer: (id, who) => kickPlayer(id, who),
     startGame: (id) => startGame(id),
     createQuickGame,
   }),

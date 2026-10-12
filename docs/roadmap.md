@@ -23,7 +23,7 @@ Gameplay milestones should end in something playable. The standalone map-authori
 - [x] Umpire service with structured output schemas, on any provider through adapters: Anthropic, OpenAI-compatible, Ollama (D14); the compose file can run a local Ollama umpire (#326)
 - [x] `parseOrders`: free text to intents, with clarification/rejection for impossible orders (`LlmOrderParser`, with the rule-based stub as fallback; the golden corpus and eval harness are in `docs/order-eval.md`)
 - [x] `narrate`: fog-filtered field reports per side, run by the game actor once per side per window (D14, "Narrate in the actor")
-- [ ] Prompt-injection and leak test suites: the visibility filter has leak tests, a dedicated injection suite does not exist yet (#350)
+- [x] Prompt-injection and leak test suites: `leak.test.ts` (#44) and `injection.test.ts` (#350)
 - [x] Record LLM calls for audit (debug trace store, Epic 8; recorded outputs make replay need no model call)
 
 ## M3: Playable game, remote (done; Epic 1 and the server half of Epic 5)

@@ -434,7 +434,7 @@ export interface NarrateOptions {
    * own short call, which a 0.5b model manages far more often than a long batch, but the calls add up (#359).
    */
   maxReports?: number;
-  /** Names and commanders the side must not learn (`hiddenTerms`): a reply that contains one is rejected, whatever its case. */
+  /** Names the side must not read (`hiddenTerms`): a dispatch that carries one, in any case or spacing, is rejected. */
   hidden?: readonly string[];
 }
 

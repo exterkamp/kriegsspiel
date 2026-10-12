@@ -22,7 +22,11 @@ process.on('SIGTERM', () => (stopLoad(), process.exit(143)));
 const failed = [];
 for (let i = 1; i <= runs; i++) {
   console.log(`\n=== stress run ${i}/${runs} (${burners} burners) ===`);
-  const res = spawnSync('npm', ['test'], { encoding: 'utf8', maxBuffer: 1 << 28 });
+  const res = spawnSync('npm', ['test'], {
+    encoding: 'utf8',
+    maxBuffer: 1 << 28,
+    shell: process.platform === 'win32', // npm is a .cmd shim on Windows
+  });
   if (res.status !== 0) {
     failed.push(i);
     const out = `${res.stdout}\n${res.stderr}`;

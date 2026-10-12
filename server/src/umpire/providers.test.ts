@@ -275,7 +275,11 @@ describe.each(wires)('provider contract: $name', (wire) => {
         id: real.id,
         capabilities: real.capabilities,
         generate: (req, signal) => {
-          if (hung) return real.generate(req, signal);
+          if (hung) {
+            // The retry goes over real sockets, whose own timers must not be faked.
+            vi.useRealTimers();
+            return real.generate(req, signal);
+          }
           hung = true;
           // Like a real transport, it rejects a tick after the abort, not inside it.
           return new Promise((_, reject) =>
@@ -526,7 +530,7 @@ describe('no SDK outside the adapters', () => {
         if (e.isDirectory()) walk(p);
         else if (/\.ts$/.test(e.name) && !/\.test\.ts$/.test(e.name)) {
           if (/from '@anthropic-ai\/sdk'/.test(readFileSync(p, 'utf8')))
-            offenders.push(p.slice(dir.length + 1));
+            offenders.push(p.slice(dir.length + 1).replaceAll('\\', '/'));
         }
       }
     };

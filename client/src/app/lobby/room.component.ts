@@ -8,9 +8,10 @@ import {
   output,
   signal,
 } from '@angular/core';
-import type { GameInfo } from '@legacy/lobby/api';
+import type { GameInfo, KickTarget } from '@legacy/lobby/api';
 import { SESSION_LABELS, inviteLink, rateLabel, startBlocker } from '@legacy/lobby/model';
 import { SHELL_API, SHELL_WINDOW } from '../shell/shell-api';
+import { ModalComponent } from '../ui/modal.component';
 import { PageFrameComponent } from '../ui/page-frame.component';
 
 /**
@@ -22,7 +23,7 @@ const MISSES_BEFORE_WARNING = 3;
 
 @Component({
   selector: 'ks-room',
-  imports: [PageFrameComponent],
+  imports: [PageFrameComponent, ModalComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <ks-page-frame
@@ -35,8 +36,27 @@ const MISSES_BEFORE_WARNING = 3;
           <li class="ks-row">
             {{ s.side }}: {{ s.taken ? (s.ready ? 'ready' : 'seated') : 'open' }}
             {{ info().you === s.side ? '(you)' : '' }}
-            @if (!s.taken && !info().you && !hot()) {
+            @if (!s.taken && !info().you && !hot() && !info().removed) {
               <button type="button" (click)="take(s.side)">Take {{ s.side }}</button>
+            }
+            @if (info().creator && s.taken && info().you !== s.side && !hot()) {
+              <button type="button" class="ks-danger" (click)="ask({ side: s.side })">
+                Remove {{ s.side }} player
+              </button>
+            }
+            @for (r of s.roles ?? []; track $index) {
+              <span class="role">
+                {{ r.role }}{{ r.you ? ' (you)' : '' }}
+                @if (info().creator) {
+                  <button
+                    type="button"
+                    class="ks-danger"
+                    (click)="ask({ side: s.side, role: r.role, unit: r.units?.[0] })"
+                  >
+                    Remove {{ r.role }}
+                  </button>
+                }
+              </span>
             }
           </li>
         }
@@ -54,6 +74,9 @@ const MISSES_BEFORE_WARNING = 3;
           {{ info().ready ? 'Not ready' : 'Ready' }}
         </button>
       }
+      @if (info().you && !info().creator && !hot()) {
+        <button id="room-leave" type="button" (click)="leaveSeat()">Leave seat</button>
+      }
       @if (info().creator) {
         <button
           id="room-start"
@@ -66,6 +89,16 @@ const MISSES_BEFORE_WARNING = 3;
         </button>
       }
       <p id="lobby-msg" role="status" [class.ks-status]="message() !== ''">{{ message() }}</p>
+      @if (pending(); as who) {
+        <ks-modal heading="Remove player?" labelId="room-kick-h">
+          <p>
+            Remove the {{ who.role ?? 'commander' }} on {{ who.side }} from this game? They are told
+            and cannot rejoin.
+          </p>
+          <button type="button" class="ks-danger" (click)="confirmKick(who)">Remove player</button>
+          <button type="button" (click)="pending.set(undefined)">Cancel</button>
+        </ks-modal>
+      }
     </ks-page-frame>
   `,
 })
@@ -87,7 +120,14 @@ export class RoomComponent implements OnInit {
   /** The status line: an error, else what stops the host starting, else the guest's wait. Empty shows no bar. */
   protected readonly message = (): string =>
     this.error() ??
-    (this.info().creator ? (this.blocker() ?? '') : 'Waiting for the host to start.');
+    (this.info().removed
+      ? 'The host removed you from this game.'
+      : this.info().creator
+        ? (this.blocker() ?? '')
+        : 'Waiting for the host to start.');
+
+  /** The player the host has asked to remove and not yet confirmed. */
+  protected readonly pending = signal<KickTarget | undefined>(undefined);
 
   private misses = 0;
 
@@ -129,6 +169,20 @@ export class RoomComponent implements OnInit {
 
   protected leave(): void {
     this.left.emit();
+  }
+
+  protected leaveSeat(): void {
+    this.api.leaveGame(this.info().id).then(
+      () => this.left.emit(),
+      (e: unknown) => this.error.set(e instanceof Error ? e.message : String(e)),
+    );
+  }
+  protected ask(who: KickTarget): void {
+    this.pending.set(who);
+  }
+  protected confirmKick(who: KickTarget): void {
+    this.pending.set(undefined);
+    this.act(this.api.kickPlayer(this.info().id, who));
   }
 
   protected take(side: string): void {
