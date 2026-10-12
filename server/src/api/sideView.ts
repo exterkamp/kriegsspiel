@@ -125,6 +125,7 @@ export function toSideView(
   clock: ClockState,
   narration?: Narration,
   staff: readonly StaffExchange[] = [],
+  overloaded?: string,
 ): SideView {
   return {
     side: view.side,
@@ -181,6 +182,7 @@ export function toSideView(
     ...(staff.length === 0
       ? {}
       : { staffHistory: staff.map((x) => staffExchangeAt(x, view.time)) }),
+    ...(overloaded ? { staffOverloaded: overloaded } : {}),
     clock,
   };
 }
@@ -198,6 +200,7 @@ export function sideViewOf(
   forwarded: readonly string[] = [],
   narration?: Narration,
   staff: readonly StaffExchange[] = [],
+  overloaded?: string,
 ): SideView {
   // `world.time` only moves when an event fires; the engine's own time is the real "now".
   if (seat) {
@@ -206,7 +209,8 @@ export function sideViewOf(
       clock,
       narration,
       staffFor(seat, staff),
+      overloaded,
     );
   }
-  return toSideView(viewFor(state.world, side, state.time), clock, narration, staff);
+  return toSideView(viewFor(state.world, side, state.time), clock, narration, staff, overloaded);
 }

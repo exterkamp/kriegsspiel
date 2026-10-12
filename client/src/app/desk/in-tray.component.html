@@ -1,5 +1,8 @@
 <div class="tray">
   <h2>In-tray</h2>
+  @if (overloaded(); as notice) {
+    <p class="ks-muted overloaded" role="status">{{ notice }}</p>
+  }
   <div class="piles" role="group" aria-label="Piles">
     @for (p of sorted().piles; track p.id) {
       <button

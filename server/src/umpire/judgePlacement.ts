@@ -8,7 +8,7 @@
  */
 import { FORMATIONS, metres, mm, positionAt } from '@kriegsspiel/engine';
 import type { TerrainFeature, GameState, Point, PlacementRuling } from '@kriegsspiel/engine';
-import type { JsonSchema, UmpireClient } from './umpireClient.js';
+import { UmpireError, type JsonSchema, type UmpireClient } from './umpireClient.js';
 
 export const JUDGE_PLACEMENT_PROMPT_VERSION = 'judge-placement-v1';
 
@@ -126,13 +126,20 @@ export async function judgePlacements(
   situation: string,
   elapsedMs: number,
 ): Promise<PlacementRuling[]> {
-  const { output } = await client.call<JudgePlacementOutput>({
-    stage: 'judge',
-    promptVersion: JUDGE_PLACEMENT_PROMPT_VERSION,
-    system: JUDGE_PLACEMENT_SYSTEM,
-    input: judgePlacementInput(world, situation, elapsedMs),
-    schema: JUDGE_PLACEMENT_SCHEMA,
-  });
+  let output: JudgePlacementOutput;
+  try {
+    ({ output } = await client.call<JudgePlacementOutput>({
+      stage: 'judge',
+      promptVersion: JUDGE_PLACEMENT_PROMPT_VERSION,
+      system: JUDGE_PLACEMENT_SYSTEM,
+      input: judgePlacementInput(world, situation, elapsedMs),
+      schema: JUDGE_PLACEMENT_SCHEMA,
+    }));
+  } catch (e) {
+    // A game over its cap gets no rulings: the units stay where the engine put them.
+    if (e instanceof UmpireError && (e.kind === 'budget' || e.kind === 'rate-limit')) return [];
+    throw e;
+  }
   return output.placements.map((p) => ({
     proposal: {
       unitId: p.unitId,

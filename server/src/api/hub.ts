@@ -155,6 +155,7 @@ export class Hub {
       conn.seat ? this.forwardedTo(gameId, conn) : [],
       game.narrationFor(conn.side),
       game.staffHistoryFor(conn.side),
+      game.overloadedFor(conn.side),
     );
   }
 

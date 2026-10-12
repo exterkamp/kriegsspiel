@@ -143,6 +143,8 @@ export const SideView = z
     dispatches: z.array(Dispatch),
     /** The side's conference with its staff officers, oldest first. Absent when nobody has asked. */
     staffHistory: z.array(StaffExchange).optional(),
+    /** In-fiction notice shown while the umpire's per-game budget or rate limit is refusing narration. Never carries the figures. */
+    staffOverloaded: z.string().optional(),
     clock: ClockState,
   })
   .strict();
