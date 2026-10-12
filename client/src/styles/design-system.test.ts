@@ -39,8 +39,11 @@ describe('component styles use the design tokens (#327)', () => {
       text.split('\n').forEach((line, i) => {
         if (/^\s*(\/\*|\*|\/\/)/.test(line)) return;
         const code = line;
-        // An id selector line ends in `{` or `,` and has no `:`; a value line that starts with a hex does not.
-        const isSelector = /^\s*#[\w-]+[^:]*[{,]\s*$/.test(code);
+        // An id selector line has no `:` or `%` and ends in `{`, or in `,` when the name is not a hex length; a value
+        // line such as `#fff 0%,` or `#abc,` is a colour.
+        const isSelector =
+          /^\s*#[\w-]+[^:;%]*\{\s*$/.test(code) ||
+          (/^\s*#[\w-]+[^:;%]*,\s*$/.test(code) && !/^\s*#[0-9a-fA-F]{3,8}\b/.test(code));
         if (
           (!isSelector && /(?:[:\s,(]|^|['"])#[0-9a-fA-F]{3,8}(?![\w-])(?!\s*\{)/.test(code)) ||
           /\b(?:rgba?|hsla?)\(/.test(code) ||

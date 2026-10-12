@@ -24,7 +24,7 @@ import { ModalComponent } from '../ui/modal.component';
       Menu (Esc)
     </button>
     @if (open()) {
-      <div>
+      <div #panel>
         <ks-modal heading="Menu" labelId="gm-h">
           <button #resume type="button" (click)="setOpen(false)">Resume</button>
           <button type="button" (click)="leave.emit()">Leave to main menu</button>
@@ -75,6 +75,7 @@ export class GameMenuComponent {
   protected readonly open = signal(false);
   private readonly resume = viewChild<ElementRef<HTMLButtonElement>>('resume');
   private readonly opener = viewChild<ElementRef<HTMLButtonElement>>('opener');
+  private readonly panel = viewChild<ElementRef<HTMLDivElement>>('panel');
 
   protected setOpen(v: boolean): void {
     this.open.set(v);
@@ -83,12 +84,31 @@ export class GameMenuComponent {
     });
   }
 
+  /** Keeps Tab inside the open panel, since the page behind it is not usable while it is up. */
+  private trapTab(e: KeyboardEvent): void {
+    const panel = this.panel()?.nativeElement;
+    if (e.key !== 'Tab' || !panel) return;
+    const items = [...panel.querySelectorAll<HTMLButtonElement>('button')];
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (!first || !last) return;
+    const at = document.activeElement;
+    if (e.shiftKey && (at === first || !panel.contains(at))) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (at === last || !panel.contains(at))) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
   /**
    * Esc closes the menu if it is open. Otherwise it opens it, but only from the table: in a desk view Esc belongs to
    * the desk (back to the table), and in a text field to the field. Runs in the capture phase so it sees the view as
    * it was before the desk handles the same key.
    */
   protected onKey(e: KeyboardEvent): void {
+    if (this.open()) this.trapTab(e);
     if (e.key !== 'Escape') return;
     if (this.open()) {
       e.preventDefault();
