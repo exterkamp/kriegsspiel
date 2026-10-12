@@ -1,4 +1,4 @@
-import type { SideView } from '@kriegsspiel/protocol';
+import type { SideView, StaffExchange } from '@kriegsspiel/protocol';
 import type { LinkStatus, StaffCharge, StaffServerAnswer } from '../net/state.js';
 import { formatGameTime } from '../net/state.js';
 import { formatAge, pct } from './roster.js';
@@ -163,6 +163,42 @@ export function applyServerAnswers(
     };
   });
   return changed ? next : log;
+}
+
+/**
+ * Take in the conference the server kept (`SideView.staffHistory`), so a reload or a reconnect
+ * does not lose it. An exchange already in the log (by its question id) is left alone; the rest
+ * are added with their officer and answer, or text-less when the server had no words. Returns the
+ * same array when nothing changed.
+ */
+export function mergeStaffHistory(
+  log: readonly Exchange[],
+  history: readonly StaffExchange[] | undefined,
+): readonly Exchange[] {
+  const known = new Set(log.flatMap((e) => (e.questionId === undefined ? [] : [e.questionId])));
+  const fresh = (history ?? []).filter((h) => !known.has(h.questionId));
+  if (fresh.length === 0) return log;
+  let id = nextExchangeId(log);
+  return [
+    ...log,
+    ...fresh.map((h): Exchange => ({
+      id: id++,
+      role: h.role,
+      question: h.question,
+      askedAtGame: h.askedAtGame,
+      answerAtGame: h.answerAtGame,
+      questionId: h.questionId,
+      officer: h.officer,
+      ...(h.text === undefined
+        ? { textless: true }
+        : {
+            answer: {
+              text: `${h.officer.name}: ${h.text}`,
+              basedOnGame: h.basedOnGame ?? h.askedAtGame,
+            },
+          }),
+    })),
+  ];
 }
 
 /**

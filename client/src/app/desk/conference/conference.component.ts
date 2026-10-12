@@ -19,6 +19,7 @@ import {
   officerFor,
   nextExchangeId,
   applyServerAnswers,
+  mergeStaffHistory,
   settleTextless,
   questionProblem,
   reconcileExchanges,
@@ -86,6 +87,12 @@ export class ConferenceComponent {
     effect(() => {
       const { staffAnswers: answers } = this.game.state();
       untracked(() => this.desk.conferenceLog.update((l) => applyServerAnswers(l, answers)));
+    });
+
+    // What the server kept of the conference comes back after a reload or a reconnect.
+    effect(() => {
+      const history = this.game.state().view?.staffHistory;
+      untracked(() => this.desk.conferenceLog.update((l) => mergeStaffHistory(l, history)));
     });
 
     // A reply with no text is answered from the newest view when the answer falls due.

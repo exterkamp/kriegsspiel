@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyServerAnswers,
+  mergeStaffHistory,
   busy,
   fixtureAnswer,
   newExchange,
@@ -159,5 +160,35 @@ describe('text-less server replies', () => {
     expect(early[0]!.answer).toBeUndefined();
     const [done] = settleTextless([marked!], 600_000, { ...fixtureView, atGame: 555_000 });
     expect(done!.answer?.basedOnGame).toBe(555_000);
+  });
+});
+
+describe('the conference the server kept (#323)', () => {
+  const officer = { name: 'Major Dessau', traits: ['terse'] };
+  const kept = (questionId: string, text?: string) => ({
+    questionId,
+    role: 'intelligence' as const,
+    question: 'Where is the enemy?',
+    askedAtGame: 60_000,
+    answerAtGame: 960_000,
+    ...(text === undefined ? {} : { text, basedOnGame: 60_000 }),
+    officer,
+  });
+
+  it('restores answered and text-less exchanges after a reload, once', () => {
+    const log = mergeStaffHistory([], [kept('q1', 'At the bridge.'), kept('q2')]);
+    expect(log).toHaveLength(2);
+    expect(log[0]).toMatchObject({
+      role: 'intelligence',
+      questionId: 'q1',
+      answerAtGame: 960_000,
+      officer,
+      answer: { text: 'Major Dessau: At the bridge.', basedOnGame: 60_000 },
+    });
+    expect(log[1]).toMatchObject({ questionId: 'q2', textless: true });
+    expect(new Set(log.map((e) => e.id)).size).toBe(2);
+    // Merging again changes nothing, and an exchange already held is not doubled.
+    expect(mergeStaffHistory(log, [kept('q1', 'At the bridge.')])).toBe(log);
+    expect(mergeStaffHistory(log, undefined)).toBe(log);
   });
 });
