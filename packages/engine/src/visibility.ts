@@ -261,28 +261,39 @@ export interface EngineSideView {
 export function renderReport(r: Report, leadMs: number): string {
   const mins = Math.round(leadMs / MS_PER_MINUTE);
   const where = r.place;
-  const when = mins === 0 ? 'as it reached us' : `${mins} min before it reached us`;
+  const when =
+    mins === 0
+      ? 'as it reached us'
+      : `${mins} ${mins === 1 ? 'minute' : 'minutes'} before it reached us`;
+  // Every report opens the same way, and says its age the same way (#323). The umpire's own words stand as written.
+  const sir = (text: string) => `Sir, ${text}`;
   switch (r.kind) {
     case 'situation':
-      return `${r.from} reports ${r.sizeEstimate ?? 'the formations'} in position ${where}; no enemy yet in sight.`;
+      return sir(
+        `${r.from} reports ${r.sizeEstimate ?? 'the formations'} in position ${where}; no enemy yet in sight.`,
+      );
     case 'contact':
-      return `${r.from} sighted ${r.sizeEstimate ?? 'enemy troops'} ${where}, ${when} (${r.confidence} confidence).`;
+      return sir(
+        `${r.from} sighted ${r.sizeEstimate ?? 'enemy troops'} ${where}, ${when} (${r.confidence} confidence).`,
+      );
     case 'unitLost':
-      return `${r.from} is lost ${where}, ${when}.`;
+      return sir(`${r.from} is lost ${where}, ${when}.`);
     case 'orderDelivered':
-      return `${r.from} received its orders ${where}, ${when}.`;
+      return sir(`${r.from} received its orders ${where}, ${when}.`);
     case 'lowAmmo':
-      return `${r.from} is running short of ammunition ${where}, ${when}.`;
+      return sir(`${r.from} is running short of ammunition ${where}, ${when}.`);
     case 'exhausted':
-      return `${r.from} is exhausted ${where}, ${when}.`;
+      return sir(`${r.from} is exhausted ${where}, ${when}.`);
     case 'destroyed':
-      return `${r.from} reports ${r.sizeEstimate ?? 'enemy troops'} destroyed ${where}, ${when}.`;
+      return sir(
+        `${r.from} reports ${r.sizeEstimate ?? 'enemy troops'} destroyed ${where}, ${when}.`,
+      );
     case 'engaged':
-      return `${r.from} is engaged ${where}, ${when}.`;
+      return sir(`${r.from} is engaged ${where}, ${when}.`);
     case 'heavyLosses':
-      return `${r.from} is taking heavy losses ${where}, ${when}.`;
+      return sir(`${r.from} is taking heavy losses ${where}, ${when}.`);
     case 'broke':
-      return `${r.from} has broken and is falling back ${where}, ${when}.`;
+      return sir(`${r.from} has broken and is falling back ${where}, ${when}.`);
     case 'battle':
       return r.text ?? `The umpire has decided the battle ${where}.`;
   }
@@ -291,7 +302,7 @@ export function renderReport(r: Report, leadMs: number): string {
 /** Prose for the table: where and when the dispatch was taken, then the enemy's own words. */
 export function renderDocument(d: ViewDocument): string {
   const mins = Math.round(d.ageMs / MS_PER_MINUTE);
-  return `Enemy dispatch to ${d.addressedTo}, taken from a courier ${d.place}, ${mins} min ago: "${d.text}"`;
+  return `Enemy dispatch to ${d.addressedTo}, taken from a courier ${d.place}, ${mins} ${mins === 1 ? 'minute' : 'minutes'} ago: "${d.text}"`;
 }
 
 /**
