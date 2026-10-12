@@ -177,3 +177,12 @@ export {
 } from './supply.js';
 export { ROLES, maySign, mayDraft, mayForward, viewForRole } from './roles.js';
 export type { EngineRoleView, Role, Seat, ViewUnitOutline } from './roles.js';
+export {
+  COMBAT_DATA,
+  CombatDataError,
+  FIRE_RULES,
+  MORALE_RULES,
+  RALLY_RULES,
+  parseCombatData,
+} from './combatRules.js';
+export type { CombatData } from './combatRules.js';

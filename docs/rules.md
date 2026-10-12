@@ -43,9 +43,17 @@ The 1824 scan confirms the march ruler and the scale. The fire and close-combat 
 
 The engine reads its unit stats from `packages/engine/src/unitTypes.ts` (decision "Unit types, formations and data-driven stats"). Types: `line_infantry`, `skirmishers`, `cavalry`, `artillery`. Formations: `line`, `column`, `square`, `skirmish`, `loose`, each with multipliers relative to `line` for ground per man and shape, march pace, outgoing fire, and casualties taken from fire and melee. Only these are traced to the tables above: infantry march (200 paces per 2-minute move, `march.json`), cavalry trot (600 paces), and line infantry ground per man (450 men in 125 x 75 paces, `frontage.json`). Everything else (fire rates, ranges, formation multipliers, change times, skirmisher and artillery pace) is a placeholder, not from the rulebook. Column moves faster than line (route march against deployed), which is a simplification of the 1824 pace bands.
 
+## Combat v2 in the engine
+
+The combat numbers are in `packages/engine/src/combatRules.ts` (decision "Combat v2 (#30)" in `decisions.md`). Traced to the tables: cover halves the casualties of fire (`fire.json`, `target_in_cover_infantry_fire`, "losses x 0.5"; the engine takes 1 - cover from the terrain, 0.5 for woods) and fire from the flank hits harder (`artillery_vs_flank`, x1.25; ours is x1.5 for every arm). Everything else, the long-range falloff, melee, rear, rout factors, the morale check (two dice, fail costs morale), melee loser, and rally (when, how far an enemy, which die), is a placeholder of ours. The rulebook has recovery moves for repulsed, defeated and totally defeated troops (`morale.json`, `recovery_moves`); the engine's rally try is a single d6 per 2 minutes and does not use them yet.
+
 ## Supply, fatigue and ammunition in the engine
 
 None of the numbers for fatigue, forced marching, ammunition use or wagon reach come from the rulebook; they are placeholders in `packages/engine/src/fatigue.ts` and `supply.ts`, listed in the decision "Supply, fatigue and ammunition" in `decisions.md`.
+
+## Sight and cover
+
+None of the sight numbers come from the 1824 rulebook, which leaves sight to the umpire. Placeholders in `packages/engine/src/visibility.ts`: sight range per unit type (`unitTypes.ts`), 200 m in or out of a wood or building, and partial concealment (`PARTIAL_PENALTY` = 4: a metre of ground at concealment c counts as 1 + 4c metres; a unit standing in it counts as 1/(1-c) times as far). Height tags (`low`, `flat`, `rise`, `high`) decide whether a ridge blocks the line. Cover is the per-feature `cover` attribute (0..1) read at the target in combat. The weather hook is `GameState.sightFactor`.
 
 ## Gaps
 

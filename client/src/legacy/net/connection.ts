@@ -22,7 +22,7 @@ export interface WebSocketLike {
 export interface ConnectionOptions {
   url: string;
   onMessage(m: ServerMessage): void;
-  onStatus(status: 'connecting' | 'open' | 'closed'): void;
+  onStatus(status: 'connecting' | 'open' | 'closed' | 'failed'): void;
   /** Called for a frame that does not parse as a `ServerMessage`. */
   onBadMessage?(error: string): void;
   createSocket?(url: string): WebSocketLike;
@@ -30,7 +30,12 @@ export interface ConnectionOptions {
   clearTimer?(handle: unknown): void;
   /** Delays between reconnect attempts; the last one repeats. */
   backoffMs?: readonly number[];
+  /** Give up after this long without an open socket (default 2 minutes); `retry()` starts over. */
+  giveUpAfterMs?: number;
+  now?(): number;
 }
+
+const GIVE_UP_AFTER_MS = 120_000;
 
 const OPEN = 1;
 
@@ -40,6 +45,10 @@ export class GameConnection {
   private attempt = 0;
   private timer: unknown;
   private stopped = false;
+  private failed = false;
+  private closedByServer = false;
+  /** When the current run of failed attempts began; undefined while connected. */
+  private downSince: number | undefined;
   private readonly backoff: readonly number[];
 
   constructor(private readonly o: ConnectionOptions) {
@@ -48,7 +57,26 @@ export class GameConnection {
 
   start(): void {
     this.stopped = false;
+    if (this.timer !== undefined) (this.o.clearTimer ?? clearTimeout)(this.timer as never);
+    this.timer = undefined;
+    this.failed = false;
+    this.closedByServer = false;
+    this.downSince = undefined;
+    this.attempt = 0;
     this.open();
+  }
+
+  /** The player's manual retry after the connection gave up. */
+  retry(): void {
+    if (this.stopped) return;
+    this.socket?.close();
+    this.start();
+  }
+
+  /** Stop reconnecting and tell the player; `retry()` or `start()` resumes. */
+  private giveUp(): void {
+    this.failed = true;
+    this.o.onStatus('failed');
   }
 
   stop(): void {
@@ -112,6 +140,7 @@ export class GameConnection {
     this.socket = socket;
     socket.onopen = () => {
       this.attempt = 0;
+      this.downSince = undefined;
       this.o.onStatus('open');
     };
     socket.onmessage = (e) => {
@@ -120,6 +149,8 @@ export class GameConnection {
       if (r.ok) {
         // An edit on a rev the server does not have (it lost it, or we missed one): start over from its snapshot.
         if (r.value.kind === 'error' && r.value.code === 'bad_rev') this.syncDrafts();
+        // The game is gone: the server will not take us back, so stop knocking.
+        if (r.value.kind === 'error' && r.value.code === 'game_closed') this.closedByServer = true;
         this.o.onMessage(r.value);
       } else this.o.onBadMessage?.(r.error);
     };
@@ -127,8 +158,12 @@ export class GameConnection {
     socket.onerror = () => {};
     socket.onclose = () => {
       if (this.socket !== socket) return;
+      if (this.stopped) return this.o.onStatus('closed');
+      const now = (this.o.now ?? Date.now)();
+      this.downSince ??= now;
+      if (this.closedByServer || now - this.downSince >= (this.o.giveUpAfterMs ?? GIVE_UP_AFTER_MS))
+        return this.giveUp();
       this.o.onStatus('closed');
-      if (this.stopped) return;
       const delay = this.backoff[Math.min(this.attempt, this.backoff.length - 1)] ?? 1000;
       this.attempt += 1;
       this.timer = (this.o.setTimer ?? ((f, ms) => setTimeout(f, ms)))(() => this.open(), delay);

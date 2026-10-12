@@ -26,6 +26,8 @@ import {
   type EngineState,
   type GameState,
 } from './index.js';
+import { RALLY_EVENT } from './contact.js';
+import { schedule } from './queue.js';
 import { BATTLE_CLOSE_MS, forceBroken, evaluateVictory } from './combat.js';
 import { viewFor } from './index.js';
 import type { BattleRuling } from './types.js';
@@ -164,6 +166,7 @@ describe('contact and combat ticks', () => {
       melee: false,
       die: expect.any(Number),
       casualties: expect.any(Number),
+      factors: expect.objectContaining({ aspect: 1.5, rout: 1, ammo: 1 }),
       targetStrength: expect.any(Number),
       targetMorale: expect.any(Number),
     });
@@ -1065,5 +1068,217 @@ describe('battle visibility (#320)', () => {
     const note = reportsOf(state, 'blue').find((r) => r.kind === 'battle')!;
     expect(note.from).not.toBe('Umpire');
     expect(note.text).toBe(ruling.narrative);
+  });
+});
+
+describe('combat v2: determinism and invariants', () => {
+  const fight = (seed: number, minutes = 40) =>
+    run(
+      field(
+        [
+          { id: 'blue-1', side: 'blue', x: 1, y: 4 },
+          { id: 'red-1', side: 'red', x: 2, y: 4 },
+          { id: 'red-2', side: 'red', x: 2, y: 3, kind: 'cavalry', strength: 200 },
+        ],
+        { seed },
+      ),
+      minutes,
+    );
+
+  it('is deterministic given a seed, events included', () => {
+    const a = fight(11);
+    const b = fight(11);
+    expect(serialize(a.state)).toEqual(serialize(b.state));
+    expect(a.emitted).toEqual(b.emitted);
+    expect(serialize(fight(12).state)).not.toEqual(serialize(a.state));
+  });
+
+  it('never lets strength go negative or come back, and keeps morale in range', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const { state, emitted } = fight(seed);
+      const lastStrength = new Map<string, number>();
+      for (const e of ofType(emitted, 'combat.fire')) {
+        const p = e.payload as { target: string; targetStrength: number; targetMorale: number };
+        expect(p.targetStrength).toBeGreaterThanOrEqual(0);
+        expect(p.targetMorale).toBeGreaterThanOrEqual(0);
+        expect(p.targetMorale).toBeLessThanOrEqual(100);
+        const before = lastStrength.get(p.target);
+        if (before !== undefined) expect(p.targetStrength).toBeLessThanOrEqual(before);
+        lastStrength.set(p.target, p.targetStrength);
+      }
+      for (const u of state.world.units) {
+        expect(u.strength).toBeGreaterThanOrEqual(0);
+        expect(u.strength).toBeLessThanOrEqual(state.world.startStrength![u.id]!);
+        if (u.status === 'destroyed') expect(u.strength).toBe(0);
+      }
+    }
+  });
+
+  it('logs the factors of a shot', () => {
+    const { emitted } = fight(3, 2);
+    for (const e of ofType(emitted, 'combat.fire')) {
+      const p = e.payload as { die: number; factors: Record<string, number> };
+      expect(Object.keys(p.factors).sort()).toEqual(
+        [
+          'aspect',
+          'ammo',
+          'fireRate',
+          'formation',
+          'morale',
+          'range',
+          'rout',
+          'vulnerability',
+        ].sort(),
+      );
+      expect(p.die).toBeGreaterThanOrEqual(1);
+      expect(p.die).toBeLessThanOrEqual(6);
+    }
+  });
+});
+
+describe('combat v2: morale checks', () => {
+  it('rolls two dice for a unit that lost men and logs the result', () => {
+    const { emitted } = run(field(duel), 6);
+    const checks = ofType(emitted, 'combat.morale');
+    expect(checks.length).toBeGreaterThan(0);
+    for (const c of checks) {
+      const p = c.payload as { roll: number; needed: number; passed: boolean; lossPercent: number };
+      expect(p.roll).toBeGreaterThanOrEqual(2);
+      expect(p.roll).toBeLessThanOrEqual(12);
+      expect(p.passed).toBe(p.roll <= p.needed);
+      expect(p.lossPercent).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it('shakes a unit hit in the rear more than one hit in front', () => {
+    const lossOf = (facingDeg: number) => {
+      const { state } = run(
+        field([
+          { id: 'blue-1', side: 'blue', x: 1, y: 4, facingDeg, morale: 100 },
+          { id: 'red-1', side: 'red', x: 2, y: 4, facingDeg: 270 },
+        ]),
+        2,
+      );
+      const u = unit(state, 'blue-1');
+      return { strength: 600 - u.strength, morale: 100 - u.morale };
+    };
+    // Red stands east of Blue: Blue facing east takes it in the front, facing west in the rear.
+    const front = lossOf(90);
+    const rear = lossOf(270);
+    expect(rear.strength).toBeGreaterThan(front.strength);
+    expect(rear.morale / rear.strength).toBeGreaterThan(front.morale / front.strength);
+  });
+});
+
+describe('combat v2: rally', () => {
+  /** Red's 1st battalion broke at minute 0 and runs; Red's cavalry stands by. */
+  function broken(seed: number, enemyX = 9) {
+    let s = field(
+      [
+        { id: 'blue-1', side: 'blue', x: enemyX, y: 0 },
+        { id: 'red-1', side: 'red', x: 0, y: 4, strength: 600 },
+        { id: 'red-2', side: 'red', x: 1, y: 3, kind: 'cavalry', strength: 300 },
+      ],
+      { seed },
+    );
+    s = {
+      ...s,
+      world: {
+        ...s.world,
+        units: s.world.units.map((u) =>
+          u.id === 'red-1'
+            ? { ...u, status: 'withdrawn' as const, brokenAt: 0, morale: 20, strength: 300 }
+            : u,
+        ),
+      },
+    };
+    return schedule(s, [
+      { time: 6 * MS_PER_MINUTE, type: RALLY_EVENT, payload: { unitId: 'red-1' } },
+    ]);
+  }
+
+  it('lets a broken unit with no enemy near come back, shaken, for most seeds', () => {
+    let rallied = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const { state, emitted } = run(broken(seed), 30);
+      if (ofType(emitted, 'unit.rallied').length === 0) continue;
+      rallied++;
+      const u = unit(state, 'red-1');
+      expect(u.status).toBe('active');
+      expect(u.brokenAt).toBeUndefined();
+      expect(u.intent).toEqual({ kind: 'idle' });
+      expect(u.morale).toBe(40);
+      expect(u.strength).toBe(300); // rallying restores no men
+    }
+    expect(rallied).toBeGreaterThan(30);
+  });
+
+  it('does not rally with an enemy close by', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const { state, emitted } = run(broken(seed, 1), 8);
+      expect(ofType(emitted, 'unit.rallied')).toEqual([]);
+      expect(unit(state, 'red-1').status).toBe('withdrawn');
+    }
+  });
+
+  it('does not rally a unit that has lost too much', () => {
+    let s = broken(5);
+    s = {
+      ...s,
+      world: {
+        ...s.world,
+        units: s.world.units.map((u) => (u.id === 'red-1' ? { ...u, strength: 100 } : u)),
+      },
+    };
+    const { emitted } = run(s, 30);
+    expect(ofType(emitted, 'unit.rallied')).toEqual([]);
+  });
+});
+
+describe('combat v2: balance smoke test', () => {
+  /** Blue (west) against Red (east), 1000 seeds; who has the field after 30 minutes. */
+  function winRates(blue: Partial<RawUnit>, red: Partial<RawUnit>, seeds = 1000) {
+    let blueWins = 0;
+    let redWins = 0;
+    for (let seed = 1; seed <= seeds; seed++) {
+      const { state } = run(
+        field(
+          [
+            { id: 'blue-1', side: 'blue', x: 1, y: 4, facingDeg: 90, ...blue },
+            { id: 'red-1', side: 'red', x: 2, y: 4, facingDeg: 270, ...red },
+          ],
+          { seed },
+        ),
+        30,
+      );
+      const power = (id: string) => {
+        const u = unit(state, id);
+        if (u.status === 'destroyed') return 0;
+        return u.status === 'withdrawn' ? 0.01 * u.strength : u.strength;
+      };
+      const b = power('blue-1');
+      const r = power('red-1');
+      if (b > r) blueWins++;
+      else if (r > b) redWins++;
+    }
+    return { blue: blueWins / seeds, red: redWins / seeds };
+  }
+
+  it('an even fight is close to even', () => {
+    const { blue, red } = winRates({}, {});
+    expect(blue).toBeGreaterThan(0.4);
+    expect(blue).toBeLessThan(0.6);
+    expect(blue + red).toBeGreaterThan(0.99);
+  });
+
+  it('a battalion with 10% fewer men to face usually wins, and one against half its size nearly always', () => {
+    expect(winRates({}, { strength: 300 }).blue).toBeGreaterThan(0.95);
+    const edge = winRates({}, { strength: 540 }).blue;
+    expect(edge).toBeGreaterThan(0.7);
+  });
+
+  it('a unit shot in the flank by an equal one loses more often than not', () => {
+    // Blue faces north, so Red's fire from the east is a flank shot; Red faces Blue.
+    expect(winRates({ facingDeg: 0 }, {}).red).toBeGreaterThan(0.6);
   });
 });

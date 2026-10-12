@@ -649,7 +649,7 @@ describe('canSee over ridges and buildings', () => {
         [x0, 600],
       ],
     });
-    const w = pair([box('m1', 'marsh', 350, 450), box('m2', 'marsh', 850, 950)]);
+    const w = pair([box('m1', 'marsh', 350, 450), box('m2', 'marsh', 600, 700)], 400, 650);
     expect(sees(w)).toBe(true);
     expect(canSee(w, unit(w, 'r'), unit(w, 'b'))).toBe(true);
     // A ford on one side, open ground on the other.
@@ -665,7 +665,7 @@ describe('canSee over ridges and buildings', () => {
   });
 
   it('is not blocked by low ground such as a marsh or a river', () => {
-    const w = pair([
+    const features = [
       {
         id: 'river',
         kind: 'river',
@@ -685,8 +685,9 @@ describe('canSee over ridges and buildings', () => {
           [500, 700],
         ],
       },
-    ]);
-    expect(sees(w)).toBe(true);
+    ];
+    // Marsh is partly concealing (0.2), so the pair stands closer than full sight range.
+    expect(sees(pair(features, 400, 750))).toBe(true);
   });
 
   it('is blocked by a building in between and sees a unit beside it', () => {
@@ -729,6 +730,71 @@ describe('canSee over ridges and buildings', () => {
     const w = pair([], 400, 900);
     expect(sees(w)).toBe(true);
     expect(sees({ ...w, sightFactor: 0.5 })).toBe(false);
+  });
+});
+
+describe('partial concealment and weather', () => {
+  type Raw = Record<string, unknown> & { id: string; kind: string };
+  const box = (id: string, kind: string, x0: number, x1: number, extra = {}): Raw => ({
+    id,
+    kind,
+    ...extra,
+    polygon: [
+      [x0, 500],
+      [x1, 500],
+      [x1, 600],
+      [x0, 600],
+    ],
+  });
+  const pair = (features: Raw[], rx = 900) =>
+    miniWorld({
+      features,
+      units: [
+        { id: 'b', x: 400, y: 550 },
+        { id: 'r', side: 'red', x: rx, y: 550 },
+      ],
+    });
+  const sees = (w: GameState) => canSee(w, unit(w, 'b'), unit(w, 'r'));
+
+  it('lets sight through scrub but shortens it by the depth crossed', () => {
+    const scrub = (c: number) => box('scrub', 'field', 550, 650, { concealment: c });
+    expect(sees(pair([scrub(0.2)], 850))).toBe(true);
+    // 100 m at 0.5 counts as 300 m: 450 m + 200 m extra is past the 600 m range.
+    expect(sees(pair([scrub(0.5)], 850))).toBe(false);
+    expect(sees(pair([scrub(0.5)], 750))).toBe(true);
+  });
+
+  it('hides a unit inside partial concealment at a shorter range, from either end', () => {
+    const near = pair([box('orchard', 'field', 640, 760, { concealment: 0.5 })], 650);
+    expect(sees(near)).toBe(true);
+    const far = pair([box('orchard', 'field', 640, 760, { concealment: 0.5 })], 700);
+    expect(sees(far)).toBe(false);
+    expect(canSee(far, unit(far, 'r'), unit(far, 'b'))).toBe(false);
+  });
+
+  it('applies the weather factor on top of partial concealment', () => {
+    const w = pair([box('scrub', 'field', 550, 650, { concealment: 0.2 })], 800);
+    expect(sees(w)).toBe(true);
+    expect(sees({ ...w, sightFactor: 0.75 })).toBe(false);
+  });
+
+  it('is symmetric over scrub', () => {
+    const w = pair([box('scrub', 'field', 550, 650, { concealment: 0.5 })], 800);
+    expect(canSee(w, unit(w, 'r'), unit(w, 'b'))).toBe(sees(w));
+  });
+
+  it('still blocks on a wood in the way, but not on one beside the line', () => {
+    expect(sees(pair([box('w', 'wood', 600, 700)], 900))).toBe(false);
+    const beside = {
+      ...box('w', 'wood', 600, 700),
+      polygon: [
+        [600, 700],
+        [700, 700],
+        [700, 800],
+        [600, 800],
+      ],
+    };
+    expect(sees(pair([beside], 800))).toBe(true);
   });
 });
 

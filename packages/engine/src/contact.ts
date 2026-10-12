@@ -2,11 +2,13 @@ import { distSegmentSegment, distance, mm, pointInPolygon, polygonsIntersect } f
 import { footprintCorners } from './formation.js';
 import type { Point, Unit, UnitKind } from './types.js';
 import { unitTypeOf } from './unitTypes.js';
+import { FIRE_RULES } from './combatRules.js';
 
 export const COMBAT_CHECK_EVENT = 'combat.check';
 export const COMBAT_TICK_EVENT = 'combat.tick';
 export const ATTACK_INTENT_EVENT = 'intent.attack';
 export const VICTORY_DEADLINE_EVENT = 'victory.deadline';
+export const RALLY_EVENT = 'combat.rally';
 
 /**
  * How far each arm's default type can hurt an enemy, in metres. A unit's own range is its
@@ -22,17 +24,17 @@ export const RANGE_M: Record<UnitKind, number> = {
  * Fire loses strength with distance: full effect point-blank, falling linearly to this
  * fraction of it at the edge of the shooter's range. Placeholder, like `RANGE_M`.
  */
-export const LONG_RANGE_FACTOR = 0.25;
+export const LONG_RANGE_FACTOR = FIRE_RULES.longRangeFactor;
 
 /** Cavalry closes to melee from this far (metres between centres): the default charge distance. */
 export const CHARGE_M = unitTypeOf('cavalry').chargeM!;
 
 /** Casualty multiplier for a melee blow against fire at the same target. */
-export const MELEE_FACTOR = 2;
+export const MELEE_FACTOR = FIRE_RULES.meleeFactor;
 
 /** Casualty multipliers by the side of the target the blow comes from. */
-export const FLANK_FACTOR = 1.5;
-export const REAR_FACTOR = 2;
+export const FLANK_FACTOR = FIRE_RULES.flankFactor;
+export const REAR_FACTOR = FIRE_RULES.rearFactor;
 
 /** Distance in mm between two points. */
 export function distanceMm(a: Point, b: Point): number {

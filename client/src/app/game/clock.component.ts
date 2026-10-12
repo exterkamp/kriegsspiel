@@ -14,6 +14,7 @@ const LINK_TEXT = {
   connecting: 'connecting…',
   open: '',
   closed: 'reconnecting…',
+  failed: 'Connection lost. The server could not be reached.',
 } as const;
 
 /** The desk clock (port of `desk/DeskClock.svelte`). Display logic stays in the pure `desk/clock.ts`. */
@@ -24,13 +25,17 @@ const LINK_TEXT = {
   styleUrl: './clock.component.css',
 })
 export class ClockComponent implements OnDestroy {
-  private readonly game = inject(GameService);
+  protected readonly game = inject(GameService);
   private readonly now = signal(Date.now());
   private readonly timer = setInterval(() => this.now.set(Date.now()), 250);
 
   protected readonly v = computed(() => clockView(this.game.state(), this.now()));
   protected readonly summary = computed(() => clockSummary(this.v()));
   protected readonly linkText = computed(() => LINK_TEXT[this.game.state().link]);
+
+  protected retry(): void {
+    this.game.retry();
+  }
 
   ngOnDestroy(): void {
     clearInterval(this.timer);
