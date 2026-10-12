@@ -143,6 +143,7 @@ export {
   SIGHT_RANGE_MM,
   UNCERTAINTY_MM_PER_MINUTE,
   canSee,
+  contactAgedOut,
   sightRangeMm,
   registerVisibility,
   startVisibility,

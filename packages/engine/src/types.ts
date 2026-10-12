@@ -241,7 +241,8 @@ export interface Outcome {
 /** A report waiting for, or already past, its courier delay. Belongs to one side's intel. */
 export interface Report {
   id: string;
-  kind: 'situation' | 'contact' | 'unitLost' | 'orderDelivered' | 'lowAmmo' | 'exhausted';
+  kind:
+    'situation' | 'contact' | 'unitLost' | 'orderDelivered' | 'lowAmmo' | 'exhausted' | 'destroyed';
   /** Game time of the thing reported. */
   observedAt: GameTime;
   /** Game time the report reaches HQ (observedAt plus courier delay). */
@@ -250,14 +251,14 @@ export interface Report {
   from: string;
   /** Where it happened; for a contact, where the enemy was seen. */
   location: Point;
-  /** Coarse size of the enemy force; only for contacts. */
+  /** Coarse size of the enemy force; only for contacts and destroyed reports. */
   sizeEstimate?: string;
   confidence: 'low' | 'medium' | 'high';
   /** Plain-language place of `location`, from the named features near it. */
   place: string;
   /** Radius in mm around `location` the report is good to. */
   uncertainty: number;
-  /** Enemy unit id; only for contacts. */
+  /** Enemy unit id; only for contacts and destroyed reports. */
   subject?: string;
 }
 
