@@ -45,6 +45,35 @@ describe('applyServerMessage', () => {
     expect(s.dispatches.map((d) => d.id).sort()).toEqual(['d1', 'd2']);
   });
 
+  it("replaces a dispatch's text when the umpire's narration of it arrives under the same id", () => {
+    let s = applyServerMessage(
+      initialState,
+      { v, kind: 'dispatch', dispatch: disp('d1', { text: 'template' }) },
+      0,
+    );
+    s = applyServerMessage(
+      s,
+      {
+        v,
+        kind: 'viewUpdate',
+        view: { ...fixtureView, dispatches: [disp('d1', { text: 'Sir, narrated.' })] },
+      },
+      0,
+    );
+    expect(s.dispatches.map((d) => [d.id, d.text])).toEqual([['d1', 'Sir, narrated.']]);
+    // The same text again leaves the list as it was.
+    const same = applyServerMessage(
+      s,
+      {
+        v,
+        kind: 'viewUpdate',
+        view: { ...fixtureView, dispatches: [disp('d1', { text: 'Sir, narrated.' })] },
+      },
+      0,
+    );
+    expect(same.dispatches).toBe(s.dispatches);
+  });
+
   it('follows clockState changes and staff-at-work', () => {
     let s = applyServerMessage(
       initialState,

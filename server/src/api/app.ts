@@ -135,6 +135,8 @@ export interface AppOptions {
   scriptedOpponents?: boolean;
   /** Replaces the built-in opponent's agents for a game, for example with LLM commanders. See `GameHostOptions.aiAgents`. */
   aiAgents?: GameHostOptions['aiAgents'];
+  /** True when the umpire is the test provider (canned responses): `GET /scenarios` says so and the client shows a badge. */
+  testUmpire?: boolean;
   /** Narrates each side's dispatches per window. See `GameHostOptions.narrator`. */
   narrator?: GameHostOptions['narrator'];
   /** Directory of the built client to serve at `/`. Unset: API only (dev uses the Vite server). */
@@ -401,6 +403,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
     ...(options.scriptedOpponents === true
       ? { opponent: options.aiAgents ? 'ai_commander' : 'scripted' }
       : {}),
+    // Present when the umpire answers with canned responses, so the game can say so.
+    ...(options.testUmpire ? { umpire: 'test' } : {}),
   }));
 
   server.post('/games', async (req, reply) => {

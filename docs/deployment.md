@@ -15,8 +15,9 @@ Compose reads the shell environment and a git-ignored `.env` next to `docker-com
 | Variable | Default | Meaning |
 |---|---|---|
 | `KRIEGSSPIEL_PORT` | `3000` | Host port for the web UI and API |
-| `ANTHROPIC_API_KEY` | empty | Passed to the server for the Anthropic provider (see [llm-providers.md](llm-providers.md)) |
-| `ORDER_PARSER` | unset | With a provider key the LLM parses orders; `stub` forces the rule-based parser |
+| `ANTHROPIC_API_KEY` | empty | Passed to the server for the Anthropic provider (see [llm-providers.md](llm-providers.md)). Empty: the umpire runs on the test provider (below) |
+| `UMPIRE_KEYLESS_PROVIDER` | `test` in the image and compose file | The provider used by any stage that would use Anthropic with no key. `test` is the canned-response umpire (below). For the rule-based order parser alone, set `ORDER_PARSER=stub` |
+| `ORDER_PARSER` | unset | With a provider (a key, or the test provider) the umpire parses orders; `stub` forces the rule-based parser |
 | `BACKUP_DIR` | `./backups` | Host directory that receives backups |
 | `BACKUP_KEEP` | `14` | Number of newest backups kept |
 | `BACKUP_HOUR_UTC` | `3` | Hour of the nightly backup |
@@ -35,6 +36,10 @@ Login needs two more settings (see D17 in [decisions.md](decisions.md)); add the
 | `VAPID_SUBJECT` | `mailto:admin@localhost` | A `mailto:` or `https:` contact sent to push services |
 
 Inside the container the server uses `HOST`, `PORT`, `DB_PATH` (`/data/games.db`) and `STATIC_DIR` (the built client); see `server/src/main.ts`. Without `DB_PATH` the server keeps games in memory. `GET /healthz` returns `{"ok":true}` and backs the container health check.
+
+### The keyless demo: test umpire
+
+With no `ANTHROPIC_API_KEY` the image and compose file run every umpire stage on the `test` provider (`UMPIRE_KEYLESS_PROVIDER=test`), so a demo is fully playable with no key and no local model. It answers from rules and templates, never calls a network, costs nothing and gives the same answer to the same input. Free-text orders ("Move the 1st Battalion to the bridge and hold it.") are understood, dispatches are written in period prose from the reports, and the staff give short advice. It is not clever: it knows the verbs move, hold, screen, withdraw and attack, and places by name or kind, and it ignores conditions and times. The game shows a "Test umpire (canned responses)" badge, and the admin LLM panel marks its calls as `test`. Setting `ANTHROPIC_API_KEY` switches every stage back to the real model, and `ORDER_PARSER=stub` still forces the rule-based parser. See [llm-providers.md](llm-providers.md#test-provider).
 
 ### Client build
 

@@ -252,6 +252,22 @@ describe('lobby', () => {
     expect(await opponentOn(true, () => [])).toBe('ai_commander');
   });
 
+  it('says on /scenarios when the umpire is the test provider', async () => {
+    const umpireOn = async (testUmpire?: boolean) => {
+      await app?.server.close();
+      app = await buildApp({
+        parser: new StubOrderParser(),
+        store: new MemoryGameStore(),
+        testUmpire,
+        auth: { mailer },
+      });
+      const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+      return ((await (await fetch(`${base}/scenarios`)).json()) as { umpire?: string }).umpire;
+    };
+    expect(await umpireOn()).toBeUndefined();
+    expect(await umpireOn(true)).toBe('test');
+  });
+
   it('gives a started game the pause rules chosen at creation', async () => {
     const base = await start();
     const a = await signIn(base, 'a@example.test');

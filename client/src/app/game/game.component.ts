@@ -10,6 +10,7 @@ import { fetchGame } from '@legacy/lobby/api';
 import { parseSession } from '@legacy/session';
 import { DeskComponent } from '../desk/desk.component';
 import { DeskStore } from '../desk/desk.store';
+import { TestUmpireBadgeComponent } from '../desk/test-umpire-badge.component';
 import { HudComponent } from '../hud/hud.component';
 import { MarksBarComponent } from '../hud/marks-bar.component';
 import { SideSwitchComponent } from '../hud/side-switch.component';
@@ -30,6 +31,7 @@ import { TableService } from './table.service';
     MarksBarComponent,
     SideSwitchComponent,
     DeskComponent,
+    TestUmpireBadgeComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -40,6 +42,7 @@ import { TableService } from './table.service';
       <ks-side-switch [game]="game.gameId()!" [sides]="sides()" [current]="current()" />
     }
     <ks-desk />
+    <ks-test-umpire-badge />
   `,
   styles: `
     :host {

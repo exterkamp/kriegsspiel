@@ -10,6 +10,8 @@ services:
     # Values come from the shell or a git-ignored .env next to this file (see .env.example).
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # With no key the umpire answers with canned responses (the `test` provider). Set a key to use the real model.
+      UMPIRE_KEYLESS_PROVIDER: ${UMPIRE_KEYLESS_PROVIDER:-test}
       PUBLIC_URL: ${PUBLIC_URL:-}
       MAIL_WEBHOOK_URL: ${MAIL_WEBHOOK_URL:-}
       MAIL_WEBHOOK_TOKEN: ${MAIL_WEBHOOK_TOKEN:-}

@@ -120,10 +120,20 @@ function anchorOf(gameMs: number, clock: ClockState, localWallMs: number): Clock
   return { gameMs, localWallMs, rate: clock.rate, status: clock.status };
 }
 
+/**
+ * New dispatches go on top. One we already have is replaced when its text changed: the umpire's
+ * narration of a report arrives after the template text was first delivered, under the same id.
+ */
 function withDispatches(have: Dispatch[], incoming: readonly Dispatch[]): Dispatch[] {
+  const latest = new Map(incoming.map((d) => [d.id, d]));
   const ids = new Set(have.map((d) => d.id));
   const fresh = incoming.filter((d) => !ids.has(d.id));
-  return fresh.length === 0 ? have : [...fresh, ...have];
+  const revised = (d: Dispatch): Dispatch | undefined => {
+    const next = latest.get(d.id);
+    return next && next.text !== d.text ? next : undefined;
+  };
+  if (fresh.length === 0 && !have.some(revised)) return have;
+  return [...fresh, ...have.map((d) => revised(d) ?? d)];
 }
 
 const sideName = (side: string | undefined): string =>

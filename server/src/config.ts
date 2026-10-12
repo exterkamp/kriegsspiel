@@ -109,3 +109,8 @@ export function llmOrderParserEnabled(
   if (!spec) return false;
   return spec.type === 'anthropic' ? Boolean(env[spec.apiKeyEnv ?? 'ANTHROPIC_API_KEY']) : true;
 }
+
+/** Whether any stage runs on the test provider (canned responses), so the game can say so. */
+export function usesTestUmpire(config: UmpireConfig): boolean {
+  return Object.values(config.stages).some((r) => config.providers[r.provider]?.type === 'test');
+}

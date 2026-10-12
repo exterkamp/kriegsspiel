@@ -40,6 +40,22 @@ Env overrides (they win over the file): `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STA
 
 Provider fields: `type`, `baseUrl`, `apiKeyEnv`, `structuredOutput` (`native`, `json-mode` or `none`, see below), `contextWindow` (informational), `numCtx` (Ollama).
 
+## Test provider
+
+`{ "type": "test" }` answers every stage from rules and templates, with no model and no network (`server/src/umpire/providers/test.ts`, `testParse.ts`). It is for demos and tests without a key.
+
+Select it with `UMPIRE_PROVIDER=test` (every stage), `UMPIRE_PROVIDER_<STAGE>=test` (one stage), a `test` provider named in the config file, or `UMPIRE_KEYLESS_PROVIDER=test`, which moves only the stages that would use Anthropic with no `ANTHROPIC_API_KEY` (the Docker image and compose file set it; a key switches back to the real model). `ORDER_PARSER=stub` still forces the rule-based parser. Its model name is `test` and it is priced at zero, so budgets and per-game caps never trip.
+
+| Stage | What it does |
+| --- | --- |
+| `parse` | Finds the unit (id, name, or `the cavalry`, `the 1st`), then one or more clauses split at `and`, `then` and commas, each a verb (move, hold/screen/defend, withdraw/fall back, attack) and a place (by name, or by kind narrowed by name words, such as `the northern wood`). `it` or `there` means the place before. No unit named: the unit nearest the first place. Several fits: a clarification with options. An unknown place or unit, no verb, or injected instructions: a rejection with a reason. Conditions and times are ignored. |
+| `narrate` | One dispatch per report, built only from the report's own officer, place, size and numbers, so it passes `checkNarration`. |
+| `staff` | One short piece of advice, chosen by the topic keywords of an optional `question` (enemy, supply, fatigue, ground, orders) or else by the officer's role, from counts in the officer's view. |
+| `judge` | No placements. |
+| `command` | Every unit holds the named place nearest the objective. |
+
+Its output is deterministic and validated like any model's, and recorded through `CallRecorder`. The game shows a "Test umpire (canned responses)" badge (`GET /scenarios` carries `umpire: "test"`), and the admin LLM panel shows its calls with mode `test`.
+
 ## Structured output
 
 - `native`: the server enforces the schema (Anthropic `output_config`, OpenAI `json_schema`, Ollama `format`). The default for all three adapters.
