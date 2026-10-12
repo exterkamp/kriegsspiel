@@ -1,12 +1,13 @@
 import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadScenario, holdTheBridge, type EmittedEvent } from '@kriegsspiel/engine';
+import { createState, loadScenario, holdTheBridge, type EmittedEvent } from '@kriegsspiel/engine';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser, ParseResult } from '../orders/index.js';
 import { GameHost, FileGameStore, MemoryGameStore, parseInputLog, replayLog } from './index.js';
 import type { GameStore, InputLogEntry } from './index.js';
 import { createRegistry, loadScenarioById } from './registry.js';
+import { advanceUntilOver } from './replay.js';
 import { FakeTime } from './testing.js';
 
 class FixedParser implements OrderParser {
@@ -233,6 +234,23 @@ describe('replay edge cases', () => {
     expect(run(entries.map((e) => (e === order ? failed : e)))).toEqual(
       run(entries.map((e) => (e === order ? noOrder : e))),
     );
+  });
+});
+
+describe('advanceUntilOver', () => {
+  it('returns a state that already has an outcome unchanged, with no events', () => {
+    const state = createState(1815, loadScenario(holdTheBridge), 0);
+    const over = {
+      ...state,
+      world: {
+        ...state.world,
+        outcome: { winner: 'blue' as const, reason: 'objective-held' as const, time: 0 },
+      },
+    };
+    // Without the early return this advance would run the world on and emit events.
+    const res = advanceUntilOver(over, 60_000, createRegistry());
+    expect(res.state).toBe(over);
+    expect(res.emitted).toEqual([]);
   });
 });
 
