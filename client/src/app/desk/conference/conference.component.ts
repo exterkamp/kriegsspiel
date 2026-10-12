@@ -17,6 +17,7 @@ import {
   isPending,
   newExchange,
   nextExchangeId,
+  applyServerAnswers,
   questionProblem,
   reconcileExchanges,
   staffFor,
@@ -78,6 +79,12 @@ export class ConferenceComponent {
         ),
       );
     });
+
+    // The umpire writes the answer; it is shown once game time reaches the exchange's answer time.
+    effect(() => {
+      const { staffAnswers: answers, view } = this.game.state();
+      untracked(() => this.desk.conferenceLog.update((l) => applyServerAnswers(l, answers, view)));
+    });
   }
 
   protected busy(r: ConferenceRole): boolean {
@@ -113,6 +120,8 @@ export class ConferenceComponent {
     }
     this.desk.conferenceLog.update((l) => [...l, ex]);
     this.question.set('');
+    // Online, the umpire answers (see the staffAnswer effect above); only the offline board answers itself.
+    if (ex.questionId !== undefined) return;
     this.desk
       .conferenceClient()
       .ask(req, state.view)

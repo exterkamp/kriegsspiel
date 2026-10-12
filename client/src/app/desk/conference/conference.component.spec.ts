@@ -55,6 +55,46 @@ describe('ConferenceComponent', () => {
     expect(desk.conferenceLog()[1]!.failed).toBe(true);
   });
 
+  it('shows the umpire’s answer, and answers a text-less reply from the newest view', async () => {
+    const { desk, ask, game, f, sender } = await open('open');
+    await ask('Where is the enemy?');
+    const [id] = sender.mock.calls[0] as unknown as [string];
+    expect(desk.conferenceLog()[0]!.answer).toBeUndefined();
+    game.update((s) => ({
+      ...s,
+      staffAnswers: {
+        [id]: {
+          text: 'A battalion at the bridge.',
+          basedOnGame: 5_000,
+          officer: { name: 'Major Dessau', traits: [] },
+        },
+      },
+    }));
+    await f.whenStable();
+    expect(desk.conferenceLog()[0]!.answer).toEqual({
+      text: 'Major Dessau: A battalion at the bridge.',
+      basedOnGame: 5_000,
+    });
+
+    sender.mockClear();
+    (f.nativeElement as HTMLElement)
+      .querySelectorAll<HTMLButtonElement>('.tabs button')[1]!
+      .click();
+    await f.whenStable();
+    await ask('And now?');
+    const [id2] = sender.mock.calls[0] as unknown as [string];
+    game.update((s) => ({
+      ...s,
+      view: { ...fixtureView, atGame: 999_000 },
+      staffAnswers: {
+        ...s.staffAnswers,
+        [id2]: { basedOnGame: 1, officer: { name: 'Major Dessau', traits: [] } },
+      },
+    }));
+    await f.whenStable();
+    expect(desk.conferenceLog()[1]!.answer?.basedOnGame).toBe(999_000);
+  });
+
   it('shows the officer traits and cost, and holds an answer until game time reaches it', async () => {
     const { el, desk, ask, sender } = await open('offline');
     expect(el.textContent).toContain('Traits: meticulous, cautious');

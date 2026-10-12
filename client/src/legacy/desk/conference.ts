@@ -1,5 +1,5 @@
 import type { SideView } from '@kriegsspiel/protocol';
-import type { LinkStatus, StaffCharge } from '../net/state.js';
+import type { LinkStatus, StaffCharge, StaffServerAnswer } from '../net/state.js';
 import { formatAge, pct } from './roster.js';
 
 /** The four officers the player can consult (docs/hq-interface.md, "Staff conference"). */
@@ -130,6 +130,32 @@ export function reconcileExchanges(
       out = { ...e, failed: true };
     if (out !== e) changed = true;
     return out;
+  });
+  return changed ? next : log;
+}
+
+/**
+ * Give each exchange its answer from the umpire's reply (`staffAnswer`). A reply with no text (the
+ * staff stage is off or failed) is answered from the view the page holds now, not the one it held
+ * when the question went out, so a late answer cites the newest reports. Returns the same array
+ * when nothing changed.
+ */
+export function applyServerAnswers(
+  log: readonly Exchange[],
+  answers: Readonly<Record<string, StaffServerAnswer>>,
+  view: SideView | undefined,
+): readonly Exchange[] {
+  let changed = false;
+  const next = log.map((e) => {
+    if (e.answer || e.failed || e.questionId === undefined) return e;
+    const a = answers[e.questionId];
+    if (!a) return e;
+    changed = true;
+    const answer =
+      a.text === undefined
+        ? fixtureAnswer({ role: e.role, question: e.question, askedAtGame: e.askedAtGame }, view)
+        : { text: `${a.officer.name}: ${a.text}`, basedOnGame: a.basedOnGame };
+    return { ...e, answer };
   });
   return changed ? next : log;
 }
