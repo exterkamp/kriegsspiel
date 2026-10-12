@@ -204,7 +204,33 @@ export interface AppOptions {
   /** Notifications (epic #5): preferences and push subscriptions (default in memory), and the web push sender (unset: no web push). */
   notify?: { store?: NotifyStore; push?: PushSender; emailEveryMs?: number };
   onError?: (gameId: string, error: unknown) => void;
+  /** Bounds on memory held by games (#161). Each field falls back to its `DEFAULT_GAME_LIMITS` value. */
+  limits?: Partial<GameLimits>;
 }
+
+export interface GameLimits {
+  /** Unfinished games (in the lobby, or open in memory) one account may have made at once. */
+  perUser: number;
+  /** The same cap for a guest. */
+  perGuest: number;
+  /** A game nobody has connected to for this long (wall ms) is closed in memory; its data stays in the store. */
+  idleMs: number;
+  /** How often the server looks for finished and idle games to close. 0 turns the sweep off. */
+  sweepEveryMs: number;
+  /**
+   * A finished game nobody is connected to is closed once it has been quiet this long (wall ms), so
+   * a viewer whose socket is between the upgrade check and `hub.attach` never meets a closed game.
+   */
+  finishedGraceMs: number;
+}
+
+export const DEFAULT_GAME_LIMITS: GameLimits = {
+  perUser: 20,
+  perGuest: 3,
+  idleMs: 24 * 3_600_000,
+  sweepEveryMs: 60_000,
+  finishedGraceMs: 30_000,
+};
 
 export interface App {
   server: FastifyInstance;
@@ -215,6 +241,8 @@ export interface App {
   auth: Auth;
   authStore: AuthStore;
   lobby: LobbyStore;
+  /** Close finished games nobody watches and games idle past `limits.idleMs`; returns the ids closed. Runs on a timer too. */
+  sweepGames(): Promise<string[]>;
 }
 
 export async function buildApp(options: AppOptions): Promise<App> {
@@ -301,6 +329,9 @@ export async function buildApp(options: AppOptions): Promise<App> {
     trace ?? NOOP_TRACE,
   );
   const lobby = options.lobby ?? new MemoryLobbyStore();
+  const limits: GameLimits = { ...DEFAULT_GAME_LIMITS, ...options.limits };
+  /** Wall time each open game was last started, reopened or connected to; the sweep reads it for idleness. */
+  const lastActive = new Map<string, number>();
   const authStore = options.auth?.store ?? new MemoryAuthStore();
   /**
    * The lobby record for a game. A game made before lobby records existed has seats and a stored
@@ -356,6 +387,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
       if (host.get(id)?.state.world.outcome) options.onGameDone?.(id);
     },
     onClose: (id) => {
+      lastActive.delete(id);
       notifier.forget(id);
       options.onGameDone?.(id);
     },
@@ -453,9 +485,13 @@ export async function buildApp(options: AppOptions): Promise<App> {
   /** A started game is reopened (paused) if the server restarted since it was last used. */
   const running = async (rec: LobbyGame): Promise<boolean> => {
     if (rec.status !== 'started') return false;
-    if (host.get(rec.id)) return true;
+    if (host.get(rec.id)) {
+      lastActive.set(rec.id, wallNow());
+      return true;
+    }
     try {
       await host.open(rec.id);
+      lastActive.set(rec.id, wallNow());
       return true;
     } catch {
       return false;
@@ -501,6 +537,20 @@ export async function buildApp(options: AppOptions): Promise<App> {
       return reply
         .code(400)
         .send({ error: 'no_ai_opponent', message: 'this server has no AI opponent' });
+    }
+    const cap = user.guest ? limits.perGuest : limits.perUser;
+    const unfinished = lobby
+      .byCreator(user.id)
+      .filter(
+        (r) =>
+          r.status === 'lobby' ||
+          (r.status === 'started' && host.get(r.id) && !host.get(r.id)?.state.world.outcome),
+      );
+    if (unfinished.length >= cap) {
+      return reply.code(429).send({
+        error: 'too_many_games',
+        message: `you already have ${unfinished.length} unfinished games; finish or leave one first`,
+      });
     }
     const createdId = randomUUID();
     const rec: LobbyGame = {
@@ -554,10 +604,20 @@ export async function buildApp(options: AppOptions): Promise<App> {
       server.log.error({ err: e, gameId: rec.id }, 'could not start game');
       return 'start_failed';
     }
+    lastActive.set(rec.id, wallNow());
     // Re-read: a /ready that landed during the await must not be overwritten.
     lobby.put({ ...(lobby.get(rec.id) ?? rec), status: 'started' });
     return undefined;
   };
+
+  /**
+   * Replay results for games that are not open, by game id. A replay only changes when the log
+   * grows, so `GET /games` replays a stored game once, not on every call (#262).
+   */
+  const replayed = new Map<
+    string,
+    { entries: number; outcome: ReturnType<typeof replayTimeline>['outcome']; endMs: number }
+  >();
 
   /** Where a started game stands: over or not, its game time and when it was last played (wall time). */
   const progressOf = async (
@@ -575,6 +635,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     const lastPlayedMs = input?.entries.reduce((m, e) => Math.max(m, e.wallMs), rec.createdAtMs);
     const live = host.get(rec.id);
     if (live) {
+      replayed.delete(rec.id);
       return {
         finished: Boolean(live.state.world.outcome),
         ...(live.state.world.outcome ? { winner: live.state.world.outcome.winner } : {}),
@@ -584,11 +645,16 @@ export async function buildApp(options: AppOptions): Promise<App> {
     }
     if (!input) return none;
     try {
-      const tl = replayTimeline(input);
+      let hit = replayed.get(rec.id);
+      if (hit?.entries !== input.entries.length) {
+        const tl = replayTimeline(input);
+        hit = { entries: input.entries.length, outcome: tl.outcome, endMs: tl.endMs };
+        replayed.set(rec.id, hit);
+      }
       return {
-        finished: Boolean(tl.outcome),
-        ...(tl.outcome ? { winner: tl.outcome.winner } : {}),
-        gameTimeMs: tl.endMs,
+        finished: Boolean(hit.outcome),
+        ...(hit.outcome ? { winner: hit.outcome.winner } : {}),
+        gameTimeMs: hit.endMs,
         lastPlayedMs: lastPlayedMs ?? rec.createdAtMs,
       };
     } catch {
@@ -901,7 +967,34 @@ export async function buildApp(options: AppOptions): Promise<App> {
     },
   );
 
+  const sweepGames = async (): Promise<string[]> => {
+    const now = wallNow();
+    const closed: string[] = [];
+    for (const id of host.ids()) {
+      if (hub.count(id) > 0) {
+        lastActive.set(id, now);
+        continue;
+      }
+      if (!lastActive.has(id)) lastActive.set(id, now);
+      const quietMs = now - lastActive.get(id)!;
+      const over = Boolean(host.get(id)?.state.world.outcome) && quietMs >= limits.finishedGraceMs;
+      const idle = quietMs >= limits.idleMs;
+      if (!over && !idle) continue;
+      try {
+        await host.close(id);
+        closed.push(id);
+      } catch (e) {
+        onError(id, e);
+      }
+    }
+    return closed;
+  };
+  const sweeper =
+    limits.sweepEveryMs > 0 ? setInterval(() => void sweepGames(), limits.sweepEveryMs) : undefined;
+  sweeper?.unref();
+
   server.addHook('onClose', async () => {
+    if (sweeper) clearInterval(sweeper);
     await hub.flushSeen();
     hub.closeAll();
     await trace?.close();
@@ -912,5 +1005,5 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (!options.notify?.store) notifyStore.close();
   });
 
-  return { server, host, hub, notifier, notifyStore, auth, authStore, lobby };
+  return { server, host, hub, notifier, notifyStore, auth, authStore, lobby, sweepGames };
 }
