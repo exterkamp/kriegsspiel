@@ -77,13 +77,15 @@ type Prep =
           />
         }
         @case ('new-game') {
-          <ks-new-game
-            [load]="api.fetchScenarioOptions"
-            [create]="api.createGame"
-            (started)="go({ name: 'game', game: $event })"
-            (back)="go({ name: 'menu' })"
-          />
-          <div class="games"><ks-game-list /></div>
+          <div class="screen">
+            <ks-new-game
+              [load]="api.fetchScenarioOptions"
+              [create]="api.createGame"
+              (started)="go({ name: 'game', game: $event })"
+              (back)="go({ name: 'menu' })"
+            />
+            <div class="games"><ks-game-list /></div>
+          </div>
         }
         @default {
           @switch (prep().step) {
@@ -121,13 +123,21 @@ type Prep =
       font-family: Georgia, serif;
       padding: 16px;
     }
+    /* One scroller holds the form and "Your games" in turn, so the list never lies over the form's end (#318). */
+    .screen {
+      height: 100%;
+      overflow: auto;
+      background: #e9dcb8 radial-gradient(circle at 30% 20%, #f3e9c9, #d9c795);
+    }
+    .screen ks-new-game {
+      height: auto;
+    }
     .games {
       max-width: 560px;
       margin: 0 auto;
       padding: 0 16px 32px;
       font-family: Georgia, serif;
       color: #2a2118;
-      background: #e9dcb8;
     }
   `,
 })
