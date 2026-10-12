@@ -1,0 +1,90 @@
+{
+  "sourceHead": "759f6e604435e87cdd2570e9d93c914ed42ed28b",
+  "base": "6d85099a9e0b44a3113c1e4ede2a833e601675c9",
+  "sourceHashes": {
+    "client/src/app/local-board/board-binding.spec.ts": "616c2558a9a3a7681cc49ca94c3921a345b1f3e72def5c51d70a93f23e4d3c77",
+    "client/src/app/local-board/board-binding.ts": "b275da29e15b710b8cce5be3fcc1cda6cf200c3f4e2128545c1de2639cd431bc",
+    "client/src/app/local-board/board-host.component.css": "e4f91b9bc610cd5a53469e0b6b47b482859e1f27e51bc8401793fe1881d9ff6e",
+    "client/src/app/local-board/board-host.component.html": "5740b778438cd50787ab3b9d9fa5e511db7a52f4b7fa1e58662a1986d6042702",
+    "client/src/app/local-board/board-host.component.spec.ts": "8545b7ecf72c6aaa0d66cedde15713f8f05a2d828f5a3b5c993bfcb2115624f6",
+    "client/src/app/local-board/board-host.component.ts": "f91b931fc4ea2a928cba407245d2f9209846d5f8835e8a87edd807a5d80e3c10",
+    "client/src/app/local-board/board-surface.spec.ts": "db917dc1cf2576a18e76b127ad213ca3049448139b81d82e8964ebbf1c6445a6",
+    "client/src/app/local-board/board-surface.ts": "3f829426e8ca503f21d4de9689c2577cebb495c9d7c70e2cd980eb416953b96f"
+  },
+  "snapshot": "/tmp/kriegsspiel-angular-a3a-proof",
+  "preview": "http://127.0.0.1:41974/dev/board-proof",
+  "harnessSha256": "6362a0ae4c8655242cc98e39885c41b70b65ad4544558cfbbdfadcbb54090c21",
+  "browser": "Chrome on macOS",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "certification": "real native validation worker, static pinned rectangle asset",
+  "painting": "real Three.js WebGL renderer and raster Canvas2D",
+  "desktopHmr": {
+    "key": "local-79da6992-e4b6-4b51-b13e-2ccd79498993",
+    "identity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+    "scenes": 4,
+    "released": 3,
+    "live": 1,
+    "rasters": 2,
+    "ready": true,
+    "points": [
+      {
+        "key": "local-79da6992-e4b6-4b51-b13e-2ccd79498993",
+        "at": {
+          "x": 2500,
+          "y": 1499.7620192307547
+        }
+      }
+    ]
+  },
+  "desktopRetirement": {
+    "scenes": 4,
+    "released": 4,
+    "live": 0,
+    "rasters": 2,
+    "ready": false,
+    "points": [
+      {
+        "key": "local-79da6992-e4b6-4b51-b13e-2ccd79498993",
+        "at": {
+          "x": 2500,
+          "y": 1499.7620192307547
+        }
+      }
+    ]
+  },
+  "narrowReady": {
+    "key": "local-14d878b7-5aa5-4102-a35e-8253438d5c2f",
+    "identity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+    "scenes": 1,
+    "released": 0,
+    "live": 1,
+    "rasters": 1,
+    "ready": true,
+    "points": []
+  },
+  "startupCancel": {
+    "scenes": 1,
+    "released": 1,
+    "live": 0,
+    "rasters": 1,
+    "ready": false,
+    "points": []
+  },
+  "cameraAndPicking": "Top-down/Oblique and focused Arrow keys, explicit camera lock picks centre x2500/y1499.7620192307547, full interaction gate suppresses additional native click point",
+  "hmr": "two actual native host HTML replacements each create one scene and call prior scene disposal, same key and retained raster count; original eight sources restored exactly",
+  "limitations": [
+    "Temporary parent wrapper style HMR before the host HMR run recreated whole host and increased cumulative rasters from1to2. Root A5 session surface registry must solve whole-parent HMR; not accepted here. Host HMR then increased scenes2to4/disposals1to3 while rasters remained2.",
+    "Counters instrument actual owned scene dispose calls and raster preparation, not GPU memory reclamation or all browser resources",
+    "Renderer does not implement personal persistence or app route/modal; A3b/A5 follow",
+    "Startup cancellation is observed with no late scene; default worker lifetime counters are uninstrumented"
+  ]
+}
