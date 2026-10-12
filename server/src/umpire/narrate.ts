@@ -375,9 +375,11 @@ export interface NarrateOptions {
 export async function narrateReports(
   client: UmpireClient,
   side: SideId,
-  reports: readonly ViewReport[],
+  allReports: readonly ViewReport[],
   opts: NarrateOptions = {},
 ): Promise<NarrateResult> {
+  // The umpire's ruling is already in its own words; a rewrite could lose what it decided.
+  const reports = allReports.filter((r) => r.kind !== 'battle');
   const template = (): NarratedDispatch[] =>
     reports.map((r) => ({ reportIds: [r.id], text: r.text }));
   if (reports.length === 0) return { dispatches: [], fellBack: false, calls: 0, rejections: [] };

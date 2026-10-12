@@ -52,7 +52,13 @@ function narrate(input: Json) {
                 ? `${from} is running short of ammunition${where}, ${when}`
                 : r.kind === 'exhausted'
                   ? `${from} is exhausted${where}, ${when}`
-                  : `${from} reports its situation${where}, ${when}`;
+                  : r.kind === 'engaged'
+                    ? `${from} is engaged${where}, ${when}`
+                    : r.kind === 'heavyLosses'
+                      ? `${from} is taking heavy losses${where}, ${when}`
+                      : r.kind === 'broke'
+                        ? `${from} has broken and is falling back${where}, ${when}`
+                        : `${from} reports its situation${where}, ${when}`;
       // Only what the staff saw for themselves is hedged or vouched for.
       const sure =
         r.kind !== 'contact' && r.kind !== 'situation'

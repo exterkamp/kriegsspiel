@@ -251,6 +251,8 @@ export interface Outcome {
   winner: SideId | null;
   reason: VictoryReason;
   time: GameTime;
+  /** Set when the losing side had nobody left to fight (destroyed, or all withdrawn) rather than being broken. */
+  loserOut?: 'eliminated' | 'withdrawn';
 }
 
 /** A report waiting for, or already past, its courier delay. Belongs to one side's intel. */
@@ -264,6 +266,9 @@ export interface Report {
     | 'lowAmmo'
     | 'exhausted'
     | 'destroyed'
+    | 'engaged'
+    | 'heavyLosses'
+    | 'broke'
     | 'battle';
   /** Game time of the thing reported. */
   observedAt: GameTime;

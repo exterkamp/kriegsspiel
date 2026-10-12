@@ -47,6 +47,7 @@ export interface GameOver {
   winner: Side | null;
   reason: Extract<ServerMessage, { kind: 'gameOver' }>['reason'];
   atGame: number;
+  loserOut?: 'eliminated' | 'withdrawn';
 }
 
 /** What came in while the player was away, from the server's `catchUp`. */
@@ -241,7 +242,15 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       };
     }
     case 'gameOver':
-      return { ...s, gameOver: { winner: m.winner, reason: m.reason, atGame: m.atGame } };
+      return {
+        ...s,
+        gameOver: {
+          winner: m.winner,
+          reason: m.reason,
+          atGame: m.atGame,
+          ...(m.loserOut ? { loserOut: m.loserOut } : {}),
+        },
+      };
     case 'notification': {
       // What would reach an away player by push or email, shown to one who has the game open.
       const notices = [

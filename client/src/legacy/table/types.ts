@@ -131,6 +131,13 @@ export interface Overlays {
 
 export const ALL_OVERLAYS: Overlays = { orders: true, routes: true, lastKnown: true };
 
+/** A fight the side knows about: its own unit and an enemy it can see, within fire of each other. */
+export interface Engagement {
+  id: string;
+  /** Midway between the two, in metres. */
+  position: { x: number; y: number };
+}
+
 export interface SceneState {
   side: string;
   map: BaseMap;
@@ -138,6 +145,8 @@ export interface SceneState {
   ghosts: GhostPiece[];
   /** Accepted live overlays; absent in the HQ fixture port. */
   orderRoutes?: OrderRoute[];
+  /** Where this side's units and a visible enemy are within fire of each other: drawn as a fight marker. */
+  engagements?: Engagement[];
   /** Omission preserves the standalone client and renders no annotations. */
   marks?: readonly SceneMark[];
 }

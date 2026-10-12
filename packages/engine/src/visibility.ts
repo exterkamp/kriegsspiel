@@ -74,6 +74,8 @@ function destructionDelivered(reports: Report[], unitId: string, now: GameTime):
 export const SCAN_INTERVAL_MS = MS_PER_MINUTE;
 
 /** Courier time for a report to reach HQ. */
+/** A unit in the fight sends word by the nearest rider: shorter than the courier from afar. */
+export const FIELD_REPORT_DELAY_MS = 3 * MS_PER_MINUTE;
 export const COURIER_DELAY_MS = 10 * MS_PER_MINUTE;
 
 /** An acknowledgement rides a shorter way back than a sighting: the unit is already on the road to HQ. */
@@ -271,6 +273,12 @@ export function renderReport(r: Report, ageMs: number): string {
       return `${r.from} is exhausted ${where}, ${when}.`;
     case 'destroyed':
       return `${r.from} reports ${r.sizeEstimate ?? 'enemy troops'} destroyed ${where}, ${when}.`;
+    case 'engaged':
+      return `${r.from} is engaged ${where}, ${when}.`;
+    case 'heavyLosses':
+      return `${r.from} is taking heavy losses ${where}, ${when}.`;
+    case 'broke':
+      return `${r.from} has broken and is falling back ${where}, ${when}.`;
     case 'battle':
       return r.text ?? `The umpire has decided the battle ${where}.`;
   }

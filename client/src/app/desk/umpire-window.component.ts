@@ -48,6 +48,8 @@ export class UmpireWindowComponent {
     const hover = this.desk.windowHover();
     return frame && hover ? unitNotes(frame, hover) : [];
   });
+  /** Every ruling made up to the game time shown, with its time and wording. */
+  protected readonly rulings = computed(() => this.desk.windowFrame()?.rulings ?? []);
   protected readonly hovered = computed(() =>
     this.desk.windowFrame()?.units.find((u) => u.id === this.desk.windowHover()),
   );

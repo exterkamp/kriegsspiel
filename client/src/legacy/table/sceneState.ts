@@ -1,5 +1,27 @@
 import type { SideView } from '@kriegsspiel/protocol';
-import type { BaseMap, GhostPiece, OwnPiece, SceneState } from './types.js';
+import type { BaseMap, Engagement, GhostPiece, OwnPiece, SceneState } from './types.js';
+
+/** The longest reach of any arm (artillery), in metres: closer than this and the two are in a fight. */
+export const ENGAGE_RANGE_M = 400;
+
+/** One marker per own unit that has a visible enemy within fire, midway between them. From the filtered view only. */
+export function engagementsOf(view: SideView): Engagement[] {
+  const out: Engagement[] = [];
+  for (const u of view.ownUnits) {
+    let best: { x: number; y: number; d: number } | undefined;
+    for (const e of view.visibleEnemies) {
+      const d = Math.hypot(e.position.x - u.position.x, e.position.y - u.position.y);
+      if (d <= ENGAGE_RANGE_M && (!best || d < best.d)) best = { ...e.position, d };
+    }
+    if (best) {
+      out.push({
+        id: u.id,
+        position: { x: (u.position.x + best.x) / 2, y: (u.position.y + best.y) / 2 },
+      });
+    }
+  }
+  return out;
+}
 
 export function formatAge(ageMs: number): string {
   const totalMin = Math.max(0, Math.floor(ageMs / 60_000));
@@ -56,5 +78,12 @@ export function buildSceneState(view: SideView, map: BaseMap): SceneState {
     uncertaintyRadius: c.uncertaintyRadius,
     ...(c.sizeEstimate !== undefined ? { sizeEstimate: c.sizeEstimate } : {}),
   }));
-  return { side: view.side, map, own, ghosts: [...live, ...stale], orderRoutes: [] };
+  return {
+    side: view.side,
+    map,
+    own,
+    ghosts: [...live, ...stale],
+    orderRoutes: [],
+    engagements: engagementsOf(view),
+  };
 }

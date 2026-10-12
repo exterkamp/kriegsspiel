@@ -11,6 +11,21 @@
       at
       {{ formatGameTime(tl.outcome.time) }}
     </p>
+    <section class="rulings" aria-label="Rulings">
+      <h3>Rulings</h3>
+      @if (rulings().length === 0) {
+        <p>The umpire has made no ruling by {{ formatGameTime(at()) }}.</p>
+      } @else {
+        <ol>
+          @for (r of rulings(); track r.id) {
+            <li>
+              <time>{{ formatGameTime(r.time) }}</time> {{ r.narrative }}
+              <span class="why">{{ r.rationale }}</span>
+            </li>
+          }
+        </ol>
+      }
+    </section>
     <div class="scrub">
       <button type="button" aria-label="Previous event" (click)="step(-1)">◀</button>
       <input
