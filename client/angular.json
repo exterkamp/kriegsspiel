@@ -72,6 +72,8 @@
           "options": {
             "tsConfig": "tsconfig.spec.json",
             "runner": "vitest",
+            "isolate": true,
+            "splitting": false,
             "include": ["src/**/*.spec.ts"],
             "buildTarget": "::development"
           }
