@@ -47,6 +47,10 @@ The engine reads its unit stats from `packages/engine/src/unitTypes.ts` (decisio
 
 None of the numbers for fatigue, forced marching, ammunition use or wagon reach come from the rulebook; they are placeholders in `packages/engine/src/fatigue.ts` and `supply.ts`, listed in the decision "Supply, fatigue and ammunition" in `decisions.md`.
 
+## Sight and cover
+
+None of the sight numbers come from the 1824 rulebook, which leaves sight to the umpire. Placeholders in `packages/engine/src/visibility.ts`: sight range per unit type (`unitTypes.ts`), 200 m in or out of a wood or building, and partial concealment (`PARTIAL_PENALTY` = 4: a metre of ground at concealment c counts as 1 + 4c metres; a unit standing in it counts as 1/(1-c) times as far). Height tags (`low`, `flat`, `rise`, `high`) decide whether a ridge blocks the line. Cover is the per-feature `cover` attribute (0..1) read at the target in combat. The weather hook is `GameState.sightFactor`.
+
 ## Gaps
 
 - Full 1824 movement table (cavalry, horse artillery, other terrain and slopes). It is an image in the edition.

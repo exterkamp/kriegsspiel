@@ -51,6 +51,16 @@ export const SIGHT_RANGE_MM: Record<UnitKind, number> = {
 /** A unit standing in or looking out of a wood sees and is seen only this close (200 m). */
 const COVERED_RANGE_MM = 200_000;
 
+/**
+ * Partial concealment (0 < concealment < 1: marsh, scrub, orchards). Each metre of the line of
+ * sight that crosses such ground counts as `1 + concealment * PARTIAL_PENALTY` metres of
+ * distance, and a unit standing in it counts as `1 / (1 - concealment)` times as far away to
+ * every watcher (it is hidden *inside*, not only behind). Concealment 1 is not partial: it
+ * blocks the line and limits sight to `COVERED_RANGE_MM`. These numbers are placeholders, not
+ * from the 1824 rulebook (docs/rules.md, "Sight and cover").
+ */
+export const PARTIAL_PENALTY = 4;
+
 /** How far, in mm, a contact's possible position spreads per minute of age (100 m). */
 export const UNCERTAINTY_MM_PER_MINUTE = 100_000;
 
@@ -116,7 +126,8 @@ const coarseFacing = (f: number): number => {
  * Whether `observer` can see `target`: within sight range (unit kind and weather), and on
  * the straight line between them no sight-blocking ground (a wood, a building) and no ground
  * higher than both of them (a ridge). A unit in or looking from a wood or building sees and
- * is seen only within 200 m. Facing does not matter yet.
+ * is seen only within 200 m. Partly concealing ground (marsh, scrub) lengthens the effective
+ * distance (`perceivedDistance`). Facing does not matter yet.
  */
 export function canSee(world: GameState, observer: Unit, target: Unit): boolean {
   const a = observer.center;
@@ -128,11 +139,34 @@ export function canSee(world: GameState, observer: Unit, target: Unit): boolean 
   const [p, q] = a.y < b.y || (a.y === b.y && a.x <= b.x) ? [a, b] : [b, a];
   // Only rise/high ground can block, so low-lying observers still see across flat ground.
   const eye = Math.max(0, rankAt(world, a), rankAt(world, b));
-  return !profileAlong(world.map, p, q).some(
-    (piece) =>
-      piece.length > 0 &&
-      (piece.attrs.concealment >= BLOCKS_SIGHT || HEIGHT_RANK[piece.attrs.height] > eye),
-  );
+  const pieces = profileAlong(world.map, p, q).filter((piece) => piece.length > 0);
+  if (
+    pieces.some(
+      (piece) => piece.attrs.concealment >= BLOCKS_SIGHT || HEIGHT_RANK[piece.attrs.height] > eye,
+    )
+  ) {
+    return false;
+  }
+  return perceivedDistance(world, a, b, pieces) <= sightRangeMm(world, observer);
+}
+
+/**
+ * The distance as sight feels it: the true distance lengthened by partial concealment along
+ * the line and by each end standing in partly concealing ground. Symmetric in `a` and `b`.
+ */
+function perceivedDistance(
+  world: GameState,
+  a: Point,
+  b: Point,
+  pieces: ReadonlyArray<{ length: number; attrs: { concealment: number } }>,
+): number {
+  let d = distance(a, b);
+  for (const piece of pieces) d += piece.length * piece.attrs.concealment * PARTIAL_PENALTY;
+  for (const end of [a, b]) {
+    const c = terrainAt(world.map, end)?.attrs.concealment ?? 0;
+    if (c > 0 && c < BLOCKS_SIGHT) d /= 1 - c;
+  }
+  return d;
 }
 
 function visibleTo(world: GameState, side: SideId): Unit[] {
