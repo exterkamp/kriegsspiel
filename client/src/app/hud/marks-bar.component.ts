@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import type { MarkTool } from '@legacy/table/markTools';
 import type { Overlays } from '@legacy/table/types';
 import { startsCollapsed } from '@legacy/hud/marksBar';
+import { GameService } from '../game/game.service';
 import { MarksService } from '../game/marks.service';
 
 const TOOLS: ReadonlyArray<readonly [MarkTool, string, string]> = [
@@ -28,7 +29,7 @@ const OVERLAYS: ReadonlyArray<readonly [keyof Overlays, string]> = [
       id="marks"
       class="ks-overlay"
       aria-label="Map marks"
-      [hidden]="marks.deskOpen() || marks.windowShown()"
+      [hidden]="marks.deskOpen() || marks.windowShown() || overShown()"
     >
       <button
         id="marks-toggle"
@@ -130,6 +131,9 @@ const OVERLAYS: ReadonlyArray<readonly [keyof Overlays, string]> = [
 })
 export class MarksBarComponent {
   protected readonly marks = inject(MarksService);
+  private readonly game = inject(GameService);
+  /** The game-over paper is up over the table; the tools would sit half hidden under it. */
+  protected readonly overShown = computed(() => this.game.state().gameOver !== undefined);
   protected readonly tools = TOOLS;
   protected readonly overlays = OVERLAYS;
   protected readonly collapsed = signal(startsCollapsed(globalThis.innerWidth ?? Infinity));

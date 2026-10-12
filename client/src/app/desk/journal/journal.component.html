@@ -11,7 +11,7 @@
   <button type="submit" id="journal-add" [disabled]="note().trim() === ''">Write in diary</button>
 </form>
 
-<div class="tools">
+<div class="ks-field search">
   <label for="journal-search">Search</label>
   <input
     id="journal-search"
@@ -19,6 +19,8 @@
     [value]="query()"
     (input)="query.set($any($event.target).value)"
   />
+</div>
+<div class="tools">
   @for (k of kindList; track k.id) {
     <button type="button" [attr.aria-pressed]="kinds().has(k.id)" (click)="toggle(k.id)">
       {{ k.label }}

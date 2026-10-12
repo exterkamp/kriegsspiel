@@ -8,7 +8,6 @@ import {
   viewChild,
 } from '@angular/core';
 import { AdminPage } from '@legacy/admin/admin';
-import { MenuLinkComponent } from '../shell/menu-link.component';
 
 /**
  * Hosts the existing imperative `AdminPage` (read-only operator console). It builds its own DOM inside `#app`, so the
@@ -21,9 +20,8 @@ import { MenuLinkComponent } from '../shell/menu-link.component';
   encapsulation: ViewEncapsulation.None,
   styleUrl: './admin.component.css',
   host: { class: 'ks-theme' },
-  imports: [MenuLinkComponent],
-  template: `<div id="app" #root></div>
-    <ks-menu-link />`,
+  template: `<p class="admin-bar"><a class="ks-btn" href="/">← Main menu</a></p>
+    <div id="app" #root class="ks-dense"></div>`,
 })
 export class AdminComponent implements OnDestroy {
   private readonly root = viewChild.required<ElementRef<HTMLElement>>('root');

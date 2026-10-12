@@ -32,6 +32,16 @@ describe('component styles use the design tokens (#327)', () => {
     expect(files.length).toBeGreaterThan(30);
   });
 
+  it('covers the admin view, the new-game screen and the desk', () => {
+    const rel = files.map((f) => f.slice(SRC.length + 1));
+    for (const name of [
+      'app/admin/admin.component.css',
+      'app/shell/new-game.component.ts',
+      'app/desk/desk.component.css',
+    ])
+      expect(rel).toContain(name);
+  });
+
   it('has no hex colours, rgb() or font-family outside the token file', () => {
     const bad: string[] = [];
     for (const f of files) {

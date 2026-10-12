@@ -14,7 +14,8 @@
   <strong>{{ officer().name }}</strong
   >, {{ officer().title.toLowerCase() }}.
   <span class="traits">Traits: {{ officer().traits.join(', ') }}.</span>
-  <small
+  {{ ' '
+  }}<small
     >Each question takes about {{ formatCost(officer().costMs) }} of game time to answer.</small
   >
 </p>

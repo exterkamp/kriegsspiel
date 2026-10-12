@@ -17,6 +17,23 @@
   flex-wrap: wrap;
   justify-content: center;
 }
+/* Narrow screens: an even grid, three to a row, with the key hints dropped (there is no keyboard to press them on). */
+@media (max-width: 600px) {
+  .dock {
+    width: calc(100% - 16px);
+  }
+  .desk-bar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+  .desk-bar button {
+    padding-inline: var(--ks-space-1);
+  }
+  kbd {
+    display: none;
+  }
+}
 kbd {
   font: inherit;
   font-size: var(--ks-text-xs);
@@ -43,7 +60,8 @@ kbd {
   top: 8%;
   transform: translateX(-50%);
   width: min(560px, calc(100% - 16px));
-  max-height: 70%;
+  /* One height for every view, so switching views does not make the paper jump (#344). */
+  height: 70%;
   overflow: auto;
   box-sizing: border-box;
   z-index: 3;

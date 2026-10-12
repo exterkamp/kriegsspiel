@@ -6,6 +6,13 @@
   gap: 6px;
   margin-bottom: 10px;
 }
+.note label {
+  flex: 1 1 100%;
+  font-weight: bold;
+}
+.search label {
+  font-weight: bold;
+}
 .note textarea {
   flex: 1 1 100%;
 }

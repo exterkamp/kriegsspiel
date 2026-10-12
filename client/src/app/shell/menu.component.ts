@@ -3,6 +3,30 @@ import type { ContinueRow } from '@legacy/shell/continueList';
 import { isHighContrast, setHighContrast } from '../ui/contrast';
 import { PageFrameComponent } from '../ui/page-frame.component';
 
+const DEV_TOOLS = [
+  {
+    href: '/map-authoring',
+    name: 'Map editor',
+    about: 'Generate, preview and export a battlefield.',
+  },
+  {
+    href: '/map-benchmark',
+    name: 'Map benchmark',
+    about: 'Time map generation and rendering on this device.',
+  },
+  {
+    href: '/table-benchmark',
+    name: 'Table benchmark',
+    about: 'Time the 3D table scene on this device.',
+  },
+  {
+    href: '/style-guide',
+    name: 'Style guide',
+    about: 'Tokens and every shared control in each state.',
+  },
+  { href: '/admin/', name: 'Admin view', about: 'Operator console; asks for the admin token.' },
+];
+
 /** The main menu: new game, the continue list, the account, and a word about the game. */
 @Component({
   selector: 'ks-menu',
@@ -28,7 +52,7 @@ import { PageFrameComponent } from '../ui/page-frame.component';
               <li>
                 <button
                   type="button"
-                  class="ks-row game"
+                  class="ks-row ks-link game"
                   [attr.aria-label]="'Continue: ' + g.label"
                   (click)="continueGame.emit(g.id)"
                 >
@@ -47,47 +71,38 @@ import { PageFrameComponent } from '../ui/page-frame.component';
         <h2 id="account-h">Account</h2>
         @if (guest()) {
           <p>Playing as a guest. Your games stay in this browser.</p>
-          <button type="button" (click)="signIn.emit()">
-            Sign in to keep your games on other devices
-          </button>
         } @else {
           <p>
             Signed in as <b>{{ email() }}</b>
           </p>
-          <button type="button" (click)="signOut.emit()">Sign out</button>
         }
-        <p>
+        <div class="ks-cluster">
+          @if (guest()) {
+            <button type="button" (click)="signIn.emit()">
+              Sign in to keep your games on other devices
+            </button>
+          } @else {
+            <button type="button" (click)="signOut.emit()">Sign out</button>
+          }
           <button type="button" [attr.aria-pressed]="contrast()" (click)="toggleContrast()">
             High contrast
           </button>
-        </p>
+        </div>
       </section>
 
       @if (devTools()) {
         <section class="dev" aria-labelledby="dev-h">
           <h2 id="dev-h">Developer tools</h2>
           <p class="ks-muted">For development; not part of the game.</p>
-          <ul>
-            <li>
-              <a href="/map-authoring" class="ks-btn tool">Map editor</a>
-              <span class="ks-muted">Generate, preview and export a battlefield.</span>
-            </li>
-            <li>
-              <a href="/map-benchmark" class="ks-btn tool">Map benchmark</a>
-              <span class="ks-muted">Time map generation and rendering on this device.</span>
-            </li>
-            <li>
-              <a href="/table-benchmark" class="ks-btn tool">Table benchmark</a>
-              <span class="ks-muted">Time the 3D table scene on this device.</span>
-            </li>
-            <li>
-              <a href="/style-guide" class="ks-btn tool">Style guide</a>
-              <span class="ks-muted">Tokens and every shared control in each state.</span>
-            </li>
-            <li>
-              <a href="/admin/" class="ks-btn tool">Admin view</a>
-              <span class="ks-muted">Operator console; asks for the admin token.</span>
-            </li>
+          <ul class="ks-stack">
+            @for (t of tools; track t.href) {
+              <li>
+                <a [href]="t.href" class="ks-row ks-link">
+                  <b>{{ t.name }}</b>
+                  <span class="ks-muted">{{ t.about }}</span>
+                </a>
+              </li>
+            }
           </ul>
         </section>
       }
@@ -106,33 +121,15 @@ import { PageFrameComponent } from '../ui/page-frame.component';
     </ks-page-frame>
   `,
   styles: `
-    .dev ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .dev li {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: 2px 12px;
-      margin: 6px 0;
-    }
-    .tool {
-      min-width: 9em;
-    }
-    .game {
-      width: 100%;
-      text-align: left;
-      justify-content: flex-start;
-      font-size: inherit;
-    }
     section {
       margin-top: var(--ks-space-5);
     }
     h2 {
       border-bottom: 1px solid var(--ks-rule);
       margin: 0 0 var(--ks-space-2);
+    }
+    .tag {
+      margin-top: 0;
     }
   `,
 })
@@ -147,6 +144,7 @@ export class MenuComponent implements OnInit {
   readonly continueGame = output<string>();
   readonly signOut = output();
   readonly signIn = output();
+  protected readonly tools = DEV_TOOLS;
   protected readonly games = signal<ContinueRow[] | undefined>(undefined);
   protected readonly loadError = signal<string | undefined>(undefined);
   protected readonly contrast = signal(isHighContrast());

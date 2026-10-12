@@ -20,7 +20,6 @@ import {
 } from '@legacy/shell/screens';
 import { GameComponent } from '../game/game.component';
 import { GameService } from '../game/game.service';
-import { GameListComponent } from '../lobby/game-list.component';
 import { RoomComponent } from '../lobby/room.component';
 import { AccountBarComponent } from './account-bar.component';
 import { GameMenuComponent } from './game-menu.component';
@@ -48,7 +47,6 @@ type Prep =
     SignInComponent,
     MenuComponent,
     NewGameComponent,
-    GameListComponent,
     RoomComponent,
     GameComponent,
     GameMenuComponent,
@@ -78,15 +76,12 @@ type Prep =
           />
         }
         @case ('new-game') {
-          <div class="screen">
-            <ks-new-game
-              [load]="api.fetchScenarioOptions"
-              [create]="api.createGame"
-              (started)="go({ name: 'game', game: $event })"
-              (back)="go({ name: 'menu' })"
-            />
-            <div class="games"><ks-game-list /></div>
-          </div>
+          <ks-new-game
+            [load]="api.fetchScenarioOptions"
+            [create]="api.createGame"
+            (started)="go({ name: 'game', game: $event })"
+            (back)="go({ name: 'menu' })"
+          />
         }
         @default {
           @switch (prep().step) {
@@ -126,21 +121,6 @@ type Prep =
     p.ks-status {
       color: var(--ks-ink);
       margin: var(--ks-space-4);
-    }
-    /* One scroller holds the form and "Your games" in turn, so the list never lies over the form's end (#318). */
-    .screen {
-      height: 100%;
-      overflow: auto;
-      background: var(--ks-page-bg);
-    }
-    .screen ks-new-game {
-      height: auto;
-    }
-    .games {
-      max-width: 560px;
-      margin: 0 auto;
-      padding: 0 var(--ks-space-4) var(--ks-space-6);
-      color: var(--ks-text);
     }
   `,
 })

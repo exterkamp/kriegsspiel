@@ -34,6 +34,12 @@ import { TableService } from '../game/table.service';
       flex-wrap: wrap;
       max-width: calc(100% - 16px);
     }
+    /* The Menu button sits at the right on a phone; the HUD wraps in the room that is left (#344). */
+    @media (max-width: 600px) {
+      #hud {
+        max-width: calc(100% - 128px);
+      }
+    }
     #gameover {
       position: absolute;
       width: 1px;

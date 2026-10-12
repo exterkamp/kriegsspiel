@@ -36,7 +36,7 @@ interface Row {
   styles: `
     :host {
       display: block;
-      margin-top: var(--ks-space-5);
+      box-sizing: border-box;
     }
     h2 {
       margin: 0 0 var(--ks-space-2);

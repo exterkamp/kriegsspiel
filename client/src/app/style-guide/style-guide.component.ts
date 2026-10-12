@@ -88,6 +88,20 @@ const SWATCHES: Swatch[] = [
           <button type="button" disabled>Disabled</button>
           <a href="/style-guide" class="ks-btn">Link as button</a>
         </div>
+        <h3>Actions row (<code>ks-actions</code>): same size, one primary</h3>
+        <div class="ks-actions">
+          <button type="button" class="ks-primary">Start</button>
+          <button type="button">Back</button>
+        </div>
+        <h3>Link rows (<code>ks-row ks-link</code>): a whole row is the target</h3>
+        <ul class="ks-stack">
+          <li>
+            <a href="/style-guide" class="ks-row ks-link">
+              <b>Map editor</b>
+              <span class="ks-muted">A title with its explanation under it.</span>
+            </a>
+          </li>
+        </ul>
       </section>
 
       <section aria-labelledby="sg-fields">
@@ -114,11 +128,33 @@ const SWATCHES: Swatch[] = [
           <span id="sg-err" class="ks-error" role="alert">Say where the battalion should go.</span>
         </label>
         <fieldset>
-          <legend>Radios and checks</legend>
-          <label><input type="radio" name="sg" checked /> One</label>
-          <label><input type="radio" name="sg" /> Two</label>
-          <label><input type="checkbox" checked /> A check</label>
+          <legend>Radios</legend>
+          <label class="ks-choice"><input type="radio" name="sg" checked /> One (selected)</label>
+          <label class="ks-choice"><input type="radio" name="sg" /> Two</label>
+          <label class="ks-choice"
+            ><input type="radio" name="sg" disabled /> Three (disabled)</label
+          >
         </fieldset>
+        <fieldset>
+          <legend>Checkboxes</legend>
+          <label class="ks-choice"><input type="checkbox" checked /> Checked</label>
+          <label class="ks-choice"><input type="checkbox" /> Unchecked</label>
+          <label class="ks-choice"><input type="checkbox" disabled checked /> Disabled</label>
+        </fieldset>
+        <label class="ks-field">
+          Select, disabled
+          <select disabled>
+            <option>1st Battalion</option>
+          </select>
+        </label>
+        <label class="ks-field">
+          Range
+          <input type="range" min="0" max="10" value="4" />
+        </label>
+        <div class="ks-overlay">
+          <label class="ks-choice"><input type="checkbox" checked /> On an overlay (checked)</label>
+          <label class="ks-choice"><input type="checkbox" /> On an overlay</label>
+        </div>
       </section>
 
       <section aria-labelledby="sg-surfaces">
@@ -138,6 +174,29 @@ const SWATCHES: Swatch[] = [
             <span class="ks-badge ks-quiet-badge">quiet</span>
           </li>
         </ul>
+      </section>
+
+      <section aria-labelledby="sg-dense">
+        <h2 id="sg-dense">Dense layout</h2>
+        <p class="ks-muted">
+          <code>ks-dense</code> shrinks type and controls for the operator console; it keeps the
+          tokens.
+        </p>
+        <div class="ks-dense ks-panel">
+          <h3>Dense heading</h3>
+          <div class="ks-cluster">
+            <label
+              >Game
+              <select>
+                <option>demo</option>
+              </select></label
+            >
+            <input type="search" placeholder="filter" aria-label="Filter" />
+            <button type="button">Connect</button>
+            <button type="button" aria-pressed="true">State</button>
+          </div>
+          <p class="ks-mono">key value (mono data)</p>
+        </div>
       </section>
 
       <section aria-labelledby="sg-tabs">
