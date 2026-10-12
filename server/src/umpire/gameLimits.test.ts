@@ -271,6 +271,7 @@ describe('a capped game degrades', () => {
       fellBack: true,
       calls: 0,
       rejections: [],
+      fallbacks: [{ reportId: 'blue-r1', reason: 'umpire budget or rate limit' }],
       overloaded: STAFF_OVERLOADED_NOTICE,
     });
     expect(seen).toHaveLength(1);

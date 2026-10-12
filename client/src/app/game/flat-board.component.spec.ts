@@ -47,6 +47,7 @@ describe('FlatBoardComponent (#343)', () => {
     expect(el.querySelectorAll('polygon.piece.own')).toHaveLength(fixtureView.ownUnits.length);
     expect(el.querySelector('polyline.order')).not.toBeNull();
     expect(el.querySelectorAll('polyline.route').length).toBeGreaterThan(1);
+    expect(el.querySelector('circle.route-end')).not.toBeNull();
     expect(el.textContent).toContain(fixtureView.ownUnits[0]!.name);
   });
 
@@ -55,6 +56,7 @@ describe('FlatBoardComponent (#343)', () => {
     marks.overlays.update((o) => ({ ...o, routes: false }));
     await f.whenStable();
     expect(el.querySelector('polyline.route')).toBeNull();
+    expect(el.querySelector('circle.route-end')).toBeNull();
     expect(el.querySelector('polyline.order')).not.toBeNull();
     marks.overlays.update((o) => ({ ...o, routes: true, orders: false }));
     await f.whenStable();

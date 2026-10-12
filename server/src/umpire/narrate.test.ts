@@ -15,6 +15,7 @@ import {
   reportsDueForNarration,
 } from './narrate.js';
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- a fake model reads raw call inputs */
 function report(over: Partial<ViewReport> = {}): ViewReport {
   return {
     id: 'blue-r1',
@@ -145,15 +146,104 @@ describe('prose check', () => {
   });
 });
 
+/** A fake model that answers each single-report call with the next scripted reply (or a function of the input). */
+function fakeModel(replies: Array<unknown | ((input: any) => unknown)>) {
+  const calls: any[] = [];
+  const client = {
+    calls,
+    async call(req: { input: unknown }) {
+      calls.push(req.input);
+      const next = replies.shift();
+      const output = typeof next === 'function' ? next(req.input) : next;
+      return { output, record: {} as never };
+    },
+  };
+  return client;
+}
+
+const one = (id: string, text: string) => ({ dispatches: [{ reportIds: [id], text }] });
+
 describe('narrateReports', () => {
-  it('makes one call for all of a side’s reports', async () => {
-    const client = new MockUmpireClient([fixture(good)]);
-    const r = await narrateReports(client, 'blue', reports);
-    expect(client.calls).toHaveLength(1);
-    expect(client.calls[0]!.stage).toBe('narrate');
-    expect(client.calls[0]!.input).toEqual(input);
-    expect(r).toMatchObject({ fellBack: false, calls: 1, rejections: [] });
-    expect(r.dispatches.map((d) => d.reportIds)).toEqual([['blue-r1'], ['blue-r2']]);
+  it('makes one call per report and keeps the model’s text for each (#359)', async () => {
+    const client = fakeModel([
+      one('blue-r1', good.dispatches[0]!.text),
+      one('blue-r2', good.dispatches[1]!.text),
+    ]);
+    const r = await narrateReports(client as never, 'blue', reports);
+    expect(client.calls).toHaveLength(2);
+    expect(client.calls.map((c) => c.reports.map((x: { id: string }) => x.id))).toEqual([
+      ['blue-r1'],
+      ['blue-r2'],
+    ]);
+    expect(client.calls[0]).toEqual(narrateInput('blue', [reports[0]!]));
+    expect(r).toMatchObject({ fellBack: false, calls: 2, rejections: [], fallbacks: [] });
+    expect(r.dispatches).toEqual([
+      { reportIds: ['blue-r1'], text: good.dispatches[0]!.text },
+      { reportIds: ['blue-r2'], text: good.dispatches[1]!.text },
+    ]);
+  });
+
+  it('keeps the model’s text for the reports that pass when another falls back, saying why (#359)', async () => {
+    const bad = one('blue-r1', 'Red-9 attacks the Cuirassiers of Lindau.');
+    const client = fakeModel([bad, bad, one('blue-r2', good.dispatches[1]!.text)]);
+    const r = await narrateReports(client as never, 'blue', reports);
+    expect(client.calls).toHaveLength(3);
+    expect(r.fellBack).toBe(true);
+    expect(r.dispatches[0]).toEqual({ reportIds: ['blue-r1'], text: reports[0]!.text });
+    expect(r.dispatches[1]!.text).toBe(good.dispatches[1]!.text);
+    expect(r.fallbacks).toHaveLength(1);
+    expect(r.fallbacks[0]).toMatchObject({ reportId: 'blue-r1' });
+    expect(r.fallbacks[0]!.reason).toMatch(/reply 2 rejected .*unknown entity "red-9"/i);
+  });
+
+  it('narrates only the newest reports of a long window, the rest keep their text', async () => {
+    const many = Array.from({ length: 4 }, (_, i) => report({ id: `blue-r${i + 1}` }));
+    const client = fakeModel(
+      many
+        .slice(2)
+        .map((r) => one(r.id, 'Sir, the 2nd Hussars report about 400 men near the mill.')),
+    );
+    const r = await narrateReports(client as never, 'blue', many, { maxReports: 2 });
+    expect(client.calls).toHaveLength(2);
+    expect(r.dispatches.map((d) => d.reportIds[0])).toEqual(many.map((x) => x.id));
+    expect(r.fallbacks.map((f) => f.reportId)).toEqual(['blue-r1', 'blue-r2']);
+    expect(r.dispatches[0]!.text).toBe(many[0]!.text);
+  });
+
+  it('takes the newest reports by delivery time, whatever order the view lists them in', async () => {
+    const many = [3, 1, 4, 2].map((n) => report({ id: `blue-r${n}`, deliveredAt: n * 1000 }));
+    const client = fakeModel([
+      one('blue-r3', 'Sir, the 2nd Hussars report about 400 men near the mill.'),
+      one('blue-r4', 'Sir, the 2nd Hussars report about 400 men near the mill.'),
+    ]);
+    const r = await narrateReports(client as never, 'blue', many, { maxReports: 2 });
+    expect(client.calls.map((c) => c.reports[0].id)).toEqual(['blue-r3', 'blue-r4']);
+    expect(r.fallbacks.map((f) => f.reportId)).toEqual(['blue-r1', 'blue-r2']);
+  });
+
+  it('keeps the prose of the reports done when time runs out, and the rest keep their text (#359)', async () => {
+    const abort = new AbortController();
+    let n = 0;
+    const client = {
+      async call(req: { input: unknown }) {
+        if (++n === 1) {
+          const id = (req.input as { reports: { id: string }[] }).reports[0]!.id;
+          return { output: one(id, good.dispatches[0]!.text), record: {} as never };
+        }
+        return new Promise<never>(() => undefined); // hangs until the deadline
+      },
+    };
+    const run = narrateReports(client as never, 'blue', reports, { signal: abort.signal });
+    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    abort.abort();
+    const r = await run;
+    expect(r.dispatches).toEqual([
+      { reportIds: ['blue-r1'], text: good.dispatches[0]!.text },
+      { reportIds: ['blue-r2'], text: reports[1]!.text },
+    ]);
+    expect(r.fallbacks).toEqual([{ reportId: 'blue-r2', reason: 'timed out' }]);
+    expect(r.fellBack).toBe(true);
   });
 
   it('leaves the umpire’s ruling in its own words, out of the model’s hands (#320)', async () => {
@@ -163,9 +253,12 @@ describe('narrateReports', () => {
       from: 'Dispatch from the field',
       text: 'Red’s attack at the bridge has been broken; Blue holds the field.',
     });
-    const client = new MockUmpireClient([fixture(good)]);
-    const r = await narrateReports(client, 'blue', [...reports, ruling]);
-    expect(JSON.stringify(client.calls[0]!.input)).not.toContain('blue-r3');
+    const client = fakeModel([
+      one('blue-r1', good.dispatches[0]!.text),
+      one('blue-r2', good.dispatches[1]!.text),
+    ]);
+    const r = await narrateReports(client as never, 'blue', [...reports, ruling]);
+    expect(JSON.stringify(client.calls)).not.toContain('blue-r3');
     expect(r.dispatches.flatMap((d) => d.reportIds)).not.toContain('blue-r3');
     const only = await narrateReports(new MockUmpireClient([]), 'blue', [ruling]);
     expect(only).toMatchObject({ dispatches: [], calls: 0 });
@@ -178,45 +271,34 @@ describe('narrateReports', () => {
   });
 
   it('rejects an invented unit and regenerates, telling the model why', async () => {
-    const bad = {
-      dispatches: [
-        { reportIds: ['blue-r1'], text: 'Sir, red-4 and the Cuirassiers of Lindau hold the mill.' },
-        good.dispatches[1],
-      ],
-    };
-    // A reply per call, in order: the first invents a unit, the retry is clean.
-    const replies = [bad, good];
-    const stub = {
-      calls: [] as unknown[],
-      async call(req: { input: unknown }) {
-        stub.calls.push(req.input);
-        return { output: replies.shift(), record: {} as never };
-      },
-    };
-    const r = await narrateReports(stub as never, 'blue', reports);
+    const bad = one('blue-r1', 'Sir, red-4 and the Cuirassiers of Lindau hold the mill.');
+    const client = fakeModel([bad, one('blue-r1', good.dispatches[0]!.text)]);
+    const r = await narrateReports(client as never, 'blue', [reports[0]!]);
     expect(r.fellBack).toBe(false);
     expect(r.calls).toBe(2);
     expect(r.rejections[0]).toEqual(
       expect.arrayContaining(['unknown entity "red-4"', 'unknown name "Cuirassiers"']),
     );
-    expect(stub.calls[1]).toMatchObject({ rejected: r.rejections[0] });
+    expect(client.calls[1]).toMatchObject({ rejected: r.rejections[0] });
     expect(r.dispatches[0]!.text).toMatch(/400 men/);
   });
 
   it('falls back to the template text when every reply invents something', async () => {
-    const bad = { dispatches: [{ reportIds: ['blue-r1', 'blue-r2'], text: 'Red-9 attacks.' }] };
+    const bad = { dispatches: [{ reportIds: ['blue-r1'], text: 'Red-9 attacks.' }] };
     const client = new MockUmpireClient([fixture(bad)]);
     const r = await narrateReports(client, 'blue', reports, { maxCalls: 2 });
-    expect(client.calls).toHaveLength(2);
+    expect(client.calls).toHaveLength(4);
     expect(r.fellBack).toBe(true);
     expect(r.dispatches).toEqual(reports.map((x) => ({ reportIds: [x.id], text: x.text })));
   });
 
-  it('falls back to the template text when the model call fails', async () => {
+  it('falls back to the template text for every report when the model call fails', async () => {
     const client = new MockUmpireClient([{ stage: 'narrate', failure: { kind: 'transport' } }]);
     const r = await narrateReports(client, 'blue', reports);
     expect(r).toMatchObject({ fellBack: true, calls: 1 });
-    expect(r.dispatches[0]!.text).toBe(reports[0]!.text);
+    expect(r.dispatches.map((d) => d.text)).toEqual(reports.map((x) => x.text));
+    expect(r.fallbacks).toHaveLength(2);
+    expect(r.fallbacks[0]!.reason).toMatch(/model call failed/);
   });
 });
 

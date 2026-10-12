@@ -66,6 +66,8 @@ export const OwnUnit = z
     name: z.string(),
     /** Who commands the formation, when the scenario names one. */
     commander: z.string().optional(),
+    /** A short note on the commander's manner, for the roster tooltip. */
+    trait: z.string().optional(),
     /** Centre of the footprint, in metres. */
     position: Coord,
     facing: Facing,

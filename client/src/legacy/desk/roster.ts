@@ -11,6 +11,7 @@ export interface RosterRow {
   name: string;
   /** Who commands it, when the scenario names one. */
   commander: string | undefined;
+  trait: string | undefined;
   /** Men, as reported (not a percent), or undefined when the report gives no usable figure. */
   strength: number | undefined;
   supply: number | undefined;
@@ -41,6 +42,12 @@ export function formatAge(ms: number): string {
   return h % 24 ? `${Math.floor(h / 24)} d ${h % 24} h` : `${Math.floor(h / 24)} d`;
 }
 
+/** `just now`, or `45 min old`: how old a figure is, in words that read right at every age. */
+export function formatAgeOld(ms: number): string {
+  const age = formatAge(ms);
+  return age === 'just now' ? age : `${age} old`;
+}
+
 /**
  * One row per formation in the SideView, and nothing else. The figures are as of the unit's own
  * `reportedAt` when the server sends one, else `view.atGame`, so they age as game time runs on past
@@ -51,12 +58,14 @@ export function rosterRows(view: SideView | undefined, nowGame: number): RosterR
   if (!view) return [];
   return view.ownUnits.map((u: OwnUnit) => {
     // Each unit's figures carry their own report date; older servers date them to the view.
-    const reportedAt = u.reportedAt ?? view.atGame;
+    // Never dated after the clock the player is reading (the local clock can lag the server's view by a moment).
+    const reportedAt = Math.min(u.reportedAt ?? view.atGame, nowGame);
     const ageMs = Math.max(0, nowGame - reportedAt);
     return {
       id: u.id,
       name: u.name,
       commander: u.commander,
+      trait: u.trait,
       strength: known(u.strength) ? Math.round(u.strength) : undefined,
       supply: pct(u.supply),
       morale: pct(u.morale),

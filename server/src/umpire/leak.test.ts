@@ -32,6 +32,7 @@ import { umpireConfigFromEnv } from './config.js';
 import { createUmpireClient } from './createUmpireClient.js';
 import { LeakProbe, ScriptedModel, describeLeaks, plantCanaries, scan } from './leakKit.testkit.js';
 import type { Leak, Secret } from './leakKit.testkit.js';
+import { hiddenTerms } from './leakGuard.js';
 import { narrateReports } from './narrate.js';
 import { StaffRoster, answerStaffQuestion, runStaff } from './staff.js';
 import type { UmpireClient } from './umpireClient.js';
@@ -114,7 +115,9 @@ const ADVERSARIAL_ORDERS = [
 async function runStages(client: UmpireClient, side: SideId): Promise<Delivered[]> {
   const out: Delivered[] = [];
   const view = viewFor(G.world, side, G.now);
-  const narrated = await narrateReports(client, side, view.reports);
+  const narrated = await narrateReports(client, side, view.reports, {
+    hidden: hiddenTerms(G.world, side),
+  });
   out.push(deliver('narrate dispatches', narrated.dispatches));
 
   const roster = new StaffRoster(side);
