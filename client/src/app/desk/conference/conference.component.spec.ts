@@ -72,7 +72,7 @@ describe('ConferenceComponent', () => {
     }));
     await f.whenStable();
     expect(desk.conferenceLog()[0]!.answer).toEqual({
-      text: 'Major Dessau: A battalion at the bridge.',
+      text: 'Major Dessau: Sir, a battalion at the bridge.',
       basedOnGame: 5_000,
     });
     // The umpire's officer replaces the fixture's name on the tab it answered.
