@@ -156,6 +156,7 @@ export type {
   EngineSideView,
   ViewContact,
   ViewDocument,
+  ViewOrderRoute,
   ViewEnemy,
   ViewReport,
   ViewUnit,

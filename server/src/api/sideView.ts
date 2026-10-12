@@ -139,6 +139,16 @@ export function toSideView(
       ...('shape' in u && u.shape ? { shape: u.shape } : {}),
       ...condition(u),
     })),
+    ...(view.orderRoutes.length === 0
+      ? {}
+      : {
+          orderRoutes: view.orderRoutes.map((o) => ({
+            id: o.id,
+            unitId: o.unitId,
+            kind: o.kind,
+            points: o.points,
+          })),
+        }),
     visibleEnemies: view.visibleEnemies.map((e) => ({
       id: e.id,
       position: e.position,

@@ -86,6 +86,7 @@ export function viewForRole(
         ...full,
         role,
         ownUnits: full.ownUnits.map(outline),
+        orderRoutes: [],
         reports: full.reports.filter((r) => r.kind === 'contact'),
       };
     case 'quartermaster':
@@ -114,6 +115,7 @@ export function viewForRole(
         ...full,
         role,
         ownUnits: full.ownUnits.filter((u) => ids.has(u.id)),
+        orderRoutes: full.orderRoutes.filter((o) => ids.has(o.unitId)),
         visibleEnemies: full.visibleEnemies.filter((e: ViewEnemy) => seenIds.has(e.id)),
         lastKnownContacts: [],
         documents: full.documents.filter((d) => passed.has(d.id)),

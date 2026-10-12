@@ -99,7 +99,11 @@ export function buildSceneState(view: SideView, map: BaseMap): SceneState {
     map,
     own,
     ghosts: [...live, ...stale],
-    orderRoutes: [],
+    orderRoutes: (view.orderRoutes ?? []).map((o) => ({
+      id: o.id,
+      kind: o.kind,
+      points: o.points,
+    })),
     engagements,
   };
 }
