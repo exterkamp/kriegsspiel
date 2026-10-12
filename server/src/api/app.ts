@@ -50,6 +50,7 @@ import {
 import { adminApi } from '../admin/adminApi.js';
 import { loadReplayInput, replayTimeline } from '../admin/replayView.js';
 import { LogMailer, type Mailer } from '../auth/mailer.js';
+import { originAllowed } from '../auth/origin.js';
 import { authRoutes, type Auth } from '../auth/routes.js';
 import { MemoryAuthStore, type AuthStore } from '../auth/store.js';
 import { NOOP_TRACE, TraceStore, traceRequest } from '../debug/trace.js';
@@ -190,6 +191,8 @@ export interface AppOptions {
     guestIdleMs?: number;
     /** Guests created per client address per hour (default 10). */
     guestPerIp?: number;
+    /** Extra origins allowed to open a game WebSocket, besides the public origin and the request's own host; `*` allows any (`ALLOWED_ORIGINS`). */
+    allowedOrigins?: string[];
   };
   /**
    * Trust `X-Forwarded-For` for `req.ip`, which keys the login rate limits. On behind a reverse proxy,
@@ -851,6 +854,16 @@ export async function buildApp(options: AppOptions): Promise<App> {
       // Runs before the upgrade, so a bad session or seat is a plain HTTP error.
       preValidation: async (req, reply) => {
         const { id } = req.params;
+        if (
+          !originAllowed(
+            req.headers.origin,
+            req.headers.host,
+            publicUrl,
+            options.auth?.allowedOrigins,
+          )
+        ) {
+          return reply.code(403).send({ error: 'bad_origin' });
+        }
         const user = auth.userOf(req);
         if (!user) return reply.code(401).send({ error: 'not_signed_in' });
         const rec = recordOf(id);

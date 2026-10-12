@@ -1,8 +1,8 @@
 /**
  * Accounts over HTTP (Epic #5, story 5.1):
  *
- *   POST   /auth/login    `{ email }`  mail a one-time login link; always 202 so it does not reveal who has an account
- *   GET    /auth/verify   `?token=`    spend the link, start a session, redirect to `/`
+ *   POST   /auth/login    `{ email, next? }`  mail a one-time login link; always 202 so it does not reveal who has an account
+ *   GET    /auth/verify   `?token=&next=`  spend the link, start a session, redirect to the validated relative `next` (default `/`)
  *   GET    /auth/me                    the signed-in user, or 401
  *   GET    /auth/features           `{ devTools }`: whether the menu shows its Developer tools section
  *   GET    /auth/guest              `{ enabled }`: whether guest play is on
@@ -17,6 +17,7 @@ import { randomBytes } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { Mailer } from './mailer.js';
+import { safeNext } from './origin.js';
 import { RateLimiter } from './rateLimit.js';
 import { hashToken, type AuthStore, type User } from './store.js';
 
@@ -58,7 +59,12 @@ export interface Auth {
   userOf(req: FastifyRequest): User | undefined;
 }
 
-const Login = z.object({ email: z.string().trim().toLowerCase().email().max(254) }).strict();
+const Login = z
+  .object({
+    email: z.string().trim().toLowerCase().email().max(254),
+    next: z.string().max(1024).optional(),
+  })
+  .strict();
 
 export function readCookie(header: string | undefined, name: string): string | undefined {
   for (const part of (header ?? '').split(';')) {
@@ -145,12 +151,13 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
     const body = Login.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'bad_email' });
     const { email } = body.data;
+    const next = safeNext(body.data.next);
     if (!perIp.hit(req.ip) || !perEmail.hit(email)) {
       return reply.code(429).header('retry-after', '3600').send({ error: 'rate_limited' });
     }
     const token = randomBytes(32).toString('base64url');
     o.store.putLoginToken(hashToken(token), email, now() + LOGIN_LINK_TTL_MS);
-    const link = `${o.publicUrl.replace(/\/$/, '')}/auth/verify?token=${token}`;
+    const link = `${o.publicUrl.replace(/\/$/, '')}/auth/verify?token=${token}${next ? `&next=${encodeURIComponent(next)}` : ''}`;
     try {
       await o.mailer.sendLoginLink(email, link);
     } catch (e) {
@@ -160,30 +167,33 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
     return reply.code(202).send({ ok: true });
   });
 
-  server.get<{ Querystring: { token?: string } }>('/auth/verify', async (req, reply) => {
-    if (!verifyPerIp.hit(req.ip)) return reply.code(429).send({ error: 'rate_limited' });
-    const token = req.query.token;
-    const email =
-      typeof token === 'string' ? o.store.consumeLoginToken(hashToken(token), now()) : undefined;
-    if (!email) {
+  server.get<{ Querystring: { token?: string; next?: string } }>(
+    '/auth/verify',
+    async (req, reply) => {
+      if (!verifyPerIp.hit(req.ip)) return reply.code(429).send({ error: 'rate_limited' });
+      const token = req.query.token;
+      const email =
+        typeof token === 'string' ? o.store.consumeLoginToken(hashToken(token), now()) : undefined;
+      if (!email) {
+        return reply
+          .code(400)
+          .type('text/plain')
+          .send('This login link is invalid, expired or already used. Request a new one.');
+      }
+      const guest = userOf(req);
+      const user = o.store.upsertUser(email, now());
+      if (guest?.guest && guest.id !== user.id) {
+        const moved = o.store.adoptGuest(guest.id, user.id);
+        o.onGuestAdopted?.(guest.id, user.id, moved);
+      }
+      const session = randomBytes(32).toString('base64url');
+      o.store.putSession(hashToken(session), user.id, now() + SESSION_TTL_MS);
       return reply
-        .code(400)
-        .type('text/plain')
-        .send('This login link is invalid, expired or already used. Request a new one.');
-    }
-    const guest = userOf(req);
-    const user = o.store.upsertUser(email, now());
-    if (guest?.guest && guest.id !== user.id) {
-      const moved = o.store.adoptGuest(guest.id, user.id);
-      o.onGuestAdopted?.(guest.id, user.id, moved);
-    }
-    const session = randomBytes(32).toString('base64url');
-    o.store.putSession(hashToken(session), user.id, now() + SESSION_TTL_MS);
-    return reply
-      .header('set-cookie', cookie(session, SESSION_TTL_MS / 1000))
-      .header('cache-control', 'no-store')
-      .redirect('/');
-  });
+        .header('set-cookie', cookie(session, SESSION_TTL_MS / 1000))
+        .header('cache-control', 'no-store')
+        .redirect(safeNext(req.query.next) ?? '/');
+    },
+  );
 
   server.get('/auth/me', async (req, reply) => {
     const user = userOf(req);
