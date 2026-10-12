@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SideView } from '@kriegsspiel/protocol';
-import { engagementsOf } from './sceneState.js';
+import { buildSceneState, engagementsOf } from './sceneState.js';
+import type { BaseMap } from './types.js';
 
 const view = (own: [number, number][], foes: [number, number][]) =>
   ({
@@ -38,5 +39,28 @@ describe('engagementsOf (#320)', () => {
         ),
       ),
     ).toHaveLength(1);
+  });
+});
+
+describe('tags beside a fight marker (#323)', () => {
+  const map = {} as BaseMap;
+  const full = (foes: [number, number][]) =>
+    ({
+      ...view([[1000, 1000]], foes),
+      side: 'blue',
+      atGame: 0,
+      lastKnownContacts: [],
+    }) as unknown as SideView;
+
+  it('drops the "just now" tag of an enemy that is in the fight the marker names', () => {
+    const scene = buildSceneState(full([[1200, 1000]]), map);
+    expect(scene.engagements).toHaveLength(1);
+    expect(scene.ghosts[0]!.ageTag).toBe('');
+  });
+
+  it('keeps it for an enemy in sight that is not fighting', () => {
+    const scene = buildSceneState(full([[1900, 1000]]), map);
+    expect(scene.engagements).toHaveLength(0);
+    expect(scene.ghosts[0]!.ageTag).toBe('just now');
   });
 });

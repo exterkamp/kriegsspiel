@@ -22,6 +22,17 @@ describe('game over logic (from held PR #266)', () => {
     ).toMatch(/was broken: Red was wiped out; Blue holds the field/);
   });
 
+  it('says the survivors left the field when the losing force was not wiped out (#323)', () => {
+    expect(
+      reasonText({
+        winner: 'blue',
+        reason: 'attack-broken',
+        atGame: 2_400_000,
+        loserOut: 'withdrawn',
+      }),
+    ).toMatch(/was broken: Red's survivors had all left the field; Blue holds the field/);
+  });
+
   it('maps the winner to a result for each side', () => {
     expect(resultFor({ winner: 'blue' }, 'blue')).toBe('victory');
     expect(resultFor({ winner: 'blue' }, 'red')).toBe('defeat');
