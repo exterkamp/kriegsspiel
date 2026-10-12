@@ -114,4 +114,27 @@ describe('login keeps the invite target', () => {
     expect((await ws('https://ks.example')).statusCode).toBe(401);
     expect((await ws()).statusCode).toBe(401);
   });
+
+  it('wires allowedOrigins from AppOptions into the upgrade check', async () => {
+    const upgrade = async (allowedOrigins: string[]) => {
+      const a = await buildApp({
+        parser: new StubOrderParser(),
+        auth: { publicUrl: 'https://ks.example', allowedOrigins },
+      });
+      try {
+        return (
+          await a.server.inject({
+            method: 'GET',
+            url: '/games/nope/ws?side=blue',
+            headers: { host: 'ks.example', origin: 'https://other.test' },
+          })
+        ).statusCode;
+      } finally {
+        await a.server.close();
+      }
+    };
+    expect(await upgrade([])).toBe(403);
+    expect(await upgrade(['https://other.test'])).toBe(401);
+    expect(await upgrade(['*'])).toBe(401);
+  });
 });

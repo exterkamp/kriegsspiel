@@ -47,6 +47,10 @@ export function originOf(url: string): string | undefined {
  * passes: it carries no ambient cookie from another site. Otherwise the origin must be the public
  * origin, the origin the request itself was addressed to (same `Host`, which covers a LAN address
  * and the dev proxy), or one of `allowed`; `*` in `allowed` turns the check off.
+ *
+ * This defends against cross-site WebSocket hijacking through the session cookie. The `Host` match
+ * is only an allowance for LAN and dev-proxy use: a cross-site page cannot forge `Host`, and
+ * `X-Forwarded-Host` is deliberately not read.
  */
 export function originAllowed(
   origin: string | undefined,

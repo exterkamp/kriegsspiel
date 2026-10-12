@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { startGuest } from './auth';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { requestLink, startGuest } from './auth';
 
 const respond = (status: number, body: string): typeof fetch =>
   (async () => new Response(body, { status })) as unknown as typeof fetch;
@@ -24,5 +24,32 @@ describe('startGuest', () => {
     expect(await startGuest(respond(429, body))).toBe(
       'Too many guests have started from this address. Try again later.',
     );
+  });
+});
+
+describe('requestLink', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const capture = () => {
+    const bodies: unknown[] = [];
+    const fetchFn = (async (_url: string, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response('', { status: 202 });
+    }) as unknown as typeof fetch;
+    return { bodies, fetchFn };
+  };
+
+  it('sends the page being visited as next, so an invite survives sign-in', async () => {
+    vi.stubGlobal('location', { pathname: '/', search: '?game=abc' });
+    const { bodies, fetchFn } = capture();
+    expect(await requestLink('a@b.test', fetchFn)).toBeUndefined();
+    expect(bodies).toEqual([{ email: 'a@b.test', next: '/?game=abc' }]);
+  });
+
+  it('omits next when there is no location', async () => {
+    vi.stubGlobal('location', undefined);
+    const { bodies, fetchFn } = capture();
+    await requestLink('a@b.test', fetchFn);
+    expect(bodies).toEqual([{ email: 'a@b.test' }]);
   });
 });
