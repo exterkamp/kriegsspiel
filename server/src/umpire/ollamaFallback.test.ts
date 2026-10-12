@@ -12,7 +12,11 @@ import { PlaybackUmpireClient } from './playbackUmpireClient.js';
 import { StaffRoster, runStaff } from './staff.js';
 import type { UmpireCallRecord } from './umpireClient.js';
 
-const ENV = { UMPIRE_KEYLESS_PROVIDER: 'ollama', OLLAMA_URL: 'http://ollama:11434' };
+const ENV = {
+  UMPIRE_KEYLESS_PROVIDER: 'ollama',
+  OLLAMA_URL: 'http://ollama:11434',
+  OLLAMA_STAGES: 'parse,narrate,staff',
+};
 const ORDER = 'Move the 1st Battalion to the bridge and hold it.';
 
 const chat = (content: string) =>
@@ -74,6 +78,18 @@ describe('keyless Ollama configuration', () => {
     expect(config.fallbackProvider).toBe('test');
     expect(llmOrderParserEnabled(ENV, config)).toBe(true);
     expect(usesTestUmpire(config)).toBe(false);
+  });
+
+  it('leaves parse to the canned parser by default, and OLLAMA_STAGES changes that', () => {
+    const c = umpireConfigFromEnv({ UMPIRE_KEYLESS_PROVIDER: 'ollama' });
+    expect(c.stages.parse.provider).toBe('test');
+    expect(c.stages.narrate.provider).toBe('ollama');
+    expect(c.stages.staff.provider).toBe('ollama');
+    const only = umpireConfigFromEnv({ UMPIRE_KEYLESS_PROVIDER: 'ollama', OLLAMA_STAGES: 'staff' });
+    expect(only.stages.narrate.provider).toBe('test');
+    expect(() =>
+      umpireConfigFromEnv({ UMPIRE_KEYLESS_PROVIDER: 'ollama', OLLAMA_STAGES: 'judge' }),
+    ).toThrow(/OLLAMA_STAGES/);
   });
 
   it('is configurable and an API key switches back to Anthropic', () => {

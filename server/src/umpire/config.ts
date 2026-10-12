@@ -60,8 +60,26 @@ export interface UmpireConfig {
   fallbackProvider?: string;
 }
 
-/** The stages `UMPIRE_KEYLESS_PROVIDER=ollama` hands to the local model; judging and the AI commander stay on `test`. */
-export const OLLAMA_STAGES: readonly UmpireStage[] = ['parse', 'narrate', 'staff'];
+/**
+ * The stages `UMPIRE_KEYLESS_PROVIDER=ollama` hands to the local model (`OLLAMA_STAGES` overrides); the rest stay on `test`.
+ * Parse is left out by default: on the order corpus the models that fit this host parse no clear order into the
+ * expected intents (see docs/llm-providers.md), while narration and staff advice pass their checks.
+ */
+export const OLLAMA_DEFAULT_STAGES: readonly UmpireStage[] = ['narrate', 'staff'];
+const OLLAMA_ELIGIBLE: readonly UmpireStage[] = ['parse', 'narrate', 'staff'];
+
+function ollamaStages(env: Env): readonly UmpireStage[] {
+  const raw = env.OLLAMA_STAGES?.trim();
+  if (!raw) return OLLAMA_DEFAULT_STAGES;
+  const names = raw.split(',').map((x) => x.trim());
+  const bad = names.filter((n) => !OLLAMA_ELIGIBLE.includes(n as UmpireStage));
+  if (bad.length) {
+    throw new Error(
+      `OLLAMA_STAGES: "${bad.join(', ')}" is not one of ${OLLAMA_ELIGIBLE.join(', ')}`,
+    );
+  }
+  return names as UmpireStage[];
+}
 export const OLLAMA_DEFAULT_MODEL = 'qwen2.5:0.5b';
 /** A CPU model answers in seconds to a minute, so the call timeout is generous. */
 export const OLLAMA_DEFAULT_TIMEOUT_MS = 120_000;
@@ -134,7 +152,7 @@ function checkFile(file: UmpireConfigFile): void {
  * Builds the config: defaults, then the optional file, then env overrides. Env reads `UMPIRE_PROVIDER` (every
  * stage; `test` answers with canned responses), `UMPIRE_KEYLESS_PROVIDER` (the provider for stages that would use
  * Anthropic with no API key; `ollama` serves parse, narrate and staff from a local model with `test` as the fallback, configured by
- * `OLLAMA_URL`, `OLLAMA_MODEL`, `OLLAMA_NUM_CTX` and `OLLAMA_TIMEOUT_MS`), `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_TIMEOUT_MS`,
+ * `OLLAMA_URL`, `OLLAMA_MODEL`, `OLLAMA_STAGES`, `OLLAMA_NUM_CTX` and `OLLAMA_TIMEOUT_MS`), `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_TIMEOUT_MS`,
  * `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`,
  * `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS` and the per-game
  * `UMPIRE_GAME_BUDGET_USD`, `UMPIRE_GAME_BUDGET_TOKENS` and `UMPIRE_GAME_CALLS_PER_MINUTE`. Throws if a stage names
@@ -155,6 +173,7 @@ export function umpireConfigFromEnv(
       numCtx: positiveInt(env, 'OLLAMA_NUM_CTX', OLLAMA_DEFAULT_NUM_CTX),
     };
   }
+  const onOllama = ollamaStages(env);
   let usesOllama = false;
   const stages = { ...d.stages, ...file.stages } as Record<UmpireStage, StageRoute>;
   for (const stage of UMPIRE_STAGES) {
@@ -171,7 +190,7 @@ export function umpireConfigFromEnv(
       !env[spec.apiKeyEnv ?? 'ANTHROPIC_API_KEY'];
     // The local model serves the stages it can; the others run on the canned provider.
     const chosen = keyless
-      ? keylessOllama && !OLLAMA_STAGES.includes(stage)
+      ? keylessOllama && !onOllama.includes(stage)
         ? 'test'
         : (env.UMPIRE_KEYLESS_PROVIDER as string)
       : provider;

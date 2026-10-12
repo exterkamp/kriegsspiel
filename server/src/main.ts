@@ -39,7 +39,12 @@ import { LlmOrderParser } from './orders/llmParser.js';
 import { StubOrderParser } from './orders/stubParser.js';
 import { TraceStore, traceUmpire } from './debug/index.js';
 import type { UmpireClient } from './umpire/index.js';
-import { createGameUmpire, createUmpireClient, loadUmpireConfig } from './umpire/index.js';
+import {
+  createGameUmpire,
+  createUmpireClient,
+  loadUmpireConfig,
+  umpireConfigFromEnv,
+} from './umpire/index.js';
 
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? '127.0.0.1';
@@ -75,6 +80,15 @@ const umpire = umpireConfig
   : undefined;
 const tracedUmpire = (client: UmpireClient, gameId: string): UmpireClient =>
   trace ? traceUmpire(client, { trace, gameId, mode: 'live' }) : client;
+// With a local model on `parse`, an order it cannot place is retried by the canned test parser before the stub.
+const cannedParser = umpireConfig?.fallbackProvider
+  ? new LlmOrderParser(
+      createUmpireClient({ config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }), env: {} }),
+      {
+        fallbackParser: new StubOrderParser(),
+      },
+    )
+  : undefined;
 const gameClients = new Map<string, ReturnType<typeof createGameUmpire>>();
 const gameUmpire = (gameId: string) => {
   let client = gameClients.get(gameId);
@@ -93,7 +107,7 @@ const { server } = await buildApp({
   parser: llmParser
     ? (gameId) =>
         new LlmOrderParser(gameUmpire(gameId), {
-          fallbackParser: new StubOrderParser(),
+          fallbackParser: cannedParser ?? new StubOrderParser(),
           onFallback: (f) => server.log.warn({ gameId, reason: f.reason }, 'order parser fallback'),
         })
     : new StubOrderParser(),

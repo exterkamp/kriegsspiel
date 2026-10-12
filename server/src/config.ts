@@ -130,8 +130,9 @@ export function llmOrderParserEnabled(
 
 /** Whether any stage runs on the test provider (canned responses), so the game can say so. */
 export function usesTestUmpire(config: UmpireConfig): boolean {
-  const served: UmpireStage[] = config.fallbackProvider
-    ? ['parse', 'narrate', 'staff']
-    : [...UMPIRE_STAGES];
-  return served.some((s) => config.providers[config.stages[s].provider]?.type === 'test');
+  const isTest = (s: UmpireStage) => config.providers[config.stages[s].provider]?.type === 'test';
+  // With a local model in front of the test provider, the game is only "canned" if no stage uses the model.
+  return config.fallbackProvider
+    ? (['parse', 'narrate', 'staff'] as const).every(isTest)
+    : UMPIRE_STAGES.some(isTest);
 }

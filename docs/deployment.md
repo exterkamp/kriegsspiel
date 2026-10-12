@@ -16,7 +16,7 @@ Compose reads the shell environment and a git-ignored `.env` next to `docker-com
 |---|---|---|
 | `KRIEGSSPIEL_PORT` | `3000` | Host port for the web UI and API |
 | `ANTHROPIC_API_KEY` | empty | Passed to the server for the Anthropic provider (see [llm-providers.md](llm-providers.md)). Empty: the umpire runs on the test provider (below) |
-| `UMPIRE_KEYLESS_PROVIDER` | `test` in the image and compose file | The provider used by any stage that would use Anthropic with no key. `test` is the canned-response umpire (below). For the rule-based order parser alone, set `ORDER_PARSER=stub` |
+| `UMPIRE_KEYLESS_PROVIDER` | `ollama` in the compose file, `test` in the bare image | The provider used by any stage that would use Anthropic with no key. `ollama` is the small local model with `test` as its fallback; `test` is the canned-response umpire (below). For the rule-based order parser alone, set `ORDER_PARSER=stub` |
 | `ORDER_PARSER` | unset | With a provider (a key, or the test provider) the umpire parses orders; `stub` forces the rule-based parser |
 | `BACKUP_DIR` | `./backups` | Host directory that receives backups |
 | `BACKUP_KEEP` | `14` | Number of newest backups kept |
@@ -38,9 +38,37 @@ Login needs two more settings (see D17 in [decisions.md](decisions.md)); add the
 
 Inside the container the server uses `HOST`, `PORT`, `DB_PATH` (`/data/games.db`) and `STATIC_DIR` (the built client); see `server/src/main.ts`. Without `DB_PATH` the server keeps games in memory. `GET /healthz` returns `{"ok":true}` and backs the container health check.
 
-### The keyless demo: test umpire
+### The keyless demo: a small local model
 
-With no `ANTHROPIC_API_KEY` the image and compose file run every umpire stage on the `test` provider (`UMPIRE_KEYLESS_PROVIDER=test`), so a demo is fully playable with no key and no local model. It answers from rules and templates, never calls a network, costs nothing and gives the same answer to the same input. Free-text orders ("Move the 1st Battalion to the bridge and hold it.") are understood, dispatches are written in period prose from the reports, and the staff give short advice. It is not clever: it knows the verbs move, hold, screen, withdraw and attack, and places by name or kind, and it ignores conditions and times. The game shows a "Test umpire (canned responses)" badge, and the admin LLM panel marks its calls as `test`. Setting `ANTHROPIC_API_KEY` switches every stage back to the real model, and `ORDER_PARSER=stub` still forces the rule-based parser. See [llm-providers.md](llm-providers.md#test-provider).
+`docker compose up` starts an `ollama` service beside the game (the official `ollama/ollama` image, CPU only) and the server sets `UMPIRE_KEYLESS_PROVIDER=ollama`. With no `ANTHROPIC_API_KEY`, the **narrate** and **staff** stages are answered by one very small instruct model, `qwen2.5:0.5b` by default; order parsing, judging and the AI commander stay on the `test` umpire below (see [llm-providers.md](llm-providers.md#local-model-in-the-docker-demo) for why parse is left out and how to turn it on). The service pulls the model in the background on first start (it retries until the download succeeds and resumes a partial one), so the game server is never held back. Until the model is there, and whenever Ollama is down, slow (`OLLAMA_TIMEOUT_MS`) or answers with something that fails the checks, the stage answers from the `test` umpire instead and the game carries on. The admin LLM panel marks those calls `fallback` and says why, and the server logs `umpire fallback to test provider`. A key switches everything back to Anthropic.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `OLLAMA_MODEL` | `qwen2.5:0.5b` | The model tag. The `ollama` service pulls it; the server asks for it |
+| `OLLAMA_STAGES` | `narrate,staff` | Stages the model serves; any of `parse`, `narrate`, `staff` |
+| `OLLAMA_URL` | `http://ollama:11434` | Where the server reaches Ollama |
+| `OLLAMA_NUM_CTX` | `4096` | Context window sent to Ollama |
+| `OLLAMA_TIMEOUT_MS` | `120000` | Per-attempt timeout (two attempts). Slower than this and the call falls back |
+| `OLLAMA_KEEP_ALIVE` | `30m` | How long Ollama keeps the model in memory |
+| `OLLAMA_PORT`, `OLLAMA_BIND` | `11434`, `127.0.0.1` | The published port of the `ollama` service |
+
+**Cost.** The `ollama/ollama` image is 5.6 GB on disk (it bundles GPU libraries this stack does not use). `qwen2.5:0.5b` is 397 MB on disk in the `ollama` volume and about 0.8 GB of memory once loaded; `llama3.2:1b` would be 1.3 GB and 2.4 GB. A call takes seconds to tens of seconds on 4 CPU cores. Narration is only asked for at a clock rate where a window (5 wall minutes) closes before the battle ends, so at 12:1 the 50-minute battle ends first and nothing is narrated by the model; use 4:1 or 1:1 to see it. Calls are made one at a time (`UMPIRE_MAX_CONCURRENT=1`).
+
+**Hosts that cannot create a compose network** (for example `network_mode: bridge` in a local override because the Docker address pool is exhausted): the service name `ollama` does not resolve there. Put the `ollama` service on the same network mode and point the server at the published port, for example in the override:
+
+```yaml
+services:
+  ollama:
+    network_mode: bridge
+environment: # on kriegsspiel; 172.17.0.1 is the docker0 gateway, which the published port must be bound to
+  OLLAMA_URL: http://172.17.0.1:11434
+```
+
+with `OLLAMA_BIND=172.17.0.1` in `.env` so the model server is not published on every interface. Ollama has no authentication, so never publish it beyond the host.
+
+### Canned umpire: the `test` provider
+
+With no `ANTHROPIC_API_KEY` the bare image (or `UMPIRE_KEYLESS_PROVIDER=test` in compose) runs every umpire stage on the `test` provider, and it is also the fallback and the parse, judge and commander umpire of the Ollama mode above, so a demo is fully playable with no key and no local model. It answers from rules and templates, never calls a network, costs nothing and gives the same answer to the same input. Free-text orders ("Move the 1st Battalion to the bridge and hold it.") are understood, dispatches are written in period prose from the reports, and the staff give short advice. It is not clever: it knows the verbs move, hold, screen, withdraw and attack, and places by name or kind, and it ignores conditions and times. The game shows a "Test umpire (canned responses)" badge, and the admin LLM panel marks its calls as `test`. Setting `ANTHROPIC_API_KEY` switches every stage back to the real model, and `ORDER_PARSER=stub` still forces the rule-based parser. See [llm-providers.md](llm-providers.md#test-provider).
 
 ### Client build
 
