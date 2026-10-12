@@ -13,16 +13,19 @@
     "client"
   ],
   "scripts": {
-    "test": "npm run verify:map-source && npm run test --workspaces --if-present && node --test \"test/*.test.js\" \"scripts/maps-assessment/*.test.mjs\"",
+    "test": "npm run verify:map-source && npm run test --workspaces --if-present && node --test \"test/*.test.js\" \"scripts/maps-assessment/*.test.mjs\" && npm run test:local-map-catalog",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "build": "npm run verify:map-source && npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && npm run typecheck:local-map-catalog",
+    "build": "npm run verify:map-source && npm run build --workspaces --if-present && npm run build:local-map-catalog",
     "verify:map-source": "node scripts/verify-map-source.mjs",
     "setup:map-source": "node scripts/setup-map-source.mjs",
     "maps:cli": "node --max-old-space-size=256 packages/maps/dist/composition/headless-cli.js",
     "review:mutations": "node scripts/review/run-mutations.mjs",
-    "test:stress": "node scripts/stress.mjs"
+    "test:stress": "node scripts/stress.mjs",
+    "build:local-map-catalog": "npm run build -w packages/maps && tsc -p tools/local-map-catalog/tsconfig.json",
+    "typecheck:local-map-catalog": "npm run build -w packages/maps && tsc --noEmit -p tools/local-map-catalog/tsconfig.json",
+    "test:local-map-catalog": "vitest run --config tools/local-map-catalog/vitest.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

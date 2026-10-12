@@ -6,6 +6,8 @@ COPY packages ./packages
 COPY server ./server
 COPY client ./client
 COPY scripts ./scripts
+# Development helper is compiled by the root build, never copied into the runtime image.
+COPY tools ./tools
 COPY vendor/settlemaker ./vendor/settlemaker
 COPY vendor/settlemaker.snapshot.json ./vendor/settlemaker.snapshot.json
 COPY vendor/settlemaker-runtime.canonical.tgz ./vendor/settlemaker-runtime.canonical.tgz
