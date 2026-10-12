@@ -16,6 +16,7 @@ import { buildWindowScene } from '@legacy/window/model';
 import { DeskStore } from '../desk/desk.store';
 import { GameService } from './game.service';
 import { MarksService } from './marks.service';
+import { WebglFallbackComponent } from './webgl-fallback.component';
 import { TABLE_SCENE_FACTORY, TableService } from './table.service';
 
 /**
@@ -26,13 +27,17 @@ import { TABLE_SCENE_FACTORY, TableService } from './table.service';
 @Component({
   selector: 'ks-table-host',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<canvas
-    #table
-    (pointerdown)="down($event)"
-    (pointermove)="move($event)"
-    (pointerup)="up($event)"
-    (pointercancel)="marks.pointerCancel()"
-  ></canvas>`,
+  imports: [WebglFallbackComponent],
+  template: `@if (tableService.unavailable()) {
+      <ks-webgl-fallback />
+    }
+    <canvas
+      #table
+      (pointerdown)="down($event)"
+      (pointermove)="move($event)"
+      (pointerup)="up($event)"
+      (pointercancel)="marks.pointerCancel()"
+    ></canvas>`,
   styles: `
     :host,
     canvas {
@@ -56,9 +61,15 @@ export class TableHostComponent implements OnDestroy {
 
   constructor() {
     afterNextRender(() => {
-      const scene = this.makeScene(this.canvas().nativeElement);
-      scene.start();
-      this.tableService.scene.set(scene);
+      try {
+        const scene = this.makeScene(this.canvas().nativeElement);
+        scene.start();
+        this.tableService.scene.set(scene);
+      } catch (e) {
+        // No WebGL (GPU or hardware acceleration off): the desk still works, so say so and list the units.
+        this.tableService.unavailable.set(e instanceof Error ? e.message : String(e));
+        this.tableService.status.set('The map table needs WebGL');
+      }
     });
     // The player's picture, or after the game the umpire's window at the scrubbed time.
     effect(() => {

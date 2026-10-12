@@ -6,6 +6,8 @@ import { TableScene } from '@legacy/table/TableScene';
 export class TableService {
   readonly scene = signal<TableScene | undefined>(undefined);
   readonly status = signal('Click the map');
+  /** Set when the browser could not make a WebGL context (#259): the host then shows a message and a unit list instead of the table. */
+  readonly unavailable = signal<string | undefined>(undefined);
 }
 
 /** Builds the scene for a canvas. A spec provides a fake, because jsdom has no WebGL. */
