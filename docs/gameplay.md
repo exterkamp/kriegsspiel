@@ -27,7 +27,11 @@ A turn-based game is just a clock that only advances when stepped. That mode exi
 1. Check in, read the new dispatches in the in-tray, and update the map.
 2. Draft or revise orders, alone or with your staff, and sign the ones that are ready.
 3. Leave. Couriers ride, columns march, and the umpire adjudicates. A notification tells you when something important arrives.
-4. Repeat until the objective is taken, the time limit passes, or a side withdraws.
+4. Repeat until the objective is taken, the time limit passes, or a battle is decided.
+
+### How a battle ends
+
+Fighting is lethal enough to break a force. When a side has lost a unit (broken or destroyed) and what is left of it, counting men by their morale, is under a quarter of the men it started with, the umpire declares the battle: a dispatch to both sides, in the same words and with no figures, says whose attack or defence was broken and who holds the field. The game then plays on for 20 game minutes so the pursuit can finish: broken units flee, cavalry that is free rides them down, and a unit run down is destroyed and reported. After that the game ends with the reason stated on the game-over paper, for example "The attack on the objective was broken". In "Hold the Bridge" a decided battle ends the game roughly 30 to 60 game minutes in; a battle nobody breaks ends at the 50-minute hold. See D13 in [decisions.md](decisions.md).
 
 ### Orders are standing instructions
 

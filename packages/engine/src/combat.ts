@@ -7,7 +7,6 @@ import {
   VICTORY_DEADLINE_EVENT,
   aspectOf,
   bearingTo,
-  PURSUIT_MS,
   canReach,
   isRouted,
   pursuable,
