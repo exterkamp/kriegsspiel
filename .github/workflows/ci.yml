@@ -17,6 +17,8 @@ env:
 
 jobs:
   validation:
+    # Temporary negative gate probe: a skipped dependency must fail check.
+    if: ${{ false }}
     name: validation (${{ matrix.group }})
     strategy:
       fail-fast: false
