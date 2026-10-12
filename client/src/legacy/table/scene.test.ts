@@ -407,3 +407,48 @@ describe('TableScene marks and overlays', () => {
     expect(shading().some(Boolean)).toBe(false);
   });
 });
+
+describe('TableScene.panTo', () => {
+  const at = (t: TableScene, x: number, y: number): THREE.Vector3 =>
+    mapToWorld(fixtureMap, { x, y }).sub(t.controls.target).setY(0);
+
+  it('slides the camera and its target together, keeping zoom and tilt', () => {
+    const t = make();
+    t.apply(state);
+    const offset = t.camera.position.clone().sub(t.controls.target);
+    t.panTo({ x: 1000, y: 2000 });
+    expect(t.controls.target.x).toBeCloseTo(mapToWorld(fixtureMap, { x: 1000, y: 2000 }).x);
+    expect(t.controls.target.z).toBeCloseTo(mapToWorld(fixtureMap, { x: 1000, y: 2000 }).z);
+    const after = t.camera.position.clone().sub(t.controls.target);
+    expect(after.distanceTo(offset)).toBeCloseTo(0);
+    expect(at(t, 1000, 2000).length()).toBeCloseTo(0);
+  });
+
+  it('clamps a point off the map to its edge', () => {
+    const t = make();
+    t.apply(state);
+    t.panTo({ x: -500, y: fixtureMap.height + 9999 });
+    const edge = mapToWorld(fixtureMap, { x: 0, y: fixtureMap.height });
+    expect(t.controls.target.x).toBeCloseTo(edge.x);
+    expect(t.controls.target.z).toBeCloseTo(edge.z);
+  });
+
+  it('does nothing before a map is applied', () => {
+    const t = make();
+    const before = t.controls.target.clone();
+    t.panTo({ x: 1000, y: 2000 });
+    expect(t.controls.target).toEqual(before);
+  });
+
+  it('moves the saved table pose, not the camera, while at the desk', () => {
+    const t = make();
+    t.apply(state);
+    t.setDesk(true, 0);
+    const camera = t.camera.position.clone();
+    t.panTo({ x: 1000, y: 2000 });
+    expect(t.camera.position).toEqual(camera);
+    t.setDesk(false, 0);
+    expect(t.controls.target.x).toBeCloseTo(mapToWorld(fixtureMap, { x: 1000, y: 2000 }).x);
+    expect(t.controls.target.z).toBeCloseTo(mapToWorld(fixtureMap, { x: 1000, y: 2000 }).z);
+  });
+});

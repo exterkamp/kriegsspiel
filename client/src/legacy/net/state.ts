@@ -58,7 +58,7 @@ export interface CatchUp {
   dispatchIds: readonly string[];
 }
 
-export type LinkStatus = 'connecting' | 'open' | 'closed' | 'offline';
+export type LinkStatus = 'connecting' | 'open' | 'closed' | 'failed' | 'offline';
 
 /** Where game time was at a local wall time; the clock display runs forward from here. */
 export interface ClockAnchor {
@@ -129,6 +129,31 @@ export const initialState: ClientState = {
 
 const MAX_NOTICES = 20;
 
+/**
+ * How much wall time an update may be behind the client's extrapolation and still be treated as network
+ * latency. A bigger lead is a real jump on the server (an LLM-barrier stall holds game time while the client
+ * keeps running), so the server's time wins.
+ */
+export const MAX_HOLD_WALL_MS = 2000;
+
+/**
+ * A fresh anchor, unless the clock was running and had already passed it by a small margin (a view built a
+ * moment before the old anchor's extrapolation): then game time holds its place instead of stepping back.
+ */
+function reanchor(
+  old: ClockAnchor | undefined,
+  gameMs: number,
+  clock: ClockState,
+  nowWall: number,
+): ClockAnchor {
+  const fresh = anchorOf(gameMs, clock, nowWall);
+  if (old?.status !== 'running' || clock.status !== 'running') return fresh;
+  const ahead = gameNowMs(old, nowWall);
+  return ahead > gameMs && ahead - gameMs <= MAX_HOLD_WALL_MS * clock.rate
+    ? { ...fresh, gameMs: ahead }
+    : fresh;
+}
+
 function anchorOf(gameMs: number, clock: ClockState, localWallMs: number): ClockAnchor {
   return { gameMs, localWallMs, rate: clock.rate, status: clock.status };
 }
@@ -188,13 +213,13 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
         ...s,
         view: m.view,
         dispatches: withDispatches(s.dispatches, m.view.dispatches),
-        clock: anchorOf(m.view.atGame, m.view.clock, nowWall),
+        clock: reanchor(s.clock, m.view.atGame, m.view.clock, nowWall),
       };
     case 'dispatch':
       return { ...s, dispatches: withDispatches(s.dispatches, [m.dispatch]) };
     case 'clockState':
       // Sent when the clock changes, so its anchor is (about) now.
-      return { ...s, clock: anchorOf(m.clock.gameMsAtAnchor, m.clock, nowWall) };
+      return { ...s, clock: reanchor(s.clock, m.clock.gameMsAtAnchor, m.clock, nowWall) };
     case 'pauseState':
       return {
         ...s,

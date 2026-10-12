@@ -379,11 +379,106 @@ describe('GameConnection', () => {
     expect(statuses).toContain('open');
   });
 
+  it('gives up after the time limit and retries by hand', () => {
+    let clock = 0;
+    const sockets: FakeSocket[] = [];
+    const timers: Array<{ fn: () => void; ms: number }> = [];
+    const statuses: string[] = [];
+    const conn = new GameConnection({
+      url: 'ws://x',
+      onMessage: () => {},
+      onStatus: (s) => statuses.push(s),
+      createSocket: () => (sockets.push(new FakeSocket()), sockets.at(-1)!),
+      setTimer: (fn, ms) => timers.push({ fn, ms }),
+      clearTimer: () => {},
+      now: () => clock,
+      giveUpAfterMs: 10_000,
+    });
+    conn.start();
+    sockets[0]!.close();
+    expect(statuses.at(-1)).toBe('closed');
+    clock = 9_000;
+    timers.at(-1)!.fn();
+    sockets[1]!.close();
+    expect(statuses.at(-1)).toBe('closed');
+    clock = 10_000;
+    timers.at(-1)!.fn();
+    sockets[2]!.close();
+    expect(statuses.at(-1)).toBe('failed');
+    const scheduled = timers.length;
+    expect(scheduled).toBe(2);
+    conn.retry();
+    expect(sockets).toHaveLength(4);
+    expect(statuses.at(-1)).toBe('connecting');
+    sockets[3]!.close();
+    expect(statuses.at(-1)).toBe('closed');
+    expect(timers.at(-1)!.ms).toBe(500);
+  });
+
+  it('stops reconnecting once the server says the game is closed', () => {
+    const { conn, sockets, timers, statuses } = setup();
+    conn.start();
+    sockets[0]!.open();
+    sockets[0]!.onmessage?.({
+      data: JSON.stringify({ v, kind: 'error', code: 'game_closed', message: 'gone' }),
+    });
+    sockets[0]!.close();
+    expect(statuses.at(-1)).toBe('failed');
+    expect(timers).toHaveLength(0);
+  });
+
   it('does not reconnect after stop()', () => {
     const { conn, timers } = setup();
     conn.start();
     conn.stop();
     expect(timers).toHaveLength(0);
+  });
+});
+
+describe('clock anchors', () => {
+  const msg = (
+    gameMsAtAnchor: number,
+    rate = 10,
+    status: 'running' | 'paused' | 'stopped' = 'running',
+  ) => ({
+    v: PROTOCOL_VERSION as 1,
+    kind: 'clockState' as const,
+    clock: { gameMsAtAnchor, wallMsAtAnchor: 1, rate, status },
+  });
+
+  it.each([1, 4, 12])('never steps back on a small lag while running at rate %i', (rate) => {
+    let s = applyServerMessage(initialState, msg(1000, rate), 1000);
+    // 100 ms later the display is 100 * rate ahead; an update anchored just behind it must not pull it back.
+    const shown = 1000 + 100 * rate;
+    s = applyServerMessage(s, msg(1000 + 50 * rate, rate), 1100);
+    expect(gameNowMs(s.clock!, 1100)).toBe(shown);
+    expect(gameNowMs(s.clock!, 1200)).toBe(shown + 100 * rate);
+  });
+
+  it.each([1, 4, 12])(
+    'takes the server time after a stall that left a big lead at rate %i',
+    (rate) => {
+      let s = applyServerMessage(initialState, msg(60_000, rate), 1000);
+      // The LLM barrier held game time for 30 s of wall time; the client ran on, then the server re-anchors.
+      s = applyServerMessage(s, msg(60_000, rate), 31_000);
+      expect(gameNowMs(s.clock!, 31_000)).toBe(60_000);
+      expect(gameNowMs(s.clock!, 41_000)).toBe(60_000 + 10_000 * rate);
+    },
+  );
+
+  it('takes a later anchor, and any anchor after a pause', () => {
+    let s = applyServerMessage(initialState, msg(1000), 1000);
+    s = applyServerMessage(s, msg(5000), 1100);
+    expect(gameNowMs(s.clock!, 1100)).toBe(5000);
+    s = applyServerMessage(s, msg(10, 10, 'paused'), 1200);
+    expect(gameNowMs(s.clock!, 1300)).toBe(10);
+  });
+
+  it('takes a stopped anchor even when the running display was ahead', () => {
+    let s = applyServerMessage(initialState, msg(1000, 4), 1000);
+    s = applyServerMessage(s, msg(1200, 4, 'stopped'), 1100);
+    expect(s.clock!.status).toBe('stopped');
+    expect(gameNowMs(s.clock!, 5000)).toBe(1200);
   });
 });
 
