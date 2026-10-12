@@ -213,7 +213,7 @@ describe('pacing of a first game (#178)', () => {
   );
 
   it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])(
-    'with no player orders Red takes the bridge whatever the seed (seed %i)',
+    'with no player orders Red takes the bridge in seeds 1 to 12 (seed %i)',
     async (seed) => {
       const run = await play('fast-forward', HORIZON_MS, [], seed);
       expect(run.state.world.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
