@@ -7,7 +7,9 @@ import { provideRouter } from '@angular/router';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BoardPreparation, CertifiedBoard } from '../../shared/game-setup/contracts';
 import { rasterLayout } from '../../shared/map-table/raster';
-import { BoardHostComponent } from './board-host.component';
+import { BOARD_BINDING_FACTORY, BoardHostComponent } from './board-host.component';
+import { PersonalRepository } from './personal-repository';
+import { PersonalStore } from './personal-store';
 import { createLocalBoardBinding } from './board-binding';
 import { BoardSurface, type BoardScene } from './board-surface';
 import {
@@ -85,6 +87,7 @@ function harness(
     bind?: SessionOwnerPorts['bind'];
     preparationLoad?: BoardPreparation['load'];
     preparationDispose?: () => void;
+    hostBinding?: typeof createLocalBoardBinding;
   } = {},
 ) {
   const order: string[] = [],
@@ -107,6 +110,11 @@ function harness(
   const ports: Partial<SessionOwnerPorts> = {
     loadDefault: vi.fn(options.loadDefault ?? (async () => structuredClone(board))),
     ...(options.bind ? { bind: options.bind } : {}),
+    freshKey: vi.fn(() => `local-${crypto.randomUUID()}` as const),
+    makeRepository: vi.fn((scope, binding) => new PersonalRepository(scope, binding)),
+    makePersonal: vi.fn(
+      (scope, binding, repository) => new PersonalStore(scope, binding, repository),
+    ),
     makeCatalog: vi.fn(() => ({
       list: async () => [{ ...board.summary, ref: board.summary.ref! }],
       read: async () => board.canonicalJson,
@@ -162,6 +170,9 @@ function harness(
       provideRouter([]),
       { provide: LOCAL_BOARD_OWNER_PORTS, useValue: ports },
       { provide: LOCAL_BOARD_ROUTE_SLOT, useValue: {} },
+      ...(options.hostBinding
+        ? [{ provide: BOARD_BINDING_FACTORY, useValue: options.hostBinding }]
+        : []),
       {
         provide: SETUP_PREVIEW_FACTORY,
         useValue: () => ({ loadAsset: () => ({ ok: true, asset: board.asset }), dispose: vi.fn() }),
@@ -528,6 +539,304 @@ describe('native local board composition', () => {
     expect(old.personal.disposed()).toBe(true);
     expect(h.surfaceOwners).toHaveLength(2);
     expect(h.root.querySelectorAll('canvas')).toHaveLength(1);
+  });
+  for (const recovery of ['retry', 'default'] as const) {
+    it(`current native board availability failure retires full Setup hooks and keeps ${recovery} behind deferred preparation/control retirement`, async () => {
+      const operationHeld = deferred(),
+        controlHeld = deferred(),
+        release = vi.fn();
+      let loads = 0;
+      const h = harness({
+        preparationDispose: release,
+        preparationLoad: async () => {
+          if (++loads === 2) await operationHeld.promise;
+          return structuredClone(board);
+        },
+      });
+      await h.ready();
+      const owner = h.component.owner()!,
+        old = h.component.state()!.session!;
+      const hostElement = h.fixture.debugElement.query(By.directive(BoardHostComponent));
+      const host = hostElement.componentInstance as BoardHostComponent;
+      const origin = hostElement.injector.get(LocalSessionHostDirective);
+      const teardown = vi.spyOn(host, 'teardown');
+      h.component.openSettings(h.button('Settings'));
+      h.component.newGame();
+      await h.fixture.whenStable();
+      const setup = h.fixture.debugElement.query(By.directive(SetupComponent))
+        .componentInstance as SetupComponent;
+      await vi.waitFor(() => expect(setup.state.canStart()).toBe(true));
+      const operation = setup.state.selectSaved(setup.state.selectedKey());
+      await vi.waitFor(() => expect(loads).toBe(2));
+      const nativeDispose = setup.dispose.bind(setup);
+      const dispose = vi.spyOn(setup, 'dispose').mockImplementation(async () => {
+        await nativeDispose();
+        await controlHeld.promise;
+      });
+      vi.mocked(h.scenes[0]!.resize).mockImplementationOnce(() => {
+        throw new Error('render failure during setup');
+      });
+      host.resize();
+      expect(owner.state().phase).toBe('failed');
+      expect(old.personal.interactionEnabled()).toBe(false);
+      expect(h.scenes[0]!.controls.enabled).toBe(false);
+      let barrierSettled = false;
+      const barrier = owner.cancelSetup().then(() => {
+        barrierSettled = true;
+      });
+      await h.fixture.whenStable();
+      expect(h.fixture.debugElement.query(By.directive(SetupComponent))).toBeNull();
+      expect(h.fixture.debugElement.query(By.directive(BoardHostComponent))).toBeNull();
+      expect(setup.state.closed()).toBe(true);
+      expect(dispose).toHaveBeenCalled();
+      expect(teardown).toHaveBeenCalled();
+      expect(origin.isCurrent()).toBe(false);
+      expect(h.root.querySelectorAll('canvas')).toHaveLength(0);
+      expect(h.component.modal()).toBe('setup');
+      expect(h.component.cancelling()).toBe(true);
+      expect(
+        h.component.setupDialog()!.nativeElement.querySelector('[role="alert"]')?.textContent,
+      ).toContain('Local board initialization failed');
+      expect(barrierSettled).toBe(false);
+      const probe = document.createElement('input'),
+        target = vi.fn();
+      h.root.querySelector('.background')!.append(probe);
+      for (const name of [
+        'input',
+        'change',
+        'click',
+        'keydown',
+        'pointerdown',
+        'pointermove',
+        'wheel',
+      ]) {
+        probe.addEventListener(name, target);
+        const event = new Event(name, { bubbles: true, cancelable: true });
+        probe.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(true);
+      }
+      expect(target).not.toHaveBeenCalled();
+      const noSuccessor = () => {
+        expect(h.ports.loadDefault).toHaveBeenCalledOnce();
+        expect(h.ports.freshKey).toHaveBeenCalledOnce();
+        expect(h.ports.makeRepository).toHaveBeenCalledOnce();
+        expect(h.ports.makePersonal).toHaveBeenCalledOnce();
+        expect(h.ports.makeCatalog).toHaveBeenCalledOnce();
+        expect(h.ports.makePreparation).toHaveBeenCalledOnce();
+        expect(h.surfaceOwners).toHaveLength(1);
+      };
+      const replacement = recovery === 'retry' ? owner.retry() : owner.returnToDefault();
+      await h.fixture.whenStable();
+      noSuccessor();
+      operationHeld.resolve();
+      await operation;
+      await h.fixture.whenStable();
+      expect(release).toHaveBeenCalledOnce();
+      expect(barrierSettled).toBe(false);
+      expect(h.component.modal()).toBe('setup');
+      noSuccessor();
+      controlHeld.resolve();
+      await barrier;
+      await h.ready();
+      await replacement;
+      expect(h.component.modal()).toBe('none');
+      expect(h.component.setupDialog()!.nativeElement.open).toBe(false);
+      expect(h.component.uiError()).toBe('');
+      expect(h.component.state()!.session!.key).not.toBe(old.key);
+      expect(h.ports.freshKey).toHaveBeenCalledTimes(2);
+      expect(h.ports.makePersonal).toHaveBeenCalledTimes(2);
+      expect(h.surfaceOwners).toHaveLength(2);
+      expect(h.ports.loadDefault).toHaveBeenCalledTimes(recovery === 'default' ? 2 : 1);
+    });
+  }
+
+  it('native board failure stays visible when outer Escape already holds the full Setup cancellation barrier', async () => {
+    const held = deferred();
+    let loads = 0;
+    const h = harness({
+      preparationLoad: async () => {
+        if (++loads === 2) await held.promise;
+        return structuredClone(board);
+      },
+    });
+    await h.ready();
+    const owner = h.component.owner()!,
+      host = h.fixture.debugElement.query(By.directive(BoardHostComponent))
+        .componentInstance as BoardHostComponent;
+    h.component.openSettings(h.button('Settings'));
+    h.component.newGame();
+    await h.fixture.whenStable();
+    const setup = h.fixture.debugElement.query(By.directive(SetupComponent))
+      .componentInstance as SetupComponent;
+    await vi.waitFor(() => expect(setup.state.canStart()).toBe(true));
+    const operation = setup.state.selectSaved(setup.state.selectedKey());
+    await vi.waitFor(() => expect(loads).toBe(2));
+    const cancellation = h.component.cancelSetup(new Event('cancel', { cancelable: true }));
+    expect(h.component.cancelling()).toBe(true);
+    vi.mocked(h.scenes[0]!.resize).mockImplementationOnce(() => {
+      throw new Error('board failed during Escape retirement');
+    });
+    host.resize();
+    await h.fixture.whenStable();
+    expect(
+      h.component.setupDialog()!.nativeElement.querySelector('[role="alert"]')?.textContent,
+    ).toContain('initialization failed');
+    expect(h.component.modal()).toBe('setup');
+    expect(h.component.blocked()).toBe(true);
+    expect(owner.state().phase).toBe('failed');
+    expect(h.fixture.debugElement.query(By.directive(SetupComponent))).toBeNull();
+    expect(h.fixture.debugElement.query(By.directive(BoardHostComponent))).toBeNull();
+    expect(h.ports.loadDefault).toHaveBeenCalledOnce();
+    expect(h.ports.freshKey).toHaveBeenCalledOnce();
+    expect(h.ports.makePersonal).toHaveBeenCalledOnce();
+    expect(h.surfaceOwners).toHaveLength(1);
+    held.resolve();
+    await operation;
+    await cancellation;
+    await h.fixture.whenStable();
+    expect(h.component.modal()).toBe('none');
+    expect(h.root.querySelector('[role="alert"]')?.textContent).toContain('initialization failed');
+  });
+  it('board failure during full Setup retains a visible blocked dialog and prevents recovery allocation after preparation retirement rejects', async () => {
+    const held = deferred(),
+      release = vi.fn(() => {
+        throw new Error('setup release rejected');
+      });
+    let loads = 0;
+    const h = harness({
+      preparationDispose: release,
+      preparationLoad: async () => {
+        if (++loads === 2) await held.promise;
+        return structuredClone(board);
+      },
+    });
+    await h.ready();
+    const owner = h.component.owner()!,
+      old = h.component.state()!.session!;
+    const host = h.fixture.debugElement.query(By.directive(BoardHostComponent))
+      .componentInstance as BoardHostComponent;
+    h.component.openSettings(h.button('Settings'));
+    h.component.newGame();
+    await h.fixture.whenStable();
+    const setup = h.fixture.debugElement.query(By.directive(SetupComponent))
+      .componentInstance as SetupComponent;
+    await vi.waitFor(() => expect(setup.state.canStart()).toBe(true));
+    const operation = setup.state.selectSaved(setup.state.selectedKey());
+    await vi.waitFor(() => expect(loads).toBe(2));
+    vi.mocked(h.scenes[0]!.resize).mockImplementationOnce(() => {
+      throw new Error('board failed behind setup');
+    });
+    host.resize();
+    let outcome = 'pending';
+    const barrier = owner.cancelSetup().then(
+      () => {
+        outcome = 'resolved';
+      },
+      () => {
+        outcome = 'rejected';
+      },
+    );
+    await h.fixture.whenStable();
+    expect(h.fixture.debugElement.query(By.directive(SetupComponent))).toBeNull();
+    expect(h.fixture.debugElement.query(By.directive(BoardHostComponent))).toBeNull();
+    expect(setup.state.closed()).toBe(true);
+    expect(h.component.modal()).toBe('setup');
+    expect(
+      h.component.setupDialog()!.nativeElement.querySelector('[role="alert"]')?.textContent,
+    ).toContain('initialization failed');
+    const recovery = owner.returnToDefault();
+    await h.fixture.whenStable();
+    expect(outcome).toBe('pending');
+    expect(h.ports.loadDefault).toHaveBeenCalledOnce();
+    expect(h.ports.freshKey).toHaveBeenCalledOnce();
+    held.resolve();
+    await operation;
+    await barrier;
+    await recovery;
+    await vi.waitFor(() => expect(h.component.uiError()).toContain('could not retire'));
+    await h.fixture.whenStable();
+    expect(outcome).toBe('rejected');
+    expect(release).toHaveBeenCalledOnce();
+    expect(owner.state()).toMatchObject({
+      phase: 'failed',
+      session: null,
+      setup: null,
+      available: false,
+    });
+    expect(h.component.modal()).toBe('setup');
+    expect(h.component.setupDialog()!.nativeElement.open).toBe(true);
+    expect(h.component.cancelling()).toBe(true);
+    expect(old.personal.interactionEnabled()).toBe(false);
+    expect(
+      h.component.setupDialog()!.nativeElement.querySelector('[role="alert"]')?.textContent,
+    ).toContain('could not retire');
+    const probe = document.createElement('input'),
+      listener = vi.fn();
+    h.root.querySelector('.background')!.append(probe);
+    probe.addEventListener('input', listener);
+    probe.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    expect(listener).not.toHaveBeenCalled();
+    expect(() => owner.openSetup()).toThrow();
+    await owner.retry();
+    expect(h.ports.loadDefault).toHaveBeenCalledOnce();
+    expect(h.ports.freshKey).toHaveBeenCalledOnce();
+    expect(h.ports.makeRepository).toHaveBeenCalledOnce();
+    expect(h.ports.makePersonal).toHaveBeenCalledOnce();
+    expect(h.ports.makePreparation).toHaveBeenCalledOnce();
+    expect(h.surfaceOwners).toHaveLength(1);
+  });
+  it('first native success followed synchronously by current render failure cannot publish Ready from the pending startup continuation', async () => {
+    const hostBindingHeld = deferred(),
+      unmountHeld = deferred();
+    const h = harness({
+      unmount: unmountHeld.promise,
+      hostBinding: async (candidate, signal) => {
+        await hostBindingHeld.promise;
+        return createLocalBoardBinding(candidate, signal);
+      },
+    });
+    h.fixture.detectChanges();
+    await vi.waitFor(() =>
+      expect(h.fixture.debugElement.query(By.directive(BoardHostComponent))).toBeTruthy(),
+    );
+    const owner = h.component.owner()!,
+      host = h.fixture.debugElement.query(By.directive(BoardHostComponent))
+        .componentInstance as BoardHostComponent;
+    let observedFailure = false;
+    host.initialized.subscribe((result) => {
+      if (!result.ok) return;
+      expect(owner.state().phase).toBe('mounting');
+      vi.mocked(h.scenes[0]!.resize).mockImplementationOnce(() => {
+        throw new Error('failure before startup resumes');
+      });
+      host.resize();
+      expect(owner.state().phase).toBe('failed');
+      observedFailure = true;
+    });
+    hostBindingHeld.resolve();
+    await owner.startDefault();
+    expect(observedFailure).toBe(true);
+    expect(owner.state()).toMatchObject({
+      phase: 'failed',
+      session: null,
+      available: false,
+      canRetry: true,
+    });
+    expect(owner.state().error).toContain('initialization failed');
+    await h.fixture.whenStable();
+    expect(h.fixture.debugElement.query(By.directive(BoardHostComponent))).toBeNull();
+    expect(h.root.querySelector('[role="alert"]')?.textContent).toContain('initialization failed');
+    const replacement = owner.returnToDefault();
+    await h.fixture.whenStable();
+    expect(h.ports.loadDefault).toHaveBeenCalledOnce();
+    expect(h.ports.freshKey).toHaveBeenCalledOnce();
+    expect(h.ports.makePersonal).toHaveBeenCalledOnce();
+    expect(h.surfaceOwners).toHaveLength(1);
+    unmountHeld.resolve();
+    await h.ready();
+    await replacement;
+    expect(h.ports.loadDefault).toHaveBeenCalledTimes(2);
+    expect(h.surfaceOwners).toHaveLength(2);
   });
 });
 

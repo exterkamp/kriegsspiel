@@ -287,6 +287,13 @@ export class SessionOwner {
     this.snapshot.set(Object.freeze({ ...this.state(), ...change }));
     this.gates();
   }
+  private retainRetirement(releases: readonly (() => Promise<void>)[]): Promise<void> {
+    // Install the complete required fence before any delegated cleanup can reenter.
+    const settlement = deferred<void>();
+    this.fence = join([this.fence, settlement.promise]);
+    void join(releases.map((release) => call(release))).then(settlement.resolve, settlement.reject);
+    return this.fence;
+  }
   private current(generation: number, abort: AbortController): boolean {
     return !this.terminal && this.generation === generation && !abort.signal.aborted;
   }
@@ -474,6 +481,8 @@ export class SessionOwner {
       const result = await record.first.promise;
       this.check(generation, abort);
       if (!result.ok) throw new Error('Local board initialization failed.');
+      // First success is historical; a newer current-host failure may already have retired it.
+      if (this.session !== record || record.closed) return;
       this.publish({ phase: 'ready', error: null });
     } catch {
       if (!committed && !this.terminal && this.generation === generation && setup) {
@@ -590,9 +599,9 @@ export class SessionOwner {
           },
           onCancel: () => {
             if (this.setup !== record || record.closed || record.committed) return;
+            this.retainRetirement([() => this.retireSetup(record)]);
             this.setup = undefined;
             this.publish({ setup: null });
-            this.fence = join([this.fence, this.retireSetup(record)]);
           },
         }),
       });
@@ -616,11 +625,11 @@ export class SessionOwner {
         if (record.phase === 'destroyed') return;
         record.phase = 'destroyed';
         record.destroyed.resolve();
+        this.retainRetirement([() => this.retireSetup(record)]);
         if (!record.committed && this.setup === record) {
           this.setup = undefined;
           this.publish({ setup: null });
         }
-        this.fence = join([this.fence, this.retireSetup(record)]);
       },
     });
   }
@@ -634,11 +643,11 @@ export class SessionOwner {
     const cancel = record.control ? call(() => record.control!.cancel()) : Promise.resolve();
     void cancel
       .then(() => {
+        this.retainRetirement([() => this.retireSetup(record)]);
         if (this.setup === record) {
           this.setup = undefined;
           this.publish({ setup: null });
         }
-        this.fence = join([this.fence, this.retireSetup(record)]);
         return this.fence;
       })
       .then(cancellation.resolve, cancellation.reject);
@@ -663,6 +672,7 @@ export class SessionOwner {
     record.retirement = retired.promise;
     ++this.setupRetiring;
     record.closed = true;
+    const gates = call(() => this.gates());
     if (!record.committed && this.startingSetup === record) this.operation?.abort();
     const attached = record.phase === 'attached' || record.phase === 'revoked';
     if (record.phase !== 'destroyed') record.phase = 'revoked';
@@ -674,20 +684,31 @@ export class SessionOwner {
       record.control = undefined;
       record.preparation = undefined;
       this.setups.delete(record);
+      this.gates();
     };
     void join([
+      gates,
       control,
       preparation,
       record.operations.settled(),
       ...(attached ? [record.destroyed.promise] : []),
     ]).then(
       () => {
-        finish();
-        retired.resolve();
+        try {
+          finish();
+          retired.resolve();
+        } catch (error) {
+          this.retirementFailed = true;
+          retired.reject(error);
+        }
       },
       (error: unknown) => {
         this.retirementFailed = true;
-        finish();
+        try {
+          finish();
+        } catch {
+          /* The required fence already retains failure. */
+        }
         retired.reject(error);
       },
     );
@@ -782,11 +803,18 @@ export class SessionOwner {
     });
     if (this.session !== record || record.closed || this.terminal) return;
     this.retryBoard = record.board;
+    const setup = this.setup;
+    this.setup = undefined;
     this.session = undefined;
-    this.fence = join([this.fence, this.retireSession(record)]);
+    this.retainRetirement([
+      () => this.retireSession(record),
+      ...(setup ? [() => this.retireSetup(setup)] : []),
+    ]);
+    if (this.terminal) return;
     this.publish({
       phase: 'failed',
       session: null,
+      setup: null,
       available: false,
       error: 'Local board initialization failed. Retry or return to the default board.',
       canRetry: true,

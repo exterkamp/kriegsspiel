@@ -1108,3 +1108,448 @@ describe('preliminary review exact regression traces', () => {
     },
   );
 });
+
+it.each(['load', 'generate'] as const)(
+  'direct facade %s disposal reserves its release before live-signal abort listener reentry and retains operation/failure barriers',
+  async (method) => {
+    const p = packet(),
+      operation = deferred<CertifiedBoard>();
+    const { handle, host } = await ready(p.owner);
+    const personalRelease = vi.spyOn(handle.personal, 'dispose');
+    const surfaceRelease = vi.spyOn(handle.surface, 'dispose');
+    const setup = p.owner.openSetup();
+    let receivedSignal: AbortSignal | undefined;
+    const reentered = vi.fn(() => setup.props.preparation.dispose());
+    const invoke = (signal: AbortSignal) => {
+      receivedSignal = signal;
+      signal.addEventListener('abort', reentered, { once: true });
+      return operation.promise;
+    };
+    if (method === 'load')
+      vi.mocked(p.preparation.load).mockImplementation((_json, _summary, signal) => invoke(signal));
+    else vi.mocked(p.preparation.generate).mockImplementation((_recipe, signal) => invoke(signal));
+    vi.mocked(p.preparation.dispose).mockImplementation(() => {
+      throw new Error('direct release failure');
+    });
+    const loading =
+      method === 'load'
+        ? setup.props.preparation.load('', board.summary as never, new AbortController().signal)
+        : setup.props.preparation.generate({} as never, new AbortController().signal);
+    expect(receivedSignal?.aborted).toBe(false);
+    // No owner cancellation/disposal precedes this call: this release itself dispatches live abort.
+    setup.props.preparation.dispose();
+    expect(receivedSignal?.aborted).toBe(true);
+    expect(reentered).toHaveBeenCalledOnce();
+    expect(p.preparation.dispose).not.toHaveBeenCalled();
+    const cancel = p.owner.cancelSetup();
+    let canceled = false;
+    void cancel.then(
+      () => {
+        canceled = true;
+      },
+      () => {
+        canceled = true;
+      },
+    );
+    await vi.waitFor(() => expect(p.preparation.dispose).toHaveBeenCalledOnce());
+    expect(canceled).toBe(false);
+    expect(() => p.owner.openSetup()).toThrow('not retired');
+    expect(p.ports.makeCatalog).toHaveBeenCalledOnce();
+    expect(p.ports.makePreparation).toHaveBeenCalledOnce();
+    const stop = p.owner.dispose('departure');
+    host.destroyed();
+    let retired = false;
+    void stop.then(
+      () => {
+        retired = true;
+      },
+      () => {
+        retired = true;
+      },
+    );
+    await vi.waitFor(() => expect(surfaceRelease).toHaveBeenCalledOnce());
+    expect(personalRelease).toHaveBeenCalledOnce();
+    expect(retired).toBe(false);
+    operation.resolve(board);
+    await expect(loading).rejects.toThrow('retired');
+    await expect(cancel).rejects.toThrow('retirement');
+    await expect(stop).rejects.toThrow('retirement');
+    expect(p.preparation.dispose).toHaveBeenCalledOnce();
+    expect(reentered).toHaveBeenCalledOnce();
+    expect(p.owner.dispose('departure')).toBe(stop);
+    expect(p.ports.makePreparation).toHaveBeenCalledOnce();
+  },
+);
+
+describe('complete owner source review production repair traces', () => {
+  it.each([
+    ['cancel', false],
+    ['cancel', true],
+    ['onCancel', false],
+    ['onCancel', true],
+    ['destroyed', false],
+    ['destroyed', true],
+  ] as const)(
+    'true intent captured before %s keeps personal/raw/camera gates closed throughout deferred setup retirement (release rejects=%s)',
+    async (path, rejects) => {
+      const p = packet(),
+        operation = deferred<CertifiedBoard>();
+      const { handle, host } = await ready(p.owner);
+      const lease = host.factory(handle.key, handle.board, handle.binding, vi.fn());
+      lease.setInteractionEnabled(true);
+      lease.setCameraEnabled(true);
+      await lease.mount(
+        document.createElement('canvas'),
+        new AbortController().signal,
+        presentation(),
+      );
+      p.owner.setInteractionState({ personal: true, board: true, camera: true });
+      const resource = p.resources[0]!;
+      expect(resource.setInteractionEnabled).toHaveBeenLastCalledWith(true);
+      const setup = p.owner.openSetup();
+      const registration = path === 'destroyed' ? attachSetup(p.owner, setup).registration : null;
+      vi.mocked(p.preparation.load).mockReturnValue(operation.promise);
+      if (rejects)
+        vi.mocked(p.preparation.dispose).mockImplementation(() => {
+          throw new Error('setup cleanup');
+        });
+      const loading = setup.props.preparation.load(
+        '',
+        board.summary as never,
+        new AbortController().signal,
+      );
+      // The requested true intent predates descriptor loss. No later setter repairs the transition.
+      p.owner.setInteractionState({ personal: true, board: true, camera: true });
+      const point = vi.spyOn(handle.personal, 'acceptPoint');
+      const closed = () => {
+        expect(handle.personal.interactionEnabled()).toBe(false);
+        expect(resource.setInteractionEnabled).toHaveBeenLastCalledWith(false);
+        expect(resource.setCameraEnabled).toHaveBeenLastCalledWith(false);
+        expect(lease.pickAt(1, 2)).toBeNull();
+        handle.personal.setNotebookText('blocked behind retiring setup');
+        expect(handle.personal.notebook().draft).toBe('');
+        host.pointed({ key: handle.key, at: { x: 1, y: 2 } });
+        expect(point).not.toHaveBeenCalled();
+      };
+      let canceled: Promise<void>;
+      if (path === 'cancel') canceled = p.owner.cancelSetup();
+      else {
+        if (path === 'onCancel') setup.props.onCancel();
+        else registration!.destroyed();
+        canceled = p.owner.cancelSetup();
+      }
+      closed();
+      await vi.waitFor(() => expect(p.owner.state().setup).toBeNull());
+      closed();
+      await vi.waitFor(() => expect(p.preparation.dispose).toHaveBeenCalledOnce());
+      closed();
+      expect(() => p.owner.openSetup()).toThrow('not retired');
+      expect(p.ports.makeCatalog).toHaveBeenCalledOnce();
+      expect(p.ports.makePreparation).toHaveBeenCalledOnce();
+      operation.resolve(board);
+      await expect(loading).rejects.toThrow('retired');
+      if (rejects) {
+        await expect(canceled).rejects.toThrow('retirement');
+        closed();
+        expect(() => p.owner.openSetup()).toThrow('not retired');
+      } else {
+        await canceled;
+        expect(handle.personal.interactionEnabled()).toBe(true);
+        expect(resource.setInteractionEnabled).toHaveBeenLastCalledWith(true);
+        expect(resource.setCameraEnabled).toHaveBeenLastCalledWith(true);
+      }
+      expect(p.ports.makeRepository).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each(['retry', 'returnToDefault'] as const)(
+    'board failure invalidates never-attached setup and gates %s through deferred preparation settlement',
+    async (recovery) => {
+      const p = packet(),
+        operation = deferred<CertifiedBoard>();
+      const { handle, host } = await ready(p.owner);
+      const surface = vi.spyOn(handle.surface, 'dispose');
+      const setup = p.owner.openSetup();
+      vi.mocked(p.preparation.generate).mockReturnValue(operation.promise);
+      const generating = setup.props.preparation.generate(
+        {} as never,
+        new AbortController().signal,
+      );
+      host.availability({ key: handle.key, ready: false, error: 'actual current-host failure' });
+      expect(p.owner.state().setup).toBeNull();
+      expect(p.owner.state().session).toBeNull();
+      expect(() => setup.props.onStart(board)).toThrow('retired');
+      const cancelBarrier = p.owner.cancelSetup(),
+        recovering = p.owner[recovery]();
+      let canceled = false;
+      void cancelBarrier.then(() => {
+        canceled = true;
+      });
+      host.destroyed();
+      await vi.waitFor(() => expect(p.preparation.dispose).toHaveBeenCalledOnce());
+      expect(surface).toHaveBeenCalledOnce();
+      expect(canceled).toBe(false);
+      expect(p.ports.loadDefault).toHaveBeenCalledOnce();
+      expect(p.ports.bind).toHaveBeenCalledOnce();
+      expect(p.ports.freshKey).toHaveBeenCalledOnce();
+      expect(p.ports.makeRepository).toHaveBeenCalledOnce();
+      operation.resolve(board);
+      await expect(generating).rejects.toThrow('retired');
+      await cancelBarrier;
+      const fresh = await descriptor(p.owner),
+        newHost = attach(p.owner, fresh);
+      acknowledge(newHost, fresh);
+      await recovering;
+      expect(fresh.key).not.toBe(handle.key);
+      expect(p.owner.state().setup).toBeNull();
+      expect(fresh.personal.notebook().draft).toBe('');
+      expect(p.ports.loadDefault).toHaveBeenCalledTimes(recovery === 'retry' ? 1 : 2);
+    },
+  );
+
+  it.each(['retry', 'returnToDefault'] as const)(
+    'board failure gates %s independently through attached setup operation, control resource and actual destruction acknowledgment',
+    async (recovery) => {
+      const p = packet(),
+        operation = deferred<CertifiedBoard>(),
+        controlRetirement = deferred();
+      const { handle, host } = await ready(p.owner);
+      const setup = p.owner.openSetup();
+      const control = {
+        cancel: vi.fn(async () => {}),
+        dispose: vi.fn(() => controlRetirement.promise),
+      };
+      const registration = attachSetup(p.owner, setup, control).registration;
+      vi.mocked(p.preparation.load).mockReturnValue(operation.promise);
+      const loading = setup.props.preparation.load(
+        '',
+        board.summary as never,
+        new AbortController().signal,
+      );
+      host.availability({
+        key: handle.key,
+        ready: false,
+        error: 'current board failure during modal',
+      });
+      const cancelBarrier = p.owner.cancelSetup(),
+        recovering = p.owner[recovery]();
+      host.destroyed();
+      expect(p.owner.state().setup).toBeNull();
+      expect(control.dispose).toHaveBeenCalledOnce();
+      await vi.waitFor(() => expect(p.preparation.dispose).toHaveBeenCalledOnce());
+      const blocked = () => {
+        expect(p.ports.loadDefault).toHaveBeenCalledOnce();
+        expect(p.ports.bind).toHaveBeenCalledOnce();
+        expect(p.ports.freshKey).toHaveBeenCalledOnce();
+        expect(p.ports.makePersonal).toHaveBeenCalledOnce();
+      };
+      blocked();
+      operation.resolve(board);
+      await expect(loading).rejects.toThrow('retired');
+      blocked();
+      controlRetirement.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      blocked();
+      expect(p.owner.state().session).toBeNull();
+      registration.destroyed();
+      await cancelBarrier;
+      const fresh = await descriptor(p.owner),
+        newHost = attach(p.owner, fresh);
+      acknowledge(newHost, fresh);
+      await recovering;
+      expect(fresh.key).not.toBe(handle.key);
+      expect(control.cancel).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['retry', false],
+    ['retry', true],
+    ['returnToDefault', false],
+    ['returnToDefault', true],
+  ] as const)(
+    'board failure with throwing preparation cleanup permanently blocks %s (attached=%s) and attempts independent session/control release',
+    async (recovery, attached) => {
+      const p = packet(),
+        operation = deferred<CertifiedBoard>();
+      const { handle, host } = await ready(p.owner);
+      const storeRelease = vi.spyOn(handle.personal, 'dispose'),
+        surfaceRelease = vi.spyOn(handle.surface, 'dispose');
+      const setup = p.owner.openSetup();
+      const registered = attached ? attachSetup(p.owner, setup) : null;
+      vi.mocked(p.preparation.load).mockReturnValue(operation.promise);
+      vi.mocked(p.preparation.dispose).mockImplementation(() => {
+        throw new Error('private release failure');
+      });
+      const loading = setup.props.preparation.load(
+        '',
+        board.summary as never,
+        new AbortController().signal,
+      );
+      host.availability({ key: handle.key, ready: false, error: 'current failure' });
+      const canceled = p.owner.cancelSetup(),
+        recovering = p.owner[recovery]();
+      host.destroyed();
+      if (registered) registered.registration.destroyed();
+      await vi.waitFor(() => expect(p.preparation.dispose).toHaveBeenCalledOnce());
+      expect(storeRelease).toHaveBeenCalledOnce();
+      expect(surfaceRelease).toHaveBeenCalledOnce();
+      if (registered) expect(registered.control.dispose).toHaveBeenCalledOnce();
+      expect(p.ports.freshKey).toHaveBeenCalledOnce();
+      operation.resolve(board);
+      await expect(loading).rejects.toThrow('retired');
+      await expect(canceled).rejects.toThrow('retirement');
+      await recovering;
+      expect(p.owner.state().phase).toBe('failed');
+      expect(p.owner.state().session).toBeNull();
+      expect(p.owner.state().setup).toBeNull();
+      expect(p.ports.loadDefault).toHaveBeenCalledOnce();
+      expect(p.ports.bind).toHaveBeenCalledOnce();
+      expect(p.ports.freshKey).toHaveBeenCalledOnce();
+      expect(p.ports.makeSurface).toHaveBeenCalledOnce();
+      expect(() => p.owner.openSetup()).toThrow('not retired');
+      await p.owner[recovery]();
+      expect(p.ports.makeRepository).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each(['retry', 'returnToDefault'] as const)(
+    'synchronous first success then current availability error before startup continuation preserves failed outcome and gates %s on actual retirement',
+    async (recovery) => {
+      const p = packet(),
+        nativeRetirement = deferred();
+      const starting = p.owner.startDefault(),
+        handle = await descriptor(p.owner);
+      const host = attach(p.owner, handle, () => nativeRetirement.promise);
+      acknowledge(host, handle);
+      // No await separates historical first success from the newer current-host failure.
+      host.availability({ key: handle.key, ready: false, error: 'new current availability error' });
+      expect(await handle.initialized).toEqual({ key: handle.key, ok: true });
+      await starting;
+      expect(p.owner.state().phase).toBe('failed');
+      expect(p.owner.state().session).toBeNull();
+      expect(p.owner.state().available).toBe(false);
+      expect(p.owner.state().error).toContain('Retry');
+      const recovering = p.owner[recovery]();
+      await vi.waitFor(() => expect(p.owner.state().phase).toBe('preparing'));
+      expect(p.ports.loadDefault).toHaveBeenCalledOnce();
+      expect(p.ports.freshKey).toHaveBeenCalledOnce();
+      nativeRetirement.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(p.ports.freshKey).toHaveBeenCalledOnce();
+      host.destroyed();
+      const fresh = await descriptor(p.owner),
+        newHost = attach(p.owner, fresh);
+      acknowledge(newHost, fresh);
+      await recovering;
+      expect(fresh.key).not.toBe(handle.key);
+      expect(p.owner.state().phase).toBe('ready');
+      expect(p.owner.state().error).toBeNull();
+    },
+  );
+});
+
+it('successful deferred setup retirement refreshes gates from latest false UI intent rather than captured pre-cancel true intent', async () => {
+  const p = packet(),
+    operation = deferred<CertifiedBoard>();
+  const { handle, host } = await ready(p.owner);
+  const lease = host.factory(handle.key, handle.board, handle.binding, vi.fn());
+  lease.setInteractionEnabled(true);
+  lease.setCameraEnabled(true);
+  await lease.mount(document.createElement('canvas'), new AbortController().signal, presentation());
+  const setup = p.owner.openSetup();
+  vi.mocked(p.preparation.load).mockReturnValue(operation.promise);
+  const loading = setup.props.preparation.load(
+    '',
+    board.summary as never,
+    new AbortController().signal,
+  );
+  p.owner.setInteractionState({ personal: true, board: true, camera: true });
+  const canceled = p.owner.cancelSetup();
+  await vi.waitFor(() => expect(p.owner.state().setup).toBeNull());
+  p.owner.setInteractionState({ personal: false, board: false, camera: false });
+  operation.resolve(board);
+  await expect(loading).rejects.toThrow('retired');
+  await canceled;
+  expect(handle.personal.interactionEnabled()).toBe(false);
+  expect(p.resources[0]!.setInteractionEnabled).toHaveBeenLastCalledWith(false);
+  expect(p.resources[0]!.setCameraEnabled).toHaveBeenLastCalledWith(false);
+  expect(p.owner.openSetup().token).not.toBe(setup.token);
+});
+
+it.each(['retry', 'returnToDefault'] as const)(
+  'board failure retains throwing attached setup control cleanup for %s while preparation/session leaves and actual destruction independently settle',
+  async (recovery) => {
+    const p = packet(),
+      operation = deferred<CertifiedBoard>();
+    const { handle, host } = await ready(p.owner);
+    const personalRelease = vi.spyOn(handle.personal, 'dispose'),
+      surfaceRelease = vi.spyOn(handle.surface, 'dispose');
+    const setup = p.owner.openSetup();
+    const control = {
+      cancel: vi.fn(async () => {}),
+      dispose: vi.fn(() => {
+        throw new Error('native control release');
+      }),
+    };
+    const registration = attachSetup(p.owner, setup, control).registration;
+    vi.mocked(p.preparation.generate).mockReturnValue(operation.promise);
+    const generating = setup.props.preparation.generate({} as never, new AbortController().signal);
+    host.availability({ key: handle.key, ready: false, error: 'current native failure' });
+    const cancelBarrier = p.owner.cancelSetup(),
+      recovering = p.owner[recovery]();
+    let settled = false;
+    void cancelBarrier.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      },
+    );
+    host.destroyed();
+    await vi.waitFor(() => expect(p.preparation.dispose).toHaveBeenCalledOnce());
+    expect(control.dispose).toHaveBeenCalledOnce();
+    expect(personalRelease).toHaveBeenCalledOnce();
+    expect(surfaceRelease).toHaveBeenCalledOnce();
+    expect(settled).toBe(false);
+    operation.resolve(board);
+    await expect(generating).rejects.toThrow('retired');
+    expect(settled).toBe(false);
+    expect(p.ports.loadDefault).toHaveBeenCalledOnce();
+    expect(p.ports.freshKey).toHaveBeenCalledOnce();
+    registration.destroyed();
+    await expect(cancelBarrier).rejects.toThrow('retirement');
+    await recovering;
+    expect(p.owner.state().phase).toBe('failed');
+    expect(p.ports.loadDefault).toHaveBeenCalledOnce();
+    expect(p.ports.bind).toHaveBeenCalledOnce();
+    expect(p.ports.makeSurface).toHaveBeenCalledOnce();
+  },
+);
+
+it('board-failure setup cleanup may reenter terminal departure without republishing failure or joining a coordinator continuation', async () => {
+  const p = packet();
+  const { handle, host } = await ready(p.owner);
+  const setup = p.owner.openSetup();
+  let stop: Promise<void> | undefined;
+  const control = {
+    cancel: vi.fn(async () => {}),
+    dispose: vi.fn(async () => {
+      stop = p.owner.dispose('departure');
+    }),
+  };
+  const registration = attachSetup(p.owner, setup, control).registration;
+  host.availability({ key: handle.key, ready: false, error: 'current failure' });
+  expect(p.owner.state().phase).toBe('disposed');
+  expect(stop).toBeDefined();
+  host.destroyed();
+  registration.destroyed();
+  await stop;
+  expect(p.owner.state().phase).toBe('disposed');
+  expect(p.owner.state().canRetry).toBe(false);
+  expect(p.preparation.dispose).toHaveBeenCalledOnce();
+  expect(p.ports.freshKey).toHaveBeenCalledOnce();
+});

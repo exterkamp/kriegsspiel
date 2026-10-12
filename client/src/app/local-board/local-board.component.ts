@@ -225,7 +225,21 @@ export class NativeLocalBoardComponent {
           board: !suspended && modal === 'none' && !cancelling && table,
           camera,
         });
+        const failure =
+          modal === 'setup' &&
+          (!cancelling || !this.uiError()) &&
+          state?.phase === 'failed' &&
+          !state.setup
+            ? (state.error ?? 'Local board initialization failed. Return to the menu.')
+            : null;
+        if (owner && failure) {
+          this.cancelling.set(true);
+          this.closeGates();
+          this.uiError.set(failure);
+        }
         for (const outlet of this.outlets) this.renderOutlet(outlet);
+        if (owner && failure)
+          void this.finishCancellation(owner, owner.cancelSetup(), this.generation, failure);
       });
     });
     afterRenderEffect(() => {
@@ -433,6 +447,7 @@ export class NativeLocalBoardComponent {
     owner: SessionOwner,
     barrier: Promise<void>,
     generation: number,
+    retiringFailure?: string,
   ): Promise<void> {
     try {
       await barrier;
@@ -443,6 +458,7 @@ export class NativeLocalBoardComponent {
         this.generation !== generation
       )
         return;
+      if (retiringFailure && this.uiError() === retiringFailure) this.uiError.set('');
       this.modal.set('none');
       this.cancelling.set(false);
       this.restoreFocus(generation);
