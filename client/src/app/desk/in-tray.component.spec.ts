@@ -52,6 +52,17 @@ async function open(dispatches: Dispatch[]) {
 }
 
 describe('InTrayComponent', () => {
+  it('shows the staff-overloaded notice only when the server sends it', async () => {
+    const t = await open([disp('a')]);
+    expect(t.el.querySelector('.overloaded')).toBeNull();
+    t.game.mergeRead([]);
+    (t.game as unknown as { set: (p: object) => void }).set({
+      view: { staffOverloaded: 'The staff are overwhelmed, sir.' },
+    });
+    await t.fixture.whenStable();
+    expect(t.el.querySelector('.overloaded')?.textContent).toContain('overwhelmed');
+  });
+
   it('opens on the first pile with something unread, not the empty Urgent pile', async () => {
     const t = await open([disp('s1', { category: 'staff' })]);
     expect(t.pileBtn('Staff').getAttribute('aria-pressed')).toBe('true');

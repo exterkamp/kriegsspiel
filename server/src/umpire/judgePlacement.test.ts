@@ -114,4 +114,24 @@ describe('judge placement', () => {
     const replayed = advanceTo(state, 0, createRegistry()).state.world;
     expect(replayed).toEqual(live);
   });
+
+  it('returns no rulings when the game budget or rate limit refuses the call', async () => {
+    const world = loadScenario(holdTheBridgeFarStart);
+    for (const kind of ['budget', 'rate-limit'] as const) {
+      const refuse = {
+        call: async () => {
+          throw new UmpireError('capped', kind, 0);
+        },
+      };
+      await expect(judgePlacements(refuse, world, 'x', THREE_MIN)).resolves.toEqual([]);
+    }
+    const broken = {
+      call: async () => {
+        throw new UmpireError('down', 'transport', 1);
+      },
+    };
+    await expect(judgePlacements(broken, world, 'x', THREE_MIN)).rejects.toBeInstanceOf(
+      UmpireError,
+    );
+  });
 });

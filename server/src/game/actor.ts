@@ -43,6 +43,7 @@ import { advanceUntilOver, applyLoggedOrder } from './replay.js';
 import {
   answerStaffQuestion,
   narrateReports,
+  STAFF_OVERLOADED_NOTICE,
   narrateWindowMs,
   reportsDueForNarration,
   staffOfficerFor,
@@ -214,6 +215,8 @@ export class GameActor {
   private readonly narratedUntil = new Map<string, number>();
   private readonly narrations = new Map<string, SideNarration>();
   private readonly narrating = new Set<string>();
+  /** Sides whose latest narration was refused by the game's budget or rate limit. */
+  private readonly overloaded = new Set<string>();
   /** Each side's questions to its staff officers and their answers (D6b), oldest first. */
   private readonly staffHistory = new Map<string, StaffExchange[]>();
 
@@ -278,6 +281,11 @@ export class GameActor {
   /** What `side` is shown in place of template text: pass to `sideViewOf`. */
   narrationFor(side: string): ReadonlyMap<string, string | null> | undefined {
     return this.narrations.get(side);
+  }
+
+  /** The in-fiction notice for a side whose latest narration the umpire's cap refused. */
+  overloadedFor(side: string): string | undefined {
+    return this.overloaded.has(side) ? STAFF_OVERLOADED_NOTICE : undefined;
   }
 
   /** `side`'s conference with its staff officers, for `sideViewOf`. */
@@ -472,6 +480,8 @@ export class GameActor {
     this.narrating.delete(side);
     this.syncBarrier();
     try {
+      if (result?.overloaded) this.overloaded.add(side);
+      else if (result) this.overloaded.delete(side);
       // A failed or timed-out stage leaves the template text, which is what the view shows already.
       if (result && !result.fellBack) {
         const text = this.narrations.get(side) ?? new Map<string, string | null>();

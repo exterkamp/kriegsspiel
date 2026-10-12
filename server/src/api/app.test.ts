@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
 import {
@@ -1226,6 +1226,7 @@ describe('SPA fallback for the Angular client', () => {
         '/map-benchmark?x=1',
         '/table-benchmark',
         '/table-benchmark?seconds=10',
+        '/style-guide',
       ]) {
         const res = await server.inject(url);
         expect(res.statusCode, url).toBe(200);
@@ -1249,6 +1250,27 @@ describe('SPA fallback for the Angular client', () => {
       expect((await server.inject({ method: 'POST', url: '/admin', payload: {} })).statusCode).toBe(
         404,
       );
+    } finally {
+      await server.close();
+      done();
+    }
+  });
+
+  it('serves the app shell for every top-level route in the Angular router', async () => {
+    const routesFile = new URL('../../../client/src/app/app.routes.ts', import.meta.url);
+    // Assumes top-level, non-parameterised paths; `path:` may sit anywhere on a line because
+    // Prettier keeps short route objects on one line.
+    const paths = [...readFileSync(routesFile, 'utf8').matchAll(/\bpath:\s*'([^']*)'/g)]
+      .map((m) => m[1]!)
+      .filter((p) => p && p !== '**' && !p.endsWith('.html') && !p.includes(':'));
+    expect(paths).toContain('style-guide');
+    const { server, done } = await spaApp(true);
+    try {
+      for (const path of paths) {
+        const res = await server.inject(`/${path}`);
+        expect(res.statusCode, path).toBe(200);
+        expect(res.body, path).toContain('<title>ng</title>');
+      }
     } finally {
       await server.close();
       done();

@@ -147,6 +147,8 @@ export const SideView = z
     staffOfficers: z
       .record(StaffRole, z.object({ name: z.string(), traits: z.array(z.string()) }).strict())
       .optional(),
+    /** In-fiction notice shown while the umpire's per-game budget or rate limit is refusing narration. Never carries the figures. */
+    staffOverloaded: z.string().optional(),
     clock: ClockState,
   })
   .strict();

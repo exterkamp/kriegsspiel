@@ -1,7 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 
 /** Pages the Angular client routes itself; the server answers each (and anything below it) with `index.html`. */
-const SPA_ROOTS = ['/admin', '/map-authoring', '/map-benchmark', '/map-table', '/table-benchmark'];
+const SPA_ROOTS = [
+  '/admin',
+  '/map-authoring',
+  '/map-benchmark',
+  '/map-table',
+  '/style-guide',
+  '/table-benchmark',
+];
 
 /** The old Svelte client's separate pages, which the client serves as routes instead; the old URLs keep working. */
 const OLD_PAGES: Record<string, string> = {
