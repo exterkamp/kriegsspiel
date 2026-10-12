@@ -56,23 +56,34 @@ async function signIn(base: string, email: string): Promise<string> {
   return res.headers.get('set-cookie')!.split(';')[0]!;
 }
 
+/** Resolve as soon as the store records an entry that makes `pick` true; the deadline is only a backstop. */
 async function waitForEntries(
   trace: TraceStore,
   gameId: string,
   pick: (entries: TraceEntry[]) => boolean,
   ms = 5000,
 ): Promise<TraceEntry[]> {
-  const deadline = Date.now() + ms;
-  for (;;) {
-    const entries = trace.entries(gameId);
-    if (pick(entries)) return entries;
-    if (Date.now() > deadline) {
-      throw new Error(
-        `timed out waiting for trace entries; got ${entries.map((e) => e.kind).join(', ')}`,
+  const already = trace.entries(gameId);
+  if (pick(already)) return already;
+  return new Promise<TraceEntry[]>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      unsub();
+      const entries = trace.entries(gameId);
+      reject(
+        new Error(
+          `timed out waiting for trace entries; got ${entries.map((e) => e.kind).join(', ')}`,
+        ),
       );
-    }
-    await new Promise((r) => setTimeout(r, 25));
-  }
+    }, ms);
+    const unsub = trace.subscribe((entry) => {
+      if (entry.gameId !== gameId) return;
+      const entries = trace.entries(gameId);
+      if (!pick(entries)) return;
+      clearTimeout(timer);
+      unsub();
+      resolve(entries);
+    });
+  });
 }
 
 const requestsOf = (entries: TraceEntry[]) => entries.filter((e) => e.kind === 'request');
@@ -157,6 +168,55 @@ describe('traceRequest wiring (#198)', () => {
     const page = (await panel.json()) as { entries: TraceEntry[] };
     expect(page.entries.length).toBeGreaterThanOrEqual(3);
     expect(page.entries.every((e) => e.kind === 'request')).toBe(true);
+  });
+
+  it('leaves no trace for a failed create', async () => {
+    const { base, trace } = await start();
+    // Signed out: 401.
+    const anon = await fetch(`${base}/games`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rate: RATE }),
+    });
+    expect(anon.status).toBe(401);
+    // Signed in but invalid: 400, for a body the schema rejects and for an unknown scenario.
+    const blue = await signIn(base, 'blue@example.test');
+    const badBody = await fetch(`${base}/games`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: blue },
+      body: JSON.stringify({ rate: 0 }),
+    });
+    expect(badBody.status).toBe(400);
+    const badScenario = await fetch(`${base}/games`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: blue },
+      body: JSON.stringify({ scenario: 'no-such-scenario' }),
+    });
+    expect(badScenario.status).toBe(400);
+    // No phantom game id appears in the store for any of them.
+    expect(trace.gameIds()).toEqual([]);
+  });
+
+  it('leaves no trace for an unknown game id, and none for an unauthenticated read of a real one', async () => {
+    const { base, trace } = await start();
+    const blue = await signIn(base, 'blue@example.test');
+    const missing = await fetch(`${base}/games/no-such-game`, { headers: { cookie: blue } });
+    expect(missing.status).toBe(404);
+    expect(trace.entries('no-such-game')).toEqual([]);
+    expect(trace.gameIds()).toEqual([]);
+
+    const res = await fetch(`${base}/games`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: blue },
+      body: JSON.stringify({ rate: RATE }),
+    });
+    expect(res.status).toBe(201);
+    const game = (await res.json()) as { id: string };
+    expect(requestsOf(trace.entries(game.id))).toHaveLength(1);
+    // A signed-out read of the real game is a 401 and adds no request row under its id.
+    const anon = await fetch(`${base}/games/${game.id}`);
+    expect(anon.status).toBe(401);
+    expect(requestsOf(trace.entries(game.id))).toHaveLength(1);
   });
 
   it('keeps global routes out of the per-game trace', async () => {
