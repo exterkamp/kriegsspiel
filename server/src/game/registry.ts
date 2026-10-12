@@ -55,14 +55,18 @@ export interface ScenarioInfo {
   defaults: { side: string; rate: number };
 }
 
-const BRIEFINGS: Record<string, { briefing: string; lengthMinutes: number }> = {
-  [holdTheBridge.id]: {
-    briefing:
-      'Blue holds a river crossing on the high road against a Red advance from the north. ' +
-      'Blue wins by keeping the bridge for three hours; Red wins by taking it.',
-    lengthMinutes: 240,
-  },
+const BRIEFINGS: Record<string, string> = {
+  [holdTheBridge.id]:
+    'Blue holds a river crossing on the high road against a Red advance from the north. ',
 };
+
+/** "50 minutes", "3 hours" or "1 hour 30 minutes". */
+function spanText(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  const part = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+  return [h > 0 ? part(h, 'hour') : '', m > 0 ? part(m, 'minute') : ''].filter(Boolean).join(' ');
+}
 
 /** The scenarios a game can be made from, with what a player needs to choose one. */
 export function scenarioList(): ScenarioInfo[] {
@@ -72,11 +76,18 @@ export function scenarioList(): ScenarioInfo[] {
       name: s.name,
       controller: s.controller as 'human' | 'scripted',
     }));
-    const meta = BRIEFINGS[raw.id] ?? { briefing: '', lengthMinutes: 0 };
+    // The length and the win condition are read from the scenario, so they cannot go stale.
+    const holdMinutes = raw.victory.holdMinutes;
+    const name = (id: string) => raw.sides.find((s) => s.id === id)?.name ?? id;
+    const briefing =
+      (BRIEFINGS[raw.id] ?? '') +
+      `${name(raw.victory.defender)} wins by keeping the objective for ${spanText(holdMinutes)}; ` +
+      `${name(raw.victory.attacker)} wins by taking it, or by breaking the defence.`;
     return {
       id: raw.id,
       name: raw.name,
-      ...meta,
+      briefing,
+      lengthMinutes: holdMinutes,
       sides,
       defaults: { side: (sides.find((s) => s.controller === 'human') ?? sides[0]!).id, rate: 12 },
     };

@@ -18,7 +18,7 @@ import {
 } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { mm, polygonCentroid } from './geometry.js';
-import { fileReport } from './visibility.js';
+import { FIELD_REPORT_DELAY_MS, fileReport } from './visibility.js';
 import { describePlace } from './place.js';
 import { positionAt, rejectOrder, startMarch } from './movement.js';
 import { FATIGUE_PER_FIGHT_TICK } from './fatigue.js';
@@ -81,6 +81,10 @@ export const BROKEN_FORCE_FRACTION = 0.25;
 export const BATTLE_CLOSE_MS = 20 * MS_PER_MINUTE;
 /** Casualty multiplier on fire or steel against a routed unit, which cannot form to answer. */
 export const ROUT_FACTOR = 3;
+/** A unit reports heavy losses when its strength falls below this share of its start. */
+export const HEAVY_LOSS_FRACTION = 0.5;
+/** A unit already reported engaged says so again only after this long without a report. */
+export const ENGAGED_REPEAT_MS = 10 * MS_PER_MINUTE;
 /** Cavalry that is idle or holding rides after a routed enemy this close (metres) to it. */
 export const PURSUIT_RANGE_M = 1500;
 
@@ -246,9 +250,12 @@ function declareBattle(
   const reason = brokenA ? 'attack-broken' : 'defence-broken';
   const name = (id: SideId) => world.sides.find((s) => s.id === id)?.name ?? id;
   const where = describePlace(world.map, polygonCentroid(world.victory.objective));
+  // `where` reads "at the bridge, on the High road": it carries its own preposition.
+  // A place with a clause in it ("at the bridge, on the High road") is closed by a comma.
+  const closed = where.includes(',') ? `${where},` : where;
   const narrative = brokenA
-    ? `${name(loser)}'s attack on ${where} has been broken; ${name(winner)} holds the field.`
-    : `${name(loser)}'s defence of ${where} has been broken; ${name(winner)} holds the field.`;
+    ? `${name(loser)}'s attack ${closed} has been broken; ${name(winner)} holds the field.`
+    : `${name(loser)}'s defence ${closed} has been broken; ${name(winner)} holds the field.`;
   const rationale =
     `${name(loser)} has lost its fighting strength (units broken or destroyed, the rest below ` +
     `${Math.round(BROKEN_FORCE_FRACTION * 100)}% of its start, morale counted) while ${name(winner)} is still in the fight.`;
@@ -274,7 +281,7 @@ function declareBattle(
       kind: 'battle',
       observedAt: time,
       deliverAt: time,
-      from: 'Umpire',
+      from: 'Dispatch from the field',
       location: { ...centre },
       place: where,
       uncertainty: 0,
@@ -311,7 +318,7 @@ function conclude(world: GameState, outcome: Outcome): HandlerResult<GameState> 
   // A side that left the field after its force broke lost the battle: say so, not just that it left.
   const said: Outcome =
     battle && (outcome.reason === 'withdrawn' || outcome.reason === 'eliminated')
-      ? { ...outcome, reason: battle.reason }
+      ? { ...outcome, reason: battle.reason, loserOut: outcome.reason }
       : outcome;
   const end = finish(declared?.world ?? world, said);
   return { ...end, emit: [...(declared?.emit ?? []), ...(end.emit ?? [])] };
@@ -635,6 +642,27 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       units: w.units.map((u) => (faced.has(u.id) ? { ...u, facing: faced.get(u.id)! } : u)),
     };
 
+    // The units in the fight send word to their own HQ: engaged, then heavy losses. These are
+    // about the side's own units, so they carry nothing of the enemy's.
+    for (const u of world.units) {
+      if (!engaged.has(u.id) || u.status !== 'active') continue;
+      const now = w.units.find((x) => x.id === u.id)!;
+      const reports = w.intel[u.side].reports;
+      if (
+        !reports.some(
+          (r) =>
+            r.kind === 'engaged' && r.from === u.name && r.observedAt > ev.time - ENGAGED_REPEAT_MS,
+        )
+      ) {
+        w = fileReport(w, 'engaged', now, ev.time, FIELD_REPORT_DELAY_MS);
+      }
+      const start = world.startStrength?.[u.id] ?? u.strength;
+      const heavy = HEAVY_LOSS_FRACTION * start;
+      const broke = now.status === 'active' && now.morale < unitTypeOf(now).breakMorale;
+      if (now.strength > 0 && u.strength >= heavy && now.strength < heavy && !broke) {
+        w = fileReport(w, 'heavyLosses', now, ev.time, FIELD_REPORT_DELAY_MS);
+      }
+    }
     for (const u of w.units) {
       if (!fate.has(u.id)) continue;
       if (u.status === 'destroyed') {
@@ -667,6 +695,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
         w = res.world;
         next.push(...(res.schedule ?? []));
         emit.push({ type: 'unit.broken', payload: { unitId: u.id, morale: u.morale } });
+        w = fileReport(w, 'broke', broken, ev.time, FIELD_REPORT_DELAY_MS);
         emit.push(...(res.emit ?? []));
         // Cavalry that is free to move rides down the unit that broke, if it is near.
         for (const rider of w.units) {

@@ -155,6 +155,21 @@ describe('narrateReports', () => {
     expect(r.dispatches.map((d) => d.reportIds)).toEqual([['blue-r1'], ['blue-r2']]);
   });
 
+  it('leaves the umpire’s ruling in its own words, out of the model’s hands (#320)', async () => {
+    const ruling = report({
+      id: 'blue-r3',
+      kind: 'battle',
+      from: 'Dispatch from the field',
+      text: 'Red’s attack at the bridge has been broken; Blue holds the field.',
+    });
+    const client = new MockUmpireClient([fixture(good)]);
+    const r = await narrateReports(client, 'blue', [...reports, ruling]);
+    expect(JSON.stringify(client.calls[0]!.input)).not.toContain('blue-r3');
+    expect(r.dispatches.flatMap((d) => d.reportIds)).not.toContain('blue-r3');
+    const only = await narrateReports(new MockUmpireClient([]), 'blue', [ruling]);
+    expect(only).toMatchObject({ dispatches: [], calls: 0 });
+  });
+
   it('makes no call for an empty window', async () => {
     const client = new MockUmpireClient([]);
     expect(await narrateReports(client, 'blue', [])).toMatchObject({ dispatches: [], calls: 0 });

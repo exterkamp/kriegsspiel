@@ -951,3 +951,119 @@ describe('a decided battle (#315)', () => {
     expect(blueView.reports.some((r) => r.kind === 'unitLost')).toBe(true);
   });
 });
+
+describe('battle visibility (#320)', () => {
+  const reportsOf = (s: EngineState<GameState>, side: 'blue' | 'red') =>
+    viewFor(s.world, side, s.time).reports;
+
+  it('tells each side its own units are engaged, before any ruling, and not twice in a row', () => {
+    const { state } = run(field(duel), 6);
+    for (const side of ['blue', 'red'] as const) {
+      const engaged = reportsOf(state, side).filter((r) => r.kind === 'engaged');
+      expect(engaged).toHaveLength(1);
+      expect(engaged[0]!.from).toBe(side === 'blue' ? 'blue-1' : 'red-1');
+      expect(engaged[0]!.text).toContain('engaged');
+      expect(engaged[0]!.observedAt).toBe(COMBAT_TICK_MS);
+    }
+  });
+
+  /** `duel`, with blue-1 worn down to `strength` of the 600 it started with and `morale` set. */
+  const worn = (strength: number, morale: number) => {
+    const s = field(duel);
+    return {
+      ...s,
+      world: {
+        ...s.world,
+        units: s.world.units.map((u) => (u.id === 'blue-1' ? { ...u, strength, morale } : u)),
+      },
+    };
+  };
+
+  it('reports heavy losses once, when a unit that holds drops below half its starting strength', () => {
+    const s = worn(305, 100);
+    expect(s.world.startStrength?.['blue-1']).toBe(600);
+    const first = run(s, 2);
+    const u1 = unit(first.state, 'blue-1');
+    expect(u1.strength).toBeLessThan(300);
+    expect(u1.strength).toBeGreaterThan(0);
+    expect(u1.status).toBe('active');
+    const heavy = (st: EngineState<GameState>) =>
+      st.world.intel.blue.reports.filter((r) => r.kind === 'heavyLosses');
+    expect(heavy(first.state)).toHaveLength(1);
+    expect(heavy(first.state)[0]!.from).toBe('blue-1');
+    expect(first.state.world.intel.red.reports.some((r) => r.kind === 'heavyLosses')).toBe(false);
+    // Already below half: later ticks do not say it again.
+    const later = run(first.state, 4);
+    expect(unit(later.state, 'blue-1').status).toBe('active');
+    expect(heavy(later.state)).toHaveLength(1);
+  });
+
+  it('files no heavy-losses report for a unit that broke in the same tick', () => {
+    const { state } = run(worn(305, 1), 2);
+    expect(unit(state, 'blue-1').strength).toBeLessThan(300);
+    expect(unit(state, 'blue-1').status).toBe('withdrawn');
+    const kinds = state.world.intel.blue.reports.map((r) => r.kind);
+    expect(kinds).toContain('broke');
+    expect(kinds).not.toContain('heavyLosses');
+  });
+
+  it('says engaged again only after the repeat window', () => {
+    const { state } = run(field(duel), 25);
+    const times = state.world.intel.blue.reports
+      .filter((r) => r.kind === 'engaged')
+      .map((r) => r.observedAt);
+    expect(times.length).toBeGreaterThanOrEqual(2);
+    for (let i = 1; i < times.length; i++) {
+      expect(times[i]! - times[i - 1]!).toBeGreaterThanOrEqual(10 * MS_PER_MINUTE);
+    }
+  });
+
+  it('reports a break when the unit goes', () => {
+    const s = field([
+      { id: 'blue-1', side: 'blue', x: 1, y: 4, strength: 100, morale: 30 },
+      { id: 'red-1', side: 'red', x: 2, y: 4 },
+      { id: 'red-2', side: 'red', x: 9, y: 0 },
+      { id: 'blue-2', side: 'blue', x: 9, y: 4 },
+    ]);
+    const { state } = run(s, 10);
+    const kinds = reportsOf(state, 'blue').map((r) => r.kind);
+    expect(kinds).toContain('engaged');
+    expect(kinds).toContain('broke');
+    const broke = reportsOf(state, 'blue').find((r) => r.kind === 'broke')!;
+    expect(broke.text).toMatch(/broken and is falling back/);
+    expect(broke.observedAt).toBe(COMBAT_TICK_MS);
+    // Red's units did not break, so Red is told nothing of Blue's break.
+    expect(reportsOf(state, 'red').some((r) => r.kind === 'broke')).toBe(false);
+  });
+
+  it('leaks no figure or unit of the other side into any report', () => {
+    const { state } = run(field(duel), 12);
+    for (const side of ['blue', 'red'] as const) {
+      const other = side === 'blue' ? 'red' : 'blue';
+      for (const r of reportsOf(state, side).filter((x) => x.kind !== 'contact')) {
+        expect(r.text).not.toContain(other);
+      }
+    }
+  });
+
+  it('words the ruling without "on at" and from the field, and says who was wiped out', () => {
+    const s = field([
+      { id: 'blue-1', side: 'blue', x: 1, y: 4 },
+      { id: 'red-1', side: 'red', x: 9, y: 0, strength: 1 },
+    ]);
+    const w = {
+      ...s.world,
+      units: s.world.units.map((u) =>
+        u.id === 'red-1' ? { ...u, status: 'destroyed' as const, strength: 0 } : u,
+      ),
+    };
+    const { state } = run({ ...s, world: w }, 2);
+    const ruling = state.world.rulings[0] as BattleRuling;
+    expect(ruling.narrative).toMatch(/^Red's attack (at|near|in|\d+ m) /);
+    expect(ruling.narrative).not.toMatch(/ on (at|near|in) /);
+    expect(state.world.outcome).toMatchObject({ winner: 'blue', loserOut: 'eliminated' });
+    const note = reportsOf(state, 'blue').find((r) => r.kind === 'battle')!;
+    expect(note.from).not.toBe('Umpire');
+    expect(note.text).toBe(ruling.narrative);
+  });
+});

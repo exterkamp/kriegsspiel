@@ -16,6 +16,7 @@ import { markAgeFactor } from './marks.js';
 import {
   ALL_OVERLAYS,
   type GhostPiece,
+  type Engagement,
   type OrderRoute,
   type OwnPiece,
   type Overlays,
@@ -146,11 +147,39 @@ export class TableScene {
     const routes = (this.state?.orderRoutes ?? []).filter((r) =>
       r.kind === 'order' ? this.overlays.orders : this.overlays.routes,
     );
-    const key = JSON.stringify([routes, this.mapKey]);
+    const fights = this.state?.engagements ?? [];
+    const key = JSON.stringify([routes, fights, this.mapKey]);
     if (key === this.overlayKey) return;
     this.overlayKey = key;
     clearGroup(this.overlayRoot);
     for (const r of routes) this.overlayRoot.add(this.routeObject(r));
+    for (const f of fights) this.overlayRoot.add(this.engagementObject(f));
+  }
+
+  /** A red ring and the word "Fighting" where a fight is going on, drawn above the pieces. */
+  private engagementObject(f: Engagement): THREE.Group {
+    const map = this.state!.map;
+    const g = new THREE.Group();
+    const radius = this.span * 0.02;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(radius * 0.8, radius, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0xc0392b,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.copy(mapToWorld(map, f.position, this.span * 0.004));
+    g.add(ring);
+    const labelW = this.span * 0.07;
+    const tag = labelSprite('Fighting', false, labelW);
+    tag.position.copy(mapToWorld(map, f.position, this.span * 0.03));
+    g.add(tag);
+    g.name = `engagement:${f.id}`;
+    return g;
   }
 
   private routeObject(r: OrderRoute): THREE.Group {

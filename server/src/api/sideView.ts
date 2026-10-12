@@ -25,6 +25,9 @@ const CATEGORY: Record<ViewReport['kind'], Dispatch['category']> = {
   lowAmmo: 'staff',
   exhausted: 'subordinates',
   destroyed: 'intelligence',
+  engaged: 'subordinates',
+  heavyLosses: 'subordinates',
+  broke: 'subordinates',
   battle: 'staff',
 };
 

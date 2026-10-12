@@ -291,6 +291,8 @@ export const ServerMessage = z.discriminatedUnion('kind', [
         'defence-broken',
       ]),
       atGame: GameMs,
+      // Set when the loser had nobody left on the field (D13), so the screen can say it was wiped out.
+      loserOut: z.enum(['eliminated', 'withdrawn']).optional(),
     })
     .strict(),
   // A heads-up for a player who has the game open: only a fixed title and line, never game content.

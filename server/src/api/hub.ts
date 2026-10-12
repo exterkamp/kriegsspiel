@@ -517,6 +517,7 @@ export class Hub {
           winner: outcome.winner,
           reason: outcome.reason,
           atGame: outcome.time,
+          ...(outcome.loserOut ? { loserOut: outcome.loserOut } : {}),
         });
       }
     } catch (e) {

@@ -59,3 +59,19 @@ button {
 button:focus-visible {
   outline: 3px solid #ffd76a;
 }
+
+.rulings ol {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.rulings .why {
+  display: block;
+  opacity: 0.7;
+  font-size: 0.85em;
+}
+.rulings {
+  margin-bottom: 0.75rem;
+}
+.rulings h3 {
+  margin: 0.25rem 0;
+}

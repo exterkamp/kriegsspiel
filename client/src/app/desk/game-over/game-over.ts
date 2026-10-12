@@ -19,6 +19,15 @@ export const HEADLINE: Record<Result, string> = {
 
 const cap = (s: string): string => `${s[0]!.toUpperCase()}${s.slice(1)}`;
 
+/** ", and Red was wiped out" when the loser had nobody left; empty when its force was only broken. */
+function out(over: GameOver): string {
+  if (!over.loserOut || over.winner === null) return '';
+  const loser = cap(over.winner === 'blue' ? 'red' : 'blue');
+  return over.loserOut === 'eliminated'
+    ? `: ${loser} was wiped out`
+    : `: ${loser} had no unit left in the fight`;
+}
+
 /** The reason in words, from the winner and the server's reason code, at the game time it happened. */
 export function reasonText(over: GameOver): string {
   const at = formatGameTime(over.atGame);
@@ -33,9 +42,9 @@ export function reasonText(over: GameOver): string {
         ? `Both sides were destroyed by ${at}.`
         : `The enemy was eliminated at ${at}.`;
     case 'attack-broken':
-      return `The attack on the objective was broken; ${w} holds the field at ${at}.`;
+      return `The attack on the objective was broken${out(over)}; ${w} holds the field at ${at}.`;
     case 'defence-broken':
-      return `The defence of the objective was broken; ${w} holds the field at ${at}.`;
+      return `The defence of the objective was broken${out(over)}; ${w} holds the field at ${at}.`;
     case 'withdrawn':
       return over.winner === null
         ? `Both sides withdrew by ${at}.`
