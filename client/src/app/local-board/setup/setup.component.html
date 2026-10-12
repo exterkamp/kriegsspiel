@@ -1,0 +1,105 @@
+<section aria-label="New game setup">
+  <header>
+    <h2>New game</h2>
+    <p>Choose the map for a fresh local board.</p>
+  </header>
+  <div class="layout">
+    <div class="controls">
+      <label
+        >Saved map
+        <select
+          #savedMap
+          name="saved-map"
+          [value]="state.selectedKey()"
+          [disabled]="state.starting() || state.closed()"
+          (change)="state.selectSaved(savedMap.value)"
+        >
+          <option value="" [selected]="state.selectedKey() === ''">Choose a map…</option>
+          @for (map of state.maps(); track refKey(map.ref)) {
+            <option [value]="refKey(map.ref)" [selected]="state.selectedKey() === refKey(map.ref)">
+              {{ map.name }} ({{ map.ref.kind }})
+            </option>
+          }
+        </select>
+      </label>
+      <h3>Generate a map</h3>
+      <label
+        >Preset
+        <select
+          #preset
+          name="preset"
+          [value]="state.preset()"
+          [disabled]="state.starting() || state.closed()"
+          (change)="state.setPreset(preset.value)"
+        >
+          <option value="">Custom / recorded settings</option>
+          @for (name of presets; track name) {
+            <option [value]="name">{{ name.replaceAll('-', ' ') }}</option>
+          }
+        </select>
+      </label>
+      <label
+        >Seed
+        <input
+          #seed
+          name="seed"
+          type="text"
+          inputmode="numeric"
+          [value]="state.seed()"
+          [disabled]="state.starting() || state.closed()"
+          (input)="state.setSeed(seed.value)"
+          [attr.aria-invalid]="state.currentDraft() ? null : 'true'"
+          aria-describedby="draft-validation"
+        />
+      </label>
+      <label
+        >Map size
+        <select
+          #size
+          name="size"
+          [value]="state.size()"
+          [disabled]="state.starting() || state.closed()"
+          (change)="state.setSize(size.value)"
+        >
+          <option value="">Custom / recorded size</option>
+          <option value="5000">5 km × 5 km</option>
+          <option value="10000">10 km × 10 km</option>
+          <option value="15000">15 km × 15 km</option>
+        </select>
+      </label>
+      <p id="draft-validation" [hidden]="!!state.currentDraft()" role="alert">
+        Enter a nonnegative whole-number seed within the safe integer range and valid settings.
+      </p>
+      <div class="actions">
+        <button type="button" (click)="state.generate()" [disabled]="!state.canGenerate()">
+          Generate
+        </button>
+        <button type="button" (click)="state.save()" [disabled]="!state.canSave()">Save map</button>
+      </div>
+      <p role="status" aria-live="polite">{{ state.phase() }}</p>
+      @if (state.board(); as board) {
+        <p>
+          {{ board.summary.name }} · {{ board.summary.widthM / 1000 }} ×
+          {{ board.summary.heightM / 1000 }} km · {{ board.summary.ref ? 'Saved' : 'Unsaved' }}
+        </p>
+      }
+      @if (previewError()) {
+        <p role="alert">{{ previewError() }}</p>
+      }
+    </div>
+    <div class="preview">
+      <canvas
+        #canvas
+        tabindex="0"
+        aria-label="Map preview. Drag to pan, scroll to zoom, F to fit."
+      ></canvas>
+      <p>Drag to pan · scroll to zoom · F to fit</p>
+    </div>
+  </div>
+  <footer>
+    <button type="button" (click)="cancel()" [disabled]="state.starting() || state.closed()">
+      Cancel
+    </button>
+    <button type="button" (click)="state.start()" [disabled]="!state.canStart()">Start game</button>
+  </footer>
+</section>

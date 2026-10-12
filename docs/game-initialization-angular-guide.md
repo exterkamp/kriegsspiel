@@ -1,6 +1,6 @@
 # Local game initialization in Angular
 
-The local New game implementation is being restored as native Angular components and services. The saved-map inspector is available at `/map-table`. The certified setup services in this packet have no route or setup UI yet; the board, selection dialog and session owner follow as separate packets. `/` retains the menu, authentication, guest, scenario and live-game flows.
+The local New game implementation is being restored as native Angular components and services. The saved-map inspector is available at `/map-table`. The certified setup services and native setup component have no application route yet; board presentation, personal data and the session owner follow as separate packets. `/` retains the menu, authentication, guest, scenario and live-game flows.
 
 ## Certified preparation
 
@@ -31,3 +31,13 @@ An existing application API can be selected with `API_URL`; the local default do
 ## Verification
 
 Focused tests cover catalog signals/errors/DTO compatibility, retained recipe validation, exact certification/hash, cancellation and reentrant/deferred allocation, and default startup ownership/failure/identity. The temporary isolated Angular diagnostic harness exercises actual emitted workers, default and catalog loading, generation, saving and cancellation. It is verification tooling, not shipped application UI. Browser measurements and source hashes travel with the packet; the full New game flow remains an integration acceptance gate.
+
+## Native map selection and generation
+
+`SetupComponent` is a standalone Angular component with a constructor-owned signal state and a separately owned canvas preview. Its `catalog`, `preparation`, `onStart` and `onCancel` inputs match `SetupProps`; `initialRef` is optional. The parent supplies its lifetime and dialog. There is no application route or live-game dependency in this packet.
+
+Selecting a saved map loads and independently certifies its bytes. Generation preserves complete recorded settings and ordered overrides while editing preset, seed and size. A generated map must be saved before Start; a failed save retries identical canonical bytes without regeneration. Start submits detached certified data once and awaits the parent callback. Changing a recipe or selection invalidates late generation/save results, and returning to an exact unsaved recipe permits retry. Late catalog lists retain newer saved metadata.
+
+Cancel immediately invalidates work and releases the preview, then calls `onCancel` after owned preparation settles. The parent can await `cancel()` or `dispose()` before another owner allocates resources; destruction initiates disposal synchronously. The Start callback is excluded from this retirement ledger so the parent can dispose setup inside that callback without a self-await cycle. Callback updates preserve work; changed ports retire their old ownership before successor work.
+
+Angular canvas replacement recreates the preview and preserves setup state, draft and operation ownership. Labels, status/error text, keyboard preview controls and responsive layout are native template bindings. Fifty focused state/component assertions include the eleven retained P4 behaviors, late native option selection, deferred/reentrant startup, stale results, callback refresh, detached values and canvas recreation. Actual browser evidence and final source-bound acceptance travel with this packet; full dialog/session replacement remains A5.
