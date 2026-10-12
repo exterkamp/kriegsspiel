@@ -510,6 +510,18 @@ describe('staff questions', () => {
     await red.waitFor('staffQueued', (m) => m.questionId === 'qd');
   });
 
+  it('answers every accepted question; with no umpire the answer carries no text', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base, { rate: 1 })).json;
+    const blue = await join(ws, game, 'blue');
+    await blue.waitFor('viewUpdate');
+    blue.send(ask('qa', 'intelligence'));
+    const answer = await blue.waitFor('staffAnswer', (m) => m.questionId === 'qa');
+    expect(answer.role).toBe('intelligence');
+    expect(answer.text).toBeUndefined();
+    expect(answer.officer.name).not.toBe('');
+  });
+
   it('refuses a question once the game is over', async () => {
     const { base, ws } = await start();
     const game = (await createGame(base)).json;

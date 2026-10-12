@@ -41,9 +41,11 @@ import { PauseVoting, type PauseConfig, type PauseTransition } from '../pause.js
 import { RatioVoting, type RatioTransition } from '../ratioVote.js';
 import { advanceUntilOver, applyLoggedOrder } from './replay.js';
 import {
+  answerStaffQuestion,
   narrateReports,
   narrateWindowMs,
   reportsDueForNarration,
+  type StaffAnswer,
   type UmpireCallRecord,
   type UmpireRequest,
   type UmpireClient,
@@ -501,6 +503,50 @@ export class GameActor {
     }
   }
 
+  /**
+   * A staff officer answers a player's question on the `staff` stage, from the side's view as of
+   * now. Not on the clock's critical path: game time does not wait for it, and the answer is shown
+   * when the officer's cost has elapsed. Logged as a journal-only entry (calls on the entry).
+   * Undefined when there is no umpire or the stage gave nothing usable.
+   */
+  async answerStaff(
+    side: SideId,
+    role: string,
+    question: string,
+  ): Promise<StaffAnswer | undefined> {
+    const umpire = this.umpire;
+    if (!umpire || this.closed || this.engine.world.outcome) return undefined;
+    let answer: StaffAnswer | undefined;
+    let failure: string | undefined;
+    try {
+      answer = await answerStaffQuestion(
+        umpire,
+        this.engine.world,
+        side,
+        role,
+        question,
+        this.engine.time,
+      );
+    } catch (e) {
+      failure = e instanceof Error ? e.message : 'staff stage failed';
+    }
+    if (this.closed) return undefined;
+    await this.enqueueCompletion(async () => {
+      const entry: InputLogEntry = {
+        seq: ++this.seq,
+        wallMs: this.wallNow(),
+        gameMs: this.engine.time,
+        endGameMs: this.engine.time,
+        command: { kind: 'staffAnswer', side, role, question },
+        calls: answer?.records ?? [],
+        ...(answer === undefined ? { error: failure ?? 'staff answer unusable' } : {}),
+      };
+      if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+      await this.commit(entry);
+    });
+    return answer;
+  }
+
   /** Game time the soonest narration window closes, when the narrate stage is on. */
   private nextNarrationAt(): number | undefined {
     if (!this.umpire || this.engine.world.outcome) return undefined;
@@ -915,6 +961,8 @@ export class GameActor {
         throw new Error('orders go through submitOrder');
       case 'narrate':
         throw new Error('narration is logged by the scheduler');
+      case 'staffAnswer':
+        throw new Error('staff answers are logged by answerStaff');
     }
   }
 

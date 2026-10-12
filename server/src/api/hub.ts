@@ -22,6 +22,7 @@ import type { PauseTransition } from '../pause.js';
 import { DraftBook, DraftError } from '../drafts/book.js';
 import { StaffDesk } from './conference.js';
 import { sideViewOf } from './sideView.js';
+import { staffOfficer } from '../umpire/index.js';
 import { mayForward, viewForRole, type Seat, type SideId } from '@kriegsspiel/engine';
 import type { Forward } from '../lobby/store.js';
 
@@ -559,6 +560,37 @@ export class Hub {
   }
 
   /** HQ passes a paper in its own view on to the subordinate commanding `unit`. */
+  /**
+   * Have the staff stage write the answer to a question the desk just accepted. The client holds it
+   * back until the officer's cost has elapsed. With no umpire, or no usable reply, the message carries
+   * no text and the client answers from its own view.
+   */
+  private async answerStaff(
+    game: GameActor,
+    conn: Connection,
+    command: Extract<Command, { kind: 'askStaff' }>,
+  ): Promise<void> {
+    let answer;
+    try {
+      answer = await game.answerStaff(conn.side, command.role, command.question);
+    } catch (e) {
+      answer = undefined;
+      this.onError(game.id, e);
+    }
+    const fallback = staffOfficer(game.state.world.seed, conn.side, 'chiefOfStaff');
+    this.send(conn, {
+      v: PROTOCOL_VERSION,
+      kind: 'staffAnswer',
+      questionId: command.questionId,
+      role: command.role,
+      ...(answer ? { text: answer.text } : {}),
+      basedOnGame: answer?.basedOnGame ?? game.state.time,
+      officer: answer
+        ? { name: answer.officer.name, traits: answer.officer.traits }
+        : { name: fallback.name, traits: fallback.traits },
+    });
+  }
+
   private handleForward(
     gameId: string,
     game: GameActor,
@@ -719,6 +751,7 @@ export class Hub {
           answerAtGame: charge.answerAtGame,
           costMs: charge.costMs,
         });
+        void this.answerStaff(game, conn, command);
       } else {
         this.send(
           conn,

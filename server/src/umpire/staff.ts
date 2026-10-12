@@ -329,3 +329,73 @@ export async function runStaff(
     }),
   );
 }
+
+/** The staff stage when a player puts a question to an officer (the conference screen, D6b). */
+export const STAFF_ANSWER_PROMPT_VERSION = 'staff-answer-v1';
+
+export const STAFF_ANSWER_SYSTEM = `${STAFF_SYSTEM}
+
+The commander has put you a question, in "question". Answer it in one "advice" message in your own voice. Use the newest reports and sightings in "view" and quote their times as clock times, never as "n minutes ago", since the note is read later. If "view" does not settle the question, say what you do not know.`;
+
+/** The engine seat that answers for a conference officer. The engineer has no seat of their own and sees what the chief of staff sees. */
+const SEAT_FOR: Readonly<Record<string, Role>> = {
+  chiefOfStaff: 'chiefOfStaff',
+  intelligence: 'intelligence',
+  quartermaster: 'quartermaster',
+  engineer: 'chiefOfStaff',
+};
+
+export interface StaffAnswer {
+  text: string;
+  officer: StaffOfficer;
+  /** Game ms of the view the officer answered from. */
+  basedOnGame: number;
+  records: UmpireCallRecord[];
+}
+
+/**
+ * An officer answers a player's question on the `staff` stage, from `viewForRole` at `now` (the
+ * newest reports the side holds). Undefined when the model gives no usable answer in `maxCalls`.
+ */
+export async function answerStaffQuestion(
+  client: UmpireClient,
+  world: GameState,
+  side: SideId,
+  conferenceRole: string,
+  question: string,
+  now: number,
+  maxCalls = 2,
+): Promise<StaffAnswer | undefined> {
+  const role = SEAT_FOR[conferenceRole] ?? 'chiefOfStaff';
+  const seat: Seat = { role };
+  const officer = staffOfficer(world.seed, side, role, conferenceRole === 'engineer' ? 1 : 0);
+  const input = { ...staffInput(officer, viewForRole(world, side, seat, now), now), question };
+  const records: UmpireCallRecord[] = [];
+  let rejected: string[] | undefined;
+  for (let call = 0; call < maxCalls; call++) {
+    let output: StaffOutput;
+    try {
+      const res = await client.call<StaffOutput>({
+        stage: 'staff',
+        promptVersion: STAFF_ANSWER_PROMPT_VERSION,
+        system: STAFF_ANSWER_SYSTEM,
+        input: rejected ? { ...input, rejected } : input,
+        schema: STAFF_SCHEMA,
+      });
+      output = res.output;
+      records.push(res.record);
+    } catch (e) {
+      if (e instanceof UmpireError) return undefined;
+      throw e;
+    }
+    const usable = {
+      messages: output.messages.filter((m) => m.kind !== 'suggestion').slice(0, 1),
+    };
+    const problems = checkStaffOutput(usable, world, side, seat, input);
+    if (usable.messages.length > 0 && problems.length === 0) {
+      return { text: usable.messages[0]!.text.trim(), officer, basedOnGame: now, records };
+    }
+    rejected = usable.messages.length === 0 ? ['no answer given'] : problems;
+  }
+  return undefined;
+}

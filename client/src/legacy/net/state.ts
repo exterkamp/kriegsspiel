@@ -73,6 +73,13 @@ export interface PauseVote {
   proposal?: PauseProposal & { closesAtWall: number };
 }
 
+/** The umpire's answer to a staff question. */
+export interface StaffServerAnswer {
+  text?: string;
+  basedOnGame: number;
+  officer: { name: string; traits: string[] };
+}
+
 /** What the server said about a staff question: charged (with the answer time), or refused. */
 export type StaffCharge = { answerAtGame: number; askedAtGame: number; costMs: number } | 'refused';
 
@@ -92,6 +99,8 @@ export interface ClientState {
   outcomes: Record<string, OrderOutcome>;
   /** Staff questions by client question id, as the server charged them. */
   staffCharges: Record<string, StaffCharge>;
+  /** The umpire's answers to staff questions by question id. Absent text: the client answers from its own view. */
+  staffAnswers: Record<string, StaffServerAnswer>;
   /** Wall time of the last error that names no question (`game_closed`, `bad_message`), which may have eaten a staff question. */
   staffFaultAtWall?: number;
   /** Set once the server says the game has ended. */
@@ -112,6 +121,7 @@ export const initialState: ClientState = {
   pending: [],
   outcomes: {},
   staffCharges: {},
+  staffAnswers: {},
   marks: [],
   notices: [],
 };
@@ -208,6 +218,18 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
             askedAtGame: m.askedAtGame,
             answerAtGame: m.answerAtGame,
             costMs: m.costMs,
+          },
+        },
+      };
+    case 'staffAnswer':
+      return {
+        ...s,
+        staffAnswers: {
+          ...s.staffAnswers,
+          [m.questionId]: {
+            ...(m.text === undefined ? {} : { text: m.text }),
+            basedOnGame: m.basedOnGame,
+            officer: m.officer,
           },
         },
       };
