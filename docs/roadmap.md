@@ -2,45 +2,46 @@
 
 Gameplay milestones should end in something playable. The standalone map-authoring milestone M3c ends in a usable generation, preview and export workflow; gameplay integration follows separately.
 
-## M0: Foundations (now)
+## M0: Foundations (done)
 - [x] Earlier Phaser/Vite prototype abandoned and removed from the repo
 - [x] Background research and design docs (`docs/`)
-- [ ] Decide server stack (TypeScript recommended) and set up workspace (`packages/engine`, `server`, `client`)
-- [ ] Pull real rules tables (march rates, frontage, fire ranges) into data files
+- [x] Server stack decided (TypeScript) and workspace set up (`packages/engine`, `packages/protocol`, `packages/maps`, `server`, `client`; lint, typecheck, test, build and CI)
+- [ ] Pull real rules tables (march rates, frontage, fire ranges) into data files: a first pass with citations is in `packages/engine/src/data` (`docs/rules.md`); gaps remain (#92)
 
-## M1: Deterministic engine, headless
-- [ ] Map, units, orders and movement in `engine`, written fresh against the event-queue design
-- [ ] Seeded RNG, event log, replay
-- [ ] Unit types: line infantry, skirmishers, cavalry, artillery; formations (column/line)
+## M1: Deterministic engine, headless (done; Epic 1 closed)
+- [x] Map, units, orders and movement in `engine`, on continuous vector terrain (D15, D10)
+- [x] Seeded RNG, event log, replay (`npm run replay -w server`, D14a)
+- [x] Unit types: infantry, cavalry, artillery; formations line, column, square, skirmish and loose (`unitTypes.ts`)
 - [x] Line of sight and per-side visibility function
-- [ ] Combat v1 with simple fire + melee tables, fractional casualties, morale
-- [ ] CLI to run a scripted two-side scenario and print the event log
-- [ ] Event queue and `advanceTo(t)`; the engine never touches the wall clock
-- [ ] `GameClock` with rate, pause and re-anchoring; manual, fast-forward and real-time modes
-- [ ] Tests: identical outcomes at rates 1, 4, 12, 1000; pause/resume is neutral
+- [x] Combat v1 with ranged fire and melee, fractional casualties, morale, supply and fatigue (D13)
+- [x] A scripted two-side scenario ("Hold the Bridge") plays headless to a result in tests (`server/src/game/endToEnd.test.ts`); there is no standalone CLI that prints the event log, only `npm run replay`
+- [x] Event queue and `advanceTo(t)`; the engine never touches the wall clock
+- [x] `GameClock` with rate, pause and re-anchoring; manual, fast-forward and real-time modes
+- [x] Tests: identical outcomes at rates 1, 4, 12, 1000 and fast-forward; pause/resume is neutral (`clockInvariance.test.ts`)
 
-## M2: LLM umpire v1 (order parsing + narration)
-- [ ] Umpire service with structured output schemas
-- [x] `parseOrders`: free text → intents, with clarification/rejection for impossible orders (`LlmOrderParser`, wired into the order route when a provider is configured with the stub as fallback; its recorded corpus outputs are a hand-authored seed until a live run replaces them, see decisions.md, parseOrders stage)
-- [x] `narrate`: fog-filtered field reports per side from the validated event list (`narrateReports`; not yet run by the scheduler, see D14 Open (narrate))
-- [ ] Prompt-injection and leak test suites
-- [ ] Record all LLM calls for audit
+## M2: LLM umpire v1 (order parsing + narration) (mostly done)
+- [x] Umpire service with structured output schemas, on any provider through adapters: Anthropic, OpenAI-compatible, Ollama (D14); the compose file can run a local Ollama umpire (#326)
+- [x] `parseOrders`: free text to intents, with clarification/rejection for impossible orders (`LlmOrderParser`, with the rule-based stub as fallback; the golden corpus and eval harness are in `docs/order-eval.md`)
+- [x] `narrate`: fog-filtered field reports per side, run by the game actor once per side per window (D14, "Narrate in the actor")
+- [ ] Prompt-injection and leak test suites: the visibility filter has leak tests, a dedicated injection suite does not exist yet
+- [x] Record LLM calls for audit (debug trace store, Epic 8; recorded outputs make replay need no model call)
 
-## M3: Two-player hot-seat game
-- [ ] Server: per-game actor, scheduler, persisted event queue, LLM barrier, crash recovery
-- [ ] Server with game/turn/orders API
-- [ ] Client sends orders as text, receives side-filtered state + narrative
-- [ ] Courier delays, lost/garbled orders, report-driven map (stale contacts)
-- [ ] One handcrafted scenario, playable start to finish
+## M3: Playable game, remote (done; Epic 1 and the server half of Epic 5)
+- [x] Server: per-game actor, scheduler, persisted input log (JSON lines or SQLite with snapshots), LLM barrier, crash recovery (D14, D14b)
+- [x] Server with game, orders, pause, ratio and window API over WebSocket and REST (D16)
+- [x] Client sends orders as text, receives side-filtered state, reports and narrative
+- [x] Courier delays, lost or garbled orders, report-driven map with stale last-known contacts (D11, D12)
+- [x] One handcrafted scenario, "Hold the Bridge", playable start to finish in a browser: a game ends at about game minute 40 with orders, or runs the 50 minute hold (D35)
 
 ## M3b: HQ interface (see [hq-interface.md](hq-interface.md))
 
 [HQ implementation plan](hq-implementation-plan.md) defines dependency gates, agent ownership, Herdr orchestration, model selection and end-to-end acceptance for Epic 4.
 
-- [ ] **Spike:** Three.js table with a flat map plane, a few block pieces, camera orbit/zoom and picking; plus one Svelte desk screen with a draggable report that places a pin on the table
-- [ ] Map table: flat historical base map + 3D pieces + player marks layer (Three.js)
-- [ ] In-tray, orders desk, order of battle, journal as Svelte views over the canvas; table ↔ desk transition
-- [ ] Reports carry structured data (location, size, confidence, time) beside the prose
+- [x] **Spike:** Three.js table with a flat map plane, block pieces, camera orbit/zoom and picking, and a desk screen over it
+- [x] Map table: vector base map + 3D pieces + player marks layer (Three.js, D16b)
+- [x] In-tray, orders desk, order of battle, journal and staff conference as Angular views over the canvas; table to desk transition. The client was Svelte until D29 and is now Angular 22 (signals, zoneless)
+- [x] Reports carry structured data (place, size, confidence, time) beside the prose
+- [x] Visual design system: tokens, shared controls and a style guide at `/style-guide` (#327, `docs/hq-interface.md`)
 - [ ] First historical scenario: hand-annotated map feeding the engine's vector terrain features
 - [ ] Decide on an annotation editor for future maps
 
@@ -108,8 +109,8 @@ Historical annotation remains #85/#88. Detailed erosion, elaborate cities, a ful
 
 ## M5: Remote async play and collaboration
 - [x] Accounts (magic-link login, sessions, seats; D17)
-- [ ] Lobbies, clock ratio chosen in the lobby (1:1, 4:1, 12:1, custom), mid-game ratio change by vote
-- [ ] Pause voting (server state machine done in #63; WebSocket wiring and client pending), emergency hold, resume rules, safe restart after downtime
+- [x] Lobbies and guest play (no email needed, D17a, D17c), clock ratio chosen in the lobby (1:1, 4:1, 12:1, custom), mid-game ratio change by vote (`ratioVote.ts`)
+- [ ] Pause voting (server state machine and desk pause panel done; WebSocket wiring is #182), emergency hold, resume rules, safe restart after downtime
 - [x] Notifications (WebSocket, web push, email) with per-player thresholds (D17b)
 - [ ] Deputy mode: LLM staff officer acting within standing orders
 - [ ] Roles per side, with LLM filling empty staff roles
@@ -121,8 +122,5 @@ Historical annotation remains #85/#88. Detailed erosion, elaborate cities, a ful
 ## Later
 Campaigns, multi-player per side, spectators, voice orders.
 
-## First concrete steps (suggested next session)
-1. Confirm stack: TypeScript monorepo with `engine`, `server`, `client`.
-2. Port `TurnSystem`, `OrderSystem`, `Pathfinding`, map data into `engine` with tests.
-3. Define the `Intent` schema and write 20-30 sample orders as the parsing test corpus.
-4. Spike the `parseOrders` LLM call against that corpus to measure accuracy and cost.
+## Next
+Epic 1 is closed. The work queue is tracked in the GitHub project and the open epics; the main gaps are shared drafting and roles (Epic 6), historical scenario content (Epic 7), pause voting over the WebSocket (#182), and the LLM-injection test suite.
