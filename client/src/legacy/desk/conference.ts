@@ -80,6 +80,8 @@ export interface Exchange {
   askedAtGame: number;
   answerAtGame: number;
   answer?: ConferenceAnswer;
+  /** The officer the umpire named in its answer: the real staff, in place of the fixture's name and traits. */
+  officer?: { name: string; traits: readonly string[] };
   failed?: boolean;
   /** Set when the server is charging the cost: the id its reply carries, and the wall time it was sent. */
   questionId?: string;
@@ -156,9 +158,15 @@ export function applyServerAnswers(
       a.text === undefined
         ? fixtureAnswer({ role: e.role, question: e.question, askedAtGame: e.askedAtGame }, view)
         : { text: `${a.officer.name}: ${a.text}`, basedOnGame: a.basedOnGame };
-    return { ...e, answer };
+    return { ...e, answer, ...(a.text === undefined ? {} : { officer: a.officer }) };
   });
   return changed ? next : log;
+}
+
+/** The officer for `role`: the one the umpire last named, else the fixture. */
+export function officerFor(log: readonly Exchange[], role: ConferenceRole): StaffMember {
+  const named = [...log].reverse().find((e) => e.role === role && e.officer)?.officer;
+  return named ? { ...staffFor(role), ...named } : staffFor(role);
 }
 
 export const staffFor = (

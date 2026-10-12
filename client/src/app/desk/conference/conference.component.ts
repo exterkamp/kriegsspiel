@@ -16,6 +16,7 @@ import {
   formatCost,
   isPending,
   newExchange,
+  officerFor,
   nextExchangeId,
   applyServerAnswers,
   questionProblem,
@@ -59,7 +60,7 @@ export class ConferenceComponent {
       ? gameNowMs(s.clock, this.wall())
       : (s.view?.atGame ?? 0) + (this.wall() - this.opened);
   });
-  protected readonly officer = computed(() => staffFor(this.role()));
+  protected readonly officer = computed(() => officerFor(this.desk.conferenceLog(), this.role()));
   protected readonly log = computed(() =>
     this.desk.conferenceLog().filter((e) => e.role === this.role()),
   );

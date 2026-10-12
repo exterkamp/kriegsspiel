@@ -75,6 +75,10 @@ describe('ConferenceComponent', () => {
       text: 'Major Dessau: A battalion at the bridge.',
       basedOnGame: 5_000,
     });
+    // The umpire's officer replaces the fixture's name on the tab it answered.
+    expect((f.nativeElement as HTMLElement).querySelector('.who')?.textContent).toContain(
+      'Major Dessau',
+    );
 
     sender.mockClear();
     (f.nativeElement as HTMLElement)
