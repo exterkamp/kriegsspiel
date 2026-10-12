@@ -251,9 +251,11 @@ function declareBattle(
   const name = (id: SideId) => world.sides.find((s) => s.id === id)?.name ?? id;
   const where = describePlace(world.map, polygonCentroid(world.victory.objective));
   // `where` reads "at the bridge, on the High road": it carries its own preposition.
+  // A place with a clause in it ("at the bridge, on the High road") is closed by a comma.
+  const closed = where.includes(',') ? `${where},` : where;
   const narrative = brokenA
-    ? `${name(loser)}'s attack ${where} has been broken; ${name(winner)} holds the field.`
-    : `${name(loser)}'s defence ${where} has been broken; ${name(winner)} holds the field.`;
+    ? `${name(loser)}'s attack ${closed} has been broken; ${name(winner)} holds the field.`
+    : `${name(loser)}'s defence ${closed} has been broken; ${name(winner)} holds the field.`;
   const rationale =
     `${name(loser)} has lost its fighting strength (units broken or destroyed, the rest below ` +
     `${Math.round(BROKEN_FORCE_FRACTION * 100)}% of its start, morale counted) while ${name(winner)} is still in the fight.`;

@@ -19,4 +19,18 @@ describe('engagementsOf (#320)', () => {
     expect(engagementsOf(view([[1000, 1000]], []))).toEqual([]);
     expect(engagementsOf(view([[1000, 1000]], [[2000, 1000]]))).toEqual([]);
   });
+
+  it('draws one marker for units fighting side by side', () => {
+    expect(
+      engagementsOf(
+        view(
+          [
+            [1000, 1000],
+            [1050, 1000],
+          ],
+          [[1200, 1000]],
+        ),
+      ),
+    ).toHaveLength(1);
+  });
 });

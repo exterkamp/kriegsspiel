@@ -25,7 +25,7 @@ function out(over: GameOver): string {
   const loser = cap(over.winner === 'blue' ? 'red' : 'blue');
   return over.loserOut === 'eliminated'
     ? `: ${loser} was wiped out`
-    : `: ${loser} left the field with nobody to fight`;
+    : `: ${loser} had no unit left in the fight`;
 }
 
 /** The reason in words, from the winner and the server's reason code, at the game time it happened. */

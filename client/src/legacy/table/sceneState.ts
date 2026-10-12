@@ -13,11 +13,10 @@ export function engagementsOf(view: SideView): Engagement[] {
       const d = Math.hypot(e.position.x - u.position.x, e.position.y - u.position.y);
       if (d <= ENGAGE_RANGE_M && (!best || d < best.d)) best = { ...e.position, d };
     }
-    if (best) {
-      out.push({
-        id: u.id,
-        position: { x: (u.position.x + best.x) / 2, y: (u.position.y + best.y) / 2 },
-      });
+    // One marker per fight: units fighting side by side share the one already placed there.
+    const mid = best && { x: (u.position.x + best.x) / 2, y: (u.position.y + best.y) / 2 };
+    if (mid && !out.some((e) => Math.hypot(e.position.x - mid.x, e.position.y - mid.y) < 150)) {
+      out.push({ id: u.id, position: mid });
     }
   }
   return out;
