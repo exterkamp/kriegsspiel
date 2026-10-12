@@ -73,9 +73,9 @@ function destructionDelivered(reports: Report[], unitId: string, now: GameTime):
 /** How often (game time) the engine rescans who sees whom. */
 export const SCAN_INTERVAL_MS = MS_PER_MINUTE;
 
-/** Courier time for a report to reach HQ. */
 /** A unit in the fight sends word by the nearest rider: shorter than the courier from afar. */
 export const FIELD_REPORT_DELAY_MS = 3 * MS_PER_MINUTE;
+/** Courier time for a report to reach HQ. */
 export const COURIER_DELAY_MS = 10 * MS_PER_MINUTE;
 
 /** An acknowledgement rides a shorter way back than a sighting: the unit is already on the road to HQ. */

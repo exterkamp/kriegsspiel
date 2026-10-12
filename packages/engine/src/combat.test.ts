@@ -967,7 +967,58 @@ describe('battle visibility (#320)', () => {
     }
   });
 
-  it('reports heavy losses once and a break when the unit goes', () => {
+  /** `duel`, with blue-1 worn down to `strength` of the 600 it started with and `morale` set. */
+  const worn = (strength: number, morale: number) => {
+    const s = field(duel);
+    return {
+      ...s,
+      world: {
+        ...s.world,
+        units: s.world.units.map((u) => (u.id === 'blue-1' ? { ...u, strength, morale } : u)),
+      },
+    };
+  };
+
+  it('reports heavy losses once, when a unit that holds drops below half its starting strength', () => {
+    const s = worn(305, 100);
+    expect(s.world.startStrength?.['blue-1']).toBe(600);
+    const first = run(s, 2);
+    const u1 = unit(first.state, 'blue-1');
+    expect(u1.strength).toBeLessThan(300);
+    expect(u1.strength).toBeGreaterThan(0);
+    expect(u1.status).toBe('active');
+    const heavy = (st: EngineState<GameState>) =>
+      st.world.intel.blue.reports.filter((r) => r.kind === 'heavyLosses');
+    expect(heavy(first.state)).toHaveLength(1);
+    expect(heavy(first.state)[0]!.from).toBe('blue-1');
+    expect(first.state.world.intel.red.reports.some((r) => r.kind === 'heavyLosses')).toBe(false);
+    // Already below half: later ticks do not say it again.
+    const later = run(first.state, 4);
+    expect(unit(later.state, 'blue-1').status).toBe('active');
+    expect(heavy(later.state)).toHaveLength(1);
+  });
+
+  it('files no heavy-losses report for a unit that broke in the same tick', () => {
+    const { state } = run(worn(305, 1), 2);
+    expect(unit(state, 'blue-1').strength).toBeLessThan(300);
+    expect(unit(state, 'blue-1').status).toBe('withdrawn');
+    const kinds = state.world.intel.blue.reports.map((r) => r.kind);
+    expect(kinds).toContain('broke');
+    expect(kinds).not.toContain('heavyLosses');
+  });
+
+  it('says engaged again only after the repeat window', () => {
+    const { state } = run(field(duel), 25);
+    const times = state.world.intel.blue.reports
+      .filter((r) => r.kind === 'engaged')
+      .map((r) => r.observedAt);
+    expect(times.length).toBeGreaterThanOrEqual(2);
+    for (let i = 1; i < times.length; i++) {
+      expect(times[i]! - times[i - 1]!).toBeGreaterThanOrEqual(10 * MS_PER_MINUTE);
+    }
+  });
+
+  it('reports a break when the unit goes', () => {
     const s = field([
       { id: 'blue-1', side: 'blue', x: 1, y: 4, strength: 100, morale: 30 },
       { id: 'red-1', side: 'red', x: 2, y: 4 },

@@ -1,13 +1,17 @@
 import type { SideView } from '@kriegsspiel/protocol';
 import type { BaseMap, Engagement, GhostPiece, OwnPiece, SceneState } from './types.js';
 
-/** The longest reach of any arm (artillery), in metres: closer than this and the two are in a fight. */
+/**
+ * The longest reach of any arm (artillery), in metres: closer than this and the two are in a fight.
+ * Copied by hand from `rangeM` of artillery in packages/engine/src/unitTypes.ts: keep the two in step.
+ */
 export const ENGAGE_RANGE_M = 400;
 
 /** One marker per own unit that has a visible enemy within fire, midway between them. From the filtered view only. */
 export function engagementsOf(view: SideView): Engagement[] {
   const out: Engagement[] = [];
   for (const u of view.ownUnits) {
+    if (u.strength !== undefined && u.strength <= 0) continue; // the dead are not fighting
     let best: { x: number; y: number; d: number } | undefined;
     for (const e of view.visibleEnemies) {
       const d = Math.hypot(e.position.x - u.position.x, e.position.y - u.position.y);

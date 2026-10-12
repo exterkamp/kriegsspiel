@@ -20,6 +20,12 @@ describe('engagementsOf (#320)', () => {
     expect(engagementsOf(view([[1000, 1000]], [[2000, 1000]]))).toEqual([]);
   });
 
+  it('ignores a destroyed own unit', () => {
+    const v = view([[1000, 1000]], [[1200, 1000]]);
+    const dead = { ...v, ownUnits: v.ownUnits.map((u) => ({ ...u, strength: 0 })) } as SideView;
+    expect(engagementsOf(dead)).toEqual([]);
+  });
+
   it('draws one marker for units fighting side by side', () => {
     expect(
       engagementsOf(
