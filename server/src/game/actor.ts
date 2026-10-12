@@ -40,6 +40,7 @@ import type { AgentOrder, SideAgent } from '../opponent/index.js';
 import { PauseVoting, type PauseConfig, type PauseTransition } from '../pause.js';
 import { RatioVoting, type RatioTransition } from '../ratioVote.js';
 import { advanceUntilOver, applyLoggedOrder } from './replay.js';
+import { hiddenTerms } from '../umpire/leakGuard.js';
 import {
   answerStaffQuestion,
   narrateReports,
@@ -164,11 +165,11 @@ interface Dependency {
   abandoned: boolean;
 }
 
-/** Why a narration used the template text, for the log and the admin LLM panel; the rejected replies are in `calls`. */
+/** Why a narration used the template text, for the log; one line per report that kept it. */
 function narrationFallbackReason(result: Awaited<ReturnType<typeof narrateReports>>): string {
   if (result.overloaded) return 'umpire budget or rate limit';
-  if (result.rejections.length === 0) return 'the model call failed';
-  return result.rejections.map((p, i) => `reply ${i + 1} rejected (${p.join('; ')})`).join(', ');
+  if (result.fallbacks.length === 0) return 'the model call failed';
+  return result.fallbacks.map((f) => `${f.reportId}: ${f.reason}`).join('; ');
 }
 
 /** Narrated text by report id for one side; `null` marks a report folded into another's dispatch. */
@@ -444,7 +445,9 @@ export class GameActor {
         },
       };
       const work = this.withTimeout(
-        narrateReports(client, side.id as SideId, due),
+        narrateReports(client, side.id as SideId, due, {
+          hidden: hiddenTerms(this.engine.world, side.id as SideId),
+        }),
         this.narrateTimeoutMs,
         'narration',
       ).then(
@@ -483,7 +486,8 @@ export class GameActor {
       if (result?.overloaded) this.overloaded.add(side);
       else if (result) this.overloaded.delete(side);
       // A failed or timed-out stage leaves the template text, which is what the view shows already.
-      if (result && !result.fellBack) {
+      // Reports that fell back carry their template text, which is what the view shows already.
+      if (result) {
         const text = this.narrations.get(side) ?? new Map<string, string | null>();
         for (const d of result.dispatches) {
           d.reportIds.forEach((id, i) => text.set(id, i === 0 ? d.text : null));
@@ -491,6 +495,20 @@ export class GameActor {
         this.narrations.set(side, text);
       }
       this.sync();
+      if (this.trace.enabled) {
+        // One admin LLM row per report that kept its template text, with the reason (#359).
+        for (const f of result?.fallbacks ?? []) {
+          this.trace.record(this.id, 'llm', {
+            mode: 'fallback',
+            stage: 'narrate',
+            provider: 'narration checks',
+            ok: false,
+            errorKind: 'template text used',
+            error: `${f.reportId}: ${f.reason}`,
+            fallbackFor: { reason: f.reason },
+          });
+        }
+      }
       const entry: InputLogEntry = {
         seq: ++this.seq,
         wallMs: this.wallNow(),

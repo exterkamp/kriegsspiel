@@ -5,15 +5,16 @@
  * The model sees only that side's `ViewReport`s from the visibility filter, never master state,
  * and the prose is checked against them: every report id it cites, every unit id, number and
  * capitalised name in it must already be in the input, or the reply is rejected and asked for
- * again. If every attempt is rejected the side gets the engine's plain template text, so a
- * dispatch is never lost and never invented. One call covers one side's whole window.
+ * again. If every attempt is rejected the report keeps the engine's plain template text, so a
+ * dispatch is never lost and never invented. One call covers one report (#359).
  */
 import { MS_PER_MINUTE } from '@kriegsspiel/engine';
 import type { SideId, ViewReport } from '@kriegsspiel/engine';
 import type { JsonSchema, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
+import { hiddenIn } from './leakGuard.js';
 
-export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v1';
+export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v2';
 
 export const NARRATE_SYSTEM = `You are the scribe at a Napoleonic army headquarters, turning staff reports into the period dispatches that reach the general's desk. You write in the voice of the officer who sent each report: a cautious subordinate hedges, a veteran scout is terse.
 
@@ -23,7 +24,7 @@ Rules:
 - Write only from the reports. Do not add units, officers, places, numbers, times or events that are not in them. Where the report is unsure, say so.
 - Name an officer, unit or place only as it appears in the reports. Quote numbers as given; do not compute new ones.
 - Lower confidence means more hedging ("perhaps", "it is thought"); high confidence means plain statement.
-- Return one dispatch per report, or one covering several reports of the same event. Each dispatch lists the "reportIds" it is drawn from.
+- You are given one report. Return one dispatch of one or two short sentences for it, with its id in "reportIds".
 Reply with the JSON object only.`;
 
 export const NARRATE_SCHEMA: JsonSchema = {
@@ -58,12 +59,14 @@ export interface NarratedDispatch {
 
 export interface NarrateResult {
   dispatches: NarratedDispatch[];
-  /** True when no reply passed the check and the engine's template text was used. */
+  /** True when any report kept the engine's template text because no reply passed the check. */
   fellBack: boolean;
   /** Model calls made (a rejected reply costs one more). */
   calls: number;
   /** Why each rejected reply was rejected, in order. For the log. */
   rejections: string[][];
+  /** Each report that kept its template text, and why. The others in `dispatches` are the model's. */
+  fallbacks: Array<{ reportId: string; reason: string }>;
   /** Set when the game's budget or rate limit refused the call: the in-fiction notice to show. */
   overloaded?: string;
 }
@@ -403,7 +406,11 @@ export function checkProseAgainst(text: string, facts: ProseFacts): string[] {
 }
 
 /** Everything wrong with a reply: unknown or missing report ids, then the prose of each dispatch. */
-export function checkNarration(output: NarrateOutput, input: Input): string[] {
+export function checkNarration(
+  output: NarrateOutput,
+  input: Input,
+  hidden: readonly string[] = [],
+): string[] {
   const ids = new Set(input.reports.map((r) => r.id));
   const covered = new Set<string>();
   const problems: string[] = [];
@@ -413,23 +420,34 @@ export function checkNarration(output: NarrateOutput, input: Input): string[] {
       else problems.push(`unknown report "${id}"`);
     }
     if (d.text.trim() === '') problems.push('empty dispatch');
-    problems.push(...checkProse(d.text, input));
+    problems.push(...checkProse(d.text, input), ...hiddenIn(d.text, hidden));
   }
   for (const id of ids) if (!covered.has(id)) problems.push(`report "${id}" not narrated`);
   return [...new Set(problems)];
 }
 
 export interface NarrateOptions {
-  /** Model calls allowed per window, the first included. Default 2: one retry, so a fallback is never three timeouts long. */
+  /** Model calls allowed per report, the first included. Default 2: one retry, so a fallback is never three timeouts long. */
   maxCalls?: number;
+  /**
+   * Reports narrated by the model in one window; the rest keep their template text. Default 6. Each report is its
+   * own short call, which a 0.5b model manages far more often than a long batch, but the calls add up (#359).
+   */
+  maxReports?: number;
+  /** Names and commanders the side must not learn (`hiddenTerms`): a reply that contains one is rejected, whatever its case. */
+  hidden?: readonly string[];
 }
+
+/** Reports narrated per window by default; the newest are kept when there are more. */
+export const NARRATE_MAX_REPORTS = 6;
 
 /**
  * Narrate `reports`, which must already be the side's own view (`viewFor(...).reports`). One call
- * for the whole list; a reply that fails `checkNarration` is rejected and the model is asked again,
- * up to `maxCalls`. A transport or schema failure (`UmpireError`) is not retried here, since the
- * client already retried it; the caller gets the template text instead, as it does after
- * exhausting the attempts.
+ * per report (a small model copes far better with one short report than with a batch, #359); a reply that
+ * fails `checkNarration` is rejected and the model is asked again, up to `maxCalls`. A report that is never
+ * narrated keeps its template text and has its reason in `fallbacks`; the others keep the model's prose. A
+ * transport or schema failure (`UmpireError`) is not retried here, since the client already retried it, and
+ * ends the window: the reports not yet narrated get their template text, as after exhausting the attempts.
  */
 export async function narrateReports(
   client: UmpireClient,
@@ -439,53 +457,90 @@ export async function narrateReports(
 ): Promise<NarrateResult> {
   // The umpire's ruling is already in its own words; a rewrite could lose what it decided.
   const reports = allReports.filter((r) => r.kind !== 'battle');
-  const template = (): NarratedDispatch[] =>
-    reports.map((r) => ({ reportIds: [r.id], text: r.text }));
-  if (reports.length === 0) return { dispatches: [], fellBack: false, calls: 0, rejections: [] };
-
-  const input = narrateInput(side, reports);
   const maxCalls = opts.maxCalls ?? 2;
-  const rejections: string[][] = [];
-  let calls = 0;
-  while (calls < maxCalls) {
-    calls++;
-    // Tell a retry what was wrong, so it does not repeat the invention.
-    const retry = rejections.at(-1);
-    let output: NarrateOutput;
-    try {
-      ({ output } = await client.call<NarrateOutput>({
-        stage: 'narrate',
-        promptVersion: NARRATE_PROMPT_VERSION,
-        system: NARRATE_SYSTEM,
-        input: retry ? { ...input, rejected: retry } : input,
-        schema: NARRATE_SCHEMA,
-      }));
-    } catch (e) {
-      if (e instanceof UmpireError) {
+  const maxReports = opts.maxReports ?? NARRATE_MAX_REPORTS;
+  const result: NarrateResult = {
+    dispatches: [],
+    fellBack: false,
+    calls: 0,
+    rejections: [],
+    fallbacks: [],
+  };
+  if (reports.length === 0) return result;
+
+  const toNarrate = reports.slice(-maxReports);
+  const skipped = new Set(reports.slice(0, reports.length - toNarrate.length).map((r) => r.id));
+  let stopped: string | undefined;
+  for (const r of reports) {
+    const template = { reportIds: [r.id], text: r.text };
+    if (skipped.has(r.id)) {
+      result.dispatches.push(template);
+      result.fellBack = true;
+      result.fallbacks.push({ reportId: r.id, reason: 'over the per-window limit of reports' });
+      continue;
+    }
+    if (stopped !== undefined) {
+      result.dispatches.push(template);
+      result.fallbacks.push({ reportId: r.id, reason: stopped });
+      continue;
+    }
+    const input = narrateInput(side, [r]);
+    const rejections: string[][] = [];
+    let narrated: NarratedDispatch | undefined;
+    let calls = 0;
+    while (calls < maxCalls && !narrated && stopped === undefined) {
+      calls++;
+      result.calls++;
+      // Tell a retry what was wrong, so it does not repeat the invention.
+      const retry = rejections.at(-1);
+      let output: NarrateOutput;
+      try {
+        ({ output } = await client.call<NarrateOutput>({
+          stage: 'narrate',
+          promptVersion: NARRATE_PROMPT_VERSION,
+          system: NARRATE_SYSTEM,
+          input: retry ? { ...input, rejected: retry } : input,
+          schema: NARRATE_SCHEMA,
+        }));
+      } catch (e) {
+        if (!(e instanceof UmpireError)) throw e;
         const overloaded = e.kind === 'budget' || e.kind === 'rate-limit';
-        return {
-          dispatches: template(),
-          fellBack: true,
-          // A refused call was never sent, so it is not a model call.
-          calls: overloaded ? calls - 1 : calls,
-          rejections,
-          ...(overloaded ? { overloaded: STAFF_OVERLOADED_NOTICE } : {}),
-        };
+        // A refused call was never sent, so it is not a model call.
+        if (overloaded) {
+          result.calls--;
+          result.overloaded = STAFF_OVERLOADED_NOTICE;
+          stopped = 'umpire budget or rate limit';
+        } else {
+          stopped = `the model call failed (${e.kind})`;
+        }
+        break;
       }
-      throw e;
+      const problems = checkNarration(output, input, opts.hidden);
+      if (problems.length === 0) {
+        narrated = {
+          reportIds: [r.id],
+          text: output.dispatches.map((d) => d.text.trim()).join(' '),
+        };
+      } else {
+        rejections.push(problems);
+        result.rejections.push(problems);
+      }
     }
-    const problems = checkNarration(output, input);
-    if (problems.length === 0) {
-      return {
-        dispatches: output.dispatches.map((d) => ({ reportIds: d.reportIds, text: d.text.trim() })),
-        fellBack: false,
-        calls,
-        rejections,
-      };
+    if (narrated) {
+      result.dispatches.push(narrated);
+    } else {
+      result.dispatches.push(template);
+      result.fellBack = true;
+      result.fallbacks.push({
+        reportId: r.id,
+        reason:
+          stopped ??
+          rejections.map((p, i) => `reply ${i + 1} rejected (${p.join('; ')})`).join(', '),
+      });
     }
-    rejections.push(problems);
   }
-  return { dispatches: template(), fellBack: true, calls, rejections };
+  if (stopped !== undefined) result.fellBack = true;
+  return result;
 }
 
 /** Game-time length of a narration window at clock rate 1. */

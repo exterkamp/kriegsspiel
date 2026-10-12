@@ -49,7 +49,7 @@ class StubUmpire implements UmpireClient {
   requests: UmpireRequest[] = [];
   gate: Promise<void> | undefined;
   /** What the staff stage says in answer to a question; undefined makes it give nothing usable. */
-  staffText: string | undefined = 'The bridge holds, sir.';
+  staffText: string | undefined = 'The bridge holds, sir; 1st Battalion is forward.';
   /** Refuse every narrate call the way a capped `GameUmpireClient` does. */
   refuse: 'budget' | 'rate-limit' | undefined;
   async call<T>(request: UmpireRequest): Promise<UmpireResponse<T>> {
@@ -225,7 +225,7 @@ describe('staff answers in the actor', () => {
     expect(history[0]).toMatchObject({
       questionId: 'q1',
       role: 'intelligence',
-      text: 'The bridge holds, sir.',
+      text: 'The bridge holds, sir; 1st Battalion is forward.',
     });
     expect(game.staffHistoryFor('red')).toEqual([]);
 
@@ -256,7 +256,7 @@ describe('staff answers in the actor', () => {
       undefined,
       game.staffHistoryFor('blue'),
     );
-    expect(due.staffHistory?.[0]?.text).toBe('The bridge holds, sir.');
+    expect(due.staffHistory?.[0]?.text).toBe('The bridge holds, sir; 1st Battalion is forward.');
     expect(staffPapers(due)).toHaveLength(1);
     expect(staffPapers(due)[0]!.from).toBe(history[0]!.officer.name);
     expect(viewAt(game, 'red').staffHistory).toBeUndefined();
@@ -286,7 +286,7 @@ describe('staff answers in the actor', () => {
       'Where is the enemy?',
       asked('q1'),
     );
-    expect(answer?.text).toBe('The bridge holds, sir.');
+    expect(answer?.text).toBe('The bridge holds, sir; 1st Battalion is forward.');
     const entry = (await store.inputLog('g1')).find((e) => e.command.kind === 'staffAnswer');
     expect(entry).toBeDefined();
     expect(entry!.error).toBeUndefined();
