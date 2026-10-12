@@ -13,6 +13,12 @@ export async function fetchMe(fetchFn: typeof fetch = fetch): Promise<Me | undef
   return res.ok ? ((await res.json()) as Me) : undefined;
 }
 
+/** The page being visited (`/?game=<id>`), which the server validates and returns to after sign-in. */
+function currentTarget(): string | undefined {
+  const l = globalThis.location;
+  return l ? l.pathname + l.search : undefined;
+}
+
 /** Asks the server to mail a login link. Resolves to an error message, or undefined on success. */
 export async function requestLink(
   email: string,
@@ -21,7 +27,7 @@ export async function requestLink(
   const res = await fetchFn('/auth/login', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, next: currentTarget() }),
   });
   if (res.status === 202) return undefined;
   if (res.status === 429) return 'Too many requests. Try again later.';
