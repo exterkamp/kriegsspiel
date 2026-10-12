@@ -69,6 +69,42 @@ export class Notifier {
     }
   }
 
+  /**
+   * A one-off notice to one account about a game (for example, that the host removed them from the room).
+   * It goes by push and email when they want those, whatever their threshold, and never names anyone else.
+   */
+  async notifyUser(gameId: string, userId: string, title: string, text: string): Promise<void> {
+    const prefs = this.o.store.getPrefs(userId);
+    const url = `${this.o.publicUrl.replace(/\/$/, '')}/?game=${encodeURIComponent(gameId)}`;
+    const sends: Promise<unknown>[] = [];
+    if (prefs.push && this.o.push) {
+      const push = this.o.push;
+      const payload = JSON.stringify({ title, body: text, url, tag: `${gameId}:removed` });
+      for (const sub of this.o.store.subscriptionsOf(userId)) {
+        sends.push(
+          push
+            .send(sub, payload)
+            .then((r) => {
+              if (r === 'gone') this.o.store.removeSubscription(sub.endpoint);
+            })
+            .catch((e) => this.o.onError(gameId, e)),
+        );
+      }
+    }
+    const user = this.o.auth.getUser(userId);
+    if (prefs.email && user && !user.guest && this.o.mailer.sendNotification) {
+      sends.push(
+        this.o.mailer.sendNotification(user.email, title, `${text}\n\n${url}`).catch((e) =>
+          this.o.onError(gameId, e),
+        ),
+      );
+    }
+    const p = Promise.all(sends).then(() => undefined);
+    this.inFlight.add(p);
+    void p.finally(() => this.inFlight.delete(p));
+    await p;
+  }
+
   /** Forget a game that has closed. */
   forget(gameId: string): void {
     this.seen.delete(gameId);
