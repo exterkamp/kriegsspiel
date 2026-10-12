@@ -1331,10 +1331,6 @@
     "owner 80 actual release completed",
     "proof actual owner leaf retirement completed"
   ],
-  "errors": [
-    "native mount rejected",
-    "real catalog read rejected",
-    "native mount rejected"
-  ],
+  "errors": ["native mount rejected", "real catalog read rejected", "native mount rejected"],
   "limits": "Method acknowledgments and native terminate calls are observable; GPU memory, actual worker exit, swallowed prerequisite cleanup errors and HMR transport require independent browser evidence. No success is inferred from DOM removal."
 }

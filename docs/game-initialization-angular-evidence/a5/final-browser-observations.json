@@ -297,9 +297,7 @@
           "cachedResult": true
         }
       ],
-      "events": [
-        "default preparation 2 actual release completed"
-      ],
+      "events": ["default preparation 2 actual release completed"],
       "errors": [],
       "limits": "Method acknowledgments and native terminate calls are observable; GPU memory, actual worker exit, swallowed prerequisite cleanup errors and HMR transport require independent browser evidence. No success is inferred from DOM removal."
     }
@@ -4566,9 +4564,7 @@
         "session surface 45 actual release completed",
         "host origin 46 actual Angular destroyed callback"
       ],
-      "errors": [
-        "native mount rejected"
-      ],
+      "errors": ["native mount rejected"],
       "limits": "Method acknowledgments and native terminate calls are observable; GPU memory, actual worker exit, swallowed prerequisite cleanup errors and HMR transport require independent browser evidence. No success is inferred from DOM removal."
     }
   },
@@ -5493,9 +5489,7 @@
         "session surface 45 actual release completed",
         "host origin 46 actual Angular destroyed callback"
       ],
-      "errors": [
-        "native mount rejected"
-      ],
+      "errors": ["native mount rejected"],
       "limits": "Method acknowledgments and native terminate calls are observable; GPU memory, actual worker exit, swallowed prerequisite cleanup errors and HMR transport require independent browser evidence. No success is inferred from DOM removal."
     }
   },
@@ -6538,11 +6532,7 @@
         "session surface 65 actual release completed",
         "host origin 66 actual Angular destroyed callback"
       ],
-      "errors": [
-        "native mount rejected",
-        "real catalog read rejected",
-        "native mount rejected"
-      ],
+      "errors": ["native mount rejected", "real catalog read rejected", "native mount rejected"],
       "limits": "Method acknowledgments and native terminate calls are observable; GPU memory, actual worker exit, swallowed prerequisite cleanup errors and HMR transport require independent browser evidence. No success is inferred from DOM removal."
     }
   },
@@ -7746,11 +7736,7 @@
         "host origin 66 actual Angular destroyed callback",
         "default preparation 71 actual release completed"
       ],
-      "errors": [
-        "native mount rejected",
-        "real catalog read rejected",
-        "native mount rejected"
-      ],
+      "errors": ["native mount rejected", "real catalog read rejected", "native mount rejected"],
       "limits": "Method acknowledgments and native terminate calls are observable; GPU memory, actual worker exit, swallowed prerequisite cleanup errors and HMR transport require independent browser evidence. No success is inferred from DOM removal."
     }
   },
@@ -8955,11 +8941,7 @@
         "INJECTED next actual default return gate armed",
         "fresh native child constructed through current public anchor"
       ],
-      "errors": [
-        "native mount rejected",
-        "real catalog read rejected",
-        "native mount rejected"
-      ],
+      "errors": ["native mount rejected", "real catalog read rejected", "native mount rejected"],
       "limits": "Method acknowledgments and native terminate calls are observable; GPU memory, actual worker exit, swallowed prerequisite cleanup errors and HMR transport require independent browser evidence. No success is inferred from DOM removal."
     }
   },
@@ -10169,11 +10151,7 @@
         "default preparation 81 actual release completed",
         "real default result held"
       ],
-      "errors": [
-        "native mount rejected",
-        "real catalog read rejected",
-        "native mount rejected"
-      ],
+      "errors": ["native mount rejected", "real catalog read rejected", "native mount rejected"],
       "limits": "Method acknowledgments and native terminate calls are observable; GPU memory, actual worker exit, swallowed prerequisite cleanup errors and HMR transport require independent browser evidence. No success is inferred from DOM removal."
     }
   },
@@ -11559,11 +11537,7 @@
         "borrowed host lease 86 actual release completed",
         "native Angular host 89 actual release completed"
       ],
-      "errors": [
-        "native mount rejected",
-        "real catalog read rejected",
-        "native mount rejected"
-      ],
+      "errors": ["native mount rejected", "real catalog read rejected", "native mount rejected"],
       "limits": "Method acknowledgments and native terminate calls are observable; GPU memory, actual worker exit, swallowed prerequisite cleanup errors and HMR transport require independent browser evidence. No success is inferred from DOM removal."
     }
   },
@@ -12915,11 +12889,7 @@
         "owner 80 actual release completed",
         "proof actual owner leaf retirement completed"
       ],
-      "errors": [
-        "native mount rejected",
-        "real catalog read rejected",
-        "native mount rejected"
-      ],
+      "errors": ["native mount rejected", "real catalog read rejected", "native mount rejected"],
       "limits": "Method acknowledgments and native terminate calls are observable; GPU memory, actual worker exit, swallowed prerequisite cleanup errors and HMR transport require independent browser evidence. No success is inferred from DOM removal."
     }
   }
