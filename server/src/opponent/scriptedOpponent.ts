@@ -101,6 +101,7 @@ const VIEW_KEYS = [
   'hq',
   'ownUnits',
   'orderRoutes',
+  'couriers',
   'visibleEnemies',
   'lastKnownContacts',
   'reports',

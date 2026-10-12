@@ -1,7 +1,7 @@
 import type { EventRegistry, NewEvent } from './events.js';
 import { schedule } from './queue.js';
 import type { EngineState } from './events.js';
-import { destinationOf } from './courier.js';
+import { courierPosition, destinationOf } from './courier.js';
 import { findPath } from './navigation.js';
 import { distance, metres } from './geometry.js';
 import { describePlace } from './place.js';
@@ -209,6 +209,19 @@ export interface ViewContact {
   sizeEstimate: string;
 }
 
+/** One of the side's own couriers riding, where it is now by the plan HQ sent it on. Never an enemy's. */
+export interface ViewCourier {
+  /** The order it carries. */
+  id: string;
+  unitId: string;
+  /** Metres. */
+  position: Point;
+  /** Metres: the unit it rides to, where the unit was when the ride was planned. */
+  to: Point;
+  /** When HQ expects it to arrive (game time). It is the plan, not a promise. */
+  arriveAt: GameTime;
+}
+
 export interface ViewReport {
   id: string;
   kind: Report['kind'];
@@ -262,6 +275,8 @@ export interface EngineSideView {
   ownUnits: ViewUnit[];
   /** Own orders in flight and own units' planned routes (#203). */
   orderRoutes: ViewOrderRoute[];
+  /** Own couriers on the road, with their delivery estimate. */
+  couriers: ViewCourier[];
   visibleEnemies: ViewEnemy[];
   lastKnownContacts: ViewContact[];
   /** Only reports whose courier delay has passed. */
@@ -293,6 +308,10 @@ export function renderReport(r: Report, leadMs: number): string {
       );
     case 'unitLost':
       return sir(`${r.from} is lost ${where}, ${when}.`);
+    case 'courierLost':
+      return sir(
+        `no word from ${r.from} ${where}: the courier carrying its orders is overdue and must be given up for lost. Send the orders again.`,
+      );
     case 'orderDelivered':
       return sir(`${r.from} received its orders ${where}, ${when}.`);
     case 'lowAmmo':
@@ -318,6 +337,23 @@ export function renderReport(r: Report, leadMs: number): string {
 export function renderDocument(d: ViewDocument): string {
   const mins = Math.round(d.ageMs / MS_PER_MINUTE);
   return `Enemy dispatch to ${d.addressedTo}, taken from a courier ${d.place}, ${mins} ${mins === 1 ? 'minute' : 'minutes'} ago: "${d.text}"`;
+}
+
+function couriersOf(state: GameState, side: SideId): ViewCourier[] {
+  const out: ViewCourier[] = [];
+  for (const c of state.couriers) {
+    const last = c.legs.at(-1);
+    // Own couriers only. One lost or taken still shows on its plan until due: the sender cannot know.
+    if (c.side !== side || !last || state.time > last.arriveAt) continue;
+    out.push({
+      id: c.order.id,
+      unitId: c.order.to,
+      position: viewPoint(courierPosition(c, state.time)),
+      to: viewPoint(last.to),
+      arriveAt: last.arriveAt,
+    });
+  }
+  return out;
 }
 
 function orderRoutesOf(state: GameState, side: SideId): ViewOrderRoute[] {
@@ -403,6 +439,7 @@ export function viewFor(
         ammo: u.ammo,
       })),
     orderRoutes: orderRoutesOf(state, side),
+    couriers: couriersOf(state, side),
     visibleEnemies: seen.map((u) => ({
       id: u.id,
       position: viewPoint(u.center),

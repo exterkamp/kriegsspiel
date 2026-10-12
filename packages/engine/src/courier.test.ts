@@ -296,3 +296,63 @@ describe('interceptChance', () => {
     expect(chance(w, 1100)).toBeCloseTo(0.15);
   });
 });
+
+describe('couriers on the table (#196)', () => {
+  const foggy = (seed: number) => game(seed, { lurk: false, sightFactor: 0.25 });
+  const seed = firstSeedWhere(500, foggy, 'order_failed')!;
+  const lostRun = () => run(foggy(seed));
+
+  it('shows a side its own riding courier, with a delivery estimate, and no one else', () => {
+    const arrival = run(game(1, { lurk: false })).emitted.find(
+      (e) => e.type === 'order_delivered',
+    )!.time;
+    const s = advanceTo(game(1, { lurk: false }), arrival / 2, registry()).state;
+    const mine = viewFor(s.world, 'blue', s.time).couriers;
+    expect(mine).toHaveLength(1);
+    expect(mine[0]).toMatchObject({ id: 'o1', unitId: 'blue-1' });
+    expect(mine[0]!.arriveAt).toBeGreaterThan(s.time);
+    expect(viewFor(s.world, 'red', s.time).couriers).toEqual([]);
+    // Leak: nothing of the courier reaches the enemy's view, even with a hussar beside its road.
+    const lurked = advanceTo(game(1), arrival / 2, registry()).state;
+    const json = JSON.stringify(viewFor(lurked.world, 'red', lurked.time));
+    for (const hidden of ['"o1"', 'Advance to the crossroads', 'courier-']) {
+      expect(json).not.toContain(hidden);
+    }
+  });
+
+  it('drops the courier from the view once it arrives', () => {
+    const s = run(game(1, { lurk: false })).state;
+    expect(viewFor(s.world, 'blue', s.time).couriers).toEqual([]);
+  });
+
+  it('keeps a lost courier on the sender’s table until it is overdue, then reports it', () => {
+    const r = lostRun();
+    const lostAt = r.emitted.find((e) => e.type === 'order_failed')!.time;
+    const mid = advanceTo(foggy(seed), lostAt, registry()).state;
+    const view = viewFor(mid.world, 'blue', mid.time);
+    // The sender cannot tell: the courier still rides on its plan and no report has come.
+    expect(view.couriers).toHaveLength(1);
+    expect(view.reports.some((x) => x.kind === 'courierLost')).toBe(false);
+    const overdue = mid.world.intel.blue.reports.find((x) => x.kind === 'courierLost')!;
+    expect(overdue.deliverAt).toBeGreaterThanOrEqual(view.couriers[0]!.arriveAt);
+    // The written time is when HQ gave the courier up, not when it fell (no timing tell).
+    expect(overdue.observedAt).toBeGreaterThanOrEqual(view.couriers[0]!.arriveAt);
+    expect(overdue.observedAt).toBeGreaterThan(lostAt);
+    const later = advanceTo(foggy(seed), overdue.deliverAt, registry()).state;
+    const told = viewFor(later.world, 'blue', later.time);
+    const report = told.reports.find((x) => x.kind === 'courierLost')!;
+    expect(report.text).toMatch(/^Sir, no word from Unit|^Sir, no word from /);
+    expect(report.observedAt).toBeGreaterThanOrEqual(view.couriers[0]!.arriveAt);
+    expect(told.couriers).toEqual([]);
+    expect(
+      viewFor(later.world, 'red', later.time).reports.some((x) => x.kind === 'courierLost'),
+    ).toBe(false);
+  });
+
+  it('does the same at any stepping of the clock (replay)', () => {
+    const whole = lostRun();
+    let s = foggy(seed);
+    for (let t = 77_000; t < END; t += 77_000) s = advanceTo(s, t, registry()).state;
+    expect(advanceTo(s, END, registry()).state).toEqual(whole.state);
+  });
+});

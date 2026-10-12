@@ -62,6 +62,31 @@ describe('FlatBoardComponent (#343)', () => {
     expect(el.querySelector('polyline.route')).not.toBeNull();
   });
 
+  it('draws an own courier with the order arrows and hides it with them (#196)', async () => {
+    stubGame({
+      ...initialState,
+      view: {
+        ...view,
+        couriers: [
+          {
+            id: 'o1',
+            unitId: fixtureView.ownUnits[0]!.id,
+            position: { x: 1500, y: 1500 },
+            to: { x: 2050, y: 1000 },
+            arriveAtGame: fixtureView.atGame + 120_000,
+          },
+        ],
+      },
+    });
+    const f = TestBed.createComponent(FlatBoardComponent);
+    await f.whenStable();
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-courier="o1"]')?.textContent).toContain('Courier, 2 min');
+    TestBed.inject(MarksService).overlays.update((o) => ({ ...o, orders: false }));
+    await f.whenStable();
+    expect(el.querySelector('[data-courier="o1"]')).toBeNull();
+  });
+
   it('keeps tags of units standing together from overlapping', async () => {
     const { el } = await open();
     const ys = [...el.querySelectorAll('text.tag:not(.enemy)')].map((t) => t.getAttribute('y'));
