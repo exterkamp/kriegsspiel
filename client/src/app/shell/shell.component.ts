@@ -88,10 +88,11 @@ type Prep =
           @switch (prep().step) {
             @case ('ready') {
               <ks-game />
-              <ks-game-menu (leave)="go({ name: 'menu' })" (signOut)="signedOut()" />
-              @if (me(); as m) {
-                <ks-account-bar [me]="m" (gone)="goHome()" />
-              }
+              <ks-game-menu (leave)="go({ name: 'menu' })" (signOut)="signedOut()">
+                @if (me(); as m) {
+                  <ks-account-bar [me]="m" (gone)="goHome()" />
+                }
+              </ks-game-menu>
             }
             @case ('room') {
               <ks-room [first]="roomInfo()!" (started)="enter()" />
@@ -179,13 +180,11 @@ export class ShellComponent implements OnInit, OnDestroy {
     return continueRows(games, names, this.now());
   };
 
-  /** With the guest cookie set, a fresh page load starts a game from the plain menu URL, or reopens the URL asked for. */
+  /** With the guest cookie set, a fresh page load opens the main menu from the plain URL, or reopens the URL asked for. */
   protected readonly playAsGuest = async (): Promise<string | undefined> => {
     const err = await this.api.startGuest();
     if (err !== undefined) return err;
-    const plain = this.state()?.screen.name === 'sign-in' && this.win.location.search === '';
-    if (plain) this.win.location.assign(urlFor({ name: 'game', create: {} }));
-    else this.win.location.reload();
+    this.win.location.reload();
     return undefined;
   };
 

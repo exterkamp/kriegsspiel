@@ -17,6 +17,8 @@ export interface PauseActions {
 export interface OrderSender {
   send(o: {
     text: string;
+    /** What the player wrote, before the addressee and annex were added. */
+    words?: string;
     toName: string;
     courier: Courier;
     eta: number | undefined;
@@ -40,6 +42,7 @@ export const ORDER_SENDER = new InjectionToken<OrderSender>('ORDER_SENDER', {
         game.sendOrder(
           o.text,
           {
+            ...(o.words === undefined ? {} : { words: o.words }),
             toName: o.toName,
             courier: o.courier,
             ...(o.eta === undefined ? {} : { etaGame: o.eta }),

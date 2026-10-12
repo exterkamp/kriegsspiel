@@ -28,6 +28,7 @@ import { DeskStore } from '../desk/desk.store';
           <button #resume type="button" (click)="setOpen(false)">Resume</button>
           <button type="button" (click)="leave.emit()">Leave to main menu</button>
           <button type="button" (click)="signOut.emit()">Sign out</button>
+          <ng-content />
           <p class="note">Leaving does not end the game. It keeps running on the server.</p>
         </div>
       </div>

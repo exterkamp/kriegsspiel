@@ -2,11 +2,16 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
+  Injector,
+  afterNextRender,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
 } from '@angular/core';
-import { gameNowMs } from '@legacy/net/state';
+import { gameNowMs, orderIdOf } from '@legacy/net/state';
 import { buildOrderText } from '@legacy/hud/hud';
 import {
   COURIERS,
@@ -16,6 +21,8 @@ import {
   estimateRideMs,
   formatEstimate,
   noticeText,
+  orderWithOption,
+  splitOptions,
   withAnnex,
   type Courier,
   type OrderDraft,
@@ -53,10 +60,23 @@ export class OrdersDeskComponent {
   protected readonly addressee = computed(() => this.units().find((u) => u.id === this.draft().to));
   protected readonly arrows = computed(() => arrowMarks(this.game.state().marks));
   protected readonly over = computed(() => this.game.state().gameOver !== undefined);
-  /** Word from the staff about orders it could not carry out, such as a clarification or a refusal. */
-  protected readonly notices = computed(() => {
+  /**
+   * Word from the staff about the last order it could not carry out, such as a clarification or a refusal.
+   * Only the latest is shown, so the hint it carries appears once; a clarification offers its options.
+   */
+  protected readonly notice = computed(() => {
     const s = this.game.state();
-    return s.notices.slice(-3).map((n) => noticeText(n, s.outcomes));
+    const n = s.notices.at(-1);
+    if (!n || n === this.dismissed()) return undefined;
+    const id = orderIdOf(n.message);
+    const o = id === undefined ? undefined : s.outcomes[id];
+    const split = o?.code === 'order_clarification' ? splitOptions(o.reason) : undefined;
+    return {
+      text: noticeText(n, s.outcomes),
+      question: split?.question ?? '',
+      words: o?.text ?? '',
+      options: split?.options ?? [],
+    };
   });
   /** The staff estimate for each courier to the chosen addressee, or undefined when it cannot be made. */
   protected readonly estimates = computed(() => {
@@ -71,8 +91,54 @@ export class OrdersDeskComponent {
   protected readonly error = signal<{ field: Field; message: string } | undefined>(undefined);
   protected readonly stamping = signal(false);
 
+  /** The notice that was showing when the player signed again, so an old refusal does not sit beside a new order. */
+  private readonly dismissed = signal<unknown>(undefined);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
+  /** The last order signed: its words and annex, to put back if the staff refuse it. */
+  private lastSent: { words: string; annex: string[] } | undefined;
+  private readonly seenOutcomes = new Set<string>();
+
   constructor() {
     inject(DestroyRef).onDestroy(() => clearTimeout(this.stampTimer));
+    // A refused order was not sent after all: take back the stamp, and give the player their words back.
+    effect(() => {
+      const outcomes = this.game.state().outcomes;
+      untracked(() => {
+        for (const [id, o] of Object.entries(outcomes)) {
+          if (this.seenOutcomes.has(id)) continue;
+          this.seenOutcomes.add(id);
+          this.refuse(o.text);
+        }
+      });
+    });
+    // Bring the staff's word into view; the panel scrolls and it would sit below the fold.
+    effect(() => {
+      if (!this.notice()) return;
+      afterNextRender(
+        () =>
+          this.host.nativeElement.querySelector('.notices')?.scrollIntoView?.({ block: 'nearest' }),
+        { injector: this.injector },
+      );
+    });
+  }
+
+  private refuse(words: string): void {
+    clearTimeout(this.stampTimer);
+    this.stamping.set(false);
+    const sent = this.lastSent;
+    if (!sent || sent.words !== words.trim()) return;
+    this.lastSent = undefined;
+    // Never over words the player has already begun again.
+    if (this.draft().text.trim() === '') this.patch({ text: sent.words, annex: sent.annex });
+  }
+
+  /** Resend the refused order with the chosen option filled in. */
+  protected choose(option: string): void {
+    const n = this.notice();
+    if (!n || n.words === '') return;
+    this.patch({ text: orderWithOption(n.words, n.question, option) });
+    this.sign();
   }
 
   protected errorFor(field: Field): string {
@@ -127,6 +193,7 @@ export class OrdersDeskComponent {
     const sentAt = state.clock ? gameNowMs(state.clock, Date.now()) : (view?.atGame ?? 0);
     const err = this.sender.send({
       text,
+      words: d.text.trim(),
       toName: addressee.name,
       courier: d.courier,
       eta: ride === undefined ? undefined : sentAt + ride,
@@ -135,6 +202,8 @@ export class OrdersDeskComponent {
       this.error.set({ field: 'send', message: err });
       return;
     }
+    this.dismissed.set(state.notices.at(-1));
+    this.lastSent = { words: d.text.trim(), annex: d.annex };
     this.stamping.set(true);
     clearTimeout(this.stampTimer);
     this.stampTimer = setTimeout(() => this.stamping.set(false), 1400);

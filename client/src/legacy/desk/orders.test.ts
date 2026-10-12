@@ -8,7 +8,10 @@ import {
   estimateRideMs,
   formatEstimate,
   loadDraft,
+  orderWithOption,
+  refusalText,
   saveDraft,
+  splitOptions,
   withAnnex,
 } from './orders.js';
 
@@ -80,5 +83,44 @@ describe('delivery status', () => {
     expect(deliveryStatus(p, 2000)).toMatchObject({ state: 'riding', fraction: 0.5 });
     expect(deliveryStatus(p, 3000)).toMatchObject({ state: 'due', fraction: 1 });
     expect(deliveryStatus({ ...p, etaGame: undefined }, 2000).state).toBe('unknown');
+  });
+});
+
+describe('clarification options', () => {
+  it('splits the question from its options, keeping brackets together', () => {
+    expect(splitOptions('Which wood, sir? (Northern wood, Southern wood)')).toEqual({
+      question: 'Which wood, sir?',
+      options: ['Northern wood', 'Southern wood'],
+    });
+    expect(
+      splitOptions('Which wood? (the wood at (1, 2) m, the wood at (3, 4) m)').options,
+    ).toEqual(['the wood at (1, 2) m', 'the wood at (3, 4) m']);
+    expect(splitOptions('Where, sir?')).toEqual({ question: 'Where, sir?', options: [] });
+  });
+
+  it('fills the choice into the order', () => {
+    expect(orderWithOption('Hold the wood.', 'Which wood, sir?', 'Northern wood')).toBe(
+      'Hold the Northern wood.',
+    );
+    expect(orderWithOption('Hold the wood.', 'Which wood, sir?', 'the Northern wood')).toBe(
+      'Hold the Northern wood.',
+    );
+    expect(
+      orderWithOption(
+        'March to the bridge.',
+        'Which unit is this order for, sir?',
+        '1st Battalion',
+      ),
+    ).toBe('1st Battalion, March to the bridge.');
+  });
+
+  it('leaves the options out of the refusal text', () => {
+    const t = refusalText({
+      text: 'Hold the wood.',
+      reason: 'Which wood, sir? (Northern wood, Southern wood)',
+      code: 'order_clarification',
+    });
+    expect(t).toContain('Which wood, sir?');
+    expect(t).not.toContain('Southern');
   });
 });
