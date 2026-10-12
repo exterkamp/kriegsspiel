@@ -479,6 +479,34 @@ describe('game over', () => {
   });
 });
 
+describe('order limits (#160)', () => {
+  it('ignores a repeated orderId and queues the order once', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    await blue.waitFor('viewUpdate');
+    blue.send(order('hold', 'dup'));
+    blue.send(order('hold', 'dup'));
+    const err = await blue.waitFor('error', (m) => m.code === 'duplicate_order');
+    expect(err.message.startsWith('dup: ')).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const orders = (await store.inputLog(game.id)).filter((e) => e.command.kind === 'order');
+    expect(orders).toHaveLength(1);
+  });
+
+  it('caps a burst of orders on one connection', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    await blue.waitFor('viewUpdate');
+    for (let i = 0; i < 200; i++) blue.send(order('hold', `b${i}`));
+    await blue.waitFor('error', (m) => m.code === 'rate_limited');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const orders = (await store.inputLog(game.id)).filter((e) => e.command.kind === 'order');
+    expect(orders.length).toBeLessThanOrEqual(30);
+  });
+});
+
 describe('staff questions', () => {
   const ask = (questionId: string, role = 'chiefOfStaff') =>
     JSON.stringify({ v, kind: 'askStaff', questionId, role, question: 'Status?' });
