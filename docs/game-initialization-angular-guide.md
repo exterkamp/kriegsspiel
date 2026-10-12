@@ -46,7 +46,7 @@ Angular canvas replacement recreates the preview and preserves setup state, draf
 
 `BoardHostComponent` is the native fixed-map rendering boundary. Supply a fresh local session key, detached CertifiedBoard and matching LocalPresentation; consume its keyed initialization and repeatable availability events. Await `teardown()` before replacing an owner. A retained host replaces its canvas safely and reuses its raster; mark-only updates never regenerate artwork. Camera and general interaction gates are independent so explicit manual placement can pick metres while camera movement is locked.
 
-The host paints only stopped, empty local presentation and validated render-only marks. It has no live GameService, MarksService, simulation or storage capability. The final development route, personal repository and session owner follow separately. Actual native-worker/WebGL desktop/narrow, picking/gates, canvas HMR and teardown evidence is in [fixed-board verification](game-initialization-verification/angular-local-board/README.md); full-parent HMR remains an integration requirement.
+The host paints only stopped, empty local presentation and validated render-only marks. It has no live GameService, MarksService, simulation or storage capability. The personal repository is described below; the final development route and session owner follow separately. Actual native-worker/WebGL desktop/narrow, picking/gates, canvas HMR and teardown evidence is in [fixed-board verification](game-initialization-verification/angular-local-board/README.md); full-parent HMR remains an integration requirement.
 
 
 ## Personal marks and notebook
