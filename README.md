@@ -36,6 +36,8 @@ Replay a finished game from its log with no model calls: `npm run replay -w serv
 
 ## Development
 
+The Angular development build includes a native local board at `/dev/local-board`: Settings → New game selects or generates/saves a certified map, with private session-scoped marks and notebook. It needs no game API for the pinned default. Catalog selection/saving uses the opt-in [development catalog](docs/dev-map-catalog.md); see the [local Angular guide](docs/game-initialization-angular-guide.md). The production build excludes this route and its default asset. The native saved-map inspector is at `/map-table`.
+
 Node version is in `.nvmrc` (`nvm use`); use npm 10.9.7 for the pinned map source build. This is an npm workspaces monorepo:
 
 - `packages/engine`: pure, deterministic game engine

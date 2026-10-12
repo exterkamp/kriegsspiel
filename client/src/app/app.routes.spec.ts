@@ -35,6 +35,26 @@ describe('routes', () => {
     expect(routes.some((r) => r.path === 'admin' && !r.children)).toBe(true);
     expect(routes.some((r) => r.path?.startsWith('admin/'))).toBe(false);
   });
+
+  it('resolves the development board directly without selecting the root shell', async () => {
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideRouter(routes)],
+    });
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/dev/local-board?mode=fixture');
+    expect(router.url).toBe('/dev/local-board?mode=fixture');
+    expect(router.routerState.snapshot.root.firstChild?.routeConfig?.path).toBe('dev/local-board');
+  });
+
+  it('keeps the retired fixture query on the existing root shell route', async () => {
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideRouter(routes)],
+    });
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/?mode=fixture');
+    expect(router.url).toBe('/?mode=fixture');
+    expect(router.routerState.snapshot.root.firstChild?.routeConfig?.path).toBe('');
+  });
 });
 
 describe('TrailingSlashUrlSerializer', () => {

@@ -1,0 +1,112 @@
+<main>
+  <div class="background" [localBackgroundGate]="this" [inert]="modal() !== 'none' || suspended()">
+    <header>
+      <h1>Local board</h1>
+      <p role="status">Time stopped at 0 · No simulation</p>
+      <nav aria-label="Local board navigation">
+        <button
+          type="button"
+          (click)="navigate('table')"
+          [disabled]="blocked()"
+          [attr.aria-pressed]="view() === 'table'"
+        >
+          Table
+        </button>
+        <button
+          type="button"
+          (click)="navigate('notebook')"
+          [disabled]="blocked() || !state()?.session"
+          [attr.aria-pressed]="view() === 'notebook'"
+        >
+          Notebook
+        </button>
+        <button
+          #settingsTrigger
+          type="button"
+          (click)="openSettings(settingsTrigger)"
+          [disabled]="blocked() || !state()?.session"
+        >
+          Settings
+        </button>
+        <a routerLink="/" data-local-exit>Back to menu</a>
+      </nav>
+    </header>
+    @if (uiError() || state()?.error) {
+      <p role="alert">{{ uiError() || state()?.error }}</p>
+    }
+    @if (!state()?.session) {
+      <p role="status">
+        {{
+          suspended()
+            ? 'Local board stopped.'
+            : state()?.phase === 'failed'
+              ? 'Local board unavailable.'
+              : 'Preparing local board…'
+        }}
+      </p>
+    }
+    @if (state()?.canRetry) {
+      <button type="button" (click)="recover('retry')">Retry same board</button>
+    }
+    @if (state()?.canReturnToDefault) {
+      <button type="button" (click)="recover('default')">Return to default board</button>
+    }
+    <ng-template localBoardOutlet="board" [outletController]="this" let-row>
+      @if (row.session; as session) {
+        <div class="table" [hidden]="view() !== 'table'">
+          <ks-local-board-host
+            [localSessionHost]="session"
+            [sessionOwner]="row.owner"
+            [key]="session.key"
+            [board]="session.board"
+            [presentation]="presentation(session)"
+            [interactionEnabled]="boardInput(session)"
+            [cameraEnabled]="boardInput(session) && session.personal.cameraEnabled()"
+            (exposedKey)="canvasKeys(session, $event)"
+            (attached)="hostAttached(row, $event)"
+          />
+          <ks-personal-tools [store]="session.personal" />
+        </div>
+        @if (view() === 'notebook') {
+          <ks-personal-notebook [store]="session.personal" (returnToTable)="navigate('table')" />
+        }
+      }
+    </ng-template>
+  </div>
+  <dialog
+    #settingsDialog
+    aria-labelledby="settings-title"
+    (cancel)="dialogCancel($event, 'settings')"
+    (close)="dialogClosed('settings')"
+  >
+    <h2 id="settings-title">Settings</h2>
+    <button type="button" autofocus (click)="newGame()">New game</button>
+    <button type="button" (click)="closeSettings()">Close</button>
+  </dialog>
+  <dialog
+    #setupDialog
+    class="fullscreen"
+    aria-label="New game setup"
+    (cancel)="dialogCancel($event, 'setup')"
+    (close)="dialogClosed('setup')"
+  >
+    @if (uiError() && cancelling()) {
+      <p role="alert">{{ uiError() }}</p>
+      <a routerLink="/">Back to menu</a>
+    }
+    <ng-template localBoardOutlet="setup" [outletController]="this" let-row>
+      @if (row.setup; as setup) {
+        <ks-local-board-setup
+          [localSetupHost]="setup"
+          [sessionOwner]="row.owner"
+          (attached)="setupAttached(row, $event)"
+          [catalog]="setup.props.catalog"
+          [preparation]="setup.props.preparation"
+          [initialRef]="setup.props.initialRef"
+          [onStart]="setupStartCallback(row)"
+          [onCancel]="setupCancelCallback(row)"
+        />
+      }
+    </ng-template>
+  </dialog>
+</main>

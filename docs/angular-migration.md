@@ -257,3 +257,10 @@ npm test -w client-ng
 ## Native Angular saved-map inspection restoration
 
 D30 restores the file-only inspector at `/map-table`; `/map-table.html` now redirects there with its query. The Angular component and component-scoped signal/resource service replace the old imperative page. Shared saved-file certification and raster algorithms are restored under `client/src/shared/map-table/` and use the retained framework-free authoring workers and Three.js renderer. The root menu, guest/scenario/live routing and retired fixture policy stay as described above. Development catalog and local New game setup are separate landing packets.
+
+
+## Native local New game after cutover
+
+The local New game flow is a fresh Angular implementation at the development-only `/dev/local-board`, with native setup, board host, personal tools/notebook and a session owner (D30–D34, D41). The saved-map inspector is native Angular at `/map-table`; `/map-table.html` redirects there. The retired HQ fixture shell and `?mode=fixture` are not restored. Existing pure map generation/certification, Canvas2D/Three rendering and geometry modules remain under `legacy` as shared algorithms; the local feature does not mount an imperative legacy page or revive Svelte components. This scope does not replace all framework-free application code.
+
+Production excludes the local page through a compile-time route replacement and excludes its default map asset/catalog proxy. The ordinary menu/authentication, guest, scenario and live-game routes remain upstream. See [local Angular guide](game-initialization-angular-guide.md) and [execution log](game-initialization-landing-log.md) for behavior, verification and remaining integration gates.
