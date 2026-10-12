@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { polygonCentroid } from './geometry.js';
+import { holdTheBridgeFarStart } from './scenario.testkit.js';
 import {
   FEATURE_KINDS,
   holdTheBridge,
@@ -17,7 +18,7 @@ import {
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- tests mutate raw scenario data freely */
 function clone(): any {
-  return JSON.parse(JSON.stringify(holdTheBridge));
+  return JSON.parse(JSON.stringify(holdTheBridgeFarStart));
 }
 
 describe('Hold the Bridge scenario', () => {
@@ -44,11 +45,31 @@ describe('Hold the Bridge scenario', () => {
   it('gives each unit a centre, a facing and a footprint from its formation', () => {
     const s = loadScenario(holdTheBridge);
     const blue = s.units.find((u) => u.id === 'blue-1')!;
-    expect(blue.center).toEqual({ x: 1_850_000, y: 2_450_000 });
+    expect(blue.center).toEqual({ x: 1_960_000, y: 1_680_000 });
     expect(blue.facing).toBe(0);
     expect(s.units.find((u) => u.id === 'red-1')!.facing).toBeCloseTo(Math.PI);
     expect(blue.formation).toBe('line');
     expect(blue.footprint.frontage).toBeGreaterThan(blue.footprint.depth);
+  });
+
+  it('starts Blue at the bridge and Red a long march away (#178)', () => {
+    const s = loadScenario(holdTheBridge);
+    const goal = polygonCentroid(s.victory.objective);
+    const away = (id: string) => {
+      const c = s.units.find((u) => u.id === id)!.center;
+      return Math.hypot(c.x - goal.x, c.y - goal.y) / 1000;
+    };
+    for (const id of ['blue-1', 'blue-2']) expect(away(id)).toBeLessThan(300);
+    for (const id of ['red-1', 'red-2', 'red-3']) expect(away(id)).toBeGreaterThan(1100);
+    expect(s.victory.takeMs).toBe(10 * MS_PER_MINUTE);
+  });
+
+  it('reads victory.takeMinutes, default 10, and rejects a negative one', () => {
+    const d = clone();
+    d.victory.takeMinutes = 3;
+    expect(loadScenario(d).victory.takeMs).toBe(3 * MS_PER_MINUTE);
+    d.victory.takeMinutes = -1;
+    expect(() => loadScenario(d)).toThrow(/takeMinutes/);
   });
 
   it('keeps every coordinate and length in state an integer number of mm', () => {
@@ -82,7 +103,7 @@ describe('Hold the Bridge scenario', () => {
   });
 
   it('is loaded identically every time', () => {
-    expect(loadScenario(holdTheBridge)).toEqual(loadScenario(clone()));
+    expect(loadScenario(holdTheBridge)).toEqual(loadScenario(JSON.parse(JSON.stringify(holdTheBridge))));
   });
 });
 

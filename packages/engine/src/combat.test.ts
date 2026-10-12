@@ -401,7 +401,7 @@ describe('victory conditions', () => {
     const { state, emitted } = run(s, 30);
     expect(ofType(emitted, 'game.end')).toEqual([
       {
-        time: 2 * MS_PER_MINUTE,
+        time: 12 * MS_PER_MINUTE,
         type: 'game.end',
         payload: { winner: 'red', reason: 'objective-taken' },
       },
@@ -409,8 +409,53 @@ describe('victory conditions', () => {
     expect(state.world.outcome).toEqual({
       winner: 'red',
       reason: 'objective-taken',
-      time: 2 * MS_PER_MINUTE,
+      time: 12 * MS_PER_MINUTE,
     });
+  });
+
+  it('does not give the objective for arriving: it must be held 10 minutes', () => {
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'red-1', side: 'red', x: 3, y: 2 },
+    ]);
+    s = issueMove(s, 'red-1', T(5, 2));
+    const nearly = run(s, 11);
+    expect(nearly.state.world.outcome).toBeNull();
+    expect(nearly.state.world.heldSince).toBe(2 * MS_PER_MINUTE);
+    expect(run(s, 12).state.world.outcome).toMatchObject({ reason: 'objective-taken' });
+  });
+
+  it('starts the hold again when the attacker leaves the objective', () => {
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'red-1', side: 'red', x: 3, y: 2 },
+    ]);
+    s = issueMove(s, 'red-1', T(5, 2));
+    s = run(s, 6).state;
+    expect(s.world.heldSince).toBe(2 * MS_PER_MINUTE);
+    s = run(issueMove(s, 'red-1', T(3, 2)), 3).state;
+    expect(s.world.heldSince).toBeNull();
+    s = issueMove(s, 'red-1', T(5, 2));
+    const back = run(s, 5);
+    expect(back.state.world.outcome).toBeNull();
+    expect(back.state.world.heldSince).not.toBeNull();
+  });
+
+  it('stops every unit where it stands when the game ends, and nothing moves after', () => {
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'red-1', side: 'red', x: 3, y: 2 },
+      { id: 'red-2', side: 'red', x: 0, y: 4 },
+    ]);
+    s = issueMove(s, 'red-1', T(5, 2));
+    s = issueMove(s, 'red-2', T(8, 0)); // still marching when red-1 wins
+    const end = run(s, 30);
+    expect(end.state.world.outcome).toMatchObject({ reason: 'objective-taken' });
+    const frozen = end.state.world.units.map((u) => [u.id, u.center, u.intent]);
+    expect(end.state.world.units.every((u) => u.intent.kind === 'idle' && !u.leg)).toBe(true);
+    const later = run(issueMove(end.state, 'red-2', T(9, 4)), 60);
+    expect(later.state.world.units.map((u) => [u.id, u.center, u.intent])).toEqual(frozen);
+    expect(later.emitted).toEqual([]);
   });
 
   it('defender wins by keeping the attacker off the objective until the time is up', () => {
@@ -533,7 +578,7 @@ describe('Hold the Bridge', () => {
       return run(s, 200);
     };
     const a = play();
-    expect(a.state.world.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
+    expect(a.state.world.outcome).toMatchObject({ winner: 'blue', reason: 'objective-held' });
     expect(ofType(a.emitted, 'game.end')).toHaveLength(1);
     expect(ofType(a.emitted, 'combat.fire').length).toBeGreaterThan(0);
     expect(a.emitted).toEqual(play().emitted);
@@ -697,24 +742,30 @@ describe('objective area', () => {
       { id: 'blue-1', side: 'blue', x: 9, y: 4 },
       { id: 'red-1', side: 'red', x: 0, y: 0 },
     ]);
-    return place(s, 'red-1', x, y).world;
+    return { ...place(s, 'red-1', x, y).world, heldSince: 0 };
   };
+  const TAKEN = 10 * MS_PER_MINUTE;
 
   it('is held by a unit whose centre is inside the area, corners included', () => {
-    expect(evaluateVictory(holder(550, 250), 0)).toMatchObject({ winner: 'red' });
-    expect(evaluateVictory(holder(579, 221), 0)).toMatchObject({ winner: 'red' });
-    expect(evaluateVictory(holder(580, 280), 0)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(holder(550, 250), TAKEN)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(holder(579, 221), TAKEN)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(holder(580, 280), TAKEN)).toMatchObject({ winner: 'red' });
+  });
+
+  it('is not taken before the hold time is up, and not at all if it was never started', () => {
+    expect(evaluateVictory(holder(550, 250), TAKEN - 1)).toBeNull();
+    expect(evaluateVictory({ ...holder(550, 250), heldSince: null }, TAKEN)).toBeNull();
   });
 
   it('is not held from outside the area, even a few metres off', () => {
-    expect(evaluateVictory(holder(585, 250), 0)).toBeNull();
-    expect(evaluateVictory(holder(550, 215), 0)).toBeNull();
+    expect(evaluateVictory(holder(585, 250), TAKEN)).toBeNull();
+    expect(evaluateVictory(holder(550, 215), TAKEN)).toBeNull();
   });
 
   it('is not round: the same distance from the centre can be in or out', () => {
     // 36 m from the centre along the diagonal is in the square's corner region; 36 m east is out.
-    expect(evaluateVictory(holder(550 + 29, 250 + 29), 0)).toMatchObject({ winner: 'red' });
-    expect(evaluateVictory(holder(550 + 36, 250), 0)).toBeNull();
+    expect(evaluateVictory(holder(550 + 29, 250 + 29), TAKEN)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(holder(550 + 36, 250), TAKEN)).toBeNull();
   });
 
   it('does not count the defender holding it jointly with the attacker', () => {
@@ -723,6 +774,6 @@ describe('objective area', () => {
       ...w,
       units: w.units.map((u) => (u.id === 'blue-1' ? { ...u, center: pointMm(560, 250) } : u)),
     };
-    expect(evaluateVictory(both, 0)).toBeNull();
+    expect(evaluateVictory(both, TAKEN)).toBeNull();
   });
 });
