@@ -264,6 +264,7 @@ export interface Report {
     | 'situation'
     | 'contact'
     | 'unitLost'
+    | 'courierLost'
     | 'orderDelivered'
     | 'lowAmmo'
     | 'exhausted'
@@ -308,6 +309,11 @@ export interface Courier {
   legs: Leg[];
   /** The intents the unit will adopt, when the courier garbles the order. Absent if the order arrives as signed. */
   garbled?: OrderIntent[];
+  /**
+   * Set when the courier was lost or taken. It stays in master state, riding on paper, until its
+   * due arrival, so the sender's view cannot tell it has gone (the report comes later).
+   */
+  lostAt?: GameTime;
 }
 
 /** An enemy dispatch a side has taken from a courier. Belongs to the capturing side's intel. */

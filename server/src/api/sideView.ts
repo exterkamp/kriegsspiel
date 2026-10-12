@@ -34,6 +34,7 @@ const CATEGORY: Record<ViewReport['kind'], Dispatch['category']> = {
   situation: 'staff',
   contact: 'scouts',
   unitLost: 'subordinates',
+  courierLost: 'subordinates',
   orderDelivered: 'subordinates',
   lowAmmo: 'staff',
   exhausted: 'subordinates',
@@ -166,6 +167,17 @@ export function toSideView(
             unitId: o.unitId,
             kind: o.kind,
             points: o.points,
+          })),
+        }),
+    ...(view.couriers.length === 0
+      ? {}
+      : {
+          couriers: view.couriers.map((c) => ({
+            id: c.id,
+            unitId: c.unitId,
+            position: c.position,
+            to: c.to,
+            arriveAtGame: c.arriveAt,
           })),
         }),
     visibleEnemies: view.visibleEnemies.map((e) => ({

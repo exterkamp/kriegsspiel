@@ -893,7 +893,7 @@ describe('places in reports', () => {
       'text',
     ]);
     const json = JSON.stringify(viewFor(w, 'red', 2000));
-    for (const hidden of ['courier', 'garbled', 'fromSide', '"route"', '"legs"']) {
+    for (const hidden of ['courier-', 'garbled', 'fromSide', '"route"', '"legs"']) {
       expect(json).not.toContain(hidden);
     }
     expect(viewFor(w, 'blue', 2000).documents).toEqual([]);

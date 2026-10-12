@@ -46,19 +46,21 @@ function narrate(input: Json) {
           ? `${from} sighted ${size || 'enemy troops'}${where}, ${when}`
           : r.kind === 'unitLost'
             ? `${from} is lost to us${where}, ${when}; I cannot say more`
-            : r.kind === 'orderDelivered'
-              ? `${from} has received its orders${where}, ${when}`
-              : r.kind === 'lowAmmo'
-                ? `${from} is running short of ammunition${where}, ${when}`
-                : r.kind === 'exhausted'
-                  ? `${from} is exhausted${where}, ${when}`
-                  : r.kind === 'engaged'
-                    ? `${from} is engaged${where}, ${when}`
-                    : r.kind === 'heavyLosses'
-                      ? `${from} is taking heavy losses${where}, ${when}`
-                      : r.kind === 'broke'
-                        ? `${from} has broken and is falling back${where}, ${when}`
-                        : `${from} reports its situation${where}, ${when}`;
+            : r.kind === 'courierLost'
+              ? `no word from ${from}${where}; the courier is overdue and must be given up for lost`
+              : r.kind === 'orderDelivered'
+                ? `${from} has received its orders${where}, ${when}`
+                : r.kind === 'lowAmmo'
+                  ? `${from} is running short of ammunition${where}, ${when}`
+                  : r.kind === 'exhausted'
+                    ? `${from} is exhausted${where}, ${when}`
+                    : r.kind === 'engaged'
+                      ? `${from} is engaged${where}, ${when}`
+                      : r.kind === 'heavyLosses'
+                        ? `${from} is taking heavy losses${where}, ${when}`
+                        : r.kind === 'broke'
+                          ? `${from} has broken and is falling back${where}, ${when}`
+                          : `${from} reports its situation${where}, ${when}`;
       // Only what the staff saw for themselves is hedged or vouched for.
       const sure =
         r.kind !== 'contact' && r.kind !== 'situation'

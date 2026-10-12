@@ -126,6 +126,18 @@ export const OrderRoute = z
   .strict();
 export type OrderRoute = z.infer<typeof OrderRoute>;
 
+/** One of the side's own couriers on the road: where it is now by plan, and when HQ expects it to arrive. */
+export const Courier = z
+  .object({
+    id: z.string().min(1),
+    unitId: UnitId,
+    position: Coord,
+    to: Coord,
+    arriveAtGame: GameMs,
+  })
+  .strict();
+export type Courier = z.infer<typeof Courier>;
+
 /** Everything one side may see. Built only by the engine's visibility filter. */
 export const SideView = z
   .object({
@@ -138,6 +150,8 @@ export const SideView = z
     ownUnits: z.array(OwnUnit),
     /** The side's own orders in flight and its units' planned routes. Absent when there are none. */
     orderRoutes: z.array(OrderRoute).optional(),
+    /** The side's own couriers riding now. Never an enemy's. Absent when there are none. */
+    couriers: z.array(Courier).optional(),
     visibleEnemies: z.array(VisibleEnemyUnit),
     lastKnownContacts: z.array(LastKnownContact),
     dispatches: z.array(Dispatch),

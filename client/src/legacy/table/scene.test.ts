@@ -345,6 +345,17 @@ describe('TableScene marks and overlays', () => {
     expect(opacityAt(12 * 3_600_000)).toBeCloseTo(0.4);
   });
 
+  it('draws own couriers with the order arrows, and not when that overlay is off (#196)', () => {
+    const t = make();
+    t.apply({
+      ...state,
+      couriers: [{ id: 'o1', position: { x: 10, y: 10 }, to: { x: 100, y: 100 }, etaMin: 4 }],
+    });
+    expect(t.scene.getObjectByName('courier:o1')).toBeTruthy();
+    t.setOverlays({ orders: false, routes: true, lastKnown: true });
+    expect(t.scene.getObjectByName('courier:o1')).toBeFalsy();
+  });
+
   it('shows order arrows, routes and last-known shading only while their overlay is on', () => {
     const t = make();
     const withRoutes = {
