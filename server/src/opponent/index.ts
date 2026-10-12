@@ -1,5 +1,6 @@
-import { featureAnchor, polygonCentroid, type GameState } from '@kriegsspiel/engine';
+import { featureAnchor, polygonCentroid, type GameState, type SideId } from '@kriegsspiel/engine';
 import type { OrderParser } from '../orders/index.js';
+import { hiddenTerms } from '../umpire/leakGuard.js';
 import type { UmpireClient } from '../umpire/umpireClient.js';
 import {
   LlmCommander,
@@ -61,6 +62,18 @@ export function llmAgents(world: GameState, opts: LlmAgentOptions): SideAgent[] 
         objective: { x: Math.round(objective.x / 1000), y: Math.round(objective.y / 1000) },
         places,
         fallback,
+        hidden: (view) => {
+          const seen = new Set([
+            ...view.visibleEnemies.map((e) => e.id),
+            ...view.lastKnownContacts.map((c) => c.id),
+          ]);
+          return [
+            ...hiddenTerms(world, fallback.side as SideId),
+            ...world.units
+              .filter((u) => u.side !== fallback.side && !seen.has(u.id))
+              .map((u) => u.id),
+          ];
+        },
         difficulty: opts.difficulty,
         personality: opts.personality,
         onNote: (note) => opts.onNote?.(fallback.side, note),

@@ -11,6 +11,8 @@
 import { metres } from '@kriegsspiel/engine';
 import type { JsonSchema, TokenUsage, UmpireClient } from '../umpire/umpireClient.js';
 import { UmpireError } from '../umpire/umpireClient.js';
+import { checkProseAgainst, proseFactsOf } from '../umpire/narrate.js';
+import { hiddenIn } from '../umpire/leakGuard.js';
 import type { Coord, OrderIntent, OrderParser, ParseContext, ParseResult } from './orderParser.js';
 
 export const PARSE_ORDERS_PROMPT_VERSION = 'parse-orders-v1';
@@ -169,11 +171,28 @@ export class LlmOrderParser implements OrderParser {
 
   /** The validated result, or a string saying why the output cannot be trusted. */
   private check(text: string, out: ParseOrdersOutput, ctx: ParseContext): ParseResult | string {
+    // The words go to the player: they may cite only what the model was shown, and no name of the
+    // other side's units (#44).
+    const facts = proseFactsOf(parseOrdersInput(text, ctx));
+    // An enemy id is fair only when the player wrote it in the order.
+    const hidden = ctx.units
+      .filter((u) => u.side !== ctx.side)
+      .flatMap((u) => [u.name, ...(text.toLowerCase().includes(u.id.toLowerCase()) ? [] : [u.id])]);
+    const unfounded = (...words: Array<string | undefined>) =>
+      words
+        .flatMap((w) => (w ? [...checkProseAgainst(w, facts), ...hiddenIn(w, hidden)] : []))
+        .join('; ');
     if (out.result === 'rejection') {
-      return out.reason?.trim() ? { kind: 'rejection', text, reason: out.reason } : 'no reason';
+      if (!out.reason?.trim()) return 'no reason';
+      const bad = unfounded(out.reason);
+      return bad
+        ? `reason cites what the model was not shown: ${bad}`
+        : { kind: 'rejection', text, reason: out.reason };
     }
     if (out.result === 'clarification') {
       if (!out.question?.trim()) return 'no question';
+      const bad = unfounded(out.question, ...(out.options ?? []));
+      if (bad) return `question cites what the model was not shown: ${bad}`;
       return out.options?.length
         ? { kind: 'clarification', text, question: out.question, options: out.options }
         : { kind: 'clarification', text, question: out.question };
