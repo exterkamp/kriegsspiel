@@ -61,11 +61,13 @@ export class TableHostComponent implements OnDestroy {
 
   constructor() {
     afterNextRender(() => {
+      let built: ReturnType<typeof this.makeScene> | undefined;
       try {
-        const scene = this.makeScene(this.canvas().nativeElement);
-        scene.start();
-        this.tableService.scene.set(scene);
+        built = this.makeScene(this.canvas().nativeElement);
+        built.start();
+        this.tableService.scene.set(built);
       } catch (e) {
+        built?.dispose();
         // No WebGL (GPU or hardware acceleration off): the desk still works, so say so and list the units.
         this.tableService.unavailable.set(e instanceof Error ? e.message : String(e));
         this.tableService.status.set('The map table needs WebGL');

@@ -168,4 +168,27 @@ describe('GameComponent without WebGL (#259)', () => {
     expect(el.querySelector('nav[aria-label=Desk]')).not.toBeNull();
     expect(TestBed.inject(TableService).scene()).toBeUndefined();
   });
+
+  it('disposes a half-built scene when start() throws', async () => {
+    const dispose = vi.fn();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        {
+          provide: TABLE_SCENE_FACTORY,
+          useValue: () => ({
+            start: () => {
+              throw new Error('Error creating WebGL context.');
+            },
+            dispose,
+          }),
+        },
+      ],
+    });
+    const f = TestBed.createComponent(GameComponent);
+    await f.whenStable();
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(f.nativeElement.querySelector('ks-webgl-fallback')).not.toBeNull();
+    expect(TestBed.inject(TableService).scene()).toBeUndefined();
+  });
 });
