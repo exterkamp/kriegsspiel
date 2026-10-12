@@ -1,8 +1,14 @@
 /** #161: a cap on unfinished games per account, and eviction of idle games from memory. */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import * as replayView from '../admin/replayView.js';
 import { MemoryGameStore } from '../game/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { buildApp, type AppOptions } from './app.js';
+
+vi.mock('../admin/replayView.js', async (orig) => {
+  const actual = await orig<typeof import('../admin/replayView.js')>();
+  return { ...actual, replayTimeline: vi.fn(actual.replayTimeline) };
+});
 
 const mailbox: Array<{ to: string; link: string }> = [];
 const mailer = {
@@ -77,6 +83,80 @@ describe('game limits', () => {
     expect(games.map((g) => g.id)).toContain(game.id);
     // A closed game does not count against the cap.
     expect(app.host.size).toBe(0);
+
+    // Using it again reopens it.
+    const ws = new WebSocket(`${base.replace('http', 'ws')}/games/${game.id}/ws`, {
+      headers: { cookie },
+    } as never);
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener('open', () => resolve());
+      ws.addEventListener('error', () => reject(new Error('connection refused')));
+    });
+    expect(app.host.get(game.id)).toBeDefined();
+    ws.close();
+    await app.server.close();
+  });
+
+  it('closes a finished game nobody watches after the grace, but not one with a socket', async () => {
+    let now = 1_000_000;
+    const { app, base, post, signIn } = await boot({
+      wallNow: () => now,
+      limits: { idleMs: 24 * 3_600_000, finishedGraceMs: 30_000, sweepEveryMs: 0 },
+    });
+    const cookie = await signIn('done@example.test');
+    const finish = async () => {
+      const game = (await (
+        await post('/games', cookie, { sessionType: 'team_vs_team' })
+      ).json()) as {
+        id: string;
+        ws: string;
+      };
+      const actor = app.host.get(game.id)!;
+      await actor.submit({ kind: 'setMode', mode: 'fast-forward' });
+      await actor.submit({ kind: 'advanceTo', gameMs: 4 * 60 * 60_000 });
+      expect(actor.state.world.outcome).toBeTruthy();
+      return game;
+    };
+    // Lower the cap's pressure: finished games do not count against it.
+    const watched = await finish();
+    const unwatched = await finish();
+    const ws = new WebSocket(`${base.replace('http', 'ws')}${watched.ws}`, {
+      headers: { cookie },
+    } as never);
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener('open', () => resolve());
+      ws.addEventListener('error', () => reject(new Error('connection refused')));
+    });
+
+    // Within the grace, a finished game stays; an unfinished one never goes before idleMs.
+    expect(await app.sweepGames()).toEqual([]);
+    now += 31_000;
+    expect(await app.sweepGames()).toEqual([unwatched.id]);
+    expect(app.host.get(unwatched.id)).toBeUndefined();
+    expect(app.host.get(watched.id)).toBeDefined();
+    ws.close();
+    await app.server.close();
+  }, 60_000);
+
+  it('replays a closed game once per log length for GET /games', async () => {
+    const { app, base, post, signIn } = await boot({ limits: { sweepEveryMs: 0 } });
+    const cookie = await signIn('replay@example.test');
+    const game = (await (await post('/games', cookie)).json()) as { id: string };
+    await app.host.close(game.id);
+    const list = () => fetch(`${base}/games`, { headers: { cookie } });
+    const spy = vi.mocked(replayView.replayTimeline);
+    spy.mockClear();
+
+    await list();
+    await list();
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    // The log grows when the game is reopened and played, so the next listing replays again.
+    const actor = await app.host.open(game.id);
+    await actor.submit({ kind: 'setMode', mode: 'fast-forward' });
+    await app.host.close(game.id);
+    await list();
+    expect(spy).toHaveBeenCalledTimes(2);
     await app.server.close();
   });
 });

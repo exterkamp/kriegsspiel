@@ -217,6 +217,11 @@ export interface GameLimits {
   idleMs: number;
   /** How often the server looks for finished and idle games to close. 0 turns the sweep off. */
   sweepEveryMs: number;
+  /**
+   * A finished game nobody is connected to is closed once it has been quiet this long (wall ms), so
+   * a viewer whose socket is between the upgrade check and `hub.attach` never meets a closed game.
+   */
+  finishedGraceMs: number;
 }
 
 export const DEFAULT_GAME_LIMITS: GameLimits = {
@@ -224,6 +229,7 @@ export const DEFAULT_GAME_LIMITS: GameLimits = {
   perGuest: 3,
   idleMs: 24 * 3_600_000,
   sweepEveryMs: 60_000,
+  finishedGraceMs: 30_000,
 };
 
 export interface App {
@@ -608,7 +614,10 @@ export async function buildApp(options: AppOptions): Promise<App> {
    * Replay results for games that are not open, by game id. A replay only changes when the log
    * grows, so `GET /games` replays a stored game once, not on every call (#262).
    */
-  const replayed = new Map<string, { entries: number; tl: ReturnType<typeof replayTimeline> }>();
+  const replayed = new Map<
+    string,
+    { entries: number; outcome: ReturnType<typeof replayTimeline>['outcome']; endMs: number }
+  >();
 
   /** Where a started game stands: over or not, its game time and when it was last played (wall time). */
   const progressOf = async (
@@ -626,6 +635,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     const lastPlayedMs = input?.entries.reduce((m, e) => Math.max(m, e.wallMs), rec.createdAtMs);
     const live = host.get(rec.id);
     if (live) {
+      replayed.delete(rec.id);
       return {
         finished: Boolean(live.state.world.outcome),
         ...(live.state.world.outcome ? { winner: live.state.world.outcome.winner } : {}),
@@ -637,14 +647,14 @@ export async function buildApp(options: AppOptions): Promise<App> {
     try {
       let hit = replayed.get(rec.id);
       if (hit?.entries !== input.entries.length) {
-        hit = { entries: input.entries.length, tl: replayTimeline(input) };
+        const tl = replayTimeline(input);
+        hit = { entries: input.entries.length, outcome: tl.outcome, endMs: tl.endMs };
         replayed.set(rec.id, hit);
       }
-      const tl = hit.tl;
       return {
-        finished: Boolean(tl.outcome),
-        ...(tl.outcome ? { winner: tl.outcome.winner } : {}),
-        gameTimeMs: tl.endMs,
+        finished: Boolean(hit.outcome),
+        ...(hit.outcome ? { winner: hit.outcome.winner } : {}),
+        gameTimeMs: hit.endMs,
         lastPlayedMs: lastPlayedMs ?? rec.createdAtMs,
       };
     } catch {
@@ -965,9 +975,10 @@ export async function buildApp(options: AppOptions): Promise<App> {
         lastActive.set(id, now);
         continue;
       }
-      const over = Boolean(host.get(id)?.state.world.outcome);
-      const idle = now - (lastActive.get(id) ?? now) >= limits.idleMs;
       if (!lastActive.has(id)) lastActive.set(id, now);
+      const quietMs = now - lastActive.get(id)!;
+      const over = Boolean(host.get(id)?.state.world.outcome) && quietMs >= limits.finishedGraceMs;
+      const idle = quietMs >= limits.idleMs;
       if (!over && !idle) continue;
       try {
         await host.close(id);
