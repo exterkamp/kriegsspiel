@@ -379,11 +379,87 @@ describe('GameConnection', () => {
     expect(statuses).toContain('open');
   });
 
+  it('gives up after the time limit and retries by hand', () => {
+    let clock = 0;
+    const sockets: FakeSocket[] = [];
+    const timers: Array<{ fn: () => void; ms: number }> = [];
+    const statuses: string[] = [];
+    const conn = new GameConnection({
+      url: 'ws://x',
+      onMessage: () => {},
+      onStatus: (s) => statuses.push(s),
+      createSocket: () => (sockets.push(new FakeSocket()), sockets.at(-1)!),
+      setTimer: (fn, ms) => timers.push({ fn, ms }),
+      clearTimer: () => {},
+      now: () => clock,
+      giveUpAfterMs: 10_000,
+    });
+    conn.start();
+    sockets[0]!.close();
+    expect(statuses.at(-1)).toBe('closed');
+    clock = 9_000;
+    timers.at(-1)!.fn();
+    sockets[1]!.close();
+    expect(statuses.at(-1)).toBe('closed');
+    clock = 10_000;
+    timers.at(-1)!.fn();
+    sockets[2]!.close();
+    expect(statuses.at(-1)).toBe('failed');
+    const scheduled = timers.length;
+    expect(scheduled).toBe(2);
+    conn.retry();
+    expect(sockets).toHaveLength(4);
+    expect(statuses.at(-1)).toBe('connecting');
+    sockets[3]!.close();
+    expect(statuses.at(-1)).toBe('closed');
+    expect(timers.at(-1)!.ms).toBe(500);
+  });
+
+  it('stops reconnecting once the server says the game is closed', () => {
+    const { conn, sockets, timers, statuses } = setup();
+    conn.start();
+    sockets[0]!.open();
+    sockets[0]!.onmessage?.({
+      data: JSON.stringify({ v, kind: 'error', code: 'game_closed', message: 'gone' }),
+    });
+    sockets[0]!.close();
+    expect(statuses.at(-1)).toBe('failed');
+    expect(timers).toHaveLength(0);
+  });
+
   it('does not reconnect after stop()', () => {
     const { conn, timers } = setup();
     conn.start();
     conn.stop();
     expect(timers).toHaveLength(0);
+  });
+});
+
+describe('clock anchors', () => {
+  const running = (gameMsAtAnchor: number) => ({
+    v,
+    kind: 'clockState' as const,
+    clock: { gameMsAtAnchor, wallMsAtAnchor: 1, rate: 10, status: 'running' as const },
+  });
+
+  it('never steps back when a later update carries an older anchor while running', () => {
+    let s = applyServerMessage(initialState, running(1000), 1000);
+    // 100 ms later the display is at 2000; an update anchored at 1500 must not pull it back.
+    s = applyServerMessage(s, running(1500), 1100);
+    expect(gameNowMs(s.clock!, 1100)).toBe(2000);
+    expect(gameNowMs(s.clock!, 1200)).toBe(3000);
+  });
+
+  it('takes a later anchor, and any anchor after a pause', () => {
+    let s = applyServerMessage(initialState, running(1000), 1000);
+    s = applyServerMessage(s, running(5000), 1100);
+    expect(gameNowMs(s.clock!, 1100)).toBe(5000);
+    s = applyServerMessage(
+      s,
+      { ...running(10), clock: { ...running(10).clock, status: 'paused' } },
+      1200,
+    );
+    expect(gameNowMs(s.clock!, 1300)).toBe(10);
   });
 });
 
