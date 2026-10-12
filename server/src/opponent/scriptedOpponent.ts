@@ -134,7 +134,6 @@ const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
 const rawPoint = (p: Point) => `(${Math.round(p.x)}, ${Math.round(p.y)})`;
 
-
 function hashSide(side: string): number {
   let h = 0;
   for (const ch of side) h = (Math.imul(h, 31) + ch.charCodeAt(0)) | 0;

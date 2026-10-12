@@ -17,7 +17,11 @@ th[scope='row'] {
   border: none;
   padding: 0;
   min-height: 0;
+  text-align: left;
   text-decoration: underline;
+}
+.when {
+  white-space: nowrap;
 }
 .unknown {
   font-style: italic;

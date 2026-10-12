@@ -334,10 +334,11 @@ describe('OrdersDeskComponent', () => {
     expect(t.el.querySelector('.notices')).toBeNull();
   });
 
-  it('disables the form once the game is over and signs nothing', async () => {
+  it('hides the form once the game is over, so nothing can be signed', async () => {
     const t = await open(undefined, { gameOver: { winner: 'blue', reason: 'x', atGame: 1 } });
-    expect(t.q<HTMLButtonElement>('#order-sign').disabled).toBe(true);
-    expect(t.q<HTMLTextAreaElement>('#desk-order-text').disabled).toBe(true);
+    expect(t.el.querySelector('#order-sign')).toBeNull();
+    expect(t.el.querySelector('#desk-order-text')).toBeNull();
+    expect(t.el.querySelector('#orders-closed')?.textContent).toContain('game is over');
   });
 
   it('drops an annex arrow that has since gone from the table', async () => {

@@ -185,6 +185,14 @@ import { MarksService, type Picker } from './marks.service';
       height: 100%;
       touch-action: none;
       font-family: var(--ks-font);
+      /* Keep the map's south edge, and a courier's label near it, clear of the desk bar (#364). */
+      box-sizing: border-box;
+      padding-bottom: 3.5rem;
+    }
+    @media (max-width: 600px) {
+      svg {
+        padding-bottom: 8.5rem;
+      }
     }
     .ground {
       fill: var(--ks-map-ground);

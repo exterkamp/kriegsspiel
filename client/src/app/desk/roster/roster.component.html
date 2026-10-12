@@ -34,7 +34,7 @@
           <td [class.unknown]="r.morale === undefined">
             {{ r.morale === undefined ? 'unknown' : r.morale + '%' }}
           </td>
-          <td>
+          <td class="when">
             {{ formatGameTime(r.reportedAt) }}
             <small class="age"
               >{{ formatAgeOld(r.ageMs)

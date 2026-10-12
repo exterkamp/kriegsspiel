@@ -1,4 +1,10 @@
-import { describePlace, featureAnchor, polygonCentroid, type GameState, type SideId } from '@kriegsspiel/engine';
+import {
+  describePlace,
+  featureAnchor,
+  polygonCentroid,
+  type GameState,
+  type SideId,
+} from '@kriegsspiel/engine';
 import type { OrderParser } from '../orders/index.js';
 import { hiddenTerms } from '../umpire/leakGuard.js';
 import type { UmpireClient } from '../umpire/umpireClient.js';
