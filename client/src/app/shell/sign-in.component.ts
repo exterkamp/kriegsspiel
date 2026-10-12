@@ -28,7 +28,13 @@ import { PageFrameComponent } from '../ui/page-frame.component';
             (input)="email.set($any($event.target).value)"
         /></label>
         <button type="submit" [disabled]="busy()">Send me a login link</button>
-        <p role="status" class="ks-status" [class.ks-error]="failed()" [class.err]="failed()" [hidden]="!message()">
+        <p
+          role="status"
+          class="ks-status"
+          [class.ks-error]="failed()"
+          [class.err]="failed()"
+          [hidden]="!message()"
+        >
           {{ message() }}
         </p>
       </form>

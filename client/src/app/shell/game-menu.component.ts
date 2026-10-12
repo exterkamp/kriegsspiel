@@ -47,6 +47,13 @@ import { ModalComponent } from '../ui/modal.component';
       font-size: var(--ks-text-sm);
       padding: 6px 12px;
     }
+    @media (max-width: 600px) {
+      .open {
+        left: auto;
+        right: var(--ks-space-2);
+        transform: none;
+      }
+    }
     .note {
       margin: 0;
       font-size: var(--ks-text-sm);

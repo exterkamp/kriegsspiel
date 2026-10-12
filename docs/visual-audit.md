@@ -1,6 +1,6 @@
 # Visual consistency audit (#327)
 
-Taken before the design system, at 1280x800 and 390x844, with `devrun` and headless Chromium. The screenshots are on the `pr-screenshots` branch under `327/before-*` (linked from the PR). Pages: sign-in, main menu (with Developer tools), New game, Your games, game table, in-tray, orders desk, order of battle, journal, staff conference, admin. The map tools (#308) are excluded.
+Taken before the design system, at 1280x800 and 390x844, with `devrun` and headless Chromium. The screenshots are on the `pr-screenshots` branch (commit `80bf138406a3c9c438cfb9f19a120d7bf60b2461`) under `327/before-*-d.png` and `-m.png` (desktop, mobile); the same pages after the change are `327/after-*`. The `06-styleguide` before shot is the menu, since the route did not exist. Pages: sign-in, main menu (with Developer tools), New game, Your games, game table, in-tray, orders desk, order of battle, journal, staff conference, admin. The map tools (#308) are excluded.
 
 ## Findings
 
