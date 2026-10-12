@@ -56,6 +56,7 @@ export function applyIntents(
   time: GameTime,
   orderId: string,
 ): HandlerResult<GameState> {
+  if (world.outcome) return { world }; // the game is over: nothing moves
   const carried = unit.standing ?? [];
   const added: StandingOrder[] = intents.filter(isConditional).map((i, n) => ({
     id: `${orderId}#${carried.length + n}`,
