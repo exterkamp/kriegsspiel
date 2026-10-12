@@ -17,7 +17,9 @@ import {
   type PauseProposal,
   type ServerMessage,
 } from '@kriegsspiel/protocol';
+import { Buffer } from 'node:buffer';
 import type { GameActor, GameStore } from '../game/index.js';
+import { NOOP_TRACE, traceRequest, type TraceSink } from '../debug/trace.js';
 import type { PauseTransition } from '../pause.js';
 import { DraftBook, DraftError } from '../drafts/book.js';
 import { StaffDesk } from './conference.js';
@@ -107,6 +109,9 @@ export class Hub {
       list(gameId: string): readonly Forward[];
       add(gameId: string, forward: Forward): void;
     } = { list: () => [], add: () => undefined },
+    /** Debug trace (#198): each message is handled inside `traceRequest`, so the commands and
+     * LLM calls it causes share its correlation id and the admin Requests panel has rows. */
+    private readonly trace: TraceSink = NOOP_TRACE,
   ) {}
 
   /** Forwards per game, read from the lobby record once and kept in step by `handleForward`. */
@@ -638,7 +643,47 @@ export class Hub {
     }
   }
 
+  /**
+   * Handle one inbound message inside `traceRequest` (#198), so the admin Requests panel has a
+   * row for it and everything it causes (commands, engine events, LLM calls) shares its
+   * correlation id. Response bytes are what this connection is sent while the message is handled.
+   */
   private async handle(
+    gameId: string,
+    conn: Connection,
+    data: unknown,
+    isBinary: boolean,
+  ): Promise<void> {
+    if (!this.trace.enabled) return this.handleMessage(gameId, conn, data, isBinary);
+    const text = isBinary ? '' : String(data);
+    const parsed = isBinary ? undefined : parseCommand(text);
+    const method = isBinary ? 'binary' : parsed?.ok ? parsed.value.kind : 'bad_message';
+    let responseBytes = 0;
+    const socket = conn.socket;
+    const send = socket.send.bind(socket);
+    socket.send = (data: string) => {
+      responseBytes += Buffer.byteLength(data);
+      send(data);
+    };
+    try {
+      await traceRequest(
+        this.trace,
+        gameId,
+        {
+          transport: 'ws',
+          method,
+          path: `/games/${gameId}/ws`,
+          ...(isBinary ? {} : { bytes: Buffer.byteLength(text) }),
+        },
+        async () => this.handleMessage(gameId, conn, data, isBinary),
+        { responseBytes: () => responseBytes },
+      );
+    } finally {
+      socket.send = send;
+    }
+  }
+
+  private async handleMessage(
     gameId: string,
     conn: Connection,
     data: unknown,
