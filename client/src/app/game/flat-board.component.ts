@@ -39,7 +39,7 @@ import { MarksService, type Picker } from './marks.service';
   template: `
     <svg
       #svg
-      role="img"
+      role="application"
       aria-label="Flat map board"
       preserveAspectRatio="xMidYMid meet"
       [attr.viewBox]="'0 0 ' + map.width + ' ' + map.height"
@@ -185,8 +185,7 @@ import { MarksService, type Picker } from './marks.service';
     polygon.marsh {
       fill: var(--ks-map-marsh);
     }
-    polygon.water,
-    polygon.field {
+    polygon.water {
       fill: var(--ks-map-water);
     }
     polygon.field {
