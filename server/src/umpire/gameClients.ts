@@ -3,7 +3,11 @@ import { LlmOrderParser } from '../orders/llmParser.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import type { UmpireClient } from './index.js';
 
-/** One umpire client per game, made on first use and dropped when the game ends or is closed. */
+/**
+ * One umpire client per game, made on first use and dropped when the game ends or is closed.
+ * A finished game reloaded after a restart gets a fresh client that nothing evicts until it is
+ * closed, so the leak is bounded to finished games per process, not unbounded.
+ */
 export class GameClients<C extends UmpireClient> {
   private readonly clients = new Map<string, C>();
 
@@ -21,10 +25,6 @@ export class GameClients<C extends UmpireClient> {
   /** Forget a game's client. Safe to call twice or for a game that never had one. */
   evict(gameId: string): void {
     this.clients.delete(gameId);
-  }
-
-  get size(): number {
-    return this.clients.size;
   }
 }
 

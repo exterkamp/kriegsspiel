@@ -15,12 +15,14 @@ describe('GameClients', () => {
     const a = clients.get('a');
     expect(clients.get('a')).toBe(a);
     clients.get('b');
-    expect(clients.size).toBe(2);
+    expect(made).toBe(2);
     clients.evict('a');
     clients.evict('a');
     clients.evict('never');
-    expect(clients.size).toBe(1);
+    expect(made).toBe(2);
     expect(clients.get('a')).not.toBe(a);
+    expect(made).toBe(3);
+    clients.get('b');
     expect(made).toBe(3);
   });
 });
