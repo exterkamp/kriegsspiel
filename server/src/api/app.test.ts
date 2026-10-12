@@ -1092,6 +1092,8 @@ describe('SPA fallback for the Angular client', () => {
         '/admin/games/3',
         '/admin/apix',
         '/map-authoring',
+        '/map-table',
+        '/map-table?x=1',
         '/map-benchmark?x=1',
       ]) {
         const res = await server.inject(url);
@@ -1106,6 +1108,8 @@ describe('SPA fallback for the Angular client', () => {
         '/auth/nope',
         '/other',
         '/administrator',
+        '/map-table-other',
+        '/__local/maps',
       ]) {
         const res = await server.inject(url);
         expect(res.statusCode, url).toBe(404);
@@ -1126,6 +1130,15 @@ describe('SPA fallback for the Angular client', () => {
       const map = await server.inject('/map-authoring.html?a=1');
       expect(map.statusCode).toBe(301);
       expect(map.headers.location).toBe('/map-authoring?a=1');
+      const inspector = await server.inject('/map-table.html?inspection=1');
+      expect(inspector.statusCode).toBe(301);
+      expect(inspector.headers.location).toBe('/map-table?inspection=1');
+      expect(
+        (await server.inject({ method: 'HEAD', url: '/map-table.html?x=1' })).headers.location,
+      ).toBe('/map-table?x=1');
+      expect(
+        (await server.inject({ method: 'POST', url: '/map-table.html', payload: {} })).statusCode,
+      ).toBe(404);
       expect((await server.inject('/map-benchmark.html')).headers.location).toBe('/map-benchmark');
       expect((await server.inject('/admin/index.html?x=1')).headers.location).toBe('/admin?x=1');
       expect((await server.inject('/table-benchmark.html')).headers.location).toBe(

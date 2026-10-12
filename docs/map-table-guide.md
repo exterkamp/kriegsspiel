@@ -2,11 +2,13 @@
 
 Open `/map-authoring.html` in the local client, choose a preset, and generate it. Wait for a validated result and export its **JSON**. The JSON preserves geography, settings, seed and provenance; an SVG or screenshot cannot be loaded as a map.
 
-Open `/map-table.html` on the same local client. Select the exported JSON and wait for validation and preparation to finish. The displayed map information identifies the accepted map and its metre extent. The page validates saved composition independently; it does not regenerate the map.
+Open `/map-table` on the same local client (`/map-table.html` redirects here). Select the exported JSON and wait for validation and preparation to finish. The displayed map information identifies the accepted map and its metre extent. The page validates saved composition independently; it does not regenerate the map.
 
 Use **Fit map**, **Top-down** and **Oblique** to inspect the paper. Scroll to zoom, drag to orbit and right-drag to pan. For keyboard panning, focus the map and use plain arrow keys. On touch devices, one finger orbits and two fingers pan and zoom. Compare settlements, terrain, roads and crossings with the authoring preview. Loading another valid JSON replaces the paper and fits the new map. A failed or cancelled load retains the previous display when it remains usable; its information continues to identify that previous map.
 
 The table is flat and shows public static geography. It has no armies, orders, marks, objectives or live game connection. Reload starts empty. Keep the exported JSON to load it again.
+
+The inspector is a standalone Angular page: template bindings and signals show load state, accepted metadata and controls. A component-scoped service owns its scene, certification loader, observer and window listeners. Leaving the route releases them; a browser back/forward-cache suspension stops rendering and cancels work, then restores the retained display on return. The route is independent of the main menu, guest login and live games.
 
 ## Detail limits
 
@@ -14,7 +16,7 @@ The paper uses a whole-map raster, up to 4096 pixels on its longest side and lim
 
 ## Local development
 
-Follow `AGENTS.md` and use `devrun` to start the client. Obtain its allocated URL with `devrun url`; append `/map-authoring.html` or `/map-table.html`. Preserve other running previews and checkouts.
+Follow `AGENTS.md` and use `devrun` to start the client. Obtain its allocated URL with `devrun url`; append `/map-authoring` or `/map-table`. Preserve other running previews and checkouts.
 
 For a reproducible saved map, build the maps workspace and export through the existing CLI:
 
