@@ -474,3 +474,13 @@ Removed with it: all `.svelte` and test files under `client/src/hq`, the `fixtur
 **Scope.** This packet delivers services and minimal render/session contracts; no local route or setup/board UI is exposed yet. Future native Angular components own these lifetimes. There is no simulation, production storage, scenario conversion or session resume, and existing live routing remains unchanged.
 
 **See.** [Angular initialization guide](game-initialization-angular-guide.md), [Development catalog](dev-map-catalog.md), [Angular landing plan](game-initialization-angular-landing-plan.md).
+
+## D32: Native local map setup owns state separately from its preview
+
+**Decision.** Implement local saved-map selection, complete-recipe generation, canonical saving, Start and Cancel as an Angular `OnPush` component with signals and native template events. Its state lifetime is independent of its canvas preview, so Angular canvas replacement preserves draft and pending work while retiring old display handles. No imperative page mount, Svelte component or HQ shell is restored.
+
+**Ownership.** Operations capture their current owner before invoking ports and reject stale completion. Start is locked before awaiting its callback and requires a current certified saved map; save retry preserves exact canonical bytes. Cancellation and destruction invalidate immediately, and awaitable teardown settles owned preparation before another owner starts. Start's callback promise is excluded from teardown so the parent can replace setup inside that callback.
+
+**Boundary.** This packet provides the isolated component and tests, without an application route, session replacement or personal storage. The forthcoming development route composes it with a certified board and scoped personal state. Existing menu/auth/guest/scenario/live flows remain upstream-owned; simulation, production storage, conversion and resume remain excluded.
+
+**See.** [Angular initialization guide](game-initialization-angular-guide.md), [Angular landing plan](game-initialization-angular-landing-plan.md).
