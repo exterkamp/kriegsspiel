@@ -73,6 +73,11 @@ import { GameService } from './game.service';
     summary {
       cursor: pointer;
     }
+    @media (max-width: 600px) {
+      .note {
+        bottom: 9rem;
+      }
+    }
   `,
 })
 export class WebglFallbackComponent {

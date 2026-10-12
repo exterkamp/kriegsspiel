@@ -312,7 +312,7 @@ export class FlatBoardComponent {
       .map((mark: Mark) => ({ mark, fade: markAgeFactor(mark.madeAtGame, now) }));
   });
   protected readonly tags = computed(() => {
-    const h = this.fontSize * 1.2;
+    const h = this.fontSize * 1.5;
     const below = (
       p: { position: { x: number; y: number } },
       id: string,
