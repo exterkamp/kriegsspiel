@@ -17,6 +17,7 @@ import {
   issueMove,
   loadScenario,
   pointMm,
+  positionAt,
   registerCombat,
   registerMovement,
   serialize,
@@ -25,7 +26,9 @@ import {
   type EngineState,
   type GameState,
 } from './index.js';
-import { evaluateVictory } from './combat.js';
+import { BATTLE_CLOSE_MS, forceBroken, evaluateVictory } from './combat.js';
+import { viewFor } from './index.js';
+import type { BattleRuling } from './types.js';
 import { polygonCentroid } from './geometry.js';
 import { river, wood } from './scenario.testkit.js';
 
@@ -374,8 +377,12 @@ describe('morale and withdrawal', () => {
     expect(blue.status).toBe('withdrawn');
     expect(blue.morale).toBeLessThan(BREAK_MORALE);
     expect(blue.center).toEqual(T(0, 4));
-    // No more shooting once it has broken.
-    expect(ofType(emitted, 'combat.fire').filter((e) => e.time > COMBAT_TICK_MS)).toEqual([]);
+    // It does not shoot once it has broken (the enemy may still fire on it as it runs).
+    expect(
+      ofType(emitted, 'combat.fire').filter(
+        (e) => e.time > COMBAT_TICK_MS && (e.payload as { attacker: string }).attacker === 'blue-1',
+      ),
+    ).toEqual([]);
   });
 
   it('refuses orders for a withdrawn unit', () => {
@@ -401,7 +408,7 @@ describe('victory conditions', () => {
     const { state, emitted } = run(s, 30);
     expect(ofType(emitted, 'game.end')).toEqual([
       {
-        time: 2 * MS_PER_MINUTE,
+        time: 12 * MS_PER_MINUTE,
         type: 'game.end',
         payload: { winner: 'red', reason: 'objective-taken' },
       },
@@ -409,8 +416,67 @@ describe('victory conditions', () => {
     expect(state.world.outcome).toEqual({
       winner: 'red',
       reason: 'objective-taken',
-      time: 2 * MS_PER_MINUTE,
+      time: 12 * MS_PER_MINUTE,
     });
+  });
+
+  it('does not give the objective for arriving: it must be held 10 minutes', () => {
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'red-1', side: 'red', x: 3, y: 2 },
+    ]);
+    s = issueMove(s, 'red-1', T(5, 2));
+    const nearly = run(s, 11);
+    expect(nearly.state.world.outcome).toBeNull();
+    expect(nearly.state.world.heldSince).toBe(2 * MS_PER_MINUTE);
+    expect(run(s, 12).state.world.outcome).toMatchObject({ reason: 'objective-taken' });
+  });
+
+  it('starts the hold again when the attacker leaves the objective', () => {
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'red-1', side: 'red', x: 3, y: 2 },
+    ]);
+    s = issueMove(s, 'red-1', T(5, 2));
+    s = run(s, 6).state;
+    expect(s.world.heldSince).toBe(2 * MS_PER_MINUTE);
+    s = run(issueMove(s, 'red-1', T(3, 2)), 3).state;
+    expect(s.world.heldSince).toBeNull();
+    s = issueMove(s, 'red-1', T(5, 2));
+    const back = run(s, 5);
+    expect(back.state.world.outcome).toBeNull();
+    expect(back.state.world.heldSince).not.toBeNull();
+  });
+
+  it('stops every unit where it stands when the game ends, and nothing moves after', () => {
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'red-1', side: 'red', x: 3, y: 2 },
+      { id: 'red-2', side: 'red', kind: 'artillery', x: 1, y: 4 },
+    ]);
+    s = issueMove(s, 'red-1', T(5, 2));
+    s = issueMove(s, 'red-2', T(9, 0)); // a slow gun on a long leg: still marching when red-1 wins
+    // The same march with red-1 left idle, so the game does not end: where red-2 is at minute 12.
+    const noWin = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'red-1', side: 'red', x: 3, y: 2 },
+      { id: 'red-2', side: 'red', kind: 'artillery', x: 1, y: 4 },
+    ]);
+    const marching = run(issueMove(noWin, 'red-2', T(9, 0)), 12).state;
+    expect(unit(marching, 'red-2').leg).toBeTruthy();
+    const end = run(s, 30);
+    const outcome = end.state.world.outcome!;
+    expect(outcome).toMatchObject({ reason: 'objective-taken', time: 12 * MS_PER_MINUTE });
+    // red-2 was mid-leg at minute 12, so it is frozen where it was then, not at its destination.
+    const red2 = unit(end.state, 'red-2');
+    const expected = positionAt(marching.world.map, unit(marching, 'red-2'), outcome.time);
+    expect(red2.center).toEqual(expected);
+    expect(red2.center).not.toEqual(T(9, 0));
+    expect(end.state.world.units.every((u) => u.intent.kind === 'idle' && !u.leg)).toBe(true);
+    const frozen = end.state.world.units.map((u) => [u.id, u.center, u.intent]);
+    const later = run(issueMove(end.state, 'red-2', T(9, 4)), 60);
+    expect(later.state.world.units.map((u) => [u.id, u.center, u.intent])).toEqual(frozen);
+    expect(later.emitted).toEqual([]);
   });
 
   it('defender wins by keeping the attacker off the objective until the time is up', () => {
@@ -457,7 +523,7 @@ describe('victory conditions', () => {
     expect(ofType(emitted, 'unit.destroyed')).toHaveLength(1);
     expect(ofType(emitted, 'game.end')[0]!.payload).toEqual({
       winner: 'red',
-      reason: 'eliminated',
+      reason: 'defence-broken',
     });
   });
 
@@ -469,7 +535,10 @@ describe('victory conditions', () => {
       ]),
       10,
     );
-    expect(ofType(emitted, 'game.end')[0]!.payload).toEqual({ winner: 'red', reason: 'withdrawn' });
+    expect(ofType(emitted, 'game.end')[0]!.payload).toEqual({
+      winner: 'red',
+      reason: 'defence-broken',
+    });
   });
 
   it('a side already past its hold time fires the deadline at once instead of throwing', () => {
@@ -533,7 +602,8 @@ describe('Hold the Bridge', () => {
       return run(s, 200);
     };
     const a = play();
-    expect(a.state.world.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
+    expect(a.state.world.outcome).toMatchObject({ winner: 'blue', reason: 'attack-broken' });
+    expect(a.state.world.rulings).toHaveLength(1);
     expect(ofType(a.emitted, 'game.end')).toHaveLength(1);
     expect(ofType(a.emitted, 'combat.fire').length).toBeGreaterThan(0);
     expect(a.emitted).toEqual(play().emitted);
@@ -584,6 +654,28 @@ describe('fire by range', () => {
     const far = firstVolley(at(2))['blue-1>red-1']!;
     expect(close.die).toBe(far.die); // same seed, same roll: only the range differs
     expect(close.casualties / far.casualties).toBeCloseTo(0.625 / 0.25, 1);
+  });
+
+  it('hits a routed unit three times as hard as one standing', () => {
+    const standing = firstVolley(at(1))['blue-1>red-1']!;
+    // A second red unit stays active, far off, so the routed one's side has not simply left the field.
+    const fleeing = field([
+      { id: 'blue-1', side: 'blue', x: 0, y: 4, facingDeg: facing.blue },
+      { id: 'red-1', side: 'red', x: 1, y: 4, facingDeg: facing.red },
+      { id: 'red-2', side: 'red', x: 9, y: 0 },
+    ]);
+    const routedWorld = {
+      ...fleeing,
+      world: {
+        ...fleeing.world,
+        units: fleeing.world.units.map((u) =>
+          u.id === 'red-1' ? { ...u, status: 'withdrawn' as const, brokenAt: 0 } : u,
+        ),
+      },
+    };
+    const run2 = firstVolley(routedWorld)['blue-1>red-1']!;
+    expect(run2.die).toBe(standing.die);
+    expect(run2.casualties / standing.casualties).toBeCloseTo(3, 1);
   });
 
   it('reports the distance in metres', () => {
@@ -697,24 +789,30 @@ describe('objective area', () => {
       { id: 'blue-1', side: 'blue', x: 9, y: 4 },
       { id: 'red-1', side: 'red', x: 0, y: 0 },
     ]);
-    return place(s, 'red-1', x, y).world;
+    return { ...place(s, 'red-1', x, y).world, heldSince: 0 };
   };
+  const TAKEN = 10 * MS_PER_MINUTE;
 
   it('is held by a unit whose centre is inside the area, corners included', () => {
-    expect(evaluateVictory(holder(550, 250), 0)).toMatchObject({ winner: 'red' });
-    expect(evaluateVictory(holder(579, 221), 0)).toMatchObject({ winner: 'red' });
-    expect(evaluateVictory(holder(580, 280), 0)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(holder(550, 250), TAKEN)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(holder(579, 221), TAKEN)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(holder(580, 280), TAKEN)).toMatchObject({ winner: 'red' });
+  });
+
+  it('is not taken before the hold time is up, and not at all if it was never started', () => {
+    expect(evaluateVictory(holder(550, 250), TAKEN - 1)).toBeNull();
+    expect(evaluateVictory({ ...holder(550, 250), heldSince: null }, TAKEN)).toBeNull();
   });
 
   it('is not held from outside the area, even a few metres off', () => {
-    expect(evaluateVictory(holder(585, 250), 0)).toBeNull();
-    expect(evaluateVictory(holder(550, 215), 0)).toBeNull();
+    expect(evaluateVictory(holder(585, 250), TAKEN)).toBeNull();
+    expect(evaluateVictory(holder(550, 215), TAKEN)).toBeNull();
   });
 
   it('is not round: the same distance from the centre can be in or out', () => {
     // 36 m from the centre along the diagonal is in the square's corner region; 36 m east is out.
-    expect(evaluateVictory(holder(550 + 29, 250 + 29), 0)).toMatchObject({ winner: 'red' });
-    expect(evaluateVictory(holder(550 + 36, 250), 0)).toBeNull();
+    expect(evaluateVictory(holder(550 + 29, 250 + 29), TAKEN)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(holder(550 + 36, 250), TAKEN)).toBeNull();
   });
 
   it('does not count the defender holding it jointly with the attacker', () => {
@@ -723,6 +821,133 @@ describe('objective area', () => {
       ...w,
       units: w.units.map((u) => (u.id === 'blue-1' ? { ...u, center: pointMm(560, 250) } : u)),
     };
-    expect(evaluateVictory(both, 0)).toBeNull();
+    expect(evaluateVictory(both, TAKEN)).toBeNull();
+  });
+});
+
+describe('a decided battle (#315)', () => {
+  /** A field with Red's units spread far from Blue's, then `edit` applied to the units. */
+  function quiet(edit: (u: GameState['units'][number]) => GameState['units'][number]) {
+    const s = field([
+      { id: 'blue-1', side: 'blue', x: 1, y: 4 },
+      { id: 'red-1', side: 'red', x: 9, y: 0 },
+      { id: 'red-2', side: 'red', x: 8, y: 0 },
+    ]);
+    return { ...s, world: { ...s.world, units: s.world.units.map(edit) } };
+  }
+  const routed = (u: GameState['units'][number]) => ({
+    ...u,
+    status: 'withdrawn' as const,
+    brokenAt: 0,
+  });
+
+  it('declares a broken attack, tells both sides, and closes the game after the pursuit', () => {
+    const s = quiet((u) =>
+      u.id === 'red-1' ? routed(u) : u.id === 'red-2' ? { ...u, strength: 90, morale: 50 } : u,
+    );
+    expect(forceBroken(s.world, 'red')).toBe(true);
+    expect(forceBroken(s.world, 'blue')).toBe(false);
+    const early = run(s, 5);
+    expect(early.state.world.outcome).toBeNull();
+    const rulings = early.state.world.rulings as BattleRuling[];
+    expect(rulings).toHaveLength(1);
+    expect(rulings[0]).toMatchObject({ kind: 'battle', winner: 'blue', loser: 'red' });
+    expect(ofType(early.emitted, 'umpire.ruling')).toHaveLength(1);
+    // Both sides hear it, in the same words, with no figure in them.
+    for (const side of ['blue', 'red'] as const) {
+      const note = viewFor(early.state.world, side, early.state.time).reports.find(
+        (r) => r.kind === 'battle',
+      );
+      expect(note?.text).toBe(rulings[0]!.narrative);
+      expect(note?.text).not.toMatch(/\d/);
+    }
+    const end = run(early.state, BATTLE_CLOSE_MS / MS_PER_MINUTE);
+    expect(end.state.world.outcome).toMatchObject({ winner: 'blue', reason: 'attack-broken' });
+    expect(ofType(end.emitted, 'game.end')).toHaveLength(1);
+  });
+
+  it('declares a broken defence as a win for the attacker', () => {
+    const s = field([
+      { id: 'blue-1', side: 'blue', x: 1, y: 4, strength: 40 },
+      { id: 'blue-2', side: 'blue', x: 1, y: 3 },
+      { id: 'red-1', side: 'red', x: 9, y: 0 },
+    ]);
+    const w = {
+      ...s.world,
+      units: s.world.units.map((u) => (u.id === 'blue-2' ? routed(u) : u)),
+    };
+    const { state } = run({ ...s, world: w }, 2);
+    expect((state.world.rulings[0] as BattleRuling).reason).toBe('defence-broken');
+    expect(state.world.battle?.winner).toBe('red');
+  });
+
+  it('does not declare while the force still has its strength, or before anyone has broken', () => {
+    const fresh = quiet((u) => u);
+    expect(run(fresh, 30).state.world.rulings).toHaveLength(0);
+    const hurt = quiet((u) => (u.id === 'red-2' ? { ...u, strength: 30, morale: 30 } : u));
+    // Nothing has broken or been destroyed yet: a thin line is still a line.
+    expect(forceBroken(hurt.world, 'red')).toBe(false);
+    const oneGone = quiet((u) => (u.id === 'red-1' ? routed(u) : u));
+    expect(forceBroken(oneGone.world, 'red')).toBe(false);
+  });
+
+  it('needs a lost unit as well as a low share: a tired line that is all still fighting is not broken', () => {
+    const tired = quiet((u) => (u.side === 'red' ? { ...u, strength: 60, morale: 40 } : u));
+    // Every red unit is active, but the morale-weighted share is far under a quarter.
+    expect(
+      tired.world.units.filter((u) => u.side === 'red').every((u) => u.status === 'active'),
+    ).toBe(true);
+    expect(forceBroken(tired.world, 'red')).toBe(false);
+    const oneRouted = {
+      ...tired,
+      world: {
+        ...tired.world,
+        units: tired.world.units.map((u) => (u.id === 'red-1' ? routed(u) : u)),
+      },
+    };
+    expect(forceBroken(oneRouted.world, 'red')).toBe(true);
+    const oneDestroyed = {
+      ...tired,
+      world: {
+        ...tired.world,
+        units: tired.world.units.map((u) =>
+          u.id === 'red-1' ? { ...u, status: 'destroyed' as const } : u,
+        ),
+      },
+    };
+    expect(forceBroken(oneDestroyed.world, 'red')).toBe(true);
+  });
+
+  it('sends free cavalry after a unit that breaks, and rides it down', () => {
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 1, y: 4, strength: 100, morale: 30 },
+      { id: 'red-1', side: 'red', x: 2, y: 4 },
+      { id: 'red-3', side: 'red', kind: 'cavalry', x: 4, y: 3, strength: 300 },
+      { id: 'blue-2', side: 'blue', x: 9, y: 4 },
+    ]);
+    s = {
+      ...s,
+      world: {
+        ...s.world,
+        units: s.world.units.map((u) => (u.id === 'blue-1' ? { ...u, home: T(0, 0) } : u)),
+      },
+    };
+    const { state, emitted } = run(s, 40);
+    const broke = ofType(emitted, 'unit.broken').find(
+      (e) => (e.payload as { unitId: string }).unitId === 'blue-1',
+    )!;
+    const after = ofType(emitted, 'combat.fire').filter(
+      (e) =>
+        e.time > broke.time &&
+        (e.payload as { target: string; attacker: string }).target === 'blue-1' &&
+        (e.payload as { attacker: string }).attacker === 'red-3',
+    );
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.every((e) => (e.payload as { melee: boolean }).melee)).toBe(true);
+    expect(unit(state, 'blue-1').status).toBe('destroyed');
+    expect(ofType(emitted, 'unit.destroyed').length).toBeGreaterThan(0);
+    // The side that lost it is told.
+    const blueView = viewFor(state.world, 'blue', state.time);
+    expect(blueView.reports.some((r) => r.kind === 'unitLost')).toBe(true);
   });
 });

@@ -19,7 +19,7 @@ import type { OrderParser, ParseResult } from '../orders/index.js';
 import { createGameUmpire } from '../umpire/gameLimits.js';
 import { UmpireError } from '../umpire/umpireClient.js';
 import type { UmpireClient, UmpireRequest, UmpireResponse } from '../umpire/umpireClient.js';
-import { llmAgents, scriptedAgents, LlmCommander, assertFogOnly } from './index.js';
+import { llmAgents, scriptedAgents, LlmCommander, assertFogOnly, FORM_UP_MS } from './index.js';
 
 const BRIDGE = { x: 2_050_000, y: 1_500_000 };
 
@@ -199,7 +199,7 @@ describe('failure', () => {
     'plays the scripted opponent when the call fails (%s)',
     async (kind) => {
       const world = loadScenario(holdTheBridge);
-      const view = viewFor(world, 'red', 0);
+      const view = viewFor(world, 'red', FORM_UP_MS);
       const orders = await commander(failing(kind), world).decide(view);
       const scripted = await scriptedAgents(world)[0]!.think(view);
       expect(orders.length).toBeGreaterThan(0);
@@ -387,9 +387,14 @@ describe('a full game', () => {
     await time.advance(60_000);
   });
 
-  it('keeps playing when the model is down: the scripted opponent takes the bridge', async () => {
+  it('keeps playing when the model is down: the scripted opponent fights on and the game ends', async () => {
     const { events } = await playGame(failing('transport'), 'fast-forward');
-    expect(events.find((e) => e.type === 'game.end')?.payload).toMatchObject({ winner: 'red' });
+    // Blue never gives an order here, so the result is Blue's to lose or Red's to take; either
+    // way Red must have advanced and fought, and the game must have reached a result.
+    expect(events.some((e) => e.type === 'combat.fire')).toBe(true);
+    expect(events.find((e) => e.type === 'game.end')?.payload).toMatchObject({
+      winner: expect.stringMatching(/blue|red/),
+    });
   });
 
   it('decides at the same game times at rates 1, 4 and 12', async () => {

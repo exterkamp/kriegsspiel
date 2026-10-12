@@ -781,6 +781,12 @@ export class Hub {
       this.send(conn, error('not_implemented', `${command.kind} is not supported yet`));
       return;
     }
+    // The client disables the order box once the game ends, but the guarantee belongs here:
+    // an order queued into a finished game could still be parsed (at model cost) and logged.
+    if (game.state.world.outcome) {
+      this.send(conn, error('game_over', `${command.orderId}: the game has ended`));
+      return;
+    }
     if (command.text === undefined) {
       this.send(conn, error('not_implemented', 'order drafts are not supported yet; send text'));
       return;

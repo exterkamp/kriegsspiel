@@ -6,6 +6,8 @@ COPY packages ./packages
 COPY server ./server
 COPY client ./client
 COPY scripts ./scripts
+# Development helper is compiled by the root build, never copied into the runtime image.
+COPY tools ./tools
 COPY vendor/settlemaker ./vendor/settlemaker
 COPY vendor/settlemaker.snapshot.json ./vendor/settlemaker.snapshot.json
 COPY vendor/settlemaker-runtime.canonical.tgz ./vendor/settlemaker-runtime.canonical.tgz
@@ -22,7 +24,8 @@ ENV NODE_ENV=production \
     PORT=3000 \
     DB_PATH=/data/games.db \
     STATIC_DIR=/app/client/dist \
-    NODE_NO_WARNINGS=1
+    NODE_NO_WARNINGS=1 \
+    UMPIRE_KEYLESS_PROVIDER=test
 WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules

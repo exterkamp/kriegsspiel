@@ -1,4 +1,4 @@
-import { ATTACK_INTENT_EVENT, COMBAT_CHECK_EVENT, canReach } from './contact.js';
+import { ATTACK_INTENT_EVENT, COMBAT_CHECK_EVENT, canReach, pursuable } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { distance } from './geometry.js';
 import { FATIGUE_PER_MARCH_MINUTE, type Pace } from './fatigue.js';
@@ -313,6 +313,7 @@ export function startMarch(
  */
 export function registerMovement(registry: EventRegistry<GameState>): void {
   registry.register(MOVE_INTENT_EVENT, (world, ev) => {
+    if (world.outcome) return { world }; // the game is over: nothing moves
     const { unitId, to, pace } = ev.payload as unknown as MovePayload;
     const unit = world.units.find((u) => u.id === unitId);
     if (!unit) return rejectUnknown(world, unitId);
@@ -321,6 +322,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
   });
 
   registry.register(HALT_INTENT_EVENT, (world, ev) => {
+    if (world.outcome) return { world }; // the game is over: nothing moves
     const { unitId } = ev.payload as unknown as { unitId: string };
     if (!world.units.some((u) => u.id === unitId)) return rejectUnknown(world, unitId);
     const unit = world.units.find((u) => u.id === unitId)!;
@@ -336,6 +338,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
   });
 
   registry.register(FORMATION_INTENT_EVENT, (world, ev) => {
+    if (world.outcome) return { world }; // the game is over: nothing moves
     const { unitId, formation } = ev.payload as unknown as {
       unitId: string;
       formation: Formation;
@@ -368,6 +371,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
   });
 
   registry.register(FORMATION_DONE_EVENT, (world, ev) => {
+    if (world.outcome) return { world }; // the game is over: nothing moves
     const p = ev.payload as unknown as { unitId: string; formation: Formation; startedAt: number };
     const unit = world.units.find((u) => u.id === p.unitId);
     const i = unit?.intent;
@@ -385,6 +389,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
   });
 
   registry.register(MOVE_STEP_EVENT, (world, ev) => {
+    if (world.outcome) return { world }; // the game is over: nothing moves
     const p = ev.payload as unknown as StepPayload;
     const unit = world.units.find((u) => u.id === p.unitId);
     const i = unit?.intent;
@@ -419,7 +424,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     const check: NewEvent = { time: ev.time, type: COMBAT_CHECK_EVENT };
     if (i.kind === 'attack') {
       const foe = world.units.find((u) => u.id === i.target);
-      if (!foe || foe.status !== 'active') {
+      if (!foe || !pursuable(foe, ev.time)) {
         return {
           world: updateUnit(
             world,

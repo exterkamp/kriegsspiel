@@ -495,10 +495,95 @@ describe('uncertainty', () => {
     });
     const young = viewFor(w, 'blue', 7 * MS_PER_MINUTE);
     expect(young.lastKnownContacts[0]!.uncertaintyRadius).toBe(700);
-    const v = viewFor(w, 'blue', 180 * MS_PER_MINUTE);
-    expect(v.lastKnownContacts[0]!.ageMs).toBe(180 * MS_PER_MINUTE);
+    const v = viewFor(w, 'blue', 30 * MS_PER_MINUTE);
+    expect(v.lastKnownContacts[0]!.ageMs).toBe(30 * MS_PER_MINUTE);
     expect(v.lastKnownContacts[0]!.uncertaintyRadius).toBe(3000);
     expect(v.lastKnownContacts[0]!.position).toEqual({ x: 2050, y: 1550 });
+    // Past the cap the sighting says nothing about where the enemy is: aged out (#110).
+    expect(viewFor(w, 'blue', 31 * MS_PER_MINUTE).lastKnownContacts).toEqual([]);
+  });
+});
+
+describe('contact pruning (#110)', () => {
+  it('ages a contact out of the intel state at a scan', () => {
+    const reg = registry();
+    const w = world([
+      ['b', 'blue', 5, 5],
+      ['r', 'red', 20, 15],
+    ]);
+    w.intel.blue.contacts.push({
+      id: 'r',
+      position: { x: 2_050_000, y: 1_550_000 },
+      seenAt: 0,
+      facing: 0,
+      sizeEstimate: 'about a battalion',
+    });
+    let s = startVisibility(createState(1, w, 0));
+    s = advanceTo(s, 30 * MS_PER_MINUTE, reg).state;
+    expect(s.world.intel.blue.contacts).toHaveLength(1);
+    s = advanceTo(s, 31 * MS_PER_MINUTE, reg).state;
+    expect(s.world.intel.blue.contacts).toEqual([]);
+  });
+
+  it('prunes a destroyed enemy only once the destruction report has been delivered', () => {
+    const reg = registry();
+    let s = startVisibility(
+      createState(
+        1,
+        world([
+          ['b', 'blue', 5, 5],
+          ['r', 'red', 8, 5],
+        ]),
+        0,
+      ),
+    );
+    s = advanceTo(s, 0, reg).state;
+    expect(viewFor(s.world, 'blue', s.time).visibleEnemies).toHaveLength(1);
+
+    const dead = unit(s.world, 'r');
+    dead.status = 'destroyed';
+    dead.strength = 0;
+
+    // The next scan sees the wreck and files the report; it rides for COURIER_DELAY_MS,
+    // and until it arrives the contact stays on the desk.
+    s = advanceTo(s, COURIER_DELAY_MS, reg).state;
+    expect(viewFor(s.world, 'blue', s.time).lastKnownContacts).toHaveLength(1);
+    expect(viewFor(s.world, 'blue', s.time).reports.filter((r) => r.kind === 'destroyed')).toEqual(
+      [],
+    );
+
+    // After delivery the report is on the desk and the contact is pruned from state.
+    s = advanceTo(s, COURIER_DELAY_MS + 2 * MS_PER_MINUTE, reg).state;
+    const v = viewFor(s.world, 'blue', s.time);
+    expect(v.lastKnownContacts).toEqual([]);
+    expect(s.world.intel.blue.contacts).toEqual([]);
+    const told = v.reports.find((r) => r.kind === 'destroyed');
+    expect(told).toBeDefined();
+    expect(told!.text).toContain('destroyed');
+  });
+
+  it('keeps a destroyed enemy nobody witnessed, and files no report', () => {
+    const reg = registry();
+    const w = world([
+      ['b', 'blue', 5, 5],
+      ['r', 'red', 20, 15],
+    ]);
+    const dead = unit(w, 'r');
+    dead.status = 'destroyed';
+    dead.strength = 0;
+    w.intel.blue.contacts.push({
+      id: 'r',
+      position: { x: 2_050_000, y: 1_550_000 },
+      seenAt: 0,
+      facing: 0,
+      sizeEstimate: 'about a battalion',
+    });
+    let s = startVisibility(createState(1, w, 0));
+    s = advanceTo(s, 20 * MS_PER_MINUTE, reg).state;
+    // Too far away to see the wreck: no report, and the contact survives (until it ages out).
+    expect(s.world.intel.blue.reports.map((r) => r.kind)).toEqual(['situation']);
+    expect(s.world.intel.blue.contacts).toHaveLength(1);
+    expect(viewFor(s.world, 'blue', s.time).lastKnownContacts).toHaveLength(1);
   });
 });
 

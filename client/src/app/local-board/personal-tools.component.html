@@ -1,0 +1,196 @@
+<section aria-label="Personal marks">
+  <h2>Personal marks</h2>
+  <p>Manual annotations · game time 0 · metres east / south from the north-west corner.</p>
+  <p role="status" aria-live="polite">
+    @if (store().marks().busy) {
+      Saving or reloading marks…
+    } @else if (store().marks().dirty) {
+      Unsaved marks
+    } @else {
+      No unsaved mark changes
+    }
+    @if (!store().marks().writable) {
+      · Saving unavailable; reload to recover.
+    }
+    @if (!store().interactionEnabled()) {
+      · Interaction paused
+    }
+  </p>
+  @if (store().marks().error; as error) {
+    <p role="alert" class="error">{{ error.message }}</p>
+  }
+  <div class="actions">
+    <button
+      type="button"
+      (click)="save()"
+      [disabled]="!editable() || !store().marks().writable || !store().marks().dirty"
+    >
+      Save marks
+    </button>
+    <button type="button" (click)="reload()" [disabled]="!editable()">Reload marks</button>
+  </div>
+  <p class="hint">Reload replaces the draft with stored marks after a successful load.</p>
+  <fieldset [disabled]="!editable()">
+    @if (store().markForm().error; as error) {
+      <p role="alert" class="error">{{ error.message }}</p>
+    }
+    <legend>{{ store().markForm().editingId ? 'Edit selected mark' : 'Create a mark' }}</legend>
+    <div class="actions" aria-label="New mark tools">
+      @for (tool of tools; track tool.value) {
+        <button
+          type="button"
+          (click)="begin(tool.value)"
+          [attr.aria-pressed]="
+            store().markForm().tool === tool.value && !store().markForm().editingId
+          "
+        >
+          New {{ tool.label }}
+        </button>
+      }
+    </div>
+    <p>Selected tool: {{ store().markForm().tool }}</p>
+    <label
+      >Mark label
+      <input
+        name="mark-label"
+        type="text"
+        maxlength="256"
+        [value]="store().markForm().label"
+        (input)="field($event, 'label')"
+      />
+    </label>
+    <div class="coordinates">
+      <label
+        >X east (metres)
+        <input
+          name="mark-x"
+          type="text"
+          inputmode="decimal"
+          [value]="store().markForm().x"
+          (input)="field($event, 'x')"
+        />
+      </label>
+      <label
+        >Y south (metres)
+        <input
+          name="mark-y"
+          type="text"
+          inputmode="decimal"
+          [value]="store().markForm().y"
+          (input)="field($event, 'y')"
+        />
+      </label>
+    </div>
+    @if (store().markForm().tool === 'ring') {
+      <label
+        >Radius (metres)
+        <input
+          name="mark-radius"
+          type="text"
+          inputmode="decimal"
+          [value]="store().markForm().radiusM"
+          (input)="field($event, 'radiusM')"
+        />
+      </label>
+    }
+    @if (store().markForm().tool === 'symbol') {
+      <label
+        >Symbol
+        <select name="mark-symbol" [value]="store().markForm().symbol" (change)="symbol($event)">
+          <option value="cross">Cross</option>
+          <option value="dot">Dot</option>
+          <option value="flag">Flag</option>
+        </select>
+      </label>
+    }
+    @if (multipoint()) {
+      <button
+        type="button"
+        (click)="appendPoint()"
+        [disabled]="store().markForm().points.length >= 256"
+      >
+        Add point
+      </button>
+      <p>
+        Ordered points: {{ store().markForm().points.length }} / 256. Add at least two, then Finish.
+      </p>
+      <p class="hint">
+        Enter X/Y above, then replace a point to keep its position in the sequence, or remove it.
+      </p>
+      <ol aria-label="Draft points">
+        @for (point of store().markForm().points; track $index) {
+          <li>
+            {{ point.x }}, {{ point.y }} m
+            <button
+              type="button"
+              (click)="replacePoint($index)"
+              [attr.aria-label]="'Replace point ' + ($index + 1) + ' with entered X/Y'"
+            >
+              Replace point {{ $index + 1 }}
+            </button>
+            <button
+              type="button"
+              (click)="removePoint($index)"
+              [attr.aria-label]="'Remove point ' + ($index + 1)"
+            >
+              Remove point {{ $index + 1 }}
+            </button>
+          </li>
+        }
+      </ol>
+      <button type="button" (click)="finish()" [disabled]="store().markForm().points.length < 2">
+        Finish {{ store().markForm().editingId ? 'edit' : 'mark' }}
+      </button>
+    } @else {
+      <button type="button" (click)="commit()">
+        {{ store().markForm().editingId ? 'Apply edit' : 'Add mark' }}
+      </button>
+    }
+    <div class="actions">
+      <button type="button" (click)="start()" [disabled]="store().drawingActive()">
+        Place on map
+      </button>
+      <button type="button" (click)="stop()" [disabled]="!store().drawingActive()">
+        Stop placement
+      </button>
+    </div>
+    <p role="status">
+      @if (store().drawingActive()) {
+        Click the map to {{ multipoint() ? 'add points, then use Finish' : 'place this mark' }}.
+        Escape stops placement and keeps the draft.
+      } @else {
+        Map placement is stopped. Numeric entry is available above.
+      }
+    </p>
+  </fieldset>
+  <h3>Marks ({{ store().marks().draft.length }} / 200)</h3>
+  <ul class="marks" aria-label="Existing marks">
+    @for (mark of store().marks().draft; track mark.id) {
+      <li>
+        <span>{{ mark.label || '(Unlabelled)' }} · {{ mark.geometry.kind }}</span>
+        <div class="actions">
+          <button
+            type="button"
+            (click)="edit(mark.id)"
+            [disabled]="!editable()"
+            [attr.aria-label]="'Edit ' + mark.geometry.kind + ': ' + (mark.label || '(Unlabelled)')"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            (click)="remove(mark.id)"
+            [disabled]="!editable()"
+            [attr.aria-label]="
+              'Delete ' + mark.geometry.kind + ': ' + (mark.label || '(Unlabelled)')
+            "
+          >
+            Delete
+          </button>
+        </div>
+      </li>
+    } @empty {
+      <li>No personal marks yet.</li>
+    }
+  </ul>
+</section>

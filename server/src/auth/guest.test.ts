@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp, type App } from '../api/app.js';
-import { guestIdleMsFromEnv, guestPlayFromEnv } from '../config.js';
+import {
+  devToolsFromEnv,
+  guestIdleMsFromEnv,
+  guestPerHourFromEnv,
+  guestPlayFromEnv,
+} from '../config.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 
 const mailbox: Array<{ to: string; link: string }> = [];
@@ -62,6 +67,22 @@ async function emailSignIn(server: Server, email: string, cookie?: string) {
   });
   return String(res.headers['set-cookie']).split(';')[0]!;
 }
+
+describe('developer tools setting', () => {
+  it('is read from DEV_TOOLS and served at /auth/features', async () => {
+    expect(devToolsFromEnv({})).toBe(true);
+    expect(devToolsFromEnv({ NODE_ENV: 'production' })).toBe(false);
+    expect(devToolsFromEnv({ NODE_ENV: 'production', DEV_TOOLS: '1' })).toBe(true);
+    expect(devToolsFromEnv({ DEV_TOOLS: 'off' })).toBe(false);
+    for (const devTools of [true, false]) {
+      const server = await start({ devTools });
+      const res = await server.inject({ method: 'GET', url: '/auth/features' });
+      expect(res.json()).toEqual({ devTools });
+      await server.close();
+      app = undefined;
+    }
+  });
+});
 
 describe('guest play', () => {
   it('is off unless enabled', async () => {
@@ -147,7 +168,23 @@ describe('guest play', () => {
     const server = await start({ guestPerIp: 2 });
     expect((await guest(server)).res.statusCode).toBe(200);
     expect((await guest(server)).res.statusCode).toBe(200);
-    expect((await guest(server)).res.statusCode).toBe(429);
+    const limited = (await guest(server)).res;
+    expect(limited.statusCode).toBe(429);
+    // The body says when the window ends, so the client can show a time.
+    expect(limited.json()).toEqual({ error: 'rate_limited', retryAt: expect.any(Number) });
+    expect(limited.json().retryAt).toBeGreaterThan(wall);
+    expect(limited.json().retryAt).toBeLessThanOrEqual(wall + HOUR);
+    // The header is the real time remaining, and shrinks as the window runs down.
+    const remaining = (r: typeof limited) => Math.ceil((r.json().retryAt - wall) / 1000);
+    expect(limited.headers['retry-after']).toBe(String(remaining(limited)));
+    wall += 10 * 60_000;
+    const later = (await guest(server)).res;
+    expect(later.statusCode).toBe(429);
+    expect(later.headers['retry-after']).toBe(String(remaining(later)));
+    expect(Number(later.headers['retry-after'])).toBeLessThan(
+      Number(limited.headers['retry-after']),
+    );
+    wall -= 10 * 60_000;
     expect((await guest(server, '10.0.0.2')).res.statusCode).toBe(200);
     wall += HOUR + 1;
     expect((await guest(server)).res.statusCode).toBe(200);
@@ -224,5 +261,15 @@ describe('guest settings from the environment', () => {
     expect(guestPlayFromEnv({ GUEST_PLAY: 'off' })).toBe(false);
     expect(guestIdleMsFromEnv({})).toBe(168 * HOUR);
     expect(guestIdleMsFromEnv({ GUEST_IDLE_HOURS: '2' })).toBe(2 * HOUR);
+  });
+
+  it('reads the guests-per-hour limit, falling back to 60', () => {
+    expect(guestPerHourFromEnv({})).toBe(60);
+    expect(guestPerHourFromEnv({ GUEST_PER_HOUR: '5' })).toBe(5);
+    // '' is what docker-compose passes when the variable is unset.
+    for (const bad of ['0', '-3', 'abc', '']) {
+      expect(guestPerHourFromEnv({ GUEST_PER_HOUR: bad })).toBe(60);
+    }
+    expect(guestPerHourFromEnv({ GUEST_PER_HOUR: '2.9' })).toBe(2);
   });
 });

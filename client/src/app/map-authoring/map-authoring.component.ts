@@ -10,6 +10,7 @@ import {
 import { battlefieldPreset, CURRENT_GENERATOR, CONSUMED_FORK } from '@kriegsspiel/maps';
 import { createAuthoringRuntime } from '@legacy/map-authoring/runtime/index';
 import { mountAuthoringApp } from '@legacy/map-authoring/authoring-app';
+import { MenuLinkComponent } from '../shell/menu-link.component';
 
 // Exact support identities come from the generator; settings edits never replace recorded versions.
 function equal(left: unknown, right: unknown): boolean {
@@ -33,6 +34,7 @@ function equal(left: unknown, right: unknown): boolean {
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
   styleUrl: './map-authoring.component.css',
+  imports: [MenuLinkComponent],
   templateUrl: './map-authoring.component.html',
 })
 export class MapAuthoringComponent implements OnDestroy {

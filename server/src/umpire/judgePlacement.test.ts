@@ -3,10 +3,11 @@ import {
   MS_PER_MINUTE,
   advanceTo,
   createState,
-  holdTheBridge,
+  holdTheBridgeFarStart,
   issuePlacement,
   loadScenario,
   mm,
+  type Ruling,
 } from '@kriegsspiel/engine';
 import { createRegistry } from '../game/registry.js';
 import { judgePlacementInput, judgePlacements } from './judgePlacement.js';
@@ -19,7 +20,7 @@ const THREE_MIN = 3 * MS_PER_MINUTE;
 
 /** Judge, then queue every proposal and let the engine rule on it. */
 async function judgeAndApply(client: MockUmpireClient, elapsedMs = THREE_MIN) {
-  const world = loadScenario(holdTheBridge);
+  const world = loadScenario(holdTheBridgeFarStart);
   const rulings = await judgePlacements(
     client,
     world,
@@ -33,7 +34,7 @@ async function judgeAndApply(client: MockUmpireClient, elapsedMs = THREE_MIN) {
 
 describe('judge placement', () => {
   it('describes the map as vector features in metres', () => {
-    const world = loadScenario(holdTheBridge);
+    const world = loadScenario(holdTheBridgeFarStart);
     const input = judgePlacementInput(world, 'x', THREE_MIN);
     expect(input.map).toMatchObject({ widthM: 4000, heightM: 3000 });
     const bridge = input.map.features.find((f) => f.id === 'bridge')!;
@@ -56,9 +57,9 @@ describe('judge placement', () => {
     ]);
     expect(u.facing).toBeCloseTo((20 * Math.PI) / 180);
     expect(world.units.find((x) => x.id === 'blue-2')!.shape).toHaveLength(4);
-    expect(world.rulings.map((r) => r.verdict.verdict)).toEqual(['accept', 'accept']);
-    expect(world.rulings[0]!.rationale).toMatch(/screen/);
-    expect(world.rulings[0]!.narrative).toMatch(/skirmishers/);
+    expect((world.rulings as Ruling[]).map((r) => r.verdict.verdict)).toEqual(['accept', 'accept']);
+    expect((world.rulings as Ruling[])[0]!.rationale).toMatch(/screen/);
+    expect((world.rulings as Ruling[])[0]!.narrative).toMatch(/skirmishers/);
   });
 
   it('clamps or rejects implausible proposals and logs the reasons', async () => {
@@ -74,9 +75,9 @@ describe('judge placement', () => {
         ],
       },
     };
-    const before = loadScenario(holdTheBridge);
+    const before = loadScenario(holdTheBridgeFarStart);
     const world = await judgeAndApply(new MockUmpireClient([wild]));
-    const [far, wet, ghost] = world.rulings;
+    const [far, wet, ghost] = world.rulings as Ruling[];
     expect(far!.verdict.verdict).toBe('clamp');
     expect(far!.verdict.reasons.join()).toMatch(/too far/);
     const moved = world.units.find((x) => x.id === 'blue-1')!;
@@ -88,7 +89,7 @@ describe('judge placement', () => {
       before.units.find((x) => x.id === 'blue-2')!.center,
     );
     expect(ghost!.verdict).toEqual({ verdict: 'reject', reasons: ['unknown unit'] });
-    expect(world.rulings.every((r) => r.rationale === 'r')).toBe(true);
+    expect((world.rulings as Ruling[]).every((r) => r.rationale === 'r')).toBe(true);
   });
 
   it('rejects a reply that breaks the schema, leaving the units alone', async () => {
@@ -101,9 +102,9 @@ describe('judge placement', () => {
     const live = await judgeAndApply(client);
     expect(client.calls).toHaveLength(1);
     // Replay: queue the logged proposals again, with no client at all.
-    const world = loadScenario(holdTheBridge);
+    const world = loadScenario(holdTheBridgeFarStart);
     let state = createState(world.seed, world, 0);
-    for (const r of live.rulings) {
+    for (const r of live.rulings as Ruling[]) {
       state = issuePlacement(
         state,
         { proposal: r.proposal, rationale: r.rationale, narrative: r.narrative },

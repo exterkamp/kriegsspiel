@@ -32,6 +32,10 @@ export function reasonText(over: GameOver): string {
       return over.winner === null
         ? `Both sides were destroyed by ${at}.`
         : `The enemy was eliminated at ${at}.`;
+    case 'attack-broken':
+      return `The attack on the objective was broken; ${w} holds the field at ${at}.`;
+    case 'defence-broken':
+      return `The defence of the objective was broken; ${w} holds the field at ${at}.`;
     case 'withdrawn':
       return over.winner === null
         ? `Both sides withdrew by ${at}.`

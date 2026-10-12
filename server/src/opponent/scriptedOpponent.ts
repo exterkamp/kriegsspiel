@@ -50,6 +50,14 @@ export interface SideAgent {
 export const THINK_INTERVAL_MS = 5 * 60_000;
 /** An enemy this close (metres) to one of its units draws it into an attack. */
 export const ENGAGE_RANGE_M = 900;
+/** Cavalry rides at an enemy this close (metres): it covers the ground fast, so it reacts earlier. */
+export const CAVALRY_ENGAGE_RANGE_M = 1500;
+/**
+ * A unit told to advance or attack that has not moved for this many decisions in a row is
+ * treated as having lost its order (garbled, intercepted, or finished chasing a stale contact)
+ * and is ordered again. Two decisions is at least 5 game minutes still, and a repeated order is harmless.
+ */
+export const STALLED_DECISIONS = 2;
 /** A last-known contact this young (game ms) still counts as a target. */
 export const CONTACT_FRESH_MS = 10 * 60_000;
 /** A unit below this morale (0..100), or this share of the strength it started with, falls back. */
@@ -59,8 +67,20 @@ export const WITHDRAW_STRENGTH_FRACTION = 0.5;
 export const HESITATE_CHANCE = 0.15;
 /** Each unit aims this far (metres, either way) off the objective's centre. */
 export const AIM_SPREAD_M = 60;
+/** A unit this close (metres) to the objective's centre needs no final order onto it. */
+const CENTRE_TOLERANCE_M = 5;
 /** A target that moved less than this (metres) since the last order is not worth a new one. */
 const RETARGET_M = 150;
+/**
+ * A unit this close (metres) to the objective stays on it instead of chasing an enemy, because
+ * the objective only falls to a side that holds it for some minutes (D13).
+ */
+export const HOLD_RADIUS_M = 120;
+/**
+ * The scripted commander forms up for this long (game ms) before it marches, so the bridge is not
+ * taken by whoever happens to start closest, and the first game has time for orders and answers.
+ */
+export const FORM_UP_MS = 10 * 60_000;
 
 export interface ScriptedOpponentConfig {
   side: string;
@@ -107,6 +127,7 @@ export function assertFogOnly(view: unknown, side: string): asserts view is Engi
 
 const mmPoint = (p: Point): Point => ({ x: Math.round(p.x * 1000), y: Math.round(p.y * 1000) });
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
 const fmt = (p: Point) => `(${Math.round(p.x)}, ${Math.round(p.y)})`;
 
 function hashSide(side: string): number {
@@ -124,6 +145,8 @@ export class ScriptedOpponent implements SideAgent {
   private readonly standing = new Map<string, Standing>();
   /** The most men each unit has been seen with: the yardstick for "weakened". */
   private readonly peak = new Map<string, number>();
+  /** Where each unit stood at the last decision and for how many decisions in a row it has not moved. */
+  private readonly still = new Map<string, { at: Point; count: number }>();
   /** Whether a unit sat out the last decision on a roll, which a later roll may reverse. */
   private hesitated = false;
 
@@ -134,8 +157,11 @@ export class ScriptedOpponent implements SideAgent {
 
   think(view: EngineSideView): AgentOrder[] {
     assertFogOnly(view, this.side);
+    this.hesitated = view.time < FORM_UP_MS;
+    if (this.hesitated) return [];
     const tick = Math.floor(view.time / this.intervalMs);
     const rng = new Rng(seedRng(this.config.seed + hashSide(this.side) + tick * 7919));
+    const objective = this.config.objective;
     const threats: { id: string; position: Point }[] = [
       ...view.visibleEnemies,
       ...view.lastKnownContacts.filter((c) => c.ageMs <= CONTACT_FRESH_MS),
@@ -146,7 +172,15 @@ export class ScriptedOpponent implements SideAgent {
       if (unit.strength <= 0) continue;
       const peak = Math.max(this.peak.get(unit.id) ?? 0, unit.strength);
       this.peak.set(unit.id, peak);
-      const standing = this.standing.get(unit.id);
+      let standing = this.standing.get(unit.id);
+      const prev = this.still.get(unit.id);
+      const count = prev && samePoint(prev.at, unit.position) ? prev.count + 1 : 0;
+      this.still.set(unit.id, { at: unit.position, count });
+      if (standing && standing.kind !== 'withdraw' && count >= STALLED_DECISIONS) {
+        // Whatever it was told never got it moving (or it has finished and stopped short): tell it again.
+        this.standing.delete(unit.id);
+        standing = undefined;
+      }
       const weak =
         unit.morale < WITHDRAW_MORALE || unit.strength < peak * WITHDRAW_STRENGTH_FRACTION;
       const near = threats
@@ -155,23 +189,36 @@ export class ScriptedOpponent implements SideAgent {
 
       let next: Standing | undefined;
       if (weak) next = { kind: 'withdraw', target: this.config.fallbackTo };
-      else if (near && near.d <= ENGAGE_RANGE_M) next = { kind: 'attack', target: near.t.position };
-      else if (rng.next() >= HESITATE_CHANCE || standing) {
-        const spread = () => (rng.next() * 2 - 1) * AIM_SPREAD_M;
-        next = {
-          kind: 'advance',
-          target: {
-            x: this.config.objective.x + spread(),
-            y: this.config.objective.y + spread(),
-          },
-        };
-      }
+      else if (dist(unit.position, this.config.objective) <= HOLD_RADIUS_M) {
+        // Close enough to the objective: the spread would leave a unit a few metres outside a
+        // 60 m square that has to be held, so the last order goes to the exact centre, once.
+        // (A unit already at the centre, e.g. after a restart that lost its memory, gets none.)
+        const onCentre = standing?.kind === 'advance' && samePoint(standing.target, objective);
+        if (onCentre || dist(unit.position, objective) <= CENTRE_TOLERANCE_M) {
+          this.standing.set(unit.id, { kind: 'advance', target: objective });
+          continue;
+        }
+        next = { kind: 'advance', target: objective };
+      } else if (
+        near &&
+        near.d <= (unit.kind === 'cavalry' ? CAVALRY_ENGAGE_RANGE_M : ENGAGE_RANGE_M)
+      )
+        next = { kind: 'attack', target: near.t.position };
+      else if (rng.next() >= HESITATE_CHANCE || standing) next = this.advanceOrder(rng);
       if (!next) this.hesitated = true;
       if (!next || !this.changes(standing, next)) continue;
       this.standing.set(unit.id, next);
       orders.push(this.order(unit.id, unit.name, next));
     }
     return orders;
+  }
+
+  private advanceOrder(rng: Rng): Standing {
+    const spread = () => (rng.next() * 2 - 1) * AIM_SPREAD_M;
+    return {
+      kind: 'advance',
+      target: { x: this.config.objective.x + spread(), y: this.config.objective.y + spread() },
+    };
   }
 
   settled(): boolean {
@@ -181,7 +228,12 @@ export class ScriptedOpponent implements SideAgent {
   /** Whether `next` differs enough from what the unit was last told to be worth an order. */
   private changes(standing: Standing | undefined, next: Standing): boolean {
     if (!standing || standing.kind !== next.kind) return true;
-    // An advance is aimed once; an attack follows its target; a withdrawal is one-way.
+    // An advance is aimed once, then corrected once onto the exact centre; an attack follows its target; a withdrawal is one-way.
+    if (next.kind === 'advance') {
+      return (
+        samePoint(next.target, this.config.objective) && !samePoint(standing.target, next.target)
+      );
+    }
     return next.kind === 'attack' && dist(standing.target, next.target) > RETARGET_M;
   }
 

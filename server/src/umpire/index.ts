@@ -47,6 +47,8 @@ export {
   AnthropicProvider,
   OllamaProvider,
   OpenAiCompatibleProvider,
+  TEST_MODEL,
+  TestProvider,
   defaultProviderRegistry,
 } from './providers/index.js';
 export { MockUmpireClient, loadFixtures, loadFixtureFile } from './mockUmpireClient.js';

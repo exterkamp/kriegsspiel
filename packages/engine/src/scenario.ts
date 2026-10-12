@@ -8,6 +8,7 @@ import { mm, pointMm, polygonCentroid } from './geometry.js';
 import { KIND_DEFAULTS, ROAD_CLASS_COST, terrainAt } from './terrain.js';
 import { UNIT_TYPES, unitTypeOf } from './unitTypes.js';
 import {
+  DEFAULT_TAKE_MS,
   FEATURE_KINDS,
   FORMATIONS,
   HEIGHTS,
@@ -344,7 +345,12 @@ export function loadScenario(raw: unknown): GameState {
       defender,
       attacker,
       holdMs: int(v.holdMinutes, 'victory.holdMinutes', 1) * MS_PER_MINUTE,
+      takeMs:
+        v.takeMinutes === undefined
+          ? DEFAULT_TAKE_MS
+          : int(v.takeMinutes, 'victory.takeMinutes', 0) * MS_PER_MINUTE,
     },
+    startStrength: Object.fromEntries(units.map((u) => [u.id, u.strength])),
     combatActive: false,
     outcome: null,
     couriers: [],

@@ -1,12 +1,19 @@
 # Development map catalog and board preparation
 
-The development client exposes a local catalog at `/__local/maps`. It lists the committed defaults in `data/maps/catalog.json` and canonical JSON saved in ignored `.local/generated-maps/`. This packet provides services for later setup UI; it adds no navigation or game-start action.
+The standalone development catalog serves `/__local/maps` on an explicitly opted-in loopback HTTP server. Angular proxy and setup integration follow in the preparation packet. It lists the committed defaults in `data/maps/catalog.json` and canonical JSON saved in ignored `.local/generated-maps/`. This packet restores local storage/import handling after the Angular cutover; it adds no navigation or game-start action.
 
-`createMapCatalog()` lists summaries, reads a `premade` or `generated` reference, and saves exact canonical JSON. References contain a kind and an ID, never a filesystem path. Reads and request bodies retain the map import limits. Generated writes use exclusive creation and never replace a committed default. Storage/import validation is not complete certification.
+`createMapCatalogHandler()` lists summaries, reads a `premade` or `generated` reference, and saves exact canonical JSON. References contain a kind and an ID, never a filesystem path. Reads and request bodies retain the map import limits. Generated writes use exclusive creation and never replace a committed default. Storage/import validation is not complete certification.
 
-`createBoardPreparation()` owns a fresh authoring runtime for each operation. Loading saved geometry runs independent certification without generation. Generation uses the exact complete recipe supplied by the caller. A successful result includes the detached asset, matching canonical export, full asset identity, and north-west-zero metre bounds. Generated results have no saved reference until a catalog save succeeds. Replacement, abort and disposal cancel owned work and terminate workers; late results cannot publish a board.
+The helper uses Node-safe DTOs in `tools/local-map-catalog/types.ts`; it imports no browser, Angular or Vite code. Paths derive from the module location, independent of the launch directory. The runtime production image contains neither the helper nor generated local storage; only the Docker builder receives `tools/` to satisfy the root build. Importing the entrypoint opens no socket. Without `LOCAL_MAP_CATALOG=1`, startup does nothing; opted-in startup requires a valid `PORT` and binds `127.0.0.1`.
 
-The Vite plugin installs the file helper only in development. Built applications contain no catalog endpoint. These services do not create engine scenarios, advance a simulation, store production games, or resume sessions.
+Build with `npm run build:local-map-catalog`, then use the managed preview runner:
+
+```sh
+LOCAL_MAP_CATALOG=1 devrun up --name init-map-catalog --port-env PORT -- node .local/local-map-catalog/serve.js
+devrun url init-map-catalog
+```
+
+These services do not create engine scenarios, advance a simulation, store production games, or resume sessions. Complete browser certification/preparation and the Angular proxy are separate dependent packets. Storage/import validity alone never makes a board playable.
 
 ## Committed defaults
 
@@ -20,4 +27,4 @@ These generated assets use the existing pinned complete battlefield recipes. The
 
 The rectangle changes only the height from its complete preset; the other defaults use complete presets without overrides. Generated JSON volume is distinct from the handwritten service and test changes.
 
-Focused verification: `npm test -w client -- dev/mapCatalog.test.ts src/game-setup/catalog.test.ts src/game-setup/preparation.test.ts`. The middleware tests use disposable directories and actual local HTTP sockets. The preparation tests cover exact recipes/exports, full identity and cancellation ownership; real browser workers remain a separate integration check.
+Focused verification: `npm run test:local-map-catalog` and `npm run typecheck:local-map-catalog`. The tests use disposable directories and real loopback HTTP sockets, checking import limits, allowlisted references, corrupt entries, exclusive writes, interrupted requests and explicitly guarded startup. These tests are included in the root test and typecheck commands.

@@ -1,0 +1,2198 @@
+{
+  "sourceHead": "b16c0503e6c62ec383016bf411cfa43b85475538",
+  "base": "38bb490ed54fc152f2e7b1d31793d69f52e69669",
+  "sourceSha256": {
+    "client/src/app/local-board/notebook.component.css": "26696d165c085a5e984139591436f8938fdcd8e8e1f967c3d7888551feb139ec",
+    "client/src/app/local-board/notebook.component.html": "1cdc0e3daedb76c03efb524ab8c80b7bc62fe90861a854b601f54b375936e8cc",
+    "client/src/app/local-board/notebook.component.spec.ts": "87eb8903e51851177a2d995107e4ac0ae03f236f2891e7ae35b3afb988589a46",
+    "client/src/app/local-board/notebook.component.ts": "6ec5a94dec8a60e6b969857969f6337a68f6f73a9d85ff382aab5c927a768cf8",
+    "client/src/app/local-board/personal-repository.test.ts": "cf88322e944a5c67dc0d3a0b251310fa29d1a7d6cbc61018c7a409bc13f35710",
+    "client/src/app/local-board/personal-repository.ts": "5491017851cb8305781094fd935ac1d774c0d74725aca7e9cbe8625782b526d3",
+    "client/src/app/local-board/personal-store.spec.ts": "fb79e84a31a6d875dee95a37d6bfa3f2158ec28da3097eaf687bc5b68f315826",
+    "client/src/app/local-board/personal-store.ts": "8dc596d6c5e07dc091f45c9ab5d14885084d3d0f726ce145d39afa1c936dea30",
+    "client/src/app/local-board/personal-tools.component.css": "4b3111a7d66cc54985cd98dcffe436418ecd1b3b6ac7c82544d1ebe5a83ce597",
+    "client/src/app/local-board/personal-tools.component.html": "8780e1fd8c399ffe0ea74910e4e8de69d8c8d495f029445528b43a28e3c7f552",
+    "client/src/app/local-board/personal-tools.component.spec.ts": "2962001fccdf759f2951fa5775cb8b7b5b958986f41723f4aeea6ddb0511fe91",
+    "client/src/app/local-board/personal-tools.component.ts": "14c68a3922518d72eef569c95c531e8d47a07fc2a5b987967ccbcb5eaf07ba5a"
+  },
+  "wrapperSha256": "11edb988fbe56038730279e94a67a3ab53b8506933927a1dcfb1c02c4d9b7ea2",
+  "snapshot": "/tmp/kriegsspiel-angular-a3b-proof",
+  "preview": "http://127.0.0.1:41110/__proof/a3b",
+  "desktopViewport": {
+    "width": 1440,
+    "height": 1000,
+    "scrollWidth": 1440
+  },
+  "narrowViewport": {
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390
+  },
+  "observations": {
+    "desktop-retired": {
+      "key": "local-b7790364-b630-48b6-ad5b-2d55430fe18a",
+      "mountId": null,
+      "phase": "retired",
+      "view": "table",
+      "ready": false,
+      "paused": false,
+      "busy": false,
+      "certifiedDefaultIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "storage": null,
+      "marks": null,
+      "notebook": null,
+      "markForm": null,
+      "drawingActive": false,
+      "cameraEnabled": true,
+      "storeInteractionEnabled": false,
+      "notebookQuery": "",
+      "notebookMatches": [],
+      "counts": {
+        "defaultCertificationCalls": 1,
+        "defaultCertificationSuccesses": 1,
+        "surfaceCreated": 3,
+        "surfaceDisposeCalls": 3,
+        "surfaceRetired": 3,
+        "sceneCreationAttempts": 3,
+        "sceneCreated": 3,
+        "sceneDisposeCalls": 3,
+        "sceneReleased": 3,
+        "sceneApplyCalls": 26,
+        "rasterPrepareCalls": 3,
+        "rasterPrepared": 3,
+        "hostTeardownCalls": 6,
+        "hostRetired": 3,
+        "storeCreated": 3,
+        "storeDisposeCalls": 3,
+        "storeRetired": 3,
+        "repositoryCreated": 3,
+        "repositoryDisposeCalls": 3,
+        "repositoryRetired": 3
+      },
+      "liveOwnedScenes": 0,
+      "raster": {
+        "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "widthM": 5000,
+        "heightM": 3000,
+        "pixelWidth": 4096,
+        "pixelHeight": 2458,
+        "contentWidthPx": 4096,
+        "contentHeightPx": 2457.6
+      },
+      "releaseAcknowledgements": [
+        "real TableScene.dispose returned",
+        "surface disposal acknowledged",
+        "host teardown acknowledged",
+        "repository disposal acknowledged",
+        "store disposal acknowledged",
+        "real TableScene.dispose returned",
+        "surface disposal acknowledged",
+        "host teardown acknowledged",
+        "repository disposal acknowledged",
+        "store disposal acknowledged",
+        "real TableScene.dispose returned",
+        "surface disposal acknowledged",
+        "host teardown acknowledged",
+        "repository disposal acknowledged",
+        "store disposal acknowledged"
+      ],
+      "faultInstrumentation": "none; real browser localStorage, workers, raster and TableScene"
+    },
+    "notebook-draft": {
+      "key": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+      "mountId": 1,
+      "phase": "ready",
+      "view": "notebook",
+      "ready": true,
+      "paused": false,
+      "busy": false,
+      "certifiedDefaultIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "storage": {
+        "marksKey": "[\"kriegsspiel.local-board.personal.v1\",\"marks\",\"local-81c8d190-d626-42f6-b78c-afb291d1fdc9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]",
+        "notebookKey": "[\"kriegsspiel.local-board.personal.v1\",\"notebook\",\"local-81c8d190-d626-42f6-b78c-afb291d1fdc9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]"
+      },
+      "marks": {
+        "draft": [
+          {
+            "id": "f7bc14e8-e566-48de-948c-a43f620f0b16",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": 0,
+            "label": "Village edited",
+            "geometry": {
+              "kind": "pin",
+              "at": {
+                "x": 1200.25,
+                "y": 900.5
+              }
+            }
+          },
+          {
+            "id": "adc925ca-c466-4723-b53f-39c9368b8ed1",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Range",
+            "geometry": {
+              "kind": "ring",
+              "centre": {
+                "x": 2500,
+                "y": 1500
+              },
+              "radiusM": 400.5
+            }
+          },
+          {
+            "id": "db40537f-8022-41e6-85ac-3df546491a24",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Flag",
+            "geometry": {
+              "kind": "symbol",
+              "at": {
+                "x": 2500,
+                "y": 1499.675882273683
+              },
+              "symbol": "flag"
+            }
+          },
+          {
+            "id": "d46732fc-a7bd-41e1-a6dd-3646978ff59f",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Track",
+            "geometry": {
+              "kind": "polyline",
+              "points": [
+                {
+                  "x": 600.25,
+                  "y": 1000
+                },
+                {
+                  "x": 1800,
+                  "y": 1000
+                }
+              ]
+            }
+          },
+          {
+            "id": "b296d3a3-984c-436b-9c26-89dc612ee8e7",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Advance",
+            "geometry": {
+              "kind": "arrow",
+              "points": [
+                {
+                  "x": 2000,
+                  "y": 2000
+                },
+                {
+                  "x": 2500,
+                  "y": 1499.675882273683
+                }
+              ]
+            }
+          }
+        ],
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "notebook": {
+        "draft": "Reconnaissance <manual>\nVillage west road\nKeep this unsaved draft.",
+        "dirty": true,
+        "busy": false,
+        "writable": true
+      },
+      "markForm": {
+        "tool": "pin",
+        "label": "Village edited",
+        "x": "1200.25",
+        "y": "900.5",
+        "radiusM": "",
+        "symbol": "cross",
+        "points": [],
+        "editingId": "f7bc14e8-e566-48de-948c-a43f620f0b16"
+      },
+      "drawingActive": false,
+      "cameraEnabled": true,
+      "storeInteractionEnabled": true,
+      "notebookQuery": "  VILLAGE  ",
+      "notebookMatches": [
+        {
+          "line": 2,
+          "text": "Village west road"
+        }
+      ],
+      "counts": {
+        "defaultCertificationCalls": 1,
+        "defaultCertificationSuccesses": 1,
+        "surfaceCreated": 1,
+        "surfaceDisposeCalls": 0,
+        "surfaceRetired": 0,
+        "sceneCreationAttempts": 1,
+        "sceneCreated": 1,
+        "sceneDisposeCalls": 0,
+        "sceneReleased": 0,
+        "sceneApplyCalls": 16,
+        "rasterPrepareCalls": 1,
+        "rasterPrepared": 1,
+        "hostTeardownCalls": 0,
+        "hostRetired": 0,
+        "storeCreated": 1,
+        "storeDisposeCalls": 0,
+        "storeRetired": 0,
+        "repositoryCreated": 1,
+        "repositoryDisposeCalls": 0,
+        "repositoryRetired": 0
+      },
+      "liveOwnedScenes": 1,
+      "raster": {
+        "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "widthM": 5000,
+        "heightM": 3000,
+        "pixelWidth": 4096,
+        "pixelHeight": 2458,
+        "contentWidthPx": 4096,
+        "contentHeightPx": 2457.6
+      },
+      "releaseAcknowledgements": [],
+      "faultInstrumentation": "none; real browser localStorage, workers, raster and TableScene"
+    },
+    "console": {
+      "desktop": [],
+      "narrow": []
+    },
+    "same-scope-readback": {
+      "key": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+      "mountId": 2,
+      "phase": "ready",
+      "view": "table",
+      "ready": true,
+      "paused": false,
+      "busy": false,
+      "certifiedDefaultIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "storage": {
+        "marksKey": "[\"kriegsspiel.local-board.personal.v1\",\"marks\",\"local-81c8d190-d626-42f6-b78c-afb291d1fdc9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]",
+        "notebookKey": "[\"kriegsspiel.local-board.personal.v1\",\"notebook\",\"local-81c8d190-d626-42f6-b78c-afb291d1fdc9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]"
+      },
+      "marks": {
+        "draft": [
+          {
+            "id": "f7bc14e8-e566-48de-948c-a43f620f0b16",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": 0,
+            "label": "Village edited",
+            "geometry": {
+              "kind": "pin",
+              "at": {
+                "x": 1200.25,
+                "y": 900.5
+              }
+            }
+          },
+          {
+            "id": "adc925ca-c466-4723-b53f-39c9368b8ed1",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Range",
+            "geometry": {
+              "kind": "ring",
+              "centre": {
+                "x": 2500,
+                "y": 1500
+              },
+              "radiusM": 400.5
+            }
+          },
+          {
+            "id": "db40537f-8022-41e6-85ac-3df546491a24",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Flag",
+            "geometry": {
+              "kind": "symbol",
+              "at": {
+                "x": 2500,
+                "y": 1499.675882273683
+              },
+              "symbol": "flag"
+            }
+          },
+          {
+            "id": "d46732fc-a7bd-41e1-a6dd-3646978ff59f",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Track",
+            "geometry": {
+              "kind": "polyline",
+              "points": [
+                {
+                  "x": 600.25,
+                  "y": 1000
+                },
+                {
+                  "x": 1800,
+                  "y": 1000
+                }
+              ]
+            }
+          },
+          {
+            "id": "b296d3a3-984c-436b-9c26-89dc612ee8e7",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Advance",
+            "geometry": {
+              "kind": "arrow",
+              "points": [
+                {
+                  "x": 2000,
+                  "y": 2000
+                },
+                {
+                  "x": 2500,
+                  "y": 1499.675882273683
+                }
+              ]
+            }
+          }
+        ],
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "notebook": {
+        "draft": "Reconnaissance <manual>\nVillage west road\nKeep this unsaved draft.",
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "markForm": {
+        "tool": "pin",
+        "label": "",
+        "x": "",
+        "y": "",
+        "radiusM": "",
+        "symbol": "cross",
+        "points": []
+      },
+      "drawingActive": false,
+      "cameraEnabled": true,
+      "storeInteractionEnabled": true,
+      "notebookQuery": "",
+      "notebookMatches": [],
+      "counts": {
+        "defaultCertificationCalls": 1,
+        "defaultCertificationSuccesses": 1,
+        "surfaceCreated": 2,
+        "surfaceDisposeCalls": 1,
+        "surfaceRetired": 1,
+        "sceneCreationAttempts": 2,
+        "sceneCreated": 2,
+        "sceneDisposeCalls": 1,
+        "sceneReleased": 1,
+        "sceneApplyCalls": 23,
+        "rasterPrepareCalls": 2,
+        "rasterPrepared": 2,
+        "hostTeardownCalls": 2,
+        "hostRetired": 1,
+        "storeCreated": 2,
+        "storeDisposeCalls": 1,
+        "storeRetired": 1,
+        "repositoryCreated": 2,
+        "repositoryDisposeCalls": 1,
+        "repositoryRetired": 1
+      },
+      "liveOwnedScenes": 1,
+      "raster": {
+        "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "widthM": 5000,
+        "heightM": 3000,
+        "pixelWidth": 4096,
+        "pixelHeight": 2458,
+        "contentWidthPx": 4096,
+        "contentHeightPx": 2457.6
+      },
+      "releaseAcknowledgements": [
+        "real TableScene.dispose returned",
+        "surface disposal acknowledged",
+        "host teardown acknowledged",
+        "repository disposal acknowledged",
+        "store disposal acknowledged"
+      ],
+      "faultInstrumentation": "none; real browser localStorage, workers, raster and TableScene"
+    },
+    "narrow-notebook": {
+      "key": "local-f4ec52c7-ab79-4f86-aeb9-0d41ef469fe9",
+      "mountId": 1,
+      "phase": "ready",
+      "view": "notebook",
+      "ready": true,
+      "paused": false,
+      "busy": false,
+      "certifiedDefaultIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "storage": {
+        "marksKey": "[\"kriegsspiel.local-board.personal.v1\",\"marks\",\"local-f4ec52c7-ab79-4f86-aeb9-0d41ef469fe9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]",
+        "notebookKey": "[\"kriegsspiel.local-board.personal.v1\",\"notebook\",\"local-f4ec52c7-ab79-4f86-aeb9-0d41ef469fe9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]"
+      },
+      "marks": {
+        "draft": [
+          {
+            "id": "c534407f-0557-41f7-b1ee-50869c3ba698",
+            "scope": {
+              "gameId": "local-f4ec52c7-ab79-4f86-aeb9-0d41ef469fe9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Narrow pin",
+            "geometry": {
+              "kind": "pin",
+              "at": {
+                "x": 500,
+                "y": 700
+              }
+            }
+          }
+        ],
+        "dirty": true,
+        "busy": false,
+        "writable": true
+      },
+      "notebook": {
+        "draft": "Narrow draft\nRoad north of village",
+        "dirty": true,
+        "busy": false,
+        "writable": true
+      },
+      "markForm": {
+        "tool": "pin",
+        "label": "Narrow pin",
+        "x": "500",
+        "y": "700",
+        "radiusM": "",
+        "symbol": "cross",
+        "points": [],
+        "editingId": "c534407f-0557-41f7-b1ee-50869c3ba698"
+      },
+      "drawingActive": false,
+      "cameraEnabled": true,
+      "storeInteractionEnabled": true,
+      "notebookQuery": "road",
+      "notebookMatches": [
+        {
+          "line": 2,
+          "text": "Road north of village"
+        }
+      ],
+      "counts": {
+        "defaultCertificationCalls": 1,
+        "defaultCertificationSuccesses": 1,
+        "surfaceCreated": 1,
+        "surfaceDisposeCalls": 0,
+        "surfaceRetired": 0,
+        "sceneCreationAttempts": 1,
+        "sceneCreated": 1,
+        "sceneDisposeCalls": 0,
+        "sceneReleased": 0,
+        "sceneApplyCalls": 5,
+        "rasterPrepareCalls": 1,
+        "rasterPrepared": 1,
+        "hostTeardownCalls": 0,
+        "hostRetired": 0,
+        "storeCreated": 1,
+        "storeDisposeCalls": 0,
+        "storeRetired": 0,
+        "repositoryCreated": 1,
+        "repositoryDisposeCalls": 0,
+        "repositoryRetired": 0
+      },
+      "liveOwnedScenes": 1,
+      "raster": {
+        "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "widthM": 5000,
+        "heightM": 3000,
+        "pixelWidth": 4096,
+        "pixelHeight": 2458,
+        "contentWidthPx": 4096,
+        "contentHeightPx": 2457.6
+      },
+      "releaseAcknowledgements": [],
+      "faultInstrumentation": "none; real browser localStorage, workers, raster and TableScene"
+    },
+    "marks-saved": {
+      "key": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+      "mountId": 1,
+      "phase": "ready",
+      "view": "table",
+      "ready": true,
+      "paused": false,
+      "busy": false,
+      "certifiedDefaultIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "storage": {
+        "marksKey": "[\"kriegsspiel.local-board.personal.v1\",\"marks\",\"local-81c8d190-d626-42f6-b78c-afb291d1fdc9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]",
+        "notebookKey": "[\"kriegsspiel.local-board.personal.v1\",\"notebook\",\"local-81c8d190-d626-42f6-b78c-afb291d1fdc9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]"
+      },
+      "marks": {
+        "draft": [
+          {
+            "id": "f7bc14e8-e566-48de-948c-a43f620f0b16",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": 0,
+            "label": "Village edited",
+            "geometry": {
+              "kind": "pin",
+              "at": {
+                "x": 1200.25,
+                "y": 900.5
+              }
+            }
+          },
+          {
+            "id": "adc925ca-c466-4723-b53f-39c9368b8ed1",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Range",
+            "geometry": {
+              "kind": "ring",
+              "centre": {
+                "x": 2500,
+                "y": 1500
+              },
+              "radiusM": 400.5
+            }
+          },
+          {
+            "id": "db40537f-8022-41e6-85ac-3df546491a24",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Flag",
+            "geometry": {
+              "kind": "symbol",
+              "at": {
+                "x": 2500,
+                "y": 1499.675882273683
+              },
+              "symbol": "flag"
+            }
+          },
+          {
+            "id": "d46732fc-a7bd-41e1-a6dd-3646978ff59f",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Track",
+            "geometry": {
+              "kind": "polyline",
+              "points": [
+                {
+                  "x": 600.25,
+                  "y": 1000
+                },
+                {
+                  "x": 1800,
+                  "y": 1000
+                }
+              ]
+            }
+          },
+          {
+            "id": "b296d3a3-984c-436b-9c26-89dc612ee8e7",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Advance",
+            "geometry": {
+              "kind": "arrow",
+              "points": [
+                {
+                  "x": 2000,
+                  "y": 2000
+                },
+                {
+                  "x": 2500,
+                  "y": 1499.675882273683
+                }
+              ]
+            }
+          }
+        ],
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "notebook": {
+        "draft": "",
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "markForm": {
+        "tool": "pin",
+        "label": "Village edited",
+        "x": "1200.25",
+        "y": "900.5",
+        "radiusM": "",
+        "symbol": "cross",
+        "points": [],
+        "editingId": "f7bc14e8-e566-48de-948c-a43f620f0b16"
+      },
+      "drawingActive": false,
+      "cameraEnabled": true,
+      "storeInteractionEnabled": true,
+      "notebookQuery": "",
+      "notebookMatches": [],
+      "counts": {
+        "defaultCertificationCalls": 1,
+        "defaultCertificationSuccesses": 1,
+        "surfaceCreated": 1,
+        "surfaceDisposeCalls": 0,
+        "surfaceRetired": 0,
+        "sceneCreationAttempts": 1,
+        "sceneCreated": 1,
+        "sceneDisposeCalls": 0,
+        "sceneReleased": 0,
+        "sceneApplyCalls": 13,
+        "rasterPrepareCalls": 1,
+        "rasterPrepared": 1,
+        "hostTeardownCalls": 0,
+        "hostRetired": 0,
+        "storeCreated": 1,
+        "storeDisposeCalls": 0,
+        "storeRetired": 0,
+        "repositoryCreated": 1,
+        "repositoryDisposeCalls": 0,
+        "repositoryRetired": 0
+      },
+      "liveOwnedScenes": 1,
+      "raster": {
+        "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "widthM": 5000,
+        "heightM": 3000,
+        "pixelWidth": 4096,
+        "pixelHeight": 2458,
+        "contentWidthPx": 4096,
+        "contentHeightPx": 2457.6
+      },
+      "releaseAcknowledgements": [],
+      "faultInstrumentation": "none; real browser localStorage, workers, raster and TableScene"
+    },
+    "hmr-restored": {
+      "key": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+      "mountId": 2,
+      "phase": "ready",
+      "view": "table",
+      "ready": true,
+      "paused": false,
+      "busy": false,
+      "certifiedDefaultIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "storage": {
+        "marksKey": "[\"kriegsspiel.local-board.personal.v1\",\"marks\",\"local-81c8d190-d626-42f6-b78c-afb291d1fdc9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]",
+        "notebookKey": "[\"kriegsspiel.local-board.personal.v1\",\"notebook\",\"local-81c8d190-d626-42f6-b78c-afb291d1fdc9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]"
+      },
+      "marks": {
+        "draft": [
+          {
+            "id": "f7bc14e8-e566-48de-948c-a43f620f0b16",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": 0,
+            "label": "Village edited",
+            "geometry": {
+              "kind": "pin",
+              "at": {
+                "x": 1200.25,
+                "y": 900.5
+              }
+            }
+          },
+          {
+            "id": "adc925ca-c466-4723-b53f-39c9368b8ed1",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Range",
+            "geometry": {
+              "kind": "ring",
+              "centre": {
+                "x": 2500,
+                "y": 1500
+              },
+              "radiusM": 400.5
+            }
+          },
+          {
+            "id": "db40537f-8022-41e6-85ac-3df546491a24",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Flag",
+            "geometry": {
+              "kind": "symbol",
+              "at": {
+                "x": 2500,
+                "y": 1499.675882273683
+              },
+              "symbol": "flag"
+            }
+          },
+          {
+            "id": "d46732fc-a7bd-41e1-a6dd-3646978ff59f",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Track",
+            "geometry": {
+              "kind": "polyline",
+              "points": [
+                {
+                  "x": 600.25,
+                  "y": 1000
+                },
+                {
+                  "x": 1800,
+                  "y": 1000
+                }
+              ]
+            }
+          },
+          {
+            "id": "b296d3a3-984c-436b-9c26-89dc612ee8e7",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Advance",
+            "geometry": {
+              "kind": "arrow",
+              "points": [
+                {
+                  "x": 2000,
+                  "y": 2000
+                },
+                {
+                  "x": 2500,
+                  "y": 1499.675882273683
+                }
+              ]
+            }
+          }
+        ],
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "notebook": {
+        "draft": "Reconnaissance <manual>\nVillage west road\nKeep this unsaved draft.",
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "markForm": {
+        "tool": "pin",
+        "label": "",
+        "x": "",
+        "y": "",
+        "radiusM": "",
+        "symbol": "cross",
+        "points": []
+      },
+      "drawingActive": false,
+      "cameraEnabled": true,
+      "storeInteractionEnabled": true,
+      "notebookQuery": "",
+      "notebookMatches": [],
+      "counts": {
+        "defaultCertificationCalls": 1,
+        "defaultCertificationSuccesses": 1,
+        "surfaceCreated": 2,
+        "surfaceDisposeCalls": 1,
+        "surfaceRetired": 1,
+        "sceneCreationAttempts": 2,
+        "sceneCreated": 2,
+        "sceneDisposeCalls": 1,
+        "sceneReleased": 1,
+        "sceneApplyCalls": 23,
+        "rasterPrepareCalls": 2,
+        "rasterPrepared": 2,
+        "hostTeardownCalls": 2,
+        "hostRetired": 1,
+        "storeCreated": 2,
+        "storeDisposeCalls": 1,
+        "storeRetired": 1,
+        "repositoryCreated": 2,
+        "repositoryDisposeCalls": 1,
+        "repositoryRetired": 1
+      },
+      "liveOwnedScenes": 1,
+      "raster": {
+        "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "widthM": 5000,
+        "heightM": 3000,
+        "pixelWidth": 4096,
+        "pixelHeight": 2458,
+        "contentWidthPx": 4096,
+        "contentHeightPx": 2457.6
+      },
+      "releaseAcknowledgements": [
+        "real TableScene.dispose returned",
+        "surface disposal acknowledged",
+        "host teardown acknowledged",
+        "repository disposal acknowledged",
+        "store disposal acknowledged"
+      ],
+      "faultInstrumentation": "none; real browser localStorage, workers, raster and TableScene"
+    },
+    "fresh-scope": {
+      "key": "local-b7790364-b630-48b6-ad5b-2d55430fe18a",
+      "mountId": 3,
+      "phase": "ready",
+      "view": "table",
+      "ready": true,
+      "paused": false,
+      "busy": false,
+      "certifiedDefaultIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "storage": {
+        "marksKey": "[\"kriegsspiel.local-board.personal.v1\",\"marks\",\"local-b7790364-b630-48b6-ad5b-2d55430fe18a\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]",
+        "notebookKey": "[\"kriegsspiel.local-board.personal.v1\",\"notebook\",\"local-b7790364-b630-48b6-ad5b-2d55430fe18a\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]"
+      },
+      "marks": {
+        "draft": [],
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "notebook": {
+        "draft": "",
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "markForm": {
+        "tool": "pin",
+        "label": "",
+        "x": "",
+        "y": "",
+        "radiusM": "",
+        "symbol": "cross",
+        "points": []
+      },
+      "drawingActive": false,
+      "cameraEnabled": true,
+      "storeInteractionEnabled": true,
+      "notebookQuery": "",
+      "notebookMatches": [],
+      "counts": {
+        "defaultCertificationCalls": 1,
+        "defaultCertificationSuccesses": 1,
+        "surfaceCreated": 3,
+        "surfaceDisposeCalls": 2,
+        "surfaceRetired": 2,
+        "sceneCreationAttempts": 3,
+        "sceneCreated": 3,
+        "sceneDisposeCalls": 2,
+        "sceneReleased": 2,
+        "sceneApplyCalls": 26,
+        "rasterPrepareCalls": 3,
+        "rasterPrepared": 3,
+        "hostTeardownCalls": 4,
+        "hostRetired": 2,
+        "storeCreated": 3,
+        "storeDisposeCalls": 2,
+        "storeRetired": 2,
+        "repositoryCreated": 3,
+        "repositoryDisposeCalls": 2,
+        "repositoryRetired": 2
+      },
+      "liveOwnedScenes": 1,
+      "raster": {
+        "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "widthM": 5000,
+        "heightM": 3000,
+        "pixelWidth": 4096,
+        "pixelHeight": 2458,
+        "contentWidthPx": 4096,
+        "contentHeightPx": 2457.6
+      },
+      "releaseAcknowledgements": [
+        "real TableScene.dispose returned",
+        "surface disposal acknowledged",
+        "host teardown acknowledged",
+        "repository disposal acknowledged",
+        "store disposal acknowledged",
+        "real TableScene.dispose returned",
+        "surface disposal acknowledged",
+        "host teardown acknowledged",
+        "repository disposal acknowledged",
+        "store disposal acknowledged"
+      ],
+      "faultInstrumentation": "none; real browser localStorage, workers, raster and TableScene"
+    },
+    "hmr-edited": {
+      "key": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+      "mountId": 2,
+      "phase": "ready",
+      "view": "table",
+      "ready": true,
+      "paused": false,
+      "busy": false,
+      "certifiedDefaultIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "storage": {
+        "marksKey": "[\"kriegsspiel.local-board.personal.v1\",\"marks\",\"local-81c8d190-d626-42f6-b78c-afb291d1fdc9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]",
+        "notebookKey": "[\"kriegsspiel.local-board.personal.v1\",\"notebook\",\"local-81c8d190-d626-42f6-b78c-afb291d1fdc9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]"
+      },
+      "marks": {
+        "draft": [
+          {
+            "id": "f7bc14e8-e566-48de-948c-a43f620f0b16",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": 0,
+            "label": "Village edited",
+            "geometry": {
+              "kind": "pin",
+              "at": {
+                "x": 1200.25,
+                "y": 900.5
+              }
+            }
+          },
+          {
+            "id": "adc925ca-c466-4723-b53f-39c9368b8ed1",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Range",
+            "geometry": {
+              "kind": "ring",
+              "centre": {
+                "x": 2500,
+                "y": 1500
+              },
+              "radiusM": 400.5
+            }
+          },
+          {
+            "id": "db40537f-8022-41e6-85ac-3df546491a24",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Flag",
+            "geometry": {
+              "kind": "symbol",
+              "at": {
+                "x": 2500,
+                "y": 1499.675882273683
+              },
+              "symbol": "flag"
+            }
+          },
+          {
+            "id": "d46732fc-a7bd-41e1-a6dd-3646978ff59f",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Track",
+            "geometry": {
+              "kind": "polyline",
+              "points": [
+                {
+                  "x": 600.25,
+                  "y": 1000
+                },
+                {
+                  "x": 1800,
+                  "y": 1000
+                }
+              ]
+            }
+          },
+          {
+            "id": "b296d3a3-984c-436b-9c26-89dc612ee8e7",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Advance",
+            "geometry": {
+              "kind": "arrow",
+              "points": [
+                {
+                  "x": 2000,
+                  "y": 2000
+                },
+                {
+                  "x": 2500,
+                  "y": 1499.675882273683
+                }
+              ]
+            }
+          }
+        ],
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "notebook": {
+        "draft": "Reconnaissance <manual>\nVillage west road\nKeep this unsaved draft.",
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "markForm": {
+        "tool": "pin",
+        "label": "",
+        "x": "",
+        "y": "",
+        "radiusM": "",
+        "symbol": "cross",
+        "points": []
+      },
+      "drawingActive": false,
+      "cameraEnabled": true,
+      "storeInteractionEnabled": true,
+      "notebookQuery": "",
+      "notebookMatches": [],
+      "counts": {
+        "defaultCertificationCalls": 1,
+        "defaultCertificationSuccesses": 1,
+        "surfaceCreated": 2,
+        "surfaceDisposeCalls": 1,
+        "surfaceRetired": 1,
+        "sceneCreationAttempts": 2,
+        "sceneCreated": 2,
+        "sceneDisposeCalls": 1,
+        "sceneReleased": 1,
+        "sceneApplyCalls": 23,
+        "rasterPrepareCalls": 2,
+        "rasterPrepared": 2,
+        "hostTeardownCalls": 2,
+        "hostRetired": 1,
+        "storeCreated": 2,
+        "storeDisposeCalls": 1,
+        "storeRetired": 1,
+        "repositoryCreated": 2,
+        "repositoryDisposeCalls": 1,
+        "repositoryRetired": 1
+      },
+      "liveOwnedScenes": 1,
+      "raster": {
+        "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "widthM": 5000,
+        "heightM": 3000,
+        "pixelWidth": 4096,
+        "pixelHeight": 2458,
+        "contentWidthPx": 4096,
+        "contentHeightPx": 2457.6
+      },
+      "releaseAcknowledgements": [
+        "real TableScene.dispose returned",
+        "surface disposal acknowledged",
+        "host teardown acknowledged",
+        "repository disposal acknowledged",
+        "store disposal acknowledged"
+      ],
+      "faultInstrumentation": "none; real browser localStorage, workers, raster and TableScene"
+    },
+    "narrow-retired": {
+      "key": "local-f4ec52c7-ab79-4f86-aeb9-0d41ef469fe9",
+      "mountId": null,
+      "phase": "retired",
+      "view": "notebook",
+      "ready": false,
+      "paused": false,
+      "busy": false,
+      "certifiedDefaultIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "storage": null,
+      "marks": null,
+      "notebook": null,
+      "markForm": null,
+      "drawingActive": false,
+      "cameraEnabled": true,
+      "storeInteractionEnabled": false,
+      "notebookQuery": "",
+      "notebookMatches": [],
+      "counts": {
+        "defaultCertificationCalls": 1,
+        "defaultCertificationSuccesses": 1,
+        "surfaceCreated": 1,
+        "surfaceDisposeCalls": 1,
+        "surfaceRetired": 1,
+        "sceneCreationAttempts": 1,
+        "sceneCreated": 1,
+        "sceneDisposeCalls": 1,
+        "sceneReleased": 1,
+        "sceneApplyCalls": 5,
+        "rasterPrepareCalls": 1,
+        "rasterPrepared": 1,
+        "hostTeardownCalls": 2,
+        "hostRetired": 1,
+        "storeCreated": 1,
+        "storeDisposeCalls": 1,
+        "storeRetired": 1,
+        "repositoryCreated": 1,
+        "repositoryDisposeCalls": 1,
+        "repositoryRetired": 1
+      },
+      "liveOwnedScenes": 0,
+      "raster": {
+        "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "widthM": 5000,
+        "heightM": 3000,
+        "pixelWidth": 4096,
+        "pixelHeight": 2458,
+        "contentWidthPx": 4096,
+        "contentHeightPx": 2457.6
+      },
+      "releaseAcknowledgements": [
+        "real TableScene.dispose returned",
+        "surface disposal acknowledged",
+        "host teardown acknowledged",
+        "repository disposal acknowledged",
+        "store disposal acknowledged"
+      ],
+      "faultInstrumentation": "none; real browser localStorage, workers, raster and TableScene"
+    },
+    "paused": {
+      "key": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+      "mountId": 2,
+      "phase": "ready",
+      "view": "table",
+      "ready": true,
+      "paused": true,
+      "busy": false,
+      "certifiedDefaultIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "storage": {
+        "marksKey": "[\"kriegsspiel.local-board.personal.v1\",\"marks\",\"local-81c8d190-d626-42f6-b78c-afb291d1fdc9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]",
+        "notebookKey": "[\"kriegsspiel.local-board.personal.v1\",\"notebook\",\"local-81c8d190-d626-42f6-b78c-afb291d1fdc9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]"
+      },
+      "marks": {
+        "draft": [
+          {
+            "id": "f7bc14e8-e566-48de-948c-a43f620f0b16",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": 0,
+            "label": "Village edited",
+            "geometry": {
+              "kind": "pin",
+              "at": {
+                "x": 1200.25,
+                "y": 900.5
+              }
+            }
+          },
+          {
+            "id": "adc925ca-c466-4723-b53f-39c9368b8ed1",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Range",
+            "geometry": {
+              "kind": "ring",
+              "centre": {
+                "x": 2500,
+                "y": 1500
+              },
+              "radiusM": 400.5
+            }
+          },
+          {
+            "id": "db40537f-8022-41e6-85ac-3df546491a24",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Flag",
+            "geometry": {
+              "kind": "symbol",
+              "at": {
+                "x": 2500,
+                "y": 1499.675882273683
+              },
+              "symbol": "flag"
+            }
+          },
+          {
+            "id": "d46732fc-a7bd-41e1-a6dd-3646978ff59f",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Track",
+            "geometry": {
+              "kind": "polyline",
+              "points": [
+                {
+                  "x": 600.25,
+                  "y": 1000
+                },
+                {
+                  "x": 1800,
+                  "y": 1000
+                }
+              ]
+            }
+          },
+          {
+            "id": "b296d3a3-984c-436b-9c26-89dc612ee8e7",
+            "scope": {
+              "gameId": "local-81c8d190-d626-42f6-b78c-afb291d1fdc9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Advance",
+            "geometry": {
+              "kind": "arrow",
+              "points": [
+                {
+                  "x": 2000,
+                  "y": 2000
+                },
+                {
+                  "x": 2500,
+                  "y": 1499.675882273683
+                }
+              ]
+            }
+          }
+        ],
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "notebook": {
+        "draft": "Reconnaissance <manual>\nVillage west road\nKeep this unsaved draft.",
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "markForm": {
+        "tool": "pin",
+        "label": "",
+        "x": "",
+        "y": "",
+        "radiusM": "",
+        "symbol": "cross",
+        "points": []
+      },
+      "drawingActive": false,
+      "cameraEnabled": true,
+      "storeInteractionEnabled": false,
+      "notebookQuery": "",
+      "notebookMatches": [],
+      "counts": {
+        "defaultCertificationCalls": 1,
+        "defaultCertificationSuccesses": 1,
+        "surfaceCreated": 2,
+        "surfaceDisposeCalls": 1,
+        "surfaceRetired": 1,
+        "sceneCreationAttempts": 2,
+        "sceneCreated": 2,
+        "sceneDisposeCalls": 1,
+        "sceneReleased": 1,
+        "sceneApplyCalls": 20,
+        "rasterPrepareCalls": 2,
+        "rasterPrepared": 2,
+        "hostTeardownCalls": 2,
+        "hostRetired": 1,
+        "storeCreated": 2,
+        "storeDisposeCalls": 1,
+        "storeRetired": 1,
+        "repositoryCreated": 2,
+        "repositoryDisposeCalls": 1,
+        "repositoryRetired": 1
+      },
+      "liveOwnedScenes": 1,
+      "raster": {
+        "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "widthM": 5000,
+        "heightM": 3000,
+        "pixelWidth": 4096,
+        "pixelHeight": 2458,
+        "contentWidthPx": 4096,
+        "contentHeightPx": 2457.6
+      },
+      "releaseAcknowledgements": [
+        "real TableScene.dispose returned",
+        "surface disposal acknowledged",
+        "host teardown acknowledged",
+        "repository disposal acknowledged",
+        "store disposal acknowledged"
+      ],
+      "faultInstrumentation": "none; real browser localStorage, workers, raster and TableScene"
+    },
+    "narrow-tools": {
+      "key": "local-f4ec52c7-ab79-4f86-aeb9-0d41ef469fe9",
+      "mountId": 1,
+      "phase": "ready",
+      "view": "table",
+      "ready": true,
+      "paused": false,
+      "busy": false,
+      "certifiedDefaultIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "storage": {
+        "marksKey": "[\"kriegsspiel.local-board.personal.v1\",\"marks\",\"local-f4ec52c7-ab79-4f86-aeb9-0d41ef469fe9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]",
+        "notebookKey": "[\"kriegsspiel.local-board.personal.v1\",\"notebook\",\"local-f4ec52c7-ab79-4f86-aeb9-0d41ef469fe9\",\"blue\",\"local-general\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",\"local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84\",0,0,5000,3000,\"north-west\",\"metres\",\"east\",\"south\"]"
+      },
+      "marks": {
+        "draft": [
+          {
+            "id": "c534407f-0557-41f7-b1ee-50869c3ba698",
+            "scope": {
+              "gameId": "local-f4ec52c7-ab79-4f86-aeb9-0d41ef469fe9",
+              "sideId": "blue",
+              "playerId": "local-general"
+            },
+            "binding": {
+              "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+              "bounds": {
+                "minX": 0,
+                "minY": 0,
+                "maxX": 5000,
+                "maxY": 3000
+              },
+              "registration": {
+                "origin": "north-west",
+                "units": "metres",
+                "xAxis": "east",
+                "yAxis": "south"
+              }
+            },
+            "source": {
+              "kind": "manual"
+            },
+            "placedAtGame": 0,
+            "editedAtGame": null,
+            "label": "Narrow pin",
+            "geometry": {
+              "kind": "pin",
+              "at": {
+                "x": 500,
+                "y": 700
+              }
+            }
+          }
+        ],
+        "dirty": true,
+        "busy": false,
+        "writable": true
+      },
+      "notebook": {
+        "draft": "",
+        "dirty": false,
+        "busy": false,
+        "writable": true
+      },
+      "markForm": {
+        "tool": "pin",
+        "label": "Narrow pin",
+        "x": "500",
+        "y": "700",
+        "radiusM": "",
+        "symbol": "cross",
+        "points": [],
+        "editingId": "c534407f-0557-41f7-b1ee-50869c3ba698"
+      },
+      "drawingActive": false,
+      "cameraEnabled": true,
+      "storeInteractionEnabled": true,
+      "notebookQuery": "",
+      "notebookMatches": [],
+      "counts": {
+        "defaultCertificationCalls": 1,
+        "defaultCertificationSuccesses": 1,
+        "surfaceCreated": 1,
+        "surfaceDisposeCalls": 0,
+        "surfaceRetired": 0,
+        "sceneCreationAttempts": 1,
+        "sceneCreated": 1,
+        "sceneDisposeCalls": 0,
+        "sceneReleased": 0,
+        "sceneApplyCalls": 4,
+        "rasterPrepareCalls": 1,
+        "rasterPrepared": 1,
+        "hostTeardownCalls": 0,
+        "hostRetired": 0,
+        "storeCreated": 1,
+        "storeDisposeCalls": 0,
+        "storeRetired": 0,
+        "repositoryCreated": 1,
+        "repositoryDisposeCalls": 0,
+        "repositoryRetired": 0
+      },
+      "liveOwnedScenes": 1,
+      "raster": {
+        "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "widthM": 5000,
+        "heightM": 3000,
+        "pixelWidth": 4096,
+        "pixelHeight": 2458,
+        "contentWidthPx": 4096,
+        "contentHeightPx": 2457.6
+      },
+      "releaseAcknowledgements": [],
+      "faultInstrumentation": "none; real browser localStorage, workers, raster and TableScene"
+    }
+  },
+  "narrowExport": "Personal notebook \u2014 unsaved changes\n\nNarrow draft\nRoad north of village",
+  "limits": [
+    "Temporary source-authored diagnostic wrapper; never canonical application route or resume selector.",
+    "Same-scope recreation is a proof-only stored-record readback action; application reload/fresh-session policy remains A5.",
+    "Counters observe actual owned methods and retirement acknowledgements, not GPU reclamation/native listener or worker allocation totals.",
+    "Corrupt/future/conflict/quota/cancellation/reentrant edge cases are unit-port tests; browser quota exhaustion or corrupt-record injection were not performed.",
+    "Initial immediate isEnabled read after pause returned true before DOM settlement; subsequent settled native DOM confirmed all actions/input gates disabled.",
+    "Two host allocations preceded personal-template HMR because of explicit proof store recreation; HMR itself kept counts/raster and current scope unchanged.",
+    "Screenshots show actual scrolled native controls; the diagnostic wrapper layout is not the forthcoming A5 shell."
+  ]
+}

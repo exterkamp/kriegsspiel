@@ -86,6 +86,7 @@ function api(over: Partial<ShellApi> = {}): ShellApi {
     signOut: async () => undefined,
     deleteAccount: async () => true,
     guestEnabled: async () => false,
+    devToolsEnabled: async () => false,
     startGuest: async () => undefined,
     fetchGame: async () => info(),
     joinSide: async () => undefined,
@@ -167,6 +168,34 @@ describe('main menu', () => {
     expect(el.textContent).toContain('About');
   });
 
+  it('shows the Developer tools links when the server turns them on', async () => {
+    await open('/', { devToolsEnabled: async () => true });
+    expect(el.querySelector('#dev-h')?.textContent).toBe('Developer tools');
+    const links = [...el.querySelectorAll('section.dev a')].map((a) => [
+      a.textContent,
+      a.getAttribute('href'),
+    ]);
+    expect(links).toEqual([
+      ['Map editor', '/map-authoring'],
+      ['Map benchmark', '/map-benchmark'],
+      ['Table benchmark', '/table-benchmark'],
+      ['Admin view', '/admin/'],
+    ]);
+    expect(el.querySelector('section.dev')?.textContent).toContain('admin token');
+  });
+
+  it('leaves the Developer tools out when the server turns them off or cannot say', async () => {
+    await open('/');
+    expect(el.querySelector('#dev-h')).toBeNull();
+    TestBed.resetTestingModule();
+    await open('/', {
+      devToolsEnabled: async () => {
+        throw new Error('down');
+      },
+    });
+    expect(el.querySelector('#dev-h')).toBeNull();
+  });
+
   it('hides Continue when there is nothing to continue', async () => {
     await open('/', { fetchGames: async () => [game({ finished: true })] });
     expect(el.querySelector('#continue-h')).toBeNull();
@@ -243,13 +272,14 @@ describe('sign-in and guest', () => {
     expect(el.textContent).not.toContain('Play as guest');
   });
 
-  it('Play as guest starts a session, then opens a new game on a fresh load', async () => {
+  it('Play as guest starts a session, then reloads into the main menu rather than a game', async () => {
     const startGuest = vi.fn(async () => undefined);
     await open('/', { fetchMe: async () => undefined, guestEnabled: async () => true, startGuest });
     click('Play as guest');
     await settle();
     expect(startGuest).toHaveBeenCalledOnce();
-    expect(assign).toHaveBeenCalledWith('/?new=1');
+    expect(reload).toHaveBeenCalledOnce();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('Play as guest on an invite link reloads it, and shows a failure', async () => {
@@ -291,9 +321,20 @@ describe('moving between screens', () => {
     expect(el.querySelector('#continue-h')).not.toBeNull();
   });
 
+  it('offers the side as a choice when there are two to pick from', async () => {
+    await open('/?lobby=1', {
+      fetchScenarioOptions: async () => ({ ...options, opponent: undefined }),
+    });
+    expect(radio('input[name=side][value=blue]').checked).toBe(true);
+    expect(radio('input[name=side][value=red]').checked).toBe(false);
+    expect(el.querySelector('.side-only')).toBeNull();
+  });
+
   it('defaults to the first scenario, Blue and 12:1, and explains the rate', async () => {
     await open('/?lobby=1');
-    expect(radio('input[name=side][value=blue]').checked).toBe(true);
+    // One side to play: shown as text, not a one-item list of radios.
+    expect(el.querySelector('input[name=side]')).toBeNull();
+    expect(el.querySelector('.side-only')?.textContent?.trim()).toBe('Blue');
     expect(radio('input[name=rate][value="12"]').checked).toBe(true);
     expect(el.textContent).toContain('one hour of battle passes in five minutes');
     expect(el.querySelector('input[name=side][value=red]')).toBeNull();
@@ -362,6 +403,8 @@ describe('moving between screens', () => {
     expect(window.location.search).toBe('?game=g1');
     expect(el.querySelector('canvas')).not.toBeNull();
     expect(el.textContent).toContain('Menu (Esc)');
+    click('Menu (Esc)');
+    await settle();
     expect(el.querySelector('#account')?.textContent).toContain('me@example.test');
   });
 
@@ -498,6 +541,7 @@ describe('in-game menu', () => {
       'Resume',
       'Leave to main menu',
       'Sign out',
+      'Delete account',
     ]);
     expect(document.activeElement?.textContent).toBe('Resume');
     await esc();
@@ -552,6 +596,8 @@ describe('account bar', () => {
   it('Delete account asks first, then leaves for the home page', async () => {
     const deleteAccount = vi.fn(async () => true);
     await open('/?game=g1', { deleteAccount });
+    click('Menu (Esc)');
+    await settle();
     const confirmSpy = vi
       .spyOn(window, 'confirm')
       .mockReturnValueOnce(false)

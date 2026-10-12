@@ -52,6 +52,18 @@ async function open(dispatches: Dispatch[]) {
 }
 
 describe('InTrayComponent', () => {
+  it('opens on the first pile with something unread, not the empty Urgent pile', async () => {
+    const t = await open([disp('s1', { category: 'staff' })]);
+    expect(t.pileBtn('Staff').getAttribute('aria-pressed')).toBe('true');
+    expect(t.pileBtn('Urgent').getAttribute('aria-pressed')).toBe('false');
+    expect(t.rows()).toHaveLength(1);
+  });
+
+  it('opens on Urgent when nothing is unread', async () => {
+    const t = await open([]);
+    expect(t.pileBtn('Urgent').getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('shows piles with unread counts and lists the open pile', async () => {
     const t = await open([disp('a', { category: 'urgent' }), disp('b'), disp('c')]);
     expect(t.pileBtn('Urgent').textContent).toContain('1');

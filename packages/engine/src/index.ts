@@ -11,6 +11,7 @@ export { serialize, deserialize } from './snapshot.js';
 export * from './types.js';
 export { loadScenario, parseTerrain, ScenarioError } from './scenario.js';
 export { holdTheBridge } from './scenarios/holdTheBridge.js';
+export { holdTheBridgeFarStart } from './scenarios/holdTheBridgeFarStart.js';
 export * from './geometry.js';
 export { rasterise, SAMPLE_TERRAIN } from './raster.js';
 export type { TerrainRaster } from './raster.js';
@@ -143,6 +144,7 @@ export {
   SIGHT_RANGE_MM,
   UNCERTAINTY_MM_PER_MINUTE,
   canSee,
+  contactAgedOut,
   sightRangeMm,
   registerVisibility,
   startVisibility,

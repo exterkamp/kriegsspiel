@@ -253,3 +253,7 @@ devrun up --name ng --port-env PORT -- sh -c 'API_URL=$(devrun url api) npm run 
 npm run build -w client-ng            # client-ng/dist
 npm test -w client-ng
 ```
+
+## Native Angular saved-map inspection restoration
+
+D30 restores the file-only inspector at `/map-table`; `/map-table.html` now redirects there with its query. The Angular component and component-scoped signal/resource service replace the old imperative page. Shared saved-file certification and raster algorithms are restored under `client/src/shared/map-table/` and use the retained framework-free authoring workers and Three.js renderer. The root menu, guest/scenario/live routing and retired fixture policy stay as described above. Development catalog and local New game setup are separate landing packets.

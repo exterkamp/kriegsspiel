@@ -60,7 +60,7 @@ export function windowAt(input: ReplayInput, gameMs: number): WindowAt {
       .map((x) => ({
         id: x.id,
         time: x.time,
-        unitId: x.proposal.unitId,
+        ...('proposal' in x ? { unitId: x.proposal.unitId } : {}),
         rationale: x.rationale,
         narrative: x.narrative,
       })),

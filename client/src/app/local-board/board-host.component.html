@@ -1,0 +1,36 @@
+<section aria-label="Local map board" [attr.aria-busy]="!state().ready && !state().error">
+  <nav aria-label="Board camera">
+    <button
+      type="button"
+      [disabled]="!state().ready || !interactionEnabled() || !cameraEnabled()"
+      (click)="snap('top-down')"
+    >
+      Top-down
+    </button>
+    <button
+      type="button"
+      [disabled]="!state().ready || !interactionEnabled() || !cameraEnabled()"
+      (click)="snap('oblique')"
+    >
+      Oblique
+    </button>
+  </nav>
+  <div class="viewport">
+    <canvas
+      #canvas
+      [tabindex]="interactionEnabled() ? 0 : -1"
+      (click)="point($event)"
+      [attr.aria-label]="
+        cameraEnabled()
+          ? 'Local map in metres; drag to orbit, right-drag to pan, scroll to zoom, or focus and use arrow keys'
+          : 'Local map in metres; click to place a manual mark'
+      "
+    ></canvas>
+  </div>
+  <p role="status" aria-live="polite" [attr.data-error]="!!state().error">
+    {{
+      state().error ??
+        (state().ready ? 'Local board ready · time stopped at 0' : 'Preparing local board…')
+    }}
+  </p>
+</section>

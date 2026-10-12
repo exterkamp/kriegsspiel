@@ -101,6 +101,25 @@ describe('GameClock realtime', () => {
     expect(() => clock.resume()).toThrow();
   });
 
+  it('stop can freeze at a given game time earlier than the current reading', () => {
+    const wall = fakeWall();
+    const clock = new GameClock(wall);
+    wall.advance(1000);
+    // The tick that notices the outcome runs late: the reading has moved past the end.
+    expect(clock.now()).toBe(1000);
+    clock.stop(400);
+    expect(clock.now()).toBe(400);
+    wall.advance(1000);
+    expect(clock.now()).toBe(400);
+    expect(clock.history().at(-1)).toMatchObject({ kind: 'stop', gameMs: 400, status: 'stopped' });
+    // A given time in the future clamps to the current reading instead of jumping forward.
+    const wall2 = fakeWall();
+    const clock2 = new GameClock(wall2);
+    wall2.advance(100);
+    clock2.stop(500);
+    expect(clock2.now()).toBe(100);
+  });
+
   it('converts wall time to game time and back', () => {
     const wall = fakeWall(0);
     const clock = new GameClock(wall, { rate: 4 });

@@ -82,6 +82,7 @@ export class TableScene {
   readonly camera: THREE.PerspectiveCamera;
   readonly renderer: THREE.WebGLRenderer;
   readonly controls: OrbitControls;
+  private readonly controlsRoot: Node;
   private state: SceneState | undefined;
   private mapKey = '';
   private mapMesh: THREE.Mesh | undefined;
@@ -139,6 +140,7 @@ export class TableScene {
       preserveDrawingBuffer: opts.preserveDrawingBuffer ?? false,
     });
     this.camera = new THREE.PerspectiveCamera(45, 1, 10, 100_000);
+    this.controlsRoot = canvas.getRootNode();
     let controls: OrbitControls | undefined;
     try {
       this.renderer.localClippingEnabled = true;
@@ -160,7 +162,7 @@ export class TableScene {
       this.scene.add(this.dressing);
       this.resize();
     } catch (error) {
-      controls?.dispose();
+      this.disposeControls(controls);
       this.releaseTree(this.scene);
       this.scene.clear();
       this.renderer.dispose();
@@ -1157,13 +1159,29 @@ export class TableScene {
     cancelAnimationFrame(this.raf);
     this.raf = 0;
   }
+  /** Three r170 recomputes the root during disconnect; Angular may already detach its canvas. */
+  private disposeControls(controls: OrbitControls | undefined): void {
+    if (!controls) return;
+    // These bound callbacks are a pinned dependency seam; real-control regressions protect it.
+    const callbacks = controls as OrbitControls & {
+      _interceptControlDown?: EventListener;
+      _interceptControlUp?: EventListener;
+    };
+    for (const root of new Set([this.controlsRoot, controls.domElement?.getRootNode()])) {
+      if (callbacks._interceptControlDown)
+        root?.removeEventListener('keydown', callbacks._interceptControlDown, true);
+      if (callbacks._interceptControlUp)
+        root?.removeEventListener('keyup', callbacks._interceptControlUp, true);
+    }
+    controls.dispose();
+  }
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     this.onPreviewUnavailable = undefined;
     this.stop();
     this.controls.removeEventListener('change', this.clipPaperLabels);
-    this.controls.dispose();
+    this.disposeControls(this.controls);
     this.releaseTree(this.scene);
     this.pieces.clear();
     this.marks.clear();

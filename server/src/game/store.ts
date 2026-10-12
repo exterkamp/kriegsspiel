@@ -5,7 +5,7 @@
  * plus clock) and an append-only input log: every player command and every parser result, so a
  * game can be replayed with no model calls. `SqliteGameStore` (sqlite.ts) is the durable implementation.
  */
-import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, truncate, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Seat } from '@kriegsspiel/engine';
 import type { DraftSnapshot, Mark } from '@kriegsspiel/protocol';
@@ -276,8 +276,41 @@ export class FileGameStore extends MemoryGameStore {
     return (await this.readLog(gameId))?.header;
   }
 
+  /** Games whose log tail this store has already checked for crash damage. */
+  private readonly tailChecked = new Set<string>();
+
   override async appendInput(gameId: string, entry: InputLogEntry): Promise<void> {
+    await this.repairTruncatedTail(gameId);
     await appendFile(this.logPath(gameId), `${JSON.stringify(entry)}\n`);
+  }
+
+  /**
+   * A crash can leave the log's final line half-written. `parseInputLog` ignores such a tail,
+   * but appending to the file as-is would glue the next entry onto the partial line and make
+   * the whole log unparseable. So before this store's first append to a log, drop a partial
+   * tail; a final line that is complete except for its newline just gets the newline. Only
+   * the first append needs the check: this store only ever writes whole lines, so a tail can
+   * be partial again only after another crash, which means a new process and a new store.
+   */
+  private async repairTruncatedTail(gameId: string): Promise<void> {
+    if (this.tailChecked.has(gameId)) return;
+    this.tailChecked.add(gameId);
+    const path = this.logPath(gameId);
+    let text: string;
+    try {
+      text = await readFile(path, 'utf8');
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw e;
+    }
+    if (text === '' || text.endsWith('\n')) return;
+    const tail = text.slice(text.lastIndexOf('\n') + 1);
+    try {
+      JSON.parse(tail);
+      await appendFile(path, '\n');
+    } catch {
+      await truncate(path, Buffer.byteLength(text) - Buffer.byteLength(tail));
+    }
   }
 
   override async inputLog(gameId: string, afterSeq = 0): Promise<readonly InputLogEntry[]> {
