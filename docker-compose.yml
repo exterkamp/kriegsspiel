@@ -11,7 +11,15 @@ services:
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # With no key the umpire answers with canned responses (the `test` provider). Set a key to use the real model.
-      UMPIRE_KEYLESS_PROVIDER: ${UMPIRE_KEYLESS_PROVIDER:-test}
+      # `ollama` (the default) answers parse, narrate and staff from the small local model below and falls back to `test`
+      # while it downloads or if a call fails; `test` uses canned responses only.
+      UMPIRE_KEYLESS_PROVIDER: ${UMPIRE_KEYLESS_PROVIDER:-ollama}
+      # Where the server reaches Ollama. The service name works on the default compose network; with `network_mode: bridge`
+      # point it at the host's published port instead (see docs/deployment.md).
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:0.5b}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-}
+      OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-}
       PUBLIC_URL: ${PUBLIC_URL:-}
       MAIL_WEBHOOK_URL: ${MAIL_WEBHOOK_URL:-}
       MAIL_WEBHOOK_TOKEN: ${MAIL_WEBHOOK_TOKEN:-}
@@ -31,6 +39,42 @@ services:
     logging:
       driver: json-file
       options: { max-size: 10m, max-file: '5' }
+
+  # A very small local model for the keyless umpire. It starts serving at once and pulls the model in the background
+  # (retrying until it succeeds, resuming a partial download), so the game does not wait: until the pull ends the
+  # server's calls fail and fall back to the test umpire. CPU only; the model is stored in the `ollama` volume.
+  ollama:
+    image: ollama/ollama:0.40.3
+    restart: unless-stopped
+    environment:
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:0.5b}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+      OLLAMA_NUM_PARALLEL: '1'
+      OLLAMA_MAX_LOADED_MODELS: '1'
+    # Published for hosts that cannot give the services a shared network; bound to the loopback by default.
+    ports:
+      - '${OLLAMA_BIND:-127.0.0.1}:${OLLAMA_PORT:-11434}:11434'
+    entrypoint:
+      - sh
+      - -c
+      - |
+        ollama serve &
+        server=$$!
+        until ollama list >/dev/null 2>&1; do sleep 1; done
+        (until ollama pull "$$OLLAMA_MODEL"; do sleep 15; done) &
+        wait $$server
+    # Healthy once the server answers; the model may still be downloading (see `docker compose logs ollama`).
+    healthcheck:
+      test: ['CMD', 'ollama', 'list']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    volumes:
+      - ollama:/root/.ollama
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: '3' }
 
   # Nightly consistent copy of the database (VACUUM INTO), keeping the newest BACKUP_KEEP.
   backup:
@@ -52,3 +96,4 @@ services:
 
 volumes:
   data:
+  ollama:

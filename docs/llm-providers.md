@@ -56,6 +56,22 @@ Select it with `UMPIRE_PROVIDER=test` (every stage), `UMPIRE_PROVIDER_<STAGE>=te
 
 Its output is deterministic and validated like any model's, and recorded through `CallRecorder`. The game shows a "Test umpire (canned responses)" badge (`GET /scenarios` carries `umpire: "test"`), and the admin LLM panel shows its calls with mode `test`.
 
+## Local model in the Docker demo
+
+`UMPIRE_KEYLESS_PROVIDER=ollama` (the compose default) puts `narrate` and `staff` (and `parse` if `OLLAMA_STAGES` lists it) on an `ollama` provider built from the env: `OLLAMA_URL`, `OLLAMA_MODEL` (default `qwen2.5:0.5b`), `OLLAMA_NUM_CTX` (4096), `OLLAMA_TIMEOUT_MS` (60000), with temperature 0.2, at most 700 output tokens (400 for parse), two attempts, and one call at a time. Every other stage uses `test`. With a key, none of this applies.
+
+**Fallback.** `createUmpireClient` wraps those stages in `FallbackUmpireClient` (`server/src/umpire/fallbackUmpireClient.ts`) when the config has `fallbackProvider` (set for this mode). If the model call fails with a transport error (Ollama down, or `model not found` while it is still being pulled), a timeout, a refusal, or output that still fails the schema after the allowed attempts, the same request is answered by the `test` provider and the returned record carries `fallbackFor` (reason, kind, provider, model). A transport failure or timeout also makes the client skip the model for 30 s so a down or slow model does not cost each call its timeout; schema failures do not, so a model that keeps producing bad output costs each call its full attempts before the fallback answers. The one-call-at-a-time limit applies to the model only: `test` stages and fallback answers never queue behind it. Budget and rate-limit refusals are not retried elsewhere. Narration and staff replies that parse but fail `checkNarration` or the staff checks are already replaced by the engine's template text or silence, as with any model. The order parser, if `parse` is on the model, falls back to the canned parser and then the rule-based stub. The recorded call is the one that answered, so replay needs no model. The trace marks fallback calls with mode `fallback` and the reason; the admin LLM panel shows the provider (`ollama`), model, latency, token counts and that mode.
+
+**Benchmark.** `OLLAMA_URL=... OLLAMA_MODEL=<tag> npm run bench:ollama -w server` (`server/src/umpire/ollamaBench.ts`) calls a live Ollama with no fallback: the golden order corpus (`orders/eval`), `checkNarration` over six report batches, and the staff checks for the four seats twice. Result on a 4-CPU, no-GPU host shared with other work (load average 3 to 9 during the runs; latencies include that contention and a cold model load):
+
+| Model | Disk | Memory | Parse (50 orders) | Narrate pass, median / p95 | Staff pass, median / p95 |
+| --- | --- | --- | --- | --- | --- |
+| `qwen2.5:0.5b` | 397 MB | 0.8 GB | 24/50, median 3.5 s, p95 7.4 s | 6/6, 7.2 s / 8.9 s | 7/8, 15.7 s / 50.8 s |
+| `gemma3:270m` | 291 MB | 0.8 GB | 4/50, 2.7 s / 4.2 s | 1/6, 6.3 s / 21.6 s | 0/8, 30.4 s / 41.4 s |
+| `llama3.2:1b` | 1.3 GB | 2.4 GB | 24/50, 16.6 s / 48.6 s | 1/6, 11.8 s / 72.9 s | 8/8, 19.5 s / 51.0 s |
+
+Narrate "pass" means the first reply passed `checkNarration` (no repair, no template); staff "pass" means a non-silent turn with no rejected reply. Parse "pass" counts the corpus's expected result per order. **No model parses a clear order**: all three score 0/10 in the `clear` category (they leave out `unitId`, or give names where place ids are required) and their 24 passes are clarifications and rejections that the corpus also accepts, with 5/15 on the injection orders. So `parse` is not on the model by default; set `OLLAMA_STAGES=parse,narrate,staff` to try it (an unusable parse falls back to the canned parser, after waiting for the model). `qwen2.5:0.5b` is the default because it is the smallest model that passes narration and almost all staff turns, and it is faster than the 1B model.
+
 ## Structured output
 
 - `native`: the server enforces the schema (Anthropic `output_config`, OpenAI `json_schema`, Ollama `format`). The default for all three adapters.
