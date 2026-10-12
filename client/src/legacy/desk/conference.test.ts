@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import {
+  applyServerAnswers,
   busy,
   fixtureAnswer,
   newExchange,
   nextExchangeId,
   reconcileExchanges,
+  settleTextless,
   SERVER_REPLY_TIMEOUT_MS,
   type Exchange,
   questionProblem,
@@ -30,6 +32,28 @@ describe('fixtureAnswer', () => {
     const a = fixtureAnswer(req('quartermaster'), fixtureView);
     for (const u of fixtureView.ownUnits)
       expect(a.text).toContain(`${u.name}: supply ${Math.round((u.supply ?? 0) * 100)}%`);
+  });
+  it('cites the newest scouting word received, even with no contact in the tables (#318)', () => {
+    const empty = {
+      ...fixtureView,
+      visibleEnemies: [],
+      lastKnownContacts: [],
+      dispatches: [
+        {
+          id: 'd1',
+          from: 'Scouts',
+          writtenAtGame: 60_000,
+          receivedAtGame: 480_000,
+          category: 'scouts' as const,
+          sizeEstimate: 'a battalion',
+          text: 'Scouts sighted a battalion at the bridge.',
+        },
+      ],
+    };
+    const text = fixtureAnswer(req('intelligence'), empty).text;
+    expect(text).toContain('received Day 1 00:08');
+    expect(text).toContain('a battalion at the bridge');
+    expect(text).not.toContain('nothing of their whereabouts');
   });
   it('admits ignorance with no view or no contacts', () => {
     expect(fixtureAnswer(req('intelligence'), undefined).text).toContain('no reports');
@@ -112,5 +136,28 @@ describe('reconcileExchanges', () => {
   it('leaves a healthy wait, answered exchanges and unchanged logs alone', () => {
     const log = [waiting(1), newExchange(2, req('intelligence'))];
     expect(reconcileExchanges(log, server())).toBe(log);
+  });
+});
+
+describe('text-less server replies', () => {
+  const ex: Exchange = {
+    ...newExchange(1, req('engineer', 0)),
+    answerAtGame: 600_000,
+    questionId: 'q-1',
+  };
+  const reply = { 'q-1': { basedOnGame: 0, officer: { name: 'Major X', traits: [] } } };
+
+  it('marks the exchange without answering it', () => {
+    const [e] = applyServerAnswers([ex], reply);
+    expect(e).toMatchObject({ textless: true });
+    expect(e!.answer).toBeUndefined();
+  });
+
+  it('answers from the view held when the answer falls due', () => {
+    const [marked] = applyServerAnswers([ex], reply);
+    const early = settleTextless([marked!], 599_999, { ...fixtureView, atGame: 100 });
+    expect(early[0]!.answer).toBeUndefined();
+    const [done] = settleTextless([marked!], 600_000, { ...fixtureView, atGame: 555_000 });
+    expect(done!.answer?.basedOnGame).toBe(555_000);
   });
 });

@@ -1,5 +1,6 @@
 import type { SideView } from '@kriegsspiel/protocol';
-import type { LinkStatus, StaffCharge } from '../net/state.js';
+import type { LinkStatus, StaffCharge, StaffServerAnswer } from '../net/state.js';
+import { formatGameTime } from '../net/state.js';
 import { formatAge, pct } from './roster.js';
 
 /** The four officers the player can consult (docs/hq-interface.md, "Staff conference"). */
@@ -79,10 +80,14 @@ export interface Exchange {
   askedAtGame: number;
   answerAtGame: number;
   answer?: ConferenceAnswer;
+  /** The officer the umpire named in its answer: the real staff, in place of the fixture's name and traits. */
+  officer?: { name: string; traits: readonly string[] };
   failed?: boolean;
   /** Set when the server is charging the cost: the id its reply carries, and the wall time it was sent. */
   questionId?: string;
   sentAtWall?: number;
+  /** The server replied with no text: the fixture answers from the newest view once `answerAtGame` is reached. */
+  textless?: boolean;
 }
 
 export const MAX_QUESTION_LENGTH = 400;
@@ -132,6 +137,62 @@ export function reconcileExchanges(
     return out;
   });
   return changed ? next : log;
+}
+
+/**
+ * Give each exchange its answer from the umpire's reply (`staffAnswer`). A reply with no text (the
+ * staff stage is off or failed) only marks the exchange `textless`: `settleTextless` builds its
+ * answer once the answer is due, so it cites the newest reports. Returns the same array when
+ * nothing changed.
+ */
+export function applyServerAnswers(
+  log: readonly Exchange[],
+  answers: Readonly<Record<string, StaffServerAnswer>>,
+): readonly Exchange[] {
+  let changed = false;
+  const next = log.map((e) => {
+    if (e.answer || e.textless || e.failed || e.questionId === undefined) return e;
+    const a = answers[e.questionId];
+    if (!a) return e;
+    changed = true;
+    if (a.text === undefined) return { ...e, textless: true };
+    return {
+      ...e,
+      answer: { text: `${a.officer.name}: ${a.text}`, basedOnGame: a.basedOnGame },
+      officer: a.officer,
+    };
+  });
+  return changed ? next : log;
+}
+
+/**
+ * Answer the text-less exchanges that are now due, from the view the page holds at `nowGame`, not
+ * the one it held when the question went out. Returns the same array when nothing changed.
+ */
+export function settleTextless(
+  log: readonly Exchange[],
+  nowGame: number,
+  view: SideView | undefined,
+): readonly Exchange[] {
+  let changed = false;
+  const next = log.map((e) => {
+    if (!e.textless || e.answer || e.failed || nowGame < e.answerAtGame) return e;
+    changed = true;
+    return {
+      ...e,
+      answer: fixtureAnswer(
+        { role: e.role, question: e.question, askedAtGame: e.askedAtGame },
+        view,
+      ),
+    };
+  });
+  return changed ? next : log;
+}
+
+/** The officer for `role`: the one the umpire last named, else the fixture. */
+export function officerFor(log: readonly Exchange[], role: ConferenceRole): StaffMember {
+  const named = [...log].reverse().find((e) => e.role === role && e.officer)?.officer;
+  return named ? { ...staffFor(role), ...named } : staffFor(role);
 }
 
 export const staffFor = (
@@ -208,7 +269,15 @@ export function fixtureAnswer(
           `A contact seen ${formatAge(c.ageMs)} ago${c.sizeEstimate ? `, ${c.sizeEstimate}` : ''}, may be anywhere within ${Math.round(c.uncertaintyRadius)} m of where it was seen.`,
         );
       }
-      if (!seen && view.lastKnownContacts.length === 0)
+      // A scout's report is word the side has received even when no contact stands in the tables.
+      const scouts = view.dispatches
+        .filter((d) => d.category === 'scouts' && d.sizeEstimate !== undefined)
+        .sort((a, b) => b.receivedAtGame - a.receivedAtGame);
+      if (scouts[0])
+        lines.push(
+          `The latest scouting word, received ${formatGameTime(scouts[0].receivedAtGame)}, is from ${scouts[0].from}: ${scouts[0].text}`,
+        );
+      if (!seen && view.lastKnownContacts.length === 0 && scouts.length === 0)
         lines.push('We know nothing of their whereabouts.');
       caveat = 'Old sightings are only as good as the men who made them.';
       break;

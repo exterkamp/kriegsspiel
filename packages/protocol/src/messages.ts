@@ -206,6 +206,20 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       costMs: GameMs,
     })
     .strict(),
+  // The umpire's answer to a staff question, written from the asking seat's view at `basedOnGame`. The
+  // client shows it once game time reaches the question's `answerAtGame`. No `text`: the staff stage is
+  // off or failed, and the client falls back to its own canned answer.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('staffAnswer'),
+      questionId: Id,
+      role: StaffRole,
+      text: z.string().max(2000).optional(),
+      basedOnGame: GameMs,
+      officer: z.object({ name: z.string(), traits: z.array(z.string()) }).strict(),
+    })
+    .strict(),
   z.object({ ...Envelope, kind: z.literal('clockState'), clock: ClockState }).strict(),
   // The pause vote. Sent on connect (only to a game that has voters) and whenever the phase or the
   // open proposal changes, including each vote. Absent `proposal` means nothing is being voted on.

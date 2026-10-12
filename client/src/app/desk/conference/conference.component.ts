@@ -16,7 +16,10 @@ import {
   formatCost,
   isPending,
   newExchange,
+  officerFor,
   nextExchangeId,
+  applyServerAnswers,
+  settleTextless,
   questionProblem,
   reconcileExchanges,
   staffFor,
@@ -58,7 +61,7 @@ export class ConferenceComponent {
       ? gameNowMs(s.clock, this.wall())
       : (s.view?.atGame ?? 0) + (this.wall() - this.opened);
   });
-  protected readonly officer = computed(() => staffFor(this.role()));
+  protected readonly officer = computed(() => officerFor(this.desk.conferenceLog(), this.role()));
   protected readonly log = computed(() =>
     this.desk.conferenceLog().filter((e) => e.role === this.role()),
   );
@@ -77,6 +80,19 @@ export class ConferenceComponent {
           reconcileExchanges(l, { charges, link, faultAtWall, nowWall }),
         ),
       );
+    });
+
+    // The umpire writes the answer; it is shown once game time reaches the exchange's answer time.
+    effect(() => {
+      const { staffAnswers: answers } = this.game.state();
+      untracked(() => this.desk.conferenceLog.update((l) => applyServerAnswers(l, answers)));
+    });
+
+    // A reply with no text is answered from the newest view when the answer falls due.
+    effect(() => {
+      const nowGame = this.nowGame();
+      const { view } = this.game.state();
+      untracked(() => this.desk.conferenceLog.update((l) => settleTextless(l, nowGame, view)));
     });
   }
 
@@ -113,6 +129,8 @@ export class ConferenceComponent {
     }
     this.desk.conferenceLog.update((l) => [...l, ex]);
     this.question.set('');
+    // Online, the umpire answers (see the staffAnswer effect above); only the offline board answers itself.
+    if (ex.questionId !== undefined) return;
     this.desk
       .conferenceClient()
       .ask(req, state.view)

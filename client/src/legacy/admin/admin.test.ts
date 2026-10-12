@@ -209,6 +209,29 @@ describe('AdminPage', () => {
     page.stop();
   });
 
+  it('asks for the token after a 401, retries with it, and keeps it for the session', async () => {
+    const fetchFn = vi.fn((url: string) =>
+      url.includes('token=s3cret')
+        ? ok({ games })
+        : (Promise.resolve({ ok: false, status: 401 }) as never),
+    );
+    const page = mount(fetchFn as never);
+    page.start();
+    await flush();
+    const form = document.querySelector<HTMLFormElement>('#tokenform')!;
+    expect(form.hidden).toBe(false);
+    document.querySelector<HTMLInputElement>('#token')!.value = ' s3cret ';
+    form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await flush();
+    const stored = sessionStorage.getItem('ks-admin-token');
+    sessionStorage.clear();
+    expect(fetchFn).toHaveBeenCalledWith('/admin/api/games?token=s3cret');
+    expect(page.linkStatus).not.toBe('unauthorized');
+    expect(form.hidden).toBe(true);
+    expect(stored).toBe('s3cret');
+    page.stop();
+  });
+
   it('reopens a stream the browser gave up on', async () => {
     const page = mount(vi.fn(() => ok({ games })));
     page.start();

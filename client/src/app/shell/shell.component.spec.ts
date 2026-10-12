@@ -321,6 +321,13 @@ describe('moving between screens', () => {
     expect(el.querySelector('#continue-h')).not.toBeNull();
   });
 
+  it('puts the form and your games in one scroller, so the list cannot cover Start (#318)', async () => {
+    await open('/?lobby=1');
+    const screen = el.querySelector('.screen')!;
+    expect(screen.contains(el.querySelector('form[aria-label="New game"]'))).toBe(true);
+    expect(screen.contains(el.querySelector('#game-list'))).toBe(true);
+  });
+
   it('offers the side as a choice when there are two to pick from', async () => {
     await open('/?lobby=1', {
       fetchScenarioOptions: async () => ({ ...options, opponent: undefined }),

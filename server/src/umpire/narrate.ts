@@ -17,7 +17,7 @@ export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v1';
 
 export const NARRATE_SYSTEM = `You are the scribe at a Napoleonic army headquarters, turning staff reports into the period dispatches that reach the general's desk. You write in the voice of the officer who sent each report: a cautious subordinate hedges, a veteran scout is terse.
 
-Input: "reports", the only things this headquarters knows. Each has an "id", the "from" officer or unit, a "kind", the "place", how many "minutesAgo" it happened, a "sizeEstimate" (contacts only), a "confidence", and how far off the location may be ("radiusM").
+Input: "reports", the only things this headquarters knows. Each has an "id", the "from" officer or unit, a "kind", the "place", how many "minutesAgo" before it reached headquarters it happened, a "sizeEstimate" (contacts only), a "confidence", and how far off the location may be ("radiusM").
 
 Rules:
 - Write only from the reports. Do not add units, officers, places, numbers, times or events that are not in them. Where the report is unsure, say so.
@@ -81,7 +81,8 @@ export function narrateInput(side: SideId, reports: readonly ViewReport[]) {
       kind: r.kind,
       from: r.from,
       place: r.place,
-      minutesAgo: Math.round(r.ageMs / MS_PER_MINUTE),
+      // Before it reached HQ, not before now: the text is read later, beside the time it was received.
+      minutesAgo: Math.round((r.deliveredAt - r.observedAt) / MS_PER_MINUTE),
       ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
       confidence: r.confidence,
       radiusM: Math.round(r.uncertaintyRadius),

@@ -40,17 +40,26 @@ const parser: OrderParser = {
 class StubUmpire implements UmpireClient {
   requests: UmpireRequest[] = [];
   gate: Promise<void> | undefined;
+  /** What the staff stage says in answer to a question; undefined makes it give nothing usable. */
+  staffText: string | undefined = 'The bridge holds, sir.';
   async call<T>(request: UmpireRequest): Promise<UmpireResponse<T>> {
     this.requests.push(request);
     await this.gate;
-    const { reports } = request.input as { reports: { id: string; from: string }[] };
-    const output = {
-      dispatches: reports.map((r) => ({ reportIds: [r.id], text: `Sir, ${r.from} writes.` })),
-    };
+    let output: unknown;
+    if (request.stage === 'staff') {
+      output = {
+        messages: this.staffText === undefined ? [] : [{ kind: 'advice', text: this.staffText }],
+      };
+    } else {
+      const { reports } = request.input as { reports: { id: string; from: string }[] };
+      output = {
+        dispatches: reports.map((r) => ({ reportIds: [r.id], text: `Sir, ${r.from} writes.` })),
+      };
+    }
     return {
       output: output as T,
       record: {
-        stage: 'narrate',
+        stage: request.stage,
         model: 'stub',
         promptVersion: request.promptVersion,
         system: request.system,
@@ -145,5 +154,34 @@ describe('narrate stage in the actor', () => {
     const { time, game } = await newGame();
     const side = await runUntilReport(time, game);
     expect(game.narrationFor(side)).toBeUndefined();
+  });
+});
+
+describe('staff answers in the actor', () => {
+  it('writes the answer on the staff stage and logs it as a journal-only entry with its calls', async () => {
+    const umpire = new StubUmpire();
+    const { store, game } = await newGame(umpire);
+    const answer = await game.answerStaff('blue', 'intelligence', 'Where is the enemy?');
+    expect(answer?.text).toBe('The bridge holds, sir.');
+    const entry = (await store.inputLog('g1')).find((e) => e.command.kind === 'staffAnswer');
+    expect(entry).toBeDefined();
+    expect(entry!.error).toBeUndefined();
+    expect(entry!.calls?.[0]).toMatchObject({ stage: 'staff', model: 'stub' });
+    expect(entry!.command).toMatchObject({ side: 'blue', role: 'intelligence' });
+  });
+
+  it('records an error and returns nothing when the stage gives nothing usable', async () => {
+    const umpire = new StubUmpire();
+    umpire.staffText = undefined;
+    const { store, game } = await newGame(umpire);
+    expect(await game.answerStaff('blue', 'engineer', 'Status?')).toBeUndefined();
+    const entry = (await store.inputLog('g1')).find((e) => e.command.kind === 'staffAnswer');
+    expect(entry?.error).toBeDefined();
+  });
+
+  it('returns nothing and logs nothing without an umpire', async () => {
+    const { store, game } = await newGame();
+    expect(await game.answerStaff('blue', 'engineer', 'Status?')).toBeUndefined();
+    expect((await store.inputLog('g1')).some((e) => e.command.kind === 'staffAnswer')).toBe(false);
   });
 });

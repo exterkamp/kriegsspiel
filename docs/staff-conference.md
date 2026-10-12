@@ -11,7 +11,9 @@ The staff conference is a desk view (hotkey C) where the player puts questions t
 
 ## Cost enforced by the server (#242)
 
-Over the game WebSocket the client sends `askStaff { questionId, role, question }`. The server charges the officer's cost in game time (see D6b in [decisions.md](decisions.md)) and replies `staffQueued { questionId, role, askedAtGame, answerAtGame, costMs }`; a question to a busy officer gets an `error` with code `staff_busy`. The client takes `answerAtGame` from the reply and does not compute it. Answer text is still the client fixture.
+Over the game WebSocket the client sends `askStaff { questionId, role, question }`. The server charges the officer's cost in game time (see D6b in [decisions.md](decisions.md)) and replies `staffQueued { questionId, role, askedAtGame, answerAtGame, costMs }`; a question to a busy officer gets an `error` with code `staff_busy`. The client takes `answerAtGame` from the reply and does not compute it.
+
+The server then writes the answer on the `staff` stage (D6b, "Conference answers") and sends `staffAnswer { questionId, role, text?, basedOnGame, officer { name, traits } }`, built from `viewForRole` at the time of the question. The client keeps it until game time reaches `answerAtGame`. With no `text` (no umpire configured, or the stage failed) the client answers from its fixture over the view it holds when the answer is shown. Answers are not filed in the in-tray; the conference log is where they live. The admin LLM panel lists the calls as `staff`.
 
 ## Server endpoint contract (not yet implemented; Epic #3)
 

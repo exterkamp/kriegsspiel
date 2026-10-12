@@ -41,7 +41,7 @@ describe('ReplayPanel', () => {
     });
     const root = document.createElement('section');
     document.body.append(root);
-    const panel = new ReplayPanel(root, 'tok', fetchFn as never);
+    const panel = new ReplayPanel(root, () => 'tok', fetchFn as never);
     return { root, panel, urls };
   }
   const settle = () => new Promise((r) => setTimeout(r, 0));

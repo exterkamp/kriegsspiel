@@ -4,10 +4,12 @@ import type { GameState, Seat } from '@kriegsspiel/engine';
 import { MockUmpireClient } from './mockUmpireClient.js';
 import type { UmpireFixture } from './mockUmpireClient.js';
 import {
+  STAFF_ANSWER_PROMPT_VERSION,
   STAFF_PROMPT_VERSION,
   STAFF_SCHEMA,
   STAFF_TEXT_MAX_LENGTH,
   StaffRoster,
+  answerStaffQuestion,
   checkStaffOutput,
   runStaff,
   staffInput,
@@ -247,5 +249,48 @@ describe('checkStaffOutput', () => {
 
   it('does not treat ordinary hyphenated words as ids', () => {
     expect(check(note('report', 'A counter-attack on the south-west flank.'))).toEqual([]);
+  });
+});
+
+const answerFixture = (output: unknown): UmpireFixture => ({
+  ...fixture(output, 'answer'),
+  promptVersion: STAFF_ANSWER_PROMPT_VERSION,
+});
+
+describe('answerStaffQuestion', () => {
+  it('asks the staff stage with the question and the newest view, and returns the first non-suggestion', async () => {
+    const w = world();
+    const client = new MockUmpireClient([
+      answerFixture({
+        messages: [note('suggestion', 'Hold.', 'blue-1'), note('advice', ' Watch the bridge. ')],
+      }),
+    ]);
+    const a = await answerStaffQuestion(
+      client,
+      w,
+      'blue',
+      'intelligence',
+      'Where is the enemy?',
+      600_000,
+    );
+    expect(a?.text).toBe('Watch the bridge.');
+    expect(a?.basedOnGame).toBe(600_000);
+    expect(a?.officer.role).toBe('intelligence');
+    expect(a?.records).toHaveLength(1);
+    expect(client.calls).toHaveLength(1);
+    expect(client.calls[0]!.stage).toBe('staff');
+    expect((client.calls[0]!.input as { question: string; now: number }).question).toBe(
+      'Where is the enemy?',
+    );
+    expect((client.calls[0]!.input as { now: number }).now).toBe(10);
+  });
+
+  it('is undefined when the model only cites entities outside the view', async () => {
+    const client = new MockUmpireClient([
+      answerFixture({ messages: [note('advice', 'See blue-99.')] }),
+    ]);
+    expect(await answerStaffQuestion(client, world(), 'blue', 'chiefOfStaff', 'Status?', 0)).toBe(
+      undefined,
+    );
   });
 });

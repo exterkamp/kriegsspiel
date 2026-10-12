@@ -80,13 +80,17 @@ export {
   STAFF_PROMPT_VERSION,
   STAFF_SCHEMA,
   STAFF_SYSTEM,
+  STAFF_ANSWER_PROMPT_VERSION,
+  STAFF_ANSWER_SYSTEM,
   StaffRoster,
+  answerStaffQuestion,
   checkStaffOutput,
   runStaff,
   staffInput,
   staffOfficer,
 } from './staff.js';
 export type {
+  StaffAnswer,
   StaffMessage,
   StaffMessageKind,
   StaffOfficer,

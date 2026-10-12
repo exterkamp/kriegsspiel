@@ -39,7 +39,10 @@ function narrate(input: Json) {
       const size = str(r.sizeEstimate);
       const minutes = num(r.minutesAgo);
       const radius = num(r.radiusM);
-      const when = minutes === 0 ? 'just now' : `${plural(minutes, 'minute', 'minutes')} since`;
+      const when =
+        minutes === 0
+          ? 'as it reached us'
+          : `${plural(minutes, 'minute', 'minutes')} before it reached us`;
       const where = place ? ` ${place}` : '';
       const body =
         r.kind === 'contact'
@@ -101,12 +104,21 @@ function staff(input: Json) {
         : role === 'subordinate'
           ? 'orders'
           : 'general');
+  // The newest contact report the side has received, whether or not a contact still stands in the tables.
+  const latest = arr(view.reports)
+    .filter((r) => r.kind === 'contact')
+    .sort((a, b) => num(b.deliveredAt) - num(a.deliveredAt))[0];
+  const word = latest
+    ? ` The latest word, a report received at game minute ${Math.floor(num(latest.deliveredAt) / 60_000)}: ${str(latest.text)}`
+    : '';
   const enemy =
     seen > 0
-      ? `We have ${plural(seen, 'enemy formation', 'enemy formations')} in sight.`
+      ? `We have ${plural(seen, 'enemy formation', 'enemy formations')} in sight.${word}`
       : contacts > 0
-        ? `We have no enemy in sight; ${plural(contacts, 'earlier contact is', 'earlier contacts are')} stale.`
-        : 'We have no enemy in sight, and I know nothing more.';
+        ? `We have no enemy in sight; ${plural(contacts, 'earlier contact is', 'earlier contacts are')} stale.${word}`
+        : latest
+          ? `We have no enemy in sight.${word}`
+          : 'We have no enemy in sight, and I know nothing more.';
   const text: Record<Topic, string> = {
     enemy: `${enemy} ${bold ? 'I would not wait for more.' : 'I would want more scouting before acting on it.'}`,
     supply:

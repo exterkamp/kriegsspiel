@@ -60,7 +60,12 @@ export type GameCommand =
    * The narrate stage ran for one side's window ending at `windowEndMs`. Journal only: narration
    * is display text and never changes the engine; the model calls are on the entry (`calls`).
    */
-  | { kind: 'narrate'; side: string; windowEndMs: number };
+  | { kind: 'narrate'; side: string; windowEndMs: number }
+  /**
+   * A staff officer answered a player's question on the `staff` stage. Journal only: the answer is
+   * advice text and never changes the engine; the model calls are on the entry (`calls`).
+   */
+  | { kind: 'staffAnswer'; side: string; role: string; question: string };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {

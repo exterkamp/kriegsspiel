@@ -337,6 +337,36 @@ describe('test provider: staff, judge and command', () => {
     );
   });
 
+  it('cites the newest contact report the side has received, not only standing contacts (#318)', async () => {
+    const res = await client().call<{ messages: { text: string }[] }>({
+      stage: 'staff',
+      promptVersion: 'x',
+      system: 'x',
+      input: {
+        officer: { role: 'intelligence', traits: [] },
+        question: 'Where is the enemy?',
+        view: {
+          ownUnits: [],
+          visibleEnemies: [],
+          lastKnownContacts: [],
+          reports: [
+            { kind: 'contact', deliveredAt: 60_000, text: 'Old sighting at the mill.' },
+            {
+              kind: 'contact',
+              deliveredAt: 480_000,
+              text: 'Scouts sighted a battalion at the bridge.',
+            },
+          ],
+        },
+      },
+      schema: (await import('./staff.js')).STAFF_SCHEMA,
+    });
+    const text = res.output.messages[0]!.text;
+    expect(text).toContain('a battalion at the bridge');
+    expect(text).not.toContain('mill');
+    expect(text).not.toContain('know nothing');
+  });
+
   it('judge makes no extra rulings, and the commander holds what it has', async () => {
     const judge = await client().call<{ placements: unknown[] }>({
       stage: 'judge',
