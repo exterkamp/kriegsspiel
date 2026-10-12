@@ -52,6 +52,7 @@ import {
   type UmpireRequest,
   type UmpireClient,
 } from '../umpire/index.js';
+import { hiddenTerms } from '../umpire/leakGuard.js';
 import type { StaffExchange } from '@kriegsspiel/protocol';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
@@ -444,7 +445,9 @@ export class GameActor {
         },
       };
       const work = this.withTimeout(
-        narrateReports(client, side.id as SideId, due),
+        narrateReports(client, side.id as SideId, due, {
+          hidden: hiddenTerms(this.engine.world, side.id as SideId),
+        }),
         this.narrateTimeoutMs,
         'narration',
       ).then(

@@ -12,6 +12,7 @@ import { MS_PER_MINUTE } from '@kriegsspiel/engine';
 import type { SideId, ViewReport } from '@kriegsspiel/engine';
 import type { JsonSchema, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
+import { hiddenIn } from './leakGuard.js';
 
 export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v1';
 
@@ -403,7 +404,11 @@ export function checkProseAgainst(text: string, facts: ProseFacts): string[] {
 }
 
 /** Everything wrong with a reply: unknown or missing report ids, then the prose of each dispatch. */
-export function checkNarration(output: NarrateOutput, input: Input): string[] {
+export function checkNarration(
+  output: NarrateOutput,
+  input: Input,
+  hidden: readonly string[] = [],
+): string[] {
   const ids = new Set(input.reports.map((r) => r.id));
   const covered = new Set<string>();
   const problems: string[] = [];
@@ -413,7 +418,7 @@ export function checkNarration(output: NarrateOutput, input: Input): string[] {
       else problems.push(`unknown report "${id}"`);
     }
     if (d.text.trim() === '') problems.push('empty dispatch');
-    problems.push(...checkProse(d.text, input));
+    problems.push(...checkProse(d.text, input), ...hiddenIn(d.text, hidden));
   }
   for (const id of ids) if (!covered.has(id)) problems.push(`report "${id}" not narrated`);
   return [...new Set(problems)];
@@ -422,6 +427,8 @@ export function checkNarration(output: NarrateOutput, input: Input): string[] {
 export interface NarrateOptions {
   /** Model calls allowed per window, the first included. Default 2: one retry, so a fallback is never three timeouts long. */
   maxCalls?: number;
+  /** Names the side must not read (`hiddenTerms`): a dispatch that carries one, in any case or spacing, is rejected. */
+  hidden?: readonly string[];
 }
 
 /**
@@ -474,7 +481,7 @@ export async function narrateReports(
       }
       throw e;
     }
-    const problems = checkNarration(output, input);
+    const problems = checkNarration(output, input, opts.hidden);
     if (problems.length === 0) {
       return {
         dispatches: output.dispatches.map((d) => ({ reportIds: d.reportIds, text: d.text.trim() })),
