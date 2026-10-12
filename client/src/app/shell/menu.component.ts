@@ -58,6 +58,31 @@ import { PAGE_CSS } from './page-styles';
           }
         </section>
 
+        @if (devTools()) {
+          <section class="dev" aria-labelledby="dev-h">
+            <h2 id="dev-h">Developer tools</h2>
+            <p class="muted">For development; not part of the game.</p>
+            <ul>
+              <li>
+                <a href="/map-authoring" class="tool">Map editor</a>
+                <span class="muted">Generate, preview and export a battlefield.</span>
+              </li>
+              <li>
+                <a href="/map-benchmark" class="tool">Map benchmark</a>
+                <span class="muted">Time map generation and rendering on this device.</span>
+              </li>
+              <li>
+                <a href="/table-benchmark" class="tool">Table benchmark</a>
+                <span class="muted">Time the 3D table scene on this device.</span>
+              </li>
+              <li>
+                <a href="/admin/" class="tool">Admin view</a>
+                <span class="muted">Operator console; asks for the admin token.</span>
+              </li>
+            </ul>
+          </section>
+        }
+
         <section aria-labelledby="about-h">
           <h2 id="about-h">About</h2>
           <p>
@@ -78,6 +103,39 @@ import { PAGE_CSS } from './page-styles';
       h1 {
         margin: 0;
       }
+      .dev {
+        font-size: 0.9em;
+        opacity: 0.9;
+      }
+      .dev ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .dev li {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 12px;
+        margin: 6px 0;
+      }
+      .tool {
+        display: inline-block;
+        min-width: 9em;
+        padding: 4px 10px;
+        border: 1px solid #8a7a52;
+        border-radius: 4px;
+        color: #2a2118;
+        text-decoration: none;
+        background: transparent;
+      }
+      .tool:hover {
+        background: #f6edd0;
+      }
+      .tool:focus-visible {
+        outline: 3px solid #1a5fb4;
+        outline-offset: 2px;
+      }
       .game {
         width: 100%;
         display: flex;
@@ -97,6 +155,8 @@ export class MenuComponent implements OnInit {
   readonly load = input.required<() => Promise<ContinueRow[]>>();
   /** A guest session: no sign-out (it would orphan the games), a way to sign in and keep them instead. */
   readonly guest = input(false);
+  /** Show the Developer tools section (server `DEV_TOOLS`). */
+  readonly devTools = input(false);
   readonly newGame = output();
   readonly continueGame = output<string>();
   readonly signOut = output();
