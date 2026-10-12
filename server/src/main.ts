@@ -39,6 +39,7 @@ import { LlmOrderParser } from './orders/llmParser.js';
 import { StubOrderParser } from './orders/stubParser.js';
 import { TraceStore, traceUmpire } from './debug/index.js';
 import type { UmpireClient } from './umpire/index.js';
+import { GameClients, orderParserFor } from './umpire/gameClients.js';
 import {
   createGameUmpire,
   createUmpireClient,
@@ -89,28 +90,23 @@ const cannedParser = umpireConfig?.fallbackProvider
       },
     )
   : undefined;
-const gameClients = new Map<string, ReturnType<typeof createGameUmpire>>();
-const gameUmpire = (gameId: string) => {
-  let client = gameClients.get(gameId);
-  if (!client) {
-    client = createGameUmpire(tracedUmpire(umpire!, gameId), {
-      gameId,
-      limits: umpireConfig?.gameBudget,
-      onMetric: (m) => server.log.info({ umpire: m }, 'umpire call'),
-    });
-    gameClients.set(gameId, client);
-  }
-  return client;
-};
+const gameClients = new GameClients((gameId) =>
+  createGameUmpire(tracedUmpire(umpire!, gameId), {
+    gameId,
+    limits: umpireConfig?.gameBudget,
+    onMetric: (m) => server.log.info({ umpire: m }, 'umpire call'),
+  }),
+);
+const gameUmpire = (gameId: string) => gameClients.get(gameId);
 
 const { server } = await buildApp({
-  parser: llmParser
-    ? (gameId) =>
-        new LlmOrderParser(gameUmpire(gameId), {
-          fallbackParser: cannedParser ?? new StubOrderParser(),
-          onFallback: (f) => server.log.warn({ gameId, reason: f.reason }, 'order parser fallback'),
-        })
-    : new StubOrderParser(),
+  parser: orderParserFor({
+    llm: llmParser,
+    clientFor: gameUmpire,
+    cannedParser,
+    onFallback: (gameId, reason) => server.log.warn({ gameId, reason }, 'order parser fallback'),
+  }),
+  onGameDone: (gameId) => gameClients.evict(gameId),
   store,
   lobby,
   staticDir: process.env.STATIC_DIR,

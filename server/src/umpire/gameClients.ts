@@ -1,0 +1,50 @@
+import type { OrderParser } from '../orders/index.js';
+import { LlmOrderParser } from '../orders/llmParser.js';
+import { StubOrderParser } from '../orders/stubParser.js';
+import type { UmpireClient } from './index.js';
+
+/** One umpire client per game, made on first use and dropped when the game ends or is closed. */
+export class GameClients<C extends UmpireClient> {
+  private readonly clients = new Map<string, C>();
+
+  constructor(private readonly make: (gameId: string) => C) {}
+
+  get(gameId: string): C {
+    let client = this.clients.get(gameId);
+    if (!client) {
+      client = this.make(gameId);
+      this.clients.set(gameId, client);
+    }
+    return client;
+  }
+
+  /** Forget a game's client. Safe to call twice or for a game that never had one. */
+  evict(gameId: string): void {
+    this.clients.delete(gameId);
+  }
+
+  get size(): number {
+    return this.clients.size;
+  }
+}
+
+export interface ParserWiringOptions {
+  /** The LLM parses orders; false keeps the rule-based parser. */
+  llm: boolean;
+  clientFor: (gameId: string) => UmpireClient;
+  /** Retried before the stub when the model cannot place an order (set with a local model on `parse`). */
+  cannedParser?: OrderParser;
+  onFallback?: (gameId: string, reason: string) => void;
+}
+
+/** The `parser` option for the app: flag -> per-game LLM parser with fallback, or the stub. */
+export function orderParserFor(
+  o: ParserWiringOptions,
+): OrderParser | ((gameId: string) => OrderParser) {
+  if (!o.llm) return new StubOrderParser();
+  return (gameId) =>
+    new LlmOrderParser(o.clientFor(gameId), {
+      fallbackParser: o.cannedParser ?? new StubOrderParser(),
+      onFallback: (f) => o.onFallback?.(gameId, f.reason),
+    });
+}
