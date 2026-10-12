@@ -111,6 +111,17 @@ export const LastKnownContact = z
   .strict();
 export type LastKnownContact = z.infer<typeof LastKnownContact>;
 
+/** One of the side's own orders in flight or planned routes, in metres, start first (#203). */
+export const OrderRoute = z
+  .object({
+    id: z.string().min(1),
+    unitId: UnitId,
+    kind: z.enum(['order', 'route']),
+    points: z.array(Coord).min(2),
+  })
+  .strict();
+export type OrderRoute = z.infer<typeof OrderRoute>;
+
 /** Everything one side may see. Built only by the engine's visibility filter. */
 export const SideView = z
   .object({
@@ -121,6 +132,8 @@ export const SideView = z
     /** Where this side's couriers set out from. */
     hq: Coord.optional(),
     ownUnits: z.array(OwnUnit),
+    /** The side's own orders in flight and its units' planned routes. Absent when there are none. */
+    orderRoutes: z.array(OrderRoute).optional(),
     visibleEnemies: z.array(VisibleEnemyUnit),
     lastKnownContacts: z.array(LastKnownContact),
     dispatches: z.array(Dispatch),

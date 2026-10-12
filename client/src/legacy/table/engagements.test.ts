@@ -64,3 +64,36 @@ describe('tags beside a fight marker (#323)', () => {
     expect(scene.ghosts[0]!.ageTag).toBe('just now');
   });
 });
+
+describe('order arrows and planned routes (#203)', () => {
+  const map = {} as BaseMap;
+  const base = {
+    side: 'blue',
+    atGame: 0,
+    ownUnits: [],
+    visibleEnemies: [],
+    lastKnownContacts: [],
+  };
+  const points = [
+    { x: 100, y: 100 },
+    { x: 400, y: 300 },
+  ];
+
+  it("maps the side view's own orders and routes into the scene", () => {
+    const v = {
+      ...base,
+      orderRoutes: [
+        { id: 'o1', unitId: 'blue-1', kind: 'order', points },
+        { id: 'route-blue-1', unitId: 'blue-1', kind: 'route', points },
+      ],
+    } as unknown as SideView;
+    expect(buildSceneState(v, map).orderRoutes).toEqual([
+      { id: 'o1', kind: 'order', points },
+      { id: 'route-blue-1', kind: 'route', points },
+    ]);
+  });
+
+  it('is empty when the server sent none', () => {
+    expect(buildSceneState(base as unknown as SideView, map).orderRoutes).toEqual([]);
+  });
+});

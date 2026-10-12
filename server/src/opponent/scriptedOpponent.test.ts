@@ -41,6 +41,7 @@ function view(over: Partial<EngineSideView> = {}): EngineSideView {
     time: FORM_UP_MS,
     mapWidth: 4000,
     mapHeight: 3000,
+    orderRoutes: [],
     ownUnits: [
       {
         id: 'red-1',

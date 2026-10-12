@@ -1,6 +1,7 @@
 import type { EventRegistry, NewEvent } from './events.js';
 import { schedule } from './queue.js';
 import type { EngineState } from './events.js';
+import { destinationOf } from './courier.js';
 import { distance, metres } from './geometry.js';
 import { describePlace } from './place.js';
 import { evaluateStanding } from './standing.js';
@@ -169,6 +170,18 @@ export interface ViewUnit {
   ammo: number;
 }
 
+/**
+ * One of the side's own orders or planned routes, as a polyline in metres (start first).
+ * `order`: a dispatch still riding to its unit, from the unit to the destination it names.
+ * `route`: where an own unit is marching now. Only the side's own units and orders appear.
+ */
+export interface ViewOrderRoute {
+  id: string;
+  unitId: string;
+  kind: 'order' | 'route';
+  points: Point[];
+}
+
 /** An enemy unit in sight now. What a watcher can make out: where, which way, and about how big a patch of ground (footprint to the nearest 10 m). */
 export interface ViewEnemy {
   id: string;
@@ -245,6 +258,8 @@ export interface EngineSideView {
   /** This side's own headquarters, where its couriers set out. */
   hq?: Point;
   ownUnits: ViewUnit[];
+  /** Own orders in flight and own units' planned routes (#203). */
+  orderRoutes: ViewOrderRoute[];
   visibleEnemies: ViewEnemy[];
   lastKnownContacts: ViewContact[];
   /** Only reports whose courier delay has passed. */
@@ -303,6 +318,46 @@ export function renderDocument(d: ViewDocument): string {
   return `Enemy dispatch to ${d.addressedTo}, taken from a courier ${d.place}, ${mins} ${mins === 1 ? 'minute' : 'minutes'} ago: "${d.text}"`;
 }
 
+function orderRoutesOf(state: GameState, side: SideId): ViewOrderRoute[] {
+  const out: ViewOrderRoute[] = [];
+  for (const c of state.couriers) {
+    if (c.side !== side) continue;
+    const unit = state.units.find((u) => u.id === c.order.to && u.side === side);
+    if (!unit || unit.strength <= 0) continue;
+    let to: Point | undefined;
+    for (const i of c.order.intents) {
+      to = destinationOf(i);
+      if (to) break;
+    }
+    if (to) {
+      out.push({
+        id: c.order.id,
+        unitId: unit.id,
+        kind: 'order',
+        points: [viewPoint(unit.center), viewPoint(to)],
+      });
+    }
+  }
+  for (const u of state.units) {
+    if (u.side !== side || u.strength <= 0 || u.status !== 'active') continue;
+    const i = u.intent;
+    const to =
+      i.kind === 'move' || i.kind === 'attack'
+        ? i.to
+        : i.kind === 'withdraw'
+          ? i.toward
+          : undefined;
+    if (!to) continue;
+    const points = [u.center, ...(u.leg ? [u.leg.to] : []), to].filter(
+      (p, n, all) => n === 0 || p.x !== all[n - 1]!.x || p.y !== all[n - 1]!.y,
+    );
+    if (points.length > 1) {
+      out.push({ id: `route-${u.id}`, unitId: u.id, kind: 'route', points: points.map(viewPoint) });
+    }
+  }
+  return out;
+}
+
 /**
  * The only function that turns master state into something a side may see. Pure.
  * `now` is the engine clock (`EngineState.time`); `world.time` only moves when an
@@ -340,6 +395,7 @@ export function viewFor(
         fatigue: u.fatigue,
         ammo: u.ammo,
       })),
+    orderRoutes: orderRoutesOf(state, side),
     visibleEnemies: seen.map((u) => ({
       id: u.id,
       position: viewPoint(u.center),
