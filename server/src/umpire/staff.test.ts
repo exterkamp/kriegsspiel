@@ -282,9 +282,43 @@ describe('checkAnswerText', () => {
   });
 });
 
+describe('checkAnswerText quality (#359)', () => {
+  const facts = ['1st Battalion', 'blue-1'];
+  it('wants a unit, place or count from the view', () => {
+    const t = 'Sir, nothing more is known at present.';
+    expect(checkAnswerText(t, 'intelligence', facts)).toEqual([
+      'answer names no unit, place or count from your view; cite one',
+    ]);
+    expect(checkAnswerText('Sir, the 1st Battalion reports calm.', 'intelligence', facts)).toEqual(
+      [],
+    );
+    expect(checkAnswerText('Sir, about 400 men are in sight.', 'intelligence', facts)).toEqual([]);
+    // A clock time is not a count.
+    expect(checkAnswerText('Sir, we last heard at 00:40.', 'intelligence', facts)).toHaveLength(1);
+  });
+  it('flags stock filler and repeats', () => {
+    expect(
+      checkAnswerText(
+        "Sir, 1st Battalion is observing the enemy's movements.",
+        'intelligence',
+        facts,
+      ),
+    ).toEqual(['answer is generic filler']);
+    expect(
+      checkAnswerText(
+        'Sir, 1st Battalion holds. Keep the reserve near the road. Keep the reserve near the road.',
+        'intelligence',
+        facts,
+      ),
+    ).toEqual(['answer repeats itself']);
+  });
+});
+
 describe('answerStaffQuestion', () => {
   it('retries a fragment once, then gives up so the canned answer is used (#342)', async () => {
-    const frag = answerFixture({ messages: [note('advice', 'Sir, we should consider moving a')] });
+    const frag = answerFixture({
+      messages: [note('advice', 'Sir, the 1st Battalion should consider moving a')],
+    });
     const client = new MockUmpireClient([frag, frag, frag]);
     const a = await answerStaffQuestion(client, world(), 'blue', 'chiefOfStaff', 'Status?', 0);
     expect(a).toBeUndefined();
@@ -295,7 +329,10 @@ describe('answerStaffQuestion', () => {
   });
 
   it('accepts the retry when the second reply is whole', async () => {
-    const replies = ['Sir, we should consider moving a', 'Sir, I would hold the bridge for now.'];
+    const replies = [
+      'Sir, the 1st Battalion should consider moving a',
+      'Sir, the 1st Battalion holds the bridge for now.',
+    ];
     const inner = new MockUmpireClient([answerFixture({ messages: [note('advice', 'x y z.')] })]);
     const calls: unknown[] = [];
     const client: UmpireClient = {
@@ -307,7 +344,7 @@ describe('answerStaffQuestion', () => {
       },
     };
     const a = await answerStaffQuestion(client, world(), 'blue', 'chiefOfStaff', 'Status?', 0);
-    expect(a?.text).toBe('Sir, I would hold the bridge for now.');
+    expect(a?.text).toBe('Sir, the 1st Battalion holds the bridge for now.');
     expect(calls).toHaveLength(2);
   });
 
@@ -317,7 +354,7 @@ describe('answerStaffQuestion', () => {
       answerFixture({
         messages: [
           note('suggestion', 'Hold.', 'blue-1'),
-          note('advice', ' Watch the bridge, sir. '),
+          note('advice', ' Watch the bridge, sir; 1st Battalion is forward. '),
         ],
       }),
     ]);
@@ -329,7 +366,7 @@ describe('answerStaffQuestion', () => {
       'Where is the enemy?',
       600_000,
     );
-    expect(a?.text).toBe('Watch the bridge, sir.');
+    expect(a?.text).toBe('Watch the bridge, sir; 1st Battalion is forward.');
     expect(a?.basedOnGame).toBe(600_000);
     expect(a?.officer.role).toBe('intelligence');
     expect(a?.records).toHaveLength(1);
@@ -359,10 +396,40 @@ describe('answerStaffQuestion', () => {
       intel: { ...w.intel, blue: { ...w.intel.blue, reports: [report] } },
     };
     const client = new MockUmpireClient([
-      answerFixture({ messages: [note('advice', 'Hold the bridge, sir.')] }),
+      answerFixture({
+        messages: [note('advice', 'Hold the bridge, sir; 1st Battalion is forward.')],
+      }),
     ]);
     const a = await answerStaffQuestion(client, held, 'blue', 'intelligence', 'Status?', 600_000);
     expect(a?.basedOnGame).toBe(180_000);
+  });
+
+  it('rejects filler and a repeat, retries with the problem, and takes a good answer (#359)', async () => {
+    const filler = "We are observing the enemy's movements and will report. Stay calm.";
+    const repeat =
+      'The 1st Battalion is forward. Be ready for any enemy action at the bridge. Be ready for any enemy action at the bridge.';
+    const good = 'Sir, the 1st Battalion and the Cavalry Squadron hold the bridge.';
+    const replies = [filler, repeat, good];
+    const inner = new MockUmpireClient([answerFixture({ messages: [note('advice', 'x y z.')] })]);
+    const seen: unknown[] = [];
+    const client: UmpireClient = {
+      call: async <T>(req: UmpireRequest) => {
+        seen.push((req.input as { rejected?: string[] }).rejected);
+        const res = await inner.call<T>(req);
+        return { ...res, output: { messages: [note('advice', replies[seen.length - 1]!)] } as T };
+      },
+    };
+    // Two calls only: filler then repeat, so the canned answer is used.
+    expect(
+      await answerStaffQuestion(client, world(), 'blue', 'intelligence', 'Enemy?', 0),
+    ).toBeUndefined();
+    expect(seen[1]).toEqual(expect.arrayContaining(['answer is generic filler']));
+    // A good answer on the retry is accepted.
+    seen.length = 0;
+    replies.splice(0, 2, repeat, good);
+    const a = await answerStaffQuestion(client, world(), 'blue', 'intelligence', 'Enemy?', 0);
+    expect(seen[1]).toEqual(['answer repeats itself']);
+    expect(a?.text).toBe(good);
   });
 
   it('is undefined when the model only cites entities outside the view', async () => {

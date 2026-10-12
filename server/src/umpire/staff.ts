@@ -257,7 +257,7 @@ const ROLE_TITLE: Partial<Record<Role, string>> = {
  * or not ending in a full stop, `!`, `?` or a closing quote, as when output is cut mid-word), or an
  * officer sending the commander to himself ("report to the chief of staff" from the chief of staff).
  */
-export function checkAnswerText(text: string, role: Role): string[] {
+export function checkAnswerText(text: string, role: Role, facts?: readonly string[]): string[] {
   const t = text.trim();
   const problems: string[] = [];
   if ((t.match(/\S+/g) ?? []).length < ANSWER_MIN_WORDS) problems.push('answer is a fragment');
@@ -269,6 +269,55 @@ export function checkAnswerText(text: string, role: Role): string[] {
       'i',
     );
     if (toSelf.test(t)) problems.push(`answer refers the commander to the ${title}, who is you`);
+  }
+  if (facts) problems.push(...checkAnswerQuality(t, facts));
+  return problems;
+}
+
+/** Stock phrases a small model falls back on when it has nothing to say (#359). */
+const FILLER =
+  /\b(?:observing the enemy'?s? movements?|be prepared for any|any potential|remain vigilant|stay vigilant|keep a (?:close|careful) eye|maintain (?:situational )?awareness|as (?:always|usual),? )/i;
+
+const wordsOf = (s: string): string[] => s.toLowerCase().match(/[a-z0-9']+/g) ?? [];
+
+/** Names and ids in the officer's view: the things an answer can point at. */
+export function answerFacts(view: unknown): string[] {
+  const out = new Set<string>();
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v !== null && typeof v === 'object') {
+      for (const [k, x] of Object.entries(v)) {
+        if ((k === 'name' || k === 'id') && typeof x === 'string' && x.length > 2) out.add(x);
+        else walk(x);
+      }
+    }
+  };
+  walk(view);
+  return [...out];
+}
+
+/**
+ * Whether an answer says something: no sentence or long phrase twice, no stock filler, and at least one
+ * concrete fact from the officer's view (a unit or place name, an id, or a count).
+ */
+export function checkAnswerQuality(text: string, facts: readonly string[]): string[] {
+  const problems: string[] = [];
+  const words = wordsOf(text);
+  const seen = new Set<string>();
+  for (let i = 0; i + 5 <= words.length; i++) {
+    const g = words.slice(i, i + 5).join(' ');
+    if (seen.has(g)) {
+      problems.push('answer repeats itself');
+      break;
+    }
+    seen.add(g);
+  }
+  if (FILLER.test(text)) problems.push('answer is generic filler');
+  const lower = text.toLowerCase();
+  const named = facts.some((f) => lower.includes(f.toLowerCase()));
+  const counted = /\b\d+\b/.test(text.replace(/\b\d{1,2}:\d{2}\b/g, ''));
+  if (!named && !counted) {
+    problems.push('answer names no unit, place or count from your view; cite one');
   }
   return problems;
 }
@@ -366,11 +415,11 @@ export async function runStaff(
 }
 
 /** The staff stage when a player puts a question to an officer (the conference screen, D6b). */
-export const STAFF_ANSWER_PROMPT_VERSION = 'staff-answer-v2';
+export const STAFF_ANSWER_PROMPT_VERSION = 'staff-answer-v3';
 
 export const STAFF_ANSWER_SYSTEM = `${STAFF_SYSTEM}
 
-The commander has put you a question, in "question". Answer it in one "advice" message in your own voice: two or three complete sentences, ending with a full stop. You are the officer named in "officer", so never tell the commander to report to or consult your own post. Use the newest reports and sightings in "view" and quote their times as clock times, never as "n minutes ago", since the note is read later. If "view" does not settle the question, say what you do not know.`;
+The commander has put you a question, in "question". Answer it in one "advice" message in your own voice: two or three complete sentences, ending with a full stop. You are the officer named in "officer", so never tell the commander to report to or consult your own post. Use the newest reports and sightings in "view" and quote their times as clock times, never as "n minutes ago", since the note is read later. Name at least one concrete fact from "view" (a unit name, a place or a count), never repeat yourself, and avoid stock phrases such as "be prepared for any potential activity". If "view" does not settle the question, say what you do not know.`;
 
 /** The engine seat that answers for a conference officer. The engineer has no seat of their own and sees what the chief of staff sees. */
 const SEAT_FOR: Readonly<Record<string, Role>> = {
@@ -412,6 +461,7 @@ export async function answerStaffQuestion(
   const officer = staffOfficerFor(world.seed, side, conferenceRole);
   const view = viewForRole(world, side, seat, now);
   const input = { ...staffInput(officer, view, now), question };
+  const facts = answerFacts(input.view);
   // The answer rests on the newest paper the side holds, which may be older than the moment of asking.
   const newest = view.reports.reduce(
     (m, r) => Math.max(m, r.deliveredAt),
@@ -441,7 +491,7 @@ export async function answerStaffQuestion(
     };
     const problems = [
       ...checkStaffOutput(usable, world, side, seat, input),
-      ...usable.messages.flatMap((m) => checkAnswerText(m.text, role)),
+      ...usable.messages.flatMap((m) => checkAnswerText(m.text, role, facts)),
     ];
     if (usable.messages.length > 0 && problems.length === 0) {
       return { text: usable.messages[0]!.text.trim(), officer, basedOnGame, records };
