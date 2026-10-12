@@ -4,6 +4,7 @@ import {
   COMBAT_CHECK_EVENT,
   COMBAT_TICK_EVENT,
   MELEE_FACTOR,
+  RALLY_EVENT,
   VICTORY_DEADLINE_EVENT,
   aspectOf,
   bearingTo,
@@ -22,6 +23,7 @@ import { FIELD_REPORT_DELAY_MS, fileReport } from './visibility.js';
 import { describePlace } from './place.js';
 import { positionAt, rejectOrder, startMarch } from './movement.js';
 import { FATIGUE_PER_FIGHT_TICK } from './fatigue.js';
+import { FIRE_RULES, MORALE_RULES, RALLY_RULES } from './combatRules.js';
 import { schedule } from './queue.js';
 import {
   AMMO_PER_FIRE_TICK,
@@ -67,7 +69,7 @@ export function coverFactor(cover: number): number {
 }
 
 /** Morale lost per percent of strength lost in one tick. */
-export const MORALE_PER_LOSS_PERCENT = 2;
+export const MORALE_PER_LOSS_PERCENT = MORALE_RULES.lossPerPercent;
 /** The morale below which a default-type unit breaks and withdraws; each type has its own. */
 export const BREAK_MORALE = unitTypeOf('infantry').breakMorale;
 
@@ -80,13 +82,20 @@ export const BROKEN_FORCE_FRACTION = 0.25;
 /** Game time between the umpire declaring a battle and the game closing: the pursuit is played out. */
 export const BATTLE_CLOSE_MS = 20 * MS_PER_MINUTE;
 /** Casualty multiplier on fire or steel against a routed unit, which cannot form to answer. */
-export const ROUT_FACTOR = 3;
+export const ROUT_FACTOR = FIRE_RULES.routFactor;
 /** A unit reports heavy losses when its strength falls below this share of its start. */
 export const HEAVY_LOSS_FRACTION = 0.5;
 /** A unit already reported engaged says so again only after this long without a report. */
 export const ENGAGED_REPEAT_MS = 10 * MS_PER_MINUTE;
 /** Cavalry that is idle or holding rides after a routed enemy this close (metres) to it. */
 export const PURSUIT_RANGE_M = 1500;
+
+/** Morale shock multiplier by the side the blow came from. */
+const SHOCK_FACTOR: Record<Aspect, number> = {
+  front: 1,
+  flank: MORALE_RULES.flankShock,
+  rear: MORALE_RULES.rearShock,
+};
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -364,6 +373,17 @@ interface Shot {
   melee: boolean;
   die: number;
   casualties: number;
+  /** The factors that made `casualties`, so the combat log can be read back (post-game reveal). */
+  factors: {
+    fireRate: number;
+    formation: number;
+    vulnerability: number;
+    morale: number;
+    range: number;
+    ammo: number;
+    aspect: number;
+    rout: number;
+  };
 }
 
 /** Whom `shooter` fires at: its attack target if reachable, else the nearest enemy (ties: lowest id). */
@@ -519,6 +539,62 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     return conclude(world, outcome);
   });
 
+  registry.register(RALLY_EVENT, (world, ev, rng) => {
+    // The result of a declared battle stands, so a rally after it changes nothing.
+    if (world.outcome || world.battle) return { world };
+    const { unitId } = ev.payload as unknown as { unitId: string };
+    const u = world.units.find((x) => x.id === unitId);
+    if (!u || u.status !== 'withdrawn' || u.brokenAt === undefined) return { world };
+    if (ev.time - u.brokenAt > RALLY_RULES.giveUpMs) return { world };
+    const start = world.startStrength?.[u.id] ?? u.strength;
+    if (u.strength < RALLY_RULES.minStrengthShare * start) return { world };
+    const retry: NewEvent = {
+      time: ev.time + RALLY_RULES.retryMs,
+      type: RALLY_EVENT,
+      payload: { unitId },
+    };
+    const where = positionAt(world.map, u, ev.time);
+    const pressed = world.units.some(
+      (e) =>
+        e.side !== u.side &&
+        e.status === 'active' &&
+        distanceMm(where, e.center) <= mm(RALLY_RULES.enemyClearM),
+    );
+    if (pressed) {
+      return {
+        world,
+        schedule: [retry],
+        emit: [{ type: 'unit.rallyFailed', payload: { unitId, reason: 'pressed' } }],
+      };
+    }
+    const die = rng.die(6);
+    if (die < RALLY_RULES.dieAtLeast) {
+      return {
+        world,
+        schedule: [retry],
+        emit: [{ type: 'unit.rallyFailed', payload: { unitId, reason: 'die', die } }],
+      };
+    }
+    const rallied: Unit = {
+      ...u,
+      center: where,
+      status: 'active',
+      morale: Math.max(u.morale, RALLY_RULES.moraleAfter),
+      intent: { kind: 'idle' },
+    };
+    delete rallied.leg;
+    delete rallied.brokenAt;
+    return {
+      world: {
+        ...world,
+        time: ev.time,
+        units: world.units.map((x) => (x.id === unitId ? rallied : x)),
+      },
+      schedule: [{ time: ev.time, type: COMBAT_CHECK_EVENT }],
+      emit: [{ type: 'unit.rallied', payload: { unitId, die, morale: rallied.morale } }],
+    };
+  });
+
   registry.register(COMBAT_TICK_EVENT, (world, ev, rng) => {
     if (world.outcome) return { world };
     const active = activeUnits(world);
@@ -538,21 +614,31 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
         inMelee(shooter, target) || (shooter.kind === 'cavalry' && target.status === 'withdrawn');
       // Melee is a blow at arm's length: no range falloff, but a heavier one than fire.
       const reach = melee ? MELEE_FACTOR : rangeFactor(shooter, target);
+      const factors = {
+        fireRate: unitTypeOf(shooter).fireRate,
+        formation: FORMATION_RULES[shooter.formation].fireFactor,
+        vulnerability: melee
+          ? FORMATION_RULES[target.formation].meleeVulnerability
+          : FORMATION_RULES[target.formation].fireVulnerability,
+        morale: moraleFactor,
+        range: reach,
+        // A shooter with no cartridges left is nearly harmless; steel in melee is not fired.
+        ammo: !melee && shooter.ammo <= 0 ? OUT_OF_AMMO_FACTOR : 1,
+        aspect: ASPECT_FACTOR[aspect],
+        rout: target.status === 'withdrawn' ? ROUT_FACTOR : 1,
+      };
       const casualties = round2(
         shooter.strength *
-          unitTypeOf(shooter).fireRate *
-          FORMATION_RULES[shooter.formation].fireFactor *
-          (melee
-            ? FORMATION_RULES[target.formation].meleeVulnerability
-            : FORMATION_RULES[target.formation].fireVulnerability) *
+          factors.fireRate *
+          factors.formation *
+          factors.vulnerability *
           (die / 3.5) *
-          moraleFactor *
+          factors.morale *
           cover *
-          reach *
-          // A shooter with no cartridges left is nearly harmless; steel in melee is not fired.
-          (!melee && shooter.ammo <= 0 ? OUT_OF_AMMO_FACTOR : 1) *
-          ASPECT_FACTOR[aspect] *
-          (target.status === 'withdrawn' ? ROUT_FACTOR : 1),
+          factors.range *
+          factors.ammo *
+          factors.aspect *
+          factors.rout,
       );
       shots.push({
         shooter,
@@ -563,6 +649,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
         melee,
         die,
         casualties,
+        factors,
       });
     }
     if (shots.length === 0) {
@@ -579,14 +666,43 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
 
     let w: GameState = { ...world, time: ev.time };
     const fate = new Map<string, Unit>();
+    const moraleLog: Array<Record<string, Json>> = [];
+    // Melee is settled by who dealt more: the side that came off worse loses heart.
+    const meleeDealt = new Map<string, number>();
+    const meleeTaken = new Map<string, number>();
+    for (const s of shots) {
+      if (!s.melee) continue;
+      meleeDealt.set(s.shooter.id, (meleeDealt.get(s.shooter.id) ?? 0) + s.casualties);
+      meleeTaken.set(s.target.id, (meleeTaken.get(s.target.id) ?? 0) + s.casualties);
+    }
     for (const u of world.units) {
       const taken = Math.min(lost.get(u.id) ?? 0, u.strength);
       if (taken === 0) continue;
       const strength = round2(u.strength - taken) < 0.01 ? 0 : round2(u.strength - taken);
-      const morale = Math.max(
-        0,
-        round2(u.morale - (taken / u.strength) * 100 * MORALE_PER_LOSS_PERCENT),
-      );
+      // Shock scales with where the blows came from: a hit in the back unnerves more.
+      let shock = 0;
+      for (const s of shots) {
+        if (s.target.id !== u.id) continue;
+        const share = (s.casualties / u.strength) * 100 * MORALE_RULES.lossPerPercent;
+        shock += share * SHOCK_FACTOR[s.aspect];
+      }
+      let morale = Math.max(0, round2(u.morale - shock));
+      const lossPercent = round2((taken / u.strength) * 100);
+      // A unit that lost real men takes a morale check: two dice against its morale.
+      if (strength > 0 && lossPercent >= MORALE_RULES.checkLossPercent) {
+        const roll = rng.die(6) + rng.die(6);
+        const needed = Math.round((morale / 100) * 12);
+        const passed = roll <= needed;
+        if (!passed) morale = Math.max(0, round2(morale - MORALE_RULES.checkFailLoss));
+        moraleLog.push({ unitId: u.id, lossPercent, roll, needed, passed, morale });
+      }
+      if (
+        strength > 0 &&
+        meleeTaken.has(u.id) &&
+        meleeTaken.get(u.id)! > (meleeDealt.get(u.id) ?? 0)
+      ) {
+        morale = Math.max(0, round2(morale - MORALE_RULES.meleeLoserLoss));
+      }
       fate.set(u.id, {
         ...u,
         strength,
@@ -594,6 +710,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
         status: strength === 0 ? 'destroyed' : u.status,
       });
     }
+    for (const m of moraleLog) emit.push({ type: 'combat.morale', payload: m });
     for (const s of shots) {
       const after = fate.get(s.target.id)!;
       emit.push({
@@ -607,6 +724,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
           melee: s.melee,
           die: s.die,
           casualties: s.casualties,
+          factors: s.factors,
           targetStrength: after.strength,
           targetMorale: after.morale,
         },
@@ -697,6 +815,11 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
         const res = startMarch(w, broken, u.home, ev.time);
         w = res.world;
         next.push(...(res.schedule ?? []));
+        next.push({
+          time: ev.time + RALLY_RULES.firstTryMs,
+          type: RALLY_EVENT,
+          payload: { unitId: u.id },
+        });
         emit.push({ type: 'unit.broken', payload: { unitId: u.id, morale: u.morale } });
         w = fileReport(w, 'broke', broken, ev.time, FIELD_REPORT_DELAY_MS);
         emit.push(...(res.emit ?? []));
