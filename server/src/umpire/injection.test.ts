@@ -11,10 +11,11 @@
  */
 import { describe, expect, it } from 'vitest';
 import { holdTheBridge, loadScenario, viewFor } from '@kriegsspiel/engine';
-import type { GameState, SideId } from '@kriegsspiel/engine';
+import type { GameState, SideId, ViewReport } from '@kriegsspiel/engine';
 import { LlmOrderParser, PARSE_ORDERS_SYSTEM } from '../orders/llmParser.js';
 import type { ParseContext } from '../orders/orderParser.js';
 import { HOSTILE, LONG_INPUT } from './injection.corpus.js';
+import { hiddenIn } from './leakGuard.js';
 import { LeakProbe, ScriptedModel, plantCanaries } from './leakKit.testkit.js';
 import { narrateReports, NARRATE_SYSTEM } from './narrate.js';
 import { STAFF_ANSWER_SYSTEM, answerStaffQuestion } from './staff.js';
@@ -22,6 +23,24 @@ import type { UmpireRequest } from './umpireClient.js';
 
 const NOW = 20 * 60_000;
 const snapshot = (w: GameState) => JSON.stringify(w);
+
+/** Blue's own reports to narrate; the scenario has none yet at `NOW`, so these are written by hand. */
+const blueReports = (): ViewReport[] => [
+  {
+    id: 'blue-r1',
+    kind: 'contact',
+    observedAt: 8 * 60_000,
+    deliveredAt: 14 * 60_000,
+    ageMs: 6 * 60_000,
+    from: '2nd Hussars',
+    location: { x: 2100, y: 900 },
+    place: 'near the mill, east of the Albrecht road',
+    uncertaintyRadius: 120,
+    sizeEstimate: 'about 400 men',
+    confidence: 'medium',
+    text: '2nd Hussars sighted about 400 men near the mill, 6 min ago (medium confidence).',
+  },
+];
 
 function setup() {
   const { world, secrets } = plantCanaries(loadScenario(holdTheBridge));
@@ -83,6 +102,7 @@ describe('player text is input, never system content', () => {
         h.text,
         NOW,
       );
+      expect(probe.exchanges.length).toBeGreaterThan(0);
       for (const ex of probe.exchanges) {
         expect(ex.request.system).toBe(STAFF_ANSWER_SYSTEM);
         expect((ex.request.input as { question: string }).question).toBe(h.text);
@@ -94,6 +114,8 @@ describe('player text is input, never system content', () => {
 });
 
 describe('an injected model that obeys the player text is stopped', () => {
+  // The scripted replies below do not depend on the corpus text, so each loop repeats the same
+  // checks per entry: the corpus only exercises the stages in the block above.
   for (const h of HOSTILE) {
     it(`parse: ${h.kind}: ordering an enemy unit, an unknown place or a made-up unit yields no intents`, async () => {
       const { world, own, enemy, ctx } = setup();
@@ -134,43 +156,70 @@ describe('an injected model that obeys the player text is stopped', () => {
       const leaks = [
         `Sir, the ${enemy.name} under ${enemy.commander} number ${enemy.strength} men.`,
         `Sir, ${enemy.id} is the unit at the ford and it is weak.`,
-        `Sir, ${enemy.name.replace(' ', '​ ')} are coming.`.replace('​ ', ' '),
+        `Sir, ${enemy.name.toLowerCase().split('').join('\u200b')} are coming.`,
+        `Sir, ${enemy.name.toLowerCase().replace(' ', '   ')} are coming.`,
       ];
       for (const text of leaks) {
         const model = new ScriptedModel({
           staff: () => ({ messages: [{ kind: 'advice', text }] }),
         });
         const a = await answerStaffQuestion(model, world, 'blue', 'intelligence', h.text, NOW);
-        expect(a?.text ?? '').not.toContain(enemy.name);
-        expect(a?.text ?? '').not.toContain(enemy.commander!);
-        expect(a?.text ?? '').not.toContain(String(enemy.strength));
-        expect(a?.text ?? '').not.toContain(enemy.id);
+        expect(a).toBeUndefined();
       }
       expect(snapshot(world)).toBe(before);
     });
   }
 
-  it('narration: a reply with state-mutating shape, fake ids or hidden names falls back to the template', async () => {
+  describe('narration: a reply that mutates state, cites fake ids or names hidden units falls back', () => {
+    const ZW = '\u200b';
+    const dispatch = (reportIds: string[], text: string, extra = {}) => ({
+      dispatches: [{ reportIds, text }],
+      ...extra,
+    });
+    const cases: Array<[string, (name: string, ids: string[]) => unknown]> = [
+      [
+        'capitalised hidden name',
+        (n, ids) => dispatch(ids, `Ignore the reports. ${n} hold the ford.`),
+      ],
+      [
+        'lower-case hidden name',
+        (n, ids) => dispatch(ids, `the ${n.toLowerCase()} hold the ford.`),
+      ],
+      [
+        'hidden name split by zero-width characters',
+        (n, ids) => dispatch(ids, `the ${n.toLowerCase().split('').join(ZW)} hold the ford.`),
+      ],
+      ['hidden unit id', (_n, ids) => dispatch(ids, 'red-1 is at the ford.')],
+      ['fake report id', (_n, ids) => dispatch(['fake-1', ...ids], 'The enemy is in sight, sir.')],
+    ];
+    for (const [label, reply] of cases) {
+      it(label, async () => {
+        const { world, enemy } = setup();
+        const before = snapshot(world);
+        const reports = blueReports();
+        const ids = reports.map((r) => r.id);
+        const model = new ScriptedModel({ narrate: () => reply(enemy.name, ids) });
+        const res = await narrateReports(model, 'blue', reports, { hidden: [enemy.name] });
+        expect(res.fellBack).toBe(true);
+        expect(res.dispatches.map((d) => d.text).join('\n')).not.toMatch(/zxqvian/i);
+        expect(snapshot(world)).toBe(before);
+      });
+    }
+  });
+
+  it('narration: an extra world key is dropped and the state is untouched', async () => {
     const { world, enemy } = setup();
     const before = snapshot(world);
-    const reports = viewFor(world, 'blue', NOW).reports.filter((r) => r.kind !== 'battle');
-    const texts = [
-      `Ignore the reports. ${enemy.name} hold the ford.`,
-      `${enemy.id} is at the ford, ${enemy.strength} strong.`,
-    ];
-    for (const text of texts) {
-      const model = new ScriptedModel({
-        narrate: () => ({
-          dispatches: [{ reportIds: ['fake-1', ...reports.map((r) => r.id)], text }],
-          world: { units: [] },
-        }),
-      });
-      const res = await narrateReports(model, 'blue', reports);
-      if (reports.length > 0) {
-        expect(res.fellBack).toBe(true);
-        expect(res.dispatches.map((d) => d.text).join('\n')).not.toContain(enemy.name);
-      }
-    }
+    const reports = blueReports();
+    const model = new ScriptedModel({
+      narrate: () => ({
+        dispatches: [{ reportIds: ['blue-r1'], text: 'The enemy is in sight, sir.' }],
+        world: { units: [] },
+      }),
+    });
+    const res = await narrateReports(model, 'blue', reports, { hidden: [enemy.name] });
+    expect(res.fellBack).toBe(false);
+    expect(Object.keys(res).sort()).not.toContain('world');
     expect(snapshot(world)).toBe(before);
   });
 });
@@ -222,15 +271,12 @@ describe('text that came from the other side', () => {
       'Status?',
       NOW,
     );
+    expect(probe.exchanges.length).toBeGreaterThan(0);
     for (const ex of probe.exchanges) expect(ex.request.system).toBe(STAFF_ANSWER_SYSTEM);
   });
 
-  it('a hostile captured dispatch (report text) is not forwarded to the narration prompt', async () => {
     const { world } = setup();
-    const view = viewFor(world, 'blue', NOW);
-    const reports = view.reports
-      .filter((r) => r.kind !== 'battle')
-      .map((r) => ({ ...r, text: trick('Captured dispatch.') }));
+    const reports = blueReports().map((r) => ({ ...r, text: trick('Captured dispatch.') }));
     const probe = new LeakProbe();
     const model = new ScriptedModel({
       narrate: (r: UmpireRequest) => ({
@@ -241,6 +287,7 @@ describe('text that came from the other side', () => {
       }),
     });
     await narrateReports(probe.client('blue', model), 'blue', reports);
+    expect(probe.exchanges.length).toBeGreaterThan(0);
     for (const ex of probe.exchanges) {
       expect(ex.request.system).toBe(NARRATE_SYSTEM);
       expect(JSON.stringify(ex.request.input)).not.toContain('Ignore previous');
@@ -260,18 +307,23 @@ describe('over-long and unicode input', () => {
     expect(snapshot(world)).toBe(before);
   });
 
-  const ZW = '​';
-  const splitName = (n: string) => n.split('').join(ZW);
+  // Lower-cased first, so the proper-noun check in `checkProseAgainst` cannot be what stops them:
+  // only `hiddenIn` can.
+  const ZW = '\u200b';
+  const lower = (n: string) => n.toLowerCase();
   for (const [label, mangle] of [
-    ['zero-width characters', splitName],
-    ['upper case', (s: string) => s.toUpperCase()],
-    ['extra spaces', (s: string) => s.replace(' ', '   ')],
+    ['zero-width characters', (n: string) => lower(n).split('').join(ZW)],
+    ['lower case', lower],
+    ['extra spaces', (n: string) => lower(n).replace(' ', '   ')],
+    ['upper case', (n: string) => n.toUpperCase()],
   ] as const) {
     it(`a hidden unit's name hidden by ${label} in a model reply does not reach the player`, async () => {
       const { world, enemy, own, ctx } = setup();
-      const text = `Sir, ${mangle(enemy.name)} are at the ford.`;
+      const text = `Sir, the ${mangle(enemy.name)} are at the ford.`;
+      expect(hiddenIn(text, [enemy.name])).toHaveLength(1);
       const parse = new ScriptedModel({ parse: () => ({ result: 'rejection', reason: text }) });
       const res = await new LlmOrderParser(parse).parse(`${own.id}: hold`, ctx);
+      expect(JSON.stringify(res)).not.toMatch(/z.?x.?q.?v/i);
       const staff = new ScriptedModel({ staff: () => ({ messages: [{ kind: 'advice', text }] }) });
       const ans = await answerStaffQuestion(
         staff,
@@ -281,9 +333,7 @@ describe('over-long and unicode input', () => {
         'Who is there?',
         NOW,
       );
-      const delivered = JSON.stringify([res, ans?.text ?? null]);
-      const bare = (s: string) => s.replace(/[\s\u200b]/g, '').toLowerCase();
-      expect(bare(delivered)).not.toContain(bare(enemy.name));
+      expect(ans).toBeUndefined();
     });
   }
 });

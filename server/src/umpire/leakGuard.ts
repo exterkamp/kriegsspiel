@@ -26,11 +26,19 @@ export function hiddenTerms(world: GameState, side: SideId): string[] {
     .filter((t) => t.trim() !== '' && !own.has(t.toLowerCase()));
 }
 
-/** The terms found in `text`, as problems. Names match as whole words, ignoring case. */
+/** Drops invisible format characters (zero-width spaces, joiners, bidi marks) and collapses runs of whitespace. */
+const squash = (s: string) => s.replace(/\p{Cf}/gu, '').replace(/\s+/gu, ' ');
+
+/**
+ * The terms found in `text`, as problems. Names match as whole words, ignoring case, invisible
+ * format characters and the amount of white space, so a name cannot be smuggled past by
+ * lower-casing it, widening its spaces or splitting it with zero-width characters.
+ */
 export function hiddenIn(text: string, terms: readonly string[]): string[] {
+  const plain = squash(text);
   const hits = terms.filter((t) => {
-    const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(text);
+    const escaped = squash(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(plain);
   });
   return [...new Set(hits)].map((t) => `names the other side ("${t}")`);
 }
