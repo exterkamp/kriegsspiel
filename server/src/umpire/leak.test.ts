@@ -26,18 +26,11 @@ import {
 } from '@kriegsspiel/engine';
 import type { GameState, SideId } from '@kriegsspiel/engine';
 import { LlmOrderParser } from '../orders/llmParser.js';
-import type { ParseContext, ParseResult } from '../orders/orderParser.js';
+import type { ParseContext } from '../orders/orderParser.js';
 import { llmAgents } from '../opponent/index.js';
 import { umpireConfigFromEnv } from './config.js';
 import { createUmpireClient } from './createUmpireClient.js';
-import {
-  LeakProbe,
-  ScriptedModel,
-  describeLeaks,
-  other,
-  plantCanaries,
-  scan,
-} from './leakKit.testkit.js';
+import { LeakProbe, ScriptedModel, describeLeaks, plantCanaries, scan } from './leakKit.testkit.js';
 import type { Leak, Secret } from './leakKit.testkit.js';
 import { narrateReports } from './narrate.js';
 import { StaffRoster, answerStaffQuestion, runStaff } from './staff.js';
@@ -230,7 +223,6 @@ describe('an adversarial model that names the other side’s units is stopped', 
   for (const side of SIDES) {
     for (const [kind, text] of Object.entries(variants(side))) {
       it(`${side}: ${kind} in narration, staff messages, answers and parse replies is not delivered`, async () => {
-        const e = enemyOf(side);
         const own = G.world.units.find((u) => u.side === side)!.id;
         const reportIds = viewFor(G.world, side, G.now).reports.map((r) => r.id);
         const model = new ScriptedModel({
@@ -245,7 +237,6 @@ describe('an adversarial model that names the other side’s units is stopped', 
         });
         const probe = new LeakProbe();
         const delivered = await runStages(probe.client(side, model), side);
-        expect(own).toBeTruthy();
         // Prompts stay clean even though the model is lying: its words never come back as state.
         // (A retry quotes the model's own words, so retries are left out.)
         const leaks = [
