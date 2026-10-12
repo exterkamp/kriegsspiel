@@ -148,3 +148,20 @@ describe('LlmPanel', () => {
     expect(document.querySelector('.llm-detail')!.textContent).toContain('You are the umpire');
   });
 });
+
+describe('fallback calls', () => {
+  it('marks a call the fallback provider answered, with the reason', () => {
+    const call = toLlmCall({
+      seq: 1,
+      ts: 1,
+      kind: 'llm',
+      data: {
+        stage: 'parse',
+        provider: 'ollama',
+        mode: 'fallback',
+        fallbackFor: { reason: 'timed out after 120000ms', kind: 'timeout' },
+      },
+    });
+    expect(call).toMatchObject({ mode: 'fallback', fallbackReason: 'timed out after 120000ms' });
+  });
+});

@@ -154,6 +154,9 @@ ks-admin {
   .badge.playback {
     color: var(--ks-warn-on-dark);
   }
+  .badge.fallback {
+    color: #f85149;
+  }
   .llm-detail details {
     margin: 6px 0;
   }

@@ -41,6 +41,8 @@ export type {
   GameUmpireReport,
 } from './gameLimits.js';
 export { PlaybackUmpireClient } from './playbackUmpireClient.js';
+export { FallbackUmpireClient } from './fallbackUmpireClient.js';
+export type { FallbackUmpireOptions, UmpireFallback } from './fallbackUmpireClient.js';
 export { createUmpireClient } from './createUmpireClient.js';
 export type { CreateUmpireClientOptions } from './createUmpireClient.js';
 export {

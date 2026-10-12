@@ -18,7 +18,9 @@ export interface LlmCall {
   stage: string;
   provider: string;
   model?: string;
-  mode: 'live' | 'playback' | 'test';
+  mode: 'live' | 'playback' | 'test' | 'fallback';
+  /** Set on a `fallback` call: why the configured model did not answer. */
+  fallbackReason?: string;
   latencyMs?: number;
   inputTokens: number;
   outputTokens: number;
@@ -55,7 +57,11 @@ export function toLlmCall(entry: TraceEntryLike): LlmCall | undefined {
     stage: str(d.stage) ?? '?',
     provider: str(d.provider) ?? 'unknown',
     model: str(d.model),
-    mode: d.mode === 'playback' || d.mode === 'test' ? d.mode : 'live',
+    mode: d.mode === 'playback' || d.mode === 'test' || d.mode === 'fallback' ? d.mode : 'live',
+    fallbackReason:
+      d.fallbackFor && typeof d.fallbackFor === 'object'
+        ? str((d.fallbackFor as Record<string, unknown>).reason)
+        : undefined,
     latencyMs: typeof d.latencyMs === 'number' ? d.latencyMs : undefined,
     inputTokens: num(usage.inputTokens),
     outputTokens: num(usage.outputTokens),
@@ -124,7 +130,16 @@ export function formatLatency(ms: number | undefined): string {
 export function matchesFilter(c: LlmCall, text: string): boolean {
   const q = text.trim().toLowerCase();
   if (!q) return true;
-  return [c.stage, c.provider, c.model, c.mode, c.ok ? 'ok' : 'error', c.errorKind, c.error]
+  return [
+    c.stage,
+    c.provider,
+    c.model,
+    c.mode,
+    c.ok ? 'ok' : 'error',
+    c.errorKind,
+    c.error,
+    c.fallbackReason,
+  ]
     .filter(Boolean)
     .join(' ')
     .toLowerCase()
@@ -291,6 +306,11 @@ export class LlmPanel {
         }`,
       ),
     ];
+    if (c.fallbackReason) {
+      out.push(
+        el('p', `fallback: the configured model did not answer (${c.fallbackReason})`, 'bad'),
+      );
+    }
     if (!c.ok) {
       out.push(el('p', `${c.errorKind ?? 'error'}: ${c.error ?? 'call failed'}`, 'bad'));
     }
