@@ -150,6 +150,21 @@ describe('test provider: parse', () => {
     });
   });
 
+  it('takes the ford for the bridge of a scenario that has no bridge', async () => {
+    const noBridge: ParseContext = {
+      ...WORLD,
+      map: {
+        features: [
+          ...WORLD.map.features.filter((f) => f.kind !== 'bridge'),
+          { id: 'real-ford', kind: 'ford', name: 'The shallows', anchor: at(300, 300) },
+        ],
+      },
+    };
+    const r = await parser().parse('Cavalry hold the bridge.', noBridge);
+    const ford = noBridge.map.features.find((f) => f.id === 'real-ford');
+    expect(r).toMatchObject({ kind: 'intents', intents: [{ kind: 'hold', at: ford?.anchor }] });
+  });
+
   it('reads place names from the scenario it is given, whatever they are', async () => {
     const other: ParseContext = {
       ...WORLD,

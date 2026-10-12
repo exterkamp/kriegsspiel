@@ -114,6 +114,16 @@ describe('clarification options', () => {
     ).toBe('1st Battalion, March to the bridge.');
   });
 
+  it('sends the offered first part as the whole order', () => {
+    expect(
+      orderWithOption(
+        'Hold the wood then march to Nowhere.',
+        'I know of no place called "Nowhere", sir. Shall I send just the first part?',
+        'Hold the wood.',
+      ),
+    ).toBe('Hold the wood.');
+  });
+
   it('leaves the options out of the refusal text', () => {
     const t = refusalText({
       text: 'Hold the wood.',

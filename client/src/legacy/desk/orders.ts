@@ -169,7 +169,8 @@ export function splitOptions(reason: string): { question: string; options: strin
  * order for the option; any other question puts the option in front (a unit) or after (a place).
  */
 export function orderWithOption(words: string, question: string, option: string): string {
-  // "Shall I send just the first part?" offers the part itself, a whole order.
+  // "Shall I send just the first part?" offers the part itself, a whole order. The wording is the
+  // test umpire's, from server/src/umpire/providers/testParse.ts; orders.test.ts pins it.
   if (/^\s*i know of no place/i.test(question)) return option;
   const noun = /^\s*which\s+([a-z]+)/i.exec(question)?.[1];
   if (noun && !/^(one|unit)$/i.test(noun)) {
