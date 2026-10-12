@@ -61,6 +61,16 @@ export const HESITATE_CHANCE = 0.15;
 export const AIM_SPREAD_M = 60;
 /** A target that moved less than this (metres) since the last order is not worth a new one. */
 const RETARGET_M = 150;
+/**
+ * A unit this close (metres) to the objective stays on it instead of chasing an enemy, because
+ * the objective only falls to a side that holds it for some minutes (D13).
+ */
+export const HOLD_RADIUS_M = 120;
+/**
+ * The scripted commander forms up for this long (game ms) before it marches, so the bridge is not
+ * taken by whoever happens to start closest, and the first game has time for orders and answers.
+ */
+export const FORM_UP_MS = 10 * 60_000;
 
 export interface ScriptedOpponentConfig {
   side: string;
@@ -134,6 +144,8 @@ export class ScriptedOpponent implements SideAgent {
 
   think(view: EngineSideView): AgentOrder[] {
     assertFogOnly(view, this.side);
+    this.hesitated = view.time < FORM_UP_MS;
+    if (this.hesitated) return [];
     const tick = Math.floor(view.time / this.intervalMs);
     const rng = new Rng(seedRng(this.config.seed + hashSide(this.side) + tick * 7919));
     const threats: { id: string; position: Point }[] = [
@@ -155,23 +167,25 @@ export class ScriptedOpponent implements SideAgent {
 
       let next: Standing | undefined;
       if (weak) next = { kind: 'withdraw', target: this.config.fallbackTo };
-      else if (near && near.d <= ENGAGE_RANGE_M) next = { kind: 'attack', target: near.t.position };
-      else if (rng.next() >= HESITATE_CHANCE || standing) {
-        const spread = () => (rng.next() * 2 - 1) * AIM_SPREAD_M;
-        next = {
-          kind: 'advance',
-          target: {
-            x: this.config.objective.x + spread(),
-            y: this.config.objective.y + spread(),
-          },
-        };
-      }
+      else if (dist(unit.position, this.config.objective) <= HOLD_RADIUS_M) {
+        next = standing?.kind === 'advance' ? standing : this.advanceOrder(rng);
+      } else if (near && near.d <= ENGAGE_RANGE_M)
+        next = { kind: 'attack', target: near.t.position };
+      else if (rng.next() >= HESITATE_CHANCE || standing) next = this.advanceOrder(rng);
       if (!next) this.hesitated = true;
       if (!next || !this.changes(standing, next)) continue;
       this.standing.set(unit.id, next);
       orders.push(this.order(unit.id, unit.name, next));
     }
     return orders;
+  }
+
+  private advanceOrder(rng: Rng): Standing {
+    const spread = () => (rng.next() * 2 - 1) * AIM_SPREAD_M;
+    return {
+      kind: 'advance',
+      target: { x: this.config.objective.x + spread(), y: this.config.objective.y + spread() },
+    };
   }
 
   settled(): boolean {

@@ -218,7 +218,7 @@ export interface Side {
 }
 
 /**
- * The `attacker` wins the moment its units alone hold `objective`, an area (a closed polygon
+ * The `attacker` wins once its units alone have held `objective` for `takeMs`, an area (a closed polygon
  * of at least three points); a unit holds it when its centre is inside. The `defender` wins if
  * the game clock reaches `holdMs` with the attacker not having taken it.
  */
@@ -227,7 +227,12 @@ export interface VictoryCondition {
   defender: SideId;
   attacker: SideId;
   holdMs: GameTime;
+  /** How long the attacker must hold the objective alone for it to count as taken. Default 10 game minutes. */
+  takeMs?: GameTime;
 }
+
+/** Game time the attacker must hold the objective, alone, before it counts as taken (D13). */
+export const DEFAULT_TAKE_MS = 10 * 60_000;
 
 export type VictoryReason = 'objective-taken' | 'objective-held' | 'eliminated' | 'withdrawn';
 
@@ -331,6 +336,8 @@ export interface GameState {
   combatActive: boolean;
   /** Set once, when the game ends. Nothing happens in combat or victory handlers after that. */
   outcome: Outcome | null;
+  /** Since when the attacker alone has held the objective, or null (D13). Absent counts as null. */
+  heldSince?: GameTime | null;
   intel: Record<SideId, SideIntel>;
   /** Couriers riding now, both sides. Master state only: never sent to a client. */
   couriers: Courier[];

@@ -15,7 +15,7 @@ import {
   type Aspect,
 } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
-import { rejectOrder, startMarch } from './movement.js';
+import { positionAt, rejectOrder, startMarch } from './movement.js';
 import { FATIGUE_PER_FIGHT_TICK } from './fatigue.js';
 import { schedule } from './queue.js';
 import {
@@ -29,6 +29,7 @@ import {
 import { terrainAt } from './terrain.js';
 import { FORMATION_RULES, unitTypeOf } from './unitTypes.js';
 import {
+  DEFAULT_TAKE_MS,
   MS_PER_MINUTE,
   type GameState,
   type Outcome,
@@ -113,9 +114,33 @@ function sideOut(world: GameState, side: SideId): 'eliminated' | 'withdrawn' | n
   return mine.every((u) => u.status === 'destroyed') ? 'eliminated' : 'withdrawn';
 }
 
+/** True while only the attacker's active units have their centres on the objective. */
+function attackerHolds(world: GameState): boolean {
+  const { attacker, objective } = world.victory;
+  const holders = activeUnits(world).filter((u) => onObjective(u, objective));
+  return holders.length > 0 && holders.every((u) => u.side === attacker);
+}
+
+/**
+ * Start or reset the hold timer as of `time`. When the attacker has just taken the ground,
+ * a check is queued for the moment the hold would be complete.
+ */
+function trackHold(world: GameState, time: number): { world: GameState; schedule: NewEvent[] } {
+  const holds = attackerHolds(world);
+  const since = world.heldSince ?? null;
+  if (!holds)
+    return { world: since === null ? world : { ...world, heldSince: null }, schedule: [] };
+  if (since !== null) return { world, schedule: [] };
+  const takeMs = world.victory.takeMs ?? DEFAULT_TAKE_MS;
+  return {
+    world: { ...world, heldSince: time },
+    schedule: [{ time: time + takeMs, type: COMBAT_CHECK_EVENT }],
+  };
+}
+
 /** The result of the game as of `time`, or null if it goes on. Exported for tests only. */
 export function evaluateVictory(world: GameState, time: number): Outcome | null {
-  const { attacker, objective } = world.victory;
+  const { attacker } = world.victory;
   const out = new Map<SideId, 'eliminated' | 'withdrawn'>();
   for (const s of world.sides) {
     const o = sideOut(world, s.id);
@@ -131,16 +156,27 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
       return { winner: world.sides.find((o) => o.id !== s.id)!.id, reason, time };
     }
   }
-  const holders = activeUnits(world).filter((u) => onObjective(u, objective));
-  if (holders.length > 0 && holders.every((u) => u.side === attacker)) {
+  const since = world.heldSince ?? null;
+  if (
+    since !== null &&
+    attackerHolds(world) &&
+    time - since >= (world.victory.takeMs ?? DEFAULT_TAKE_MS)
+  ) {
     return { winner: attacker, reason: 'objective-taken', time };
   }
   return null;
 }
 
 function finish(world: GameState, outcome: Outcome): HandlerResult<GameState> {
+  // The game is over: every unit stops where it stands and takes no further orders.
+  const units = world.units.map((u) => {
+    const center = positionAt(world.map, u, outcome.time);
+    const stopped: Unit = { ...u, center, intent: { kind: 'idle' } };
+    delete stopped.leg;
+    return stopped;
+  });
   return {
-    world: { ...world, time: outcome.time, combatActive: false, outcome },
+    world: { ...world, units, time: outcome.time, combatActive: false, outcome },
     emit: [
       {
         type: 'game.end',
@@ -259,6 +295,8 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
 
   registry.register(COMBAT_CHECK_EVENT, (world, ev) => {
     if (world.outcome) return { world };
+    const held = trackHold(world, ev.time);
+    world = held.world;
     const outcome = evaluateVictory(world, ev.time);
     if (outcome) return finish(world, outcome);
     // An attacker that stopped in reach (its `to` is where it stands) and whose target
@@ -276,6 +314,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
         });
       }
     }
+    chase.push(...held.schedule);
     if (world.combatActive) return { world, schedule: chase };
     const pairs = contactPairs(world);
     if (pairs.length === 0) return { world, schedule: chase };
@@ -449,6 +488,9 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       }),
     };
 
+    const held = trackHold(w, ev.time);
+    w = held.world;
+    next.push(...held.schedule);
     const outcome = evaluateVictory(w, ev.time);
     if (outcome) {
       const end = finish(w, outcome);
