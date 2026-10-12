@@ -462,3 +462,9 @@ Removed with it: all `.svelte` and test files under `client/src/hq`, the `fixtur
 **Boundaries.** This file-only inspection route has no catalog dependency, personal marks, simulation, live-game state, production storage or session resume. `/` remains the upstream menu/auth/guest/scenario/live flow and D28's fixture retirement stays in force. Local New game setup and session replacement follow in separate development-only Angular packets.
 
 **See.** [Map table guide](map-table-guide.md), [Angular landing plan](game-initialization-angular-landing-plan.md).
+
+## CI validation parallelism — 2026-10-11
+
+**Decision.** CI runs static checks/builds, maps/catalog tests and application/repository tests on three isolated runners. Existing serial build ordering and all ordinary/effectiveness coverage remain required. The existing `check` status aggregates explicit success from the complete validation matrix and `test-effectiveness`; failure, cancellation or unexpected skipping cannot clear it. Every validation runner verifies the exact candidate and uploads its own ordinary checkout evidence, including on failure. Only superseded pull-request runs cancel; main and merge-group runs retain distinct concurrency groups. Branch protection is unchanged.
+
+**See.** [CI measurements and review](ci-performance-optimization.md), [review workflow](review-workflow.md).

@@ -38,3 +38,45 @@ eight inspected queues 2–3s, test step 1m59s–3m04s. Representative
 [run 38199171816](https://github.com/exterkamp/kriegsspiel/actions/runs/38199171816).
 Latest current-main [run 38199508028](https://github.com/exterkamp/kriegsspiel/actions/runs/38199508028)
 was successful; detailed baseline replication and implementation evidence follow.
+
+## Refreshed baseline and selected change
+
+Unchanged workflow on current main: run 38199508028 attempt 1, H
+`a86a661c82002bb9680b13ca427742a11caa26a3`, green 287s, ordinary
+job 285s, effectiveness 41s, 326 runner-seconds (6 rounded job minutes).
+Test step 179s, lint 18s, typecheck 30s, build 31s. Queues 1–2s.
+The docs-only baseline PR H `a9e5fe88a529d1f4c9d3a61489c841185bec785a`
+changes no validation/product source: [run 38200062794 attempt 1](https://github.com/exterkamp/kriegsspiel/actions/runs/38200062794/attempts/1)
+green 297s, 328 runner-seconds, test step 182s. Main's same-source repeat
+attempt 2 is also measured below. Both use GitHub-hosted `ubuntu-latest`,
+image `ubuntu-24.04` version `20261004.327.1`, Node 22.23.3/npm 10.9.7.
+Runner names: original 1000002560/2561; PR 1000002566/2567;
+main repeat 1000002568/2569. These are separate attempts, not new source revisions.
+
+Selected change: three ordinary groups with isolated checkouts/install/output:
+static/build (serial lint, typecheck, build); maps (workspace build/tests, then
+catalog); application (engine, protocol, server, both client test runners, then
+all repository/review-workflow/maps-assessment Node tests). Root `npm test`
+retains its original selection/order through a shared repository-test script.
+A coverage control fails if a workspace is added without assignment.
+`check` requires explicit success from the complete non-fail-fast matrix and
+unchanged effectiveness job. Its actual shell is tested against all 36 pairs
+of success/failure/cancelled/skipped/empty/unknown results.
+
+Map profiling shows 58.71s Vitest wall time plus compilation. Repository Node
+suites take 44.78s: the slowest review control spends 6.49s checking restoration
+failure/reaping; two bookkeeping controls take 3.90s and 3.58s. These execute
+real process/error/cleanup boundaries. Scheduling them independently removes
+serialization without touching assertions, geometry fixtures, timeouts or
+production code. No speculative caching or test-internal optimization is used.
+
+Superseded PR runs cancel by workflow/event/PR number. Main and merge-group runs
+use unique run IDs and do not cancel; merge-group is now explicitly supported.
+No branch protection, path exclusions, dependency artifacts or shared build cache
+are introduced. Each ordinary artifact adds its group to the existing name;
+review consumers must inspect all three checkout records. Retention remains 30 days.
+
+Local first-pass lint and typecheck passed. Initial tests could not bind sockets
+(`listen EPERM`) and Angular tests/build rejected shell Node 22.22.2 (the repo pins
+22.23.3). These are local environment failures, not CI timing evidence or assertions
+relaxed for performance. Pinned temporary tools and socket-enabled rerun follow.
