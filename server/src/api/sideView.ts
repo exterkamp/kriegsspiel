@@ -82,8 +82,10 @@ function staffDispatch(x: StaffExchange, now: number): Dispatch[] {
 /** The answer's words are withheld until the officer's time has passed. */
 function staffExchangeAt(x: StaffExchange, now: number): StaffExchange {
   if (now >= x.answerAtGame) return x;
-  const { text: _text, basedOnGame: _based, ...rest } = x;
-  return rest;
+  const early = { ...x };
+  delete early.text;
+  delete early.basedOnGame;
+  return early;
 }
 
 /** A unit's condition on the wire; a role that may not know it (an outline) leaves the fields out. */
@@ -147,7 +149,9 @@ export function toSideView(
       ...view.documents.map(documentToDispatch),
       ...staff.flatMap((x) => staffDispatch(x, view.time)),
     ],
-    ...(staff.length === 0 ? {} : { staffHistory: staff.map((x) => staffExchangeAt(x, view.time)) }),
+    ...(staff.length === 0
+      ? {}
+      : { staffHistory: staff.map((x) => staffExchangeAt(x, view.time)) }),
     clock,
   };
 }

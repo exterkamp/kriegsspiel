@@ -130,7 +130,15 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
       sideViews: Object.fromEntries(
         actor.state.world.sides.map((s) => [
           s.id,
-          sideViewOf(actor.state, s.id, clock, undefined, [], actor.narrationFor(s.id), actor.staffHistoryFor(s.id)),
+          sideViewOf(
+            actor.state,
+            s.id,
+            clock,
+            undefined,
+            [],
+            actor.narrationFor(s.id),
+            actor.staffHistoryFor(s.id),
+          ),
         ]),
       ),
     };

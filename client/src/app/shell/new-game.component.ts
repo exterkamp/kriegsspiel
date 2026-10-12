@@ -167,6 +167,18 @@ import { PAGE_CSS } from './page-styles';
         display: flex;
         gap: 12px;
       }
+      /* The screen scrolls, not the page, so the sticky bar below has the right scroller. */
+      .page {
+        overflow: visible;
+      }
+      /* Start stays in view while the form is longer than the window (#323). */
+      form .actions {
+        position: sticky;
+        bottom: 0;
+        padding: 10px 0;
+        background: #e9dcb8;
+        border-top: 1px solid #8a7a52;
+      }
     `,
   ],
 })
