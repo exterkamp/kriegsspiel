@@ -1135,49 +1135,60 @@ it.each(['load', 'generate'] as const)(
       method === 'load'
         ? setup.props.preparation.load('', board.summary as never, new AbortController().signal)
         : setup.props.preparation.generate({} as never, new AbortController().signal);
-    expect(receivedSignal?.aborted).toBe(false);
-    // No owner cancellation/disposal precedes this call: this release itself dispatches live abort.
-    setup.props.preparation.dispose();
-    expect(receivedSignal?.aborted).toBe(true);
-    expect(reentered).toHaveBeenCalledOnce();
-    expect(p.preparation.dispose).not.toHaveBeenCalled();
-    const cancel = p.owner.cancelSetup();
-    let canceled = false;
-    void cancel.then(
-      () => {
-        canceled = true;
-      },
-      () => {
-        canceled = true;
-      },
-    );
-    await vi.waitFor(() => expect(p.preparation.dispose).toHaveBeenCalledOnce());
-    expect(canceled).toBe(false);
-    expect(() => p.owner.openSetup()).toThrow('not retired');
-    expect(p.ports.makeCatalog).toHaveBeenCalledOnce();
-    expect(p.ports.makePreparation).toHaveBeenCalledOnce();
-    const stop = p.owner.dispose('departure');
-    host.destroyed();
-    let retired = false;
-    void stop.then(
-      () => {
-        retired = true;
-      },
-      () => {
-        retired = true;
-      },
-    );
-    await vi.waitFor(() => expect(surfaceRelease).toHaveBeenCalledOnce());
-    expect(personalRelease).toHaveBeenCalledOnce();
-    expect(retired).toBe(false);
-    operation.resolve(board);
-    await expect(loading).rejects.toThrow('retired');
-    await expect(cancel).rejects.toThrow('retirement');
-    await expect(stop).rejects.toThrow('retirement');
-    expect(p.preparation.dispose).toHaveBeenCalledOnce();
-    expect(reentered).toHaveBeenCalledOnce();
-    expect(p.owner.dispose('departure')).toBe(stop);
-    expect(p.ports.makePreparation).toHaveBeenCalledOnce();
+    // Observe the expected retirement rejection immediately; assertions still inspect the original promise.
+    void loading.catch(() => {});
+    try {
+      expect(receivedSignal?.aborted).toBe(false);
+      // No owner cancellation/disposal precedes this call: this release itself dispatches live abort.
+      setup.props.preparation.dispose();
+      expect(receivedSignal?.aborted).toBe(true);
+      expect(reentered).toHaveBeenCalledOnce();
+      expect(p.preparation.dispose).not.toHaveBeenCalled();
+      const cancel = p.owner.cancelSetup();
+      let canceled = false;
+      void cancel.then(
+        () => {
+          canceled = true;
+        },
+        () => {
+          canceled = true;
+        },
+      );
+      await vi.waitFor(() => expect(p.preparation.dispose).toHaveBeenCalledOnce());
+      expect(canceled).toBe(false);
+      expect(() => p.owner.openSetup()).toThrow('not retired');
+      expect(p.ports.makeCatalog).toHaveBeenCalledOnce();
+      expect(p.ports.makePreparation).toHaveBeenCalledOnce();
+      const stop = p.owner.dispose('departure');
+      host.destroyed();
+      let retired = false;
+      void stop.then(
+        () => {
+          retired = true;
+        },
+        () => {
+          retired = true;
+        },
+      );
+      await vi.waitFor(() => expect(surfaceRelease).toHaveBeenCalledOnce());
+      expect(personalRelease).toHaveBeenCalledOnce();
+      expect(retired).toBe(false);
+      operation.resolve(board);
+      await expect(loading).rejects.toThrow('retired');
+      await expect(cancel).rejects.toThrow('retirement');
+      await expect(stop).rejects.toThrow('retirement');
+      expect(p.preparation.dispose).toHaveBeenCalledOnce();
+      expect(reentered).toHaveBeenCalledOnce();
+      expect(p.owner.dispose('departure')).toBe(stop);
+      expect(p.ports.makePreparation).toHaveBeenCalledOnce();
+    } finally {
+      // Release fixture-owned gates even when an assertion fails, then join the actual owner fence.
+      const retirement = p.owner.dispose('departure');
+      operation.resolve(board);
+      host.destroyed();
+      await expect(loading).rejects.toThrow('retired');
+      await expect(retirement).rejects.toThrow('retirement');
+    }
   },
 );
 
@@ -1422,31 +1433,45 @@ describe('complete owner source review production repair traces', () => {
       const starting = p.owner.startDefault(),
         handle = await descriptor(p.owner);
       const host = attach(p.owner, handle, () => nativeRetirement.promise);
-      acknowledge(host, handle);
-      // No await separates historical first success from the newer current-host failure.
-      host.availability({ key: handle.key, ready: false, error: 'new current availability error' });
-      expect(await handle.initialized).toEqual({ key: handle.key, ok: true });
-      await starting;
-      expect(p.owner.state().phase).toBe('failed');
-      expect(p.owner.state().session).toBeNull();
-      expect(p.owner.state().available).toBe(false);
-      expect(p.owner.state().error).toContain('Retry');
-      const recovering = p.owner[recovery]();
-      await vi.waitFor(() => expect(p.owner.state().phase).toBe('preparing'));
-      expect(p.ports.loadDefault).toHaveBeenCalledOnce();
-      expect(p.ports.freshKey).toHaveBeenCalledOnce();
-      nativeRetirement.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(p.ports.freshKey).toHaveBeenCalledOnce();
-      host.destroyed();
-      const fresh = await descriptor(p.owner),
+      let newHost: HostRegistration | undefined;
+      try {
+        acknowledge(host, handle);
+        // No await separates historical first success from the newer current-host failure.
+        host.availability({
+          key: handle.key,
+          ready: false,
+          error: 'new current availability error',
+        });
+        expect(await handle.initialized).toEqual({ key: handle.key, ok: true });
+        await starting;
+        expect(p.owner.state().phase).toBe('failed');
+        expect(p.owner.state().session).toBeNull();
+        expect(p.owner.state().available).toBe(false);
+        expect(p.owner.state().error).toContain('Retry');
+        const recovering = p.owner[recovery]();
+        await vi.waitFor(() => expect(p.owner.state().phase).toBe('preparing'));
+        expect(p.ports.loadDefault).toHaveBeenCalledOnce();
+        expect(p.ports.freshKey).toHaveBeenCalledOnce();
+        nativeRetirement.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(p.ports.freshKey).toHaveBeenCalledOnce();
+        host.destroyed();
+        const fresh = await descriptor(p.owner);
         newHost = attach(p.owner, fresh);
-      acknowledge(newHost, fresh);
-      await recovering;
-      expect(fresh.key).not.toBe(handle.key);
-      expect(p.owner.state().phase).toBe('ready');
-      expect(p.owner.state().error).toBeNull();
+        acknowledge(newHost, fresh);
+        await recovering;
+        expect(fresh.key).not.toBe(handle.key);
+        expect(p.owner.state().phase).toBe('ready');
+        expect(p.owner.state().error).toBeNull();
+      } finally {
+        // Native resource retirement and destruction acknowledgments remain real independent barriers.
+        const retirement = p.owner.dispose('departure');
+        nativeRetirement.resolve();
+        host.destroyed();
+        newHost?.destroyed();
+        await retirement;
+      }
     },
   );
 });

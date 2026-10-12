@@ -370,8 +370,11 @@ export class NativeLocalBoardComponent {
     outlet.view = view;
     view.onDestroy(() => {
       if (outlet.view === view) {
-        outlet.row = null;
+        // Angular may destroy the embedded child before its anchor's DestroyRef.
+        // Keep the captured origin for full-fence cancellation; this old anchor is
+        // now retirement-only. Controller clears already unset view before hooks.
         outlet.view = null;
+        this.retireOutlet(outlet);
       }
     });
     // Native bridge OnInit registers before any host after-render acquisition.

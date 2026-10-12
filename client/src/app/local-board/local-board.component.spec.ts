@@ -1,6 +1,6 @@
 import { webcrypto } from 'node:crypto';
 import { assetIdentity, canonicalizeAsset, createReferenceAsset } from '@kriegsspiel/maps';
-import { provideZonelessChangeDetection, signal } from '@angular/core';
+import { provideZonelessChangeDetection, signal, ViewContainerRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
@@ -16,6 +16,7 @@ import {
   LOCAL_BOARD_OWNER_PORTS,
   LOCAL_BOARD_ROUTE_SLOT,
   NativeLocalBoardComponent,
+  LocalBoardOutletDirective,
 } from './local-board.component';
 import { LocalSessionHostDirective } from './local-session-host.directive';
 import { SetupComponent, SETUP_PREVIEW_FACTORY } from './setup/setup.component';
@@ -461,6 +462,178 @@ describe('native local board composition', () => {
       h.component.setupDialog()!.nativeElement.querySelector('[role="alert"]')?.textContent,
     ).toContain('could not retire');
   });
+  it('child-first native hooks remove the uncommitted descriptor before anchor retirement and automatically close the dialog without Escape', async () => {
+    const h = harness();
+    await h.ready();
+    const owner = h.component.owner()!,
+      old = owner.state().session!;
+    const trigger = h.button('Settings');
+    h.component.openSettings(trigger);
+    h.component.newGame();
+    await h.fixture.whenStable();
+    const native = h.fixture.debugElement.query(By.directive(SetupComponent))
+      .componentInstance as SetupComponent;
+    await vi.waitFor(() => expect(native.state.canStart()).toBe(true));
+    const anchor = h.fixture.debugElement
+      .queryAllNodes(By.directive(LocalBoardOutletDirective))
+      .find((node) => node.injector.get(LocalBoardOutletDirective).localBoardOutlet() === 'setup')!;
+    const observed: Array<{ descriptor: unknown; closed: boolean }> = [];
+    const retire = h.component.retireOutlet.bind(h.component);
+    vi.spyOn(h.component, 'retireOutlet').mockImplementation((record) => {
+      if (record.kind === 'setup')
+        observed.push({ descriptor: owner.state().setup, closed: native.state.closed() });
+      retire(record);
+    });
+    anchor.injector.get(ViewContainerRef).clear();
+    expect(observed[0]).toEqual({ descriptor: null, closed: true });
+    expect(h.component.cancelling()).toBe(true);
+    await vi.waitFor(() => expect(h.component.modal()).toBe('none'));
+    await h.fixture.whenStable();
+    expect(h.component.setupDialog()!.nativeElement.open).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+    expect(owner.state().session).toBe(old);
+    expect(old.personal.disposed()).toBe(false);
+    expect(h.ports.freshKey).toHaveBeenCalledOnce();
+    expect(h.surfaceOwners).toHaveLength(1);
+    expect(h.raster).toHaveBeenCalledOnce();
+  });
+  for (const outcome of ['settle', 'reject'] as const) {
+    it(`child embedded view destruction before setup anchor retirement automatically cancels through private/control/native acknowledgment fences (${outcome})`, async () => {
+      const operationHeld = deferred(),
+        controlHeld = deferred(),
+        hookHeld = deferred();
+      let loads = 0;
+      const release = vi.fn(() => {
+        if (outcome === 'reject') throw new Error('captured private release rejected');
+      });
+      const h = harness({
+        template: replacementTemplate,
+        preparationDispose: release,
+        preparationLoad: async () => {
+          if (++loads === 2) await operationHeld.promise;
+          return structuredClone(board);
+        },
+      });
+      const visible = signal(true);
+      Object.assign(h.component, { setupVisible: visible });
+      await h.ready();
+      const owner = h.component.owner()!,
+        old = owner.state().session!;
+      old.personal.setNotebookText('retained parent private note');
+      old.personal.beginTool('polyline');
+      old.personal.setMarkFields({ x: '12', y: '24' });
+      old.personal.appendNumericPoint();
+      const canvas = h.root.querySelector('canvas');
+      const realAttach = owner.attachSetup.bind(owner);
+      const hook = vi.fn();
+      vi.spyOn(owner, 'attachSetup').mockImplementation((handle, control) => {
+        const registration = realAttach(handle, control);
+        return {
+          destroyed: () => {
+            hook();
+            void hookHeld.promise.then(() => registration.destroyed());
+          },
+        };
+      });
+      h.component.openSettings(document.createElement('button'));
+      h.component.newGame();
+      await h.fixture.whenStable();
+      const native = h.fixture.debugElement.query(By.directive(SetupComponent))
+        .componentInstance as SetupComponent;
+      await vi.waitFor(() => expect(native.state.canStart()).toBe(true));
+      const operation = native.state.selectSaved(native.state.selectedKey());
+      await vi.waitFor(() => expect(loads).toBe(2));
+      const nativeDispose = native.dispose.bind(native);
+      let controlRetirement: Promise<void> | undefined;
+      vi.spyOn(native, 'dispose').mockImplementation(() => {
+        if (!controlRetirement) {
+          // Reserve the result before invoking real cleanup, including reentrant callers.
+          let resolve!: () => void, reject!: (error: unknown) => void;
+          controlRetirement = new Promise<void>((yes, no) => {
+            resolve = yes;
+            reject = no;
+          });
+          void nativeDispose()
+            .then(() => controlHeld.promise)
+            .then(resolve, reject);
+        }
+        return controlRetirement;
+      });
+      const anchor = h.fixture.debugElement
+        .queryAllNodes(By.directive(LocalBoardOutletDirective))
+        .find(
+          (node) => node.injector.get(LocalBoardOutletDirective).localBoardOutlet() === 'setup',
+        )!;
+      const container = anchor.injector.get(ViewContainerRef);
+      expect(container.length).toBe(1);
+      // Public Angular removes the real child first; its anchor still exists here.
+      container.clear();
+      expect(hook).toHaveBeenCalledOnce();
+      expect(native.state.closed()).toBe(true);
+      expect(h.component.modal()).toBe('setup');
+      expect(h.component.cancelling()).toBe(true);
+      expect(old.personal.interactionEnabled()).toBe(false);
+      expect(h.scenes[0]!.controls.enabled).toBe(false);
+      visible.set(false);
+      await h.fixture.whenStable();
+      visible.set(true);
+      await h.fixture.whenStable();
+      expect(h.fixture.debugElement.query(By.directive(SetupComponent))).toBeNull();
+      expect(h.component.setupDialog()!.nativeElement.open).toBe(true);
+      const probe = h.root.querySelector('input')!;
+      const target = vi.fn();
+      probe.addEventListener('input', target);
+      const blocked = new Event('input', { bubbles: true, cancelable: true });
+      probe.dispatchEvent(blocked);
+      expect(blocked.defaultPrevented).toBe(true);
+      expect(target).not.toHaveBeenCalled();
+      owner.setInteractionState({ personal: true, board: true, camera: true });
+      const noSuccessor = () => {
+        expect(owner.state().session).toBe(old);
+        expect(h.ports.freshKey).toHaveBeenCalledOnce();
+        expect(h.ports.makeRepository).toHaveBeenCalledOnce();
+        expect(h.ports.makePersonal).toHaveBeenCalledOnce();
+        expect(h.ports.makePreparation).toHaveBeenCalledOnce();
+        expect(h.surfaceOwners).toHaveLength(1);
+        expect(h.raster).toHaveBeenCalledOnce();
+        expect(h.root.querySelector('canvas')).toBe(canvas);
+        expect(old.personal.notebook().draft).toBe('retained parent private note');
+        expect(old.personal.markForm().points).toEqual([{ x: 12, y: 24 }]);
+        expect(old.personal.disposed()).toBe(false);
+      };
+      noSuccessor();
+      controlHeld.resolve();
+      hookHeld.resolve();
+      await h.fixture.whenStable();
+      expect(h.component.modal()).toBe('setup');
+      expect(h.component.cancelling()).toBe(true);
+      noSuccessor();
+      operationHeld.resolve();
+      await operation;
+      if (outcome === 'settle') {
+        await vi.waitFor(() => expect(h.component.modal()).toBe('none'));
+        await h.fixture.whenStable();
+        expect(h.component.setupDialog()!.nativeElement.open).toBe(false);
+        expect(h.component.cancelling()).toBe(false);
+        expect(owner.state().phase).toBe('ready');
+        expect(old.personal.interactionEnabled()).toBe(true);
+      } else {
+        await vi.waitFor(() => expect(h.component.uiError()).toContain('could not retire'));
+        await h.fixture.whenStable();
+        expect(h.component.modal()).toBe('setup');
+        expect(h.component.cancelling()).toBe(true);
+        expect(h.component.setupDialog()!.nativeElement.open).toBe(true);
+        expect(
+          h.component.setupDialog()!.nativeElement.querySelector('[role="alert"]')?.textContent,
+        ).toContain('could not retire');
+        expect(old.personal.interactionEnabled()).toBe(false);
+        expect(() => owner.openSetup()).toThrow();
+      }
+      noSuccessor();
+      expect(hook).toHaveBeenCalledOnce();
+      expect(release).toHaveBeenCalledOnce();
+    });
+  }
   it('actual setup outlet destruction during deferred precommit bind preserves old handle/key/store/drafts and settles Start without allocation', async () => {
     const held = deferred();
     let binds = 0;
@@ -490,6 +663,11 @@ describe('native local board composition', () => {
       settled = true;
     });
     await vi.waitFor(() => expect(binds).toBe(2));
+    h.fixture.debugElement
+      .queryAllNodes(By.directive(LocalBoardOutletDirective))
+      .find((node) => node.injector.get(LocalBoardOutletDirective).localBoardOutlet() === 'setup')!
+      .injector.get(ViewContainerRef)
+      .clear();
     visible.set(false);
     await h.fixture.whenStable();
     expect(native.state.closed()).toBe(true);
@@ -525,6 +703,11 @@ describe('native local board composition', () => {
     await vi.waitFor(() => expect(native.state.canStart()).toBe(true));
     const start = native.state.start();
     await vi.waitFor(() => expect(h.component.state()!.phase).toBe('retiring'));
+    h.fixture.debugElement
+      .queryAllNodes(By.directive(LocalBoardOutletDirective))
+      .find((node) => node.injector.get(LocalBoardOutletDirective).localBoardOutlet() === 'setup')!
+      .injector.get(ViewContainerRef)
+      .clear();
     visible.set(false);
     await h.fixture.whenStable();
     expect(native.state.closed()).toBe(true);
@@ -843,10 +1026,12 @@ describe('native local board composition', () => {
 // Public Angular structural destruction exercises the retained parent controller and real native
 // child hooks. Actual metadata HMR remains an independent root browser integration gate.
 const replacementTemplate = `
+<div class="background" [localBackgroundGate]="this"><input aria-label="background probe" /></div>
 <ng-template localBoardOutlet="board" [outletController]="this" let-row>
   <ks-local-board-host [localSessionHost]="row.session" [sessionOwner]="row.owner" [key]="row.session.key" [board]="row.session.board" [presentation]="presentation(row.session)" />
 </ng-template>
 <dialog #setupDialog (cancel)="dialogCancel($event, 'setup')">
+@if (uiError()) { <p role="alert">{{ uiError() }}</p> }
 @if (setupVisible()) {
   <ng-template localBoardOutlet="setup" [outletController]="this" let-row>
     <ks-local-board-setup [localSetupHost]="row.setup" [sessionOwner]="row.owner" (attached)="setupAttached(row, $event)" [catalog]="row.setup.props.catalog" [preparation]="row.setup.props.preparation" [initialRef]="row.setup.props.initialRef" [onStart]="setupStartCallback(row)" [onCancel]="setupCancelCallback(row)" />
