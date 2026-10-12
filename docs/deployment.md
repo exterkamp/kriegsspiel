@@ -106,3 +106,7 @@ Accounts and seats are stored in the same database file, so they survive a resta
 ## Map distribution gate
 
 The container build bootstraps the pinned map source before installing the root dependencies. This makes the source-review recipe reproducible; publishing or distributing a combined browser build remains gated by the owner's licensing decision (D23). No container publication or deployment is part of Epic #132's review PR.
+
+## Game limits (#161)
+
+`POST /games` answers 429 `too_many_games` when the account already has 20 unfinished games (3 for a guest); a game counts while it is in the lobby or open in memory and not over. A sweep every minute closes, in memory only, finished games nobody is connected to and games with no connection for 24 hours. Their data stays in the store, so the games list and the umpire's window still work, and the next visit reopens the game paused. The limits are `AppOptions.limits` (`perUser`, `perGuest`, `idleMs`, `sweepEveryMs`). `GET /games` replays a stored game once per log length instead of on every call.
