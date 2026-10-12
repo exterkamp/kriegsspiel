@@ -18,7 +18,7 @@ function report(over: Partial<ViewReport> = {}): ViewReport {
   return {
     id: 'blue-r1',
     kind: 'contact',
-    observedAt: 10 * MS_PER_MINUTE,
+    observedAt: 8 * MS_PER_MINUTE,
     deliveredAt: 14 * MS_PER_MINUTE,
     ageMs: 6 * MS_PER_MINUTE,
     from: '2nd Hussars',

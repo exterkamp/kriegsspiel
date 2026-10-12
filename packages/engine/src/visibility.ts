@@ -251,11 +251,15 @@ export interface EngineSideView {
   documents: ViewDocument[];
 }
 
-/** Plain template prose for a report. The LLM replaces this later. */
-export function renderReport(r: Report, ageMs: number): string {
-  const mins = Math.round(ageMs / MS_PER_MINUTE);
+/**
+ * Plain template prose for a report. The LLM replaces this later. `leadMs` is how long before the
+ * report reached HQ the thing happened, so the text is the same whenever it is read and agrees with
+ * the "received" time shown beside it (#318); never an age measured against the clock at read time.
+ */
+export function renderReport(r: Report, leadMs: number): string {
+  const mins = Math.round(leadMs / MS_PER_MINUTE);
   const where = r.place;
-  const when = `${mins} min ago`;
+  const when = mins === 0 ? 'as it reached us' : `${mins} min before it reached us`;
   switch (r.kind) {
     case 'situation':
       return `${r.from} reports ${r.sizeEstimate ?? 'the formations'} in position ${where}; no enemy yet in sight.`;
@@ -369,7 +373,7 @@ export function viewFor(
           uncertaintyRadius: metres(r.uncertainty),
           ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
           confidence: r.confidence,
-          text: renderReport(r, ageMs),
+          text: renderReport(r, r.deliverAt - r.observedAt),
         };
       }),
     documents: intel.documents

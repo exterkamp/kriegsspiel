@@ -818,7 +818,7 @@ describe('places in reports', () => {
     const r = viewFor(s.world, 'blue', s.time).reports.find((x) => x.kind === 'contact');
     expect(r).toMatchObject({ place: 'near the mill, east of the road', uncertaintyRadius: 60 });
     expect(r!.text).toBe(
-      'Unit b sighted about a battalion near the mill, east of the road, 10 min ago (medium confidence).',
+      'Unit b sighted about a battalion near the mill, east of the road, 10 min before it reached us (medium confidence).',
     );
     expect(r!.text).not.toMatch(/\d+, \d+/);
   });

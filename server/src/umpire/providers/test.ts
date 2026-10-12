@@ -39,7 +39,8 @@ function narrate(input: Json) {
       const size = str(r.sizeEstimate);
       const minutes = num(r.minutesAgo);
       const radius = num(r.radiusM);
-      const when = minutes === 0 ? 'just now' : `${plural(minutes, 'minute', 'minutes')} since`;
+      const when =
+        minutes === 0 ? 'as it reached us' : `${plural(minutes, 'minute', 'minutes')} before it reached us`;
       const where = place ? ` ${place}` : '';
       const body =
         r.kind === 'contact'
