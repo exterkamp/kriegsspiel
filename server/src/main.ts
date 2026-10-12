@@ -9,6 +9,7 @@
  *   AI_COMMANDER        `llm` plays scripted sides with the LLM commander (needs a provider key, see docs/llm-providers.md); AI_DIFFICULTY easy|normal|hard, AI_PERSONALITY cautious|balanced|aggressive
  *   ORDER_PARSER        `stub` forces the rule-based order parser; otherwise the LLM parses orders whenever the parse stage's provider is configured (ANTHROPIC_API_KEY for the default)
  *   ADMIN_ENABLED       `1`/`true`/`on` mounts the read-only /admin/api (loopback only unless ADMIN_TOKEN is set)
+ *   ALLOWED_ORIGINS     extra origins (comma-separated) allowed to open a game WebSocket; * allows any (default: PUBLIC_URL and the request's own Host)
  *   PUBLIC_URL          origin used in login links (default http://localhost:$PORT); https makes the session cookie Secure
  *   MAIL_WEBHOOK_URL    POST `{to, subject, text}` here to send the magic link; unset logs the link instead (dev only)
  *   MAIL_WEBHOOK_TOKEN  optional bearer token for the mail webhook
@@ -18,6 +19,7 @@
 import { buildApp } from './api/app.js';
 import { adminFromEnv } from './admin/adminApi.js';
 import { SqliteNotifyStore, pushFromEnv } from './notify/index.js';
+import { allowedOriginsFromEnv } from './auth/origin.js';
 import { SqliteAuthStore } from './auth/store.js';
 import { SqliteLobbyStore } from './lobby/store.js';
 import {
@@ -148,6 +150,7 @@ const { server } = await buildApp({
     store: authStore,
     ...authFromEnv(process.env, port, (line) => server.log.warn(line)),
     guestPlay: guestPlayFromEnv(process.env),
+    allowedOrigins: allowedOriginsFromEnv(process.env),
     devTools: devToolsFromEnv(process.env),
     guestIdleMs: guestIdleMsFromEnv(process.env),
     guestPerIp: guestPerHourFromEnv(process.env),

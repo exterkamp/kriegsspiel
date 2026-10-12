@@ -55,7 +55,14 @@ interface Connection {
   pauseSeen: number;
   /** Total bytes sent on this connection, counted in `Hub.send`; the trace reads deltas of it. */
   sentBytes: number;
+  /** Orders being parsed now, and the wall-clock times of recent ones (#160). */
+  ordersInFlight: number;
+  orderTimes: number[];
 }
+
+/** Orders one connection may have parsing at once, and per minute; each costs a model call. */
+export const MAX_ORDERS_IN_FLIGHT = 3;
+export const MAX_ORDERS_PER_MINUTE = 30;
 
 type PauseResult = Extract<ServerMessage, { kind: 'pauseResult' }>;
 
@@ -96,6 +103,8 @@ export class Hub {
   private readonly seen = new Map<string, number>();
   /** Saves run one after another per side, so the last write is the newest list. */
   private readonly saves = new Map<string, Promise<void>>();
+  /** Order ids each side has submitted (`gameId:side`) that were accepted or are still parsing. */
+  private readonly orderIds = new Map<string, Set<string>>();
 
   constructor(
     private readonly lookup: (gameId: string) => GameActor | undefined,
@@ -369,6 +378,8 @@ export class Hub {
       lastPause: '',
       pauseSeen: this.lookup(gameId)?.pauseSteps.at(-1)?.n ?? 0,
       sentBytes: 0,
+      ordersInFlight: 0,
+      orderTimes: [],
     };
     const set = this.conns.get(gameId) ?? new Set();
     // A side with a connection already open is not away, so it gets no catch-up.
@@ -444,6 +455,8 @@ export class Hub {
   closeGame(gameId: string, code = 1001, reason = 'game closed'): void {
     for (const conn of [...(this.conns.get(gameId) ?? [])]) conn.socket.close(code, reason);
     this.conns.delete(gameId);
+    for (const k of [...this.orderIds.keys()])
+      if (k.startsWith(`${gameId}:`)) this.orderIds.delete(k);
   }
 
   /** Save the seen time of every side that still has a connection, so a restart does not lose it. */
@@ -845,6 +858,26 @@ export class Hub {
       this.send(conn, error('not_permitted', 'staff officers draft orders; the commander signs'));
       return;
     }
+    const now = Date.now();
+    conn.orderTimes = conn.orderTimes.filter((t) => now - t < 60_000);
+    if (
+      conn.ordersInFlight >= MAX_ORDERS_IN_FLIGHT ||
+      conn.orderTimes.length >= MAX_ORDERS_PER_MINUTE
+    ) {
+      this.send(conn, error('rate_limited', `${command.orderId}: too many orders; wait a moment`));
+      return;
+    }
+    const idKey = `${gameId}:${conn.side}`;
+    let ids = this.orderIds.get(idKey);
+    if (!ids) this.orderIds.set(idKey, (ids = new Set()));
+    if (ids.has(command.orderId)) {
+      // A retry after a reconnect: the first copy already took effect or is still being parsed.
+      this.send(conn, error('duplicate_order', `${command.orderId}: that order was already sent`));
+      return;
+    }
+    ids.add(command.orderId);
+    conn.orderTimes.push(now);
+    conn.ordersInFlight++;
     let result;
     try {
       result = await game.submit({
@@ -855,10 +888,15 @@ export class Hub {
         ...(command.courier ? { courier: command.courier } : {}),
       });
     } catch (e) {
+      ids.delete(command.orderId);
       this.send(conn, error('game_closed', e instanceof Error ? e.message : 'game is closed'));
       return;
+    } finally {
+      conn.ordersInFlight--;
     }
     if (result.ok) return;
+    // Nothing was issued, so the player may send the id again after fixing the text.
+    ids.delete(command.orderId);
     if (result.kind === 'clarification') {
       const options = result.options?.length ? ` (${result.options.join(', ')})` : '';
       this.send(
