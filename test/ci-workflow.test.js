@@ -64,13 +64,10 @@ test('required check rejects failed, cancelled, skipped and unknown dependency r
 
 test('cancelled workflow explicitly fails while the result evaluator still runs', () => {
   const gate = workflow.slice(workflow.indexOf('\n  check:\n'));
+  assert.match(gate, /name: Reject cancelled workflow\n {8}if: cancelled\(\)\n {8}run: exit 1/);
   assert.match(
     gate,
-    /name: Reject cancelled workflow\n        if: cancelled\(\)\n        run: exit 1/,
-  );
-  assert.match(
-    gate,
-    /name: Require every validation group and effectiveness job\n        if: always\(\)/,
+    /name: Require every validation group and effectiveness job\n {8}if: always\(\)/,
   );
   assert.notEqual(spawnSync('bash', ['-e', '-c', 'exit 1']).status, 0);
 });
