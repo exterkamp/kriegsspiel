@@ -123,6 +123,16 @@ describe('behaviour', () => {
     expect(bot.think(view({ time: FORM_UP_MS + 600_000, ...near(2050, 1540) }))).toEqual([]);
   });
 
+  it('words its orders with a place name, not metres, when it can describe one', () => {
+    const agent = new ScriptedOpponent({ ...CONFIG, describe: () => 'near the mill' });
+    const orders = agent.think(view());
+    expect(orders.length).toBeGreaterThan(0);
+    for (const o of orders) {
+      expect(o.text).toContain('near the mill');
+      expect(o.text).not.toMatch(/\(\d+, \d+\)/);
+    }
+  });
+
   it('forms up first: no order, and not settled, until FORM_UP_MS has passed', () => {
     const bot = new ScriptedOpponent(CONFIG);
     expect(bot.think(view({ time: 0 }))).toEqual([]);

@@ -56,6 +56,13 @@ describe('clockView', () => {
     }
   });
 
+  it('stands at the final moment once the game is over, whatever the wall time', () => {
+    let s = withClock(initialState, clock(12, 'running'));
+    s = { ...s, gameOver: { winner: 'blue', reason: 'eliminated', atGame: 3_000_000 } };
+    expect(clockView(s, 0).time).toBe('Day 1 00:50');
+    expect(clockView(s, 600_000).time).toBe('Day 1 00:50');
+  });
+
   it('shows staff at work only while the umpire is working and the game is on', () => {
     let s = withClock(initialState, clock(4, 'running'));
     expect(clockView(s, 0).staffAtWork).toBe(false);

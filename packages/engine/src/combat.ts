@@ -762,7 +762,8 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
 
     // The units in the fight send word to their own HQ: engaged, then heavy losses. These are
     // about the side's own units, so they carry nothing of the enemy's.
-    for (const u of world.units) {
+    // Once the battle is ruled, the fight is over for the record: no more field reports of it.
+    for (const u of world.battle ? [] : world.units) {
       if (!engaged.has(u.id) || (u.status !== 'active' && u.status !== 'withdrawn')) continue;
       const now = w.units.find((x) => x.id === u.id)!;
       const reports = w.intel[u.side].reports;

@@ -1010,6 +1010,18 @@ describe('battle visibility (#320)', () => {
     expect(kinds.filter((k) => k === 'heavyLosses')).toHaveLength(1);
   });
 
+  it('files no engaged or heavy-losses reports once the battle is ruled', () => {
+    const base = worn(305, 100);
+    const ruled = {
+      ...base,
+      world: { ...base.world, battle: { winner: 'red', reason: 'defence-broken', declaredAt: 0 } },
+    } as EngineState<GameState>;
+    const { state } = run(ruled, 4);
+    const kinds = state.world.intel.blue.reports.map((r) => r.kind);
+    expect(kinds).not.toContain('heavyLosses');
+    expect(kinds).not.toContain('engaged');
+  });
+
   it('says engaged again only after the repeat window', () => {
     const { state } = run(field(duel), 25);
     const times = state.world.intel.blue.reports

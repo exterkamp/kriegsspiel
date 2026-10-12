@@ -1,4 +1,4 @@
-import { featureAnchor, polygonCentroid, type GameState, type SideId } from '@kriegsspiel/engine';
+import { describePlace, featureAnchor, polygonCentroid, type GameState, type SideId } from '@kriegsspiel/engine';
 import type { OrderParser } from '../orders/index.js';
 import { hiddenTerms } from '../umpire/leakGuard.js';
 import type { UmpireClient } from '../umpire/umpireClient.js';
@@ -28,6 +28,7 @@ export function scriptedAgents(world: GameState): SideAgent[] {
           seed: world.seed,
           objective: { x: objective.x / 1000, y: objective.y / 1000 },
           fallbackTo: { x: s.hq.x / 1000, y: s.hq.y / 1000 },
+          describe: (p) => describePlace(world.map, { x: p.x * 1000, y: p.y * 1000 }),
         }),
     );
 }

@@ -90,6 +90,8 @@ export interface ScriptedOpponentConfig {
   objective: Point;
   /** Where weakened units fall back to, in metres (own HQ). */
   fallbackTo: Point;
+  /** A place name for a point in metres, so orders that may be captured read as prose, not coordinates. */
+  describe?: (p: Point) => string;
   intervalMs?: number;
 }
 
@@ -130,7 +132,8 @@ export function assertFogOnly(view: unknown, side: string): asserts view is Engi
 const mmPoint = (p: Point): Point => ({ x: Math.round(p.x * 1000), y: Math.round(p.y * 1000) });
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
-const fmt = (p: Point) => `(${Math.round(p.x)}, ${Math.round(p.y)})`;
+const rawPoint = (p: Point) => `(${Math.round(p.x)}, ${Math.round(p.y)})`;
+
 
 function hashSide(side: string): number {
   let h = 0;
@@ -241,6 +244,7 @@ export class ScriptedOpponent implements SideAgent {
 
   private order(unitId: string, name: string, s: Standing): AgentOrder {
     const to = mmPoint(s.target);
+    const fmt = this.config.describe ?? rawPoint;
     switch (s.kind) {
       case 'withdraw':
         return {
