@@ -229,6 +229,7 @@ describe('role views over the WebSocket', () => {
     expect(leadV!.role).toBe('commander');
     expect(leadV!.ownUnits.map((u) => u.id)).toEqual(['blue-1', 'blue-2', 'blue-3']);
     expect(leadV!.ownUnits.every((u) => u.strength !== undefined)).toBe(true);
+    expect(leadV!.ownUnits.every((u) => u.reportedAt === leadV!.atGame)).toBe(true);
 
     expect(intelV!.role).toBe('intelligence');
     expect(intelV!.ownUnits).toHaveLength(3);
@@ -236,6 +237,8 @@ describe('role views over the WebSocket', () => {
       expect(u.strength).toBeUndefined();
       expect(u.morale).toBeUndefined();
       expect(u.supply).toBeUndefined();
+      expect(u.reportedAt).toBeUndefined();
+      expect(u.commander).toBeUndefined();
     }
 
     expect(subV!.role).toBe('subordinate');

@@ -64,12 +64,16 @@ export const OwnUnit = z
   .object({
     id: UnitId,
     name: z.string(),
+    /** Who commands the formation, when the scenario names one. */
+    commander: z.string().optional(),
     /** Centre of the footprint, in metres. */
     position: Coord,
     facing: Facing,
     formation: Formation,
     footprint: Footprint,
     shape: Shape.optional(),
+    /** Game time of the report behind strength, morale and supply. Left out with them. */
+    reportedAt: GameMs.optional(),
     // Left out when the viewer's role may not know a unit's condition (the intelligence officer).
     strength: z.number().nonnegative().optional(),
     morale: z.number().min(0).max(1).optional(),

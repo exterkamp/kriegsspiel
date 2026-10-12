@@ -265,6 +265,7 @@ function parseUnits(raw: unknown, map: TerrainMap, sides: Side[]): Unit[] {
       kind,
       type: type.id,
       name,
+      ...(o.commander === undefined ? {} : { commander: str(o.commander, `${p}.commander`) }),
       center,
       facing: (num(o.facingDeg, `${p}.facingDeg`) * Math.PI) / 180,
       formation,

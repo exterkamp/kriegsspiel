@@ -36,4 +36,11 @@ describe('rosterRows', () => {
     expect(formatAge(190 * 60_000)).toBe('3 h 10 min');
     expect(formatAge(26 * 3_600_000)).toBe('1 d 2 h');
   });
+
+  it('shows the commander and dates each unit by its own report', () => {
+    const u = { ...view.ownUnits[0]!, commander: 'Gen. Ney', reportedAt: view.atGame - 3_600_000 };
+    const r = rosterRows({ ...view, ownUnits: [u] }, view.atGame)[0]!;
+    expect(r).toMatchObject({ commander: 'Gen. Ney', reportedAt: u.reportedAt, ageMs: 3_600_000 });
+    expect(rosterRows(view, view.atGame)[0]!.commander).toBeUndefined();
+  });
 });

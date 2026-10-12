@@ -91,3 +91,26 @@ describe('sideViewOf orderRoutes (#203)', () => {
     expect(JSON.stringify(red.orderRoutes)).not.toContain('blue-1');
   });
 });
+
+describe('sideViewOf commander and report date (#223)', () => {
+  const clock = { gameMsAtAnchor: 1, wallMsAtAnchor: 0, rate: 1, status: 'running' } as const;
+  const named = () => {
+    const raw = JSON.parse(JSON.stringify(holdTheBridgeFarStart));
+    raw.units.find((u: { id: string }) => u.id === 'blue-1').commander = 'Col. Aubry';
+    return createState(loadScenario(raw).seed, loadScenario(raw), 0);
+  };
+
+  it('sends the side its own commander and dates the figures to the view', () => {
+    const view = SideView.parse(sideViewOf(named(), 'blue', clock));
+    expect(view.ownUnits.find((u) => u.id === 'blue-1')).toMatchObject({
+      commander: 'Col. Aubry',
+      reportedAt: view.atGame,
+    });
+    expect(view.ownUnits.find((u) => u.id === 'blue-2')!.commander).toBeUndefined();
+  });
+
+  it('never sends it to the other side', () => {
+    const view = JSON.stringify(sideViewOf(named(), 'red', clock));
+    expect(view).not.toContain('Aubry');
+  });
+});

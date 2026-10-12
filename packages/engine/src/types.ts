@@ -175,6 +175,8 @@ export interface Unit {
   /** Id of the unit type (see unitTypes.ts) that gives this unit its stats. */
   type: string;
   name: string;
+  /** Who commands it, as the scenario names them. Absent when the scenario does not say. */
+  commander?: string;
   /** Centre of the unit's footprint. */
   center: Point;
   /** Compass bearing in radians the unit faces: 0 is north (-y), growing clockwise (east is pi/2). */

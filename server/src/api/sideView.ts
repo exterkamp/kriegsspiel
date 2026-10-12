@@ -107,9 +107,11 @@ function staffExchangeAt(x: StaffExchange, now: number): StaffExchange {
 /** A unit's condition on the wire; a role that may not know it (an outline) leaves the fields out. */
 function condition(
   u: EngineRoleView['ownUnits'][number],
-): Pick<OwnUnit, 'strength' | 'morale' | 'supply'> {
+  reportedAt: number,
+): Pick<OwnUnit, 'strength' | 'morale' | 'supply' | 'reportedAt'> {
   if (!('strength' in u)) return {};
   return {
+    reportedAt,
     strength: u.strength,
     // The engine scores morale 0..100; the wire uses 0..1.
     morale: Math.min(1, Math.max(0, u.morale / 100)),
@@ -137,7 +139,8 @@ export function toSideView(
       formation: u.formation,
       footprint: u.footprint,
       ...('shape' in u && u.shape ? { shape: u.shape } : {}),
-      ...condition(u),
+      ...('commander' in u && u.commander !== undefined ? { commander: u.commander } : {}),
+      ...condition(u, view.time),
     })),
     ...(view.orderRoutes.length === 0
       ? {}

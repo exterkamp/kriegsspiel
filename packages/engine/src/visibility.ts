@@ -152,6 +152,7 @@ function sizeEstimate(strength: number): string {
 export interface ViewUnit {
   id: string;
   name: string;
+  commander?: string;
   kind: UnitKind;
   /** Centre of the footprint, in metres. */
   position: Point;
@@ -385,6 +386,7 @@ export function viewFor(
       .map((u) => ({
         id: u.id,
         name: u.name,
+        ...(u.commander === undefined ? {} : { commander: u.commander }),
         kind: u.kind,
         position: viewPoint(u.center),
         facing: u.facing,
