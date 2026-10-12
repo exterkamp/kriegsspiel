@@ -66,6 +66,9 @@ jobs:
         if: matrix.group == 'maps'
       - run: npm run test:ci-application
         if: matrix.group == 'application'
+      - name: Controlled aggregate failure probe (temporary)
+        if: matrix.group == 'application'
+        run: exit 1
       - uses: actions/upload-artifact@v7
         if: always()
         with:
