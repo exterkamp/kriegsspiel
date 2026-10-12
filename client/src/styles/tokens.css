@@ -76,6 +76,16 @@
   --ks-focus-ring: 3px solid var(--ks-focus);
   --ks-move: 450ms ease-out;
   --ks-move-fast: 120ms ease-out;
+
+  /* The flat map board (the table's fallback when WebGL is off) */
+  --ks-map-ground: #d8cfa0;
+  --ks-map-wood: #8fa36b;
+  --ks-map-marsh: #a9b38a;
+  --ks-map-water: #8fb4cc;
+  --ks-map-road: #a8885a;
+  --ks-map-own: #1f5fbf;
+  --ks-map-enemy: #8a1c10;
+  --ks-map-route: #b4561c;
 }
 
 /* Plain high contrast: black on white, one strong focus colour, no texture. */

@@ -1,62 +1,82 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { FlatBoardComponent } from './flat-board.component';
 import { GameService } from './game.service';
 
 /**
- * Shown in place of the map table when the browser cannot make a WebGL context (#259). It says what is wrong and how
- * to fix it, and lists the side's units and the enemy it can see so the player knows the situation; orders are still
+ * Shown in place of the map table when the browser cannot make a WebGL context (#259): a flat board (#343) with a note
+ * that says what is wrong and how to fix it, and lists the side's units and the enemy it can see. Orders are still
  * written on the desk, which does not need WebGL.
  */
 @Component({
   selector: 'ks-webgl-fallback',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'ks-theme', role: 'region', 'aria-label': 'Map table unavailable' },
+  imports: [FlatBoardComponent],
+  host: { class: 'ks-theme', role: 'region', 'aria-label': 'Flat map board' },
   template: `
-    <div class="ks-paper ks-stack panel">
-      <h2>The map table needs WebGL</h2>
-      <p role="alert">
-        This browser could not start 3D graphics, so the map table cannot be drawn. The desk still
-        works: read the in-tray and write orders as usual.
-      </p>
-      <p class="ks-muted">
-        To fix it, turn on hardware acceleration (in Chrome: Settings, System, "Use graphics
-        acceleration when available"), then restart the browser and reload this page. On a virtual
-        machine or remote desktop, enable 3D acceleration or a software renderer.
-      </p>
-      @if (view(); as v) {
-        <h3>Your units</h3>
-        <ul>
-          @for (u of v.ownUnits; track u.id) {
-            <li>
-              {{ u.name }}: strength {{ u.strength }}, {{ u.formation }}, at {{ at(u.position) }}
-            </li>
-          } @empty {
-            <li class="ks-muted">None.</li>
-          }
-        </ul>
-        <h3>Enemy in sight</h3>
-        <ul>
-          @for (e of v.visibleEnemies; track e.id) {
-            <li>{{ e.id }} at {{ at(e.position) }}</li>
-          } @empty {
-            <li class="ks-muted">None.</li>
-          }
-        </ul>
-      }
-    </div>
+    <ks-flat-board />
+    <details class="ks-paper note" #note>
+      <summary>The 3D map table needs WebGL: showing a flat board</summary>
+      <div class="ks-stack">
+        <p role="alert">
+          This browser could not start 3D graphics, so the map table is drawn flat. The desk still
+          works: read the in-tray and write orders as usual, and pick places on the board with the
+          Tools.
+        </p>
+        <p class="ks-muted">
+          To get the 3D table, turn on hardware acceleration (in Chrome: Settings, System, "Use
+          graphics acceleration when available"), then restart the browser and reload this page. On
+          a virtual machine or remote desktop, enable 3D acceleration or a software renderer.
+        </p>
+        @if (view(); as v) {
+          <h3>Your units</h3>
+          <ul>
+            @for (u of v.ownUnits; track u.id) {
+              <li>
+                {{ u.name }}: strength {{ u.strength }}, {{ u.formation }}, at {{ at(u.position) }}
+              </li>
+            } @empty {
+              <li class="ks-muted">None.</li>
+            }
+          </ul>
+          <h3>Enemy in sight</h3>
+          <ul>
+            @for (e of v.visibleEnemies; track e.id) {
+              <li>{{ e.id }} at {{ at(e.position) }}</li>
+            } @empty {
+              <li class="ks-muted">None.</li>
+            }
+          </ul>
+        }
+      </div>
+    </details>
   `,
   styles: `
     :host {
       display: block;
       position: absolute;
       inset: 0;
-      overflow: auto;
-      padding: 4rem 1rem 6rem;
-      background: var(--ks-table);
+      pointer-events: none;
     }
-    .panel {
-      max-width: 40rem;
-      margin: 0 auto;
-      padding: 1rem 1.25rem;
+    ks-flat-board {
+      pointer-events: auto;
+    }
+    .note {
+      position: absolute;
+      left: 0.5rem;
+      bottom: 4.5rem;
+      max-width: min(26rem, calc(100% - 1rem));
+      max-height: 60%;
+      overflow: auto;
+      padding: 0.5rem 0.75rem;
+      pointer-events: auto;
+    }
+    summary {
+      cursor: pointer;
+    }
+    @media (max-width: 600px) {
+      .note {
+        bottom: 9rem;
+      }
     }
   `,
 })

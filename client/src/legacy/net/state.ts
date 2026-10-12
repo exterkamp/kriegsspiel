@@ -236,6 +236,26 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       };
     case 'marks':
       return { ...s, marks: m.marks };
+    case 'sentOrders': {
+      // The server's record of what this side has sent: fills in orders a reload (or another device) lost (#343).
+      const have = new Set(s.pending.map((p) => p.orderId));
+      const fresh = m.orders.filter((o) => !have.has(o.id));
+      return fresh.length === 0
+        ? s
+        : {
+            ...s,
+            pending: [
+              ...fresh.map((o) => ({
+                orderId: o.id,
+                text: o.text,
+                sentAtGame: o.sentAtGame,
+                ...(o.toName ? { toName: o.toName } : {}),
+                ...(o.courier ? { courier: o.courier } : {}),
+              })),
+              ...s.pending,
+            ],
+          };
+    }
     case 'drafts':
     case 'draftState':
     case 'draftEntry':

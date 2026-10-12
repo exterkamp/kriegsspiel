@@ -24,6 +24,13 @@
             </li>
           }
         </ol>
+        @if (lastRuling(); as last) {
+          @if (last.time !== tl.outcome.time) {
+            <p class="ended">
+              Declared {{ formatGameTime(last.time) }}, ended {{ formatGameTime(tl.outcome.time) }}.
+            </p>
+          }
+        }
       }
     </section>
     <div class="scrub">

@@ -60,6 +60,23 @@ describe('TableScene.apply', () => {
     expect(count(t)).toBe(state.own.length + state.ghosts.length);
   });
 
+  it('moves the tag of a unit standing on another so the two do not overlap (#343)', () => {
+    const t = make();
+    const [a, b] = state.own;
+    t.apply({ ...state, ghosts: [], own: [a!, { ...b!, position: { ...a!.position } }] });
+    const tags: Array<{ z: number; w: number; h: number }> = [];
+    t.scene.traverse((o) => {
+      if (o instanceof THREE.Sprite)
+        tags.push({
+          z: o.getWorldPosition(new THREE.Vector3()).z,
+          w: o.scale.x,
+          h: o.scale.y,
+        });
+    });
+    expect(tags).toHaveLength(2);
+    expect(Math.abs(tags[0]!.z - tags[1]!.z)).toBeGreaterThanOrEqual(tags[0]!.h);
+  });
+
   it('rebuilds the map when the features change', () => {
     const t = make();
     t.apply(state);
@@ -358,6 +375,10 @@ describe('TableScene marks and overlays', () => {
         .filter((c) => c.name === '' && c.children.some((k) => k.name.startsWith('overlay:')))
         .reduce((n, c) => n + c.children.length, 0);
     expect(overlay()).toBe(2);
+    // A planned route is dotted (many dashes); the order arrow is one strip and a head (#343).
+    const strips = (id: string): number =>
+      t.scene.getObjectByName(`overlay:${id}`)!.children.length;
+    expect(strips('r1')).toBeGreaterThan(strips('o1'));
     t.setOverlays({ orders: false, routes: true, lastKnown: true });
     expect(overlay()).toBe(1);
     t.setOverlays({ orders: false, routes: false, lastKnown: true });

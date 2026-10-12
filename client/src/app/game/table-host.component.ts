@@ -33,6 +33,7 @@ import { TABLE_SCENE_FACTORY, TableService } from './table.service';
     }
     <canvas
       #table
+      [hidden]="tableService.unavailable()"
       (pointerdown)="down($event)"
       (pointermove)="move($event)"
       (pointerup)="up($event)"
@@ -70,7 +71,6 @@ export class TableHostComponent implements OnDestroy {
         built?.dispose();
         // No WebGL (GPU or hardware acceleration off): the desk still works, so say so and list the units.
         this.tableService.unavailable.set(e instanceof Error ? e.message : String(e));
-        this.tableService.status.set('The map table needs WebGL');
       }
     });
     // The player's picture, or after the game the umpire's window at the scrubbed time.

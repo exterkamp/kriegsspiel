@@ -15,6 +15,7 @@ import {
   type GameState,
   type Order,
 } from './index.js';
+import { findPath } from './navigation.js';
 import { holdTheBridgeFarStart } from './scenario.testkit.js';
 
 function registry() {
@@ -89,11 +90,13 @@ describe('orderRoutes in a side view (#203)', () => {
     const routes = viewFor(w, 'blue', 1).orderRoutes.filter((o) => o.kind === 'route');
     expect(routes).toHaveLength(1);
     const u = w.units.find((x) => x.id === 'blue-1')!;
-    expect(routes[0]!.points).toEqual([
-      { x: u.center.x / 1000, y: u.center.y / 1000 },
-      { x: mid.x / 1000, y: mid.y / 1000 },
-      { x: dest.x / 1000, y: dest.y / 1000 },
-    ]);
+    const pts = routes[0]!.points;
+    expect(pts[0]).toEqual({ x: u.center.x / 1000, y: u.center.y / 1000 });
+    expect(pts[1]).toEqual({ x: mid.x / 1000, y: mid.y / 1000 });
+    expect(pts[pts.length - 1]).toEqual({ x: dest.x / 1000, y: dest.y / 1000 });
+    // The rest is the planned path from the leg's end (#343): the same one the unit will march.
+    const planned = findPath(w.map, mid, dest, { width: u.footprint.frontage })!.waypoints;
+    expect(pts.slice(1)).toEqual(planned.map((p) => ({ x: p.x / 1000, y: p.y / 1000 })));
     // A leg that ends on the destination adds no second point there.
     const w2 = {
       ...w,

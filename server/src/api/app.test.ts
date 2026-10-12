@@ -495,6 +495,35 @@ class CountingParser extends StubOrderParser {
 }
 
 describe('order limits (#160)', () => {
+  it('refuses the same words sent again within seconds, and sends them once (#343)', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    await blue.waitFor('viewUpdate');
+    blue.send(order('Hold the bridge', 'first'));
+    blue.send(order('  hold   the BRIDGE ', 'second'));
+    const err = await blue.waitFor('error', (m) => m.code === 'duplicate_text');
+    expect(err.message.startsWith('second: ')).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const orders = (await store.inputLog(game.id)).filter((e) => e.command.kind === 'order');
+    expect(orders).toHaveLength(1);
+  });
+
+  it('sends a returning side the orders it sent, from the input log (#343)', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    await blue.waitFor('viewUpdate');
+    blue.send(order('blue-1 hold', 'kept'));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const back = await join(ws, game, 'blue');
+    const m = await back.waitFor('sentOrders');
+    expect(m.orders).toHaveLength(1);
+    expect(m.orders[0]).toMatchObject({ id: 'kept', text: 'blue-1 hold' });
+    const red = await join(ws, game, 'red');
+    expect((await red.waitFor('sentOrders')).orders).toEqual([]);
+  });
+
   it('ignores a repeated orderId and queues the order once', async () => {
     const { base, ws } = await start();
     const game = (await createGame(base)).json;
@@ -520,17 +549,17 @@ describe('order limits (#160)', () => {
     try {
       // One at a time, so the in-flight cap never comes into play.
       for (let i = 0; i < MAX_ORDERS_PER_MINUTE; i++) {
-        blue.send(order('blue-1 hold', `m${i}`));
+        blue.send(order(`blue-1 hold ${i}`, `m${i}`));
         await vi.waitFor(() => expect(parser.calls).toBe(i + 1));
         await new Promise((resolve) => setImmediate(resolve));
       }
-      blue.send(order('blue-1 hold', 'over'));
+      blue.send(order('blue-1 hold over', 'over'));
       const err = await blue.waitFor('error', (m) => m.code === 'rate_limited');
       expect(err.message.startsWith('over: ')).toBe(true);
       expect(parser.calls).toBe(MAX_ORDERS_PER_MINUTE);
 
       now.mockReturnValue(t0 + 61_000);
-      blue.send(order('blue-1 hold', 'later'));
+      blue.send(order('blue-1 hold later', 'later'));
       await vi.waitFor(() => expect(parser.calls).toBe(MAX_ORDERS_PER_MINUTE + 1));
     } finally {
       now.mockRestore();
@@ -545,9 +574,9 @@ describe('order limits (#160)', () => {
     const game = (await createGame(base)).json;
     const blue = await join(ws, game, 'blue');
     await blue.waitFor('viewUpdate');
-    for (let i = 0; i < MAX_ORDERS_IN_FLIGHT; i++) blue.send(order('blue-1 hold', `f${i}`));
+    for (let i = 0; i < MAX_ORDERS_IN_FLIGHT; i++) blue.send(order(`blue-1 hold ${i}`, `f${i}`));
     await vi.waitFor(() => expect(parser.calls).toBe(MAX_ORDERS_IN_FLIGHT));
-    blue.send(order('blue-1 hold', 'extra'));
+    blue.send(order('blue-1 hold extra', 'extra'));
     const err = await blue.waitFor('error', (m) => m.code === 'rate_limited');
     expect(err.message.startsWith('extra: ')).toBe(true);
     expect(parser.calls).toBe(MAX_ORDERS_IN_FLIGHT);
@@ -556,7 +585,7 @@ describe('order limits (#160)', () => {
     parser.gate = undefined;
     await vi.waitFor(() => expect(parser.done).toBe(MAX_ORDERS_IN_FLIGHT));
     await new Promise((resolve) => setImmediate(resolve));
-    blue.send(order('blue-1 hold', 'after'));
+    blue.send(order('blue-1 hold after', 'after'));
     await vi.waitFor(() => expect(parser.calls).toBe(MAX_ORDERS_IN_FLIGHT + 1));
   });
 
