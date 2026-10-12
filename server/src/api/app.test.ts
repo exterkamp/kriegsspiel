@@ -463,6 +463,20 @@ describe('game over', () => {
       expect(c.messages.filter((m) => m.kind === 'gameOver')).toHaveLength(1);
     }
   });
+
+  it('rejects an order sent after the game is over and queues nothing', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    const blue = await join(ws, game, 'blue');
+    await blue.waitFor('gameOver');
+
+    blue.send(JSON.stringify({ v, kind: 'issueOrder', orderId: 'too-late', text: 'hold' }));
+    const err = await blue.waitFor('error', (m) => m.code === 'game_over');
+    expect(err.message.startsWith('too-late: ')).toBe(true);
+    // Nothing was submitted: no order entry reached the game's input log.
+    const orders = (await store.inputLog(game.id)).filter((e) => e.command.kind === 'order');
+    expect(orders).toHaveLength(0);
+  });
 });
 
 describe('staff questions', () => {
