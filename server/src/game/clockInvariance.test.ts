@@ -253,3 +253,50 @@ describe('clock invariance', () => {
     expect(replayed.emitted).toEqual(run.events);
   }, 60_000);
 });
+
+/**
+ * Drive the same script to game over in one clock configuration, leaving the game open so the
+ * caller can read its clock. In manual and fast-forward modes the orders are signed by
+ * `advanceTo`, exactly as in `playSteady`'s fast-forward path.
+ */
+async function playToOutcome(rate: number, mode?: 'manual' | 'fast-forward') {
+  const { time, game } = await start(rate);
+  if (mode) await game.submit({ kind: 'setMode', mode });
+  let at = 0;
+  for (const step of SCRIPT) {
+    if (game.state.world.outcome) break;
+    if (mode) await game.submit({ kind: 'advanceTo', gameMs: step.atMs });
+    else await time.advance((step.atMs - at) / rate);
+    at = step.atMs;
+    if (game.state.world.outcome) break;
+    await game.submit({ kind: 'order', side: 'blue', text: step.text });
+  }
+  if (mode) await game.submit({ kind: 'advanceTo', gameMs: HORIZON_MS });
+  else await time.advance((HORIZON_MS - at) / rate);
+  return game;
+}
+
+describe('the stopped clock at game over', () => {
+  // The actor freezes the clock at the outcome's own time (actor.ts passes outcome.time to
+  // clock.stop). Reverting that call to a bare stop() must fail here: in manual and fast-forward
+  // modes advanceTo has already moved the clock past the outcome time when the end is noticed,
+  // so the stopped reading would sit at the advance target instead.
+  it('reads exactly the outcome time at rates 1, 4 and 12, and in manual and fast-forward modes', async () => {
+    const configs: { label: string; run: () => ReturnType<typeof playToOutcome> }[] = [
+      { label: 'rate 1', run: () => playToOutcome(1) },
+      { label: 'rate 4', run: () => playToOutcome(4) },
+      { label: 'rate 12', run: () => playToOutcome(12) },
+      { label: 'manual', run: () => playToOutcome(1, 'manual') },
+      { label: 'fast-forward', run: () => playToOutcome(1, 'fast-forward') },
+    ];
+    for (const { label, run } of configs) {
+      const game = await run();
+      const outcome = game.state.world.outcome;
+      expect(outcome, label).toBeTruthy();
+      expect(game.gameClock.status, label).toBe('stopped');
+      expect(game.gameClock.now(), label).toBe(outcome!.time);
+      await host!.shutdown();
+      host = undefined;
+    }
+  }, 120_000);
+});
