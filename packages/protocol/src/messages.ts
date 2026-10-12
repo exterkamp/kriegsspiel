@@ -171,6 +171,25 @@ export const ServerMessage = z.discriminatedUnion('kind', [
   z.object({ ...Envelope, kind: z.literal('dispatch'), dispatch: Dispatch }).strict(),
   // Every mark the side has made, sent on connect and again after any change by either connection.
   z.object({ ...Envelope, kind: z.literal('marks'), marks: z.array(Mark) }).strict(),
+  // The orders the side has sent, oldest first, sent on connect so a reload can rebuild the war diary (#343).
+  // `id` is the client's order id where the server kept it, else `log-<seq>`.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('sentOrders'),
+      orders: z.array(
+        z
+          .object({
+            id: Id,
+            text: z.string(),
+            sentAtGame: GameMs,
+            toName: z.string().optional(),
+            courier: z.enum(['fast', 'safe']).optional(),
+          })
+          .strict(),
+      ),
+    })
+    .strict(),
   // Every draft the side has, sent on connect. A player back after a while catches up from this.
   z.object({ ...Envelope, kind: z.literal('drafts'), drafts: z.array(DraftSnapshot) }).strict(),
   // One draft in full: sent when it is created or forked, and when a merge closes a fork.

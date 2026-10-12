@@ -1,3 +1,4 @@
+import { formatGameTime } from '@legacy/net/state';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -158,6 +159,19 @@ describe('UmpireWindowComponent', () => {
     expect(text).toContain('blue b1');
     expect(text).toContain('strength 400, morale 80');
     expect(text).toContain('No fire or rulings');
+  });
+
+  it('says when the ruling was declared and when the game ended (#343)', async () => {
+    stubFetch();
+    const t = await open();
+    t.desk.windowFrame.set({
+      ...frameAt(3_600_000),
+      rulings: [{ id: 'r1', time: 1_560_000, narrative: 'The bridge falls.', rationale: 'dice' }],
+    } as unknown as WindowAt);
+    await t.fixture.whenStable();
+    const text = t.el.querySelector('.ended')!.textContent!;
+    expect(text).toContain(`Declared ${formatGameTime(1_560_000)}`);
+    expect(text).toContain(`ended ${formatGameTime(3_600_000)}`);
   });
 
   it('clears the frame and hover when it is closed', async () => {

@@ -50,6 +50,8 @@ export class UmpireWindowComponent {
   });
   /** Every ruling made up to the game time shown, with its time and wording. */
   protected readonly rulings = computed(() => this.desk.windowFrame()?.rulings ?? []);
+  /** The latest ruling shown: the one that decided the game, so the window can say when it was declared and when the game ended (#343). */
+  protected readonly lastRuling = computed(() => this.rulings().at(-1));
   protected readonly hovered = computed(() =>
     this.desk.windowFrame()?.units.find((u) => u.id === this.desk.windowHover()),
   );

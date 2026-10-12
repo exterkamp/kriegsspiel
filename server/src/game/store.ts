@@ -31,6 +31,8 @@ export type GameCommand =
       side: string;
       text: string;
       courier?: 'fast' | 'safe';
+      /** The id the player's client gave the order, so a reload can match it with the war diary (#343). Absent in older entries. */
+      orderId?: string;
       /** The seat that signed, when the side plays with roles; the order is refused if it may not sign for the addressee. */
       signer?: Seat;
     }

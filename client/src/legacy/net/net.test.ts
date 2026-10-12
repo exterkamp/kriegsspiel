@@ -26,6 +26,25 @@ const disp = (id: string, extra: Partial<Dispatch> = {}): Dispatch => ({
 });
 
 describe('applyServerMessage', () => {
+  it('rebuilds the sent orders from the server after a reload, without doubling a local one (#343)', () => {
+    let s = withPendingOrder(initialState, { orderId: 'o1', text: 'hold', sentAtGame: 5 });
+    s = applyServerMessage(
+      s,
+      {
+        v,
+        kind: 'sentOrders',
+        orders: [
+          { id: 'o1', text: 'hold', sentAtGame: 5 },
+          { id: 'log-3', text: 'advance', sentAtGame: 2, toName: '1st Battalion' },
+        ],
+      },
+      0,
+    );
+    expect(s.pending.map((p) => p.orderId)).toEqual(['log-3', 'o1']);
+    expect(s.pending[0]).toMatchObject({ toName: '1st Battalion', sentAtGame: 2 });
+    expect(applyServerMessage(s, { v, kind: 'sentOrders', orders: [] }, 0)).toBe(s);
+  });
+
   it('stores the view, merges its dispatches and anchors the clock', () => {
     const view = { ...fixtureView, dispatches: [disp('d1')] };
     const s = applyServerMessage(initialState, { v, kind: 'viewUpdate', view }, 1000);

@@ -124,6 +124,17 @@ describe('clarification options', () => {
     ).toBe('Hold the wood.');
   });
 
+  it('adds no example-orders hint to a rate limit or a repeat (#343)', () => {
+    for (const code of ['rate_limited', 'duplicate_text']) {
+      const t = refusalText({ text: 'Hold.', reason: 'too many orders; wait a moment', code });
+      expect(t).toContain('too many orders; wait a moment.');
+      expect(t).not.toContain('The staff understand');
+    }
+    expect(
+      refusalText({ text: 'Hold.', reason: 'no such unit', code: 'order_rejected' }),
+    ).toContain('The staff understand');
+  });
+
   it('leaves the options out of the refusal text', () => {
     const t = refusalText({
       text: 'Hold the wood.',

@@ -1,3 +1,5 @@
+import { dashPolyline } from './dash';
+import { stackLabels } from './flatBoard';
 import * as THREE from 'three';
 import type { Coord, Mark } from '@kriegsspiel/protocol';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -131,7 +133,33 @@ export class TableScene {
         this.pieces.delete(k);
       }
     }
+    this.separateTags();
     this.syncOverlays();
+  }
+
+  /**
+   * Unit tags sit just below their pieces; two units standing together (the battalions at the bridge) would draw
+   * one over the other, so each tag that would overlap an earlier one is moved down the table until it is clear (#343).
+   */
+  private separateTags(): void {
+    const tags: Array<{ id: string; at: Coord; w: number; sprite: THREE.Sprite; baseZ: number }> =
+      [];
+    let h = 0;
+    for (const [id, p] of this.pieces) {
+      const sprite = p.group.children.find((c): c is THREE.Sprite => c instanceof THREE.Sprite);
+      if (!sprite) continue;
+      const baseZ = (sprite.userData.baseZ ??= sprite.position.z) as number;
+      h = sprite.scale.y * 1.05;
+      tags.push({
+        id,
+        sprite,
+        baseZ,
+        w: sprite.scale.x,
+        at: { x: p.group.position.x, y: p.group.position.z + baseZ },
+      });
+    }
+    const placed = stackLabels(tags, h);
+    for (const t of tags) t.sprite.position.z = t.baseZ + (placed.get(t.id)!.y - t.at.y);
   }
 
   /** Show or hide the overlay layers; the shading follows the stale sightings already in the scene. */
@@ -211,17 +239,16 @@ export class TableScene {
   private routeObject(r: OrderRoute): THREE.Group {
     const map = this.state!.map;
     const g = new THREE.Group();
-    const colour = r.kind === 'order' ? 0x1f1a12 : 0x6b5a3a;
+    const colour = r.kind === 'order' ? 0x1f1a12 : 0x8a3b12;
     const pts = r.points;
-    g.add(
-      this.ribbon(
-        pts,
-        this.span / (r.kind === 'order' ? 450 : 700),
-        colour,
-        r.kind === 'order' ? 0.8 : 0.5,
-        0.0015,
-      ),
-    );
+    if (r.kind === 'order') {
+      g.add(this.ribbon(pts, this.span / 450, colour, 0.8, 0.0015));
+    } else {
+      // A planned route is dotted, so it reads apart from the order arrow drawn over the same ground (#343).
+      for (const d of dashPolyline(pts, this.span / 120, this.span / 160)) {
+        g.add(this.ribbon(d, this.span / 380, colour, 0.9, 0.0015));
+      }
+    }
     if (r.kind === 'order' && pts.length >= 2) {
       const a = pts[pts.length - 2]!;
       const b = pts[pts.length - 1]!;
