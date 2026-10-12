@@ -322,6 +322,23 @@ describe('moving between screens', () => {
     expect(el.querySelector('#continue-h')).not.toBeNull();
   });
 
+  it('Your games shows a finished game as won, lost or ended, never as started (#325)', async () => {
+    await open('/', {
+      fetchGames: async () => [
+        game({ id: 'w', finished: true, winner: 'blue' }),
+        game({ id: 'l', finished: true, winner: 'red' }),
+        game({ id: 'p' }),
+      ],
+    });
+    click('New game');
+    await settle();
+    const rows = [...el.querySelectorAll('#game-list li')].map((li) => li.textContent ?? '');
+    expect(rows[0]).toContain('won, you are blue');
+    expect(rows[1]).toContain('lost, you are blue');
+    expect(rows[2]).toContain('started, you are blue');
+    expect(rows.slice(0, 2).join(' ')).not.toContain('started');
+  });
+
   it('puts the form and your games in one scroller, so the list cannot cover Start (#318)', async () => {
     await open('/?lobby=1');
     const screen = el.querySelector('.screen')!;
