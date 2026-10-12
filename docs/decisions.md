@@ -28,7 +28,7 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 **Decision.** Game time is tied to wall-clock time at a per-game ratio (1:1, 4:1, 12:1, custom). Couriers and battles take real hours at 1:1. The engine is a continuous-time event simulator that never reads the wall clock. Manual-step and fast-forward modes are required, for testing and for optional turn-based play.
 **Why.** It makes order lag and delegation real, and one engine supports every pace. An earlier turn-based design with deadlines was superseded.
 **Consequence.** An **LLM barrier** stops game time from advancing past an unresolved LLM result. Inputs are logged for deterministic replay.
-**Open.** The default ratio is chosen after the first scenario's pacing is measured.
+**Open.** The default ratio is chosen after the first scenario's pacing is measured. (Measured in D35: 12:1 stays the default for a first game.)
 **See.** [architecture.md](architecture.md), [gameplay.md](gameplay.md)
 
 ## D5: Pause by unanimous vote
@@ -526,7 +526,7 @@ With WebGL off the game page draws a flat SVG board (`ks-flat-board`, map metres
 
 ## D35: Epic 1 closed: the vertical slice is played and verified (issue #25)
 
-**Decision.** Epic 1 (Playable vertical slice) is met on `main`. A person signs in (or plays as a guest, D17c), creates a game, writes orders at the orders desk, waits for couriers and reports in the in-tray, and plays "Hold the Bridge" to a result in the Angular client. The evidence per "Done when" item (tests by name, real playthrough durations) is in the PR that closed #25.
+**Decision.** Epic 1 (Playable vertical slice) is met on `main`. A person signs in (or plays as a guest, D17c), creates a game, writes orders at the orders desk, waits for couriers and reports in the in-tray, and plays "Hold the Bridge" to a result in the Angular client. The evidence per "Done when" item (tests by name, real playthrough durations) is in the PR that closed #25; the server-side tests are `server/src/game/clockInvariance.test.ts`, `endToEnd.test.ts` and `replay.test.ts`.
 
 **What the playthroughs showed (headless Chromium with software WebGL, guest play, dev server, scripted Red, 2026-10-12).** Three full games through the real UI: (1) 12:1, orders "1st Battalion march to the bridge and hold" and the same for 2nd Battalion sent by fast rider: "the attack on the objective was broken", Blue holds the field at game minute 40, 205 s of real time (Blue lost 656 men, Red 1115). (2) The same orders at 4:1: the same result at game minute 40 with the same losses, 610 s of real time, which is the rate-invariance of D4 seen from the browser. (3) 12:1 with no orders: the game ran the full 50 game-minute hold (about 4.2 real minutes) and Blue held it. A passive Blue does not always lose (see the pacing note in D13). So 12:1 gives a 3 to 4 minute game, and 4:1 a 10 to 12 minute one, which leaves time to read a dispatch and answer it. The default stays 12:1 for a first game, and a longer-form default belongs to Epic 7 (#89).
 
