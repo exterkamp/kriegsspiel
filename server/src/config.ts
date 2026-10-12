@@ -87,6 +87,17 @@ export function guestPlayFromEnv(env: Record<string, string | undefined>): boole
   return env.NODE_ENV !== 'production';
 }
 
+/**
+ * `DEV_TOOLS` of `1`, `true` or `on` shows the main menu's Developer tools section (map editor, benchmarks, admin);
+ * `0`, `false` or `off` hides it. Unset: shown outside production, hidden when `NODE_ENV=production`. The routes work either way.
+ */
+export function devToolsFromEnv(env: Record<string, string | undefined>): boolean {
+  const v = env.DEV_TOOLS?.trim().toLowerCase();
+  if (v === '1' || v === 'true' || v === 'on') return true;
+  if (v === '0' || v === 'false' || v === 'off') return false;
+  return env.NODE_ENV !== 'production';
+}
+
 /** `GUEST_PER_HOUR` (default 60): guests one client address may create per hour. */
 export function guestPerHourFromEnv(env: Record<string, string | undefined>): number {
   const n = Math.floor(Number(env.GUEST_PER_HOUR));

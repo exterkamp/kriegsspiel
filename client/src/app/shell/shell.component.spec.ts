@@ -86,6 +86,7 @@ function api(over: Partial<ShellApi> = {}): ShellApi {
     signOut: async () => undefined,
     deleteAccount: async () => true,
     guestEnabled: async () => false,
+    devToolsEnabled: async () => false,
     startGuest: async () => undefined,
     fetchGame: async () => info(),
     joinSide: async () => undefined,
@@ -165,6 +166,34 @@ describe('main menu', () => {
     );
     expect(el.textContent).toContain('me@example.test');
     expect(el.textContent).toContain('About');
+  });
+
+  it('shows the Developer tools links when the server turns them on', async () => {
+    await open('/', { devToolsEnabled: async () => true });
+    expect(el.querySelector('#dev-h')?.textContent).toBe('Developer tools');
+    const links = [...el.querySelectorAll('section.dev a')].map((a) => [
+      a.textContent,
+      a.getAttribute('href'),
+    ]);
+    expect(links).toEqual([
+      ['Map editor', '/map-authoring'],
+      ['Map benchmark', '/map-benchmark'],
+      ['Table benchmark', '/table-benchmark'],
+      ['Admin view', '/admin/'],
+    ]);
+    expect(el.querySelector('section.dev')?.textContent).toContain('admin token');
+  });
+
+  it('leaves the Developer tools out when the server turns them off or cannot say', async () => {
+    await open('/');
+    expect(el.querySelector('#dev-h')).toBeNull();
+    TestBed.resetTestingModule();
+    await open('/', {
+      devToolsEnabled: async () => {
+        throw new Error('down');
+      },
+    });
+    expect(el.querySelector('#dev-h')).toBeNull();
   });
 
   it('hides Continue when there is nothing to continue', async () => {

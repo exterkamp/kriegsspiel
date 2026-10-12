@@ -39,6 +39,16 @@ export async function guestEnabled(fetchFn: typeof fetch = fetch): Promise<boole
   }
 }
 
+/** Whether the server wants the main menu's Developer tools section shown (`DEV_TOOLS`). Off when it cannot be asked. */
+export async function devToolsEnabled(fetchFn: typeof fetch = fetch): Promise<boolean> {
+  try {
+    const res = await fetchFn('/auth/features', { credentials: 'same-origin' });
+    return res.ok && ((await res.json()) as { devTools?: boolean }).devTools === true;
+  } catch {
+    return false;
+  }
+}
+
 /** Starts a guest session. Resolves to an error message, or undefined on success. */
 export async function startGuest(fetchFn: typeof fetch = fetch): Promise<string | undefined> {
   const res = await fetchFn('/auth/guest', { method: 'POST', credentials: 'same-origin' });

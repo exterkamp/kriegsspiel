@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp, type App } from '../api/app.js';
-import { guestIdleMsFromEnv, guestPerHourFromEnv, guestPlayFromEnv } from '../config.js';
+import {
+  devToolsFromEnv,
+  guestIdleMsFromEnv,
+  guestPerHourFromEnv,
+  guestPlayFromEnv,
+} from '../config.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 
 const mailbox: Array<{ to: string; link: string }> = [];
@@ -62,6 +67,22 @@ async function emailSignIn(server: Server, email: string, cookie?: string) {
   });
   return String(res.headers['set-cookie']).split(';')[0]!;
 }
+
+describe('developer tools setting', () => {
+  it('is read from DEV_TOOLS and served at /auth/features', async () => {
+    expect(devToolsFromEnv({})).toBe(true);
+    expect(devToolsFromEnv({ NODE_ENV: 'production' })).toBe(false);
+    expect(devToolsFromEnv({ NODE_ENV: 'production', DEV_TOOLS: '1' })).toBe(true);
+    expect(devToolsFromEnv({ DEV_TOOLS: 'off' })).toBe(false);
+    for (const devTools of [true, false]) {
+      const server = await start({ devTools });
+      const res = await server.inject({ method: 'GET', url: '/auth/features' });
+      expect(res.json()).toEqual({ devTools });
+      await server.close();
+      app = undefined;
+    }
+  });
+});
 
 describe('guest play', () => {
   it('is off unless enabled', async () => {

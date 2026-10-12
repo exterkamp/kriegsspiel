@@ -165,6 +165,7 @@ export interface AppOptions {
     loginPerIp?: number;
     /** Guest play (D17c): `POST /auth/guest` starts a session with no email. Default off. */
     guestPlay?: boolean;
+    devTools?: boolean;
     /** Unused guests, and their games, are removed after this long (default 7 days). */
     guestIdleMs?: number;
     /** Guests created per client address per hour (default 10). */
@@ -323,6 +324,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     loginPerEmail: options.auth?.loginPerEmail,
     loginPerIp: options.auth?.loginPerIp,
     guestPlay: options.auth?.guestPlay,
+    devTools: options.auth?.devTools,
     guestIdleMs: options.auth?.guestIdleMs,
     guestPerIp: options.auth?.guestPerIp,
     onAccountDeleted: (userId) => {

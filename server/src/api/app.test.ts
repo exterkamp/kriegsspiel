@@ -1109,6 +1109,8 @@ describe('SPA fallback for the Angular client', () => {
         '/map-table',
         '/map-table?x=1',
         '/map-benchmark?x=1',
+        '/table-benchmark',
+        '/table-benchmark?seconds=10',
       ]) {
         const res = await server.inject(url);
         expect(res.statusCode, url).toBe(200);
@@ -1156,7 +1158,7 @@ describe('SPA fallback for the Angular client', () => {
       expect((await server.inject('/map-benchmark.html')).headers.location).toBe('/map-benchmark');
       expect((await server.inject('/admin/index.html?x=1')).headers.location).toBe('/admin?x=1');
       expect((await server.inject('/table-benchmark.html')).headers.location).toBe(
-        '/map-benchmark',
+        '/table-benchmark',
       );
       expect((await server.inject({ method: 'HEAD', url: '/map-authoring.html' })).statusCode).toBe(
         301,

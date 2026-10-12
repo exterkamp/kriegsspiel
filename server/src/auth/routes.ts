@@ -4,6 +4,7 @@
  *   POST   /auth/login    `{ email }`  mail a one-time login link; always 202 so it does not reveal who has an account
  *   GET    /auth/verify   `?token=`    spend the link, start a session, redirect to `/`
  *   GET    /auth/me                    the signed-in user, or 401
+ *   GET    /auth/features           `{ devTools }`: whether the menu shows its Developer tools section
  *   GET    /auth/guest              `{ enabled }`: whether guest play is on
  *   POST   /auth/guest              start a guest session with no email (only when `guestPlay` is on, else 404)
  *   POST   /auth/logout                end this session
@@ -34,6 +35,8 @@ export interface AuthOptions {
   loginPerIp?: number;
   /** Guest play (D17c): `POST /auth/guest` makes a guest user. Off by default here; `GUEST_PLAY` turns it on in `main.ts`. */
   guestPlay?: boolean;
+  /** Show the main menu's Developer tools section (`DEV_TOOLS`, default on outside production). Routes work either way. */
+  devTools?: boolean;
   /** Guest sessions last this long unused before the guest and their games are removed (default 7 days). */
   guestIdleMs?: number;
   /** Guests created per client address per hour (default 60; `GUEST_PER_HOUR`). */
@@ -109,6 +112,8 @@ export async function authRoutes(server: FastifyInstance, o: AuthOptions): Promi
   const timer = setInterval(sweep, 10 * 60_000);
   timer.unref();
   server.addHook('onClose', async () => clearInterval(timer));
+
+  server.get('/auth/features', async () => ({ devTools: o.devTools === true }));
 
   server.get('/auth/guest', async () => ({ enabled: o.guestPlay === true }));
 

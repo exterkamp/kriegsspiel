@@ -19,6 +19,18 @@ describe('routes', () => {
     expect(router.url).toBe(to);
   });
 
+  it.each(['/map-authoring', '/map-benchmark', '/table-benchmark', '/admin/'])(
+    'has a route for the menu link %s',
+    async (url) => {
+      TestBed.configureTestingModule({
+        providers: [provideZonelessChangeDetection(), provideRouter(routes)],
+      });
+      const router = TestBed.inject(Router);
+      await router.navigateByUrl(url.replace(/\/$/, ''));
+      expect(router.url).toBe(url.replace(/\/$/, ''));
+    },
+  );
+
   it('keeps /admin/api out of the app routes', () => {
     expect(routes.some((r) => r.path === 'admin' && !r.children)).toBe(true);
     expect(routes.some((r) => r.path?.startsWith('admin/'))).toBe(false);

@@ -69,6 +69,7 @@ type Prep =
             [email]="me()?.email ?? ''"
             [guest]="me()?.guest === true"
             [load]="loadRows"
+            [devTools]="devTools()"
             (newGame)="go({ name: 'new-game' })"
             (continueGame)="go({ name: 'game', game: $event })"
             (signOut)="signedOut()"
@@ -138,6 +139,7 @@ export class ShellComponent implements OnInit, OnDestroy {
   protected readonly state = signal<ShellState | undefined>(undefined);
   protected readonly me = signal<Me | undefined>(undefined);
   protected readonly guestOn = signal(false);
+  protected readonly devTools = signal(false);
   protected readonly prep = signal<Prep>({ step: 'working' });
   protected readonly roomInfo = signal<GameInfo | undefined>(undefined);
   protected readonly failure = signal('');
@@ -161,6 +163,10 @@ export class ShellComponent implements OnInit, OnDestroy {
     const me = await this.api.fetchMe().catch(() => undefined);
     if (this.stopped) return;
     this.me.set(me);
+    this.api.devToolsEnabled().then(
+      (on) => this.devTools.set(on),
+      () => undefined,
+    );
     if (me === undefined) this.guestOn.set(await this.api.guestEnabled().catch(() => false));
     this.show(initialShell(this.win.location.search, me !== undefined));
   }
