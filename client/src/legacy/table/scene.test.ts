@@ -60,6 +60,23 @@ describe('TableScene.apply', () => {
     expect(count(t)).toBe(state.own.length + state.ghosts.length);
   });
 
+  it('moves the tag of a unit standing on another so the two do not overlap (#343)', () => {
+    const t = make();
+    const [a, b] = state.own;
+    t.apply({ ...state, ghosts: [], own: [a!, { ...b!, position: { ...a!.position } }] });
+    const tags: Array<{ z: number; w: number; h: number }> = [];
+    t.scene.traverse((o) => {
+      if (o instanceof THREE.Sprite)
+        tags.push({
+          z: o.getWorldPosition(new THREE.Vector3()).z,
+          w: o.scale.x,
+          h: o.scale.y,
+        });
+    });
+    expect(tags).toHaveLength(2);
+    expect(Math.abs(tags[0]!.z - tags[1]!.z)).toBeGreaterThanOrEqual(tags[0]!.h);
+  });
+
   it('rebuilds the map when the features change', () => {
     const t = make();
     t.apply(state);
