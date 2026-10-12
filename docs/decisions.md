@@ -181,7 +181,9 @@ Retry, backoff, the per-attempt timeout and schema validation stay in `ProviderU
 
 **Decision.** Tracing is an injected `TraceSink`; a no-op sink is the default so the disabled admin view has zero overhead. Correlation ids travel by `AsyncLocalStorage` rather than being threaded through every signature. Redaction happens inside the store, so no producer can forget it. Details in `docs/architecture.md` (Debug trace).
 
-**Open.** HTTP and WebSocket transports do not wrap each request in `traceRequest` yet. The composition root builds a default `TraceStore` when the admin view is on; it still has to take config (size, file path, the API key as a registered secret) and wrap the live umpire client with `traceUmpire`.
+**Update (#198).** Game-scoped HTTP routes and WebSocket messages are now wrapped in `traceRequest` (`tracedHttp` in `server/src/api/app.ts`, the message handler in `server/src/api/hub.ts`), so the admin Requests panel has rows and caused entries share the request's correlation id. Requests that belong to no game (`/healthz`, `/auth`, `/scenarios`, the game list) are not recorded: entries are stored per game, and a synthetic bucket would surface as a phantom game in the admin picker.
+
+**Open.** The composition root builds a default `TraceStore` when the admin view is on; it still has to take config (size, file path, the API key as a registered secret) and wrap the live umpire client with `traceUmpire`.
 
 ## Read-only admin API (story 8.2, #121)
 
