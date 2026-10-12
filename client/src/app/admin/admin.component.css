@@ -155,7 +155,7 @@ ks-admin {
     color: var(--ks-warn-on-dark);
   }
   .badge.fallback {
-    color: #f85149;
+    color: var(--ks-wax-on-dark);
   }
   .llm-detail details {
     margin: 6px 0;
