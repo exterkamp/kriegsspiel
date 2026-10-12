@@ -5,7 +5,6 @@ import {
   MS_PER_MINUTE,
   advanceTo,
   createState,
-  holdTheBridge,
   interceptChance,
   issueOrder,
   loadScenario,
@@ -22,7 +21,7 @@ import {
   type Order,
   type Point,
 } from './index.js';
-import { miniWorld, wood } from './scenario.testkit.js';
+import { miniWorld, wood, holdTheBridgeFarStart } from './scenario.testkit.js';
 
 function registry() {
   const r = new EventRegistry<GameState>();
@@ -45,7 +44,7 @@ const ORDER: Order = {
 
 /** A game with red's hussars sitting on blue's courier route to blue-1, unless `lurk` is false. */
 function game(seed: number, opts: { lurk?: boolean; sightFactor?: number; order?: Order } = {}) {
-  const g = loadScenario(holdTheBridge);
+  const g = loadScenario(holdTheBridgeFarStart);
   const world: GameState = {
     ...g,
     seed,
@@ -210,7 +209,7 @@ describe('courier loss and garbling', () => {
 });
 
 describe('rideRisk', () => {
-  const world = loadScenario(holdTheBridge);
+  const world = loadScenario(holdTheBridgeFarStart);
   const to = world.units.find((u) => u.id === 'blue-1')!;
   const km = 1_000_000;
 

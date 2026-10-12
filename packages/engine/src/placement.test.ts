@@ -13,7 +13,6 @@ import {
   MS_PER_MINUTE,
   OVERLAP_TOLERANCE_MM,
   footprintCorners,
-  holdTheBridge,
   loadScenario,
   mm,
   pointMm,
@@ -21,7 +20,7 @@ import {
   type GameState,
   type Point,
 } from './index.js';
-import { bridge, miniWorld, river } from './scenario.testkit.js';
+import { bridge, miniWorld, river, holdTheBridgeFarStart } from './scenario.testkit.js';
 
 const P = (x: number, y: number): Point => pointMm(x, y);
 
@@ -177,7 +176,7 @@ describe('validatePlacement', () => {
   });
 
   it('works on the real scenario map', () => {
-    const g = loadScenario(holdTheBridge);
+    const g = loadScenario(holdTheBridgeFarStart);
     const u = g.units.find((x) => x.id === 'blue-1')!;
     const r = validatePlacement(g, { unitId: 'blue-1', center: u.center, elapsedMs: 0 });
     expect(r.verdict).toBe('accept');

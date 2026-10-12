@@ -1,3 +1,4 @@
+import { holdTheBridgeFarStart } from './scenario.testkit.js';
 import { describe, expect, it } from 'vitest';
 import {
   COURIER_CHOICES,
@@ -12,7 +13,6 @@ import {
   choiceRisk,
   createState,
   findPath,
-  holdTheBridge,
   issueOrder,
   loadScenario,
   pointMm,
@@ -40,7 +40,7 @@ function registry() {
 }
 
 function game(): EngineState<GameState> {
-  const g = loadScenario(holdTheBridge);
+  const g = loadScenario(holdTheBridgeFarStart);
   return createState(g.seed, g, 0);
 }
 
