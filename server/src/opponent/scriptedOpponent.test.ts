@@ -20,6 +20,7 @@ import type { OrderParser } from '../orders/index.js';
 import type { SideAgent } from './index.js';
 import {
   AIM_SPREAD_M,
+  FORM_UP_MS,
   THINK_INTERVAL_MS,
   ScriptedOpponent,
   assertFogOnly,
@@ -37,7 +38,7 @@ const CONFIG: ScriptedOpponentConfig = {
 function view(over: Partial<EngineSideView> = {}): EngineSideView {
   return {
     side: 'red',
-    time: 0,
+    time: FORM_UP_MS,
     mapWidth: 4000,
     mapHeight: 3000,
     ownUnits: [
@@ -95,7 +96,7 @@ describe('fog of war', () => {
   it('accepts what viewFor builds from the real world', () => {
     const world = loadScenario(holdTheBridge);
     const bot = new ScriptedOpponent(CONFIG);
-    expect(bot.think(viewFor(world, 'red')).length).toBeGreaterThan(0);
+    expect(bot.think(viewFor(world, 'red', FORM_UP_MS)).length).toBeGreaterThan(0);
   });
 });
 
@@ -108,16 +109,33 @@ describe('behaviour', () => {
     expect(Math.abs(to.y - 1_500_000)).toBeLessThanOrEqual(AIM_SPREAD_M * 1000);
   });
 
+  it('forms up first: no order, and not settled, until FORM_UP_MS has passed', () => {
+    const bot = new ScriptedOpponent(CONFIG);
+    expect(bot.think(view({ time: 0 }))).toEqual([]);
+    expect(bot.settled()).toBe(false);
+    expect(bot.think(view({ time: FORM_UP_MS - 1 }))).toEqual([]);
+    expect(bot.think(view({ time: FORM_UP_MS }))).toHaveLength(1);
+  });
+
+  it('stays on the objective instead of chasing an enemy it sees', () => {
+    const bot = new ScriptedOpponent(CONFIG);
+    const onObjective = {
+      ownUnits: [{ ...view().ownUnits[0]!, position: { x: 2040, y: 1510 } }],
+    };
+    bot.think(view(onObjective));
+    expect(bot.think(view({ ...onObjective, visibleEnemies: [enemy(1960, 1680)] }))).toEqual([]);
+  });
+
   it('does not repeat an order that would change nothing', () => {
     const bot = new ScriptedOpponent(CONFIG);
     expect(bot.think(view())).toHaveLength(1);
-    expect(bot.think(view({ time: 300_000 }))).toHaveLength(0);
+    expect(bot.think(view({ time: FORM_UP_MS + 300_000 }))).toHaveLength(0);
   });
 
   it('attacks an enemy it sees near it', () => {
     const bot = new ScriptedOpponent(CONFIG);
     bot.think(view());
-    const [o] = bot.think(view({ time: 300_000, visibleEnemies: [enemy(1950, 900)] }));
+    const [o] = bot.think(view({ time: FORM_UP_MS + 300_000, visibleEnemies: [enemy(1950, 900)] }));
     expect(o?.intent).toEqual({ kind: 'move', to: { x: 1_950_000, y: 900_000 } });
     expect(o?.text).toMatch(/advance on the enemy/);
   });
@@ -126,7 +144,7 @@ describe('behaviour', () => {
     const bot = new ScriptedOpponent(CONFIG);
     bot.think(view());
     const far = view({
-      time: 300_000,
+      time: FORM_UP_MS + 300_000,
       visibleEnemies: [enemy(1950, 2400)],
       lastKnownContacts: [
         {
@@ -148,18 +166,22 @@ describe('behaviour', () => {
     const bot = new ScriptedOpponent(CONFIG);
     bot.think(view());
     const weak = view({ ownUnits: [{ ...view().ownUnits[0]!, morale: 20 }] });
-    const [o] = bot.think({ ...weak, time: 300_000, visibleEnemies: [enemy(1950, 900)] });
+    const [o] = bot.think({
+      ...weak,
+      time: FORM_UP_MS + 300_000,
+      visibleEnemies: [enemy(1950, 900)],
+    });
     expect(o?.intent).toEqual({ kind: 'withdraw', toward: { x: 2_050_000, y: 50_000 } });
-    expect(bot.think({ ...weak, time: 600_000, visibleEnemies: [enemy(1950, 900)] })).toHaveLength(
-      0,
-    );
+    expect(
+      bot.think({ ...weak, time: FORM_UP_MS + 600_000, visibleEnemies: [enemy(1950, 900)] }),
+    ).toHaveLength(0);
   });
 
   it('withdraws when strength falls below half its peak', () => {
     const bot = new ScriptedOpponent(CONFIG);
     bot.think(view());
     const hurt = view({ ownUnits: [{ ...view().ownUnits[0]!, strength: 300 }] });
-    expect(bot.think({ ...hurt, time: 300_000 })[0]?.intent.kind).toBe('withdraw');
+    expect(bot.think({ ...hurt, time: FORM_UP_MS + 300_000 })[0]?.intent.kind).toBe('withdraw');
   });
 
   it('is deterministic for the same seed, view and time, and varies with the seed', () => {
@@ -185,8 +207,8 @@ describe('behaviour', () => {
     expect(outcomes.every((o) => (o.orders === 0) === !o.settled)).toBe(true);
     // Once it has been told to advance, a quiet decision is a settled one.
     const agent = new ScriptedOpponent({ ...CONFIG, seed: 1 });
-    for (let t = 0; t < 4; t++) agent.think(view({ time: t * THINK_INTERVAL_MS }));
-    expect(agent.think(view({ time: 5 * THINK_INTERVAL_MS }))).toEqual([]);
+    for (let t = 0; t < 4; t++) agent.think(view({ time: FORM_UP_MS + t * THINK_INTERVAL_MS }));
+    expect(agent.think(view({ time: FORM_UP_MS + 5 * THINK_INTERVAL_MS }))).toEqual([]);
     expect(agent.settled()).toBe(true);
   });
 
@@ -513,10 +535,10 @@ describe('headless game', () => {
         await time.advance((minute - elapsed) * 60_000);
         elapsed = minute;
       };
-      // Exactly 5 game minutes: the instant Red thinks, so a command and a decision share it.
-      await to(5);
+      // Exactly 10 game minutes: the instant Red first thinks, so a command and a decision share it.
+      await to(10);
       await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 move to the ridge' });
-      await to(12);
+      await to(14);
       if (stopAndReopenAt !== undefined) {
         await to(stopAndReopenAt);
         await game.submit({ kind: 'pause' });
@@ -526,7 +548,7 @@ describe('headless game', () => {
         game = await h.open('g1');
         await game.submit({ kind: 'resume' });
       }
-      await to(25);
+      await to(24);
       await game.submit({ kind: 'pause' });
       return { game, time };
     }
@@ -555,7 +577,7 @@ describe('headless game', () => {
       const world = straight.game.state.world;
       await host?.shutdown();
       host = undefined;
-      const resumed = await play(new MemoryGameStore(), 18);
+      const resumed = await play(new MemoryGameStore(), 21);
       expect(resumed.game.state.time).toBe(straight.game.state.time);
       expect(resumed.game.state.world).toEqual(world);
     });

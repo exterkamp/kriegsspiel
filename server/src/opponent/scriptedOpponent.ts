@@ -168,7 +168,13 @@ export class ScriptedOpponent implements SideAgent {
       let next: Standing | undefined;
       if (weak) next = { kind: 'withdraw', target: this.config.fallbackTo };
       else if (dist(unit.position, this.config.objective) <= HOLD_RADIUS_M) {
-        next = standing?.kind === 'advance' ? standing : this.advanceOrder(rng);
+        // Already on the ground it was sent to take: nothing to order (this also covers a
+        // restart that has lost its memory of earlier orders).
+        if (!standing || standing.kind === 'advance') {
+          this.standing.set(unit.id, standing ?? { kind: 'advance', target: unit.position });
+          continue;
+        }
+        next = this.advanceOrder(rng);
       } else if (near && near.d <= ENGAGE_RANGE_M)
         next = { kind: 'attack', target: near.t.position };
       else if (rng.next() >= HESITATE_CHANCE || standing) next = this.advanceOrder(rng);

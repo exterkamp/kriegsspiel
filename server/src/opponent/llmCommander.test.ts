@@ -19,7 +19,7 @@ import type { OrderParser, ParseResult } from '../orders/index.js';
 import { createGameUmpire } from '../umpire/gameLimits.js';
 import { UmpireError } from '../umpire/umpireClient.js';
 import type { UmpireClient, UmpireRequest, UmpireResponse } from '../umpire/umpireClient.js';
-import { llmAgents, scriptedAgents, LlmCommander, assertFogOnly } from './index.js';
+import { llmAgents, scriptedAgents, LlmCommander, assertFogOnly, FORM_UP_MS } from './index.js';
 
 const BRIDGE = { x: 2_050_000, y: 1_500_000 };
 
@@ -199,7 +199,7 @@ describe('failure', () => {
     'plays the scripted opponent when the call fails (%s)',
     async (kind) => {
       const world = loadScenario(holdTheBridge);
-      const view = viewFor(world, 'red', 0);
+      const view = viewFor(world, 'red', FORM_UP_MS);
       const orders = await commander(failing(kind), world).decide(view);
       const scripted = await scriptedAgents(world)[0]!.think(view);
       expect(orders.length).toBeGreaterThan(0);
