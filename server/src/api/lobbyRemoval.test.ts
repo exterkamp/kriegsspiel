@@ -138,6 +138,33 @@ describe('the creator removing a player', () => {
     expect((await t.call(t.lead, 'kick', { side: 'blue', role: 'chiefOfStaff' })).status).toBe(404);
   });
 
+  it('removes a subordinate by one of their units, and only that holder', async () => {
+    const t = await table();
+    expect(
+      (await t.call(t.red, 'join', { side: 'blue', role: 'subordinate', units: ['blue-2'] }))
+        .status,
+    ).toBe(200);
+    expect(
+      (await t.call(t.cos, 'join', { side: 'blue', role: 'subordinate', units: ['blue-3'] }))
+        .status,
+    ).toBe(200);
+    // A subordinate needs a unit to be named.
+    const bare = await t.call(t.lead, 'kick', { side: 'blue', role: 'subordinate' });
+    expect(bare.status).toBe(404);
+    expect(await bare.json()).toMatchObject({ error: 'no_such_player' });
+    expect(
+      (await t.call(t.lead, 'kick', { side: 'blue', role: 'subordinate', unit: 'blue-9' })).status,
+    ).toBe(404);
+    expect((await t.info(t.red)).removed).toBe(false);
+    expect((await t.info(t.cos)).removed).toBe(false);
+
+    expect(
+      (await t.call(t.lead, 'kick', { side: 'blue', role: 'subordinate', unit: 'blue-3' })).status,
+    ).toBe(200);
+    expect((await t.info(t.cos)).removed).toBe(true);
+    expect((await t.info(t.red)).removed).toBe(false);
+  });
+
   it('is the creator only, never themselves, and not after the start', async () => {
     const t = await table();
     await t.call(t.red, 'join', { side: 'red' });

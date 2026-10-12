@@ -797,7 +797,6 @@ export async function buildApp(options: AppOptions): Promise<App> {
   /** Takes `userId` out of a lobby game: their seat or role and their ready mark. */
   const vacate = (rec: LobbyGame, userId: string, removed: boolean): void => {
     authStore.releaseSeat(rec.id, userId);
-    hub.disconnectUser(userId, removed ? 'removed from the game' : 'left the game');
     lobby.put({
       ...rec,
       roles: (rec.roles ?? []).filter((r) => r.userId !== userId),
@@ -847,12 +846,14 @@ export async function buildApp(options: AppOptions): Promise<App> {
       if (!target) return reply.code(404).send({ error: 'no_such_player' });
       if (target === user.id) return reply.code(400).send({ error: 'cannot_kick_self' });
       vacate(rec, target, true);
-      void notifier.notifyUser(
-        rec.id,
-        target,
-        'Removed from the game',
-        'The host removed you from the room before the game started.',
-      );
+      void notifier
+        .notifyUser(
+          rec.id,
+          target,
+          'Removed from the game',
+          'The host removed you from the room before the game started.',
+        )
+        .catch((e) => onError(rec.id, e));
       return { removed: true };
     });
   });
