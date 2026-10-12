@@ -130,8 +130,15 @@ export const initialState: ClientState = {
 const MAX_NOTICES = 20;
 
 /**
- * A fresh anchor, unless the clock was running and had already passed it (a view built a moment before the
- * old anchor's extrapolation): then game time holds its place instead of stepping back.
+ * How much wall time an update may be behind the client's extrapolation and still be treated as network
+ * latency. A bigger lead is a real jump on the server (an LLM-barrier stall holds game time while the client
+ * keeps running), so the server's time wins.
+ */
+export const MAX_HOLD_WALL_MS = 2000;
+
+/**
+ * A fresh anchor, unless the clock was running and had already passed it by a small margin (a view built a
+ * moment before the old anchor's extrapolation): then game time holds its place instead of stepping back.
  */
 function reanchor(
   old: ClockAnchor | undefined,
@@ -142,7 +149,9 @@ function reanchor(
   const fresh = anchorOf(gameMs, clock, nowWall);
   if (old?.status !== 'running' || clock.status !== 'running') return fresh;
   const ahead = gameNowMs(old, nowWall);
-  return ahead > gameMs ? { ...fresh, gameMs: ahead } : fresh;
+  return ahead > gameMs && ahead - gameMs <= MAX_HOLD_WALL_MS * clock.rate
+    ? { ...fresh, gameMs: ahead }
+    : fresh;
 }
 
 function anchorOf(gameMs: number, clock: ClockState, localWallMs: number): ClockAnchor {

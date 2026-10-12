@@ -25,11 +25,16 @@ describe('ClockComponent', () => {
   it('says the connection was lost and offers a retry once it gives up', async () => {
     const game = TestBed.inject(GameService);
     const retry = vi.spyOn(game, 'retry');
-    // A socket that never answers, so only the test moves the link.
+    const sockets: Array<{ onmessage?: (e: { data: string }) => void; onclose?: () => void }> = [];
     vi.stubGlobal(
       'WebSocket',
       class {
         readyState = 0;
+        onmessage?: (e: { data: string }) => void;
+        onclose?: () => void;
+        constructor() {
+          sockets.push(this);
+        }
         send(): void {}
         close(): void {}
       },
@@ -37,9 +42,11 @@ describe('ClockComponent', () => {
     game.connect({ protocol: 'http:', host: 'x', search: '?game=g1&side=blue' });
     const fixture = TestBed.createComponent(ClockComponent);
     await fixture.whenStable();
-    (game as unknown as { _state: { update(f: (s: object) => object): void } })._state.update(
-      (s) => ({ ...s, link: 'failed' }),
-    );
+    // The server says the game is closed and drops the socket: the connection gives up.
+    sockets[0]!.onmessage?.({
+      data: JSON.stringify({ v: 1, kind: 'error', code: 'game_closed', message: 'gone' }),
+    });
+    sockets[0]!.onclose?.();
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('Connection lost');

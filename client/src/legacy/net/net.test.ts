@@ -436,30 +436,49 @@ describe('GameConnection', () => {
 });
 
 describe('clock anchors', () => {
-  const running = (gameMsAtAnchor: number) => ({
+  const msg = (
+    gameMsAtAnchor: number,
+    rate = 10,
+    status: 'running' | 'paused' | 'stopped' = 'running',
+  ) => ({
     v: PROTOCOL_VERSION as 1,
     kind: 'clockState' as const,
-    clock: { gameMsAtAnchor, wallMsAtAnchor: 1, rate: 10, status: 'running' as const },
+    clock: { gameMsAtAnchor, wallMsAtAnchor: 1, rate, status },
   });
 
-  it('never steps back when a later update carries an older anchor while running', () => {
-    let s = applyServerMessage(initialState, running(1000), 1000);
-    // 100 ms later the display is at 2000; an update anchored at 1500 must not pull it back.
-    s = applyServerMessage(s, running(1500), 1100);
-    expect(gameNowMs(s.clock!, 1100)).toBe(2000);
-    expect(gameNowMs(s.clock!, 1200)).toBe(3000);
+  it.each([1, 4, 12])('never steps back on a small lag while running at rate %i', (rate) => {
+    let s = applyServerMessage(initialState, msg(1000, rate), 1000);
+    // 100 ms later the display is 100 * rate ahead; an update anchored just behind it must not pull it back.
+    const shown = 1000 + 100 * rate;
+    s = applyServerMessage(s, msg(1000 + 50 * rate, rate), 1100);
+    expect(gameNowMs(s.clock!, 1100)).toBe(shown);
+    expect(gameNowMs(s.clock!, 1200)).toBe(shown + 100 * rate);
   });
+
+  it.each([1, 4, 12])(
+    'takes the server time after a stall that left a big lead at rate %i',
+    (rate) => {
+      let s = applyServerMessage(initialState, msg(60_000, rate), 1000);
+      // The LLM barrier held game time for 30 s of wall time; the client ran on, then the server re-anchors.
+      s = applyServerMessage(s, msg(60_000, rate), 31_000);
+      expect(gameNowMs(s.clock!, 31_000)).toBe(60_000);
+      expect(gameNowMs(s.clock!, 41_000)).toBe(60_000 + 10_000 * rate);
+    },
+  );
 
   it('takes a later anchor, and any anchor after a pause', () => {
-    let s = applyServerMessage(initialState, running(1000), 1000);
-    s = applyServerMessage(s, running(5000), 1100);
+    let s = applyServerMessage(initialState, msg(1000), 1000);
+    s = applyServerMessage(s, msg(5000), 1100);
     expect(gameNowMs(s.clock!, 1100)).toBe(5000);
-    s = applyServerMessage(
-      s,
-      { ...running(10), clock: { ...running(10).clock, status: 'paused' } },
-      1200,
-    );
+    s = applyServerMessage(s, msg(10, 10, 'paused'), 1200);
     expect(gameNowMs(s.clock!, 1300)).toBe(10);
+  });
+
+  it('takes a stopped anchor even when the running display was ahead', () => {
+    let s = applyServerMessage(initialState, msg(1000, 4), 1000);
+    s = applyServerMessage(s, msg(1200, 4, 'stopped'), 1100);
+    expect(s.clock!.status).toBe('stopped');
+    expect(gameNowMs(s.clock!, 5000)).toBe(1200);
   });
 });
 
