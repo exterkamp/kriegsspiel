@@ -468,3 +468,13 @@ Removed with it: all `.svelte` and test files under `client/src/hq`, the `fixtur
 **Decision.** CI runs static checks/builds, maps/catalog tests and application/repository tests on three isolated runners. Existing serial build ordering and all ordinary/effectiveness coverage remain required. The existing `check` status aggregates explicit success from the complete validation matrix and `test-effectiveness`; failure, cancellation or unexpected skipping cannot clear it. Every validation runner verifies the exact candidate and uploads its own ordinary checkout evidence, including on failure. Only superseded pull-request runs cancel; main and merge-group runs retain distinct concurrency groups. Branch protection is unchanged.
 
 **See.** [CI measurements and review](ci-performance-optimization.md), [review workflow](review-workflow.md).
+
+## D31: Local initialization certifies maps independently of catalog storage
+
+**Decision.** Restore local initialization's framework-free preparation and catalog contracts for native Angular consumers. A prepared board contains canonical public map bytes, a full SHA-256 identity, detached certified geometry and north-west-zero metre bounds; successful catalog storage is not certification. The development catalog remains an opt-in loopback sidecar, proxied only by Angular's development configuration, without a live API fallback.
+
+**Default and ownership.** Startup's pinned 5 × 3 km default is a development-only static asset and certifies without a catalog or live API. Development/test asset preparation copies only the identity-checked canonical rectangle inside the Angular workspace; production assets exclude it. Preparation invalidates cancelled, replaced or disposed operations and retires their workers. Consumers await operation settlement before acknowledging asynchronous teardown or allocating through another owner.
+
+**Scope.** This packet delivers services and minimal render/session contracts; no local route or setup/board UI is exposed yet. Future native Angular components own these lifetimes. There is no simulation, production storage, scenario conversion or session resume, and existing live routing remains unchanged.
+
+**See.** [Angular initialization guide](game-initialization-angular-guide.md), [Development catalog](dev-map-catalog.md), [Angular landing plan](game-initialization-angular-landing-plan.md).
