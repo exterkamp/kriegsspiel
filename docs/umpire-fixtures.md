@@ -34,3 +34,7 @@ The first fixture that matches a call wins, so put specific fixtures (with `inpu
 ## Judge placement fixtures
 
 `fixtures/judge-placement.json` answers the `judge` placement task (prompt `judge-placement-v1`, see `server/src/umpire/judgePlacement.ts`) for the `hold-the-bridge` scenario. Its output lists `placements` with metres for `x`, `y` and `shape`, and degrees for `facingDeg`. Pin new placement fixtures to the prompt version so they do not shadow other judge fixtures.
+
+## Leak suite
+
+`server/src/umpire/leak.test.ts` is the cross-side leak suite (#44, decision "Cross-side leak suite for LLM stages" in `docs/decisions.md`). Its harness, `leakKit.testkit.ts`, is for any test that needs to know what a side's prompts carried: `plantCanaries(world)` puts distinctive names, officers and strengths in the master state and lists them as secrets; `new LeakProbe().client(side, inner)` wraps the client a side's stages use and records its requests and answers; `probe.findLeaks(secrets)` and `scan(text, secrets, side, where)` return the leaks, and `describeLeaks` prints which secret leaked and where; `ScriptedModel({ narrate: req => ..., staff: ... })` is a fake model for adversarial replies. To cover a new stage or a new hostile input, add it to `runStages` or the adversarial variants in the test. Run it against a real model with `LEAK_REAL_MODEL=1 UMPIRE_PROVIDER=ollama npm test -w server -- leak`.

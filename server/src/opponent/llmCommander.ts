@@ -18,6 +18,7 @@
  */
 import type { EngineSideView, Point } from '@kriegsspiel/engine';
 import type { OrderParser, ParseFeature } from '../orders/index.js';
+import { hiddenIn } from '../umpire/leakGuard.js';
 import type { JsonSchema, UmpireClient } from '../umpire/umpireClient.js';
 import {
   assertFogOnly,
@@ -105,6 +106,12 @@ export interface LlmCommanderConfig {
   fallback: SideAgent;
   difficulty?: Difficulty;
   personality?: Personality;
+  /**
+   * What the commander's side must never read, given the view it acts on (#44): the other side's
+   * unit names, officers and figures, and the ids of its units this side has not seen. An order whose
+   * text names one is dropped before it is parsed. Absent, nothing is checked.
+   */
+  hidden?: (view: EngineSideView) => string[];
   /** Called when a call fails or an order is dropped. A failing logger is ignored. */
   onNote?: (note: CommanderNote) => void;
 }
@@ -204,10 +211,18 @@ export class LlmCommander implements SideAgent {
     };
     // Parse in parallel (each parse can be a model call, all inside the actor's one timeout);
     // the own-unit and de-duplication checks then run in order.
+    const hidden = this.cfg.hidden?.(view) ?? [];
     const parsed = await Promise.all(
       written.map(async (w) => {
         const text = typeof w?.text === 'string' ? w.text.trim() : '';
         if (!text) return undefined;
+        if (hiddenIn(text, hidden).length > 0) {
+          this.note({
+            kind: 'order-dropped',
+            reason: `names what this side has not seen: ${text}`,
+          });
+          return undefined;
+        }
         try {
           return { text, result: await this.cfg.parser.parse(text, context) };
         } catch (err) {

@@ -6,5 +6,5 @@
     "rootDir": "src",
     "paths": {}
   },
-  "exclude": ["src/**/*.test.ts", "src/game/testing.ts"]
+  "exclude": ["src/**/*.test.ts", "src/**/*.testkit.ts", "src/game/testing.ts"]
 }
