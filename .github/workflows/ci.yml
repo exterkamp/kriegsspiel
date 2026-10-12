@@ -4,13 +4,24 @@ on:
   pull_request:
   push:
     branches: [main]
+  merge_group:
+
+# Superseded PRs can stop; main and merge-queue runs each retain a unique group.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  HQ_REVIEW_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-  HQ_REVIEW_BASE: ${{ github.event.pull_request.base.sha || github.sha }}
+  HQ_REVIEW_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+  HQ_REVIEW_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.sha }}
 
 jobs:
-  check:
+  validation:
+    name: validation (${{ matrix.group }})
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [static-build, maps, application]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,14 +54,22 @@ jobs:
       - run: npm install --global npm@10.9.7
       - run: npm run setup:map-source
       - run: npm ci
+      # Each group has a separate checkout, install and output directories.
+      # Keep typecheck/build ordering (including map compilation) unchanged.
       - run: npm run lint
+        if: matrix.group == 'static-build'
       - run: npm run typecheck
-      - run: npm test
+        if: matrix.group == 'static-build'
       - run: npm run build
+        if: matrix.group == 'static-build'
+      - run: npm run test:ci-maps
+        if: matrix.group == 'maps'
+      - run: npm run test:ci-application
+        if: matrix.group == 'application'
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: hq-ordinary-${{ github.run_id }}-${{ github.run_attempt }}
+          name: hq-ordinary-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/hq-ordinary
           retention-days: 30
           if-no-files-found: warn
@@ -99,3 +118,22 @@ jobs:
             ${{ runner.temp }}/hq-effectiveness-checkout.json
           retention-days: 30
           if-no-files-found: warn
+
+  # Preserve the existing status name. always() runs this gate even after a
+  # failed/cancelled/skipped prerequisite; only explicit success is accepted.
+  check:
+    if: always()
+    needs: [validation, test-effectiveness]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject cancelled workflow
+        if: cancelled()
+        run: exit 1
+      - name: Require every validation group and effectiveness job
+        if: always()
+        env:
+          VALIDATION_RESULT: ${{ needs.validation.result }}
+          EFFECTIVENESS_RESULT: ${{ needs.test-effectiveness.result }}
+        run: |
+          test "$VALIDATION_RESULT" = success
+          test "$EFFECTIVENESS_RESULT" = success
