@@ -271,3 +271,27 @@ describe('idempotent ops and comment anchors', () => {
     expect(b.get('d1')!.comments).toHaveLength(1);
   });
 });
+
+describe('signing', () => {
+  it('stamps a draft once and then takes no more edits or comments', () => {
+    const book = new DraftBook();
+    book.create('d', 'ann', { text: 'Hold the bridge' });
+    expect(book.signable('d').text).toBe('Hold the bridge');
+    const d = book.stamp('d', 5, { orderId: 'o1', by: 'ann', role: 'commander' });
+    expect(d.sent).toEqual({ orderId: 'o1', by: 'ann', role: 'commander', at: 5 });
+    expect(() => book.edit('d', 'bob', 6, { baseRev: 0, op: [15, '!'] })).toThrow(
+      /signed and sent/,
+    );
+    expect(() => book.stamp('d', 7, { orderId: 'o2', by: 'ann' })).toThrow(/signed and sent/);
+    // The wording can still be forked into an alternative plan.
+    expect(book.fork('d', 'f', 'bob').text).toBe('Hold the bridge');
+  });
+
+  it('will not sign a draft that was merged away', () => {
+    const book = new DraftBook();
+    book.create('d', 'ann', { text: 'Hold' });
+    book.fork('d', 'f', 'bob');
+    book.merge('f', 1);
+    expect(() => book.signable('f')).toThrow(/merged/);
+  });
+});

@@ -131,6 +131,34 @@ export class Hub {
     private readonly trace: TraceSink = NOOP_TRACE,
   ) {}
 
+  /** Where a user's current seat is read from: the lobby record, so authority follows who holds the role now (#77). */
+  private seatResolver: ((gameId: string, userId: string) => Seat | undefined) | undefined;
+
+  /** Have seats re-read from `resolve` on every command, not fixed when the socket opened. */
+  setSeatResolver(resolve: (gameId: string, userId: string) => Seat | undefined): void {
+    this.seatResolver = resolve;
+  }
+
+  /**
+   * Bring a connection's seat up to date before a command is handled. Command authority belongs to
+   * the role, not the socket: when the role changed hands the old holder's connection is closed
+   * (never left as shared HQ, which would let it sign for anyone), and a changed seat on the same
+   * user (say a subordinate who took over other formations) applies from now on. False: closed.
+   */
+  private refreshSeat(gameId: string, conn: Connection): boolean {
+    if (!this.seatResolver || !conn.seat || conn.userId === undefined) return true;
+    const now = this.seatResolver(gameId, conn.userId);
+    if (!now) {
+      conn.socket.close(1008, 'your seat changed hands');
+      return false;
+    }
+    if (seatKey(now) !== seatKey(conn.seat)) {
+      conn.seat = now;
+      this.push(gameId, conn);
+    }
+    return true;
+  }
+
   /** Forwards per game, read from the lobby record once and kept in step by `handleForward`. */
   private readonly forwardCache = new Map<string, Forward[]>();
 
@@ -338,6 +366,31 @@ export class Hub {
       return;
     }
     this.saveDrafts(gameId, side, book);
+  }
+
+  /** Mark a draft sent, tell the side, and keep the book. A draft sent meanwhile is left as it is. */
+  private stampDraft(
+    gameId: string,
+    conn: Connection,
+    book: DraftBook,
+    draftId: string,
+    orderId: string,
+  ): void {
+    try {
+      const d = book.stamp(draftId, Date.now(), {
+        orderId,
+        by: conn.userId ?? conn.side,
+        ...(conn.seat ? { role: conn.seat.role } : {}),
+      });
+      this.broadcastSide(gameId, conn.side, {
+        v: PROTOCOL_VERSION,
+        kind: 'draftState',
+        draft: structuredClone(d),
+      });
+      this.saveDrafts(gameId, conn.side, book);
+    } catch (e) {
+      if (!(e instanceof DraftError)) throw e;
+    }
   }
 
   /** Tell every connection of a side its marks. */
@@ -782,6 +835,7 @@ export class Hub {
       this.send(conn, error('bad_message', parsed.error));
       return;
     }
+    if (!this.refreshSeat(gameId, conn)) return;
     const game = this.lookup(gameId);
     if (!game) {
       this.send(conn, error('game_closed', 'this game is no longer running'));
@@ -882,16 +936,31 @@ export class Hub {
       this.send(conn, error('game_over', `${command.orderId}: the game has ended`));
       return;
     }
-    if (command.text === undefined) {
-      this.send(conn, error('not_implemented', 'order drafts are not supported yet; send text'));
-      return;
-    }
     // Only the commander and subordinate commanders sign. Whether a subordinate may sign for the
     // addressee is checked by the actor once the parse names it.
     if (conn.seat && conn.seat.role !== 'commander' && conn.seat.role !== 'subordinate') {
       this.send(conn, error('not_permitted', 'staff officers draft orders; the commander signs'));
       return;
     }
+    // Signing a draft sends the wording the server holds, never text the signer supplies. Anyone
+    // may have proposed it; the check above and the actor's decide who may stamp it.
+    let draftBook: DraftBook | undefined;
+    let text = command.text;
+    if (command.draft !== undefined) {
+      draftBook = await this.draftsOf(gameId, conn.side);
+      try {
+        text = draftBook.signable(command.draft).text.trim();
+      } catch (e) {
+        if (!(e instanceof DraftError)) throw e;
+        this.send(conn, error(e.code, `${command.orderId}: ${e.message}`));
+        return;
+      }
+      if (text === '') {
+        this.send(conn, error('bad_draft', `${command.orderId}: the draft is empty`));
+        return;
+      }
+    }
+    if (text === undefined) return;
     const now = Date.now();
     conn.orderTimes = conn.orderTimes.filter((t) => now - t < 60_000);
     if (
@@ -910,7 +979,7 @@ export class Hub {
       return;
     }
     // The same words again within a few seconds are a double click or a retry under a new id: say so, send nothing (#343).
-    const words = `${command.courier ?? ''}|${command.text.trim().replace(/\s+/g, ' ').toLowerCase()}`;
+    const words = `${command.courier ?? ''}|${text.trim().replace(/\s+/g, ' ').toLowerCase()}`;
     const last = this.lastOrderText.get(idKey);
     if (last && last.words === words && now - last.at < DUPLICATE_TEXT_MS) {
       this.send(
@@ -931,7 +1000,7 @@ export class Hub {
       result = await game.submit({
         kind: 'order',
         side: conn.side,
-        text: command.text,
+        text,
         orderId: command.orderId,
         ...(conn.seat ? { signer: conn.seat } : {}),
         ...(command.courier ? { courier: command.courier } : {}),
@@ -944,7 +1013,11 @@ export class Hub {
     } finally {
       conn.ordersInFlight--;
     }
-    if (result.ok) return;
+    if (result.ok) {
+      if (draftBook && command.draft !== undefined)
+        this.stampDraft(gameId, conn, draftBook, command.draft, command.orderId);
+      return;
+    }
     // Nothing was issued, so the player may send the id again after fixing the text.
     ids.delete(command.orderId);
     this.lastOrderText.delete(idKey);
