@@ -486,6 +486,133 @@ export function checkProseAgainst(text: string, facts: ProseFacts): string[] {
   return [...new Set(problems)];
 }
 
+/** The longest dispatch accepted: the prompt asks for two or three short sentences (#419). */
+export const NARRATE_MAX_CHARS = 360;
+const NARRATE_MAX_SENTENCES = 4;
+
+/** The words `unitCondition` uses, by what they describe; one unit is only ever one of each (#419). */
+const CONDITION_GROUPS: readonly (readonly string[])[] = [
+  ['steady', 'shaken', 'wavering'],
+  ['fresh', 'tiring', 'spent'],
+  ['well supplied', 'running low', 'nearly gone'],
+];
+
+/** Condition words a report of this kind already implies, so the note may use them whatever the unit's condition. */
+const KIND_CONDITION: Partial<Record<ViewReport['kind'], readonly string[]>> = {
+  broke: ['shaken', 'wavering'],
+  heavyLosses: ['shaken', 'wavering'],
+  exhausted: ['tiring', 'spent'],
+  lowAmmo: ['running low', 'nearly gone'],
+};
+
+/**
+ * Words of which a note on a report of this kind must use one, so it is about the reported event and
+ * not about something the model made up (#419). Generous on purpose: any fair way of saying it passes.
+ */
+const EVENT_WORDS: Record<Exclude<ViewReport['kind'], 'battle'>, RegExp> = {
+  situation:
+    /\b(position|posted|placed|in place|in line|line|ready|deployed|formed|stand|standing|quiet|no enemy|nothing)\b/i,
+  contact:
+    /\b(see|seen|saw|sight|sighted|sighting|spotted|spied|observed|watch|watching|enemy|enemies|troops|column|columns|men|horse|foot|force)\b/i,
+  orderDelivered:
+    /\b(order|orders|instructions|your note|your letter|despatch|dispatch|received|in hand|have them|obey)\b/i,
+  lowAmmo: /\b(ammunition|cartridges?|powder|ball|shot|rounds|supply|supplies|resupply)\b/i,
+  exhausted:
+    /\b(exhausted|exhaustion|tired|tiring|weary|spent|fatigue|fatigued|rest|done in|worn|dropping|can go no further)\b/i,
+  destroyed:
+    /\b(destroyed|broken|broke|routed|rout|scattered|cut down|cut up|wiped|beaten|gone|fled|flight|dispersed)\b/i,
+  engaged:
+    /\b(engaged|engage|fight|fighting|fire|firing|attack|attacked|attacking|action|contact|skirmish|presses|pressing|press|hold|holding|battle|struggle|enemy)\b/i,
+  heavyLosses:
+    /\b(loss|losses|lost|casualties|fallen|dead|killed|wounded|cut up|bled|bleeding|thinned|heavy|dearly)\b/i,
+  broke:
+    /\b(broke|broken|break|fall back|falling back|fell back|retreat|retreating|rout|routed|flee|fled|fleeing|withdraw|withdrawing|gave way|give way|ran)\b/i,
+  unitLost: /\b(lost|gone|destroyed|no word|silent|silence|missing|no more|cut off|perished)\b/i,
+  courierLost: /\b(courier|rider|messenger|orders?|overdue|lost|no word)\b/i,
+};
+
+const FIRST_PERSON =
+  /\b(i|i'm|i’m|i've|i’ve|i'd|i’d|we|we're|we’re|we've|we’ve|my|our|ours|me|us)\b/i;
+
+/** A span of time the note says something lasted: "for 10 minutes", "for an hour", "twenty minutes long". */
+const DURATION =
+  /\bfor (?:(?:about|some|nearly|almost|over|fully|a full|the (?:last|past)) )?(?:\d+|an?|half an?|[a-z]+(?:[- ][a-z]+)?) (?:minutes?|hours?|quarters? of an hour)\b|\b(?:minutes?|hours?) (?:long|on end)\b/i;
+
+/** Strength the reports never give: "a strong line", "a solid position". */
+const STRENGTH =
+  /\b(?:strong|solid|firm|stout|formidable|unbroken|powerful) (?:line|lines|position|front|defence|defense|force)\b/i;
+
+const COMBAT_KINDS: ReadonlySet<ViewReport['kind']> = new Set([
+  'engaged',
+  'heavyLosses',
+  'broke',
+  'destroyed',
+  'unitLost',
+]);
+
+/** The phrases of one sentence's worth of words: ", " and " and " split a list of conditions. */
+function conditionWordsIn(text: string): string[] {
+  const lower = text.toLowerCase();
+  return CONDITION_GROUPS.flat().filter((w) => new RegExp(`\\b${w}\\b`).test(lower));
+}
+
+/**
+ * The problems with one dispatch as a field note on `report` (#419), beyond the fact check of
+ * `checkProse`. The two notes a small model wrote in QA, and every rule here is aimed at them:
+ * - a note from the unit is in its officer's own voice: one that never says "I", "we", "my" or "our"
+ *   but names its own unit or commander is a third-person account, not his note;
+ * - no span of time ("held for 10 minutes"): a report has an age, never a duration;
+ * - no strength the report does not give ("a strong line"), and no fire on a report that is not a fight;
+ * - condition words agree with each other and with the unit's condition (or the report's kind), and
+ *   the note does not recite the whole condition list instead of judging it;
+ * - it says what happened (a word for the report's kind), and it is short.
+ */
+export function checkFieldNote(text: string, report: Input['reports'][number]): string[] {
+  const problems: string[] = [];
+  const kind = report.kind as ViewReport['kind'];
+  if (text.length > NARRATE_MAX_CHARS) {
+    problems.push(`too long (${text.length} characters, at most ${NARRATE_MAX_CHARS})`);
+  }
+  const sentences = text.split(/[.!?]+(?:\s|$)/).filter((x) => x.trim() !== '').length;
+  if (sentences > NARRATE_MAX_SENTENCES) {
+    problems.push(`too long (${sentences} sentences, at most ${NARRATE_MAX_SENTENCES})`);
+  }
+  const lower = text.toLowerCase();
+  if (!STAFF_KINDS.has(kind) && !FIRST_PERSON.test(text)) {
+    const self = [report.from, report.commander ?? ''].filter((n) => n !== '');
+    const named = self.find((n) => lower.includes(n.toLowerCase()));
+    if (named !== undefined) {
+      problems.push(`not in the first person: names "${named}" as someone else would`);
+    }
+  }
+  const duration = text.match(DURATION);
+  if (duration) problems.push(`invented duration "${duration[0]}"`);
+  const strength = text.match(STRENGTH);
+  if (strength) problems.push(`invented strength "${strength[0]}"`);
+  if (!COMBAT_KINDS.has(kind) && /\bunder fire\b/i.test(text)) {
+    problems.push('invented event "under fire": the report is not of a fight');
+  }
+
+  const said = conditionWordsIn(text);
+  for (const group of CONDITION_GROUPS) {
+    const clash = group.filter((w) => said.includes(w));
+    if (clash.length > 1) problems.push(`contradictory condition "${clash.join('" and "')}"`);
+  }
+  if (report.condition !== undefined) {
+    const allowed = [...conditionWordsIn(report.condition), ...(KIND_CONDITION[kind] ?? [])];
+    for (const w of said) {
+      if (!allowed.includes(w)) problems.push(`condition "${w}" is not the unit’s`);
+    }
+    if (conditionWordsIn(report.condition).every((w) => said.includes(w))) {
+      problems.push('recites the unit’s condition instead of judging it');
+    }
+  }
+  if (kind !== 'battle' && !EVENT_WORDS[kind].test(text)) {
+    problems.push(`does not say what happened (${kind})`);
+  }
+  return problems;
+}
+
 /** Everything wrong with a reply: unknown or missing report ids, then the prose of each dispatch. */
 export function checkNarration(
   output: NarrateOutput,
@@ -502,6 +629,9 @@ export function checkNarration(
     }
     if (d.text.trim() === '') problems.push('empty dispatch');
     problems.push(...checkProse(d.text, input), ...hiddenIn(d.text, hidden));
+    for (const r of input.reports) {
+      if (d.reportIds.includes(r.id)) problems.push(...checkFieldNote(d.text, r));
+    }
   }
   for (const id of ids) if (!covered.has(id)) problems.push(`report "${id}" not narrated`);
   return [...new Set(problems)];

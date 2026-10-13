@@ -44,6 +44,19 @@ const parser: OrderParser = {
   }),
 };
 
+/** What the stub's note says happened, by report kind: a field note that passes `checkNarration` (#419). */
+const HAPPENED: Record<string, string> = {
+  orderDelivered: 'we have your orders',
+  contact: 'we see enemy troops',
+  engaged: 'we are engaged',
+  heavyLosses: 'we are taking heavy losses',
+  broke: 'we have broken and fall back',
+  lowAmmo: 'we are short of ammunition',
+  exhausted: 'we are exhausted',
+  destroyed: 'we have destroyed them',
+  situation: 'we are in position',
+};
+
 /** Narrates each report on its own, quoting the officer, once the gate (if any) opens. */
 class StubUmpire implements UmpireClient {
   requests: UmpireRequest[] = [];
@@ -66,11 +79,15 @@ class StubUmpire implements UmpireClient {
         messages: this.staffText === undefined ? [] : [{ kind: 'advice', text: this.staffText }],
       };
     } else {
-      const { reports } = request.input as { reports: { id: string; from: string }[] };
+      const { reports } = request.input as {
+        reports: { id: string; from: string; kind: string }[];
+      };
       output = {
         dispatches: reports.map((r) => ({
           reportIds: [r.id],
-          text: this.narrateText?.(r.from) ?? `Sir, ${r.from} writes.`,
+          text:
+            this.narrateText?.(r.from) ??
+            `Sir, ${r.from} writes: ${HAPPENED[r.kind] ?? 'we hold, and it is lost'}.`,
         })),
       };
     }
@@ -280,7 +297,7 @@ describe('narrate stage in the actor', () => {
     expect(narrateCalls()).toBeGreaterThan(before);
     expect(game.state.time).toBeGreaterThanOrEqual(pausedUntil);
     expect([...(game.narrationFor('blue')?.values() ?? [])]).toContain(
-      'Sir, 1st Battalion writes.',
+      'Sir, 1st Battalion writes: we have your orders.',
     );
     expect(game.narrationBreaker.pausedUntil).toBeUndefined();
   });
