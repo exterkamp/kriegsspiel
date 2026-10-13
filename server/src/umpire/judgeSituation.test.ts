@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   JUDGMENT_CAP,
+  caseLaw,
   advanceTo,
   createState,
   holdTheBridge,
@@ -212,12 +213,12 @@ describe('judge situation: the rigid-to-free dial and personas (3.11)', () => {
     expect(client.calls).toHaveLength(0);
     expect(result.proposal).toMatchObject({ modifier: 0, fallback: true });
     expect(world.rulings[0]).toMatchObject({ modifier: 0 });
-    expect(world.rulings.filter((r) => r.kind === 'judgment' && !r.fallback)).toHaveLength(0);
+    expect(caseLaw(world)).toHaveLength(0);
   });
 
   it('tells the model the dial’s cap, and a persona changes only the prompt text', async () => {
     const seen: UmpireRequest[] = [];
-    const spy = (persona?: 'dry' | 'pedantic' | 'dramatic') => ({
+    const spy = () => ({
       call: async (req: UmpireRequest) => {
         seen.push(req);
         return { output: testReply(req.schema, req.input as never), record: {} as never };
@@ -226,7 +227,7 @@ describe('judge situation: the rigid-to-free dial and personas (3.11)', () => {
     const w = withDial('free');
     const runs = [];
     for (const persona of [undefined, 'pedantic', 'dramatic'] as const) {
-      const r = await judgeSituation(spy(persona) as unknown as MockUmpireClient, w, request, {
+      const r = await judgeSituation(spy() as unknown as MockUmpireClient, w, request, {
         persona,
       });
       runs.push(r.proposal);

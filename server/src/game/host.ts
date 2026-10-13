@@ -16,7 +16,7 @@ import { GameActor, type GameActorOptions, type StaffAtWork, type Timers } from 
 import type { UmpireClient } from '../umpire/index.js';
 import type { TraceSink } from '../debug/trace.js';
 import { replayFrom } from './replay.js';
-import type { StaffExchange, UmpirePersona, UmpireSettings } from '@kriegsspiel/protocol';
+import type { StaffExchange, UmpireSettings } from '@kriegsspiel/protocol';
 import type { GameStore } from './store.js';
 
 export interface GameHostOptions {
