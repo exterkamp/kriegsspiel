@@ -231,23 +231,59 @@ describe('narrate stage in the actor', () => {
   });
 });
 
-const asked = (questionId: string, askedAtGame = 0) => ({
+const asked = (
+  questionId: string,
+  askedAtGame = 0,
+): {
+  questionId: string;
+  askedAtGame: number;
+  answerAtGame: number;
+  askedBy?: string;
+} => ({
   questionId,
   askedAtGame,
   answerAtGame: askedAtGame + 10 * 60_000,
 });
 
+type Game = Awaited<ReturnType<typeof newGame>>['game'];
+
+/**
+ * Put a question and let the actor take it (the exchange is listed and logged as asked). Resolves once it
+ * is taken, with `answer`, which settles when the officer has written at the due time.
+ */
+async function ask(game: Game, role: string, question: string, at: ReturnType<typeof asked>) {
+  const answer = game.answerStaff('blue', role, question, at);
+  // Queued behind the question, so it is registered once this settles.
+  await game.submit({ kind: 'setRate', rate: 1 });
+  return { answer };
+}
+
+/** Run game time on to `gameMs` (rate 1) and bring the world up to it. */
+async function runTo(time: FakeTime, game: Game, gameMs: number) {
+  await time.advance(gameMs - game.gameClock.now());
+  await game.submit({ kind: 'setRate', rate: 1 });
+}
+
+const staffEntries = async (store: MemoryGameStore) =>
+  (await store.inputLog('g1')).filter((e) => e.command.kind === 'staffAnswer');
+
 describe('staff answers in the actor', () => {
   it('keeps the conference per side, files one dispatch when due, and restores both after a restart', async () => {
     const umpire = new StubUmpire();
     const { time, store, game } = await newGame(umpire);
-    await game.answerStaff('blue', 'intelligence', 'Where is the enemy?', asked('q1'));
+    const { answer: pending } = await ask(game, 'intelligence', 'Where is the enemy?', asked('q1'));
+    // Asked, not yet due: listed without words, and the model has not been called.
+    expect(game.staffHistoryFor('blue')[0]?.text).toBeUndefined();
+    expect(umpire.requests.filter((r) => r.stage === 'staff')).toHaveLength(0);
+    await runTo(time, game, 11 * 60_000);
+    expect((await pending)?.text).toBe('The bridge holds, sir; 1st Battalion is forward.');
     const history = game.staffHistoryFor('blue');
     expect(history).toHaveLength(1);
     expect(history[0]).toMatchObject({
       questionId: 'q1',
       role: 'intelligence',
       text: 'The bridge holds, sir; 1st Battalion is forward.',
+      basedOnGame: 10 * 60_000,
     });
     expect(game.staffHistoryFor('red')).toEqual([]);
 
@@ -263,27 +299,14 @@ describe('staff answers in the actor', () => {
       );
     const staffPapers = (v: ReturnType<typeof viewAt>) =>
       v.dispatches.filter((d) => d.category === 'staff' && d.id === 'staff-q1');
-    // Not yet due: the exchange is listed without its words and no paper is filed.
-    const early = viewAt(game, 'blue');
-    expect(early.staffHistory?.[0]?.text).toBeUndefined();
-    expect(staffPapers(early)).toHaveLength(0);
     // Due: the words and one paper, in the officer's name. The other side sees neither.
-    await game.submit({ kind: 'advanceTo', gameMs: 11 * 60_000 }).catch(() => undefined);
-    const due = sideViewOf(
-      { ...game.state, time: 11 * 60_000 },
-      'blue',
-      game.gameClock.snapshot(),
-      undefined,
-      [],
-      undefined,
-      game.staffHistoryFor('blue'),
-    );
+    const due = viewAt(game, 'blue');
     expect(due.staffHistory?.[0]?.text).toBe('The bridge holds, sir; 1st Battalion is forward.');
     expect(staffPapers(due)).toHaveLength(1);
     expect(staffPapers(due)[0]!.from).toBe(history[0]!.officer.name);
     expect(viewAt(game, 'red').staffHistory).toBeUndefined();
 
-    // A restart: the conference comes back from the input log.
+    // A restart: the conference comes back from the input log, the words unchanged.
     await host!.close('g1');
     const h2 = new GameHost({
       store,
@@ -297,43 +320,152 @@ describe('staff answers in the actor', () => {
     const reopened = await h2.open('g1');
     expect(reopened.staffHistoryFor('blue')).toEqual(history);
     expect(reopened.staffHistoryFor('red')).toEqual([]);
+    expect(staffPapers(viewAt(reopened, 'blue'))).toHaveLength(1);
   });
 
-  it('writes the answer on the staff stage and logs it as a journal-only entry with its calls', async () => {
+  it('writes the answer once, at the due time, and never again however often it is viewed (#418)', async () => {
     const umpire = new StubUmpire();
-    const { store, game } = await newGame(umpire);
-    const answer = await game.answerStaff(
-      'blue',
-      'intelligence',
-      'Where is the enemy?',
-      asked('q1'),
+    const { time, store, game } = await newGame(umpire);
+    await ask(game, 'chiefOfStaff', 'Status?', asked('q1', 5 * 60_000));
+    await runTo(time, game, 30 * 60_000);
+    const [first] = game.staffHistoryFor('blue');
+    expect(first?.basedOnGame).toBe(15 * 60_000);
+    // Later views, later times and another question leave it as it was.
+    umpire.staffText = 'Something else entirely, sir, about 1st Battalion.';
+    for (const t of [45, 60, 90]) {
+      await runTo(time, game, t * 60_000);
+      const v = sideViewOf(
+        game.state,
+        'blue',
+        game.gameClock.snapshot(),
+        undefined,
+        [],
+        undefined,
+        game.staffHistoryFor('blue'),
+      );
+      expect(v.staffHistory?.[0]).toMatchObject({
+        text: first!.text,
+        basedOnGame: first!.basedOnGame,
+      });
+      expect(v.dispatches.filter((d) => d.id === 'staff-q1')).toEqual([
+        expect.objectContaining({ text: first!.text, receivedAtGame: first!.answerAtGame }),
+      ]);
+    }
+    expect(umpire.requests.filter((r) => r.stage === 'staff')).toHaveLength(1);
+    // Logged twice: once asked (no words), once answered; the answered entry has the model's calls.
+    const entries = await staffEntries(store);
+    expect(entries).toHaveLength(2);
+    const [askedEntry, answered] = entries.map(
+      (e) => e.command as { exchange?: { text?: string } },
     );
-    expect(answer?.text).toBe('The bridge holds, sir; 1st Battalion is forward.');
-    const entry = (await store.inputLog('g1')).find((e) => e.command.kind === 'staffAnswer');
-    expect(entry).toBeDefined();
-    expect(entry!.error).toBeUndefined();
-    expect(entry!.calls?.[0]).toMatchObject({ stage: 'staff', model: 'stub' });
-    expect(entry!.command).toMatchObject({ side: 'blue', role: 'intelligence' });
+    expect(askedEntry!.exchange?.text).toBeUndefined();
+    expect(answered!.exchange?.text).toBe(first!.text);
+    expect(entries[1]!.error).toBeUndefined();
+    expect(entries[1]!.calls?.[0]).toMatchObject({ stage: 'staff', model: 'stub' });
+    expect(entries[1]!.command).toMatchObject({ side: 'blue', role: 'chiefOfStaff' });
   });
 
-  it('records an error and returns nothing when the stage gives nothing usable', async () => {
+  it('never quotes a report that arrived after the due time (#418)', async () => {
+    // A dry run finds when blue's first report reaches HQ.
+    const dry = await newGame();
+    const first = async (g: Game, t: FakeTime) => {
+      await runUntilReport(t, g);
+      return Math.min(
+        ...viewFor(g.state.world, 'blue', g.state.time).reports.map((r) => r.deliveredAt),
+      );
+    };
+    const arrives = await first(dry.game, dry.time);
+    await host!.close('g1');
+
+    const umpire = new StubUmpire();
+    const { time, game } = await newGame(umpire);
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' });
+    const due = arrives - 60_000;
+    expect(due).toBeGreaterThan(0);
+    const { answer: pending } = await ask(game, 'chiefOfStaff', 'What news?', {
+      questionId: 'q1',
+      askedAtGame: 0,
+      answerAtGame: due,
+    });
+    // One long jump past both the due time and the report: the answer is still written as of `due`.
+    await runTo(time, game, arrives + 30 * 60_000);
+    await pending;
+    expect(viewFor(game.state.world, 'blue', game.state.time).reports.length).toBeGreaterThan(0);
+    const call = umpire.requests.find((r) => r.stage === 'staff')!;
+    const input = call.input as { now: number; view: { reports: { deliveredAt: number }[] } };
+    expect(input.now).toBe(Math.round(due / 60_000));
+    expect(input.view.reports.filter((r) => r.deliveredAt > due)).toEqual([]);
+    expect(game.staffHistoryFor('blue')[0]?.basedOnGame).toBeLessThanOrEqual(due);
+  });
+
+  it('answers in the officer’s own voice and logs why when the stage gives nothing usable', async () => {
     const umpire = new StubUmpire();
     umpire.staffText = undefined;
-    const { store, game } = await newGame(umpire);
-    expect(await game.answerStaff('blue', 'engineer', 'Status?', asked('q2'))).toBeUndefined();
-    const entry = (await store.inputLog('g1')).find((e) => e.command.kind === 'staffAnswer');
-    expect(entry?.error).toBeDefined();
-    // The kept exchange says the stage gave no words, and names the officer who was asked.
-    const [kept] = game.staffHistoryFor('blue');
-    expect(kept).toMatchObject({ questionId: 'q2', role: 'engineer', textless: true });
-    expect(kept!.officer).toEqual(
-      (({ name, traits }) => ({ name, traits }))(
-        staffOfficerFor(game.state.world.seed, 'blue', 'engineer'),
-      ),
-    );
-    expect(kept!.officer.name).not.toBe(
+    const { time, store, game } = await newGame(umpire);
+    const { answer: pending } = await ask(game, 'engineer', 'Status?', asked('q2'));
+    await runTo(time, game, 11 * 60_000);
+    const answer = await pending;
+    const officer = staffOfficerFor(game.state.world.seed, 'blue', 'engineer');
+    expect(answer?.text).toMatch(/survey/);
+    expect(answer?.textless).toBeUndefined();
+    expect(answer?.officer).toEqual({ name: officer.name, traits: officer.traits });
+    expect(officer.name).not.toBe(
       staffOfficerFor(game.state.world.seed, 'blue', 'chiefOfStaff').name,
     );
+    const entries = await staffEntries(store);
+    expect(entries.at(-1)?.error).toBeDefined();
+    expect((entries.at(-1)!.command as { exchange?: { text?: string } }).exchange?.text).toBe(
+      answer?.text,
+    );
+  });
+
+  it('answers with no umpire at all, from the view, and replay needs no model', async () => {
+    const { time, store, game } = await newGame();
+    const { answer: pending } = await ask(game, 'chiefOfStaff', 'Status?', asked('q2'));
+    await runTo(time, game, 11 * 60_000);
+    const answer = await pending;
+    expect(answer?.text).toMatch(/formation/);
+    const entries = await staffEntries(store);
+    expect(entries).toHaveLength(2);
+    expect(entries.every((e) => (e.calls ?? []).length === 0 && e.error === undefined)).toBe(true);
+  });
+
+  it('names one officer per role in the conference tab, the signature and the Staff paper (#418)', async () => {
+    const { time, game } = await newGame();
+    const roles = ['chiefOfStaff', 'intelligence', 'quartermaster', 'engineer'] as const;
+    const asks = await Promise.all(
+      roles.map((role, i) =>
+        ask(game, role, 'Status?', {
+          questionId: `q-${role}`,
+          askedAtGame: i,
+          answerAtGame: 60_000 + i,
+          askedBy: 'commander',
+        }),
+      ),
+    );
+    await runTo(time, game, 5 * 60_000);
+    await Promise.all(asks.map((a) => a.answer));
+    const v = sideViewOf(
+      game.state,
+      'blue',
+      game.gameClock.snapshot(),
+      { role: 'commander' },
+      [],
+      undefined,
+      game.staffHistoryFor('blue'),
+    );
+    const names = new Set<string>();
+    for (const role of roles) {
+      const tab = v.staffOfficers![role];
+      const x = v.staffHistory!.find((h) => h.role === role)!;
+      const paper = v.dispatches.find((d) => d.id === `staff-q-${role}`)!;
+      expect(x.officer).toEqual(tab);
+      expect(paper.from).toBe(tab.name);
+      expect(paper.category).toBe('staff');
+      names.add(tab.name);
+    }
+    // Four roles, four officers.
+    expect(names.size).toBe(4);
   });
 
   it('shows a seat only the exchanges it asked, and never the asker key', async () => {
@@ -341,8 +473,9 @@ describe('staff answers in the actor', () => {
     const { game } = await newGame(umpire);
     const hq = { ...asked('q-hq'), askedBy: 'commander' };
     const sub = { ...asked('q-sub'), askedBy: seatKey({ role: 'subordinate', units: ['blue-1'] }) };
-    await game.answerStaff('blue', 'intelligence', 'Where is the enemy?', hq);
-    await game.answerStaff('blue', 'chiefOfStaff', 'Status?', sub);
+    await ask(game, 'intelligence', 'Where is the enemy?', hq);
+    await ask(game, 'chiefOfStaff', 'Status?', sub);
+    await game.submit({ kind: 'setRate', rate: 1 });
     const at = (seat?: Seat) => {
       const v = sideViewOf(
         game.state,
@@ -365,10 +498,36 @@ describe('staff answers in the actor', () => {
     expect(JSON.stringify(at())).not.toContain('askedBy');
   });
 
-  it('returns nothing and logs nothing without an umpire', async () => {
-    const { store, game } = await newGame();
-    expect(await game.answerStaff('blue', 'engineer', 'Status?', asked('q2'))).toBeUndefined();
-    expect((await store.inputLog('g1')).some((e) => e.command.kind === 'staffAnswer')).toBe(false);
+  it('answers a question that fell due while the game was stopped, once, after the restart', async () => {
+    const umpire = new StubUmpire();
+    const { time, store, game } = await newGame(umpire);
+    await ask(game, 'quartermaster', 'Supplies?', asked('q1'));
+    await host!.close('g1');
+    expect(game.staffHistoryFor('blue')[0]?.text).toBeUndefined();
+    await time.advance(20 * 60_000);
+    host = new GameHost({
+      store,
+      parser,
+      registry: registry(),
+      wallNow: time.now,
+      timers: time,
+      narrator: () => umpire,
+    });
+    const reopened = await host.open('g1');
+    // A reopened game comes back paused; resume it and run past the due time.
+    await reopened.submit({ kind: 'resume' }).catch(() => undefined);
+    await time.advance(11 * 60_000);
+    await reopened.submit({ kind: 'setRate', rate: 1 });
+    for (let i = 0; i < 5 && reopened.staffHistoryFor('blue')[0]?.text === undefined; i++)
+      await reopened.submit({ kind: 'setRate', rate: 1 });
+    const [x] = reopened.staffHistoryFor('blue');
+    expect(x?.text).toBeDefined();
+    expect(x?.basedOnGame).toBeLessThanOrEqual(10 * 60_000);
+    expect(
+      (await staffEntries(store)).filter(
+        (e) => (e.command as { exchange?: { text?: string } }).exchange?.text !== undefined,
+      ),
+    ).toHaveLength(1);
   });
 
   it('shows a narration that took longer than the parse timeout (#342)', async () => {

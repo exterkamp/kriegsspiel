@@ -952,9 +952,9 @@ export class Hub {
   }
 
   /**
-   * Have the staff stage write the answer to a question the desk just accepted. The client holds it
-   * back until the officer's cost has elapsed. With no umpire, or no usable reply, the message carries
-   * no text and the client answers from its own view.
+   * Send the asker the officer's answer once it is written, at its due time (#418). The words are
+   * stored with the game, so a later view shows the same ones. Nothing is sent if the game closes or
+   * ends first; a reopened game answers from its log.
    */
   private async answerStaff(
     game: GameActor,
@@ -966,20 +966,17 @@ export class Hub {
     try {
       answer = await game.answerStaff(conn.side, command.role, command.question, asked);
     } catch (e) {
-      answer = undefined;
       this.onError(game.id, e);
     }
-    const fallback = staffOfficerFor(game.state.world.seed, conn.side, command.role);
+    if (!answer || answer.text === undefined) return;
     this.send(conn, {
       v: PROTOCOL_VERSION,
       kind: 'staffAnswer',
       questionId: command.questionId,
       role: command.role,
-      ...(answer ? { text: answer.text } : {}),
-      basedOnGame: answer?.basedOnGame ?? game.state.time,
-      officer: answer
-        ? { name: answer.officer.name, traits: answer.officer.traits }
-        : { name: fallback.name, traits: fallback.traits },
+      text: answer.text,
+      basedOnGame: answer.basedOnGame ?? answer.answerAtGame,
+      officer: answer.officer,
     });
   }
 

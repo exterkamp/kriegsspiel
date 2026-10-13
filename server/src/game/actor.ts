@@ -49,13 +49,12 @@ import { RatioVoting, type RatioTransition } from '../ratioVote.js';
 import { advanceUntilOver, applyLoggedOrder } from './replay.js';
 import { hiddenTerms } from '../umpire/leakGuard.js';
 import {
-  answerStaffQuestion,
   narrateReports,
   STAFF_OVERLOADED_NOTICE,
   narrateWindowMs,
   reportsDueForNarration,
   staffOfficerFor,
-  type StaffAnswer,
+  writeStaffAnswer,
   type UmpireCallRecord,
   type UmpireRequest,
   type UmpireClient,
@@ -250,6 +249,13 @@ function narrationFallbackReason(result: Awaited<ReturnType<typeof narrateReport
 /** Narrated text by report id for one side; `null` marks a report folded into another's dispatch. */
 type SideNarration = Map<string, string | null>;
 
+/** A question put to a staff officer, waiting for its due time; `settle` hands the written exchange to the asker. */
+interface PendingStaff {
+  side: string;
+  exchange: StaffExchange;
+  settle: (exchange: StaffExchange | undefined) => void;
+}
+
 interface ParseOutcome {
   parsed: ParseResult;
   fallback?: { attempts: number; error: string };
@@ -302,6 +308,8 @@ export class GameActor {
   private readonly overloaded = new Set<string>();
   /** Each side's questions to its staff officers and their answers (D6b), oldest first. */
   private readonly staffHistory = new Map<string, StaffExchange[]>();
+  /** Questions not yet due, by question id: each is answered once, from the view at its due time (#418). */
+  private readonly pendingStaff = new Map<string, PendingStaff>();
   private readonly dissents = new Map<string, Dissent[]>();
 
   /** The pause state machine; absent when the game has no voters configured. */
@@ -350,7 +358,14 @@ export class GameActor {
     this.seq = options.seq ?? 0;
     this.umpire = options.umpire;
     this.persona = options.persona;
-    for (const [side, list] of options.staffHistory ?? []) this.staffHistory.set(side, [...list]);
+    for (const [side, list] of options.staffHistory ?? []) {
+      this.staffHistory.set(side, [...list]);
+      // Asked before a stop and not yet answered: answered when due, as if the game had not stopped.
+      for (const exchange of list) {
+        if (exchange.text !== undefined || exchange.textless) continue;
+        this.pendingStaff.set(exchange.questionId, { side, exchange, settle: () => undefined });
+      }
+    }
     for (const [side, list] of options.dissents ?? []) this.dissents.set(side, [...list]);
     // Reports from before this actor started (a reopened game) keep their template text.
     for (const side of this.engine.world.sides) this.narratedUntil.set(side.id, this.engine.time);
@@ -517,6 +532,8 @@ export class GameActor {
       await this.persist();
       await this.persistProgress();
       if (this.turns && !this.openTurn) await this.openNextTurn();
+      // A question that fell due while the game was down is answered from the view at its due time.
+      this.takeDueStaff();
       this.reschedule();
       // A reopened game whose sides had all sent before the stop resolves that turn now.
       if (this.turnReady())
@@ -553,6 +570,9 @@ export class GameActor {
       for (const handle of [...this.parseTimers]) this.clearParseTimer(handle);
       // Abandon work still with the umpire: its callers are told, and a late result is ignored.
       this.narrating.clear();
+      // Still logged as asked, so a reopened game answers them.
+      for (const p of this.pendingStaff.values()) p.settle(undefined);
+      this.pendingStaff.clear();
       for (const dep of [...this.dependencies.values()]) {
         dep.abandoned = true;
         this.dependencies.delete(dep.id);
@@ -733,8 +753,16 @@ export class GameActor {
     };
     try {
       for (;;) {
+        if (this.engine.world.outcome) break;
         const due = this.nextAgent();
-        if (!due || due.nextAt > target || this.engine.world.outcome) break;
+        // A staff answer is written at its due time, from the world as it stood then (#418).
+        const staffAt = this.nextStaffDue();
+        if (staffAt <= target && (!due || staffAt <= due.nextAt)) {
+          step(Math.max(staffAt, this.engine.time));
+          this.takeDueStaff();
+          continue;
+        }
+        if (!due || due.nextAt > target) break;
         step(due.nextAt);
         due.nextAt += due.agent.intervalMs;
         if (this.engine.world.outcome) continue;
@@ -748,6 +776,7 @@ export class GameActor {
         else due.idle = !this.think(due.agent) && (due.agent.settled?.() ?? true);
       }
       step(target);
+      this.takeDueStaff();
     } finally {
       // A finished game does not run on. Freeze the clock at the outcome's own time, not at
       // this tick's later reading, so the stopped clock agrees with the end panel.
@@ -763,61 +792,119 @@ export class GameActor {
   }
 
   /**
-   * A staff officer answers a player's question on the `staff` stage, from the side's view as of
-   * now. Not on the clock's critical path: game time does not wait for it, and the answer is shown
-   * when the officer's cost has elapsed. Logged as a journal-only entry (calls on the entry).
-   * Undefined when there is no umpire or the stage gave nothing usable.
+   * A player put a question to a staff officer (D6b). The question is logged now (journal only), so a
+   * restart keeps it, and the answer is written once, when game time reaches `answerAtGame`: from the
+   * officer's view at that time, on the `staff` stage or, with no umpire or no usable reply, in the
+   * officer's canned voice (#418). The written exchange is stored, logged and never recomputed.
+   * Resolves with it once written; undefined when the game is over or closes first. Game time never
+   * waits for it.
    */
   async answerStaff(
     side: SideId,
     role: string,
     question: string,
     asked: { questionId: string; askedAtGame: number; answerAtGame: number; askedBy?: string },
-  ): Promise<StaffAnswer | undefined> {
-    const umpire = this.umpire;
-    if (!umpire || this.closed || this.engine.world.outcome) return undefined;
-    let answer: StaffAnswer | undefined;
-    let failure: string | undefined;
-    try {
-      answer = await answerStaffQuestion(
-        umpire,
-        this.engine.world,
-        side,
-        role,
-        question,
-        this.engine.time,
-      );
-    } catch (e) {
-      failure = e instanceof Error ? e.message : 'staff stage failed';
-    }
-    if (this.closed) return undefined;
+  ): Promise<StaffExchange | undefined> {
+    if (this.closed || this.engine.world.outcome) return undefined;
+    const officer = staffOfficerFor(this.engine.world.seed, side, role);
     const exchange: StaffExchange = {
       ...asked,
       role: role as StaffExchange['role'],
       question,
-      ...(answer
-        ? { text: answer.text, basedOnGame: answer.basedOnGame }
-        : { textless: true as const }),
-      officer: (({ name, traits }) => ({ name, traits }))(
-        answer?.officer ?? staffOfficerFor(this.engine.world.seed, side as SideId, role),
-      ),
+      officer: { name: officer.name, traits: officer.traits },
     };
+    let settle!: (x: StaffExchange | undefined) => void;
+    const written = new Promise<StaffExchange | undefined>((r) => (settle = r));
     await this.enqueueCompletion(async () => {
+      if (this.closed) return settle(undefined);
       this.staffHistory.set(side, [...(this.staffHistory.get(side) ?? []), exchange]);
-      const entry: InputLogEntry = {
-        seq: ++this.seq,
-        wallMs: this.wallNow(),
-        gameMs: this.engine.time,
-        endGameMs: this.engine.time,
-        command: { kind: 'staffAnswer', side, role, question, exchange },
-        calls: answer?.records ?? [],
-        ...(answer === undefined ? { error: failure ?? 'staff answer unusable' } : {}),
-      };
-      if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
-      await this.commit(entry);
+      await this.logStaff(side, exchange, []);
+      this.pendingStaff.set(asked.questionId, { side, exchange, settle });
+      this.takeDueStaff();
       this.notify();
     });
-    return answer;
+    return written;
+  }
+
+  /** The earliest due time of a question still waiting, or Infinity. */
+  private nextStaffDue(): number {
+    let at = Number.POSITIVE_INFINITY;
+    for (const p of this.pendingStaff.values()) at = Math.min(at, p.exchange.answerAtGame);
+    return at;
+  }
+
+  /** Write the answer of every question now due (all of them once the game is over), from the world as it is now. */
+  private takeDueStaff(): void {
+    const now = this.engine.time;
+    const over = Boolean(this.engine.world.outcome);
+    for (const p of [...this.pendingStaff.values()]) {
+      if (!over && p.exchange.answerAtGame > now) continue;
+      this.pendingStaff.delete(p.exchange.questionId);
+      const at = Math.min(p.exchange.answerAtGame, now);
+      void this.writeStaff(p, this.engine.world, at).catch((e) => {
+        p.settle(undefined);
+        this.onError?.(e);
+      });
+    }
+  }
+
+  /** Write one answer from `world` as seen at `at`, then store and log it. Not on the clock's critical path. */
+  private async writeStaff(p: PendingStaff, world: GameState, at: number): Promise<void> {
+    const { side, exchange } = p;
+    const answer = await writeStaffAnswer(
+      this.umpire,
+      world,
+      side as SideId,
+      exchange.role,
+      exchange.question,
+      at,
+    );
+    if (this.closed) return p.settle(undefined);
+    const done: StaffExchange = {
+      ...exchange,
+      text: answer.text,
+      basedOnGame: answer.basedOnGame,
+      officer: { name: answer.officer.name, traits: answer.officer.traits },
+    };
+    await this.enqueueCompletion(async () => {
+      if (this.closed) return p.settle(undefined);
+      this.staffHistory.set(
+        side,
+        (this.staffHistory.get(side) ?? []).map((x) =>
+          x.questionId === done.questionId ? done : x,
+        ),
+      );
+      await this.logStaff(side, done, answer.records, answer.failure);
+      this.notify();
+      p.settle(done);
+    });
+  }
+
+  /** Log a staff exchange as a journal-only entry: once when asked, once when answered. A restart keeps the latest. */
+  private async logStaff(
+    side: string,
+    exchange: StaffExchange,
+    calls: UmpireCallRecord[],
+    failure?: string,
+  ): Promise<void> {
+    const entry: InputLogEntry = {
+      seq: ++this.seq,
+      wallMs: this.wallNow(),
+      gameMs: this.engine.time,
+      endGameMs: this.engine.time,
+      command: {
+        kind: 'staffAnswer',
+        side,
+        role: exchange.role,
+        question: exchange.question,
+        exchange,
+      },
+      calls,
+      // The canned answer stands; the log says why the model's did not.
+      ...(failure === undefined ? {} : { error: failure }),
+    };
+    if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+    await this.commit(entry);
   }
 
   /**

@@ -97,6 +97,57 @@ export function staffOfficer(seed: number, side: SideId, role: Role, ordinal = 0
   return { name: NAMES[h % NAMES.length]!, role, traits: picks };
 }
 
+/** The officers a player can consult in the staff conference (docs/staff-conference.md). */
+export const CONFERENCE_ROLES = [
+  'chiefOfStaff',
+  'intelligence',
+  'quartermaster',
+  'engineer',
+] as const;
+export type ConferenceRole = (typeof CONFERENCE_ROLES)[number];
+
+/** The engine seat that answers for a conference officer. The engineer has no seat of their own and sees what the chief of staff sees. */
+const SEAT_FOR: Readonly<Record<ConferenceRole, Role>> = {
+  chiefOfStaff: 'chiefOfStaff',
+  intelligence: 'intelligence',
+  quartermaster: 'quartermaster',
+  engineer: 'chiefOfStaff',
+};
+
+const seatFor = (conferenceRole: string): Role =>
+  SEAT_FOR[conferenceRole as ConferenceRole] ?? 'chiefOfStaff';
+
+/**
+ * The side's conference officers: the one place their name, rank and traits come from (#418). The
+ * conference tab (`SideView.staffOfficers`), an answer's signature and its Staff-pile paper all read
+ * it. Pure, so the same in every replay; no two share a name, so a role is never answered by another's officer.
+ */
+export function conferenceOfficers(
+  seed: number,
+  side: SideId,
+): Readonly<Record<ConferenceRole, StaffOfficer>> {
+  const used = new Set<string>();
+  const out = {} as Record<ConferenceRole, StaffOfficer>;
+  for (const role of CONFERENCE_ROLES) {
+    const officer = staffOfficer(seed, side, SEAT_FOR[role], role === 'engineer' ? 1 : 0);
+    let i = NAMES.indexOf(officer.name);
+    while (used.has(NAMES[i]!)) i = (i + 1) % NAMES.length;
+    used.add(NAMES[i]!);
+    out[role] = { ...officer, name: NAMES[i]! };
+  }
+  return out;
+}
+
+/** The officer who sits in an engine seat: the conference officer for the chief of staff, intelligence and quartermaster posts. */
+function officerForSeat(seed: number, side: SideId, role: Role, ordinal: number): StaffOfficer {
+  if (
+    ordinal === 0 &&
+    (role === 'chiefOfStaff' || role === 'intelligence' || role === 'quartermaster')
+  )
+    return conferenceOfficers(seed, side)[role];
+  return staffOfficer(seed, side, role, ordinal);
+}
+
 export interface StaffSeat extends Seat {
   /** Who holds the seat. Absent: a staff officer plays it. */
   human?: string;
@@ -358,7 +409,7 @@ export async function runStaff(
         .all()
         .filter((s) => s.role === seat.role)
         .indexOf(seat);
-      const officer = staffOfficer(world.seed, side, seat.role, ordinal);
+      const officer = officerForSeat(world.seed, side, seat.role, ordinal);
       const gen = roster.generation(seat);
       const view = viewForRole(world, side, seat, now);
       const input = staffInput(officer, view, now);
@@ -423,18 +474,10 @@ export const STAFF_ANSWER_SYSTEM = `${STAFF_SYSTEM}
 
 The commander has put you a question, in "question". Answer it in one "advice" message in your own voice: two or three complete sentences, ending with a full stop. You are the officer named in "officer", so never tell the commander to report to or consult your own post. Use the newest reports and sightings in "view" and quote their times as clock times, never as "n minutes ago", since the note is read later. Name at least one concrete fact from "view" (a unit name, a place or a count), never repeat yourself, and avoid stock phrases such as "be prepared for any potential activity". If "view" does not settle the question, say what you do not know.`;
 
-/** The engine seat that answers for a conference officer. The engineer has no seat of their own and sees what the chief of staff sees. */
-const SEAT_FOR: Readonly<Record<string, Role>> = {
-  chiefOfStaff: 'chiefOfStaff',
-  intelligence: 'intelligence',
-  quartermaster: 'quartermaster',
-  engineer: 'chiefOfStaff',
-};
-
-/** The officer who stands in for `conferenceRole` when the staff stage gave nothing: the same one `answerStaffQuestion` would name. */
+/** The conference officer for `conferenceRole` (an unknown role is the chief of staff), from `conferenceOfficers`. */
 export function staffOfficerFor(seed: number, side: SideId, conferenceRole: string): StaffOfficer {
-  const role = SEAT_FOR[conferenceRole] ?? 'chiefOfStaff';
-  return staffOfficer(seed, side, role, conferenceRole === 'engineer' ? 1 : 0);
+  const officers = conferenceOfficers(seed, side);
+  return officers[conferenceRole as ConferenceRole] ?? officers.chiefOfStaff;
 }
 
 export interface StaffAnswer {
@@ -458,7 +501,7 @@ export async function answerStaffQuestion(
   now: number,
   maxCalls = 2,
 ): Promise<StaffAnswer | undefined> {
-  const role = SEAT_FOR[conferenceRole] ?? 'chiefOfStaff';
+  const role = seatFor(conferenceRole);
   const seat: Seat = { role };
   const officer = staffOfficerFor(world.seed, side, conferenceRole);
   const view = viewForRole(world, side, seat, now);
@@ -501,4 +544,153 @@ export async function answerStaffQuestion(
     rejected = usable.messages.length === 0 ? ['no answer given'] : problems;
   }
   return undefined;
+}
+
+/** `08:35`: a game time as the clock on the desk shows it, so an answer reads the same whenever it is read. */
+function clockTime(ms: number): string {
+  const min = Math.floor(Math.max(0, ms) / MS_PER_MINUTE);
+  const h = Math.floor((min % 1440) / 60);
+  return `${String(h).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+}
+
+const list = (xs: readonly string[]): string =>
+  xs.length <= 2 ? xs.join(' and ') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`;
+
+const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * What the officer can say about their own post from `view`, and the caveat that fits it. Only units,
+ * sightings and reports in `view` are named; where the view is silent the officer says so.
+ */
+function cannedFacts(conferenceRole: string, view: EngineRoleView): [string[], string] {
+  const own = view.ownUnits;
+  const lines: string[] = [];
+  switch (conferenceRole) {
+    case 'intelligence': {
+      const seen = view.visibleEnemies;
+      lines.push(
+        seen.length
+          ? `${plural(seen.length, 'enemy unit')} ${seen.length === 1 ? 'is' : 'are'} in sight as I write, ${list(seen.map((e) => e.sizeEstimate))}.`
+          : 'No enemy is in sight as I write.',
+      );
+      const newest = [...view.reports].sort((a, b) => b.deliveredAt - a.deliveredAt)[0];
+      if (newest)
+        lines.push(
+          `The latest word, received ${clockTime(newest.deliveredAt)} from ${newest.from}, puts ${newest.sizeEstimate ?? 'them'} ${newest.place}.`,
+        );
+      for (const c of view.lastKnownContacts.slice(0, 2))
+        lines.push(
+          `A contact of ${c.sizeEstimate} seen at ${clockTime(c.seenAt)} may be anywhere within ${Math.round(c.uncertaintyRadius)} m of where it was seen.`,
+        );
+      if (!seen.length && !newest && view.lastKnownContacts.length === 0)
+        lines.push('We know nothing of their whereabouts.');
+      return [lines, 'Old sightings are only as good as the men who made them.'];
+    }
+    case 'quartermaster': {
+      const full = own.filter((u): u is Extract<typeof u, { ammo: number }> => 'ammo' in u);
+      const low = full.filter((u) => u.ammo < 40);
+      lines.push(
+        low.length
+          ? `${list(low.map((u) => u.name))} ${low.length === 1 ? 'is' : 'are'} running short of ammunition.`
+          : full.length
+            ? `Nobody is short yet: ${plural(full.length, 'formation')} reporting.`
+            : 'I have no returns to report.',
+      );
+      for (const u of full.slice(0, 4)) lines.push(`${u.name}: ammunition ${Math.round(u.ammo)}%.`);
+      return [lines, 'Returns lag behind the men on the road.'];
+    }
+    case 'engineer': {
+      lines.push(
+        'I cannot judge roads, bridges or fords from these reports; I have no survey of the ground before me.',
+      );
+      if (own.length)
+        lines.push(
+          `I can say where ${list(own.map((u) => u.name))} stand, but not what lies between them.`,
+        );
+      return [lines, 'Send word if you want the ground surveyed.'];
+    }
+    default: {
+      lines.push(
+        own.length
+          ? `We have ${plural(own.length, 'formation')} reporting: ${list(own.map((u) => u.name))}.`
+          : 'No formations are reporting.',
+      );
+      lines.push(
+        `${view.visibleEnemies.length} enemy in sight, ${plural(view.lastKnownContacts.length, 'older contact')}.`,
+      );
+      lines.push(
+        `${plural(view.reports.length, 'dispatch', 'dispatches')} received by ${clockTime(view.time)}.`,
+      );
+      return [lines, 'Things may have changed since.'];
+    }
+  }
+}
+
+/**
+ * The answer an officer gives when the staff stage is off or gave nothing usable (#418): built from
+ * `view` alone (the officer's seat at the due time), in a manner that fits the officer's traits. A terse
+ * officer gives the bare facts; a long-winded one gives all of them, a caveat and signs off by name;
+ * the rest add a note of caution or confidence.
+ */
+export function cannedAnswer(
+  officer: StaffOfficer,
+  conferenceRole: string,
+  view: EngineRoleView,
+): string {
+  const [lines, caveat] = cannedFacts(conferenceRole, view);
+  const t = officer.traits;
+  if (t.includes('terse')) return lines.slice(0, 2).join(' ');
+  const tone =
+    t.includes('cautious') || t.includes('sceptical') ? caveat : 'I would not wait on it.';
+  if (t.includes('long-winded'))
+    return [
+      `I have been through every paper on my table as of ${clockTime(view.time)}, and this is how matters stand.`,
+      ...lines,
+      tone,
+      `I set it all down so that nothing is missed. Your obedient servant, ${officer.name}.`,
+    ].join(' ');
+  return [...lines.slice(0, 3), tone].join(' ');
+}
+
+/** An answer as it is stored: always words, from the model or, failing that, `cannedAnswer`. */
+export interface WrittenStaffAnswer extends StaffAnswer {
+  /** True when the words are the canned fallback, not the model's. */
+  canned: boolean;
+  /** Why the model's words were not used, for the log. */
+  failure?: string;
+}
+
+/**
+ * Write an answer once, at its due time `at` (#418): from the officer's view at `at` only, so nothing
+ * received later can be quoted. `world` is the world at or after `at`. The model is tried first (when
+ * there is one); otherwise, or when it gives nothing usable, the officer answers from `cannedAnswer`.
+ */
+export async function writeStaffAnswer(
+  client: UmpireClient | undefined,
+  world: GameState,
+  side: SideId,
+  conferenceRole: string,
+  question: string,
+  at: number,
+): Promise<WrittenStaffAnswer> {
+  let failure: string | undefined;
+  if (client) {
+    try {
+      const answer = await answerStaffQuestion(client, world, side, conferenceRole, question, at);
+      if (answer) return { ...answer, canned: false };
+      failure = 'staff answer unusable';
+    } catch (e) {
+      failure = e instanceof Error ? e.message : 'staff stage failed';
+    }
+  }
+  const officer = staffOfficerFor(world.seed, side, conferenceRole);
+  const view = viewForRole(world, side, { role: seatFor(conferenceRole) }, at);
+  return {
+    text: cannedAnswer(officer, conferenceRole, view),
+    officer,
+    basedOnGame: at,
+    records: [],
+    canned: true,
+    ...(failure === undefined ? {} : { failure }),
+  };
 }
