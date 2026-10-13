@@ -5,6 +5,7 @@ Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a serve
 ## Docs
 - `docs/decisions.md`: decision log and open questions
 - `docs/architecture.md`: clock, scheduler, LLM barrier, pause voting, components
+- `docs/system-overview.md`: diagrams of the system, how LLMs are integrated, and what each class is responsible for
 - `docs/gameplay.md`: how the game plays, pacing, roles, collaboration
 - `docs/hq-interface.md`: the desk and map table, rendering decision
 - `docs/staff-conference.md`: staff conference screen and its endpoint contract
