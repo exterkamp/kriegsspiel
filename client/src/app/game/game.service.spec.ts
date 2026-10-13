@@ -53,6 +53,38 @@ describe('GameService', () => {
     expect(FakeSocket.all[0]!.closed).toBe(true);
   });
 
+  it('knows a turn-mode game from its settings, also once it is over (#429)', async () => {
+    const info = (umpire: unknown) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ sides: [{ side: 'blue' }, { side: 'red' }], umpire }),
+    });
+    const svc = TestBed.inject(GameService);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => info({ dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 30 })),
+    );
+    svc.connect(loc('?game=t1'));
+    await vi.waitFor(() => expect(svc.sides()).toEqual(['blue', 'red']));
+    expect(svc.state()).toMatchObject({ turnMode: true, turnMinutes: 30 });
+  });
+
+  it('leaves a real-time game in real-time dress when its settings arrive', async () => {
+    const svc = TestBed.inject(GameService);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ sides: [{ side: 'blue' }], umpire: { dial: 'standard', persona: 'dry' } }),
+      })),
+    );
+    svc.connect(loc('?game=r1'));
+    await vi.waitFor(() => expect(svc.sides()).toEqual(['blue']));
+    expect(svc.state().turnMode).toBeUndefined();
+    expect(svc.state().turnMinutes).toBeUndefined();
+  });
+
   it('closes the previous socket when connecting again', () => {
     const svc = TestBed.inject(GameService);
     svc.connect(loc('?game=a'));

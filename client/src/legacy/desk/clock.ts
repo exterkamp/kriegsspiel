@@ -15,6 +15,8 @@ export interface ClockView {
   label: string;
   /** Turn mode (D39): the open turn, `Turn 3: 08:20 to 08:40`; `time` then holds it and `rate` is empty. */
   turn?: string;
+  /** Turn mode: the turn length, `20-min turns`, shown in place of the rate once no turn is open. */
+  turnLength?: string;
 }
 
 const LABEL = { running: 'Running', paused: 'Paused', stopped: 'Stopped', none: 'No clock' };
@@ -59,6 +61,7 @@ function turnClockView(state: ClientState): ClockView {
     staffAtWork: false,
     label: TURN_LABEL[phase],
     ...(t && !state.gameOver ? { turn: turnLine(t) } : {}),
+    ...(state.turnMinutes ? { turnLength: `${state.turnMinutes}-min turns` } : {}),
   };
 }
 
@@ -67,7 +70,12 @@ export function clockSummary(v: ClockView): string {
   if (v.turn) return [v.turn, v.label.toLowerCase()].join(', ');
   if (v.status === 'none') return 'No clock yet';
   // A finished turn-mode game has no rate to give.
-  const parts = [v.time, v.label.toLowerCase(), ...(v.rate ? [`rate ${v.rate}`] : [])];
+  const parts = [
+    v.time,
+    v.label.toLowerCase(),
+    ...(v.rate ? [`rate ${v.rate}`] : []),
+    ...(v.turnLength ? [v.turnLength] : []),
+  ];
   if (v.vote) parts.push(`${v.vote} proposed`);
   if (v.staffAtWork) parts.push('staff at work');
   return parts.join(', ');

@@ -12,7 +12,9 @@ import type {
   ServerMessage,
   Side,
   SideView,
+  UmpireSettings,
 } from '@kriegsspiel/protocol';
+import { turnSettingsOf } from '@kriegsspiel/protocol';
 
 /** An order this client sent that the server has not rejected. The server reports no delivery estimate yet. */
 export interface PendingOrder {
@@ -113,6 +115,8 @@ export interface ClientState {
   turn?: TurnInfo;
   /** Set once the server has sent a `turnState`: the game is played in turns (D39). Kept after the game ends. */
   turnMode?: true;
+  /** Turn mode: game minutes per turn, from the game's settings (`GET /games/:id`); kept after the game ends. */
+  turnMinutes?: number;
   pending: PendingOrder[];
   /** Orders the staff could not carry out, by order id; the order itself leaves `pending`. */
   outcomes: Record<string, OrderOutcome>;
@@ -474,6 +478,15 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       };
     }
   }
+}
+
+/**
+ * What the game's settings (`GET /games/:id`) say about its mode: a turn-mode game is known as one from the
+ * start and after it ends, when the server sends no `turnState` (D39, #429). A real-time game is unchanged.
+ */
+export function withTurnSettings(s: ClientState, umpire: Partial<UmpireSettings> | undefined): ClientState {
+  const t = turnSettingsOf(umpire);
+  return t ? { ...s, turnMode: true, turnMinutes: t.turnMinutes } : s;
 }
 
 export function withLink(s: ClientState, link: LinkStatus): ClientState {
