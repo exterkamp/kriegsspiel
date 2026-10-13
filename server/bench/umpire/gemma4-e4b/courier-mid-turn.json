@@ -1,0 +1,32 @@
+{
+  "caseId": "courier-mid-turn",
+  "model": "gemma4:e4b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 2229658,
+  "usage": {
+    "inputTokens": 3205,
+    "outputTokens": 4457
+  },
+  "raw": "{\n  \"turn\": 2,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 2030,\n      \"y\": 1600,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 560,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"b1-7\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Aubry, being literal, moved his battalion steadily towards the south end of the bridge as ordered. Upon reaching the vicinity, he engaged the advancing enemy force, sustaining moderate losses but holding his ground firmly.\",\n      \"departure\": \"Moved significantly towards the bridge and engaged the enemy, contrary to the projection.\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 1850,\n      \"y\": 1700,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 550,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"b2-7\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Delacroix, being cautious, executed the movement slowly, positioning his battalion to the west and slightly behind the 1st Battalion, forming a line to support the main defensive position near the bridge.\",\n      \"departure\": \"Moved significantly to the west flank, contrary to the projection.\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 2050,\n      \"y\": 1850,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 200,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"Maj. Verneuil maintained his position, holding the high ground and observing the enemy movements below, ready to exploit any opportunity.\",\n      \"departure\": \"No departure.\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 2050,\n      \"y\": 1350,\n      \"facingDeg\": 0,\n      \"formation\": \"column\",\n      \"strength\": 600,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"r1-7\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Brandt, being aggressive, pressed his battalion rapidly towards the bridge. Upon arrival, he immediately engaged the defending blue unit, seizing the critical position despite taking losses in the initial clash.\",\n      \"departure\": \"Moved significantly towards the bridge and engaged the enemy, contrary to the projection.\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2250,\n      \"y\": 700,\n      \"facingDeg\": 180,\n      \"formation\": \"column\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"Col. Hartmann maintained his position, adhering strictly to the defensive plan and awaiting further orders from HQ.\",\n      \"departure\": \"No departure.\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 1550,\n      \"y\": 400,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 220,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"Maj. von Reiter held his scouting position, maintaining vigilance over the northern approaches, though he did not press forward.\",\n      \"departure\": \"No departure.\"\n    }\n  ],\n  \"observations\": [\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-1\",\n      \"by\": \"blue-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-2\",\n      \"by\": \"blue-2\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-3\",\n      \"by\": \"blue-3\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-1\",\n      \"by\": \"red-1\",\n      \"when\": \"end\"\n    }\n  ],\n  \"summary\": \"The Red forces launched a determined push towards the objective. R1, driven by aggression, advanced rapidly and successfully reached the bridge area, engaging B1. The resulting clash saw moderate losses for both sides, but R1 managed to seize the critical position. Meanwhile, Blue forces reacted to the threat. B1 moved to hold the bridge approach, while B2, following orders, moved cautiously to the west flank to reinforce the line. B3 maintained its position, observing the developing battle. R2 and R3 remained static, holding their respective positions away from the immediate action.\",\n  \"rolls\": []\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [
+        "blue-1: order b1-7 is on the road but is \"carried-out\""
+      ],
+      "limits": [],
+      "ammo": [],
+      "observations": [
+        "blue-1 saw blue-1: not blue's unit watching an enemy",
+        "blue-2 saw blue-2: not blue's unit watching an enemy",
+        "blue-3 saw blue-3: not blue's unit watching an enemy",
+        "red-1 saw red-1: not red's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}
