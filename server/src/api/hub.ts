@@ -694,6 +694,7 @@ export class Hub {
         kind: state.phase === 'resume_proposed' ? 'resume' : 'pause',
         ...(bySide === undefined ? {} : { bySide }),
         byYou: conn.userId !== undefined && open.by === conn.userId,
+        ...(open.hold ? { hold: true } : {}),
         ...(open.reason === undefined ? {} : { reason: open.reason }),
         yes: votes.filter((v) => v).length,
         no: votes.filter((v) => !v).length,
@@ -703,7 +704,8 @@ export class Hub {
       };
     }
     // The countdown changes every push, so only the rest decides whether anything is new.
-    const key = JSON.stringify([state.phase, proposal && { ...proposal, msLeft: 0 }]);
+    const holdsLeft = conn.userId === undefined ? undefined : game.holdsLeftFor(conn.userId);
+    const key = JSON.stringify([state.phase, proposal && { ...proposal, msLeft: 0 }, holdsLeft]);
     if (key === conn.lastPause) return;
     conn.lastPause = key;
     this.send(conn, {
@@ -711,6 +713,7 @@ export class Hub {
       kind: 'pauseState',
       phase: state.phase,
       ...(proposal ? { proposal } : {}),
+      ...(holdsLeft === undefined ? {} : { holdsLeft }),
     });
   }
 
@@ -835,7 +838,7 @@ export class Hub {
   private async handlePauseCommand(
     game: GameActor,
     conn: Connection,
-    command: Extract<Command, { kind: 'proposePause' | 'proposeResume' | 'vote' }>,
+    command: Extract<Command, { kind: 'proposePause' | 'proposeHold' | 'proposeResume' | 'vote' }>,
   ): Promise<void> {
     if (!game.pauseState) {
       this.send(conn, error('pause_unavailable', 'this game has no pause voting'));
@@ -857,6 +860,9 @@ export class Hub {
         });
       } else if (command.kind === 'proposeResume') {
         result = await game.submit({ kind: 'proposeResume', by });
+      } else if (command.kind === 'proposeHold') {
+        const reason = command.reason?.trim();
+        result = await game.submit({ kind: 'proposeHold', by, ...(reason ? { reason } : {}) });
       } else {
         const reason = command.reason?.trim();
         result = await game.submit({ kind: 'proposePause', by, ...(reason ? { reason } : {}) });
@@ -870,6 +876,9 @@ export class Hub {
     const text = result.kind === 'rejection' ? result.reason : '';
     if (/not a voter/.test(text)) {
       this.send(conn, error('not_a_voter', 'you do not vote in this game'));
+    } else if (/hold limit/.test(text)) {
+      // Fixed wording: it says no hold is left, not whose holds were used.
+      this.send(conn, error('hold_refused', 'no emergency hold is left to you in this game'));
     } else if (/already voted/.test(text)) {
       this.send(conn, error('pause_refused', 'you have already voted on that'));
     } else {
@@ -967,6 +976,7 @@ export class Hub {
     }
     if (
       command.kind === 'proposePause' ||
+      command.kind === 'proposeHold' ||
       command.kind === 'proposeResume' ||
       command.kind === 'vote'
     ) {
