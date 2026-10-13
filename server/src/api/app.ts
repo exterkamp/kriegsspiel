@@ -65,6 +65,7 @@ import {
   type Timers,
 } from '../game/index.js';
 import { adminApi } from '../admin/adminApi.js';
+import type { OrderPlayground } from '../admin/orderDebug.js';
 import { loadReplayInput, replayTimeline } from '../admin/replayView.js';
 import { LogMailer, type Mailer } from '../auth/mailer.js';
 import { originAllowed } from '../auth/origin.js';
@@ -214,7 +215,14 @@ export interface AppOptions {
    * Debug/admin view (Epic #119). Off unless `enabled`: then no `/admin` route exists and the
    * trace is a no-op. When on, requests must be loopback or carry `token`.
    */
-  admin?: { enabled: boolean; token?: string; open?: boolean; trace?: TraceStore };
+  admin?: {
+    enabled: boolean;
+    token?: string;
+    open?: boolean;
+    trace?: TraceStore;
+    /** Dry runs for the admin Orders panel (#395); never tied to a game's client or budget. */
+    playground?: OrderPlayground;
+  };
   /**
    * Accounts. Defaults to an in-memory store and a mailer that logs the login link, which suits
    * tests and local development; `main.ts` supplies the SQLite store and a real mailer.
@@ -472,6 +480,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
       store,
       token: options.admin?.token,
       open: options.admin?.open === true,
+      playground: options.admin?.playground,
     });
 
   if (options.staticDir) {

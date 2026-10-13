@@ -81,7 +81,8 @@ export class InterpretingParser implements OrderParser {
   constructor(
     private readonly inner: OrderParser,
     private readonly client: UmpireClient,
-    private readonly opts: { onFallback?: (reason: string) => void } = {},
+    /** `reason` starts with `interpret: `; `orderText` is the order as written. */
+    private readonly opts: { onFallback?: (reason: string, orderText: string) => void } = {},
   ) {}
 
   async parse(orderText: string, ctx: ParseContext): Promise<ParseResult> {
@@ -111,7 +112,7 @@ export class InterpretingParser implements OrderParser {
 
   private asWritten(parsed: Intents, reason: string): Intents {
     try {
-      this.opts.onFallback?.(`interpret: ${reason}`);
+      this.opts.onFallback?.(`interpret: ${reason}`, parsed.text);
     } catch {
       // a failing logger must not stop the order
     }

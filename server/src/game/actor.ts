@@ -1717,6 +1717,11 @@ export class GameActor {
     this.turnTimerSet = true;
   }
 
+  /** What the parser would read for an order `side` signs now. Read-only; the admin playground prefills from it (#395). */
+  orderContext(side: string): ParseContext {
+    return this.parseContext(side);
+  }
+
   /** What the parser may read: the issuing side, named places and the side's own units. */
   private parseContext(side: string): ParseContext {
     const { map, units } = this.engine.world;

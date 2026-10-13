@@ -178,6 +178,47 @@ describe('failed calls', () => {
     });
   });
 
+  it('reports answeredBy fallback when the fallback parser gives intents, after it has run', async () => {
+    const seen: string[] = [];
+    const client = new MockUmpireClient([{ stage: 'parse', failure: { kind: 'timeout' } }]);
+    const parser = new LlmOrderParser(client, {
+      fallbackParser: {
+        async parse(text) {
+          seen.push('fallback');
+          return { kind: 'intents', text, unitId: 'blue-1', intents: [] };
+        },
+      },
+      onFallback: (f) => seen.push(`note:${f.answeredBy}`),
+    });
+    expect(await parser.parse('march', CORPUS_CONTEXT)).toMatchObject({ kind: 'intents' });
+    expect(seen).toEqual(['fallback', 'note:fallback']);
+  });
+
+  it.each([
+    [
+      'asks a question',
+      async (text: string) => ({ kind: 'clarification' as const, text, question: 'which?' }),
+    ],
+    [
+      'throws',
+      async () => {
+        throw new Error('stub down');
+      },
+    ],
+  ])('reports answeredBy none when the fallback parser %s', async (_, parse) => {
+    const fallbacks: ParserFallback[] = [];
+    const client = new MockUmpireClient([{ stage: 'parse', failure: { kind: 'timeout' } }]);
+    const parser = new LlmOrderParser(client, {
+      fallbackParser: { parse },
+      onFallback: (f) => fallbacks.push(f),
+    });
+    expect(await parser.parse('march', CORPUS_CONTEXT)).toMatchObject({
+      kind: 'clarification',
+      question: FALLBACK_QUESTION,
+    });
+    expect(fallbacks).toMatchObject([{ orderText: 'march', answeredBy: 'none' }]);
+  });
+
   it('counts the usage of successful and failed calls', async () => {
     const usage = { inputTokens: 100, outputTokens: 10, cacheReadTokens: 0, cacheWriteTokens: 0 };
     const ok = {

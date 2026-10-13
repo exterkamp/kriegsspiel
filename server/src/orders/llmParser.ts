@@ -86,7 +86,12 @@ export function parseOrdersInput(orderText: string, ctx: ParseContext) {
 export const FALLBACK_QUESTION =
   'Your order could not be understood in time. The unit holds where it stands and awaits clarification: please restate the order.';
 
-export type ParserFallback = { orderText: string; reason: string };
+export type ParserFallback = {
+  orderText: string;
+  reason: string;
+  /** Who answered instead: the fallback parser, or nobody (the player is asked to restate). */
+  answeredBy: 'fallback' | 'none';
+};
 
 export interface LlmOrderParserOptions {
   /** Called whenever the parser falls back to "hold and await clarification". */
@@ -153,20 +158,29 @@ export class LlmOrderParser implements OrderParser {
     ctx: ParseContext,
     reason: string,
   ): Promise<ParseResult> {
-    try {
-      this.opts.onFallback?.({ orderText, reason });
-    } catch {
-      // a failing logger must not turn the safe fallback into an error
-    }
+    let result: ParseResult = {
+      kind: 'clarification',
+      text: orderText,
+      question: FALLBACK_QUESTION,
+    };
     if (this.opts.fallbackParser) {
       try {
         const stub = await this.opts.fallbackParser.parse(orderText, ctx);
-        if (stub.kind === 'intents') return stub;
+        if (stub.kind === 'intents') result = stub;
       } catch {
         // fall through to asking the player to restate
       }
     }
-    return { kind: 'clarification', text: orderText, question: FALLBACK_QUESTION };
+    try {
+      this.opts.onFallback?.({
+        orderText,
+        reason,
+        answeredBy: result.kind === 'intents' ? 'fallback' : 'none',
+      });
+    } catch {
+      // a failing logger must not turn the safe fallback into an error
+    }
+    return result;
   }
 
   /** The validated result, or a string saying why the output cannot be trusted. */
