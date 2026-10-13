@@ -25,6 +25,7 @@ import {
   viewForRole,
 } from '@kriegsspiel/engine';
 import type { GameState, SideId } from '@kriegsspiel/engine';
+import { InterpretingParser } from '../orders/interpret.js';
 import { LlmOrderParser } from '../orders/llmParser.js';
 import type { ParseContext } from '../orders/orderParser.js';
 import { llmAgents } from '../opponent/index.js';
@@ -318,5 +319,38 @@ describe.skipIf(!process.env.LEAK_REAL_MODEL)('real model', () => {
       );
     },
     600_000,
+  );
+});
+
+describe('the interpret task (#45)', () => {
+  it.each(SIDES)(
+    '%s: no prompt carries the other side, and a leaking question is dropped',
+    async (side) => {
+      const e = enemyOf(side);
+      const ctx = parseContext(side);
+      const own = G.world.units.find((u) => u.side === side)!;
+      const withTraits: ParseContext = {
+        ...ctx,
+        units: ctx.units.map((u) => (u.id === own.id ? { ...u, personality: ['literal'] } : u)),
+      };
+      const model = new ScriptedModel({
+        parse: (req) =>
+          req.promptVersion.startsWith('interpret')
+            ? { action: 'clarify', intentStated: false, question: `Is ${e.name} at the bridge?` }
+            : { result: 'intents', unitId: own.id, intents: [{ kind: 'hold', place: 'here' }] },
+      });
+      const probe = new LeakProbe();
+      const client = probe.client(side, model);
+      const r = await new InterpretingParser(new LlmOrderParser(client), client).parse(
+        `${own.id}: hold`,
+        withTraits,
+      );
+      expect(r.kind).toBe('intents');
+      const prompts = probe.exchanges.filter((x) =>
+        x.request.promptVersion.startsWith('interpret'),
+      );
+      expect(prompts).toHaveLength(1);
+      expect(describeLeaks(probe.findLeaks(SECRETS, { outputs: false, retries: false }))).toBe('');
+    },
   );
 });
