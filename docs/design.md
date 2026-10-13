@@ -40,7 +40,7 @@ The LLM may propose any arrangement of units it judges realistic, subject only t
 - **Commander's intent matters.** Orders that explain *why* are executed more sensibly when circumstances change (Auftragstaktik vs literal obedience). The umpire grades this.
 - **Written reports as the only sensor.** Player maps are reconstructed from reports, with the player free to annotate. No omniscient minimap.
 - **Courier and signal layer.** Couriers can be intercepted by enemy cavalry, and captured dispatches can be read by the other side (the umpire hands them over in-fiction). Implemented as courier model v2 (see "Courier model v2" in [decisions.md](decisions.md)).
-- **Rigid / Free dial.** Lobby setting from "rigid" (engine-heavy, tables visible) to "free" (LLM judgment dominant). Same server, different caps.
+- **Rigid / Free dial.** Lobby setting from "rigid" (engine-heavy, tables visible) to "free" (wider bounded judgment). Same server, different caps (D14, 3.11).
 - **Umpire personas.** Tone and temperament: dry Prussian staff officer, a pedantic one, a dramatic war-correspondent mode.
 - **Umpire consultation.** Players may submit questions ("Can I see the ford from the ridge?"). The umpire answers in character, and the question costs game time.
 - **Hot-seat and solo vs AI commander.** A second LLM plays the opposing commander using only fog-filtered information.

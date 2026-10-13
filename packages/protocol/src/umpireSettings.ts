@@ -23,7 +23,7 @@ export const DIAL_INFO: Readonly<Record<UmpireDial, { label: string; description
   rigid: {
     label: 'Rigid',
     description:
-      'The tables decide. Dice and the rules settle every fight and march, and the umpire never bends a result by his own judgment.',
+      'The tables decide. Dice and the rules settle every fight and march, and the umpire never bends a result by judgment.',
   },
   standard: {
     label: 'Standard',
@@ -33,7 +33,7 @@ export const DIAL_INFO: Readonly<Record<UmpireDial, { label: string; description
   free: {
     label: 'Free',
     description:
-      'The umpire is given wider room: where the rules are silent he may swing a result by up to two fifths either way. Every ruling is still bounded, recorded and followed in like cases.',
+      'The umpire is given wider room: where the rules are silent the umpire may swing a result by up to two fifths either way. Every ruling is still bounded, recorded and followed in like cases.',
   },
 };
 

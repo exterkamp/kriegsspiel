@@ -12,6 +12,15 @@
 6. **Resolution.** Dice and tables (rigid) or the umpire's judgment (free).
 7. **Critique.** The umpire ends the game and runs a discussion of what happened and why. This is where much of the learning happened.
 
+### Rigid to free, and the umpire's manner
+
+Two settings are chosen on the new-game screen and fixed for the game (D14, story 3.11):
+
+- **How strictly the umpire follows the rules** (the dial). *Rigid*: the tables decide; the umpire never adjusts a result. *Standard*: where the rules are silent the umpire may nudge a result by up to a quarter either way. *Free*: the umpire has wider room, up to two fifths. In every setting each ruling is bounded by the engine, recorded and followed in like cases (the game's case law). The dial changes only that bound.
+- **The umpire's manner** (the persona): a dry staff officer (the default), a pedantic umpire, or a dramatic correspondent. It changes only the voice and strictness of the umpire's prose, never what happens: the same orders and dice give the same outcome under any persona.
+
+Both are recorded with the game, so the umpire's window and a replay agree with how it was played.
+
 ## Our model
 
 ### A continuous game clock

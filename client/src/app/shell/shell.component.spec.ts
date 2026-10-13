@@ -371,13 +371,19 @@ describe('moving between screens', () => {
     const createGame = vi.fn(async () => 'new1');
     await open('/?lobby=1', { createGame });
     radio('input[name=rate][value="4"]').click();
+    radio('input[name=dial][value=free]').click();
+    radio('input[name=persona][value=dramatic]').click();
     await settle();
+    expect(el.textContent).toContain('wider room');
+    expect(el.textContent).toContain('war correspondent');
     click('Start');
     await settle();
     expect(createGame).toHaveBeenCalledWith({
       scenario: 'hold-the-bridge',
       side: 'blue',
       rate: 4,
+      dial: 'free',
+      persona: 'dramatic',
       sessionType: 'co_op_vs_ai',
     });
     expect(window.location.search).toBe('?game=new1');
