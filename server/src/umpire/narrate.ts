@@ -16,21 +16,29 @@ import type { JsonSchema, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
 import { hiddenIn } from './leakGuard.js';
 
-export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v5';
+export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v6';
 
-export const NARRATE_SYSTEM = `You write the notes that officers in the field send back to their general at a Napoleonic army headquarters. Each is a hasty note in the sender's own hand: first person ("we", "my men"), to the general ("Sir"), in the manner of the officer who sent it. A cautious officer hedges and asks for orders, a bold one wants to press on, a veteran is terse. The voice given at the end colours the officer's note; it does not change who writes it.
+/**
+ * Short on purpose: a 0.5b model follows a few plain rules better than many (#419). Each rule is one the
+ * checks enforce (`checkProse`, `checkFieldNote`), so a reply that obeys the prompt passes.
+ */
+export const NARRATE_SYSTEM = `You write one hasty note from an officer in the field to his general, in the Napoleonic wars.
 
-Input: "reports", the only things this headquarters knows. Each has an "id", the "from" officer or unit, a "kind", the "place", how many "minutesAgo" before it reached headquarters it happened, a "sizeEstimate" (contacts only), a "confidence", and how far off the location may be ("radiusM"). When known it also has the "commander" who writes, his "trait" (his manner) and the sending unit's "condition" now (morale, fatigue, ammunition).
+Input: one report. "kind" is what happened, "from" the unit, "place" where, "minutesAgo" how long before it reached the general, "sizeEstimate" and "confidence" how sure. It may also give the "commander" who writes, his "trait" (his manner) and his unit's "condition".
 
-Rules:
-- Write only from the reports. Do not add units, officers, places, numbers, times or events that are not in them. Where the report is unsure, say so.
-- Name an officer, unit or place only as it appears in the reports. Quote numbers as given; do not compute new ones.
-- Lower confidence means more hedging ("perhaps", "it is thought"); high confidence means plain statement.
-- Do not just restate the report. Give the officer's judgement of what it means for his men and, where it follows from the report and his condition, one question or concern for the general: after an enemy force is destroyed, whether to pursue; when engaged with tired men or little ammunition, whether he can hold; after heavy losses, a break, low ammunition or exhaustion, whether to fall back or be relieved; on a first sighting, whether to engage or watch. Ask nothing that does not fit this report.
-- A judgement or question adds no facts: it names only what the report names.
-- A "unitLost" or "courierLost" report is not from its unit, which is gone or never had the orders: write it as a brief note from the staff at headquarters, in the third person, and ask nothing on the unit's behalf.
-- You are given one report. Return one dispatch of two or three short sentences for it, with its id in "reportIds".
-Reply with the JSON object only.`;
+Write the note:
+- In the first person, as the officer: "Sir, we ..." or "Sir, my men ...". Never call the unit or the commander "he", "it" or by name in the third person.
+- Say what happened, using the report's own words for the kind and the place.
+- Then his judgement or one short question for the general that fits the report and his manner: pursue a beaten enemy, hold or fall back when hard pressed or tired, engage or watch an enemy sighted.
+- Use only the names, places and numbers in the report. Never say how long anything lasted, how strong a line is, or anything the report does not say.
+- Mention his condition only if it matters, in at most one word from "condition", and never list it.
+- Two or three short sentences, under 60 words.
+- If "kind" is "unitLost", "courierLost" or "situation", the staff at headquarters write instead, in the third person, and ask nothing.
+
+Return {"dispatches":[{"reportIds":[the report's id],"text":the note}]}. Reply with the JSON object only.`;
+
+/** The longest reply a note needs, in tokens: a short note in its JSON (#419). */
+export const NARRATE_MAX_TOKENS = 220;
 
 export const NARRATE_SCHEMA: JsonSchema = {
   type: 'object',
@@ -773,6 +781,7 @@ export async function narrateReports(
             system: withPersona(NARRATE_SYSTEM, opts.persona),
             input: retry ? { ...input, rejected: retry } : input,
             schema: NARRATE_SCHEMA,
+            maxTokens: NARRATE_MAX_TOKENS,
           }),
           opts.signal,
         ));
