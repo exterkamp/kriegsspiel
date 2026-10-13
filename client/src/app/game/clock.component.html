@@ -2,14 +2,19 @@
   id="clock"
   class="ks-overlay"
   [attr.data-status]="v().status"
+  [attr.data-turn]="v().turn ? '' : null"
   aria-label="Clock"
   [title]="summary()"
 >
   <b class="time">{{ v().time }}</b>
-  <span class="rate" data-testid="clock-rate">{{ v().rate }}</span>
+  @if (!v().turn) {
+    <span class="rate" data-testid="clock-rate">{{ v().rate }}</span>
+  }
   <span class="status" data-testid="clock-status" role="status">
     <span aria-hidden="true">{{
-      v().status === 'paused'
+      v().turn
+        ? ''
+        : v().status === 'paused'
         ? '⏸'
         : v().status === 'stopped'
           ? '⏹'

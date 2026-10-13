@@ -10,6 +10,7 @@ import { formatGameTime, gameNowMs } from '@legacy/net/state';
 import { deliveryStatus } from '@legacy/desk/orders';
 import {
   JOURNAL_KINDS,
+  TURN_KIND,
   chronological,
   exportText,
   filterEntries,
@@ -29,7 +30,10 @@ export class JournalComponent {
   private readonly game = inject(GameService);
   protected readonly desk = inject(DeskStore);
 
-  protected readonly kindList = JOURNAL_KINDS;
+  /** Turn headings are a filter of their own only in a turn-mode game (D39). */
+  protected readonly kindList = computed(() =>
+    this.game.state().turnMode ? [...JOURNAL_KINDS, TURN_KIND] : JOURNAL_KINDS,
+  );
   protected readonly query = signal('');
   protected readonly kinds = signal<ReadonlySet<JournalKind>>(new Set());
   protected readonly note = signal('');

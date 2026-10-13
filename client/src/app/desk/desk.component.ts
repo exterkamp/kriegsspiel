@@ -22,6 +22,7 @@ import { JournalComponent } from './journal/journal.component';
 import { OrdersDeskComponent } from './orders-desk.component';
 import { PausePanelComponent } from './pause-panel/pause-panel.component';
 import { RosterComponent } from './roster/roster.component';
+import { TurnPanelComponent } from './turn-panel/turn-panel.component';
 import { UmpireWindowComponent } from './umpire-window.component';
 
 /** What to focus when a view opens, so keyboard users land inside it. */
@@ -43,6 +44,7 @@ const FOCUS: Partial<Record<ViewId, string>> = {
   imports: [
     ClockComponent,
     PausePanelComponent,
+    TurnPanelComponent,
     InTrayComponent,
     OrdersDeskComponent,
     RosterComponent,
@@ -66,6 +68,8 @@ export class DeskComponent {
   protected readonly state = this.game.state;
   protected readonly gameId = this.game.gameId;
   private readonly ended = computed(() => this.game.state().gameOver !== undefined);
+  /** A turn-mode game (D39) has no pause vote; the turn panel takes its place. */
+  protected readonly turnMode = computed(() => this.game.state().turnMode === true);
   protected readonly unread = computed(() =>
     unreadCount(this.game.state().dispatches, this.desk.trayMarks()),
   );

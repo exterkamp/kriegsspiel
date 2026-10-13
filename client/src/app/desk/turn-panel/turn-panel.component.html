@@ -1,0 +1,38 @@
+@let p = phase();
+@if (p !== 'over') {
+  <section class="turn-panel ks-overlay" aria-label="Turn" data-testid="turn-panel" [attr.data-phase]="p">
+    @if (decidedText(); as d) {
+      <p class="decided" role="status" data-testid="turn-decided">
+        <b>{{ d }}</b>
+        <span class="buttons">
+          <button type="button" class="ks-primary" (click)="readReports()">Read the reports</button>
+          <button type="button" (click)="dismiss()" aria-label="Dismiss">Dismiss</button>
+        </span>
+      </p>
+    }
+    @if (p === 'resolving') {
+      <p class="resolving" role="status" data-testid="turn-resolving">
+        <span class="quill" aria-hidden="true"></span>{{ resolvingText }}
+      </p>
+    } @else {
+      <p class="sides">
+        @for (s of sides(); track s.side) {
+          <span class="side" [class.sent]="s.sent" [attr.data-side]="s.side"
+            ><span aria-hidden="true">{{ s.sent ? '✓ ' : '' }}</span>{{ s.name
+            }}{{ s.you ? ' (you)' : '' }}: {{ s.sent ? 'sent' : 'writing' }}</span
+          >
+        }
+      </p>
+      @if (p === 'writing') {
+        <p class="buttons">
+          <button type="button" class="ks-primary" id="turn-open-orders" (click)="openOrders()">
+            {{ heldCount() === 0 ? 'Write orders' : 'Send orders (' + heldCount() + ' held)' }}
+          </button>
+          @if (deadline(); as d) {
+            <span class="deadline">{{ d }}</span>
+          }
+        </p>
+      }
+    }
+  </section>
+}

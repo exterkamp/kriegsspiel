@@ -1,6 +1,7 @@
 import { InjectionToken, inject } from '@angular/core';
 import type { ConferenceRole } from '@legacy/desk/conference';
 import type { Courier } from '@legacy/desk/orders';
+import type { TurnOrder } from '@kriegsspiel/protocol';
 import { GameService } from './game.service';
 
 /** What the pause panel can ask of the server; each returns false when the link is down. */
@@ -69,6 +70,27 @@ export const PAUSE_ACTIONS = new InjectionToken<PauseActions>('PAUSE_ACTIONS', {
       proposePause: (r) => game.proposePause(r),
       proposeResume: () => game.proposeResume(),
       vote: (id, yes) => game.vote(id, yes),
+    };
+  },
+});
+
+/** What the orders desk asks of the server in a turn-mode game (D39); each returns false when the link is down. */
+export interface TurnActions {
+  hold(order: TurnOrder): boolean;
+  withdraw(orderId: string): boolean;
+  send(): boolean;
+  newId(): string;
+}
+
+export const TURN_ACTIONS = new InjectionToken<TurnActions>('TURN_ACTIONS', {
+  providedIn: 'root',
+  factory: () => {
+    const game = inject(GameService);
+    return {
+      hold: (o) => game.holdTurnOrder(o),
+      withdraw: (id) => game.withdrawTurnOrder(id),
+      send: () => game.sendTurn(),
+      newId: () => game.newTurnOrderId(),
     };
   },
 });

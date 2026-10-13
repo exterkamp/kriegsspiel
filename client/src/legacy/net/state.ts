@@ -111,6 +111,8 @@ export interface ClientState {
   pause?: PauseVote;
   /** Turn mode only: the open turn, its sides that have sent and this side's held orders. Absent in a real-time game. */
   turn?: TurnInfo;
+  /** Set once the server has sent a `turnState`: the game is played in turns (D39). Kept after the game ends. */
+  turnMode?: true;
   pending: PendingOrder[];
   /** Orders the staff could not carry out, by order id; the order itself leaves `pending`. */
   outcomes: Record<string, OrderOutcome>;
@@ -227,6 +229,35 @@ export function pauseResultText(m: Extract<ServerMessage, { kind: 'pauseResult' 
   }
 }
 
+/**
+ * Once the side has sent its turn, its held orders are with the couriers: they join `pending`, set out
+ * at the turn's start, as `sentOrders` does for them after a reload. Before that they are drafts.
+ */
+function withSentTurn(
+  s: ClientState,
+  m: Extract<ServerMessage, { kind: 'turnState' }>,
+): PendingOrder[] {
+  const side = s.view?.side;
+  if (side === undefined || !m.sent.includes(side)) return s.pending;
+  const have = new Set(s.pending.map((p) => p.orderId));
+  const fresh = m.held.filter((o) => !have.has(o.orderId));
+  if (fresh.length === 0) return s.pending;
+  const names = new Map(s.view?.ownUnits.map((u) => [u.id, u.name]));
+  return [
+    ...s.pending,
+    ...fresh.map((o) => {
+      const toName = names.get(o.to);
+      return {
+        orderId: o.orderId,
+        text: o.text,
+        sentAtGame: m.startsAt,
+        ...(toName ? { toName } : {}),
+        ...(o.courier ? { courier: o.courier } : {}),
+      };
+    }),
+  ];
+}
+
 /** The order id a rejection or clarification refers to; the server prefixes its message with `<orderId>: `. */
 export function orderIdOf(message: string): string | undefined {
   const i = message.indexOf(': ');
@@ -265,6 +296,8 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       const { turn, startsAt, endsAt, sent, deadline, resolving, held } = m;
       return {
         ...s,
+        turnMode: true,
+        pending: withSentTurn(s, m),
         turn: {
           turn,
           startsAt,

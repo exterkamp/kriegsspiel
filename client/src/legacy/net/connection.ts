@@ -7,6 +7,7 @@ import {
   type StaffRole,
   type ServerMessage,
   type TextOp,
+  type TurnOrder,
 } from '@kriegsspiel/protocol';
 
 /** The slice of a browser WebSocket the connection uses, so tests can fake it. */
@@ -102,6 +103,20 @@ export class GameConnection {
       text,
       ...(courier ? { courier } : {}),
     });
+  }
+
+  /** Turn mode (D39): hold an order for the open turn, or replace the held order with the same id. */
+  holdTurnOrder(order: TurnOrder): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'holdTurnOrder', order });
+  }
+
+  withdrawTurnOrder(orderId: string): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'withdrawTurnOrder', orderId });
+  }
+
+  /** Send the side's held orders for the open turn. Final for the side. */
+  sendTurn(): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'sendTurn' });
   }
 
   askStaff(questionId: string, role: StaffRole, question: string): boolean {

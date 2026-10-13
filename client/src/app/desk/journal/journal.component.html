@@ -21,7 +21,7 @@
   />
 </div>
 <div class="tools">
-  @for (k of kindList; track k.id) {
+  @for (k of kindList(); track k.id) {
     <button type="button" [attr.aria-pressed]="kinds().has(k.id)" (click)="toggle(k.id)">
       {{ k.label }}
     </button>

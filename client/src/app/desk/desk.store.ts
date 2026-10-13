@@ -33,6 +33,7 @@ import {
   type JournalEntry,
 } from '@legacy/desk/journal';
 import { loadMarks, saveMarks, type TrayMarks } from '@legacy/desk/tray';
+import { turnEntry } from '@legacy/desk/turn';
 import type { ViewId } from '@legacy/desk/views';
 import { fixtureClient, type ConferenceClient, type Exchange } from '@legacy/desk/conference';
 import { GameService } from '../game/game.service';
@@ -69,6 +70,8 @@ export class DeskStore {
 
   /** The order form on the orders desk. */
   readonly orderDraft = signal<OrderDraft>(emptyDraft());
+  /** Turn mode: the held order being rewritten in the order box, so holding it replaces it. */
+  readonly editingTurnOrder = signal<string | undefined>(undefined);
 
   /** The staff conference: where answers come from (the fixture until the server endpoint exists) and what has been asked. */
   readonly conferenceClient = signal<ConferenceClient>(fixtureClient);
@@ -143,7 +146,9 @@ export class DeskStore {
             return d ? [arrivedEntry(p, d)] : [];
           }),
         ];
-        if (s.clock) {
+        // A turn-mode game's clock never runs (D39): each turn's heading stands in for pauses and resumes.
+        if (s.turn) found.push(turnEntry(s.turn));
+        if (s.clock && !s.turnMode) {
           const c = clockEntry(prevStatus, s.clock.status, s.clock.gameMs);
           if (c) found.push(c);
           prevStatus = s.clock.status;
