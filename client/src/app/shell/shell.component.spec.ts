@@ -59,6 +59,7 @@ const fakeScene = () => ({
   apply: vi.fn(),
   resize: vi.fn(),
   setDesk: vi.fn(),
+  setGlide: vi.fn(),
   setOverlays: vi.fn(),
   setMarks: vi.fn(),
   panTo: vi.fn(),
@@ -400,6 +401,41 @@ describe('moving between screens', () => {
     });
     expect(window.location.search).toBe('?game=new1');
     expect(el.querySelector('canvas')).not.toBeNull();
+  });
+
+  it('Start makes a turn-mode game with its turn length and deadline (D39)', async () => {
+    const createGame = vi.fn(async () => 'turns1');
+    await open('/?lobby=1', { createGame });
+    expect(radio('input[name=mode][value=realtime]').checked).toBe(true);
+    expect(el.querySelector('#turn-minutes')).toBeNull();
+    radio('input[name=mode][value=turns]').click();
+    await settle();
+    // The rate is not asked for; the turns are, and the dial says who decides each turn.
+    expect(el.querySelector('input[name=rate]')).toBeNull();
+    expect(el.textContent).toContain('in 12 turns of 20 minutes');
+    expect(el.textContent).toContain('Who decides each turn');
+    radio('input[name=dial][value=rigid]').click();
+    const minutes = el.querySelector<HTMLInputElement>('#turn-minutes')!;
+    minutes.value = '30';
+    minutes.dispatchEvent(new Event('input'));
+    const due = el.querySelector<HTMLInputElement>('#turn-deadline')!;
+    due.value = '24';
+    due.dispatchEvent(new Event('input'));
+    await settle();
+    expect(el.textContent).toContain('tables alone decide each turn');
+    click('Start');
+    await settle();
+    expect(createGame).toHaveBeenCalledWith({
+      scenario: 'hold-the-bridge',
+      side: 'blue',
+      rate: 12,
+      dial: 'rigid',
+      persona: 'dry',
+      sessionType: 'co_op_vs_ai',
+      mode: 'turns',
+      turnMinutes: 30,
+      turnDeadlineHours: 24,
+    });
   });
 
   it('Start shows a server error and keeps the form; a double click makes one game', async () => {

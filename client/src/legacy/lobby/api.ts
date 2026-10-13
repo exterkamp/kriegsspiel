@@ -1,4 +1,5 @@
 /** The lobby REST calls (server/src/api/app.ts): make a game, list yours, join, ready up, start. */
+import type { UmpireSettings } from '@kriegsspiel/protocol';
 
 export type SessionType = 'team_vs_team' | 'co_op_vs_ai' | 'hot_seat';
 
@@ -13,6 +14,8 @@ export interface GameSummary {
   status: 'lobby' | 'started';
   sessionType: SessionType;
   rate: number;
+  /** The umpire settings chosen at creation; `mode: 'turns'` marks a turn-mode game (D39). */
+  umpire?: UmpireSettings;
   /** The side you hold, or null. */
   side: string | null;
   creator: boolean;
@@ -46,6 +49,12 @@ export interface NewGame {
   rate: number;
   sessionType: SessionType;
   pause?: PauseSettings;
+  /** The umpire's dial and persona (3.11), and turn mode with its settings (D39); the server defaults each. */
+  dial?: UmpireSettings['dial'];
+  persona?: UmpireSettings['persona'];
+  mode?: 'turns';
+  turnMinutes?: number;
+  turnDeadlineHours?: number;
 }
 
 type Fetch = typeof fetch;

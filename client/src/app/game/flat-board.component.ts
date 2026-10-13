@@ -1,9 +1,14 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   computed,
+  effect,
   inject,
+  linkedSignal,
+  signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import type { Mark } from '@kriegsspiel/protocol';
@@ -20,6 +25,15 @@ import {
 import { pieceAtPoint } from '@legacy/table/picking';
 import { markAgeFactor } from '@legacy/table/marks';
 import { buildSceneState } from '@legacy/table/sceneState';
+import type { SceneState } from '@legacy/table/types';
+import {
+  GLIDE_MS,
+  NO_GLIDES,
+  drawnAt,
+  gliding,
+  nextGlides,
+  type GlideState,
+} from '@legacy/table/glide';
 import type { PickResult } from '@legacy/table/picking';
 import { boardLines } from '@legacy/table/boardText';
 import { buildWindowScene } from '@legacy/window/model';
@@ -345,8 +359,45 @@ export class FlatBoardComponent {
     return view ? buildSceneState(view, fixtureMap) : undefined;
   });
   protected readonly summary = computed(() => boardLines(this.scene(), fixtureMap));
-  protected readonly own = computed(() => this.scene()?.own ?? []);
-  protected readonly ghosts = computed(() => this.scene()?.ghosts ?? []);
+  /**
+   * In a turn-mode game (D39) the pieces glide to where a turn left them, as on the 3D table. `frameNow`
+   * is the wall time of the frame being drawn; it only ticks while a glide is running.
+   */
+  private readonly frameNow = signal(0);
+  private readonly glide = linkedSignal<
+    { scene: SceneState | undefined; frame: boolean },
+    GlideState
+  >({
+    source: () => ({ scene: this.scene(), frame: this.desk.windowFrame() !== undefined }),
+    computation: ({ scene: s, frame }, prev) => {
+      const at = new Map([
+        ...(s?.own ?? []).map((o) => [`own:${o.id}`, o.position] as const),
+        ...(s?.ghosts ?? []).map((g) => [`ghost:${g.id}`, g.position] as const),
+      ]);
+      const still =
+        typeof window !== 'undefined' &&
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      // Only a new scene starts a glide; the mode is read, not tracked. The umpire's window's frames, and the way
+      // back from them to the live picture, are set down at once.
+      const turns = untracked(() => this.game.state().turnMode) && !frame && !prev?.source.frame;
+      const ms = turns && !still ? GLIDE_MS : 0;
+      return nextGlides(prev?.value ?? NO_GLIDES, at, performance.now(), ms);
+    },
+  });
+  protected readonly own = computed(() => {
+    const g = this.glide();
+    const now = this.frameNow();
+    return (this.scene()?.own ?? []).map((p) =>
+      g.glides.size === 0 ? p : { ...p, position: drawnAt(g, `own:${p.id}`, p.position, now) },
+    );
+  });
+  protected readonly ghosts = computed(() => {
+    const g = this.glide();
+    const now = this.frameNow();
+    return (this.scene()?.ghosts ?? []).map((p) =>
+      g.glides.size === 0 ? p : { ...p, position: drawnAt(g, `ghost:${p.id}`, p.position, now) },
+    );
+  });
   protected readonly fights = computed(() => this.scene()?.engagements ?? []);
   protected readonly routes = computed(() => {
     const o = this.marks.overlays();
@@ -396,6 +447,21 @@ export class FlatBoardComponent {
       return piece ? { type: 'piece', ...piece, coord } : { type: 'point', coord };
     },
   };
+
+  constructor() {
+    let raf = 0;
+    effect(() => {
+      const g = this.glide();
+      cancelAnimationFrame(raf);
+      const frame = (): void => {
+        const now = performance.now();
+        this.frameNow.set(now);
+        if (gliding(g, now)) raf = requestAnimationFrame(frame);
+      };
+      if (g.glides.size > 0) frame();
+    });
+    inject(DestroyRef).onDestroy(() => cancelAnimationFrame(raf));
+  }
 
   protected pts = pointsAttr;
   protected corners(p: Parameters<typeof pieceCorners>[0]) {

@@ -1,5 +1,6 @@
 /** Pure lobby rules, shared by the screens and their tests. */
-import type { GameInfo, SessionType } from './api.js';
+import { turnSettingsOf } from '@kriegsspiel/protocol';
+import type { GameInfo, GameSummary, SessionType } from './api.js';
 
 export const RATE_PRESETS = [1, 4, 12] as const;
 
@@ -20,6 +21,17 @@ export function parseRate(text: string): number | undefined {
 }
 
 export const rateLabel = (rate: number): string => `${rate}:1`;
+
+/**
+ * How the game is paced, for its title: the clock rate, or for a turn-mode game (D39) its turns,
+ * `turns of 20 min` or `turns of 20 min, orders due in 24 h`.
+ */
+export function paceLabel(g: Pick<GameSummary, 'rate' | 'umpire'>): string {
+  const t = turnSettingsOf(g.umpire);
+  if (!t) return rateLabel(g.rate);
+  const due = t.turnDeadlineHours === undefined ? '' : `, orders due in ${t.turnDeadlineHours} h`;
+  return `turns of ${t.turnMinutes} min${due}`;
+}
 
 /** What the start button should do now: ready, or the reason it is not. */
 export function startBlocker(info: GameInfo): string | undefined {

@@ -1,5 +1,5 @@
 /** The game-over screen's pure logic: what the result means for the player's side, and the Play again request. */
-import type { Side } from '@kriegsspiel/protocol';
+import { turnSettingsOf, type Side } from '@kriegsspiel/protocol';
 import { formatGameTime, type GameOver } from '@legacy/net/state';
 import type { GameInfo } from '@legacy/lobby/api';
 
@@ -74,16 +74,23 @@ export function summaryLines(over: GameOver, losses?: { own: number; enemy: numb
   return lines;
 }
 
-/** The body of the POST /games that repeats a finished game: same scenario, side, rate, session type and pause settings. */
+/**
+ * The body of the POST /games that repeats a finished game: same scenario, side, rate, session type, pause
+ * settings, umpire dial and persona, and for a turn-mode game (D39) the same turns.
+ */
 export function replayRequest(
-  info: Pick<GameInfo, 'scenario' | 'rate' | 'sessionType'> & Partial<Pick<GameInfo, 'pause'>>,
+  info: Pick<GameInfo, 'scenario' | 'rate' | 'sessionType'> &
+    Partial<Pick<GameInfo, 'pause' | 'umpire'>>,
   side: string | undefined,
 ) {
+  const turns = turnSettingsOf(info.umpire);
   return {
     scenario: info.scenario,
     rate: info.rate,
     sessionType: info.sessionType,
     ...(info.pause ? { pause: info.pause } : {}),
+    ...(info.umpire ? { dial: info.umpire.dial, persona: info.umpire.persona } : {}),
+    ...(turns ? { mode: 'turns' as const, ...turns } : {}),
     ...(side ? { side } : {}),
   };
 }

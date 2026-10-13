@@ -28,10 +28,13 @@ import {
   type Courier,
   type OrderDraft,
 } from '@legacy/desk/orders';
+import { turnPhase } from '@legacy/desk/turn';
+import type { TurnOrder } from '@kriegsspiel/protocol';
 import { GameService } from '../game/game.service';
-import { ORDER_SENDER } from '../game/ports';
+import { ORDER_SENDER, TURN_ACTIONS } from '../game/ports';
 import { DeskStore } from './desk.store';
 import { DraftsPanelComponent } from './drafts-panel.component';
+import { TurnOrdersComponent } from './turn-orders.component';
 
 /** The longest order text the server accepts, once the addressee and annex are added. */
 const MAX_ORDER_CHARS = 2000;
@@ -41,7 +44,7 @@ type Field = 'to' | 'text' | 'send';
 /** The orders desk (port of `desk/OrdersDesk.svelte`): addressee, wording, annex, courier and signing. */
 @Component({
   selector: 'ks-orders-desk',
-  imports: [DraftsPanelComponent],
+  imports: [DraftsPanelComponent, TurnOrdersComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './orders-desk.component.html',
   styleUrl: './orders-desk.component.css',
@@ -50,6 +53,7 @@ export class OrdersDeskComponent {
   private readonly game = inject(GameService);
   private readonly desk = inject(DeskStore);
   private readonly sender = inject(ORDER_SENDER);
+  private readonly turnActions = inject(TURN_ACTIONS);
   private stampTimer: ReturnType<typeof setTimeout> | undefined;
 
   protected readonly examples = ORDER_EXAMPLES.map((e) => `"${e}"`).join(' or ');
@@ -63,6 +67,13 @@ export class OrdersDeskComponent {
   protected readonly addressee = computed(() => this.units().find((u) => u.id === this.draft().to));
   protected readonly arrows = computed(() => arrowMarks(this.game.state().marks));
   protected readonly over = computed(() => this.game.state().gameOver !== undefined);
+  /** Turn mode (D39): orders are held for the turn and the side sends them together. */
+  protected readonly turnMode = computed(() => this.game.state().turnMode === true);
+  /** In turn mode the order box only takes orders while the side is still writing its turn. */
+  protected readonly closed = computed(
+    () => this.over() || (this.turnMode() && turnPhase(this.game.state()) !== 'writing'),
+  );
+  protected readonly editing = this.desk.editingTurnOrder;
   /**
    * Word from the staff about the last order it could not carry out, such as a clarification or a refusal.
    * Only the latest is shown, so the hint it carries appears once; a clarification offers its options.
@@ -102,6 +113,20 @@ export class OrdersDeskComponent {
   private readonly injector = inject(Injector);
   /** The last order signed: its words and annex, to put back if the staff refuse it. */
   private lastSent: { words: string; annex: string[] } | undefined;
+  /**
+   * Turn mode: the last order held, to put back if the server refuses it. Held orders are not pending, so a refusal
+   * is known only by the order id that prefixes the notice; `after` is the notice that was last before it went.
+   */
+  private lastHeld:
+    | {
+        orderId: string;
+        text: string;
+        draft: OrderDraft;
+        replaced: boolean;
+        turn?: number;
+        after: unknown;
+      }
+    | undefined;
   private readonly seenOutcomes = new Set<string>();
 
   constructor() {
@@ -115,6 +140,23 @@ export class OrdersDeskComponent {
           this.seenOutcomes.add(id);
           this.refuse(o.text);
         }
+      });
+    });
+    // A hold the server refused (too many orders, too many commands, the turn closing) did not go: give it back.
+    effect(() => {
+      const { notices, turn } = this.game.state();
+      untracked(() => {
+        const held = this.lastHeld;
+        if (!held) return;
+        // Once the turn lists it as written, it went.
+        if (turn?.held.some((o) => o.orderId === held.orderId && o.text === held.text)) {
+          this.lastHeld = undefined;
+          return;
+        }
+        const from = notices.indexOf(held.after as never) + 1;
+        if (!notices.slice(from).some((n) => orderIdOf(n.message) === held.orderId)) return;
+        this.lastHeld = undefined;
+        this.unhold(held);
       });
     });
     // Bring the staff's word into view; the panel scrolls and it would sit below the fold.
@@ -137,6 +179,20 @@ export class OrdersDeskComponent {
     this.lastSent = undefined;
     // Never over words the player has already begun again.
     if (this.draft().text.trim() === '') this.patch({ text: sent.words, annex: sent.annex });
+  }
+
+  private unhold(held: NonNullable<OrdersDeskComponent['lastHeld']>): void {
+    this.confirmation.set('');
+    // Never over words the player has already begun again.
+    if (this.draft().text.trim() !== '') return;
+    this.desk.orderDraft.set(held.draft);
+    // A change to a held order that is still held this turn is still a change to it.
+    const s = this.game.state();
+    const still =
+      s.turn?.turn === held.turn &&
+      turnPhase(s) === 'writing' &&
+      !!s.turn?.held.some((o) => o.orderId === held.orderId);
+    if (held.replaced && still) this.desk.editingTurnOrder.set(held.orderId);
   }
 
   /** Resend the refused order with the chosen option filled in. */
@@ -175,7 +231,75 @@ export class OrdersDeskComponent {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) this.sign();
   }
 
+  /** Put a held order back in the order box; holding it again replaces it (same id). */
+  protected editTurn(o: TurnOrder): void {
+    this.error.set(undefined);
+    this.desk.editingTurnOrder.set(o.orderId);
+    this.patch({ to: o.to, text: o.text, courier: o.courier ?? 'safe', annex: [] });
+    afterNextRender(
+      () => this.host.nativeElement.querySelector<HTMLElement>('#desk-order-text')?.focus(),
+      { injector: this.injector },
+    );
+  }
+
+  protected cancelEdit(): void {
+    this.desk.editingTurnOrder.set(undefined);
+    this.patch({ text: '', annex: [] });
+  }
+
+  /** Turn mode: hold the order for the turn. The server's `turnState` lists it once held. */
+  private hold(): void {
+    const d = this.draft();
+    const state = this.game.state();
+    const addressee = this.addressee();
+    if (this.closed()) return;
+    if (!addressee) {
+      this.error.set({ field: 'to', message: 'Address the order to one of your commanders.' });
+      return;
+    }
+    if (d.text.trim() === '') {
+      this.error.set({ field: 'text', message: 'Write the order first.' });
+      return;
+    }
+    // The addressee travels as `to`, so the words are not prefixed with the unit's name.
+    const text = withAnnex(d.text.trim(), state.marks, d.annex);
+    if (text.length > MAX_ORDER_CHARS) {
+      this.error.set({
+        field: 'text',
+        message: `With the annex the order runs to ${text.length} characters; the most a courier can carry is ${MAX_ORDER_CHARS}. Shorten it or drop an arrow.`,
+      });
+      return;
+    }
+    const orderId = this.editing() ?? this.turnActions.newId();
+    const ok = this.turnActions.hold({ orderId, to: addressee.id, text, courier: d.courier });
+    if (!ok) {
+      this.error.set({ field: 'send', message: 'Not connected. Try again when the link is back.' });
+      return;
+    }
+    this.dismissed.set(state.notices.at(-1));
+    const replaced = this.editing() !== undefined;
+    this.lastHeld = {
+      orderId,
+      text,
+      draft: d,
+      replaced,
+      ...(state.turn ? { turn: state.turn.turn } : {}),
+      after: state.notices.at(-1),
+    };
+    this.desk.editingTurnOrder.set(undefined);
+    this.patch({ text: '', annex: [] });
+    this.confirmation.set(
+      `${replaced ? 'Changed order held' : 'Held'} for this turn: to ${addressee.name}. Send the turn's orders when they are all written.`,
+    );
+  }
+
   protected sign(): void {
+    if (this.turnMode()) {
+      this.error.set(undefined);
+      this.confirmation.set('');
+      this.hold();
+      return;
+    }
     const d = this.draft();
     const state = this.game.state();
     const view = state.view;

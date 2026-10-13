@@ -1,5 +1,8 @@
 <div class="form" [class.stamping]="stamping()">
   <h2>Orders</h2>
+  @if (turnMode() && !over()) {
+    <ks-turn-orders (edit)="editTurn($event)" />
+  }
   @if (!over()) {
     <ks-drafts-panel (useDraft)="patch({ text: $event })" />
   }
@@ -12,7 +15,7 @@
         id="order-to"
         [value]="draft().to"
         (change)="patch({ to: $any($event.target).value })"
-        [disabled]="over()"
+        [disabled]="closed()"
         [attr.aria-invalid]="error()?.field === 'to'"
         [attr.aria-describedby]="error()?.field === 'to' ? 'order-err-to' : null"
       >
@@ -34,13 +37,20 @@
         [value]="draft().text"
         (input)="patch({ text: $any($event.target).value })"
         (keydown)="onKey($event)"
-        [disabled]="over()"
+        [disabled]="closed()"
         [attr.aria-invalid]="error()?.field === 'text'"
         [attr.aria-describedby]="error()?.field === 'text' ? 'order-err-text' : null"
       ></textarea>
     </div>
     <div class="err ks-error" id="order-err-text" role="alert">{{ errorFor('text') }}</div>
-    <p class="hint">The staff understand orders such as {{ examples }}.</p>
+    @if (turnMode()) {
+      <p class="hint">
+        Write as you would to a subordinate who knows the ground. The order is held for this turn
+        until your side sends; you can change or withdraw it until then.
+      </p>
+    } @else {
+      <p class="hint">The staff understand orders such as {{ examples }}.</p>
+    }
 
     <fieldset class="annex">
       <legend>Marked-map annex</legend>
@@ -53,7 +63,7 @@
               type="checkbox"
               [checked]="draft().annex.includes(a.id)"
               (change)="toggleArrow(a.id, $any($event.target).checked)"
-              [disabled]="over()"
+              [disabled]="closed()"
             />
             {{ annexLine(a) }}
           </label>
@@ -71,7 +81,7 @@
             [value]="c.id"
             [checked]="draft().courier === c.id"
             (change)="patch({ courier: c.id })"
-            [disabled]="over()"
+            [disabled]="closed()"
           />
           <span>
             <b>{{ c.label }}</b>
@@ -90,8 +100,17 @@
       <span class="signature" aria-hidden="true">{{
         stamping() ? 'Signed, the Commander' : ''
       }}</span>
-      <button type="button" id="order-sign" (click)="sign()" [disabled]="over()">
-        Sign and send
+      @if (turnMode() && editing()) {
+        <button type="button" id="order-cancel-edit" (click)="cancelEdit()">Cancel edit</button>
+      }
+      <button type="button" id="order-sign" (click)="sign()" [disabled]="closed()">
+        {{
+          !turnMode()
+            ? 'Sign and send'
+            : editing()
+              ? 'Hold the changed order'
+              : 'Hold for this turn'
+        }}
       </button>
     </div>
     <div class="err ks-error" id="order-err-send" role="alert">{{ errorFor('send') }}</div>
@@ -104,7 +123,7 @@
         @if (n.options.length > 0) {
           <div class="options" role="group" aria-label="Choose one">
             @for (o of n.options; track o) {
-              <button type="button" (click)="choose(o)" [disabled]="over()">{{ o }}</button>
+              <button type="button" (click)="choose(o)" [disabled]="closed()">{{ o }}</button>
             }
           </div>
         }

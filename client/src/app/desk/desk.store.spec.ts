@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ClockState } from '@kriegsspiel/protocol';
+import type { ClientState } from '@legacy/net/state';
 import { GameService } from '../game/game.service';
 import { DeskStore } from './desk.store';
 
@@ -159,5 +161,38 @@ describe('DeskStore', () => {
     d2.addNote('next', 2);
     TestBed.tick();
     expect(set).toHaveBeenCalled();
+  });
+
+  it('writes each turn into the diary in a turn-mode game, with no pause or resume lines (D39)', () => {
+    const d = TestBed.inject(DeskStore);
+    const game = TestBed.inject(GameService) as unknown as {
+      _state: { update(f: (s: ClientState) => ClientState): void };
+    };
+    const MIN = 60_000;
+    const at = (turn: number, status: ClockState['status']) =>
+      game._state.update((s) => ({
+        ...s,
+        turnMode: true,
+        clock: { gameMs: turn * 20 * MIN, localWallMs: 0, rate: 1, status },
+        turn: {
+          turn,
+          startsAt: (turn - 1) * 20 * MIN,
+          endsAt: turn * 20 * MIN,
+          sent: [],
+          resolving: false,
+          held: [],
+        },
+      }));
+    d.persistJournal('g');
+    TestBed.tick();
+    at(1, 'paused');
+    TestBed.tick();
+    at(2, 'running');
+    TestBed.tick();
+    at(2, 'paused');
+    TestBed.tick();
+    const ids = d.journal().map((e) => e.id);
+    expect(ids).toEqual(expect.arrayContaining(['turn:1', 'turn:2']));
+    expect(d.journal().some((e) => e.kind === 'pause')).toBe(false);
   });
 });

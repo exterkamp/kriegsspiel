@@ -10,6 +10,11 @@ import {
   rateExplanation,
   rateOf,
   toRequest,
+  TURN_DIAL_INFO,
+  MODE_CHOICES,
+  deadlineHoursOf,
+  turnMinutesOf,
+  turnsLine,
   validate,
   type ScenarioOptions,
 } from './newGame.js';
@@ -51,6 +56,9 @@ describe('new game form', () => {
       customRate: '',
       dial: 'standard',
       persona: 'dry',
+      mode: 'realtime',
+      turnMinutes: '20',
+      deadlineHours: '',
     });
     expect(initialForm({ scenarios: [], opponent: undefined })).toBeUndefined();
   });
@@ -62,6 +70,9 @@ describe('new game form', () => {
       customRate: '7',
       dial: 'standard',
       persona: 'dry',
+      mode: 'realtime',
+      turnMinutes: '20',
+      deadlineHours: '',
     });
     expect(chooseScenario(o, 'nope')).toBeUndefined();
   });
@@ -95,6 +106,70 @@ describe('new game form', () => {
     expect(toRequest(initialForm(o)!, { ...o, opponent: undefined })).not.toHaveProperty(
       'sessionType',
     );
+  });
+  it('offers real time and turns, real time by default', () => {
+    expect(MODE_CHOICES.map((m) => [m.id, m.label])).toEqual([
+      ['realtime', 'Real time'],
+      ['turns', 'Turns, umpire decides'],
+    ]);
+    // A real-time request carries no turn settings, so it is the same as before turn mode (D39).
+    const req = toRequest(initialForm(o)!, o);
+    expect(req).not.toHaveProperty('mode');
+    expect(req).not.toHaveProperty('turnMinutes');
+  });
+  it('reads turn length and deadline, and validates them only in turn mode', () => {
+    const f = { ...initialForm(o)!, mode: 'turns' as const };
+    expect(turnMinutesOf(f)).toBe(20);
+    expect(turnMinutesOf({ turnMinutes: '4' })).toBeUndefined();
+    expect(turnMinutesOf({ turnMinutes: '61' })).toBeUndefined();
+    expect(turnMinutesOf({ turnMinutes: '12.5' })).toBeUndefined();
+    expect(deadlineHoursOf({ deadlineHours: '' })).toBeNull();
+    expect(deadlineHoursOf({ deadlineHours: '48' })).toBe(48);
+    expect(deadlineHoursOf({ deadlineHours: '0.1' })).toBeUndefined();
+    expect(deadlineHoursOf({ deadlineHours: 'soon' })).toBeUndefined();
+    expect(validate(f, o)).toBeUndefined();
+    expect(validate({ ...f, turnMinutes: '90' }, o)).toMatch(
+      /whole number of minutes from 5 to 60/,
+    );
+    expect(validate({ ...f, deadlineHours: '999' }, o)).toMatch(/deadline/);
+    // The rate is not asked for in turn mode, so a bad custom rate does not stop the form.
+    expect(validate({ ...f, rate: 'custom', customRate: '' }, o)).toBeUndefined();
+    expect(validate({ ...f, mode: 'realtime', turnMinutes: '90' }, o)).toBeUndefined();
+  });
+  it('builds a turn-mode request with its settings', () => {
+    const f = {
+      ...initialForm(o)!,
+      mode: 'turns' as const,
+      turnMinutes: '30',
+      dial: 'rigid' as const,
+    };
+    expect(toRequest(f, o)).toEqual({
+      scenario: 'a',
+      side: 'blue',
+      rate: 12,
+      dial: 'rigid',
+      persona: 'dry',
+      sessionType: 'co_op_vs_ai',
+      mode: 'turns',
+      turnMinutes: 30,
+    });
+    expect(toRequest({ ...f, deadlineHours: '24' }, o)).toMatchObject({ turnDeadlineHours: 24 });
+  });
+  it('keeps the mode and turn settings when the scenario changes', () => {
+    const f = { ...initialForm(o)!, mode: 'turns' as const, turnMinutes: '15', deadlineHours: '6' };
+    expect(chooseScenario(o, 'b', f)).toMatchObject({
+      mode: 'turns',
+      turnMinutes: '15',
+      deadlineHours: '6',
+    });
+  });
+  it('says how long a turn game runs and what the dial means in it', () => {
+    expect(turnsLine(240, 20)).toBe('About 4 hours of battle in 12 turns of 20 minutes.');
+    expect(turnsLine(50, 20)).toBe('About 50 minutes of battle in 3 turns of 20 minutes.');
+    expect(turnsLine(240, undefined)).toBe('About 4 hours of battle.');
+    expect(TURN_DIAL_INFO.rigid).toMatch(/tables alone/);
+    expect(TURN_DIAL_INFO.standard).toMatch(/stated reason/);
+    expect(TURN_DIAL_INFO.free).toMatch(/advice/);
   });
   it('sends the chosen dial and persona, and keeps them when the scenario changes', () => {
     const f = { ...initialForm(o)!, dial: 'free' as const, persona: 'dramatic' as const };

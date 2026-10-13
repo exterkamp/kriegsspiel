@@ -10,7 +10,10 @@ export function stubGame(state: ClientState = initialState): WritableSignal<Clie
   TestBed.configureTestingModule({
     providers: [
       provideZonelessChangeDetection(),
-      { provide: GameService, useValue: { state: s.asReadonly(), view: () => s().view } },
+      {
+        provide: GameService,
+        useValue: { state: s.asReadonly(), view: () => s().view, sides: () => [] },
+      },
     ],
   });
   return s;

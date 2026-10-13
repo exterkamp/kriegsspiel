@@ -3,7 +3,7 @@ import { debugGameUrl } from '@legacy/auth';
 import type { GameSummary } from '@legacy/lobby/api';
 import type { PlayedGame } from '@legacy/shell/continueList';
 import { gameStatus } from '@legacy/shell/continueList';
-import { SESSION_LABELS, rateLabel } from '@legacy/lobby/model';
+import { SESSION_LABELS, paceLabel } from '@legacy/lobby/model';
 import { SHELL_API } from '../shell/shell-api';
 
 interface Row {
@@ -66,7 +66,7 @@ export class GameListComponent implements OnInit {
         this.rows.set(
           (games as Array<GameSummary | PlayedGame>).map((g) => ({
             id: g.id,
-            title: `${scenarios.find((s) => s.id === g.scenario)?.name ?? g.scenario}, ${SESSION_LABELS[g.sessionType]}, ${rateLabel(g.rate)}`,
+            title: `${scenarios.find((s) => s.id === g.scenario)?.name ?? g.scenario}, ${SESSION_LABELS[g.sessionType]}, ${paceLabel(g)}`,
             state: gameStatus(g),
           })),
         ),

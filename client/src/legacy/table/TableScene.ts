@@ -27,6 +27,7 @@ import {
   type SceneState,
 } from './types.js';
 import { deskPose, easeInOut, lerpPose, type CameraPose } from './transition.js';
+import { NO_GLIDES, glidePoint, gliding, nextGlides, type GlideState } from './glide.js';
 
 const SIDE_COLOURS: Record<string, number> = { blue: 0x2f55a4, red: 0xa83232 };
 
@@ -82,6 +83,9 @@ export class TableScene {
   /** Camera pose to return to when leaving the desk, so the table looks the same as it was left. */
   private tablePose: CameraPose | undefined;
   private dolly: { from: CameraPose; to: CameraPose; start: number; ms: number } | undefined;
+  /** Pieces sliding to where a turn left them; `glideMs` 0 (real time) places them at once. */
+  private glide: GlideState = NO_GLIDES;
+  private glideMs = 0;
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -136,6 +140,30 @@ export class TableScene {
     }
     this.separateTags();
     this.syncOverlays();
+    const at = new Map([
+      ...state.own.map((o) => [`own:${o.id}`, o.position] as const),
+      ...state.ghosts.map((g) => [`ghost:${g.id}`, g.position] as const),
+    ]);
+    const now = performance.now();
+    this.glide = nextGlides(this.glide, at, now, this.glideMs);
+    this.stepGlides(now);
+  }
+
+  /**
+   * How long a piece takes to slide to a new position on the next `apply`: a turn-mode game (D39) moves
+   * by a whole turn at once, so its pieces glide there; 0 (the default) puts them in place at once.
+   */
+  setGlide(ms: number): void {
+    this.glideMs = Math.max(0, ms);
+  }
+
+  /** Draw each gliding piece where it has got to at wall time `now`. */
+  stepGlides(now: number): void {
+    if (this.glide.glides.size === 0 || !this.state) return;
+    for (const [key, g] of this.glide.glides) {
+      this.pieces.get(key)?.group.position.copy(mapToWorld(this.state.map, glidePoint(g, now)));
+    }
+    if (!gliding(this.glide, now)) this.glide = { at: this.glide.at, glides: new Map() };
   }
 
   /**
@@ -813,6 +841,7 @@ export class TableScene {
   start(): void {
     if (this.raf) return;
     const loop = (): void => {
+      this.stepGlides(performance.now());
       if (this.dolly) this.stepDolly(performance.now());
       else if (this.controls.enabled) this.controls.update();
       this.renderer.render(this.scene, this.camera);

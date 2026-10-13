@@ -1,7 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { fixtureView } from '@legacy/table/fixture';
 import { initialState } from '@legacy/net/state';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { WindowAt } from '@kriegsspiel/protocol';
+import { GLIDE_MS } from '@legacy/table/glide';
+import { DeskStore } from '../desk/desk.store';
 import { stubGame } from '../desk/testing';
 import { FlatBoardComponent } from './flat-board.component';
 import { MarksService } from './marks.service';
@@ -103,5 +106,111 @@ describe('FlatBoardComponent (#343)', () => {
     svg.dispatchEvent(new MouseEvent('pointerdown', { clientX: 400, clientY: 300, bubbles: true }));
     await f.whenStable();
     expect(marks.draft()).toMatchObject({ kind: 'pin', at: { x: 2000, y: 1500 } });
+  });
+
+  describe('gliding pieces (D39)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
+
+    /** Fakes the frame clock: `now` is what `performance.now` answers, `advance` runs the frames asked for. */
+    function clock() {
+      let now = 1000;
+      let id = 0;
+      // Angular's scheduler asks for frames too, so they are kept by id.
+      const frames = new Map<number, FrameRequestCallback>();
+      vi.spyOn(performance, 'now').mockImplementation(() => now);
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        frames.set(++id, cb);
+        return id;
+      });
+      vi.stubGlobal('cancelAnimationFrame', (n: number) => frames.delete(n));
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+      );
+      return {
+        advance: (ms: number) => {
+          now += ms;
+          const due = [...frames.values()];
+          frames.clear();
+          for (const cb of due) cb(now);
+        },
+      };
+    }
+
+    const first = fixtureView.ownUnits[0]!;
+    const moved = {
+      ...view,
+      atGame: view.atGame + 1,
+      ownUnits: view.ownUnits.map((u) =>
+        u.id === first.id ? { ...u, position: { x: u.position.x + 600, y: u.position.y } } : u,
+      ),
+    };
+
+    async function board(turnMode: boolean) {
+      const c = clock();
+      const s = stubGame({ ...initialState, view, ...(turnMode ? { turnMode: true } : {}) });
+      const f = TestBed.createComponent(FlatBoardComponent);
+      await f.whenStable();
+      const el = f.nativeElement as HTMLElement;
+      const piece = () => el.querySelector('polygon.piece.own')!.getAttribute('points');
+      return { c, s, f, piece, before: piece() };
+    }
+
+    it('sets a real-time piece down at its new place at once', async () => {
+      const b = await board(false);
+      b.s.update((x) => ({ ...x, view: moved }));
+      await b.f.whenStable();
+      expect(b.piece()).not.toBe(b.before);
+      // Nothing is left to animate.
+      b.c.advance(GLIDE_MS);
+      const after = b.piece();
+      await b.f.whenStable();
+      expect(b.piece()).toBe(after);
+    });
+
+    it('glides a turn-mode piece from its old place to its new one', async () => {
+      const rt = await board(false);
+      rt.s.update((x) => ({ ...x, view: moved }));
+      await rt.f.whenStable();
+      const target = rt.piece();
+      TestBed.resetTestingModule();
+      vi.restoreAllMocks();
+
+      const b = await board(true);
+      b.s.update((x) => ({ ...x, view: moved }));
+      await b.f.whenStable();
+      expect(b.piece()).toBe(b.before);
+      b.c.advance(GLIDE_MS / 2);
+      await b.f.whenStable();
+      expect(b.piece()).not.toBe(b.before);
+      expect(b.piece()).not.toBe(target);
+      b.c.advance(GLIDE_MS);
+      await b.f.whenStable();
+      expect(b.piece()).toBe(target);
+    });
+
+    it("sets the way back from the umpire's window down at once", async () => {
+      const b = await board(true);
+      const desk = TestBed.inject(DeskStore);
+      const frame = {
+        gameMs: 0,
+        units: [{ ...first, side: 'blue', position: { x: 10, y: 10 } }],
+        beliefs: {
+          blue: { visibleEnemies: [], lastKnownContacts: [] },
+          red: { visibleEnemies: [], lastKnownContacts: [] },
+        },
+        events: [],
+        rulings: [],
+      } as unknown as WindowAt;
+      desk.windowFrame.set(frame);
+      await b.f.whenStable();
+      expect(b.piece()).not.toBe(b.before);
+      desk.windowFrame.set(undefined);
+      await b.f.whenStable();
+      expect(b.piece()).toBe(b.before);
+    });
   });
 });

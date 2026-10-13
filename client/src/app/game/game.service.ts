@@ -12,7 +12,8 @@ import {
   type ClientState,
   type PendingOrder,
 } from '@legacy/net/state';
-import type { Mark } from '@kriegsspiel/protocol';
+import type { Mark, TurnOrder } from '@kriegsspiel/protocol';
+import { fetchGame } from '@legacy/lobby/api';
 import { fixtureView } from '@legacy/table/fixture';
 import { parseSession, wsUrl } from '@legacy/session';
 
@@ -29,6 +30,9 @@ export class GameService {
   private readonly _gameId = signal<string | undefined>(undefined);
   /** The game this page is playing, once joined; the umpire's window reads its log. */
   readonly gameId = this._gameId.asReadonly();
+  private readonly _sides = signal<readonly string[]>([]);
+  /** Every side in the game, from the lobby record; empty until read. The turn panel lists who has sent. */
+  readonly sides = this._sides.asReadonly();
   private conn: GameConnection | undefined;
   private orderSeq = 0;
   private stopPageEvents: (() => void) | undefined;
@@ -44,6 +48,14 @@ export class GameService {
       return;
     }
     this._gameId.set(params.game);
+    this._sides.set([]);
+    const game = params.game;
+    fetchGame(game).then(
+      (info) => {
+        if (this._gameId() === game) this._sides.set(info.sides.map((x) => x.side));
+      },
+      () => undefined,
+    );
     this.conn = new GameConnection({
       url: wsUrl(loc, params.game, params.side),
       onStatus: (s) => this._state.update((st) => withLink(st, s)),
@@ -149,6 +161,20 @@ export class GameService {
   }
   askStaff(...args: Parameters<GameConnection['askStaff']>): boolean {
     return this.conn?.askStaff(...args) ?? false;
+  }
+  /** Turn mode (D39): hold an order for the open turn (or replace the held one with its id). */
+  holdTurnOrder(order: TurnOrder): boolean {
+    return this.conn?.holdTurnOrder(order) ?? false;
+  }
+  withdrawTurnOrder(orderId: string): boolean {
+    return this.conn?.withdrawTurnOrder(orderId) ?? false;
+  }
+  sendTurn(): boolean {
+    return this.conn?.sendTurn() ?? false;
+  }
+  /** A fresh id for an order held for the turn. */
+  newTurnOrderId(): string {
+    return `t-${Date.now().toString(36)}-${++this.orderSeq}`;
   }
   proposePause(reason?: string): boolean {
     return this.conn?.proposePause(reason) ?? false;
