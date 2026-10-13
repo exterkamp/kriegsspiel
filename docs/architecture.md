@@ -296,3 +296,12 @@ type Ruling = {                          // an umpire judgment call, always reco
 - **Replay**: a recorded game replays to an identical state with no model calls.
 - **End to end**: `server/src/game/endToEnd.test.ts` plays Hold the Bridge headless (scripted Blue orders against the scripted Red, on a fake wall clock) at rates 1, 4, 12 and in fast-forward, checks the final states and event logs are identical (a failure prints the first divergence) and that replay from the log matches.
 - **Crash recovery**: kill the server mid-game, restart, and check the game comes back paused with state intact.
+
+
+## Development local board
+
+The Angular development configuration alone includes `/dev/local-board` (D41). The route bypasses the live shell and its GameService, DeskStore, server marks and WebSocket bootstrap. It certifies the pinned static public map independently of the game API/catalog and displays stopped time with empty pieces, roster and papers. Settings → New game uses the development catalog and native certification workers, without converting public geography to simulation state.
+
+A constructor-owned SessionOwner owns startup/replacement, one fresh personal scope/store/repository, and a SessionSurface caching the fixed raster. Native host/directive registrations capture session and origin identity; resource retirement and actual Angular destruction are separate barriers. Parent metadata HMR retains the owner and personal drafts while replacing only captured native views/mounts. Explicitly owned public Angular outlets clear synchronously on departure/pagehide; asynchronous leaf operations and late handles still settle before another owner allocates. The private route claim registry stores retirement coordination, never a resume pointer or a personal-state service.
+
+Before Start's commit, validation failure leaves the existing session intact. After commit, replacement/recovery constructs a fresh scope only after full old-session retirement and awaits a framed real render. Pagehide is terminal; persisted pageshow starts a fresh pinned default after retirement. Production route replacement, asset/proxy exclusion and live routing are separate build/browser verification gates. See [local Angular guide](game-initialization-angular-guide.md) and [landing log](game-initialization-landing-log.md) for current acceptance evidence.

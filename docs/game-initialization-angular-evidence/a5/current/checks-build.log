@@ -1,0 +1,73 @@
+
+> build
+> npm run verify:map-source && npm run build --workspaces --if-present && npm run build:local-map-catalog
+
+
+> verify:map-source
+> node scripts/verify-map-source.mjs
+
+{"revision":"e08ec2e09f9a15f9110a3048123a31a58d08c341","files":163,"bytes":3842340}
+
+> @kriegsspiel/engine@0.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> @kriegsspiel/protocol@0.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> @kriegsspiel/maps@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @kriegsspiel/server@0.0.0 build
+> tsc -p tsconfig.build.json
+
+
+> @kriegsspiel/client@0.0.0 build
+> ng build
+
+❯ Building...
+✔ Building...
+Initial chunk files | Names                   |  Raw size | Estimated transfer size
+main-RAZI3MQD.js    | main                    | 233.18 kB |                63.86 kB
+styles-46OU2WZO.css | styles                  |  11.13 kB |                 2.46 kB
+
+                    | Initial total           | 244.31 kB |                66.33 kB
+
+Lazy chunk files    | Names                   |  Raw size | Estimated transfer size
+worker-VUG6IS2I.js  | generate-worker         |   2.77 MB |               262.33 kB
+worker-TXN6MSST.js  | validate-worker         |   2.64 MB |               227.02 kB
+chunk-CwMMK5qq.js   | -                       |   2.16 MB |               141.31 kB
+chunk-DGbkUBeV.js   | -                       | 521.03 kB |               107.61 kB
+chunk-DQLecZZl.js   | -                       | 426.96 kB |                77.91 kB
+chunk-CXNmjTzL.js   | shell-component         | 169.44 kB |                44.51 kB
+chunk-BNJWT2Ad.js   | admin-component         |  38.20 kB |                11.16 kB
+chunk-B2YtjuoS.js   | map-authoring-component |  33.26 kB |                10.48 kB
+chunk-BWRo8oI7.js   | -                       |  29.71 kB |                 9.26 kB
+chunk-BTH1oeMB.js   | map-table-component     |  16.44 kB |                 5.53 kB
+chunk-4Be2WiCi.js   | -                       |  15.29 kB |                 3.63 kB
+chunk-Dgj2ADqv.js   | map-benchmark-component |  10.80 kB |                 4.12 kB
+chunk-DCiZAX5U.js   | style-guide-component   |   9.48 kB |                 3.00 kB
+chunk-BIRwiAhB.js   | -                       |   5.28 kB |                 1.90 kB
+chunk-Dd3OqE06.js   | -                       |   2.88 kB |                 1.18 kB
+...and 3 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation complete. [8.677 seconds] - 2026-10-12T23:22:09.023Z
+
+▲ [WARNING] Module 'polygon-clipping' used by '../packages/maps/src/composition/validate.ts' is not ESM
+
+  CommonJS or AMD dependencies can cause optimization bailouts.
+  For more information see: https://angular.dev/tools/cli/build#configuring-commonjs-dependencies
+
+
+Output location: /private/tmp/kriegsspiel-angular-a5-source-final/client/dist
+
+
+> build:local-map-catalog
+> npm run build -w packages/maps && tsc -p tools/local-map-catalog/tsconfig.json
+
+
+> @kriegsspiel/maps@0.1.0 build
+> tsc -p tsconfig.build.json
+

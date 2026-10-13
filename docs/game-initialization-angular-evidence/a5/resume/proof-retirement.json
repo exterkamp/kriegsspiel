@@ -1,0 +1,262 @@
+{
+  "toolSource": "c38727836520003bfe5d5419917fa465d7abbae3",
+  "observedAt": "2026-10-13T15:52:01.630Z",
+  "url": "http://127.0.0.1:41856/__proof/a5-v2",
+  "diagnostics": {
+    "mode": "source-authored isolated diagnostics; injected controls explicitly labeled",
+    "active": false,
+    "proofRetirement": "retired",
+    "observerRestoration": {
+      "pending": 0,
+      "failed": false
+    },
+    "phase": "no native child",
+    "available": false,
+    "modal": null,
+    "cancelling": false,
+    "ownerError": null,
+    "uiError": null,
+    "current": null,
+    "injections": {
+      "deferNextDefault": false,
+      "defaultReturnGatesReserved": 0,
+      "failNextNewSessionMount": false,
+      "deferNextCompletedListResult": false,
+      "deferNextCompletedSaveResult": false,
+      "armedOldSessionAcknowledgmentKey": null,
+      "returns": []
+    },
+    "knownOwnRecords": [
+      {
+        "scope": {
+          "gameId": "local-451ea78f-7b42-454a-90f7-1585925edf50",
+          "sideId": "blue",
+          "playerId": "local-general"
+        },
+        "binding": {
+          "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+          "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+          "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+          "bounds": {
+            "minX": 0,
+            "minY": 0,
+            "maxX": 5000,
+            "maxY": 3000
+          },
+          "registration": {
+            "origin": "north-west",
+            "units": "metres",
+            "xAxis": "east",
+            "yAxis": "south"
+          }
+        },
+        "retiredRepository": "released",
+        "observedSuccessfulMarksSave": false,
+        "observedSuccessfulNotebookSave": false
+      }
+    ],
+    "retiredOwnRecordChecks": [],
+    "networkObservation": {
+      "totals": {
+        "fetch": 1,
+        "websocket": 0,
+        "auth": 0,
+        "gameCreate": 0,
+        "gameWebsocket": 0,
+        "devHmrWebsocket": 0,
+        "droppedUrlBuckets": 0
+      },
+      "paths": [
+        {
+          "transport": "fetch",
+          "path": "/__local-default/*",
+          "method": "GET",
+          "calls": 1
+        }
+      ],
+      "limits": "Observer installed before proof child/default only. Initial page/bootstrap/HMR connection may predate it; constructors/calls, not transport completion or server receipt. Paths omit query/fragment/credentials; no bodies/cookies/headers retained. Dev HMR sockets classified separately. Zero applies only to this observed interval."
+    },
+    "counts": {
+      "owner.acquired": 1,
+      "owner.defaultStart.calls": 1,
+      "default.calls": 1,
+      "default.preparation.factory": 1,
+      "default preparation.acquired": 1,
+      "default.preparation.load.calls": 1,
+      "native.Worker.constructor.attempts": 1,
+      "native.Worker.constructed": 1,
+      "native.Worker.terminate.calls": 1,
+      "default.preparation.load.completed": 1,
+      "default.certified": 1,
+      "default.returned": 1,
+      "binding.calls": 1,
+      "binding.completed": 1,
+      "freshKey.calls": 1,
+      "repository.acquired": 1,
+      "personal store.acquired": 1,
+      "session surface.acquired": 1,
+      "personal.initialize.calls": 1,
+      "personal.initialize.completed": 1,
+      "attached host origin.acquired": 1,
+      "borrowed host lease.acquired": 1,
+      "native board surface.acquired": 1,
+      "native.mount.calls": 1,
+      "scene.constructor.attempts": 1,
+      "native scene.acquired": 1,
+      "raster.prepare.calls": 1,
+      "raster.prepare.completed": 1,
+      "scene.apply.calls": 3,
+      "scene.first-real-frame.completed": 1,
+      "native.mount.completed": 1,
+      "native Angular host.acquired": 1,
+      "native.unmount.calls": 1,
+      "native.unmount.completed": 1
+    },
+    "resources": [
+      {
+        "id": 1,
+        "kind": "owner",
+        "key": null,
+        "releaseCalls": 2,
+        "acknowledgment": "released",
+        "cachedResult": true
+      },
+      {
+        "id": 2,
+        "kind": "default preparation",
+        "key": null,
+        "releaseCalls": 1,
+        "acknowledgment": "released",
+        "cachedResult": true
+      },
+      {
+        "id": 3,
+        "kind": "repository",
+        "key": "local-451ea78f-7b42-454a-90f7-1585925edf50",
+        "releaseCalls": 1,
+        "acknowledgment": "released",
+        "cachedResult": true
+      },
+      {
+        "id": 4,
+        "kind": "personal store",
+        "key": "local-451ea78f-7b42-454a-90f7-1585925edf50",
+        "releaseCalls": 1,
+        "acknowledgment": "released",
+        "cachedResult": true
+      },
+      {
+        "id": 5,
+        "kind": "session surface",
+        "key": "local-451ea78f-7b42-454a-90f7-1585925edf50",
+        "releaseCalls": 1,
+        "acknowledgment": "released",
+        "cachedResult": true
+      },
+      {
+        "id": 6,
+        "kind": "attached host origin",
+        "key": "local-451ea78f-7b42-454a-90f7-1585925edf50",
+        "releaseCalls": 1,
+        "acknowledgment": "released",
+        "cachedResult": true
+      },
+      {
+        "id": 7,
+        "kind": "borrowed host lease",
+        "key": "local-451ea78f-7b42-454a-90f7-1585925edf50",
+        "releaseCalls": 2,
+        "acknowledgment": "released",
+        "cachedResult": true
+      },
+      {
+        "id": 8,
+        "kind": "native board surface",
+        "key": "local-451ea78f-7b42-454a-90f7-1585925edf50",
+        "releaseCalls": 1,
+        "acknowledgment": "released",
+        "cachedResult": true
+      },
+      {
+        "id": 9,
+        "kind": "native scene",
+        "key": "local-451ea78f-7b42-454a-90f7-1585925edf50",
+        "releaseCalls": 1,
+        "acknowledgment": "released",
+        "cachedResult": true
+      },
+      {
+        "id": 10,
+        "kind": "native Angular host",
+        "key": null,
+        "releaseCalls": 3,
+        "acknowledgment": "released",
+        "cachedResult": true
+      }
+    ],
+    "nativeWorkers": [
+      {
+        "id": 1,
+        "url": "http://127.0.0.1:41856/worker-TMRGVNIY.js?worker_file&type=module",
+        "type": "module",
+        "operation": "default real load #1",
+        "terminateCalls": 1,
+        "terminated": true,
+        "errors": 0
+      }
+    ],
+    "nativeWorkerTotals": {
+      "constructed": 1,
+      "terminateCalled": 1,
+      "remainingWithoutTerminateCall": 0
+    },
+    "defaultNativeFactoryTotals": {
+      "preparationCreated": 1,
+      "nativeWorkersConstructedDuringDefault": 1,
+      "nativeWorkersWithoutTerminateDuringDefault": 0,
+      "preparationReleaseAcknowledged": 1,
+      "note": "Default certification uses real validation workers; zero outstanding resources is checked after completion, never zero construction by assumption."
+    },
+    "rasters": [
+      {
+        "key": "local-451ea78f-7b42-454a-90f7-1585925edf50",
+        "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "widthM": 5000,
+        "heightM": 3000,
+        "pixelWidth": 4096,
+        "pixelHeight": 2458
+      }
+    ],
+    "actualOwnerRetirementAcknowledgments": [
+      {
+        "id": 1,
+        "kind": "owner",
+        "key": null,
+        "releaseCalls": 2,
+        "acknowledgment": "released",
+        "cachedResult": true
+      }
+    ],
+    "events": [
+      "default preparation 2 actual release completed",
+      "host origin 6 actual Angular destroyed callback",
+      "native scene 9 actual release completed",
+      "repository 3 actual release completed",
+      "personal store 4 actual release completed",
+      "borrowed host lease 7 actual release completed",
+      "native Angular host 10 actual release completed",
+      "native board surface 8 actual release completed",
+      "session surface 5 actual release completed",
+      "owner 1 actual release completed",
+      "proof actual owner leaf retirement completed"
+    ],
+    "errors": [],
+    "limits": "Method acknowledgments and native terminate calls are observable; GPU memory, actual worker exit, swallowed prerequisite cleanup errors and HMR transport require independent browser evidence. No success is inferred from DOM removal."
+  },
+  "renderedCounts": {
+    "canvases": 0,
+    "dialogs": 0
+  },
+  "rawSHA256": "36d7cd83654bb011067d739bf6f6773c305879215f26f4f8d625dc62d84c5084",
+  "limits": "Terminal cleanup of owned historical proof, not a new H0a lifecycle campaign. Method acknowledgments and Worker.terminate invocation do not prove GPU reclamation or actual worker-process exit."
+}

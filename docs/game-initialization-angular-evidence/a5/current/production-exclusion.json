@@ -1,0 +1,209 @@
+{
+  "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+  "base": "36406f70c485e7f23befb9f9b9e27fdfbd4c32e0",
+  "snapshot": "/private/tmp/kriegsspiel-angular-a5-source-final",
+  "url": "http://127.0.0.1:41912",
+  "responses": [
+    {
+      "method": "GET",
+      "path": "/",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41912/",
+      "bytes": 2862,
+      "sha256": "fbf369940cb9c913b20bdcecf5f57162baf0db5373405ba08e1358814ea433fb",
+      "bodyPrefix": "<!doctype html>\n<html lang=\"en\" data-beasties-container>\n  <head>\n    <meta charset=\"UTF-8\">\n    <me"
+    },
+    {
+      "method": "GET",
+      "path": "/?mode=fixture",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41912/?mode=fixture",
+      "bytes": 2862,
+      "sha256": "fbf369940cb9c913b20bdcecf5f57162baf0db5373405ba08e1358814ea433fb",
+      "bodyPrefix": "<!doctype html>\n<html lang=\"en\" data-beasties-container>\n  <head>\n    <meta charset=\"UTF-8\">\n    <me"
+    },
+    {
+      "method": "GET",
+      "path": "/dev/local-board",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41912/dev/local-board",
+      "bytes": 87,
+      "sha256": "efc7d1435fcbc1bbed59306fbf038fbed87fcf943feffc525ed99fca33d9cda5",
+      "bodyPrefix": "{\"message\":\"Route GET:/dev/local-board not found\",\"error\":\"Not Found\",\"statusCode\":404}"
+    },
+    {
+      "method": "GET",
+      "path": "/dev/local-board?mode=fixture",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41912/dev/local-board?mode=fixture",
+      "bytes": 87,
+      "sha256": "efc7d1435fcbc1bbed59306fbf038fbed87fcf943feffc525ed99fca33d9cda5",
+      "bodyPrefix": "{\"message\":\"Route GET:/dev/local-board not found\",\"error\":\"Not Found\",\"statusCode\":404}"
+    },
+    {
+      "method": "GET",
+      "path": "/__local-default/countryside-rectangle.json",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41912/__local-default/countryside-rectangle.json",
+      "bytes": 114,
+      "sha256": "f922c0cc9324324953cce78ad401d89367c22effe19419ab6235c1d73d17ba9f",
+      "bodyPrefix": "{\"message\":\"Route GET:/__local-default/countryside-rectangle.json not found\",\"error\":\"Not Found\",\"st"
+    },
+    {
+      "method": "GET",
+      "path": "/__local/maps",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41912/__local/maps",
+      "bytes": 84,
+      "sha256": "ba1cdbb4553bdebb45888e5e5250ebba8eff3465a30e3770f96b4ff12a4a1c9e",
+      "bodyPrefix": "{\"message\":\"Route GET:/__local/maps not found\",\"error\":\"Not Found\",\"statusCode\":404}"
+    },
+    {
+      "method": "POST",
+      "path": "/__local/maps",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41912/__local/maps",
+      "bytes": 85,
+      "sha256": "07d4323cc1afa43b34f11c80ab17757db7f6f14ad6e1c113dae0fc97638a5cba",
+      "bodyPrefix": "{\"message\":\"Route POST:/__local/maps not found\",\"error\":\"Not Found\",\"statusCode\":404}"
+    },
+    {
+      "method": "GET",
+      "path": "/map-table.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41912/map-table",
+      "bytes": 2862,
+      "sha256": "fbf369940cb9c913b20bdcecf5f57162baf0db5373405ba08e1358814ea433fb",
+      "bodyPrefix": "<!doctype html>\n<html lang=\"en\" data-beasties-container>\n  <head>\n    <meta charset=\"UTF-8\">\n    <me"
+    }
+  ],
+  "productionFiles": [
+    {
+      "path": "chunk-4Be2WiCi.js",
+      "bytes": 15293,
+      "sha256": "3b2b016ab260183ace719b2a3a4b73c505087ae8878cf7ae491a5376325d50bd"
+    },
+    {
+      "path": "chunk-B2YtjuoS.js",
+      "bytes": 33256,
+      "sha256": "edec783247b613783db432eb7d5cd93d7820568d3da7bbb404c2f9ce49c82001"
+    },
+    {
+      "path": "chunk-BIRwiAhB.js",
+      "bytes": 5282,
+      "sha256": "de3fac5138b3258c0040de14c076e5055721517c3b867252c2f9601e62875f50"
+    },
+    {
+      "path": "chunk-BMUu1r-L.js",
+      "bytes": 857,
+      "sha256": "5b474e9999d7fa782a7fb4c362c86c3f1e4cfeeb0bdc14ade561fc6cf67bcacc"
+    },
+    {
+      "path": "chunk-BNJWT2Ad.js",
+      "bytes": 38197,
+      "sha256": "0007b7eba4eb86efcef6ea57a02bf28113c43d7270bb5fda4998a268ba6901b3"
+    },
+    {
+      "path": "chunk-BTH1oeMB.js",
+      "bytes": 16444,
+      "sha256": "35d948b3eb03f8953621d92df0db21e657a0d8260aee41520285b4a16e0a25a2"
+    },
+    {
+      "path": "chunk-BWRo8oI7.js",
+      "bytes": 29709,
+      "sha256": "8cda39bff25c911b612f19d3a1fa155353f7b416862680622160b4771dc28546"
+    },
+    {
+      "path": "chunk-Bd69xk2U.js",
+      "bytes": 2782,
+      "sha256": "36964f1f135a40067d69918625e66c4d137fa407d9bd1a3a979844174abb8153"
+    },
+    {
+      "path": "chunk-CXNmjTzL.js",
+      "bytes": 169438,
+      "sha256": "b9ea8b4a7a41fe58e124a091e319459f8207a5fc630df62f56bfc8e775f6e763"
+    },
+    {
+      "path": "chunk-CwMMK5qq.js",
+      "bytes": 2155481,
+      "sha256": "582ac74690ae9104f5ac31bae09a5c03e958ced43ac5f2b369cae560d75bf408"
+    },
+    {
+      "path": "chunk-Cztueq-9.js",
+      "bytes": 826,
+      "sha256": "ae11a415e41a0ee330a3de821878aff5704788a6a649daf8111e113342701ceb"
+    },
+    {
+      "path": "chunk-DCiZAX5U.js",
+      "bytes": 9485,
+      "sha256": "e076b533200c082ed10fc6d8c49898d325500c1cfb8396a034832559f5d086ed"
+    },
+    {
+      "path": "chunk-DGbkUBeV.js",
+      "bytes": 521029,
+      "sha256": "0820052f2dfbf41b29fff98329166c10440d2b32ed4363d11fa960e4aba3835e"
+    },
+    {
+      "path": "chunk-DQLecZZl.js",
+      "bytes": 426965,
+      "sha256": "60bf46807c5fa45eaddfefa39973567d00ab2f19f5005cb877f5773978891165"
+    },
+    {
+      "path": "chunk-Dd3OqE06.js",
+      "bytes": 2876,
+      "sha256": "ca46dfcbb4530d2585bcd3c35bd7bbf33dca648b65fa77ea62433bb21dfbf3d9"
+    },
+    {
+      "path": "chunk-Dgj2ADqv.js",
+      "bytes": 10805,
+      "sha256": "5e033b6040108514573c5b17aac818bbe38e952072b342e930ad1ba98dd11829"
+    },
+    {
+      "path": "hq-preview.svg",
+      "bytes": 1417,
+      "sha256": "6deca4f086c35698519c912030086524880fc21cfb40861ee43fd8dec33abc07"
+    },
+    {
+      "path": "index.html",
+      "bytes": 2862,
+      "sha256": "fbf369940cb9c913b20bdcecf5f57162baf0db5373405ba08e1358814ea433fb"
+    },
+    {
+      "path": "main-RAZI3MQD.js",
+      "bytes": 233175,
+      "sha256": "616f9ac1d638dfb9254363e6240c4c23a5a9355f477f0c05b083a66d600a7983"
+    },
+    {
+      "path": "styles-46OU2WZO.css",
+      "bytes": 11135,
+      "sha256": "729927c0b2617329b149e5293755103e4d3d8b4029a4d8e63bc5ff89032731f6"
+    },
+    {
+      "path": "worker-TXN6MSST.js",
+      "bytes": 2644783,
+      "sha256": "0e9333c96ff7fc97012ffece92a13ddcb5642803b6abeca625a4a8a188467e27"
+    },
+    {
+      "path": "worker-VUG6IS2I.js",
+      "bytes": 2766343,
+      "sha256": "e4657237a53383c2ed2418e81ab8f41e573c16666f24d8a9cd32a2a9b207c126"
+    }
+  ],
+  "searchedTokens": [
+    "dev/local-board",
+    "__local-default",
+    "local-general",
+    "Local board ready",
+    "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84"
+  ],
+  "hits": [],
+  "limits": "Exact locally served built files; usable app flows require separate browser evidence. No deployed build."
+}

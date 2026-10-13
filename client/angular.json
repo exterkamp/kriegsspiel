@@ -35,6 +35,12 @@
             "development": {
               "optimization": false,
               "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/app/development.routes.ts",
+                  "with": "src/app/development.routes.dev.ts"
+                }
+              ],
               "assets": [
                 {
                   "glob": "**/*",

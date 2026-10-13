@@ -1,0 +1,452 @@
+{
+  "head": "04453f4a126f072d7731fa84749cf4a9a4ec8c9b",
+  "base": "c8e3ec61efe56846f462f105414a615401ef3e4a",
+  "mergeBase": "c8e3ec61efe56846f462f105414a615401ef3e4a",
+  "tree": "e75b971c875c8f43d5e1c6b72d60d18bccbd1d0d",
+  "paths": [
+    {
+      "path": "README.md",
+      "blob": "614e526e87eccbffa05ab6157b867f0ab1c3adb4",
+      "bytes": 6358,
+      "sha256": "e80fbde66a2cc5adbf2826dd9d89e3af1d11157286a029789ad9d5ed852a3620"
+    },
+    {
+      "path": "client/angular.json",
+      "blob": "85824e3ca8f269d40a3831253900378c2b74c54f",
+      "bytes": 2603,
+      "sha256": "17a629070c8d70083271206b42cd2c9e2615aeaa0b3aae12dfac65324fd7bcb1"
+    },
+    {
+      "path": "client/src/app/app.routes.spec.ts",
+      "blob": "51c10f8e312be66c1f691e33f8e5bb85b95df0fd",
+      "bytes": 2751,
+      "sha256": "9488794aece89d79dbff45ddc9df8eebf489402f316890c9032f44aca459c054"
+    },
+    {
+      "path": "client/src/app/app.routes.ts",
+      "blob": "28a94cb3527f8613e505f32b2b3cff53b9e76349",
+      "bytes": 2097,
+      "sha256": "de097ff817c6661e21993ddcdc1964fd7f70608ba41c58a6fc6b0d6e49a6ae64"
+    },
+    {
+      "path": "client/src/app/development.routes.dev.ts",
+      "blob": "255600f3204ff474c7a3ebf48b559075bfb2d54f",
+      "bytes": 379,
+      "sha256": "2a07b49608371915e785ed1596d8572384710327bd27266d3262d64d6ad56f80"
+    },
+    {
+      "path": "client/src/app/development.routes.ts",
+      "blob": "a9726cf351a32cb74d0c56e5eb8ac680ba664d70",
+      "bytes": 190,
+      "sha256": "696b9031de2f1b5a2c7c66fc4a7c421da88ad6dd4ce0c314bd12e6c76a4d2dda"
+    },
+    {
+      "path": "client/src/app/local-board/local-board.component.css",
+      "blob": "5d86cf67f284a2d69ce3ee58d383106c6d80d2cb",
+      "bytes": 1462,
+      "sha256": "afda701899ca1aa8ebf368f1a6ed58bd19670906b5f0f851531514f90bdc1d77"
+    },
+    {
+      "path": "client/src/app/local-board/local-board.component.html",
+      "blob": "35d4897668c78275688fc0adb967c8c22bf0e643",
+      "bytes": 3763,
+      "sha256": "976a6a4047dfae6f150d5c0ab116128faba91aedf51bf4db390f383fedaefce8"
+    },
+    {
+      "path": "client/src/app/local-board/local-board.component.spec.ts",
+      "blob": "95d58ea7d188dcd91e8465e7f560e535861b2e7c",
+      "bytes": 46452,
+      "sha256": "77eb488033f5bf1bda9a3e52496840908f653705554f169c23b0d58fec7999c6"
+    },
+    {
+      "path": "client/src/app/local-board/local-board.component.ts",
+      "blob": "63ddd2b70f52a90371258aea62e1215b6c84d2d9",
+      "bytes": 22910,
+      "sha256": "8a86140aa39b922578b73dfe05800deaf8c3ad8f85f14d7b457d66646aad3748"
+    },
+    {
+      "path": "client/src/app/local-board/local-session-host.directive.spec.ts",
+      "blob": "35f9f63254e4797f0af973cf63f890fbf5ee46be",
+      "bytes": 6346,
+      "sha256": "79bb550f5d310b7fc3412f3a6eb25437da8f33b1dac11589d5aee9d147d8eaa1"
+    },
+    {
+      "path": "client/src/app/local-board/local-session-host.directive.ts",
+      "blob": "6f8b67016cac4b0ca96f7486029a2fedcf408211",
+      "bytes": 3655,
+      "sha256": "151e8046193f93031198b245b5158617cd26df3077ce03d7f0976668618836e6"
+    },
+    {
+      "path": "client/src/app/local-board/local-setup-host.directive.spec.ts",
+      "blob": "b4db2bddae61b89531f1b2f695017aa6d37f16fa",
+      "bytes": 4696,
+      "sha256": "81fc39ab1736dd2ae37215c356853078d9e72ceddfa02d3072025928fdcf4dd2"
+    },
+    {
+      "path": "client/src/app/local-board/local-setup-host.directive.ts",
+      "blob": "4607f6e1e0c0cbf6ceccef537ad5b83de790e3c4",
+      "bytes": 1604,
+      "sha256": "5da3c997efde221d471dfe7a06d5aec7d4d4c1abd28744e803bb28966bdc0fdf"
+    },
+    {
+      "path": "client/src/app/local-board/session-owner.spec.ts",
+      "blob": "f8c95f162dc504a4d7710b286fd35aeb5ec29c9f",
+      "bytes": 65322,
+      "sha256": "4cfb73bf09c1e027cf15382da47b5530f9f480e4771a5ba50f0028f478b136f7"
+    },
+    {
+      "path": "client/src/app/local-board/session-owner.ts",
+      "blob": "3d38ce9dad9f036a7b40e5ad5b931b2e5bb265ca",
+      "bytes": 36336,
+      "sha256": "eff2894916cb7e2c87f78a73b0e38727147de02552c4aa8b996cba10b2ba3f60"
+    },
+    {
+      "path": "client/src/app/local-board/session-surface.spec.ts",
+      "blob": "8814544ab44973280cb664c027644a5b104298db",
+      "bytes": 20570,
+      "sha256": "538b0ccd714a898e7710f1d9e1edb56aeb1b304f78ad5aa12db41c33001c8885"
+    },
+    {
+      "path": "client/src/app/local-board/session-surface.ts",
+      "blob": "0de6459548200a8c85d4267eff9532326c36d104",
+      "bytes": 10074,
+      "sha256": "2bfd4512a58a6afc916f7db071b98b9c96103296f7af85df69133719b8570002"
+    },
+    {
+      "path": "client/src/legacy/map-authoring/display-lifecycle.test.ts",
+      "blob": "3e6b06ab286ae7fbb546562742bfce5e3708d71b",
+      "bytes": 5082,
+      "sha256": "a64177433d098f7eebc48b30af9dce04b7242b28f489ba17a9178f70b6e10cc5"
+    },
+    {
+      "path": "client/src/legacy/map-authoring/display-lifecycle.ts",
+      "blob": "fc7131d3dda2a29c1aa496bc7e45944539feeb20",
+      "bytes": 2124,
+      "sha256": "5889b41528ebd8048d72b4a097e7d176b9527a376ac8dd6a39aa24fe0db620b0"
+    },
+    {
+      "path": "client/src/legacy/map-authoring/preview.test.ts",
+      "blob": "b066f36bf5b47992c39618b73cede96ccb9edb81",
+      "bytes": 10632,
+      "sha256": "e348aeb42ab2f46f5895a5bde364cce2bb63e90eb0c2db3ab17aa484e1633a8e"
+    },
+    {
+      "path": "client/src/legacy/map-authoring/preview.ts",
+      "blob": "ecc580ef3d1f78e864fc3adf75765da124b45885",
+      "bytes": 9632,
+      "sha256": "6df176e199eab4285e3d93dc180a4130963af04b23a3958a4dcc20072d8df1dc"
+    },
+    {
+      "path": "docs/angular-migration.md",
+      "blob": "ee4dab1ccccac477f16b86b1fb36350376a96aac",
+      "bytes": 38096,
+      "sha256": "2a938901b740c8ad24ad95f5d67917db320d71c3037deb33de9910f4ca2f18da"
+    },
+    {
+      "path": "docs/architecture.md",
+      "blob": "afbbd23f66f248617efff618b3bd1a6e4824d3b1",
+      "bytes": 37701,
+      "sha256": "79445e7e804000847b95f91dd97c51a208913e81930912f12ee0b1b47c725e73"
+    },
+    {
+      "path": "docs/decisions.md",
+      "blob": "c17f6d8a873dc7c85285ef3fe838d298c8c4f074",
+      "bytes": 149982,
+      "sha256": "545d26f4c0ea195108a921dda654aaf7e131a63427529b7aa9384bd0c61cfac9"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/README.md",
+      "blob": "3f9ce14e292fa29722cbee27c35ec50412bf71c4",
+      "bytes": 4491,
+      "sha256": "82eea4f7d1d73e8da36d433b46df7ea5005b4ba6b56eba0c113a83ca5d4a38d7"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/artifacts.json",
+      "blob": "ed08a914d3d249a29f2721319930fdc629f81b91",
+      "bytes": 4473,
+      "sha256": "ab931ced7a6b3a371b0654e804501d93060680db9cc679711fcfcd92552c75cf"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/ci-review.md",
+      "blob": "72f8af376c109d087303a04ee2a2922138d0408b",
+      "bytes": 12187,
+      "sha256": "a121318f213901189a78a687bdddd0a35962f661ccac1ece8349a89abf493fff"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current-served-source-manifest.json",
+      "blob": "bf030ebc0573f83cf439d6d84efdabe237a512b7",
+      "bytes": 104188,
+      "sha256": "0d500c1555f35d9b2fb87819aca99e4c4b2f7faa7833ecc1f4cb87e818c2b495"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/README.md",
+      "blob": "4d525abc92877f9254fa54dab9fd7c3c230befe6",
+      "bytes": 5944,
+      "sha256": "c01a2cfcf74b520e3722444e8cf83e369ee4a896f40005b0a33db395f5873ae0"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/artifacts.json",
+      "blob": "3f7ffbc2cc3a4cdac25e1e585de04a9ac30fdc3c",
+      "bytes": 8967,
+      "sha256": "d7e7ed6c97627366d1ced77b7f3240f53c8d4d6ec480aeb0b8c9c1cd208b194a"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/checks-build.log",
+      "blob": "0dda2378e431c75a18147547aa5aa13bf6edd75c",
+      "bytes": 2959,
+      "sha256": "b7144acac85d668daf5134192ef0a32c269fcc6638aec2895ef3519e0e8aa254"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/checks-install.log",
+      "blob": "d048762a3052eaacc8757a7344dcc1cea80f891b",
+      "bytes": 281,
+      "sha256": "956856800dcdd97445590080aeaa38f0f6a52ad6f0c321bb407aeaf04c082e48"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/checks-lint.log",
+      "blob": "6b071bea649b4323d848e8b05961e2d79b1795fb",
+      "bytes": 108,
+      "sha256": "27db8120787d818efa12af0c97d73f156b2ee2cc178a19e247a77222062a2fe9"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/checks-setup.log",
+      "blob": "ee16c7287fb512464d444047b9c4fce61fed7569",
+      "bytes": 668,
+      "sha256": "b609658f6c14b093b1524e376c8be1a331a9449b93edec8d6709e5f430025afa"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/checks-test.log",
+      "blob": "41573fb7ad38148dbe4ed24c40d0bc66b48c7fcf",
+      "bytes": 33577,
+      "sha256": "b1e8c4631dde9b0ea121bdd3012c108d886389914cd53b9c63278248dae28521"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/checks-typecheck.log",
+      "blob": "2d02d601deaa0e46a3fb5e21665456fc53c0d3bc",
+      "bytes": 658,
+      "sha256": "bdd3e728d9e2b8f271bace2594306ec5b2457b85f6cc968844342e3bd1053cdf"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/checks.json",
+      "blob": "793fdd960c57c6c8bf591abfaf9e6a0448194dc4",
+      "bytes": 1063,
+      "sha256": "ac87a11454ab994f21129d7320f9140f75b5a9bd2287c74bcf6a506d07036429"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/ci-review.md",
+      "blob": "2920268c30eb9372b7a9adcb06f736b3877f049c",
+      "bytes": 14843,
+      "sha256": "c75fa0eccb89fb689cc25e266fca36fcad0961a07d5d02e724c48129bd79d67e"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/committed-hmr-source-manifest.json",
+      "blob": "5e0113a8951886b583e11360c484810d5141dc85",
+      "bytes": 104859,
+      "sha256": "c3521e6d2d5af5d4461ca23aa64a95011aed8c865b7399762eee130b61d176a3"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/game-over.jpg",
+      "blob": "811398e54fd500b210fa809bed978c2f76e5a5a6",
+      "bytes": 54065,
+      "sha256": "8fdc78b7a8e11f6a99bf5f52e7b954b8d00116b7840bd17a277ea28e0a070b94"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/hmr-overrides.json",
+      "blob": "1a4b9785944aa695540fd8532dbfbe96b61e6017",
+      "bytes": 2140,
+      "sha256": "8aa642a1762483b998a15bc38e102ea6036e2c533702a06e9e1916e7eb4bd85f"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/inspector-identity.txt",
+      "blob": "2b190a0a1e0ed1145252f511a536b261494f26b4",
+      "bytes": 84,
+      "sha256": "329c2f9e982103dc98c68053b2a19da87f8c16f386f860050d41544f448cf91f"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/inspector-oblique-narrow.jpg",
+      "blob": "1cf1ee8a8dd3d82ae012741ca35bbede391f37f1",
+      "bytes": 42742,
+      "sha256": "973eccd834aca1f56f68de640170d1fd9175e89c59e12ee4b3a4227168b0cb51"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/integration-review.md",
+      "blob": "0b23fbf4532229922998e5ec43cc780cf5a91e91",
+      "bytes": 36212,
+      "sha256": "4f921c691902812e828fdfbcd5224317687936c6dc02ea4bfbed966b0ac6f362"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/keyboard.json",
+      "blob": "a396458127983706fcfaaec23a218a614281c34b",
+      "bytes": 48369,
+      "sha256": "67368a852072071726ab047548b0b67014be261c5270ce46702ba20c1f4af143"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/live-mark-readback.json",
+      "blob": "d42adb67f2843d374cca0d0fddadc21e8ec37c5f",
+      "bytes": 474,
+      "sha256": "66ecb4f7496dbf0b20c45441b848a282ac11c4ee66ba016889adc1334cba3b23"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/live-orders.jpg",
+      "blob": "7ef49d2cfdde2dbdb58fa0cf9679b8ffbcec7c1f",
+      "bytes": 60158,
+      "sha256": "2273dce111a171b00dcc4b4929fa9d382ca206e358e9e6eafbee3d4da71e1ab8"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/lobby-seed.json",
+      "blob": "8de295cea116b579fa3c7f98cfc41a0cd6e1d58e",
+      "bytes": 1026,
+      "sha256": "0bdbf57631cb7610fdb3d2d399b6a91d0b0a0c26c9d0438b221fed8d1f101efb"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/pending-startup-source-manifest.json",
+      "blob": "f509af7a299c02ab9895aba80ea5b283a66667d4",
+      "bytes": 104859,
+      "sha256": "e106211043ebec08517d3fc3a80e026404c92e529ebdbe258b818a420aabd83e"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/production-browser.json",
+      "blob": "3356bbbd81580582677e77225a51bbf45d2fca68",
+      "bytes": 41632,
+      "sha256": "24ad75eead7c6e45753d962a986882b0c5e8c7b158557403a8bca5e7a274404f"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/production-exclusion.json",
+      "blob": "a6812802d0aa279f13ae66e474e5223e90df5589",
+      "bytes": 7437,
+      "sha256": "ddfb1e00e792de03db840fd533640d5f567d2a3bff5aaeb273f01ec8068fe4a4"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/retry-actions.json",
+      "blob": "688a080b976d156fa9394cd011fb9ef42635069c",
+      "bytes": 1537,
+      "sha256": "1e82cd7af2975de4aeefb664b807b420bda3c1267076c5dc194202ca7e7f45b8"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/retry-observations.json",
+      "blob": "13f43c7d9350655cdcfbbcd5b4b7669e81a2778a",
+      "bytes": 111513,
+      "sha256": "2cb32d39f970f189bede67700c36e07ecdb25f3eaabf17d4267e37848f8e84e9"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/retry-retirement.json",
+      "blob": "8253caa048480df4356a4699e4ae3d99ac82b8b7",
+      "bytes": 16124,
+      "sha256": "726d67b28c25ea65afa3a11b5bcd08db7df7600ffc1cfed1c844ee06051f917d"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/retry-source-manifest.json",
+      "blob": "8abb11f223c28cd6d71760b3a7d6571070afd495",
+      "bytes": 104860,
+      "sha256": "cd24f5199a52d5b570c17ced2e399db6dbe5f1893aa3e34078be0ddff052c274"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/setup-hmr-source-manifest.json",
+      "blob": "232601d400bd5c6e751abe935fe90149c448f218",
+      "bytes": 104859,
+      "sha256": "f21f7c46651117de4833f555a6dec9cb233d7c6c71ebf068413e31e11d3b903a"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/setup-narrow.jpg",
+      "blob": "2f56175f288f281966eef37d14a45f0659629b5a",
+      "bytes": 37567,
+      "sha256": "b3d835ee5167d07044c34c7a0f56821e01ec6587746ca45203319b39dc6e2ad5"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/shipped-source-manifest.json",
+      "blob": "425d9f1127ad1c37e8a08b8b9707eaa043b94099",
+      "bytes": 103286,
+      "sha256": "82b69c2cf916a528b529fcb5f8b96dd2f904367ecf24e1f65439a758236b32c8"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/current/source-carry.json",
+      "blob": "fc0d1c3e702b3b3bc7c2f3835e53b7b89ce94604",
+      "bytes": 35966,
+      "sha256": "bb59d423389f9cb71631b08838d93bec09c60828137526d1387c59cc5d26fc63"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/final-browser-actions.json",
+      "blob": "0ab4f854f71e88fc6ae303acf9bb3b86fa9f09de",
+      "bytes": 210133,
+      "sha256": "47f75b1d31c5382ba8ab996f581761403ee792d6df88c5bda05448dc05ec4492"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/final-browser-observations.json",
+      "blob": "0b56fddbf7d2ade953c3742407efc074eab94162",
+      "bytes": 423907,
+      "sha256": "dd41177ef38664fa30eca43a64bb0f548b66ef4465e4f621e1583ab3110ba4f0"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/final-retirement.json",
+      "blob": "76df5c8a8ed2b98e99a9cf05cc39465ee2e63e50",
+      "bytes": 39000,
+      "sha256": "c34b4e5cc8c8fa47d17ac9d333376f3f233c70afa8265558b37a092a1b952679"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/final-served-source-manifest.json",
+      "blob": "c9bd4142c78faf2a992a8f0c2e9af864c03395d1",
+      "bytes": 104860,
+      "sha256": "2c597b5128127a5064667fac50aa4297f386ee5dcd46a5918d9060c0023a9cae"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/generated-map-readback.json",
+      "blob": "bd4e9eaf734b65ff94609aea218d01949745991e",
+      "bytes": 994,
+      "sha256": "ec8c50a23923891b7af132fbc70fa8b19b1227127f840c4fc106843c3a5c0959"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/lifecycle-repair-review.md",
+      "blob": "d3b08a1af843320ac7e3132af8688bae68fbe29b",
+      "bytes": 23024,
+      "sha256": "f2ffd18e005c83455ae9608dacbec92a191823f5ec4ce86ccf0cc7e9937347b0"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/production-exclusion.json",
+      "blob": "a3228ef6901d1261fa4c1c8e30679d9a146295a1",
+      "bytes": 2422,
+      "sha256": "3ab3e6422efe11038cd7027a1041ee69d237481826f33c6117e374307a4fbca0"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/production-menu.txt",
+      "blob": "f9f4cf0fce4e14188df81725e7a8ffeeb42135d4",
+      "bytes": 1974,
+      "sha256": "dadfa16b41546d94b3e3f4d03b448dc6d8de3e4735b8067b927e43f3848dc7df"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/scenario-short-high.jpg",
+      "blob": "9df6507e29ea7bd620d94d1d5e333acae45d5a43",
+      "bytes": 35587,
+      "sha256": "29f13c39f0374de8741c0a729cefc7877a60f031ba322756eabb7d552401daf4"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/setup-narrow.jpg",
+      "blob": "ec50563da608b2b1560a95b8adb71fdbe20e568a",
+      "bytes": 41740,
+      "sha256": "644dc9a212caa56cf7bf5d2c4a6af4de25d9419d3b0e3018e30be635ebcf5f6e"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/source-checks.json",
+      "blob": "745b2f37f3bf24de7c3d2925b749ee2b1eb3b1dc",
+      "bytes": 1065,
+      "sha256": "9cfd30b67a188c95df6e4318ed88f655339f0fd31ea645b077225d351d867940"
+    },
+    {
+      "path": "docs/game-initialization-angular-evidence/a5/source-review.md",
+      "blob": "d68b597cda18d07adb97ed591742dbbf845cb174",
+      "bytes": 32345,
+      "sha256": "941091bb3237c480dc4bbd0c4e364bbee6eb44a4d571417e2c9b8210b5419f4b"
+    },
+    {
+      "path": "docs/game-initialization-angular-guide.md",
+      "blob": "8ee54976ffac490e7bb241313c76bfb54e193d8e",
+      "bytes": 12257,
+      "sha256": "97fd6af10a6d1f1e6b8c1de1f6c4a44ed28c4cf57506183c5d4097e8e04a08cd"
+    },
+    {
+      "path": "docs/game-initialization-landing-log.md",
+      "blob": "7bc5f4e78368ee27f292ac90c8015d0b638c14c5",
+      "bytes": 95940,
+      "sha256": "5839be9ce234fe784d5b3eb89ce06bae78ff8eea5d5efd9f01a423eef941336c"
+    }
+  ]
+}
