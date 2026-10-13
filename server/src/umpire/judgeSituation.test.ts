@@ -71,6 +71,17 @@ describe('judge situation', () => {
     ]);
   });
 
+  it('does not list a followed precedent as case law again', async () => {
+    const client = new MockUmpireClient([answer({})]);
+    const first = await ruleOn(client);
+    const again = await judgeSituation(client, first.world, request);
+    const world = issueJudgment(createState(first.world.seed, first.world, 0), again.proposal, 0);
+    const w2 = advanceTo(world, 0, createRegistry()).state.world;
+    expect(w2.rulings).toHaveLength(2);
+    await judgeSituation(client, w2, { key: 'other', situation: 'Other.' });
+    expect((client.calls[1]!.input as { caseLaw: unknown[] }).caseLaw).toHaveLength(1);
+  });
+
   it('retries a malformed answer once, then uses the standard rule', async () => {
     const bad = { stage: 'judge' as const, output: { modifier: 0, rationale: '', narrative: 'x' } };
     const client = new MockUmpireClient([bad]);
@@ -117,11 +128,39 @@ describe('judge situation: hidden names and injection', () => {
   const { world, secrets } = plantCanaries();
   const enemy = secrets.find((s) => s.hiddenFrom === 'blue' && s.what.endsWith('name'))!.value;
 
-  it('a narrative naming a hidden unit is not used', async () => {
-    const client = new MockUmpireClient([answer({ narrative: `The ${enemy} cross the ford.` })]);
-    const r = await judgeSituation(client, world, request, { hidden: [enemy] });
+  it('a narrative naming a hidden unit the model was shown is not used', async () => {
+    const asked = { ...request, situation: `Can the ${enemy} cross the ford under fire?` };
+    const narrative = `The ${enemy} cross the ford.`;
+    const open = await judgeSituation(new MockUmpireClient([answer({ narrative })]), world, asked);
+    expect(open.proposal.fallback).toBeUndefined();
+    const r = await judgeSituation(new MockUmpireClient([answer({ narrative })]), world, asked, {
+      hidden: [enemy],
+    });
     expect(r.proposal.fallback).toBe(true);
-    expect(JSON.stringify(r.proposal)).not.toContain(enemy);
+    expect(r.proposal.narrative).not.toContain(enemy);
+    expect(r.proposal.rationale).not.toContain(enemy);
+  });
+
+  it('a short hidden term matches whole words only', async () => {
+    const narrative = 'The column crosses with reduced speed.';
+    const r = await judgeSituation(new MockUmpireClient([answer({ narrative })]), world, request, {
+      hidden: ['Red'],
+    });
+    expect(r.proposal.fallback).toBeUndefined();
+  });
+
+  it('a precedent does not replay a narrative for another unit or one naming a hidden term', async () => {
+    const first = await ruleOn(
+      new MockUmpireClient([answer({ narrative: 'The column crosses slowly.' })]),
+    );
+    const client = new MockUmpireClient([]);
+    const other = await judgeSituation(client, first.world, { ...request, unitId: 'red-1' });
+    expect(other.proposal).toMatchObject({ precedent: true, modifier: -0.1 });
+    expect(other.proposal.narrative).not.toContain('column');
+    const hid = await judgeSituation(client, first.world, request, { hidden: ['column'] });
+    expect(hid.proposal.narrative).not.toContain('column');
+    const same = await judgeSituation(client, first.world, request);
+    expect(same.proposal.narrative).toContain('column');
   });
 
   it('a narrative with an invented name or figure is not used', async () => {

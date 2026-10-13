@@ -80,11 +80,11 @@ export function registerJudgment(registry: EventRegistry<GameState>): void {
 
 /**
  * The game's case law: every ruling that came from the umpire's own judgment (a fallback is no
- * precedent), oldest first. Master state: it names the situations of both sides.
+ * precedent, and a repeat that followed one adds nothing), oldest first. Master state: it names the situations of both sides.
  */
 export function caseLaw(world: GameState): JudgmentRuling[] {
   return world.rulings.filter(
-    (r): r is JudgmentRuling => 'kind' in r && r.kind === 'judgment' && !r.fallback,
+    (r): r is JudgmentRuling => 'kind' in r && r.kind === 'judgment' && !r.fallback && !r.precedent,
   );
 }
 

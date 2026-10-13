@@ -70,6 +70,19 @@ const STANDARD_RULE: Pick<JudgmentProposal, 'rationale' | 'narrative'> = {
   narrative: 'The umpire sees no cause to depart from the usual rule.',
 };
 
+const escapeRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Whether `text` names `term`: whole words for a short term, ignoring spacing for a long one. */
+function names(text: string, term: string): boolean {
+  const t = term.trim().toLowerCase();
+  if (!t) return false;
+  const lower = text.toLowerCase();
+  if (t.length < 4)
+    return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(t)}(?![\\p{L}\\p{N}])`, 'u').test(lower);
+  const squash = (x: string) => x.replace(/[\s\u200b-\u200d\u2060\ufeff]+/g, '');
+  return squash(lower).includes(squash(t));
+}
+
 function problemsWith(
   out: unknown,
   facts: ReturnType<typeof proseFactsOf>,
@@ -81,8 +94,8 @@ function problemsWith(
   }
   if (typeof o.rationale !== 'string' || !o.rationale.trim()) return ['no rationale'];
   if (typeof o.narrative !== 'string' || !o.narrative.trim()) return ['no narrative'];
-  const lower = o.narrative.toLowerCase().replace(/[\s\u200b-\u200d\u2060\ufeff]+/g, '');
-  const leaked = hidden.filter((h) => h && lower.includes(h.toLowerCase().replace(/\s+/g, '')));
+  const narrative = o.narrative;
+  const leaked = hidden.filter((h) => names(narrative, h));
   return [
     ...leaked.map((h) => `narrative names hidden "${h}"`),
     ...checkProseAgainst(o.narrative, facts),
@@ -103,7 +116,13 @@ export async function judgeSituation(
         request,
         modifier: prior.modifier,
         rationale: `Following ${prior.id} on the same situation: ${prior.rationale}`,
-        narrative: prior.narrative,
+        // The stored sentence was written for the first unit and side: reuse it only for the
+        // same unit and when it names nothing hidden from the asker.
+        narrative:
+          prior.unitId === request.unitId &&
+          !(opts.hidden ?? []).some((h) => names(prior.narrative, h))
+            ? prior.narrative
+            : STANDARD_RULE.narrative,
         precedent: true,
       },
     };
