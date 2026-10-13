@@ -305,14 +305,17 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     if (!c || c.lostAt !== undefined) return { world };
     const at = courierPosition(c, ev.time);
     // In a turn the engine resolves, the courier pass decided the ride: taken where it was taken
-    // then, by the same unit, and otherwise not, with no roll.
+    // then, by the same unit, and otherwise not, with no roll. A captor destroyed by then (the
+    // pass held the units) takes nothing, and the ride goes on.
     const forcedRide = c.forced && ev.time <= c.forced.untilMs ? c.forced : undefined;
     // One roll per enemy unit in reach, in unit order; the first to succeed takes the courier.
     // Rolls stop at the first success, so draws per step depend on who captured: still fixed by
     // the seed, but keep every roll inside this handler or the clock-invariance rule breaks.
     const captor = forcedRide
       ? forcedRide.takenAt === ev.time
-        ? world.units.find((u) => u.id === forcedRide.takenBy && u.side !== c.side)
+        ? world.units.find(
+            (u) => u.id === forcedRide.takenBy && u.side !== c.side && u.strength > 0,
+          )
         : undefined
       : world.units.find((u) => {
           if (u.side === c.side) return false;

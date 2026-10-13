@@ -82,9 +82,11 @@ export function rulesParseTurnOrder(world: GameState, order: SentTurnOrder): Rul
     return { ...base, none: 'a condition or a time the rules cannot carry out' };
   }
   const ctx = parseContextOf(world, order.side);
-  const parsed = testParse(
-    parseOrdersInput(order.text, { ...ctx, units: ctx.units.filter((u) => u.id === unit.id) }),
-  );
+  // An order that names no unit ("hold here") is for the addressee: the desk already chose it.
+  const parsed = testParse({
+    ...parseOrdersInput(order.text, { ...ctx, units: ctx.units.filter((u) => u.id === unit.id) }),
+    addressee: unit.id,
+  });
   if (parsed.result === 'rejection') return { ...base, none: parsed.reason ?? 'not understood' };
   if (parsed.result === 'clarification') return { ...base, none: parsed.question ?? 'unclear' };
   if (parsed.unitId !== unit.id || !parsed.intents?.length) {

@@ -69,7 +69,9 @@ afterEach(async () => {
   host = undefined;
 });
 
-async function play(opts: { seed?: number; turnMinutes?: number; scripted?: boolean } = {}) {
+async function play(
+  opts: { seed?: number; turnMinutes?: number; scripted?: boolean; resolver?: TurnResolver } = {},
+) {
   const time = new FakeTime();
   const store = new MemoryGameStore();
   const watching = new Watching();
@@ -81,7 +83,7 @@ async function play(opts: { seed?: number; turnMinutes?: number; scripted?: bool
     timers: time,
     init: startingState,
     scriptedOpponents: opts.scripted ?? false,
-    turnResolver: () => watching,
+    turnResolver: () => opts.resolver ?? watching,
   });
   const settings: UmpireSettings = {
     dial: 'rigid',
@@ -151,6 +153,27 @@ describe('the engine adjudicator: rigid turn mode (D39, 11.4)', () => {
       expect(JSON.stringify(run.replayed.state.world)).toBe(JSON.stringify(run.game.state.world));
     },
   );
+
+  it('refuses a logged turn whose couriers the courier pass does not give', async () => {
+    const engine = new EngineTurnResolver(createRegistry());
+    // The first turn's log claims its first courier was lost, which the pass did not roll.
+    const tampering: TurnResolver = {
+      resolve: async (state, input) => {
+        const res = await engine.resolve(state, input);
+        if (input.n !== 1) return res;
+        const out = res.output as EngineTurnOutput;
+        const [first, ...rest] = out.couriers;
+        expect(first!.outcome).not.toBe('lost');
+        return { ...res, output: { ...out, couriers: [{ ...first!, outcome: 'lost' }, ...rest] } };
+      },
+    };
+    const run = await play({ resolver: tampering });
+    const turns = run.log.filter((e) => e.command.kind === 'resolveTurn');
+    expect(turns[0]!.error).toBe('turn 1: the courier pass differs from the logged couriers');
+    expect(turns.slice(1).every((e) => e.error === undefined)).toBe(true);
+    // Replay refuses the same turn and so ends where the live game did.
+    expect(JSON.stringify(run.replayed.state.world)).toBe(JSON.stringify(run.game.state.world));
+  });
 
   it('is deterministic for a given seed', async () => {
     const a = await play({ seed: 99 });
@@ -230,6 +253,46 @@ describe('the rules parse in turn mode', () => {
     expect(
       rulesParseTurnOrder(world, sent('blue-1', 'hold the bridge at all costs')).intents,
     ).toHaveLength(1);
+  });
+
+  it('reads an immediate order as one, whatever numbers it carries', () => {
+    for (const text of [
+      'march to the bridge at once',
+      'Advance to the bridge at once.',
+      'advance to the bridge in 2 columns',
+      'advance to the bridge in two columns',
+      'march to the bridge by 2 roads',
+      'march to the bridge in first line',
+    ]) {
+      const p = rulesParseTurnOrder(world, sent('blue-1', text));
+      expect(p.none, text).toBeUndefined();
+      expect(p.intents, text).toEqual([{ kind: 'move', to: expect.any(Object) }]);
+    }
+    for (const text of [
+      'Once the enemy is in sight, fall back to the southern wood',
+      'march to the bridge at 2 pm',
+      'march to the bridge at 14:00',
+      'march to the bridge by first light',
+      'march to the bridge in an hour',
+      'at 3, march to the bridge',
+    ]) {
+      expect(rulesParseTurnOrder(world, sent('blue-1', text)).none, text).toMatch(
+        /condition or a time/,
+      );
+    }
+  });
+
+  it('gives an order that names no unit to the addressee', () => {
+    for (const text of ['hold', 'Halt and hold here', 'Halt!', 'hold here']) {
+      const p = rulesParseTurnOrder(world, sent('blue-2', text));
+      expect(p.none, text).toBeUndefined();
+      expect(p.to, text).toBe('blue-2');
+      expect(p.intents?.[0], text).toMatchObject({ kind: 'hold' });
+    }
+    // Words that name no unit of ours are still refused, not taken as the addressee.
+    expect(rulesParseTurnOrder(world, sent('blue-2', 'Jones, hold here')).none).toMatch(
+      /no unit called/,
+    );
   });
 
   it('refuses another side’s unit and what the rules cannot carry out', () => {

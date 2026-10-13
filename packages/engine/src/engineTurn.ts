@@ -10,10 +10,11 @@
  * The projection does that on a copy; a `rigid` or fallback turn does it on the real world, so
  * both end in the same state.
  */
-import type { EmittedEvent, EngineState, EventRegistry } from './events.js';
+import { EventRegistry, type EmittedEvent, type EngineState, type Handler } from './events.js';
 import { advanceTo } from './advance.js';
 import {
   COURIER_LOST_EVENT,
+  ORDER_ISSUE_EVENT,
   issueForcedOrder,
   issueOrder,
   type ForcedIssue,
@@ -23,7 +24,12 @@ import { beginTurn } from './turn.js';
 import type { RngState } from './rng.js';
 import type { Courier, ForcedRide, GameState, GameTime, SideId, TurnFlag } from './types.js';
 
-/** What became of one courier in a turn, as the courier pass rolled it. */
+/**
+ * What became of one courier in a turn, as the courier pass rolled it: the ride's outcome, with the
+ * units held at `T0`. The turn itself may still end a ride otherwise, and says so in what it emits:
+ * a ride `delivered` to a unit destroyed before `atMs` fails there (`order_failed`), and one
+ * `intercepted` by a unit destroyed before `atMs` is not taken and rides on.
+ */
 export interface TurnCourier {
   /** The engine order id (`Order.id`). */
   orderId: string;
@@ -64,6 +70,42 @@ const flag = (turn: Bounds, adjudicator: TurnFlag['adjudicator']): TurnFlag => (
   adjudicator,
 });
 
+/** How a new order's courier set out: the courier, and the loss time it drew (if it is lost). */
+interface SetOut {
+  courier: Courier;
+  lostAt?: GameTime;
+}
+
+/**
+ * `registry`, with each courier noted as it sets out. A ride decided at its first instant (a loss
+ * drawn at `T0`, a 0 ms ride delivered at once) is gone from the queue and the world by the time
+ * `advanceTo` returns, so it is read here, where the ride is rolled.
+ */
+class SetOutRegistry extends EventRegistry<GameState> {
+  readonly setOut = new Map<string, SetOut>();
+
+  constructor(private readonly inner: EventRegistry<GameState>) {
+    super();
+  }
+
+  override get(type: string): Handler<GameState> {
+    const h = this.inner.get(type);
+    if (type !== ORDER_ISSUE_EVENT) return h;
+    return (world, ev, rng) => {
+      const res = h(world, ev, rng);
+      const orderId = (ev.payload as { id?: unknown }).id;
+      const courier = res.world.couriers.find(
+        (c) => c.order.id === orderId && !world.couriers.includes(c),
+      );
+      if (courier && typeof orderId === 'string') {
+        const lost = res.schedule?.find((e) => e.type === COURIER_LOST_EVENT);
+        this.setOut.set(orderId, { courier, ...(lost ? { lostAt: lost.time } : {}) });
+      }
+      return res;
+    };
+  }
+}
+
 const withoutForced = (c: Courier): Courier => {
   if (!c.forced) return c;
   const rest = { ...c };
@@ -85,20 +127,12 @@ export function courierPass(
 ): CourierPass {
   let s = beginTurn(state, flag(turn, 'umpire'));
   s = { ...s, world: { ...s.world, couriers: s.world.couriers.map(withoutForced) } };
-  const riding = s.world.couriers.filter((c) => c.lostAt === undefined).map((c) => c.order.id);
+  const riding = s.world.couriers.filter((c) => c.lostAt === undefined);
   for (const o of orders) s = issueOrder(s, o, turn.startMs);
-  // The new couriers set out (their loss and garbling are rolled now); then the turn rides.
-  const out = advanceTo(s, turn.startMs, registry);
-  const setOut = new Map(out.state.world.couriers.map((c) => [c.order.id, c]));
-  const lostAt = new Map<string, GameTime>();
-  for (const e of out.state.queue) {
-    if (e.type !== COURIER_LOST_EVENT) continue;
-    const id = (e.payload as { courierId?: string }).courierId;
-    const c = out.state.world.couriers.find((x) => x.id === id);
-    if (c) lostAt.set(c.order.id, e.time);
-  }
-  const end = advanceTo(out.state, turn.endMs, registry);
-  const emitted: EmittedEvent[] = [...out.emitted, ...end.emitted];
+  // The new couriers set out at `T0` (their loss and garbling are rolled then) and the turn rides.
+  const recording = new SetOutRegistry(registry);
+  const end = advanceTo(s, turn.endMs, recording);
+  const emitted: EmittedEvent[] = end.emitted;
 
   const fate = new Map<string, Pick<TurnCourier, 'outcome' | 'atMs' | 'by' | 'reason'>>();
   for (const e of emitted) {
@@ -139,17 +173,14 @@ export function courierPass(
       if (f.by) ride.takenBy = f.by;
     }
     if (fresh.has(order.id)) {
-      const lost = lostAt.get(order.id);
+      const lost = recording.setOut.get(order.id)?.lostAt;
       if (lost !== undefined) ride.lostAt = lost;
       if (c.garbled) ride.garbled = c.garbled;
     }
     forced[order.id] = ride;
   };
-  for (const id of riding) {
-    const c = setOut.get(id) ?? s.world.couriers.find((x) => x.order.id === id)!;
-    describe(c.order, c);
-  }
-  for (const o of orders) describe(o, setOut.get(o.id));
+  for (const c of riding) describe(c.order, c);
+  for (const o of orders) describe(o, recording.setOut.get(o.id)?.courier);
   return { couriers, rng: end.state.rng, forced };
 }
 
