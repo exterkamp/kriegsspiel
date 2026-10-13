@@ -261,6 +261,8 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       }
     }
     // Lost on the road: the point is drawn along the ride, so the loss can be before or after a check.
+    // The turn's courier pass reads the loss time from this handler's `schedule` (`SetOutRegistry`,
+    // engineTurn.ts): schedule it anywhere else and the pass stops forcing it.
     if (!forced && rng.next() < risk.loss) {
       const at = ev.time + Math.floor(rng.next() * (arrival - ev.time));
       later.push({ time: at, type: COURIER_LOST_EVENT, payload: { courierId: courier.id } });

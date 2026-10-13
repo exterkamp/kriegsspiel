@@ -378,7 +378,8 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
     if (refersBack) {
       place = previous;
       if (!place && verb.kind === 'hold') {
-        intents.push({ kind: 'hold', place: 'here' });
+        // "Halt and hold here": one hold where it stands, not two.
+        if (lastKind !== 'hold') intents.push({ kind: 'hold', place: 'here' });
         lastKind = 'hold';
         continue;
       }

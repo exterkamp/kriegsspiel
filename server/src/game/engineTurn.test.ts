@@ -287,7 +287,7 @@ describe('the rules parse in turn mode', () => {
       const p = rulesParseTurnOrder(world, sent('blue-2', text));
       expect(p.none, text).toBeUndefined();
       expect(p.to, text).toBe('blue-2');
-      expect(p.intents?.[0], text).toMatchObject({ kind: 'hold' });
+      expect(p.intents, text).toEqual([expect.objectContaining({ kind: 'hold' })]);
     }
     // Words that name no unit of ours are still refused, not taken as the addressee.
     expect(rulesParseTurnOrder(world, sent('blue-2', 'Jones, hold here')).none).toMatch(
