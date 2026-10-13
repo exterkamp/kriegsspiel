@@ -20,6 +20,7 @@ import { createGameUmpire } from '../umpire/gameLimits.js';
 import { UmpireError } from '../umpire/umpireClient.js';
 import type { UmpireClient, UmpireRequest, UmpireResponse } from '../umpire/umpireClient.js';
 import { llmAgents, scriptedAgents, LlmCommander, assertFogOnly, FORM_UP_MS } from './index.js';
+import type { SideAgent } from './scriptedOpponent.js';
 
 const BRIDGE = { x: 2_050_000, y: 1_500_000 };
 
@@ -212,7 +213,7 @@ describe('turn mode', () => {
 
   it('cannot be copied when its fallback cannot', () => {
     const world = loadScenario(holdTheBridge);
-    const fallback = { ...scriptedAgents(world)[0]!, fork: undefined };
+    const fallback: SideAgent = { side: 'red', intervalMs: 300_000, think: () => [] };
     const agent = new LlmCommander({ ...commander(new FakeModel(), world)['cfg'], fallback });
     expect(agent.fork()).toBeUndefined();
   });
