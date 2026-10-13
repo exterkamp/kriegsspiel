@@ -26,11 +26,22 @@ afterEach(async () => {
   host = undefined;
 });
 
-/** Hold the Bridge against the scripted Red, with the time limit and the hold time given. */
-function scenario(victory: { holdMs?: number; takeMs?: number } = {}): Scenario {
-  const s = loadScenario(holdTheBridge);
+/**
+ * Hold the Bridge with Blue's one battalion far from the river and the rest left out, so the
+ * scripted Red marches onto the bridge unopposed: no fight can break its attack, and its hold
+ * starts at 00:15 whenever its sides think (#435). The game-end rules are what these tests prove,
+ * not who wins the fight for the bridge.
+ */
+function unopposed(victory: { holdMs?: number; takeMs?: number } = {}): Scenario {
+  const units = holdTheBridge.units
+    .filter((u) => u.side === 'red' || u.id === 'blue-1')
+    .map((u) => (u.id === 'blue-1' ? { ...u, at: { x: 200, y: 2900 } } : u));
+  const s = loadScenario({ ...holdTheBridge, units });
   return { ...s, seed: 1815, victory: { ...s.victory, ...victory } };
 }
+
+/** When Red's hold on the bridge starts in `unopposed`, to the game minute (#435). */
+const HOLD_FROM = 15 * MINUTE;
 
 /**
  * Play a rigid turn game with Blue sending nothing: each turn closes when Blue sends, or, with a
@@ -116,17 +127,17 @@ describe('turn mode: the game ends in the turn that decides it (#429)', () => {
     'opens no further turn when the objective falls at the end of a $turnMinutes-minute turn (deadline $deadlineHours h)',
     async ({ turnMinutes, deadlineHours }) => {
       const turnMs = turnMinutes * MINUTE;
-      // First find when Red's hold on the bridge starts (it starts part-way through a minute).
-      const probe = await play(scenario({ holdMs: 4 * HOUR, takeMs: 3 * HOUR }), turnMinutes);
+      // First check that Red's hold on the bridge starts at HOLD_FROM (counted to the game minute).
+      const probe = await play(unopposed({ holdMs: 4 * HOUR, takeMs: 3 * HOUR }), turnMinutes);
       const since = probe.heldSince.find((s) => typeof s === 'number')!;
-      expect(since).toBeTypeOf('number');
-      // Then make the hold complete at the end of a turn: counted to the game minute, as the
-      // clock shows it, the take falls on the turn end and decides that turn.
-      const minute = Math.floor(since / MINUTE) * MINUTE;
+      expect(since).toBe(HOLD_FROM);
+      // Then make the hold complete at the end of a turn: the take falls on the turn end and
+      // decides that turn.
+      const minute = since;
       let end = Math.ceil((minute + MINUTE) / turnMs) * turnMs;
       if (end - minute < 2 * MINUTE) end += turnMs;
       const { game, log } = await play(
-        scenario({ holdMs: 4 * HOUR, takeMs: end - minute }),
+        unopposed({ holdMs: 4 * HOUR, takeMs: end - minute }),
         turnMinutes,
         deadlineHours,
       );
@@ -145,17 +156,20 @@ describe('turn mode: the game ends in the turn that decides it (#429)', () => {
   it.each([10, 20, 30])(
     'ends at the time limit with the last %i-minute turn and opens no other',
     async (turnMinutes) => {
-      // Red cannot take the bridge in time: the defender wins at the time limit.
+      // Red holds the bridge from 00:15 but cannot take it in time, and no fight declares a
+      // battle: the defender wins at the time limit.
       const holdMs = 50 * MINUTE;
-      const { game, log } = await play(scenario({ holdMs, takeMs: 3 * HOUR }), turnMinutes);
+      const { game, log } = await play(unopposed({ holdMs, takeMs: 3 * HOUR }), turnMinutes);
       expect(game.state.world.outcome).toMatchObject({ reason: 'objective-held', time: holdMs });
       expectOver(game, holdMs);
       expect(opened(log).at(-1)).toMatchObject({ endMs: holdMs });
     },
   );
 
-  it('ends the 20-minute Hold the Bridge game at 00:40 with turn 2, as in the QA game', async () => {
-    const { game, log } = await play(scenario(), 20);
+  it('ends a 20-minute game at 00:40 with turn 2 when the take falls at its end, as in the QA game', async () => {
+    // The QA game's hold completed in the minute turn 2 ended at; here the hold starts at 00:15
+    // and takes 25 minutes, so it completes at 00:40 too.
+    const { game, log } = await play(unopposed({ takeMs: 40 * MINUTE - HOLD_FROM }), 20);
     expect(game.state.world.outcome).toMatchObject({
       winner: 'red',
       reason: 'objective-taken',
@@ -167,7 +181,8 @@ describe('turn mode: the game ends in the turn that decides it (#429)', () => {
 
   it('ends a turn at the victory when it falls inside the turn', async () => {
     // 10-minute turns: Red's hold starts at 00:15 and completes at 00:25, inside turn 3.
-    const { game, log } = await play(scenario(), 10);
+    const { game, log } = await play(unopposed(), 10);
+    expect(game.state.world.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
     const at = game.state.world.outcome!.time;
     const last = opened(log).at(-1)!;
     expect(last.turn).toBe(3);
