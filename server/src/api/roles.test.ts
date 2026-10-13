@@ -434,3 +434,112 @@ describe('forwarding up the chain of command', () => {
     app!.hub.closeAll();
   });
 });
+
+describe('signing a shared draft', () => {
+  const draftOf = (tap: Tap, id: string) =>
+    tap.messages
+      .flatMap((m) => (m.kind === 'draftState' ? [m.draft] : []))
+      .filter((d) => d.id === id)
+      .at(-1);
+
+  async function seated(t: Table) {
+    await startTable(t);
+    const url = `${t.ws}/games/${t.id}/ws`;
+    const taps = {
+      cos: await Tap.open(url, t.cos),
+      sub: await Tap.open(url, t.sub),
+      lead: await Tap.open(url, t.lead),
+    };
+    await Promise.all(
+      Object.values(taps).map((c) => c.until((m) => m.find((x) => x.kind === 'viewUpdate'))),
+    );
+    return taps;
+  }
+
+  it('lets staff propose but only the commander stamp, and closes a draft once sent', async () => {
+    const t = await lobbyTable();
+    const { cos, sub, lead } = await seated(t);
+    cos.send({ kind: 'createDraft', draft: 'd1', text: 'blue-1 march to the bridge' });
+    await lead.until((m) => m.find((x) => x.kind === 'draftState' && x.draft.id === 'd1'));
+
+    cos.send({ kind: 'issueOrder', orderId: 'c1', draft: 'd1' });
+    expect(await cos.until((m) => m.find((x) => x.kind === 'error'))).toMatchObject({
+      code: 'not_permitted',
+    });
+    // A subordinate may not stamp an order to a formation they do not command either.
+    sub.send({ kind: 'issueOrder', orderId: 's1', draft: 'd1' });
+    const rejected = await sub.until((m) => m.find((x) => x.kind === 'error'));
+    expect(rejected).toMatchObject({ code: 'order_rejected' });
+    expect((await store.inputLog(t.id)).filter((e) => e.command.kind === 'order')).toHaveLength(1);
+    expect(draftOf(lead, 'd1')?.sent).toBeUndefined();
+
+    lead.send({ kind: 'issueOrder', orderId: 'l1', draft: 'd1' });
+    const sent = await lead.until((m) => {
+      const d = m.flatMap((x) => (x.kind === 'draftState' ? [x.draft] : [])).at(-1);
+      return d?.sent ? d : undefined;
+    });
+    expect(sent.sent).toMatchObject({ orderId: 'l1', role: 'commander' });
+    // The order logged is the draft's wording, so a replay needs no draft.
+    const logged = (await store.inputLog(t.id)).filter((e) => e.command.kind === 'order');
+    expect(logged.at(-1)!.command).toMatchObject({
+      text: 'blue-1 march to the bridge',
+      signer: { role: 'commander' },
+    });
+
+    // Sent: no more edits from anyone, and it cannot be stamped twice.
+    cos.send({ kind: 'draftEdit', draft: 'd1', baseRev: 0, op: [26, ' now'], opId: 'e1' });
+    await cos.until((m) => m.find((x) => x.kind === 'error' && x.code === 'draft_sent'));
+    lead.send({ kind: 'issueOrder', orderId: 'l2', draft: 'd1' });
+    await lead.until((m) => m.find((x) => x.kind === 'error' && x.code === 'draft_sent'));
+    app!.hub.closeAll();
+  });
+
+  it('lets a subordinate stamp a draft for their own formation', async () => {
+    const t = await lobbyTable();
+    const { cos, sub } = await seated(t);
+    cos.send({ kind: 'createDraft', draft: 'd2', text: 'blue-2 march to the bridge' });
+    await sub.until((m) => m.find((x) => x.kind === 'draftState' && x.draft.id === 'd2'));
+    sub.send({ kind: 'issueOrder', orderId: 's2', draft: 'd2' });
+    const d = await sub.until((m) =>
+      m.find((x) => x.kind === 'draftState' && x.draft.id === 'd2' && x.draft.sent),
+    );
+    expect(d).toMatchObject({ draft: { sent: { role: 'subordinate', orderId: 's2' } } });
+    app!.hub.closeAll();
+  });
+
+  it('moves authority with the role: a new seat applies at once and a lost one is cut off', async () => {
+    const t = await lobbyTable();
+    const { cos, sub } = await seated(t);
+    const rec = app!.lobby.get(t.id)!;
+    const subRole = rec.roles!.find((r) => r.role === 'subordinate')!;
+    const cosRole = rec.roles!.find((r) => r.role === 'chiefOfStaff')!;
+
+    // The subordinate now commands blue-1 instead: the same socket may sign for it, not for blue-2.
+    app!.lobby.put({
+      ...rec,
+      roles: rec.roles!.map((r) => (r === subRole ? { ...r, units: ['blue-1'] } : r)),
+    });
+    sub.send({ kind: 'issueOrder', orderId: 'n1', text: 'blue-2 march to the bridge' });
+    expect(await sub.until((m) => m.find((x) => x.kind === 'error'))).toMatchObject({
+      code: 'order_rejected',
+    });
+    sub.send({ kind: 'issueOrder', orderId: 'n2', text: 'blue-1 march to the bridge' });
+    await sub.until((m) => m.find((x) => x.kind === 'dispatch' && x.dispatch.from.includes('1')));
+
+    // The chief of staff's role goes to someone else: the old holder's socket is closed, not
+    // left as shared HQ.
+    const closed = new Promise<number>((resolve) =>
+      cos.socket.addEventListener('close', (e) => resolve(e.code)),
+    );
+    app!.lobby.put({
+      ...app!.lobby.get(t.id)!,
+      roles: app!.lobby
+        .get(t.id)!
+        .roles!.filter((r) => r !== cosRole && r.userId !== cosRole.userId),
+    });
+    cos.send({ kind: 'issueOrder', orderId: 'x1', text: 'blue-1 march to the bridge' });
+    expect(await closed).toBe(1008);
+    expect((await store.inputLog(t.id)).filter((e) => e.command.kind === 'order')).toHaveLength(2);
+    app!.hub.closeAll();
+  });
+});
