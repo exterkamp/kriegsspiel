@@ -297,7 +297,7 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
         },
       };
     case 'turnState': {
-      const { turn, startsAt, endsAt, sent, deadline, resolving, held } = m;
+      const { turn, startsAt, endsAt, sent, deadline, resolving, held, pursuitUntil } = m;
       return {
         ...s,
         turnMode: true,
@@ -310,6 +310,7 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
           ...(deadline === undefined ? {} : { deadline }),
           resolving,
           held,
+          ...(pursuitUntil === undefined ? {} : { pursuitUntil }),
         },
       };
     }

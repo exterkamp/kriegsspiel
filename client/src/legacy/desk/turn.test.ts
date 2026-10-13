@@ -5,6 +5,7 @@ import { clockSummary, clockView } from './clock.js';
 import {
   deadlineText,
   heldLine,
+  pursuitText,
   resolvedText,
   sidesSent,
   timeOfDay,
@@ -189,5 +190,18 @@ describe('a sent turn in the client state', () => {
     const held = [{ orderId: 't-1', to: 'b1', text: 'Hold' }];
     const s = applyServerMessage(withView(initialState), turnState({ held, sent: ['red'] }), 0);
     expect(s.pending).toEqual([]);
+  });
+});
+
+describe('the pursuit after a ruling (#438)', () => {
+  it('keeps the time the game closes by from the turn state, and says the battle is decided', () => {
+    let s = applyServerMessage(withView(initialState), turnState(), 0);
+    expect(s.turn?.pursuitUntil).toBeUndefined();
+    expect(pursuitText(s.turn)).toBeUndefined();
+    s = applyServerMessage(s, turnState({ pursuitUntil: 8 * 60 * MIN + 51 * MIN }), 0);
+    expect(s.turn?.pursuitUntil).toBe(8 * 60 * MIN + 51 * MIN);
+    expect(pursuitText(s.turn)).toBe(
+      'The battle is decided; this turn is the pursuit. The game closes by 08:51 at the latest. You may send this turn with no orders.',
+    );
   });
 });

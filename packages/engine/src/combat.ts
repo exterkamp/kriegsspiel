@@ -187,6 +187,15 @@ function timerFrom(world: GameState, time: number): number {
   return world.turn ? Math.floor(time / MS_PER_MINUTE) * MS_PER_MINUTE : time;
 }
 
+/**
+ * When a declared battle closes (D13): the pursuit runs `BATTLE_CLOSE_MS` from the ruling, counted
+ * from its game minute in turn mode. It closes sooner if a side has nobody left. Undefined until a
+ * battle is declared. Public, like the ruling.
+ */
+export function pursuitEndsAt(world: GameState): GameTime | undefined {
+  return world.battle && timerFrom(world, world.battle.declaredAt) + BATTLE_CLOSE_MS;
+}
+
 /** True while only the attacker's active units have their centres on the objective. */
 function attackerHolds(world: GameState): boolean {
   const { attacker, objective } = world.victory;
@@ -226,7 +235,7 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
   if (battle) {
     const loser = world.sides.find((s) => s.id !== battle.winner)!.id;
     const loserOut = out.get(loser);
-    if (out.size === 0 && time < timerFrom(world, battle.declaredAt) + BATTLE_CLOSE_MS) return null;
+    if (out.size === 0 && time < pursuitEndsAt(world)!) return null;
     return {
       winner: battle.winner,
       reason: battle.reason,

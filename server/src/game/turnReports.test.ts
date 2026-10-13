@@ -30,6 +30,8 @@ interface Played {
   emitted: EmittedEvent[];
   /** Blue's in-tray as it stood at the end of each turn. */
   trays: { end: number; dispatches: Dispatch[] }[];
+  /** Blue's turn state as each turn opened. */
+  turns: NonNullable<ReturnType<Played['game']['turnStateFor']>>[];
 }
 
 /** A rigid turn game; with `orders`, Blue writes to its three units in turn 2. */
@@ -50,7 +52,9 @@ async function play(seed: number, turnMinutes: number, orders: boolean): Promise
   const settings: UmpireSettings = { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes };
   const game = await host.create('g1', { ...loadScenario(holdTheBridge), seed }, { settings });
   const trays: Played['trays'] = [];
+  const turns: Played['turns'] = [];
   for (let n = 1; n <= 20 && game.turnStateFor('blue'); n++) {
+    turns.push(game.turnStateFor('blue')!);
     if (orders && n === 2) {
       for (const [i, to] of ['blue-1', 'blue-3', 'blue-2'].entries()) {
         const order = {
@@ -67,7 +71,7 @@ async function play(seed: number, turnMinutes: number, orders: boolean): Promise
     const view = sideViewOf(game.state, 'blue', game.gameClock.snapshot());
     trays.push({ end: game.state.time, dispatches: view.dispatches });
   }
-  return { game, emitted, trays };
+  return { game, emitted, trays, turns };
 }
 
 const CASES = [10, 20, 30].flatMap((turnMinutes) =>
@@ -143,5 +147,25 @@ describe('turn mode: the turn reports (#438)', () => {
     const seen = first.dispatches.filter((d) => d.category === 'scouts');
     expect(seen.length).toBeGreaterThan(0);
     for (const d of seen) expect(d.receivedAtGame).toBeLessThanOrEqual(20 * MINUTE);
+  });
+
+  it('tells the players that a turn after the ruling is the pursuit, and until when (D13, D39)', async () => {
+    let pursuits = 0;
+    for (const { turnMinutes, seed, orders } of CASES) {
+      const { game, turns } = await play(seed, turnMinutes, orders);
+      const battle = game.state.world.battle;
+      for (const t of turns) {
+        if (battle && battle.declaredAt < t.startsAt) {
+          pursuits++;
+          // The game closes 20 game minutes after the ruling, counted from its minute.
+          const closes = Math.floor(battle.declaredAt / MINUTE) * MINUTE + 20 * MINUTE;
+          expect(t.pursuitUntil, `${turnMinutes} min, seed ${seed}, turn ${t.turn}`).toBe(closes);
+          expect(game.state.world.outcome!.time).toBeLessThanOrEqual(closes);
+        } else {
+          expect(t.pursuitUntil).toBeUndefined();
+        }
+      }
+    }
+    expect(pursuits).toBeGreaterThan(0);
   });
 });

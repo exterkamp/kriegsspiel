@@ -108,6 +108,7 @@ export {
   coverFactor,
   FIRE_RATE,
   issueAttack,
+  pursuitEndsAt,
   registerCombat,
   startGame,
 } from './combat.js';

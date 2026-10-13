@@ -15,6 +15,9 @@
         </span>
       </p>
     }
+    @if (pursuit(); as text) {
+      <p class="pursuit" role="note" data-testid="turn-pursuit">{{ text }}</p>
+    }
     @if (p === 'resolving') {
       <p class="resolving" role="status" data-testid="turn-resolving">
         <span class="quill" aria-hidden="true"></span>{{ resolvingText }}
