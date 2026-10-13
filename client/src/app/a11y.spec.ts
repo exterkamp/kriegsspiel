@@ -104,6 +104,18 @@ describe('screen reader support', () => {
     });
     await f.whenStable();
     expect(say()).toBe('New dispatch from Capt. Hale.');
+    const first = f.nativeElement.querySelector('[data-testid=announcer]').textContent;
+    g.fake.set({
+      dispatches: [
+        ...dispatches,
+        { ...dispatches[0]!, id: 'd2', from: 'Capt. Hale' },
+        { ...dispatches[0]!, id: 'd3', from: 'Capt. Hale' },
+      ],
+    });
+    await f.whenStable();
+    const again = f.nativeElement.querySelector('[data-testid=announcer]').textContent;
+    expect(again.trim()).toBe('New dispatch from Capt. Hale.');
+    expect(again).not.toBe(first);
   });
 
   it('describes the flat board in text', async () => {
@@ -111,6 +123,7 @@ describe('screen reader support', () => {
     const items = [...el.querySelectorAll('#board-summary li')].map((l) => l.textContent);
     expect(items.some((t) => t?.startsWith('Your unit'))).toBe(true);
     expect(el.querySelector('svg')?.getAttribute('aria-describedby')).toBe('board-summary');
+    expect(el.querySelector('svg')?.getAttribute('role')).toBe('img');
   });
 
   it('keeps Tab inside the game-over dialog', async () => {

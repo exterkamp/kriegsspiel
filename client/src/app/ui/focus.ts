@@ -1,4 +1,6 @@
-const FOCUSABLE = 'button:not([disabled]), input, select, textarea, a[href]';
+const FOCUSABLE = ['button', 'input', 'select', 'textarea', 'a[href]', '[tabindex]']
+  .map((s) => `${s}:not([disabled]):not([tabindex="-1"])`)
+  .join(', ');
 
 /** Keeps Tab and Shift+Tab inside `container` (a modal dialog): wraps from the last control to the first and back. */
 export function trapTab(e: KeyboardEvent, container: HTMLElement): void {
