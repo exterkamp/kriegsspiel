@@ -1,6 +1,6 @@
 /** Pure helpers for the admin page (Epic #119, story 8.3). The DOM wiring lives in `admin.ts`. */
 
-export const PANELS = ['State', 'Events', 'Requests', 'LLM', 'Replay'] as const;
+export const PANELS = ['State', 'Events', 'Requests', 'LLM', 'Replay', 'Orders'] as const;
 export type PanelId = (typeof PANELS)[number];
 
 export type LinkStatus = 'connecting' | 'live' | 'reconnecting' | 'disabled' | 'unauthorized';
@@ -34,7 +34,7 @@ export function stepPanel(current: PanelId, delta: number): PanelId {
   return PANELS[(i + delta + PANELS.length) % PANELS.length]!;
 }
 
-/** The panel for a digit key `1`-`5`, if any. */
+/** The panel for a digit key `1`-`6`, if any. */
 export function panelForKey(key: string): PanelId | undefined {
   const n = Number(key);
   return Number.isInteger(n) ? PANELS[n - 1] : undefined;

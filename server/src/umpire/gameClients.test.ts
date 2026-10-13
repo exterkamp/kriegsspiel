@@ -1,7 +1,7 @@
 /** Per-game umpire clients are evicted (#263) and the parser wiring from main.ts is testable. */
 import { describe, expect, it } from 'vitest';
 import { CORPUS_CONTEXT } from '../orders/eval/corpus.js';
-import { InterpretingParser } from '../orders/interpret.js';
+import { INTERPRET_ORDERS_PROMPT_VERSION, InterpretingParser } from '../orders/interpret.js';
 import type { OrderParser } from '../orders/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { GameClients, orderParserFor } from './gameClients.js';
@@ -97,5 +97,51 @@ describe('orderParserFor', () => {
     const r = await (make as (id: string) => OrderParser)('g').parse('Advance', CORPUS_CONTEXT);
     expect(calls).toEqual(['Advance']);
     expect(r).toMatchObject({ kind: 'intents', unitId: 'blue-1' });
+  });
+
+  it("records an interpret note when the subordinate's reading is refused", async () => {
+    const recorded: Array<{ kind: string; data: unknown }> = [];
+    const trace = {
+      enabled: true,
+      record: (_id: string, kind: string, data: unknown) => recorded.push({ kind, data }),
+    };
+    const client: UmpireClient = {
+      async call(req) {
+        if (req.promptVersion === INTERPRET_ORDERS_PROMPT_VERSION) {
+          return { output: { action: 'exceed', intentStated: false } } as never;
+        }
+        return {
+          output: {
+            result: 'intents',
+            unitId: 'blue-1',
+            intents: [{ kind: 'move', place: 'bridge' }],
+          },
+          record: {},
+        } as never;
+      },
+    };
+    const ctx = {
+      ...CORPUS_CONTEXT,
+      units: CORPUS_CONTEXT.units.map((u) =>
+        u.id === 'blue-1' ? { ...u, personality: ['aggressive'] } : u,
+      ),
+    };
+    const make = orderParserFor({ llm: true, clientFor: () => client, trace }) as (
+      id: string,
+    ) => OrderParser;
+    const r = await make('g').parse('Take the bridge', ctx);
+    expect(r).toMatchObject({ kind: 'intents', unitId: 'blue-1' });
+    expect(r).not.toHaveProperty('interpretation');
+    expect(recorded).toEqual([
+      {
+        kind: 'order',
+        data: {
+          step: 'interpret',
+          text: 'Take the bridge',
+          reason: 'bad amount',
+          answeredBy: 'as-written',
+        },
+      },
+    ]);
   });
 });

@@ -41,8 +41,14 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import { spaFallback } from './spaFallback.js';
 import {
   DEFAULT_UMPIRE_DIAL,
+  DEFAULT_TURN_MINUTES,
   DEFAULT_UMPIRE_PERSONA,
   DIALS,
+  GAME_MODES,
+  MAX_TURN_DEADLINE_HOURS,
+  MAX_TURN_MINUTES,
+  MIN_TURN_DEADLINE_HOURS,
+  MIN_TURN_MINUTES,
   PERSONAS,
 } from '@kriegsspiel/protocol';
 import { z } from 'zod';
@@ -59,6 +65,7 @@ import {
   type Timers,
 } from '../game/index.js';
 import { adminApi } from '../admin/adminApi.js';
+import type { OrderPlayground } from '../admin/orderDebug.js';
 import { loadReplayInput, replayTimeline } from '../admin/replayView.js';
 import { LogMailer, type Mailer } from '../auth/mailer.js';
 import { originAllowed } from '../auth/origin.js';
@@ -124,6 +131,15 @@ const CreateGame = z
     /** The rigid-to-free dial and the umpire's persona (3.11); both optional, defaulting to standard and dry. */
     dial: z.enum(DIALS).optional(),
     persona: z.enum(PERSONAS).optional(),
+    /** Real-time (the default) or turn-based play (D39); the turn settings apply only to the latter. */
+    mode: z.enum(GAME_MODES).optional(),
+    turnMinutes: z.number().int().min(MIN_TURN_MINUTES).max(MAX_TURN_MINUTES).optional(),
+    turnDeadlineHours: z
+      .number()
+      .finite()
+      .min(MIN_TURN_DEADLINE_HOURS)
+      .max(MAX_TURN_DEADLINE_HOURS)
+      .optional(),
     hierarchy: z.enum(['shared', 'chain']).optional(),
     lobby: z.boolean().optional(),
   })
@@ -199,7 +215,14 @@ export interface AppOptions {
    * Debug/admin view (Epic #119). Off unless `enabled`: then no `/admin` route exists and the
    * trace is a no-op. When on, requests must be loopback or carry `token`.
    */
-  admin?: { enabled: boolean; token?: string; open?: boolean; trace?: TraceStore };
+  admin?: {
+    enabled: boolean;
+    token?: string;
+    open?: boolean;
+    trace?: TraceStore;
+    /** Dry runs for the admin Orders panel (#395); never tied to a game's client or budget. */
+    playground?: OrderPlayground;
+  };
   /**
    * Accounts. Defaults to an in-memory store and a mailer that logs the login link, which suits
    * tests and local development; `main.ts` supplies the SQLite store and a real mailer.
@@ -457,6 +480,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
       store,
       token: options.admin?.token,
       open: options.admin?.open === true,
+      playground: options.admin?.playground,
     });
 
   if (options.staticDir) {
@@ -613,6 +637,16 @@ export async function buildApp(options: AppOptions): Promise<App> {
       umpire: {
         dial: body.data.dial ?? DEFAULT_UMPIRE_DIAL,
         persona: body.data.persona ?? DEFAULT_UMPIRE_PERSONA,
+        // Turn mode only: a real-time game's record and header stay as before (D39).
+        ...(body.data.mode === 'turns'
+          ? {
+              mode: 'turns' as const,
+              turnMinutes: body.data.turnMinutes ?? DEFAULT_TURN_MINUTES,
+              ...(body.data.turnDeadlineHours === undefined
+                ? {}
+                : { turnDeadlineHours: body.data.turnDeadlineHours }),
+            }
+          : {}),
       },
       ...(body.data.hierarchy ? { hierarchy: body.data.hierarchy } : {}),
       creator: user.id,

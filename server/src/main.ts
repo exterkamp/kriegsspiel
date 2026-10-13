@@ -41,6 +41,7 @@ import { llmAgents } from './opponent/index.js';
 import { LlmOrderParser } from './orders/llmParser.js';
 import { StubOrderParser } from './orders/stubParser.js';
 import { TraceStore, traceUmpire } from './debug/index.js';
+import { OrderPlayground } from './admin/orderDebug.js';
 import type { UmpireClient } from './umpire/index.js';
 import { GameClients, orderParserFor } from './umpire/gameClients.js';
 import {
@@ -85,13 +86,16 @@ const umpire = umpireConfig
 const tracedUmpire = (client: UmpireClient, gameId: string): UmpireClient =>
   trace ? traceUmpire(client, { trace, gameId, mode: 'live' }) : client;
 // With a local model on `parse`, an order it cannot place is retried by the canned test parser before the stub.
+// The test provider is also the canned parser the admin playground compares against (#395).
+const testUmpire = createUmpireClient({
+  config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }),
+  env: {},
+});
 const cannedParser = umpireConfig?.fallbackProvider
-  ? new LlmOrderParser(
-      createUmpireClient({ config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }), env: {} }),
-      {
+  ? (gameId: string) =>
+      new LlmOrderParser(tracedUmpire(testUmpire, gameId), {
         fallbackParser: new StubOrderParser(),
-      },
-    )
+      })
   : undefined;
 const gameClients = new GameClients((gameId) =>
   createGameUmpire(tracedUmpire(umpire!, gameId), {
@@ -108,6 +112,7 @@ const { server } = await buildApp({
     clientFor: gameUmpire,
     cannedParser,
     onFallback: (gameId, reason) => server.log.warn({ gameId, reason }, 'order parser fallback'),
+    trace,
   }),
   onGameDone: (gameId) => {
     const report = gameClients.peek(gameId)?.report();
@@ -140,7 +145,14 @@ const { server } = await buildApp({
         (gameId) => gameUmpire(gameId)
       : undefined,
   critic: umpire && umpireConfig ? (gameId) => gameUmpire(gameId) : undefined,
-  admin: { ...admin, trace },
+  admin: {
+    ...admin,
+    trace,
+    // Dry runs use their own client from the same config: no game budget, no fallback (#395).
+    playground: admin.enabled
+      ? new OrderPlayground({ config: umpireConfig ?? loadedConfig, cannedClient: testUmpire })
+      : undefined,
+  },
   testUmpire: umpireConfig ? usesTestUmpire(umpireConfig) : false,
   trustProxy: trustProxyFromEnv(process.env),
   notify: { store: notifyStore, push: pushFromEnv(process.env) },

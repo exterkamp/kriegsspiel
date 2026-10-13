@@ -24,7 +24,9 @@ import type {
   StaffExchange,
   UmpireSettings,
 } from '@kriegsspiel/protocol';
+import { turnSettingsOf } from '@kriegsspiel/protocol';
 import type { GameStore, InputLogEntry } from './store.js';
+import { openTurnFromLog, sentTurnIdsFromLog, type TurnResolver } from './turns.js';
 
 /** Each side's deputy settings (the last set) and the account of its turns, from a game's whole input log (D6f). */
 export function deputiesFromLog(
@@ -84,8 +86,10 @@ export interface GameHostOptions {
   narrator?: (gameId: string) => UmpireClient | undefined;
   /** Whether the player who appointed a side's deputy is away from the table now (D6f). Unset: always. */
   deputyAway?: (gameId: string, side: string, seat: Seat | undefined) => boolean;
-  /** Pause voting for a game: who votes and the host's rules. Unset: players cannot vote to pause. */
+  /** Pause voting for a game: who votes and the host's rules. Unset: players cannot vote to pause. Never used in turn mode. */
   pause?: (id: string, world: GameState) => PauseConfig | undefined;
+  /** Resolves a turn-mode game's turns (D39). Unset: `NO_ORDERS_RESOLVER` (until 11.4). */
+  turnResolver?: (gameId: string, settings: UmpireSettings) => TurnResolver | undefined;
 }
 
 export class GameHost {
@@ -129,6 +133,18 @@ export class GameHost {
       parseTimeoutMs: o.parseTimeoutMs,
       narrateTimeoutMs: o.narrateTimeoutMs,
       parseRetryDelayMs: o.parseRetryDelayMs,
+    };
+  }
+
+  /** The actor's turn options for a turn-mode game; undefined for a real-time one. */
+  private turnsFor(id: string, settings: UmpireSettings | undefined) {
+    const turn = turnSettingsOf(settings);
+    if (!turn || !settings) return undefined;
+    const resolver = this.options.turnResolver?.(id, settings);
+    return {
+      turnMs: turn.turnMinutes * 60_000,
+      ...(turn.turnDeadlineHours === undefined ? {} : { deadlineHours: turn.turnDeadlineHours }),
+      ...(resolver ? { resolver } : {}),
     };
   }
 
@@ -179,13 +195,16 @@ export class GameHost {
       seed: world.seed,
       ...(settings ? { settings } : {}),
     });
+    // Turn mode (D39): the clock is manual for the game's whole life, there is no pause vote, and
+    // the rate is ignored.
+    const turns = this.turnsFor(id, settings);
     const actor = new GameActor({
       ...this.actorOptions(id),
       state,
       agents: this.agentsFor(id, world),
-      pause: this.options.pause?.(id, world),
+      ...(turns ? { turns } : { pause: this.options.pause?.(id, world) }),
       persona: settings?.persona,
-      clock: new GameClock(this.options.wallNow, { rate: clock.rate }),
+      clock: new GameClock(this.options.wallNow, turns ? { mode: 'manual' } : { rate: clock.rate }),
     });
     this.games.set(id, actor);
     await actor.start();
@@ -226,11 +245,14 @@ export class GameHost {
       else if (e.command.kind === 'setMode') mode = e.command.mode;
       for (const t of e.ratio ?? []) if (t.outcome === 'passed') rate = t.rate;
     }
+    const settings = (await store.logHeader(id))?.settings;
+    const turnOptions = this.turnsFor(id, settings);
+    // A turn-mode game has nothing to pause: game time does not run while it is down.
     const clock = new GameClock(this.options.wallNow, {
       gameMs: state.time,
       rate,
-      mode,
-      status: snap.clock.status === 'stopped' ? 'stopped' : 'paused',
+      mode: turnOptions ? 'manual' : mode,
+      status: snap.clock.status === 'stopped' ? 'stopped' : turnOptions ? 'running' : 'paused',
     });
     // The conference is not in a snapshot, so it comes from the whole log.
     const log = await store.inputLog(id);
@@ -248,6 +270,12 @@ export class GameHost {
       staffHistory.set(c.side, [...(staffHistory.get(c.side) ?? []), c.exchange]);
     }
     const deputies = deputiesFromLog(log);
+    const open = turnOptions ? openTurnFromLog(log) : undefined;
+    const turns = turnOptions && {
+      ...turnOptions,
+      ...(open ? { open } : {}),
+      sentIds: sentTurnIdsFromLog(log),
+    };
     const actor = new GameActor({
       ...this.actorOptions(id),
       state,
@@ -257,9 +285,9 @@ export class GameHost {
       holdsUsed,
       clock,
       agents: this.agentsFor(id, state.world),
-      pause: this.options.pause?.(id, state.world),
+      ...(turns ? { turns } : { pause: this.options.pause?.(id, state.world) }),
       restart: { downMs },
-      persona: (await store.logHeader(id))?.settings?.persona,
+      persona: settings?.persona,
       // The log is in insertion order, which is not always seq order (see D14b).
       seq: tail.reduce((max, e) => Math.max(max, e.seq), snap.seq),
     });
