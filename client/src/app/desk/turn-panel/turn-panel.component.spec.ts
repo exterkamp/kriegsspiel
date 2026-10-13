@@ -106,6 +106,20 @@ describe('TurnPanelComponent', () => {
     expect(note?.textContent).toContain('no orders');
   });
 
+  it('drops "send with no orders" from the pursuit note once the side has sent or the turn is being decided', async () => {
+    const pursuit = { turn: 3, startsAt: 40 * MIN, endsAt: 60 * MIN, pursuitUntil: 51 * MIN };
+    for (const t of [
+      turn({ ...pursuit, sent: ['blue'] }),
+      turn({ ...pursuit, sent: ['blue', 'red'], resolving: true }),
+    ]) {
+      TestBed.resetTestingModule();
+      const m = await mount(t);
+      const note = m.el.querySelector('[data-testid="turn-pursuit"]');
+      expect(note?.textContent).toContain('closes by 00:51 at the latest');
+      expect(note?.textContent).not.toContain('no orders');
+    }
+  });
+
   it('is gone once the game is over', async () => {
     const t = await mount();
     t.g.fake.set({ gameOver: { winner: 'blue', reason: 'eliminated', atGame: 0 } });

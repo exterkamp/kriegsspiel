@@ -71,6 +71,12 @@ export interface Order {
    * it as "no new order" and carries on as before. `intents` is then empty.
    */
   textOnly?: true;
+  /**
+   * The desk's own id for the order, when a player sent it. The unit's acknowledgement and the
+   * staff's lost-courier paper carry it (`Report.orderRef`), so the desk knows which order a paper
+   * is about (#438).
+   */
+  ref?: string;
 }
 
 /** A fast courier rides hard and is more likely to be lost or to garble; a safe one takes the quiet way. */
@@ -209,7 +215,10 @@ function reportOverdue(world: GameState, c: Courier, time: number): GameState {
   if (!unit || unit.strength <= 0) return world;
   const orderDueAt = arrivalOf(c, c.order.issuedAt);
   const due = Math.max(time, orderDueAt + COURIER_OVERDUE_MS);
-  return fileReport(world, 'courierLost', unit, due, 0, { orderDueAt });
+  return fileReport(world, 'courierLost', unit, due, 0, {
+    orderDueAt,
+    ...(c.order.ref === undefined ? {} : { orderRef: c.order.ref }),
+  });
 }
 const arrivalOf = (c: Courier, issuedAt: number) => c.legs.at(-1)?.arriveAt ?? issuedAt;
 
@@ -379,7 +388,11 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     const ack = {
       time: ev.time,
       type: REPORT_EVENT,
-      payload: { kind: 'orderDelivered', unitId: unit.id },
+      payload: {
+        kind: 'orderDelivered',
+        unitId: unit.id,
+        ...(order.ref === undefined ? {} : { orderRef: order.ref }),
+      },
     };
     // In an umpire turn the order is delivered and acknowledged, but the umpire decides what
     // the unit makes of it: no intent is adopted (D39).

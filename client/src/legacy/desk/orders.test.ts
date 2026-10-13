@@ -10,6 +10,7 @@ import {
   formatEstimate,
   loadDraft,
   lostBy,
+  orderOutcomes,
   orderWithOption,
   refusalText,
   saveDraft,
@@ -187,5 +188,35 @@ describe('word of an order (#438)', () => {
     expect(lostBy(order, [paper('r1', 'engaged', 21), lost])).toBe(lost);
     expect(lostBy(order, [paper('r2', 'orderDelivered', 22), lost])).toBeUndefined();
     expect(lostBy(order, [paper('r5', 'courierLost', 15)])).toBeUndefined();
+  });
+
+  describe('two orders to one unit in flight: each paper names its order', () => {
+    const a = { ...order, orderId: 'o-a', sentAtGame: 10 * 60_000 };
+    const b = { ...order, orderId: 'o-b', sentAtGame: 25 * 60_000 };
+    const about = (d: Dispatch, orderId: string): Dispatch => ({ ...d, orderId });
+
+    it("resending after silence: A's courier lost, B acknowledged before A is given up", () => {
+      const ackB = about(paper('r1', 'orderDelivered', 30), 'o-b');
+      const lostA = about(paper('r2', 'courierLost', 35), 'o-a');
+      for (const papers of [[ackB], [ackB, lostA], [lostA, ackB]]) {
+        expect(deliveredBy(a, papers)).toBeUndefined();
+        expect(deliveredBy(b, papers)).toBe(ackB);
+        expect(lostBy(b, papers)).toBeUndefined();
+      }
+      expect(lostBy(a, [ackB, lostA])).toBe(lostA);
+      const outcomes = orderOutcomes([a, b], [lostA, ackB]);
+      expect(outcomes.get('o-a')).toEqual({ lost: lostA });
+      expect(outcomes.get('o-b')).toEqual({ arrived: ackB });
+    });
+
+    it("one order per turn: A's lost paper written after B was sent does not lose B", () => {
+      const lostA = about(paper('r1', 'courierLost', 35), 'o-a');
+      const ackB = about(paper('r2', 'orderDelivered', 40), 'o-b');
+      expect(lostBy(b, [lostA])).toBeUndefined();
+      expect(lostBy(a, [lostA])).toBe(lostA);
+      const outcomes = orderOutcomes([a, b], [ackB, lostA]);
+      expect(outcomes.get('o-a')).toEqual({ lost: lostA });
+      expect(outcomes.get('o-b')).toEqual({ arrived: ackB });
+    });
   });
 });

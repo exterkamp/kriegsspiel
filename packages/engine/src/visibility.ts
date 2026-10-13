@@ -300,6 +300,8 @@ export interface ViewReport {
   sizeEstimate?: string;
   confidence: Report['confidence'];
   text: string;
+  /** For an acknowledgement or a lost courier: the desk's id of the order it is about. */
+  orderRef?: string;
 }
 
 /** An enemy dispatch this side took from a courier, once it has reached HQ. */
@@ -528,6 +530,7 @@ export function viewFor(
             senderOf(state, side, r),
             state.seed,
           ),
+          ...(r.orderRef === undefined ? {} : { orderRef: r.orderRef }),
         };
       }),
     documents: intel.documents
@@ -640,7 +643,7 @@ export function fileReport(
   unit: Unit,
   time: GameTime,
   delayMs: number = COURIER_DELAY_MS,
-  extra: Pick<Report, 'orderDueAt' | 'routed' | 'rallied'> = {},
+  extra: Pick<Report, 'orderDueAt' | 'orderRef' | 'routed' | 'rallied'> = {},
 ): GameState {
   const report: Report = {
     id: reportId(world, unit.side),
@@ -679,14 +682,15 @@ export function registerVisibility(registry: EventRegistry<GameState>): void {
   });
 
   registry.register(REPORT_EVENT, (world, ev) => {
-    const p = ev.payload as unknown as { kind: string; unitId: string };
+    const p = ev.payload as unknown as { kind: string; unitId: string; orderRef?: string };
     if (!REPORT_KINDS.includes(p?.kind as Report['kind'])) {
       throw new Error(`${REPORT_EVENT}: unknown report kind ${String(p?.kind)}`);
     }
     const unit = world.units.find((u) => u.id === p.unitId);
     if (!unit) throw new Error(`${REPORT_EVENT}: unknown unit ${String(p.unitId)}`);
     const delay = p.kind === 'orderDelivered' ? ACK_DELAY_MS : COURIER_DELAY_MS;
-    return { world: fileReport(world, p.kind as Report['kind'], unit, ev.time, delay) };
+    const extra = typeof p.orderRef === 'string' ? { orderRef: p.orderRef } : {};
+    return { world: fileReport(world, p.kind as Report['kind'], unit, ev.time, delay, extra) };
   });
 }
 

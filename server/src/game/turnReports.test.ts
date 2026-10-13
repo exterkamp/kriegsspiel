@@ -111,6 +111,24 @@ describe('turn mode: the turn reports (#438)', () => {
         }
       }
 
+      // (1) Each acknowledgement and lost-courier paper names the desk's order it is about, and says
+      // what really became of that order, so the journal never has to guess.
+      const deliveredIds = new Set(
+        emitted
+          .filter((e) => e.type === 'order_delivered')
+          .map((e) => (e.payload as { orderId?: string }).orderId),
+      );
+      for (const d of last.filter((x) => x.kind === 'orderDelivered' || x.kind === 'courierLost')) {
+        expect(d.orderId, `${d.id} ${d.kind}`).toMatch(/^o[0-2]$/);
+        expect(deliveredIds.has(`blue-${d.orderId}`), `${d.id} ${d.kind}`).toBe(
+          d.kind === 'orderDelivered',
+        );
+      }
+      if (!orders)
+        expect(last.filter((x) => x.kind === 'orderDelivered' || x.kind === 'courierLost')).toEqual(
+          [],
+        );
+
       // (3) A unit that broke says it holds only once it has rallied, and then it says so.
       for (const u of world.units.filter((x) => x.side === 'blue')) {
         const mine = last
@@ -157,9 +175,16 @@ describe('turn mode: the turn reports (#438)', () => {
       for (const t of turns) {
         if (battle && battle.declaredAt < t.startsAt) {
           pursuits++;
-          // The game closes 20 game minutes after the ruling, counted from its minute.
-          const closes = Math.floor(battle.declaredAt / MINUTE) * MINUTE + 20 * MINUTE;
-          expect(t.pursuitUntil, `${turnMinutes} min, seed ${seed}, turn ${t.turn}`).toBe(closes);
+          // The game closes 20 game minutes after the ruling, counted from its minute, or at the
+          // time limit if that comes first.
+          const limit = game.state.world.victory.holdMs;
+          const closes = Math.min(
+            Math.floor(battle.declaredAt / MINUTE) * MINUTE + 20 * MINUTE,
+            limit,
+          );
+          const label = `${turnMinutes} min, seed ${seed}, turn ${t.turn}`;
+          expect(t.pursuitUntil, label).toBe(closes);
+          expect(t.pursuitUntil!, label).toBeLessThanOrEqual(limit);
           expect(game.state.world.outcome!.time).toBeLessThanOrEqual(closes);
         } else {
           expect(t.pursuitUntil).toBeUndefined();

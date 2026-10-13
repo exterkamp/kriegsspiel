@@ -463,7 +463,10 @@ export class GameActor {
   turnStateFor(side: string): TurnStateView | undefined {
     const t = this.openTurn;
     if (!t || this.engine.world.outcome) return undefined;
-    const pursuit = pursuitEndsAt(this.engine.world);
+    // The time limit cuts the pursuit short (D13), so the banner never names a later minute.
+    const close = pursuitEndsAt(this.engine.world);
+    const pursuit =
+      close === undefined ? undefined : Math.min(close, this.engine.world.victory.holdMs);
     return {
       turn: t.n,
       startsAt: t.startMs,
@@ -2289,6 +2292,8 @@ export class GameActor {
       command.side,
       parsed,
       command.courier,
+      undefined,
+      command.orderId,
     );
     if ('reason' in applied) {
       if (parsed.kind === 'clarification') {

@@ -61,6 +61,8 @@ export const Dispatch = z
     sizeEstimate: z.string().optional(),
     confidence: z.enum(['low', 'medium', 'high']).optional(),
     text: z.string(),
+    /** For `orderDelivered` and `courierLost`: the id of the order the paper is about, as the desk sent it (#438). */
+    orderId: z.string().optional(),
   })
   .strict();
 export type Dispatch = z.infer<typeof Dispatch>;

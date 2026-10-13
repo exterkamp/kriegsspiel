@@ -81,11 +81,16 @@ export const turnEntry = (t: Pick<TurnInfo, 'turn' | 'startsAt' | 'endsAt'>): Jo
 
 /**
  * The banner on a turn after the umpire has ruled the battle (D13): the rest is the pursuit, and the
- * player need not write orders for it (#438). Undefined before a ruling.
+ * player need not write orders for it (#438), which is said only while the turn is being written.
+ * Undefined before a ruling.
  */
-export function pursuitText(t: Pick<TurnInfo, 'pursuitUntil'> | undefined): string | undefined {
+export function pursuitText(
+  t: Pick<TurnInfo, 'pursuitUntil'> | undefined,
+  writing = true,
+): string | undefined {
   if (t?.pursuitUntil === undefined) return undefined;
-  return `The battle is decided; this turn is the pursuit. The game closes by ${timeOfDay(t.pursuitUntil)} at the latest. You may send this turn with no orders.`;
+  const text = `The battle is decided; this turn is the pursuit. The game closes by ${timeOfDay(t.pursuitUntil)} at the latest.`;
+  return writing ? `${text} You may send this turn with no orders.` : text;
 }
 
 /** What the desk says while the turn is being decided. */

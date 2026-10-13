@@ -32,11 +32,13 @@ import {
   BATTLE_CLOSE_MS,
   forceBroken,
   evaluateVictory,
+  standing,
   outcomeText,
   turnVictory,
 } from './combat.js';
 import { viewFor } from './index.js';
-import type { BattleRuling } from './types.js';
+import type { BattleRuling, Report } from './types.js';
+import { fileReport } from './visibility.js';
 import { polygonCentroid } from './geometry.js';
 import { river, wood } from './scenario.testkit.js';
 
@@ -1478,5 +1480,40 @@ describe('combat v2: balance smoke test', () => {
   it('a unit shot in the flank by an equal one loses more often than not', () => {
     // Blue faces north, so Red's fire from the east is a flank shot; Red faces Blue.
     expect(winRates({ facingDeg: 0 }, {}).red).toBeGreaterThan(0.6);
+  });
+});
+
+describe('how a unit in the fight stands as it writes (#438)', () => {
+  const s = field(duel);
+  const blue = unit(s, 'blue-1');
+  /** The world with these fight reports from blue-1 on file, oldest first. */
+  const filed = (...kinds: [Report['kind'], Pick<Report, 'routed' | 'rallied'>?][]): GameState => {
+    let w = s.world;
+    for (const [i, [kind, extra]] of kinds.entries())
+      w = fileReport(w, kind, blue, i * MS_PER_MINUTE, 0, extra ?? {});
+    return w;
+  };
+
+  it('is routed while broken and falling back, and in the tick it breaks', () => {
+    const withdrawn = { ...blue, status: 'withdrawn' as const, brokenAt: 0 };
+    expect(standing(s.world, withdrawn)).toEqual({ routed: true });
+    expect(standing(s.world, { ...blue, morale: BREAK_MORALE - 1 })).toEqual({ routed: true });
+  });
+
+  it('is plain for a unit that has not broken', () => {
+    expect(standing(s.world, blue)).toEqual({});
+    expect(standing(filed(['engaged'], ['heavyLosses']), blue)).toEqual({});
+    // A withdrawal by order is not a rout.
+    expect(standing(s.world, { ...blue, status: 'withdrawn' as const })).toEqual({});
+  });
+
+  it('says it rallied in its first fight report after a break, and is plain after that', () => {
+    expect(standing(filed(['engaged'], ['broke']), blue)).toEqual({ rallied: true });
+    expect(standing(filed(['broke'], ['heavyLosses', { routed: true }]), blue)).toEqual({
+      rallied: true,
+    });
+    expect(standing(filed(['broke'], ['engaged', { rallied: true }]), blue)).toEqual({});
+    // Other papers from the unit, such as an acknowledgement, are not fight reports.
+    expect(standing(filed(['broke'], ['orderDelivered']), blue)).toEqual({ rallied: true });
   });
 });

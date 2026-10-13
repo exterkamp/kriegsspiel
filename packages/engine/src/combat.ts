@@ -355,7 +355,7 @@ function declareBattle(
     world: w,
     schedule: [
       {
-        time: Math.max(time, timerFrom(world, time) + BATTLE_CLOSE_MS),
+        time: Math.max(time, pursuitEndsAt(w)!),
         type: COMBAT_CHECK_EVENT,
       },
     ],
@@ -392,7 +392,7 @@ const FIGHT_REPORTS: ReadonlySet<Report['kind']> = new Set(['engaged', 'heavyLos
  * so its note does not say it holds; `rallied` in its first report of the fight since it rallied
  * from a break, so the note says so before it says it holds again.
  */
-function standing(world: GameState, u: Unit): Pick<Report, 'routed' | 'rallied'> {
+export function standing(world: GameState, u: Unit): Pick<Report, 'routed' | 'rallied'> {
   // Broken, or breaking in this very tick (its `broke` report follows this one).
   if (u.status === 'withdrawn' && u.brokenAt !== undefined) return { routed: true };
   if (u.status === 'active' && u.morale < unitTypeOf(u).breakMorale) return { routed: true };
@@ -423,6 +423,13 @@ function finish(world: GameState, outcome: Outcome): HandlerResult<GameState> {
           r.deliverAt > outcome.time && r.observedAt <= outcome.time
             ? { ...r, deliverAt: outcome.time }
             : r,
+        ),
+        // Dispatches taken before the end are read too, though captured ones are dated to the
+        // turn's end in turn mode (#438).
+        documents: i.documents.map((d) =>
+          d.deliverAt > outcome.time && d.capturedAt <= outcome.time
+            ? { ...d, deliverAt: outcome.time }
+            : d,
         ),
       },
     ]),

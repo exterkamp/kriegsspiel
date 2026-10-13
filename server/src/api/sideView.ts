@@ -70,6 +70,7 @@ export function toDispatch(r: ViewReport): Dispatch {
     ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
     confidence: r.confidence,
     text: r.text,
+    ...(r.orderRef === undefined ? {} : { orderId: r.orderRef }),
   };
 }
 
