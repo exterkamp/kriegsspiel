@@ -1,0 +1,230 @@
+{
+  "head": "04453f4a126f072d7731fa84749cf4a9a4ec8c9b",
+  "base": "c8e3ec61efe56846f462f105414a615401ef3e4a",
+  "snapshot": "/private/tmp/kriegsspiel-angular-a5-source-c8",
+  "url": "http://127.0.0.1:41772",
+  "responses": [
+    {
+      "method": "GET",
+      "path": "/",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41772/",
+      "bytes": 2862,
+      "sha256": "3eafba09ac99bc208bbf7bfc2fe51171a1ed3921f701107abfe24dc7b21f51bc",
+      "bodyPrefix": "<!doctype html>\n<html lang=\"en\" data-beasties-container>\n  <head>\n    <meta charset=\"UTF-8\">\n    <me"
+    },
+    {
+      "method": "GET",
+      "path": "/?mode=fixture",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41772/?mode=fixture",
+      "bytes": 2862,
+      "sha256": "3eafba09ac99bc208bbf7bfc2fe51171a1ed3921f701107abfe24dc7b21f51bc",
+      "bodyPrefix": "<!doctype html>\n<html lang=\"en\" data-beasties-container>\n  <head>\n    <meta charset=\"UTF-8\">\n    <me"
+    },
+    {
+      "method": "GET",
+      "path": "/dev/local-board",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41772/dev/local-board",
+      "bytes": 87,
+      "sha256": "efc7d1435fcbc1bbed59306fbf038fbed87fcf943feffc525ed99fca33d9cda5",
+      "bodyPrefix": "{\"message\":\"Route GET:/dev/local-board not found\",\"error\":\"Not Found\",\"statusCode\":404}"
+    },
+    {
+      "method": "GET",
+      "path": "/dev/local-board?mode=fixture",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41772/dev/local-board?mode=fixture",
+      "bytes": 87,
+      "sha256": "efc7d1435fcbc1bbed59306fbf038fbed87fcf943feffc525ed99fca33d9cda5",
+      "bodyPrefix": "{\"message\":\"Route GET:/dev/local-board not found\",\"error\":\"Not Found\",\"statusCode\":404}"
+    },
+    {
+      "method": "GET",
+      "path": "/__local-default/countryside-rectangle.json",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41772/__local-default/countryside-rectangle.json",
+      "bytes": 114,
+      "sha256": "f922c0cc9324324953cce78ad401d89367c22effe19419ab6235c1d73d17ba9f",
+      "bodyPrefix": "{\"message\":\"Route GET:/__local-default/countryside-rectangle.json not found\",\"error\":\"Not Found\",\"st"
+    },
+    {
+      "method": "GET",
+      "path": "/__local/maps",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41772/__local/maps",
+      "bytes": 84,
+      "sha256": "ba1cdbb4553bdebb45888e5e5250ebba8eff3465a30e3770f96b4ff12a4a1c9e",
+      "bodyPrefix": "{\"message\":\"Route GET:/__local/maps not found\",\"error\":\"Not Found\",\"statusCode\":404}"
+    },
+    {
+      "method": "POST",
+      "path": "/__local/maps",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41772/__local/maps",
+      "bytes": 85,
+      "sha256": "07d4323cc1afa43b34f11c80ab17757db7f6f14ad6e1c113dae0fc97638a5cba",
+      "bodyPrefix": "{\"message\":\"Route POST:/__local/maps not found\",\"error\":\"Not Found\",\"statusCode\":404}"
+    },
+    {
+      "method": "GET",
+      "path": "/map-table.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41772/map-table",
+      "bytes": 2862,
+      "sha256": "3eafba09ac99bc208bbf7bfc2fe51171a1ed3921f701107abfe24dc7b21f51bc",
+      "bodyPrefix": "<!doctype html>\n<html lang=\"en\" data-beasties-container>\n  <head>\n    <meta charset=\"UTF-8\">\n    <me"
+    }
+  ],
+  "files": [
+    {
+      "path": "client/dist/browser/chunk-B4WVUSWz.js",
+      "bytes": 15322,
+      "sha256": "bca2dbddf34a4c84c90e4c44660494a232bf8183a042eef87678beab5272e0f5",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-BJZ9rNOB.js",
+      "bytes": 9485,
+      "sha256": "83e98b02f850476657dace7a4a829427fb136329e7c2a1935ef027e3eb634057",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-BRzegpYU.js",
+      "bytes": 5282,
+      "sha256": "f6d069be42c7d705ac7a2b80aafc56214951590e917abe0124342f715bdde00a",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-Bk-blG5w.js",
+      "bytes": 38197,
+      "sha256": "da8cc7479bf93ceabee733c096e220ac90067aff28647a3d262af45c356a46fb",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-BnCXFu2j.js",
+      "bytes": 2782,
+      "sha256": "29480b594b898babcc097cc8dd0d552e9529c2ee9b7659e34cd5513481ebcd4b",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-BulmGWRr.js",
+      "bytes": 2876,
+      "sha256": "293970043227e49b6f9f2736522c032aac18312b805f50545009d6952ce61dca",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-ByYUruLu.js",
+      "bytes": 16444,
+      "sha256": "041176d94900e5b4798c52e9958abba4ef85f43453159c14e913ae65d1efe254",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-CD0-xsuc.js",
+      "bytes": 29709,
+      "sha256": "d7c24fd373b21ae944f55815f2be98457b56c384389ca426541686895539a1bc",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-Cl00RuMc.js",
+      "bytes": 521029,
+      "sha256": "051164c0f2a06ebd9de79d91c54b9b85dd055f746196c639dbc0f7395c3374d6",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-Cu7X8FYr.js",
+      "bytes": 10805,
+      "sha256": "d5bbe0cd85c5e8e989561a3a288bb7c5148044ca67c4d3df4897c11280a389a7",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-DDd5Y6TE.js",
+      "bytes": 857,
+      "sha256": "817a49c54e87a6bade00357979564750bff13eb6f8263b07510a504cb6b51b21",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-DMrZ9Vu-.js",
+      "bytes": 2155481,
+      "sha256": "604d6a1473efc38d1fb2e68576f3cc2731b6f0020af2ee3c10615531054cd98e",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-DQOlzuwf.js",
+      "bytes": 426965,
+      "sha256": "a965891a46d66194623f2aee31e4602952303d9677d0f7db0431b34399b92889",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-DSZIOvfT.js",
+      "bytes": 826,
+      "sha256": "e4375796b4ca6c5a29bf89baa2fd1e8087f51ad8f761bd735b76045739f8e4c3",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-aF0pH2SM.js",
+      "bytes": 170030,
+      "sha256": "575fb89f1f6d33fa14995eb38139913e702e24c4bd427e73438b598235daec7b",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-zUo3faxb.js",
+      "bytes": 33256,
+      "sha256": "dbdb8df78e24f8f8fe78305b8524e981d0f15b7dd2a1cd687d29c9e502e9ba4e",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/hq-preview.svg",
+      "bytes": 1417,
+      "sha256": "6deca4f086c35698519c912030086524880fc21cfb40861ee43fd8dec33abc07",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/index.html",
+      "bytes": 2862,
+      "sha256": "3eafba09ac99bc208bbf7bfc2fe51171a1ed3921f701107abfe24dc7b21f51bc",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/main-R7UTF42X.js",
+      "bytes": 233175,
+      "sha256": "2e9e20ee484bd15f0c9a5e89a724bcf7a0d7e3006e1c382f51a58b19f0d590cd",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/styles-46OU2WZO.css",
+      "bytes": 11135,
+      "sha256": "729927c0b2617329b149e5293755103e4d3d8b4029a4d8e63bc5ff89032731f6",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/worker-TXN6MSST.js",
+      "bytes": 2644783,
+      "sha256": "0e9333c96ff7fc97012ffece92a13ddcb5642803b6abeca625a4a8a188467e27",
+      "tokenHits": []
+    },
+    {
+      "path": "client/dist/browser/worker-VUG6IS2I.js",
+      "bytes": 2766343,
+      "sha256": "e4657237a53383c2ed2418e81ab8f41e573c16666f24d8a9cd32a2a9b207c126",
+      "tokenHits": []
+    }
+  ],
+  "tokens": [
+    "/dev/local-board",
+    "__local-default",
+    "/__local/maps",
+    "SessionOwner",
+    "LocalBoardComponent",
+    "local-UUID"
+  ]
+}
