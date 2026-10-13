@@ -186,16 +186,19 @@ describe('the engine adjudicator: rigid turn mode (D39, 11.4)', () => {
     expect(outputs(b.log)).toEqual(outputs(a.log));
   });
 
-  it('folds a scripted side into the turn: it sends at the turn start and the turn still ends as projected', async () => {
+  it('folds a scripted side into the turn: it thinks at its interval inside it and the turn still ends as projected', async () => {
     const run = await play({ scripted: true });
     expect(run.game.state.world.outcome).toBeDefined();
     const agentTimes = run.log.filter((e) => e.agent).map((e) => e.gameMs);
     expect(agentTimes.length).toBeGreaterThan(0);
+    // On its 5-minute interval, as in real time (#430), not only when a turn opens.
+    for (const t of agentTimes) expect(t % (5 * MINUTE)).toBe(0);
     const starts = new Set(
       run.log.filter((e) => e.command.kind === 'openTurn').map((e) => e.gameMs),
     );
-    for (const t of agentTimes) expect(starts.has(t)).toBe(true);
-    // The next turn's scripted orders are already riding when a turn is read back, so compare units.
+    expect(agentTimes.some((t) => !starts.has(t))).toBe(true);
+    // The projection ran copies of the scripted side, so each turn ends with the units it projected.
+    // A turn's orders thought at its end are already queued when it is read back, so compare units.
     for (const [i, p] of run.projections.entries()) {
       const units = JSON.parse(run.ends[i]!).units;
       expect(units).toEqual(JSON.parse(JSON.stringify(p.state.world.units)));

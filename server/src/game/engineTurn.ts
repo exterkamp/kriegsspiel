@@ -6,7 +6,8 @@
  * an order with a condition or a time is "no new order" rather than its plain verb. Its couriers
  * are rolled once by the engine's courier pass; the turn then runs from its start under the
  * ordinary handlers (movement, contact, combat, morale, rally, supply, visibility, victory) to its
- * end, with each ride forced to the pass's outcome. That is:
+ * end, with each ride forced to the pass's outcome, and the scripted sides thinking at their
+ * interval as in real time (#430). That is:
  *
  * - `projectTurn`: the same on a copy, with a compact summary for the umpire (11.6). Pure.
  * - `EngineTurnResolver`: the `rigid` resolver; it logs the parsed orders, the couriers and the
@@ -36,7 +37,7 @@ import { hasConditionOrTime, testParse } from '../umpire/providers/testParse.js'
 import { parseContextOf } from './parseContext.js';
 import { advanceUntilOver } from './advance.js';
 import type { SentTurnOrder, TurnRecord } from './store.js';
-import type { TurnInput, TurnResolution, TurnResolver } from './turns.js';
+import type { TurnAgent, TurnInput, TurnResolution, TurnResolver } from './turns.js';
 
 /** The name a resolver logs for a turn the engine resolved. */
 export const ENGINE_ADJUDICATOR = 'engine';
@@ -261,6 +262,7 @@ function runEngineTurn(
   orders: readonly Order[],
   turn: Bounds,
   registry: EventRegistry<GameState>,
+  agents: TurnAgent[] = [],
   pass: CourierPass = courierPass(state, orders, turn, registry),
 ) {
   let s = engineTurnStart(state, orders, pass, turn);
@@ -272,11 +274,31 @@ function runEngineTurn(
       (paths.get(u.id) ?? paths.set(u.id, []).get(u.id)!).push([m(p.x), m(p.y)]);
     }
   };
-  // Chunked for the path samples; advancing in steps gives exactly the state of one advance.
-  for (let t = turn.startMs; ; t = Math.min(turn.endMs, t + PATH_STEP_MS)) {
-    const res = advanceUntilOver(s, t, registry);
+  const step = (to: number) => {
+    const res = advanceUntilOver(s, to, registry);
     s = res.state;
     emitted.push(...res.emitted);
+    if (res.emitted.length > 0) for (const a of agents) a.idle = false;
+  };
+  // The scripted sides think at their interval, as the actor runs them (`advanceEngine`): the one
+  // due soonest, leaving out idle ones while no event is queued to wake them.
+  const nextAgent = () =>
+    agents.reduce<TurnAgent | undefined>(
+      (best, a) =>
+        (a.idle && s.queue.length === 0) || (best && best.nextAt <= a.nextAt) ? best : a,
+      undefined,
+    );
+  // Chunked for the path samples; advancing in steps gives exactly the state of one advance.
+  for (let t = turn.startMs; ; t = Math.min(turn.endMs, t + PATH_STEP_MS)) {
+    for (let due = nextAgent(); due && due.nextAt <= t && !s.world.outcome; due = nextAgent()) {
+      step(due.nextAt);
+      due.nextAt += due.intervalMs;
+      if (s.world.outcome) continue;
+      const res = due.think(s);
+      s = res.state;
+      due.idle = res.idle;
+    }
+    step(t);
     sample();
     if (t >= turn.endMs || s.world.outcome) break;
   }
@@ -290,12 +312,12 @@ function runEngineTurn(
  */
 export function projectTurn(
   state: EngineState<GameState>,
-  input: Pick<TurnInput, 'n' | 'startMs' | 'endMs' | 'orders'>,
+  input: Pick<TurnInput, 'n' | 'startMs' | 'endMs' | 'orders' | 'agents'>,
   registry: EventRegistry<GameState>,
 ): Projection {
   const parsed = input.orders.map((o) => rulesParseTurnOrder(state.world, o));
   const orders = engineOrdersOf(parsed, input.orders, input.startMs);
-  const run = runEngineTurn(state, orders, input, registry);
+  const run = runEngineTurn(state, orders, input, registry, input.agents?.());
   return {
     state: run.state,
     emitted: run.emitted,

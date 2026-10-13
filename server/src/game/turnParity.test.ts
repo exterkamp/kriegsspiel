@@ -117,7 +117,9 @@ async function playRealTime(seed: number, times: number[]) {
   const parser: OrderParser = {
     async parse(text): Promise<ParseResult> {
       const to = text.split(' ')[0]!;
-      return { kind: 'intents', text, unitId: to, intents: read.get(to)!.intents! };
+      // The rules read these two as a plain hold and march, which the parse result can carry.
+      const intents = read.get(to)!.intents as Extract<ParseResult, { kind: 'intents' }>['intents'];
+      return { kind: 'intents', text, unitId: to, intents };
     },
   };
   host = new GameHost({

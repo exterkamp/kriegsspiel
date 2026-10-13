@@ -87,6 +87,7 @@ import {
   turnBounds,
   withdrawOrder,
   type OpenTurn,
+  type TurnAgent,
   type TurnInput,
   type TurnResolution,
   type TurnResolver,
@@ -260,6 +261,14 @@ type SideNarration = Map<string, string | null>;
 
 /** Question ids are unique per side only. */
 const staffKey = (side: string, questionId: string): string => `${side}\u0000${questionId}`;
+
+/** An agent's order as the order path takes it: understood, with the agent's own intents. */
+const agentParse = (o: AgentOrder): ParseResult => ({
+  kind: 'intents',
+  text: o.text,
+  unitId: o.unitId,
+  intents: o.intents ?? [o.intent],
+});
 
 /** A question put to a staff officer, waiting for its due time; `settle` hands the written exchange to the asker. */
 interface PendingStaff {
@@ -855,10 +864,11 @@ export class GameActor {
     try {
       for (;;) {
         if (this.engine.world.outcome) break;
-        // In turn mode agents think when a turn opens (`openNextTurn`), never inside one, so the turn
-        // runs exactly as its resolver projected it (D39). Staff answers only read the world, so they
-        // are still written at their due time.
-        const due = this.turns ? undefined : this.nextAgent();
+        // In a turn the engine resolves, agents think at their interval as in real time (#430); the
+        // resolver ran copies of them through the same turn, so it still ends as projected (D39). A
+        // held turn (the umpire's) moves nothing: there they think only as it opens (`openNextTurn`).
+        // Staff answers only read the world, so they are still written at their due time.
+        const due = this.engine.world.turn?.adjudicator === 'umpire' ? undefined : this.nextAgent();
         // A staff answer is written at its due time, from the world as it stood then (#418).
         const staffAt = this.nextStaffDue();
         if (staffAt <= target && (!due || staffAt <= due.nextAt)) {
@@ -875,7 +885,8 @@ export class GameActor {
           due.idle = true;
           continue;
         }
-        if (due.agent.decide) this.beginDecision(due);
+        // Nothing may hold a turn's clock, so in turn mode an LLM commander plays by its script.
+        if (due.agent.decide && !this.turns) this.beginDecision(due);
         else due.idle = !this.think(due.agent) && (due.agent.settled?.() ?? true);
       }
       step(target);
@@ -1142,6 +1153,39 @@ export class GameActor {
     );
   }
 
+  /**
+   * Copies of the scripted sides as they stand, for a turn's projection (#430): each thinks from its
+   * side's view of the world it is given and issues its orders as `issueAgentOrders` does, with ids
+   * of its own (the live orders take theirs from the log). Agents that cannot be copied are left out.
+   */
+  private turnAgents(n: number): TurnAgent[] {
+    return this.agents.flatMap((slot) => {
+      if (slot.pending || slot.retired || slot.agent.dormant?.()) return [];
+      const copy = slot.agent.fork?.();
+      if (!copy) return [];
+      let k = 0;
+      const think = (state: EngineState<GameState>) => {
+        const view = viewFor(state.world, copy.side as SideId, state.time);
+        let changed = false;
+        for (const o of copy.think(view)) {
+          const applied = applyLoggedOrder(
+            state,
+            `${this.id}-t${n}`,
+            ++k,
+            copy.side,
+            agentParse(o),
+          );
+          if ('state' in applied) {
+            state = applied.state;
+            changed = true;
+          }
+        }
+        return { state, idle: !changed && (copy.settled?.() ?? true) };
+      };
+      return [{ intervalMs: copy.intervalMs, nextAt: slot.nextAt, idle: slot.idle, think }];
+    });
+  }
+
   /** Run one decision: the same order path as a human's, logged so replay needs no agent. */
   private think(agent: SideAgent): boolean {
     const view = viewFor(this.engine.world, agent.side as SideId, this.engine.time);
@@ -1227,12 +1271,7 @@ export class GameActor {
   ): boolean {
     let changed = false;
     for (const o of orders) {
-      const parsed: ParseResult = {
-        kind: 'intents',
-        text: o.text,
-        unitId: o.unitId,
-        intents: o.intents ?? [o.intent],
-      };
+      const parsed = agentParse(o);
       const entry: InputLogEntry = {
         seq: ++this.seq,
         wallMs: this.wallNow(),
@@ -1839,12 +1878,16 @@ export class GameActor {
       },
     };
     if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
-    // Scripted sides send when the turn opens (D39): each agent thinks once, now, and its orders
-    // are issued at the turn's start and logged as in real time. No LLM commander plays turn mode
-    // yet (nothing may hold the turn's clock), so it plays by its script.
+    // Scripted sides think on their interval as in real time (#430): one due now thinks here, on
+    // the world caught up to the turn's start, and its orders are issued then and logged as in real
+    // time. In a turn the engine resolves it thinks again inside the turn (`advanceEngine`); in a
+    // held turn this is its one decision. No LLM commander plays turn mode yet (nothing may hold
+    // the turn's clock), so it plays by its script.
+    this.advanceEngine(startMs);
     for (const slot of this.agents) {
-      if (slot.pending || slot.retired || slot.agent.dormant?.()) continue;
+      if (slot.pending || slot.retired || slot.agent.dormant?.() || slot.nextAt > startMs) continue;
       this.think(slot.agent);
+      slot.nextAt = (Math.floor(startMs / slot.agent.intervalMs) + 1) * slot.agent.intervalMs;
     }
     await this.commit(entry);
   }
@@ -1869,6 +1912,7 @@ export class GameActor {
       cause,
       orders: sentOrdersOf(t),
       sent: [...t.sent.keys()],
+      agents: () => this.turnAgents(t.n),
     };
     const state = this.engine;
     this.onStaffAtWork?.({ working: true, needAtMs: t.startMs });

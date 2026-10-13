@@ -34,6 +34,27 @@ export interface TurnInput {
   orders: readonly SentTurnOrder[];
   /** The sides that sent, in send order. */
   sent: readonly string[];
+  /**
+   * Fresh copies of the scripted sides, for a resolution that runs the turn under the engine: they
+   * think inside it at their interval as the live agents will (#430). Not logged: what the live
+   * agents order is logged as they order it.
+   */
+  agents?: () => TurnAgent[];
+}
+
+/** A scripted side as a turn's projection runs it: a copy, so the live agent is untouched. */
+export interface TurnAgent {
+  /** Game ms between decisions. */
+  intervalMs: number;
+  /** Game time of its next decision. */
+  nextAt: number;
+  /** As the actor keeps it: its last decision changed nothing and nothing has happened since. */
+  idle: boolean;
+  /**
+   * Decide from `state` (the world at that instant, which it sees only through its side's view)
+   * and issue its orders as the live agent's are issued. `idle` is the actor's rule for the result.
+   */
+  think(state: EngineState<GameState>): { state: EngineState<GameState>; idle: boolean };
 }
 
 /** A resolver's answer: what to log and apply. It never carries a state. */

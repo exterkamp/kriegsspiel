@@ -159,6 +159,12 @@ export class LlmCommander implements SideAgent {
     return this.cfg.fallback.think(view);
   }
 
+  /** In turn mode it plays by its script (D39), so a copy is a commander over a copy of that. */
+  fork(): LlmCommander | undefined {
+    const fallback = this.cfg.fallback.fork?.();
+    return fallback && new LlmCommander({ ...this.cfg, fallback });
+  }
+
   /** Ask the model. A failed, refused or invalid call is played by the fallback instead. */
   async decide(view: EngineSideView): Promise<AgentOrder[]> {
     assertFogOnly(view, this.side);
