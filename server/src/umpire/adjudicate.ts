@@ -9,12 +9,16 @@
  * with the problems listed. After that a proposal that still fails the gate (the schema, the wrong
  * turn, a commander's account naming the enemy, or more than half of the units clamped) is not
  * used, and the caller resolves the turn with the engine instead (`game/umpireTurn.ts`). Anything
- * else still wrong is clamped by the validator when the turn is applied.
+ * else still wrong is clamped by the validator when the turn is applied. A first reply that passed
+ * the gate is applied that way too when the resend fails or its reply does not pass.
  */
 import {
+  DEPARTURE_LOSS_SHARE,
+  DEPARTURE_TOLERANCE_M,
   MS_PER_MINUTE,
   metres,
   msPerMetreOf,
+  positionAt,
   unitTypeOf,
   validateProposal,
   type GameState,
@@ -27,6 +31,7 @@ import { TURN_PROPOSAL_JSON_SCHEMA } from './eval/turnProposal.js';
 import { deg } from './eval/turnInput.js';
 import { featureInput } from './judgePlacement.js';
 import { withPersona } from './persona.js';
+import { ADJUDICATE_MAX_TOKENS } from './config.js';
 import type { JsonSchema, UmpireCallRecord, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
 
@@ -37,11 +42,13 @@ export const ADJUDICATE_PROMPT_VERSION = 'adjudicate-v1';
 export type UmpireDial = 'standard' | 'free';
 
 /** Under `standard`, how far an outcome may stray from the projection without a stated reason (D39). */
-export const DEPARTURE_TOLERANCE = { metres: 100, lossShareOfStrength: 0.05 } as const;
+export const DEPARTURE_TOLERANCE = {
+  metres: DEPARTURE_TOLERANCE_M,
+  lossShareOfStrength: DEPARTURE_LOSS_SHARE,
+} as const;
 
 const DIAL_INSTRUCTION: Record<UmpireDial, string> = {
-  standard:
-    'The dial is "standard": the projection is your reference. Depart from it only for a reason a staff officer would accept (an order read as its commander would read it, ground the engine does not weigh, a fight the tables get wrong). Where a unit\'s outcome differs from its projected one by more than the tolerance (end position more than 100 m away, losses differing by more than 5% of its start strength, or a different status), give the reason in "departure"; an unexplained departure is put back to the projection.',
+  standard: `The dial is "standard": the projection is your reference. Depart from it only for a reason a staff officer would accept (an order read as its commander would read it, ground the engine does not weigh, a fight the tables get wrong). Where a unit's outcome differs from its projected one by more than the tolerance (end position more than ${DEPARTURE_TOLERANCE_M} m away, losses differing by more than ${Math.round(DEPARTURE_LOSS_SHARE * 100)}% of its start strength, or a different status), give the reason in "departure"; an unexplained departure is put back to the projection.`,
   free: 'The dial is "free": the projection is advice only. Decide by your own military judgment; no departure reasons are required. The hard limits still apply.',
 };
 
@@ -127,10 +134,27 @@ export interface AdjudicateTurn {
 const m = (millimetres: number) => Math.round(metres(millimetres));
 const minute = (ms: number) => Math.round((ms / MS_PER_MINUTE) * 10) / 10;
 
+/**
+ * `world` with every unit standing where it is at `time`, no march under way: a unit's `center`
+ * moves only at its march steps, so mid-leg it lags behind the unit (the validator uses
+ * `positionAt` too). What the umpire is shown and what the checks measure from.
+ */
+function standingAt(world: GameState, time: number): GameState {
+  return {
+    ...world,
+    units: world.units.map((u) => {
+      if (!u.leg) return u;
+      const placed = { ...u, center: positionAt(world.map, u, time) };
+      delete placed.leg;
+      return placed;
+    }),
+  };
+}
+
 /** What the model sees (D39, "The umpire's input"), in metres and compass degrees. */
-export function adjudicateInput(world: GameState, turn: AdjudicateTurn) {
+export function adjudicateInput(start: GameState, turn: AdjudicateTurn) {
+  const world = standingAt(start, turn.startMs);
   const turnMs = turn.endMs - turn.startMs;
-  const turnOf = (ms: number) => Math.floor(ms / Math.max(1, turnMs)) + 1;
   return {
     turn: turn.n,
     startMinute: minute(turn.startMs),
@@ -200,12 +224,8 @@ export function adjudicateInput(world: GameState, turn: AdjudicateTurn) {
         ? { status: 'arrived', arrivedAtMinuteOfTurn: minute(o.arrivedAtMs - turn.startMs) }
         : {
             status: 'on-the-road',
-            ...(o.dueMs !== undefined
-              ? {
-                  dueTurn: turnOf(o.dueMs),
-                  dueMinuteOfTurn: minute(o.dueMs - (turnOf(o.dueMs) - 1) * turnMs),
-                }
-              : {}),
+            // The game minute, not a turn: the last turn may be cut short by the time limit.
+            ...(o.dueMs !== undefined ? { dueAtMinute: minute(o.dueMs) } : {}),
           }),
       ...(o.garbled ? { garbled: true } : {}),
     })),
@@ -227,6 +247,8 @@ export interface AdjudicateOptions {
   maxCalls?: number;
   /** The umpire's voice (3.11); tone only. */
   persona?: UmpirePersona;
+  /** Aborted when the turn's time is up: the call in flight is abandoned and no further call is made. */
+  signal?: AbortSignal;
 }
 
 export interface AdjudicateResult {
@@ -250,7 +272,8 @@ const MAX_LISTED = 40;
 /** The check context the benchmark's checks need, from the stage's input. */
 function checkContext(world: GameState, turn: AdjudicateTurn): TurnCheckContext {
   return {
-    world,
+    // The checks measure the march from where each unit stands at the turn's start.
+    world: standingAt(world, turn.startMs),
     turn: turn.n,
     turnMs: turn.endMs - turn.startMs,
     projection: turn.projection.units.map((u) => ({
@@ -299,23 +322,50 @@ function judge(
     ...validation.problems,
     ...CHECKS.flatMap((k) => checks.problems[k].map((p) => `${k}: ${p}`)),
   ];
+  // The benchmark's injected-marker check needs a case's canary; a live turn has none, so it is
+  // not part of the gate (an obeyed injection shows as clamps, a fog leak or a resend's problems).
   const gate = validation.fatal
     ? validation.fatal
     : checks.problems.fog.length > 0
       ? `an account names the other side (${checks.problems.fog[0]})`
-      : checks.problems.injection.length > 0
-        ? 'the reply wrote an injected marker'
-        : validation.clampedUnits * 2 > validation.units
-          ? `the validator would clamp ${validation.clampedUnits} of ${validation.units} units`
-          : undefined;
+      : validation.clampedUnits * 2 > validation.units
+        ? `the validator would clamp ${validation.clampedUnits} of ${validation.units} units`
+        : undefined;
   return { proposal, validation, problems: [...new Set(problems)], ...(gate ? { gate } : {}) };
+}
+
+const CANCELLED = Symbol('cancelled');
+
+/** `work`, or `CANCELLED` as soon as `signal` fires. */
+function untilAborted<T>(
+  work: Promise<T>,
+  signal: AbortSignal | undefined,
+): Promise<T | typeof CANCELLED> {
+  if (!signal) return work;
+  if (signal.aborted) return Promise.resolve(CANCELLED);
+  return new Promise((resolve, reject) => {
+    const onAbort = () => resolve(CANCELLED);
+    signal.addEventListener('abort', onAbort, { once: true });
+    work.then(
+      (v) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(v);
+      },
+      (e) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(e);
+      },
+    );
+  });
 }
 
 /**
  * Ask the umpire for the turn. `world` is the state at the turn's start. Always answers: a
- * failed, refused or unusable reply comes back with `error` and no proposal, and the caller falls
- * back to the engine (D39, "Fallback"). A refusal by the game's budget or rate limit is not
- * retried; a transport failure, a schema failure or a reply with problems gets the one resend.
+ * failed, refused, cancelled or unusable reply comes back with `error` and no proposal, and the
+ * caller falls back to the engine (D39, "Fallback"). A refusal by the game's budget or rate limit
+ * is not retried; a transport failure, a schema failure or a reply with problems gets the one
+ * resend. When a reply that passed the gate was sent back and the resend fails or does not pass,
+ * that first reply is used, clamped when applied.
  */
 export async function adjudicateTurn(
   client: UmpireClient,
@@ -330,17 +380,36 @@ export async function adjudicateTurn(
   let attempts = 0;
   let resent: string[] | undefined;
   let error = 'no call made';
+  // The newest reply that passed the gate, to apply (clamped) if the resend does no better.
+  let usable: { proposal: TurnProposal; validation: TurnValidation } | undefined;
+  const result = (): AdjudicateResult =>
+    usable
+      ? { ...usable, calls, attempts, ...(resent ? { resent } : {}) }
+      : { calls, attempts, error, ...(resent ? { resent } : {}) };
   for (let call = 1; call <= maxCalls; call++) {
     const last = call === maxCalls;
+    if (opts.signal?.aborted) {
+      error = 'cancelled: the turn ran out of time';
+      return { calls, attempts, error, ...(resent ? { resent } : {}) };
+    }
     let output: unknown;
     try {
-      const res = await client.call<unknown>({
-        stage: 'adjudicate',
-        promptVersion: ADJUDICATE_PROMPT_VERSION,
-        system,
-        input: resent ? { ...input, rejected: { problems: resent } } : input,
-        schema: ADJUDICATE_SCHEMA,
-      });
+      const res = await untilAborted(
+        client.call<unknown>({
+          stage: 'adjudicate',
+          promptVersion: ADJUDICATE_PROMPT_VERSION,
+          system,
+          input: resent ? { ...input, rejected: { problems: resent } } : input,
+          schema: ADJUDICATE_SCHEMA,
+          // Set on the request, so a config file that replaces the stage's route cannot lower it.
+          maxTokens: ADJUDICATE_MAX_TOKENS,
+        }),
+        opts.signal,
+      );
+      if (res === CANCELLED) {
+        error = 'cancelled: the turn ran out of time';
+        return { calls, attempts: attempts + 1, error, ...(resent ? { resent } : {}) };
+      }
       attempts += res.record.attempts;
       calls.push(res.record);
       output = res.output;
@@ -349,6 +418,10 @@ export async function adjudicateTurn(
       error = e instanceof Error ? e.message : String(e);
       if (e instanceof UmpireError && (e.kind === 'budget' || e.kind === 'rate-limit')) break;
       continue;
+    }
+    if (opts.signal?.aborted) {
+      error = 'cancelled: the turn ran out of time';
+      return { calls, attempts, error, ...(resent ? { resent } : {}) };
     }
     const verdict = judge(output, world, turn, opts.context);
     if (verdict.proposal && verdict.problems.length === 0) {
@@ -360,22 +433,16 @@ export async function adjudicateTurn(
         ...(resent ? { resent } : {}),
       };
     }
+    if (verdict.proposal && !verdict.gate) {
+      usable = { proposal: verdict.proposal, validation: verdict.validation! };
+    } else {
+      error = verdict.gate ?? 'no usable proposal';
+    }
     if (!last) {
       resent = verdict.problems.slice(0, MAX_LISTED);
       continue;
     }
-    if (verdict.gate || !verdict.proposal) {
-      error = verdict.gate ?? 'no usable proposal';
-      break;
-    }
-    // What is still wrong after the resend is clamped when the turn is applied.
-    return {
-      proposal: verdict.proposal,
-      validation: verdict.validation!,
-      calls,
-      attempts,
-      ...(resent ? { resent } : {}),
-    };
   }
-  return { calls, attempts, error, ...(resent ? { resent } : {}) };
+  // What is still wrong in a usable reply is clamped when the turn is applied.
+  return result();
 }

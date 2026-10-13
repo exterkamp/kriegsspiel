@@ -36,7 +36,7 @@ import {
   type UmpireDial,
 } from '../umpire/adjudicate.js';
 import { deg } from '../umpire/eval/turnInput.js';
-import type { UmpireClient } from '../umpire/umpireClient.js';
+import type { UmpireCallRecord, UmpireClient } from '../umpire/umpireClient.js';
 import {
   ENGINE_ADJUDICATOR,
   engineOrdersOf,
@@ -201,7 +201,7 @@ export class UmpireTurnResolver implements TurnResolver {
     input: TurnInput,
     context?: TurnResolveContext,
   ): Promise<TurnResolution> {
-    const { registry, client, dial } = this.opts;
+    const { registry } = this.opts;
     const p = projectTurn(state, input, registry, context);
     const engine: EngineTurnOutput = {
       orders: p.orders,
@@ -211,7 +211,37 @@ export class UmpireTurnResolver implements TurnResolver {
     // The projection is the engine's resolution: a turn the game had already ended has nothing
     // for the umpire to decide, and the engine's turn is exactly what it projected.
     if (state.world.outcome) return { adjudicator: ENGINE_ADJUDICATOR, output: engine };
+    const fallBack = (
+      reason: string,
+      attempts: number,
+      calls: UmpireCallRecord[] = [],
+    ): TurnResolution => {
+      const error = `umpire fell back to the engine: ${reason}`;
+      this.opts.onFallback?.(input.n, error);
+      return {
+        adjudicator: ENGINE_ADJUDICATOR,
+        output: engine,
+        ...(calls.length > 0 ? { calls } : {}),
+        fallback: { error, attempts },
+      };
+    };
+    // Anything that throws from here on (building the input, checking an odd reply) falls back to
+    // the engine's turn, already computed, rather than failing the turn and dropping its orders.
+    try {
+      return await this.adjudicate(state, input, p, engine, fallBack);
+    } catch (e) {
+      return fallBack(e instanceof Error ? e.message : String(e), 0);
+    }
+  }
 
+  private async adjudicate(
+    state: EngineState<GameState>,
+    input: TurnInput,
+    p: Projection,
+    engine: EngineTurnOutput,
+    fallBack: (reason: string, attempts: number, calls?: UmpireCallRecord[]) => TurnResolution,
+  ): Promise<TurnResolution> {
+    const { client, dial } = this.opts;
     const live = new Set(
       state.world.units.filter((u) => u.status !== 'destroyed').map((u) => u.id),
     );
@@ -240,30 +270,24 @@ export class UmpireTurnResolver implements TurnResolver {
       })),
     };
 
+    // The time limit cancels the adjudication: the call in flight is abandoned and no resend
+    // goes out after the turn has fallen back.
     const limitMs = this.opts.turnTimeoutMs ?? ADJUDICATE_TURN_TIMEOUT_MS;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timedOut = new Promise<Awaited<ReturnType<typeof adjudicateTurn>>>((resolve) => {
-      timer = setTimeout(
-        () =>
-          resolve({
-            calls: [],
-            attempts: 0,
-            error: `the umpire took longer than ${Math.round(limitMs / 1000)} s`,
-          }),
-        limitMs,
-      );
-    });
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), limitMs);
     let r: Awaited<ReturnType<typeof adjudicateTurn>>;
     try {
-      r = await Promise.race([
-        adjudicateTurn(client, state.world, turn, {
-          context: turnContext,
-          ...(this.opts.persona ? { persona: this.opts.persona } : {}),
-        }),
-        timedOut,
-      ]);
+      r = await adjudicateTurn(client, state.world, turn, {
+        context: turnContext,
+        signal: ctrl.signal,
+        ...(this.opts.persona ? { persona: this.opts.persona } : {}),
+      });
     } finally {
       clearTimeout(timer);
+      ctrl.abort();
+    }
+    if (!r.proposal && ctrl.signal.aborted && r.error?.startsWith('cancelled')) {
+      r = { ...r, error: `the umpire took longer than ${Math.round(limitMs / 1000)} s` };
     }
 
     if (r.proposal) {
@@ -277,14 +301,7 @@ export class UmpireTurnResolver implements TurnResolver {
       };
       return { adjudicator: UMPIRE_ADJUDICATOR, output, calls: r.calls };
     }
-    const error = `umpire fell back to the engine: ${r.error ?? 'no proposal'}`;
-    this.opts.onFallback?.(input.n, error);
-    return {
-      adjudicator: ENGINE_ADJUDICATOR,
-      output: engine,
-      ...(r.calls.length > 0 ? { calls: r.calls } : {}),
-      fallback: { error, attempts: r.attempts },
-    };
+    return fallBack(r.error ?? 'no proposal', r.attempts, r.calls);
   }
 }
 

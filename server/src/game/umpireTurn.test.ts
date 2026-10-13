@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser } from '../orders/index.js';
 import { ADJUDICATE_PROMPT_VERSION, adjudicateSystem } from '../umpire/adjudicate.js';
-import { umpireConfigFromEnv } from '../umpire/config.js';
+import { ADJUDICATE_MAX_TOKENS, umpireConfigFromEnv } from '../umpire/config.js';
 import { createUmpireClient } from '../umpire/createUmpireClient.js';
 import { TURN_CASES, type TurnCase } from '../umpire/eval/turnCases.js';
 import { caseWorld, turnEndMs, turnStartMs } from '../umpire/eval/turnInput.js';
@@ -386,6 +386,135 @@ describe('the adjudicate pipeline: checks, one resend, clamp or fall back', () =
     expect(r.fallback!.error).toMatch(/longer than/);
   });
 
+  it('makes no call after the time limit: the resend is cancelled with the turn', async () => {
+    const { state, input } = firstTurn();
+    let calls = 0;
+    // Answers in 50 ms with a reply that fails the schema, so a resend would follow.
+    const slow: UmpireClient = {
+      call: async (req) => {
+        calls++;
+        await new Promise((r) => setTimeout(r, 50));
+        return (await new ScriptedModel({ adjudicate: () => ({ turn: 1 }) }).call(req)) as never;
+      },
+    };
+    const r = await new UmpireTurnResolver({
+      registry,
+      client: slow,
+      dial: 'standard',
+      turnTimeoutMs: 20,
+    }).resolve(state, input);
+    expect(r.adjudicator).toBe('engine');
+    expect(r.fallback!.error).toMatch(/longer than/);
+    await new Promise((res) => setTimeout(res, 300));
+    expect(calls).toBe(1);
+  });
+
+  it('keeps a usable first reply, clamped, when the resend fails', async () => {
+    const { state, input } = firstTurn();
+    let call = 0;
+    const model = editing((p) => ({
+      ...p,
+      units: p.units.map((u) => (u.unitId === 'red-1' ? { ...u, strength: 99_999 } : u)),
+    }));
+    const flaky: UmpireClient = {
+      call: async (req) => {
+        if (++call === 2) throw new UmpireError('upstream 529', 'transport', 3);
+        return model.call(req);
+      },
+    };
+    const r = await resolver(flaky).resolve(state, input);
+    expect(call).toBe(2);
+    expect(r.adjudicator).toBe('umpire');
+    expect(r.fallback).toBeUndefined();
+    expect(r.calls).toHaveLength(1);
+    expect((r.output as UmpireTurnOutput).resent!.some((p) => p.includes('red-1'))).toBe(true);
+    const end = advanceTo(
+      applyTurn(state, record(input, r), { gameId: 'g', registry }),
+      input.endMs,
+      registry,
+    ).state.world;
+    // The first reply is applied, its impossible strength clamped.
+    expect(turnRulings(end).find((x) => x.unitId === 'red-1')).toBeDefined();
+    expect(Math.round(end.units.find((u) => u.id === 'red-1')!.strength)).toBeLessThanOrEqual(
+      Math.round(state.world.units.find((u) => u.id === 'red-1')!.strength),
+    );
+  });
+
+  it('keeps a usable first reply when the resend fails the gate', async () => {
+    const { state, input } = firstTurn();
+    const model = editing((p, call) => ({
+      ...p,
+      ...(call === 2 ? { turn: 2 } : {}),
+      units: p.units.map((u) => (u.unitId === 'red-1' ? { ...u, strength: 99_999 } : u)),
+    }));
+    const r = await resolver(model).resolve(state, input);
+    expect(model.requests).toHaveLength(2);
+    expect(r.adjudicator).toBe('umpire');
+    expect((r.output as UmpireTurnOutput).proposal.turn).toBe(1);
+  });
+
+  it('falls back to the engine, not dropping the orders, when checking a reply throws', async () => {
+    const { state, input } = firstTurn();
+    const boom = new ScriptedModel({
+      adjudicate: () =>
+        new Proxy(
+          {},
+          {
+            get: () => {
+              throw new Error('odd reply');
+            },
+          },
+        ),
+    });
+    const r = await resolver(boom).resolve(state, input);
+    const engine = await new EngineTurnResolver(registry).resolve(state, input);
+    expect(r.adjudicator).toBe('engine');
+    expect(r.output).toEqual(engine.output);
+    expect(r.fallback!.error).toMatch(/fell back to the engine: odd reply/);
+  });
+
+  it('asks for the stage’s reply tokens on every request', async () => {
+    const { state, input } = firstTurn();
+    const model = editing((p) => p);
+    await resolver(model).resolve(state, input);
+    expect(model.requests[0]!.maxTokens).toBe(ADJUDICATE_MAX_TOKENS);
+  });
+
+  it('shows each unit where it stands at the turn’s start, not at its last march step', async () => {
+    const reg = createRegistry();
+    const { state, input } = firstTurn();
+    const first = await new EngineTurnResolver(reg).resolve(state, input);
+    const t1 = advanceTo(
+      applyTurn(state, record(input, first), { gameId: 'g', registry: reg }),
+      input.endMs,
+      reg,
+    );
+    const marching = t1.state.world.units.filter((u) => u.leg);
+    expect(marching.length).toBeGreaterThan(0);
+    const model = editing((p) => p);
+    await new UmpireTurnResolver({ registry: reg, client: model, dial: 'standard' }).resolve(
+      t1.state,
+      {
+        ...input,
+        n: 2,
+        startMs: input.endMs,
+        endMs: input.endMs + 20 * MINUTE,
+        orders: [],
+      },
+    );
+    const shown = (model.requests[0]!.input as { units: { id: string; x: number; y: number }[] })
+      .units;
+    let lagging = 0;
+    for (const u of marching) {
+      const at = positionAt(t1.state.world.map, u, input.endMs);
+      const s = shown.find((x) => x.id === u.id)!;
+      expect(s.x).toBe(Math.round(at.x / 1000));
+      expect(s.y).toBe(Math.round(at.y / 1000));
+      if (Math.abs(at.x - u.center.x) + Math.abs(at.y - u.center.y) > 1000) lagging++;
+    }
+    expect(lagging).toBeGreaterThan(0);
+  });
+
   it('puts an unexplained departure back to the projection under standard, but not under free', async () => {
     const { state, input } = firstTurn();
     // Blue's second battalion loses 100 men with no reason given.
@@ -408,6 +537,34 @@ describe('the adjudicate pipeline: checks, one resend, clamp or fall back', () =
     const projected = canned.proposal.units.find((u) => u.unitId === 'blue-2')!.strength;
     expect(Math.round(await strengthAfter('standard'))).toBe(projected);
     expect(Math.round(await strengthAfter('free'))).toBe(projected - 100);
+    // `free` does not check departures, so the reply is not sent back; `standard` sends it back.
+    const callsAt = async (dial: 'standard' | 'free') => {
+      const model = editing(lose);
+      await resolver(model, dial).resolve(state, input);
+      return model.requests.length;
+    };
+    expect(await callsAt('free')).toBe(1);
+    expect(await callsAt('standard')).toBe(2);
+  });
+});
+
+describe('applying a logged umpire turn', () => {
+  it('refuses a turn whose courier pass differs from the logged couriers', async () => {
+    const registry = createRegistry();
+    const { state, input } = firstTurn();
+    const r = await new UmpireTurnResolver({
+      registry,
+      client: cannedClient(),
+      dial: 'standard',
+    }).resolve(state, input);
+    expect(r.adjudicator).toBe('umpire');
+    const rec = record(input, r);
+    const out = rec.output as UmpireTurnOutput;
+    expect(out.couriers[0]!.outcome).not.toBe('lost');
+    out.couriers[0] = { ...out.couriers[0]!, outcome: 'lost' };
+    expect(() => applyTurn(state, rec, { gameId: 'g', registry })).toThrow(
+      'turn 1: the courier pass differs from the logged couriers',
+    );
   });
 });
 

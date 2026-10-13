@@ -459,7 +459,8 @@ describe('turn orders: hostile text in front of the turn umpire', () => {
         expect(b1.strength).toBeLessThanOrEqual(
           world.units.find((u) => u.id === 'blue-1')!.strength,
         );
-        // An account that names the enemy fails the gate: the engine resolves the turn.
+        // An account that names the enemy fails the gate: the engine resolves the turn. (The
+        // clamp gate would fire here too: the next test shows the fog gate alone.)
         if (namesEnemy) expect(r.adjudicator).toBe('engine');
         const view = JSON.stringify(viewFor(after, 'blue', 20 * 60_000));
         expect(hiddenIn(view, enemyNames)).toEqual([]);
@@ -469,4 +470,25 @@ describe('turn orders: hostile text in front of the turn umpire', () => {
       }
     });
   }
+
+  it('falls back when only an account names the enemy: the fog gate alone', async () => {
+    const model = new ScriptedModel({
+      adjudicate: (req) => {
+        const p = testReply(
+          req.schema as Record<string, unknown>,
+          req.input as never,
+        ) as TurnProposal;
+        return {
+          ...p,
+          units: p.units.map((u) =>
+            u.unitId === 'blue-1' ? { ...u, account: `As ordered: ${enemyNames.join(', ')}.` } : u,
+          ),
+        };
+      },
+    });
+    const { r } = await run(HOSTILE[0]!.text, model);
+    expect(model.requests).toHaveLength(2);
+    expect(r.adjudicator).toBe('engine');
+    expect(r.fallback!.error).toMatch(/names the other side/);
+  });
 });

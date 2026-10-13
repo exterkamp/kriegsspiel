@@ -142,12 +142,13 @@ const { server } = await buildApp({
           return llm.length > 0 ? llm : scripted;
         }
       : undefined,
+  // Not with the turn umpire alone: turning it on changes only how turns are decided.
   narrator:
-    umpire && umpireConfig
+    umpire && (ai || llmParser)
       ? // The same client as the parser's, so one game has one budget.
         (gameId) => gameUmpire(gameId)
       : undefined,
-  critic: umpire && umpireConfig ? (gameId) => gameUmpire(gameId) : undefined,
+  critic: umpire && (ai || llmParser) ? (gameId) => gameUmpire(gameId) : undefined,
   adjudicator: umpire && turnUmpire ? (gameId) => gameUmpire(gameId) : undefined,
   admin: {
     ...admin,

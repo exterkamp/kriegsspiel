@@ -11,7 +11,8 @@ import type { UmpireFallback } from './fallbackUmpireClient.js';
 import { NARRATE_SCHEMA, narrateInput, narrateReports } from './narrate.js';
 import { PlaybackUmpireClient } from './playbackUmpireClient.js';
 import { StaffRoster, runStaff } from './staff.js';
-import type { UmpireCallRecord } from './umpireClient.js';
+import { ADJUDICATE_SCHEMA } from './adjudicate.js';
+import { UmpireError, type UmpireCallRecord } from './umpireClient.js';
 
 const ENV = {
   UMPIRE_KEYLESS_PROVIDER: 'ollama',
@@ -210,6 +211,31 @@ describe('Ollama failures fall back to the test provider', () => {
     vi.unstubAllGlobals();
     expect(replayed).toEqual(original);
     expect(noNetwork).not.toHaveBeenCalled();
+  });
+});
+
+describe('the adjudicate stage is not answered by the fallback', () => {
+  it('a failed turn call fails, so the turn falls back to the engine, and starts no cooldown', async () => {
+    const down = vi.fn(() => Promise.reject(new TypeError('fetch failed')));
+    const { client, fallbacks } = setup(down as never, {
+      UMPIRE_PROVIDER_ADJUDICATE: 'ollama',
+      UMPIRE_MAX_ATTEMPTS: '1',
+    });
+    await expect(
+      client.call({
+        stage: 'adjudicate',
+        promptVersion: 'x',
+        system: 'x',
+        input: {},
+        schema: ADJUDICATE_SCHEMA,
+      }),
+    ).rejects.toBeInstanceOf(UmpireError);
+    expect(fallbacks).toEqual([]);
+    // The local stages still try the model: the turn's failure put them in no cooldown.
+    const before = down.mock.calls.length;
+    expect((await new LlmOrderParser(client).parse(ORDER, CORPUS_CONTEXT)).kind).toBe('intents');
+    expect(down.mock.calls.length).toBeGreaterThan(before);
+    expect(fallbacks[0]).toMatchObject({ stage: 'parse', kind: 'transport' });
   });
 });
 
