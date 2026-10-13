@@ -96,10 +96,9 @@ describe('AdminPage', () => {
     const page = mount(vi.fn(() => ok({ games })));
     page.start();
     await flush();
-    expect([...document.querySelectorAll('#game option')].map((o) => o.value)).toEqual([
-      'aaaaaaaa-1',
-      'bbbbbbbb-2',
-    ]);
+    expect(
+      [...document.querySelectorAll<HTMLOptionElement>('#game option')].map((o) => o.value),
+    ).toEqual(['aaaaaaaa-1', 'bbbbbbbb-2']);
     expect(FakeES.last!.url).toBe('/admin/api/games/aaaaaaaa-1/stream');
     FakeES.last!.onopen!();
     expect(document.querySelector<HTMLElement>('#live')!.dataset.status).toBe('live');
