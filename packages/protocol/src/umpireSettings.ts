@@ -14,9 +14,43 @@ export const PERSONAS = ['dry', 'pedantic', 'dramatic'] as const;
 export type UmpirePersona = (typeof PERSONAS)[number];
 export const DEFAULT_UMPIRE_PERSONA: UmpirePersona = 'dry';
 
+/**
+ * How the game is played (D39): `realtime` on the continuous clock, or `turns`, where each side's
+ * orders for a fixed slice of game time are collected and the turn is resolved at once.
+ */
+export const GAME_MODES = ['realtime', 'turns'] as const;
+export type GameMode = (typeof GAME_MODES)[number];
+
+/** Game minutes per turn in turn mode (D39): an integer in this range, 20 unless the game says otherwise. */
+export const MIN_TURN_MINUTES = 5;
+export const MAX_TURN_MINUTES = 60;
+export const DEFAULT_TURN_MINUTES = 20;
+/** Longest wall-clock deadline a turn may have, in hours (two weeks), and the shortest (a quarter hour). */
+export const MAX_TURN_DEADLINE_HOURS = 336;
+export const MIN_TURN_DEADLINE_HOURS = 0.25;
+
 export interface UmpireSettings {
   dial: UmpireDial;
   persona: UmpirePersona;
+  /** Absent means `realtime`, so every game made before turn mode is unchanged (D39). */
+  mode?: GameMode;
+  /** Turn mode: game minutes per turn. Absent: `DEFAULT_TURN_MINUTES`. */
+  turnMinutes?: number;
+  /** Turn mode: wall-clock hours a turn waits for its orders. Absent: it waits until every human side has sent. */
+  turnDeadlineHours?: number;
+}
+
+/** The turn settings of a turn-mode game, with defaults filled in; undefined for a real-time game. */
+export function turnSettingsOf(
+  settings: Partial<UmpireSettings> | undefined,
+): { turnMinutes: number; turnDeadlineHours?: number } | undefined {
+  if (settings?.mode !== 'turns') return undefined;
+  return {
+    turnMinutes: settings.turnMinutes ?? DEFAULT_TURN_MINUTES,
+    ...(settings.turnDeadlineHours === undefined
+      ? {}
+      : { turnDeadlineHours: settings.turnDeadlineHours }),
+  };
 }
 
 export const DIAL_INFO: Readonly<Record<UmpireDial, { label: string; description: string }>> = {

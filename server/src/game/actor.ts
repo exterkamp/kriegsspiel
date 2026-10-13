@@ -17,7 +17,8 @@
  */
 import {
   deserialize,
-  featureAnchor,
+  heldTurn,
+  mayDraft,
   maySign,
   serialize,
   viewFor,
@@ -46,15 +47,22 @@ import type { AgentOrder, SideAgent } from '../opponent/index.js';
 import { PauseVoting, type PauseConfig, type PauseTransition } from '../pause.js';
 import { RatioVoting, type RatioTransition } from '../ratioVote.js';
 import { advanceUntilOver, applyLoggedOrder } from './replay.js';
+import { parseContextOf } from './parseContext.js';
 import { hiddenTerms } from '../umpire/leakGuard.js';
 import {
-  answerStaffQuestion,
+  breakerAllows,
+  breakerAt,
+  breakerCooldownMs,
+  breakerSummary,
+  closedBreaker,
   narrateReports,
+  recordNarrateCall,
+  type NarrateBreakerState,
   STAFF_OVERLOADED_NOTICE,
   narrateWindowMs,
   reportsDueForNarration,
   staffOfficerFor,
-  type StaffAnswer,
+  writeStaffAnswer,
   type UmpireCallRecord,
   type UmpireRequest,
   type UmpireClient,
@@ -64,10 +72,27 @@ import type {
   DeputySettings,
   Dissent,
   StaffExchange,
+  TurnCause,
+  TurnOrder,
   UmpirePersona,
 } from '@kriegsspiel/protocol';
 import { DeputyAgent } from '../deputy/deputy.js';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
+import {
+  NO_ADJUDICATOR,
+  NO_ORDERS_RESOLVER,
+  applyTurn,
+  holdOrder,
+  humanSides,
+  sentOrdersOf,
+  turnBounds,
+  withdrawOrder,
+  type OpenTurn,
+  type TurnAgent,
+  type TurnInput,
+  type TurnResolution,
+  type TurnResolver,
+} from './turns.js';
 
 /** Timer functions, injectable so tests can run on a fake clock. */
 export interface Timers {
@@ -88,6 +113,22 @@ export interface StaffAtWork {
   working: boolean;
   /** The earliest game time that needs a pending result. */
   needAtMs?: number;
+}
+
+/** The fixed refusal for clock and vote commands in a turn-mode game (D39). */
+export const TURN_MODE_REFUSAL =
+  'this is a turn-based game: game time moves only when a turn is resolved, so there is nothing to pause or speed up';
+
+/** Where the open turn stands, as one side is shown it (`turnState`). */
+export interface TurnStateView {
+  turn: number;
+  startsAt: number;
+  endsAt: number;
+  sent: string[];
+  deadline?: number;
+  resolving: boolean;
+  /** The side's own held (or sent) orders. */
+  held: TurnOrder[];
 }
 
 /** Defaults for the parse retry policy. */
@@ -161,6 +202,8 @@ export interface GameActorOptions {
   umpire?: UmpireClient;
   /** The umpire's voice for narration (3.11); tone only. Default the dry staff officer. */
   persona?: UmpirePersona;
+  /** The narration circuit breaker of a reopened game, from its input log (#419). Default closed. */
+  narrateBreaker?: NarrateBreakerState;
   /** Server-side agents that play scripted sides (see `opponent/`). */
   agents?: SideAgent[];
   /** Pause voting: who votes and the host's rules. Unset: the vote commands are refused. */
@@ -169,6 +212,19 @@ export interface GameActorOptions {
   holdsUsed?: Readonly<Record<string, number>>;
   /** Set when the game was reopened after the server went down: wall ms it was down (estimated). */
   restart?: { downMs: number };
+  /**
+   * Turn mode (D39): the clock must be in manual mode, and moves only when a turn is resolved. `open`
+   * is the open turn of a reopened game (`openTurnFromLog`). Unset: a real-time game.
+   */
+  turns?: {
+    turnMs: number;
+    deadlineHours?: number;
+    /** Resolves a closed turn. Default `NO_ORDERS_RESOLVER` (`GameHost` passes the engine's). */
+    resolver?: TurnResolver;
+    open?: OpenTurn;
+    /** The order ids each side sent in earlier turns of a reopened game (`sentTurnIdsFromLog`). */
+    sentIds?: ReadonlyMap<string, ReadonlySet<string>>;
+  };
 }
 
 interface AgentSlot {
@@ -203,6 +259,24 @@ function narrationFallbackReason(result: Awaited<ReturnType<typeof narrateReport
 
 /** Narrated text by report id for one side; `null` marks a report folded into another's dispatch. */
 type SideNarration = Map<string, string | null>;
+
+/** Question ids are unique per side only. */
+const staffKey = (side: string, questionId: string): string => `${side}\u0000${questionId}`;
+
+/** An agent's order as the order path takes it: understood, with the agent's own intents. */
+const agentParse = (o: AgentOrder): ParseResult => ({
+  kind: 'intents',
+  text: o.text,
+  unitId: o.unitId,
+  intents: o.intents ?? [o.intent],
+});
+
+/** A question put to a staff officer, waiting for its due time; `settle` hands the written exchange to the asker. */
+interface PendingStaff {
+  side: string;
+  exchange: StaffExchange;
+  settle: (exchange: StaffExchange | undefined) => void;
+}
 
 interface ParseOutcome {
   parsed: ParseResult;
@@ -252,10 +326,18 @@ export class GameActor {
   private readonly narratedUntil = new Map<string, number>();
   private readonly narrations = new Map<string, SideNarration>();
   private readonly narrating = new Set<string>();
+  /** Sides a server-side agent plays (`options.agents`): nobody reads their dispatches, so they are never narrated (#419). */
+  private readonly scriptedSides: ReadonlySet<string>;
+  /** The narrate stage's circuit breaker, shared by the game's sides (#419). */
+  private narrateBreaker: NarrateBreakerState;
   /** Sides whose latest narration was refused by the game's budget or rate limit. */
   private readonly overloaded = new Set<string>();
   /** Each side's questions to its staff officers and their answers (D6b), oldest first. */
   private readonly staffHistory = new Map<string, StaffExchange[]>();
+  /** Questions not yet due, by `staffKey`: each is answered once, from the view at its due time (#418). */
+  private readonly pendingStaff = new Map<string, PendingStaff>();
+  /** Every question id used, by `staffKey`, taken the moment a question is asked so a resend is refused. */
+  private readonly staffAsked = new Set<string>();
   private readonly dissents = new Map<string, Dissent[]>();
 
   /** The pause state machine; absent when the game has no voters configured. */
@@ -267,6 +349,16 @@ export class GameActor {
   private pauseTimer: unknown;
   private pauseTimerSet = false;
   private readonly restartInfo: { downMs: number } | undefined;
+
+  /** Turn mode: the settings, the resolver, the open turn and its deadline timer. */
+  private readonly turns:
+    | { turnMs: number; deadlineHours?: number; resolver: TurnResolver; humans: string[] }
+    | undefined;
+  private openTurn: OpenTurn | undefined;
+  /** Order ids each side has sent in any turn; an id is not reused across turns. */
+  private readonly turnSentIds = new Map<string, Set<string>>();
+  private turnTimer: unknown;
+  private turnTimerSet = false;
 
   private tail: Promise<unknown> = Promise.resolve();
   private timer: unknown;
@@ -294,7 +386,20 @@ export class GameActor {
     this.seq = options.seq ?? 0;
     this.umpire = options.umpire;
     this.persona = options.persona;
-    for (const [side, list] of options.staffHistory ?? []) this.staffHistory.set(side, [...list]);
+    this.narrateBreaker = options.narrateBreaker ?? closedBreaker();
+    for (const [side, list] of options.staffHistory ?? []) {
+      this.staffHistory.set(side, [...list]);
+      // Asked before a stop and not yet answered: answered when due, as if the game had not stopped.
+      for (const exchange of list) {
+        this.staffAsked.add(staffKey(side, exchange.questionId));
+        if (exchange.text !== undefined || exchange.textless) continue;
+        this.pendingStaff.set(staffKey(side, exchange.questionId), {
+          side,
+          exchange,
+          settle: () => undefined,
+        });
+      }
+    }
     for (const [side, list] of options.dissents ?? []) this.dissents.set(side, [...list]);
     // Reports from before this actor started (a reopened game) keep their template text.
     for (const side of this.engine.world.sides) this.narratedUntil.set(side.id, this.engine.time);
@@ -306,9 +411,15 @@ export class GameActor {
     }
     // Decisions fall on multiples of the interval; a resumed game picks up at the next one.
     const t = this.engine.time;
+    this.scriptedSides = new Set((options.agents ?? []).map((a) => a.side));
     this.agents = (options.agents ?? []).map((agent) => ({
       agent,
-      nextAt: t === 0 ? 0 : (Math.floor(t / agent.intervalMs) + 1) * agent.intervalMs,
+      // A turn open at minute 0 in a reopened game: its agents thought as it opened (logged), so
+      // they do not think at minute 0 again.
+      nextAt:
+        t === 0 && !options.turns?.open
+          ? 0
+          : (Math.floor(t / agent.intervalMs) + 1) * agent.intervalMs,
       idle: false,
       pending: false,
     }));
@@ -323,11 +434,51 @@ export class GameActor {
     }
     this.snapshotSeq = -1;
     this.snapshotEvery = Math.max(1, Math.floor(options.snapshotEvery ?? 1));
+    if (options.turns) {
+      if (this.clock.mode !== 'manual') throw new Error('a turn-mode game runs on a manual clock');
+      const agentSides = new Set(this.agents.map((a) => a.agent.side as string));
+      this.turns = {
+        turnMs: options.turns.turnMs,
+        ...(options.turns.deadlineHours === undefined
+          ? {}
+          : { deadlineHours: options.turns.deadlineHours }),
+        resolver: options.turns.resolver ?? NO_ORDERS_RESOLVER,
+        humans: humanSides(this.engine.world.sides, agentSides),
+      };
+      this.openTurn = options.turns.open;
+      for (const [side, ids] of options.turns.sentIds ?? [])
+        this.turnSentIds.set(side, new Set(ids));
+    }
+  }
+
+  /** Whether this is a turn-mode game (D39). */
+  get turnMode(): boolean {
+    return this.turns !== undefined;
+  }
+
+  /** The open turn as `side` is shown it; undefined in a real-time game or once the game is over. */
+  turnStateFor(side: string): TurnStateView | undefined {
+    const t = this.openTurn;
+    if (!t || this.engine.world.outcome) return undefined;
+    return {
+      turn: t.n,
+      startsAt: t.startMs,
+      endsAt: t.endMs,
+      sent: [...t.sent.keys()],
+      ...(t.deadlineWallMs === undefined ? {} : { deadline: t.deadlineWallMs }),
+      resolving: t.resolving,
+      held: structuredClone(t.held.get(side) ?? []),
+    };
   }
 
   /** What `side` is shown in place of template text: pass to `sideViewOf`. */
   narrationFor(side: string): ReadonlyMap<string, string | null> | undefined {
     return this.narrations.get(side);
+  }
+
+  /** The narrate stage's circuit breaker now (#419). */
+  get narrationBreaker(): Readonly<NarrateBreakerState> {
+    return this.narrateBreaker;
   }
 
   /** The in-fiction notice for a side whose latest narration the umpire's cap refused. */
@@ -348,6 +499,11 @@ export class GameActor {
     return this.staffHistory.get(side) ?? [];
   }
 
+  /** True when this side has used `questionId` before, including for a question not yet logged. */
+  staffQuestionUsed(side: string, questionId: string): boolean {
+    return this.staffAsked.has(staffKey(side, questionId));
+  }
+
   /** The players who may vote changed (D6e). Without voting set up, nothing happens. */
   setVoters(voters: readonly string[]): void {
     this.pauseVoting?.setVoters(voters);
@@ -361,6 +517,8 @@ export class GameActor {
 
   /** Whether the game is waiting on the umpire. */
   get staffAtWork(): StaffAtWork {
+    // In turn mode the umpire holds no clock: it is at work while a turn is being resolved.
+    if (this.openTurn?.resolving) return { working: true, needAtMs: this.openTurn.startMs };
     const needAtMs = this.clock.barrier;
     return needAtMs === undefined ? { working: false } : { working: true, needAtMs };
   }
@@ -423,7 +581,13 @@ export class GameActor {
       if (this.restartInfo) await this.apply({ kind: 'restart', downMs: this.restartInfo.downMs });
       await this.persist();
       await this.persistProgress();
+      if (this.turns && !this.openTurn) await this.openNextTurn();
+      // A question that fell due while the game was down is answered from the view at its due time.
+      this.takeDueStaff();
       this.reschedule();
+      // A reopened game whose sides had all sent before the stop resolves that turn now.
+      if (this.turnReady())
+        void this.enqueue(() => this.closeTurn('all-sent')).catch((e) => this.onError?.(e));
     });
   }
 
@@ -432,7 +596,16 @@ export class GameActor {
     const admin = options.admin === true;
     // The id of the request being handled, or a fresh one for a caller outside any request.
     const id = this.trace.enabled ? (currentCorrelationId() ?? newCorrelationId()) : undefined;
-    if (command.kind === 'order') return this.submitOrder(command, id);
+    if (command.kind === 'order') {
+      if (this.turns) {
+        return Promise.resolve({
+          ok: false,
+          kind: 'rejection',
+          reason: 'in a turn-based game orders are held for the turn and sent with it',
+        });
+      }
+      return this.submitOrder(command, id);
+    }
     if (id === undefined) return this.enqueue(() => this.apply(command, admin));
     return this.enqueue(() => withCorrelationId(id, () => this.apply(command, admin)));
   }
@@ -443,9 +616,13 @@ export class GameActor {
       this.closed = true;
       this.clearTimer();
       this.clearPauseTimer();
+      this.clearTurnTimer();
       for (const handle of [...this.parseTimers]) this.clearParseTimer(handle);
       // Abandon work still with the umpire: its callers are told, and a late result is ignored.
       this.narrating.clear();
+      // Still logged as asked, so a reopened game answers them.
+      for (const p of this.pendingStaff.values()) p.settle(undefined);
+      this.pendingStaff.clear();
       for (const dep of [...this.dependencies.values()]) {
         dep.abandoned = true;
         this.dependencies.delete(dep.id);
@@ -485,10 +662,11 @@ export class GameActor {
    */
   private beginNarrations(): void {
     const umpire = this.umpire;
-    if (!umpire || this.closed || this.engine.world.outcome) return;
+    // Turn mode has no narrate stage: each turn's reports come from its resolution (D39, 11.9).
+    if (!umpire || this.turns || this.closed || this.engine.world.outcome) return;
     const now = this.engine.time;
     for (const side of this.engine.world.sides) {
-      if (this.narrating.has(side.id)) continue;
+      if (this.narrating.has(side.id) || this.scriptedSides.has(side.id)) continue;
       const since = this.narratedUntil.get(side.id) ?? now;
       if (now < since + narrateWindowMs(this.clock.rate)) continue;
       // The window is closed: reports delivered later belong to the next one, whether or not any are due.
@@ -496,6 +674,15 @@ export class GameActor {
       const view = viewFor(this.engine.world, side.id, now);
       const due = reportsDueForNarration(view.reports, since, now, this.clock.rate);
       if (due.length === 0) continue;
+      this.narrateBreaker = breakerAt(this.narrateBreaker, now);
+      if (!breakerAllows(this.narrateBreaker, now)) {
+        // The model has been failing: the reports keep their template text and no call is made.
+        const breaker = this.narrateBreaker;
+        void this.enqueueCompletion(() => this.logPausedNarration(side.id, now, breaker)).catch(
+          (e) => this.onError?.(e),
+        );
+        continue;
+      }
       this.narrating.add(side.id);
       const before = this.clock.barrier;
       const dep: Dependency = {
@@ -519,11 +706,24 @@ export class GameActor {
       // At the deadline the reports already narrated are kept and the rest fall back to template text.
       const abort = new AbortController();
       const deadline = this.parseTimer(() => abort.abort(), this.narrateTimeoutMs);
+      const cooldownMs = breakerCooldownMs(narrateWindowMs(this.clock.rate));
       const work = narrateReports(client, side.id as SideId, due, {
         hidden: hiddenTerms(this.engine.world, side.id as SideId),
         signal: abort.signal,
         persona: this.persona,
         ownUnits: view.ownUnits,
+        // Game time stands at `now` while the stage works (the barrier), so the breaker's clock is `now`.
+        breaker: {
+          allows: () => breakerAllows(this.narrateBreaker, now),
+          reason: () => breakerSummary(this.narrateBreaker),
+          record: (ok) => {
+            const wasOpen = !breakerAllows(this.narrateBreaker, now);
+            this.narrateBreaker = recordNarrateCall(this.narrateBreaker, ok, now, cooldownMs);
+            if (!wasOpen && !breakerAllows(this.narrateBreaker, now)) {
+              this.traceBreaker(this.narrateBreaker, 'opened');
+            }
+          },
+        },
       }).then(
         (result) => {
           this.clearParseTimer(deadline);
@@ -572,6 +772,8 @@ export class GameActor {
         }
         this.narrations.set(side, text);
       }
+      // As this window left it: `sync` may begin another side's window, which can move the breaker on.
+      const narrateBreaker = this.narrateBreaker;
       this.sync();
       if (this.trace.enabled) {
         // One admin LLM row per report that kept its template text, with the reason (#359).
@@ -594,6 +796,7 @@ export class GameActor {
         endGameMs: this.engine.time,
         command: { kind: 'narrate', side, windowEndMs },
         calls,
+        narrateBreaker,
         ...(result?.fellBack
           ? {
               error: `narration fell back to template text: ${narrationFallbackReason(result)}`,
@@ -607,6 +810,47 @@ export class GameActor {
       this.reschedule();
       this.notify();
     }
+  }
+
+  /** Journal a window the open breaker skipped: its reports keep their template text (#419). */
+  private async logPausedNarration(
+    side: string,
+    windowEndMs: number,
+    breaker: NarrateBreakerState,
+  ): Promise<void> {
+    if (this.closed) return;
+    this.traceBreaker(breaker, `${side} window skipped`);
+    const entry: InputLogEntry = {
+      seq: ++this.seq,
+      wallMs: this.wallNow(),
+      gameMs: this.engine.time,
+      endGameMs: this.engine.time,
+      command: { kind: 'narrate', side, windowEndMs },
+      calls: [],
+      narrateBreaker: breaker,
+      error: `narration fell back to template text: ${breakerSummary(breaker)}`,
+    };
+    if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+    await this.commit(entry);
+  }
+
+  /** One admin LLM row for the breaker: "model narration paused: 5 of 6 failed" and until when. */
+  private traceBreaker(breaker: NarrateBreakerState, what: string): void {
+    if (!this.trace.enabled) return;
+    const until =
+      breaker.pausedUntil === undefined
+        ? ''
+        : `, until game minute ${Math.round(breaker.pausedUntil / 60_000)}`;
+    const reason = `${breakerSummary(breaker)}${until}`;
+    this.trace.record(this.id, 'llm', {
+      mode: 'fallback',
+      stage: 'narrate',
+      provider: 'narration breaker',
+      ok: false,
+      errorKind: 'model narration paused',
+      error: `${reason} (${what})`,
+      fallbackFor: { reason },
+    });
   }
 
   /**
@@ -625,8 +869,20 @@ export class GameActor {
     };
     try {
       for (;;) {
-        const due = this.nextAgent();
-        if (!due || due.nextAt > target || this.engine.world.outcome) break;
+        if (this.engine.world.outcome) break;
+        // In a turn the engine resolves, agents think at their interval as in real time (#430); the
+        // resolver ran copies of them through the same turn, so it still ends as projected (D39). A
+        // held turn (the umpire's) moves nothing: there they think only as it opens (`openNextTurn`).
+        // Staff answers only read the world, so they are still written at their due time.
+        const due = heldTurn(this.engine.world, this.engine.time) ? undefined : this.nextAgent();
+        // A staff answer is written at its due time, from the world as it stood then (#418).
+        const staffAt = this.nextStaffDue();
+        if (staffAt <= target && (!due || staffAt <= due.nextAt)) {
+          step(Math.max(staffAt, this.engine.time));
+          this.takeDueStaff();
+          continue;
+        }
+        if (!due || due.nextAt > target) break;
         step(due.nextAt);
         due.nextAt += due.agent.intervalMs;
         if (this.engine.world.outcome) continue;
@@ -635,10 +891,12 @@ export class GameActor {
           due.idle = true;
           continue;
         }
-        if (due.agent.decide) this.beginDecision(due);
+        // Nothing may hold a turn's clock, so in turn mode an LLM commander plays by its script.
+        if (due.agent.decide && !this.turns) this.beginDecision(due);
         else due.idle = !this.think(due.agent) && (due.agent.settled?.() ?? true);
       }
       step(target);
+      this.takeDueStaff();
     } finally {
       // A finished game does not run on. Freeze the clock at the outcome's own time, not at
       // this tick's later reading, so the stopped clock agrees with the end panel.
@@ -654,61 +912,141 @@ export class GameActor {
   }
 
   /**
-   * A staff officer answers a player's question on the `staff` stage, from the side's view as of
-   * now. Not on the clock's critical path: game time does not wait for it, and the answer is shown
-   * when the officer's cost has elapsed. Logged as a journal-only entry (calls on the entry).
-   * Undefined when there is no umpire or the stage gave nothing usable.
+   * A player put a question to a staff officer (D6b). The question is logged now (journal only), so a
+   * restart keeps it, and the answer is written once, when game time reaches `answerAtGame`: from the
+   * officer's view at that time, on the `staff` stage or, with no umpire or no usable reply, in the
+   * officer's canned voice (#418). The written exchange is stored, logged and never recomputed.
+   * Resolves with it once written; undefined when the game is over or closes first. Game time never
+   * waits for it.
    */
   async answerStaff(
     side: SideId,
     role: string,
     question: string,
     asked: { questionId: string; askedAtGame: number; answerAtGame: number; askedBy?: string },
-  ): Promise<StaffAnswer | undefined> {
-    const umpire = this.umpire;
-    if (!umpire || this.closed || this.engine.world.outcome) return undefined;
-    let answer: StaffAnswer | undefined;
-    let failure: string | undefined;
-    try {
-      answer = await answerStaffQuestion(
-        umpire,
-        this.engine.world,
-        side,
-        role,
-        question,
-        this.engine.time,
-      );
-    } catch (e) {
-      failure = e instanceof Error ? e.message : 'staff stage failed';
-    }
-    if (this.closed) return undefined;
+  ): Promise<StaffExchange | undefined> {
+    if (this.closed || this.engine.world.outcome) return undefined;
+    const key = staffKey(side, asked.questionId);
+    if (this.staffAsked.has(key)) return undefined;
+    this.staffAsked.add(key);
+    const officer = staffOfficerFor(this.engine.world.seed, side, role);
     const exchange: StaffExchange = {
       ...asked,
       role: role as StaffExchange['role'],
       question,
-      ...(answer
-        ? { text: answer.text, basedOnGame: answer.basedOnGame }
-        : { textless: true as const }),
-      officer: (({ name, traits }) => ({ name, traits }))(
-        answer?.officer ?? staffOfficerFor(this.engine.world.seed, side as SideId, role),
-      ),
+      officer: { name: officer.name, traits: officer.traits },
     };
+    let settle!: (x: StaffExchange | undefined) => void;
+    const written = new Promise<StaffExchange | undefined>((r) => (settle = r));
     await this.enqueueCompletion(async () => {
+      if (this.closed) return settle(undefined);
+      await this.logStaff(side, exchange, []);
       this.staffHistory.set(side, [...(this.staffHistory.get(side) ?? []), exchange]);
-      const entry: InputLogEntry = {
-        seq: ++this.seq,
-        wallMs: this.wallNow(),
-        gameMs: this.engine.time,
-        endGameMs: this.engine.time,
-        command: { kind: 'staffAnswer', side, role, question, exchange },
-        calls: answer?.records ?? [],
-        ...(answer === undefined ? { error: failure ?? 'staff answer unusable' } : {}),
-      };
-      if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
-      await this.commit(entry);
+      this.pendingStaff.set(key, { side, exchange, settle });
+      this.takeDueStaff();
+      // Wake at its due time, so the answer is written then even on a quiet field.
+      this.reschedule();
       this.notify();
     });
-    return answer;
+    return written;
+  }
+
+  /** When the actor must wake to write a staff answer, if any (none once the game is over). */
+  private nextStaffWake(): number | undefined {
+    const at = this.nextStaffDue();
+    return this.engine.world.outcome || !Number.isFinite(at) ? undefined : at;
+  }
+
+  /** The earliest due time of a question still waiting, or Infinity. */
+  private nextStaffDue(): number {
+    let at = Number.POSITIVE_INFINITY;
+    for (const p of this.pendingStaff.values()) at = Math.min(at, p.exchange.answerAtGame);
+    return at;
+  }
+
+  /**
+   * Write the answer of every question now due, from the world as it is now. Once the game is over all
+   * of them are written; one not yet due then is never shown (the clock stops before it), so it is
+   * answered in the canned voice without calling the model.
+   */
+  private takeDueStaff(): void {
+    const now = this.engine.time;
+    const over = Boolean(this.engine.world.outcome);
+    for (const [key, p] of [...this.pendingStaff]) {
+      if (!over && p.exchange.answerAtGame > now) continue;
+      this.pendingStaff.delete(key);
+      const at = Math.min(p.exchange.answerAtGame, now);
+      const umpire = p.exchange.answerAtGame > now ? undefined : this.umpire;
+      void this.writeStaff(p, this.engine.world, at, umpire).catch((e) => {
+        p.settle(undefined);
+        this.onError?.(e);
+      });
+    }
+  }
+
+  /** Write one answer from `world` as seen at `at`, then log and store it. Not on the clock's critical path. */
+  private async writeStaff(
+    p: PendingStaff,
+    world: GameState,
+    at: number,
+    umpire: UmpireClient | undefined,
+  ): Promise<void> {
+    const { side, exchange } = p;
+    const answer = await writeStaffAnswer(
+      umpire,
+      world,
+      side as SideId,
+      exchange.role,
+      exchange.question,
+      at,
+    );
+    if (this.closed) return p.settle(undefined);
+    const done: StaffExchange = {
+      ...exchange,
+      text: answer.text,
+      basedOnGame: answer.basedOnGame,
+      officer: { name: answer.officer.name, traits: answer.officer.traits },
+    };
+    await this.enqueueCompletion(async () => {
+      if (this.closed) return p.settle(undefined);
+      // Logged first: if the commit fails, nothing shows words that a restart would write again.
+      await this.logStaff(side, done, answer.records, answer.failure);
+      this.staffHistory.set(
+        side,
+        (this.staffHistory.get(side) ?? []).map((x) =>
+          x.questionId === done.questionId ? done : x,
+        ),
+      );
+      this.notify();
+      p.settle(done);
+    });
+  }
+
+  /** Log a staff exchange as a journal-only entry: once when asked, once when answered. A restart keeps the latest. */
+  private async logStaff(
+    side: string,
+    exchange: StaffExchange,
+    calls: UmpireCallRecord[],
+    failure?: string,
+  ): Promise<void> {
+    const entry: InputLogEntry = {
+      seq: ++this.seq,
+      wallMs: this.wallNow(),
+      gameMs: this.engine.time,
+      endGameMs: this.engine.time,
+      command: {
+        kind: 'staffAnswer',
+        side,
+        role: exchange.role,
+        question: exchange.question,
+        exchange,
+      },
+      calls,
+      // The canned answer stands; the log says why the model's did not.
+      ...(failure === undefined ? {} : { error: failure }),
+    };
+    if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+    await this.commit(entry);
   }
 
   /**
@@ -798,10 +1136,10 @@ export class GameActor {
 
   /** Game time the soonest narration window closes, when the narrate stage is on. */
   private nextNarrationAt(): number | undefined {
-    if (!this.umpire || this.engine.world.outcome) return undefined;
+    if (!this.umpire || this.turns || this.engine.world.outcome) return undefined;
     let next: number | undefined;
     for (const side of this.engine.world.sides) {
-      if (this.narrating.has(side.id)) continue;
+      if (this.narrating.has(side.id) || this.scriptedSides.has(side.id)) continue;
       const at =
         (this.narratedUntil.get(side.id) ?? this.engine.time) + narrateWindowMs(this.clock.rate);
       if (next === undefined || at < next) next = at;
@@ -809,7 +1147,11 @@ export class GameActor {
     return next;
   }
 
-  /** The agent due to think soonest, leaving out idle ones when no event is queued to wake them. */
+  /**
+   * The agent due to think soonest, leaving out idle ones when no event is queued to wake them.
+   * A turn's projection runs the same rule (`runEngineTurn` in `engineTurn.ts`): change both, or a
+   * rigid turn no longer ends as projected.
+   */
   private nextAgent(): AgentSlot | undefined {
     const waiting = this.engine.queue.length > 0;
     return this.agents.reduce<AgentSlot | undefined>(
@@ -819,6 +1161,41 @@ export class GameActor {
           : a,
       undefined,
     );
+  }
+
+  /**
+   * Copies of the scripted sides as they stand, for a turn's projection (#430): each thinks from its
+   * side's view of the world it is given and issues its orders as `issueAgentOrders` does, with ids
+   * of its own (the live orders take theirs from the log). Agents that cannot be copied are left out.
+   */
+  private turnAgents(n: number): TurnAgent[] {
+    // One counter for all the copies, as the log's `seq` is one: two copies' orders never share an
+    // id, so neither do their couriers (`courier-<order id>`).
+    let k = 0;
+    return this.agents.flatMap((slot) => {
+      if (slot.pending || slot.retired || slot.agent.dormant?.()) return [];
+      const copy = slot.agent.fork?.();
+      if (!copy) return [];
+      const think = (state: EngineState<GameState>) => {
+        const view = viewFor(state.world, copy.side as SideId, state.time);
+        let changed = false;
+        for (const o of copy.think(view)) {
+          const applied = applyLoggedOrder(
+            state,
+            `${this.id}-t${n}`,
+            ++k,
+            copy.side,
+            agentParse(o),
+          );
+          if ('state' in applied) {
+            state = applied.state;
+            changed = true;
+          }
+        }
+        return { state, idle: !changed && (copy.settled?.() ?? true) };
+      };
+      return [{ intervalMs: copy.intervalMs, nextAt: slot.nextAt, idle: slot.idle, think }];
+    });
   }
 
   /** Run one decision: the same order path as a human's, logged so replay needs no agent. */
@@ -906,12 +1283,7 @@ export class GameActor {
   ): boolean {
     let changed = false;
     for (const o of orders) {
-      const parsed: ParseResult = {
-        kind: 'intents',
-        text: o.text,
-        unitId: o.unitId,
-        intents: o.intents ?? [o.intent],
-      };
+      const parsed = agentParse(o);
       const entry: InputLogEntry = {
         seq: ++this.seq,
         wallMs: this.wallNow(),
@@ -957,6 +1329,9 @@ export class GameActor {
     if (this.closed || this.engine.world.outcome) return { ok: false, reason: 'the game is over' };
     if (settings.enabled && !this.umpire) {
       return { ok: false, reason: 'this game has no staff to appoint a deputy from' };
+    }
+    if (settings.enabled && this.turns) {
+      return { ok: false, reason: 'a deputy does not act in a turn-based game yet' };
     }
     await this.enqueueCompletion(async () => {
       this.deputySettings.set(side, { settings, ...(seat ? { seat } : {}) });
@@ -1103,10 +1478,11 @@ export class GameActor {
   private reschedule(): void {
     this.clearTimer();
     this.reschedulePause();
+    this.rescheduleTurnDeadline();
     if (this.closed) return;
     const nextEvent = this.engine.queue[0];
     const nextThink = this.engine.world.outcome ? undefined : this.nextAgent()?.nextAt;
-    const woken = [nextEvent?.time, nextThink, this.nextNarrationAt()].filter(
+    const woken = [nextEvent?.time, nextThink, this.nextNarrationAt(), this.nextStaffWake()].filter(
       (t) => t !== undefined,
     );
     const nextTime = woken.length > 0 ? Math.min(...woken) : undefined;
@@ -1166,10 +1542,10 @@ export class GameActor {
       // Nothing is waited for: jump to the next event, one instant per tick.
       const nextEvent = this.engine.queue[0];
       const nextThink = this.engine.world.outcome ? undefined : this.nextAgent()?.nextAt;
-      const next =
-        nextEvent && nextThink !== undefined
-          ? Math.min(nextEvent.time, nextThink)
-          : (nextEvent?.time ?? nextThink);
+      const woken = [nextEvent?.time, nextThink, this.nextStaffWake()].filter(
+        (t) => t !== undefined,
+      );
+      const next = woken.length > 0 ? Math.min(...woken) : undefined;
       if (next !== undefined && next <= (this.clock.barrier ?? Infinity)) {
         this.clock.advanceTo(Math.max(next, this.clock.now()));
         this.sync();
@@ -1295,7 +1671,69 @@ export class GameActor {
   }
 
   private async run(command: GameCommand, entry: InputLogEntry): Promise<CommandResult> {
+    if (this.turns && TURN_REFUSED.has(command.kind)) throw new Error(TURN_MODE_REFUSAL);
     switch (command.kind) {
+      case 'turnOrder': {
+        const t = this.writableTurn(command.side);
+        const unit = this.engine.world.units.find((u) => u.id === command.order.to);
+        if (!unit || unit.side !== command.side) throw new Error('that is not one of your units');
+        // A held order is as good as drafted: a seat holds only for units it may draft for (D6a).
+        if (
+          command.by &&
+          !mayDraft(this.engine.world, command.side as SideId, command.by, unit.id)
+        ) {
+          throw new Error(`You may not write orders to ${unit.name}.`);
+        }
+        if (this.turnSentIds.get(command.side)?.has(command.order.orderId)) {
+          throw new Error('that order id was already sent in an earlier turn');
+        }
+        entry.command = { ...command, turn: t.n };
+        holdOrder(t, command.side, structuredClone(command.order));
+        return { ok: true, orderId: command.order.orderId };
+      }
+      case 'withdrawTurnOrder': {
+        const t = this.writableTurn(command.side);
+        entry.command = { ...command, turn: t.n };
+        const held = t.held.get(command.side)?.find((o) => o.orderId === command.orderId);
+        if (
+          held &&
+          command.by &&
+          !mayDraft(this.engine.world, command.side as SideId, command.by, held.to)
+        ) {
+          const unit = this.engine.world.units.find((u) => u.id === held.to);
+          throw new Error(`You may not write orders to ${unit?.name ?? held.to}.`);
+        }
+        if (!withdrawOrder(t, command.side, command.orderId)) {
+          throw new Error('no such order is held for this turn');
+        }
+        return { ok: true };
+      }
+      case 'sendTurn': {
+        const t = this.writableTurn(command.side);
+        const orders = structuredClone(t.held.get(command.side) ?? []);
+        // Role permissions apply at sending, as for a real-time order (D6a, D39).
+        const { signer } = command;
+        if (signer) {
+          for (const o of orders) {
+            if (maySign(this.engine.world, command.side as SideId, signer, o.to)) continue;
+            const unit = this.engine.world.units.find((u) => u.id === o.to);
+            throw new Error(`You may not sign orders to ${unit?.name ?? o.to}.`);
+          }
+        }
+        t.sent.set(command.side, { orders, ...(signer ? { signer } : {}) });
+        const ids = this.turnSentIds.get(command.side) ?? new Set<string>();
+        for (const o of orders) ids.add(o.orderId);
+        this.turnSentIds.set(command.side, ids);
+        entry.command = { ...command, turn: t.n, orders };
+        // Closed after this send is logged, in its own job.
+        if (this.turnReady()) {
+          void this.enqueue(() => this.closeTurn('all-sent')).catch((e) => this.onError?.(e));
+        }
+        return { ok: true };
+      }
+      case 'openTurn':
+      case 'resolveTurn':
+        throw new Error('turns are opened and resolved by the game itself');
       case 'proposePause':
       case 'proposeResume': {
         const pv = this.requirePauseVoting();
@@ -1396,6 +1834,204 @@ export class GameActor {
     }
   }
 
+  /** The open turn, if `side` may still change its orders for it; otherwise a player-facing refusal. */
+  private writableTurn(side: string): OpenTurn {
+    const t = this.openTurn;
+    if (!this.turns) throw new Error('this game is not turn-based');
+    if (this.engine.world.outcome) throw new Error('the game is over');
+    if (!t || t.resolving) throw new Error('the turn is being resolved; wait for the next one');
+    if (t.sent.has(side)) throw new Error('your side has sent its orders for this turn');
+    return t;
+  }
+
+  /** Every human side has sent for the open turn, which is not yet resolving. */
+  private turnReady(): boolean {
+    const t = this.openTurn;
+    const humans = this.turns?.humans ?? [];
+    return (
+      t !== undefined && !t.resolving && humans.length > 0 && humans.every((h) => t.sent.has(h))
+    );
+  }
+
+  /**
+   * Open the next turn at the current game time and journal it. It ends `turnMs` later, or at the
+   * scenario's time limit when that comes first (D39, "Clock").
+   */
+  private async openNextTurn(previous?: number): Promise<void> {
+    const turns = this.turns;
+    if (!turns || this.closed || this.engine.world.outcome) return;
+    const startMs = this.engine.time;
+    const n = previous === undefined ? Math.floor(startMs / turns.turnMs) + 1 : previous + 1;
+    const { endMs } = turnBounds(startMs, turns.turnMs, this.engine.world);
+    const deadlineWallMs =
+      turns.deadlineHours === undefined
+        ? undefined
+        : this.wallNow() + Math.round(turns.deadlineHours * 3_600_000);
+    this.openTurn = {
+      n,
+      startMs,
+      endMs,
+      ...(deadlineWallMs === undefined ? {} : { deadlineWallMs }),
+      held: new Map(),
+      sent: new Map(),
+      resolving: false,
+    };
+    const entry: InputLogEntry = {
+      seq: ++this.seq,
+      wallMs: this.wallNow(),
+      gameMs: startMs,
+      endGameMs: startMs,
+      command: {
+        kind: 'openTurn',
+        turn: n,
+        startMs,
+        endMs,
+        ...(deadlineWallMs === undefined ? {} : { deadlineWallMs }),
+      },
+    };
+    if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+    // Scripted sides think on their interval as in real time (#430): one due now thinks here, on
+    // the world caught up to the turn's start, and its orders are issued then and logged as in real
+    // time. In a turn the engine resolves it thinks again inside the turn (`advanceEngine`); in a
+    // held turn this is its one decision. No LLM commander plays turn mode yet (nothing may hold
+    // the turn's clock), so it plays by its script.
+    // `advanceEngine` has already run every due agent but those it skips: idle ones (as real time
+    // does, so they are skipped here too) and all of them in a held turn.
+    this.advanceEngine(startMs);
+    const waiting = this.engine.queue.length > 0;
+    for (const slot of this.agents) {
+      if (slot.pending || slot.retired || slot.nextAt > startMs || (slot.idle && !waiting))
+        continue;
+      slot.nextAt = (Math.floor(startMs / slot.agent.intervalMs) + 1) * slot.agent.intervalMs;
+      if (slot.agent.dormant?.()) slot.idle = true;
+      else slot.idle = !this.think(slot.agent) && (slot.agent.settled?.() ?? true);
+    }
+    await this.commit(entry);
+  }
+
+  /**
+   * Close the open turn and start its resolution outside the queue, like a parse: the resolver may
+   * take minutes, and game time cannot move meanwhile (the clock is manual and every clock command is
+   * refused), so the state it was given is still the state its output is applied to.
+   */
+  private async closeTurn(cause: TurnCause): Promise<void> {
+    const t = this.openTurn;
+    const turns = this.turns;
+    if (!t || !turns || t.resolving || this.closed || this.engine.world.outcome) return;
+    if (cause === 'all-sent' && !this.turnReady()) return;
+    this.sync();
+    t.resolving = true;
+    const input: TurnInput = {
+      gameId: this.id,
+      n: t.n,
+      startMs: t.startMs,
+      endMs: t.endMs,
+      cause,
+      orders: sentOrdersOf(t),
+      sent: [...t.sent.keys()],
+    };
+    const state = this.engine;
+    this.onStaffAtWork?.({ working: true, needAtMs: t.startMs });
+    this.reschedule();
+    this.notify();
+    const resolved = (async (): Promise<TurnResolution> => {
+      try {
+        return await turns.resolver.resolve(state, input, {
+          agents: () => this.turnAgents(t.n),
+        });
+      } catch (e) {
+        // A resolver must always answer; one that throws leaves the units on their last orders.
+        if (this.trace.enabled) this.trace.record(this.id, 'error', { source: 'turn', error: e });
+        const error = e instanceof Error ? e.message : String(e);
+        return { adjudicator: NO_ADJUDICATOR, fallback: { error, attempts: 1 } };
+      }
+    })();
+    void resolved
+      .then((res) => this.enqueueCompletion(() => this.completeTurn(t, input, res)))
+      .catch((e) => this.onError?.(e));
+  }
+
+  /**
+   * Apply a resolved turn at its start with the adjudicator it names (the same call replay makes),
+   * advance the clock to its end, log it and open the next turn.
+   */
+  private async completeTurn(t: OpenTurn, input: TurnInput, res: TurnResolution): Promise<void> {
+    if (this.closed || this.openTurn !== t) return;
+    const entry: InputLogEntry = {
+      seq: ++this.seq,
+      wallMs: this.wallNow(),
+      gameMs: this.engine.time,
+      command: { kind: 'resolveTurn', turn: t.n, cause: input.cause },
+      turn: {
+        n: t.n,
+        startMs: t.startMs,
+        endMs: t.endMs,
+        cause: input.cause,
+        orders: [...input.orders],
+        sent: [...input.sent],
+        adjudicator: res.adjudicator,
+        ...(res.output === undefined ? {} : { output: res.output }),
+        ...(res.fallback ? { fallback: res.fallback } : {}),
+      },
+      ...(res.calls ? { calls: res.calls } : {}),
+    };
+    try {
+      this.sync();
+      entry.gameMs = this.engine.time;
+      try {
+        this.engine = applyTurn(this.engine, entry.turn!, {
+          gameId: this.id,
+          registry: this.registry,
+        });
+      } catch (e) {
+        // Replay skips a failed turn's output but still runs on to its end, as here.
+        entry.error = e instanceof Error ? e.message : String(e);
+        if (this.trace.enabled) this.trace.record(this.id, 'error', { source: 'turn', error: e });
+      }
+      if (this.clock.status !== 'stopped') this.clock.skipTo(t.endMs);
+      this.sync();
+      entry.endGameMs = this.engine.time;
+    } finally {
+      this.openTurn = undefined;
+      this.onStaffAtWork?.({ working: false });
+    }
+    if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+    try {
+      await this.commit(entry);
+    } finally {
+      // The turn is resolved in memory whether or not the store took it; a failed commit must not
+      // leave the live game with no turn open (a restart would re-resolve it from the log).
+      await this.openNextTurn(t.n);
+    }
+  }
+
+  private clearTurnTimer(): void {
+    if (this.turnTimerSet) this.timers.clearTimeout(this.turnTimer);
+    this.turnTimerSet = false;
+  }
+
+  /** Wake at the open turn's wall-clock deadline, which no game event accounts for. */
+  private rescheduleTurnDeadline(): void {
+    this.clearTurnTimer();
+    const t = this.openTurn;
+    const deadline = t?.deadlineWallMs;
+    if (this.closed || !t || t.resolving || deadline === undefined) return;
+    const delay = Math.min(MAX_SLEEP_MS, Math.max(0, deadline - this.wallNow()));
+    this.turnTimer = this.timers.setTimeout(() => {
+      this.turnTimerSet = false;
+      this.enqueue(async () => {
+        // Checked when the job runs: the turn may have closed meanwhile, or a long sleep woke early.
+        if (this.openTurn !== t || t.resolving) return;
+        if (this.wallNow() >= deadline) await this.closeTurn('deadline');
+        else this.rescheduleTurnDeadline();
+      }).catch((e) => {
+        if (this.trace.enabled) this.trace.record(this.id, 'error', { source: 'turn', error: e });
+        this.onError?.(e);
+      });
+    }, delay);
+    this.turnTimerSet = true;
+  }
+
   /** What the parser would read for an order `side` signs now. Read-only; the admin playground prefills from it (#395). */
   orderContext(side: string): ParseContext {
     return this.parseContext(side);
@@ -1403,26 +2039,7 @@ export class GameActor {
 
   /** What the parser may read: the issuing side, named places and the side's own units. */
   private parseContext(side: string): ParseContext {
-    const { map, units } = this.engine.world;
-    return {
-      side,
-      map: {
-        features: map.features.map((f) => ({
-          id: f.id,
-          kind: f.kind,
-          ...(f.name === undefined ? {} : { name: f.name }),
-          anchor: featureAnchor(f.geometry),
-        })),
-      },
-      units: units.map((u) => ({
-        id: u.id,
-        side: u.side,
-        name: u.name,
-        center: u.center,
-        ...(u.personality && u.side === side ? { personality: u.personality } : {}),
-      })),
-      hidden: hiddenTerms(this.engine.world, side as SideId),
-    };
+    return parseContextOf(this.engine.world, side);
   }
 
   /**
@@ -1683,6 +2300,22 @@ export class GameActor {
     return { ok: true, orderId: applied.orderId };
   }
 }
+
+/** Clock and vote commands a turn-mode game refuses (D39): only resolving a turn moves its clock. */
+const TURN_REFUSED: ReadonlySet<GameCommand['kind']> = new Set<GameCommand['kind']>([
+  'setRate',
+  'pause',
+  'resume',
+  'setMode',
+  'advanceTo',
+  'step',
+  'proposePause',
+  'proposeResume',
+  'proposeHold',
+  'vote',
+  'proposeRate',
+  'rateVote',
+]);
 
 /** Rebuild engine state from a stored snapshot. */
 export function restoreEngine(serialized: string): EngineState<GameState> {

@@ -26,9 +26,15 @@ import {
   type EngineState,
   type GameState,
 } from './index.js';
-import { RALLY_EVENT } from './contact.js';
+import { COMBAT_CHECK_EVENT, RALLY_EVENT } from './contact.js';
 import { schedule } from './queue.js';
-import { BATTLE_CLOSE_MS, forceBroken, evaluateVictory } from './combat.js';
+import {
+  BATTLE_CLOSE_MS,
+  forceBroken,
+  evaluateVictory,
+  outcomeText,
+  turnVictory,
+} from './combat.js';
 import { viewFor } from './index.js';
 import type { BattleRuling } from './types.js';
 import { polygonCentroid } from './geometry.js';
@@ -955,6 +961,186 @@ describe('a decided battle (#315)', () => {
   });
 });
 
+describe('a decided battle against the time limit (#417)', () => {
+  const HOLD = 50;
+  /**
+   * Blue (the defender) is broken at game minute `breakAt`: its 2nd battalion routed, its 1st
+   * down to 40 men but still standing, so Blue is not out of the field. Red is far off.
+   */
+  function brokenDefenceAt(breakAt: number) {
+    const s = field(
+      [
+        { id: 'blue-1', side: 'blue', x: 1, y: 4 },
+        { id: 'blue-2', side: 'blue', x: 1, y: 3 },
+        { id: 'red-1', side: 'red', x: 9, y: 0 },
+      ],
+      { holdMinutes: HOLD },
+    );
+    const at = breakAt * MS_PER_MINUTE;
+    const before = advanceTo(s, at, registry()).state;
+    const units = before.world.units.map((u) =>
+      u.id === 'blue-2'
+        ? { ...u, status: 'withdrawn' as const, brokenAt: at }
+        : u.id === 'blue-1'
+          ? { ...u, strength: 40 }
+          : u,
+    );
+    return schedule({ ...before, world: { ...before.world, units } }, [
+      { time: at, type: COMBAT_CHECK_EVENT },
+    ]);
+  }
+  const END = (HOLD + BATTLE_CLOSE_MS / MS_PER_MINUTE + 5) * MS_PER_MINUTE;
+
+  it.each([HOLD - 20, HOLD - 15, HOLD - 5])(
+    'a defence ruled broken at minute %i wins for the attacker, not objective-held',
+    (breakAt) => {
+      const s = brokenDefenceAt(breakAt);
+      const { state, emitted } = advanceTo(s, END, registry());
+      expect(state.world.rulings).toHaveLength(1);
+      expect(state.world.outcome).toMatchObject({ winner: 'red', reason: 'defence-broken' });
+      // The ruling decides by the time limit at the latest: the game is never longer than the scenario.
+      expect(state.world.outcome!.time).toBe(
+        Math.min(HOLD * MS_PER_MINUTE, breakAt * MS_PER_MINUTE + BATTLE_CLOSE_MS),
+      );
+      expect(ofType(emitted, 'game.end')).toHaveLength(1);
+    },
+  );
+
+  it('gives the same result however the clock is stepped (rates 1, 4, 12, fast-forward)', () => {
+    const whole = advanceTo(brokenDefenceAt(HOLD - 20), END, registry()).state;
+    // A real minute at rate r is r game minutes; fast-forward jumps straight to the end.
+    for (const rate of [1, 4, 12]) {
+      let s = brokenDefenceAt(HOLD - 20);
+      for (let t = s.time; t < END; t += (rate * MS_PER_MINUTE) / 7)
+        s = advanceTo(s, t, registry()).state;
+      s = advanceTo(s, END, registry()).state;
+      expect(serialize(s)).toBe(serialize(whole));
+    }
+  });
+
+  it('the time limit still goes to the defender when no battle was decided', () => {
+    const s = field(
+      [
+        { id: 'blue-1', side: 'blue', x: 1, y: 4 },
+        { id: 'red-1', side: 'red', x: 9, y: 0 },
+      ],
+      { holdMinutes: HOLD },
+    );
+    const { state } = advanceTo(s, END, registry());
+    expect(state.world.outcome).toMatchObject({
+      winner: 'blue',
+      reason: 'objective-held',
+      time: HOLD * MS_PER_MINUTE,
+    });
+  });
+
+  it('the ruling stands when the winner then has nobody left on the field', () => {
+    const s = brokenDefenceAt(HOLD - 20);
+    const declared = advanceTo(s, s.time + 1, registry()).state;
+    expect(declared.world.battle).toMatchObject({ winner: 'red', reason: 'defence-broken' });
+    // Red's only battalion breaks in the pursuit and leaves the field: before #417 Blue won by it.
+    const gone = {
+      ...declared.world,
+      units: declared.world.units.map((u) =>
+        u.side === 'red' ? { ...u, status: 'withdrawn' as const } : u,
+      ),
+    };
+    expect(evaluateVictory(gone, declared.time)).toEqual({
+      winner: 'red',
+      reason: 'defence-broken',
+      time: declared.time,
+    });
+    // The loser leaving ends it at once too, and says so.
+    const fled = {
+      ...declared.world,
+      units: declared.world.units.map((u) =>
+        u.side === 'blue' ? { ...u, status: 'withdrawn' as const } : u,
+      ),
+    };
+    expect(evaluateVictory(fled, declared.time)).toEqual({
+      winner: 'red',
+      reason: 'defence-broken',
+      time: declared.time,
+      loserOut: 'withdrawn',
+    });
+  });
+
+  it('an umpire turn ending at the time limit closes a declared battle with its ruling', () => {
+    const s = brokenDefenceAt(HOLD - 10);
+    const declared = advanceTo(s, s.time + 1, registry()).state;
+    expect(declared.world.battle).toMatchObject({ winner: 'red', reason: 'defence-broken' });
+    const res = turnVictory(declared.world, HOLD * MS_PER_MINUTE);
+    expect(res.world.outcome).toMatchObject({ winner: 'red', reason: 'defence-broken' });
+  });
+
+  it('files the outcome as the umpire’s paper to both sides in turn mode only (#429)', () => {
+    const s = brokenDefenceAt(HOLD - 10);
+    const declared = advanceTo(s, s.time + 1, registry()).state;
+    const end = HOLD * MS_PER_MINUTE;
+    const closing = (w: typeof declared.world) =>
+      w.sides.map((side) =>
+        w.intel[side.id].reports.filter((r) => r.text?.includes('The game is over')),
+      );
+    const turn = { n: 3, startMs: end - 20 * MS_PER_MINUTE, endMs: end, adjudicator: 'umpire' };
+    const inTurn = turnVictory({ ...declared.world, turn } as typeof declared.world, end).world;
+    for (const papers of closing(inTurn)) {
+      expect(papers).toHaveLength(1);
+      expect(papers[0]).toMatchObject({ kind: 'battle', observedAt: end, deliverAt: end });
+      expect(papers[0]!.text).toMatch(/defence has been broken .*The game is over: \w+ wins\./);
+    }
+    // A real-time game ends on the game-over screen alone, as before.
+    for (const papers of closing(turnVictory(declared.world, end).world)) {
+      expect(papers).toHaveLength(0);
+    }
+  });
+
+  it('the time-limit paper does not say the defender holds ground the attacker may stand on', () => {
+    const s = brokenDefenceAt(HOLD - 10);
+    const outcome = {
+      winner: 'blue',
+      reason: 'objective-held',
+      time: HOLD * MS_PER_MINUTE,
+    } as const;
+    const text = outcomeText(s.world, outcome);
+    expect(text).toMatch(/^The time limit is reached and Red has not taken the objective /);
+    expect(text).toMatch(/The game is over: Blue wins\.$/);
+    expect(text).not.toMatch(/holding/);
+  });
+
+  it("a defence broken by the combat tick on the time limit's own minute goes to the ruling", () => {
+    // Two weak Blue battalions in contact with two strong Red ones from the start, no orders.
+    const fight = (holdMinutes: number) =>
+      field(
+        [
+          { id: 'blue-1', side: 'blue', x: 1, y: 4, strength: 300 },
+          { id: 'blue-2', side: 'blue', x: 1, y: 3, strength: 300 },
+          { id: 'red-1', side: 'red', x: 2, y: 4, strength: 800 },
+          { id: 'red-2', side: 'red', x: 2, y: 3, strength: 800 },
+        ],
+        { holdMinutes, seed: 9 },
+      );
+    const long = advanceTo(fight(180), 180 * MS_PER_MINUTE, registry()).state;
+    const breakAt = long.world.battle?.declaredAt;
+    expect(long.world.battle).toMatchObject({ winner: 'red', reason: 'defence-broken' });
+    // The break falls on a combat tick, which is queued after the deadline for the same minute.
+    expect(breakAt! % COMBAT_TICK_MS).toBe(0);
+    const { state } = advanceTo(fight(breakAt! / MS_PER_MINUTE), END, registry());
+    expect(state.world.outcome).toMatchObject({
+      winner: 'red',
+      reason: 'defence-broken',
+      time: breakAt,
+    });
+    expect(state.world.rulings).toHaveLength(1);
+  });
+
+  it('an umpire turn ending at the time limit with a defence just broken rules it, not objective-held', () => {
+    const s = brokenDefenceAt(HOLD - 10);
+    const res = turnVictory(s.world, HOLD * MS_PER_MINUTE);
+    expect(res.world.outcome).toMatchObject({ winner: 'red', reason: 'defence-broken' });
+    expect(res.world.rulings).toHaveLength(1);
+  });
+});
+
 describe('battle visibility (#320)', () => {
   const reportsOf = (s: EngineState<GameState>, side: 'blue' | 'red') =>
     viewFor(s.world, side, s.time).reports;
@@ -965,7 +1151,7 @@ describe('battle visibility (#320)', () => {
       const engaged = reportsOf(state, side).filter((r) => r.kind === 'engaged');
       expect(engaged).toHaveLength(1);
       expect(engaged[0]!.from).toBe(side === 'blue' ? 'blue-1' : 'red-1');
-      expect(engaged[0]!.text).toContain('engaged');
+      expect(engaged[0]!.text).toMatch(/engaged|fighting|in action|blows/);
       expect(engaged[0]!.observedAt).toBe(COMBAT_TICK_MS);
     }
   });
@@ -1045,7 +1231,7 @@ describe('battle visibility (#320)', () => {
     expect(kinds).toContain('engaged');
     expect(kinds).toContain('broke');
     const broke = reportsOf(state, 'blue').find((r) => r.kind === 'broke')!;
-    expect(broke.text).toMatch(/broken and is falling back/);
+    expect(broke.text).toMatch(/broken|falling back|given way|driven back/);
     expect(broke.observedAt).toBe(COMBAT_TICK_MS);
     // Red's units did not break, so Red is told nothing of Blue's break.
     expect(reportsOf(state, 'red').some((r) => r.kind === 'broke')).toBe(false);

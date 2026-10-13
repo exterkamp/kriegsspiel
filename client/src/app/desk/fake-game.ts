@@ -11,6 +11,7 @@ export function fakeGame(state: Partial<ClientState> = {}, gameId?: string) {
     state: s.asReadonly(),
     view: computed(() => s().view),
     gameId: signal(gameId).asReadonly(),
+    sides: signal<readonly string[]>([]),
     markRead: (id: string) => s.update((x) => withRead(x, id)),
     mergeRead: (ids: Iterable<string>) =>
       s.update((x) => ({ ...x, read: new Set([...x.read, ...ids]) })),

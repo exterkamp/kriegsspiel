@@ -644,16 +644,34 @@ describe('staff questions', () => {
     await red.waitFor('staffQueued', (m) => m.questionId === 'qd');
   });
 
-  it('answers every accepted question; with no umpire the answer carries no text', async () => {
+  it('answers every accepted question at its due time; with no umpire in the officer’s canned voice (#418)', async () => {
     const { base, ws } = await start();
     const game = (await createGame(base, { rate: 1 })).json;
+    const actor = app!.host.get(game.id)!;
+    await actor.submit({ kind: 'setMode', mode: 'manual' });
     const blue = await join(ws, game, 'blue');
-    await blue.waitFor('viewUpdate');
+    const first = await blue.waitFor('viewUpdate');
     blue.send(ask('qa', 'intelligence'));
+    const queued = await blue.waitFor('staffQueued', (m) => m.questionId === 'qa');
+    // Not due yet: no answer is sent.
+    expect(blue.messages.some((m) => m.kind === 'staffAnswer')).toBe(false);
+    await actor.submit({ kind: 'advanceTo', gameMs: queued.answerAtGame + 60_000 });
     const answer = await blue.waitFor('staffAnswer', (m) => m.questionId === 'qa');
     expect(answer.role).toBe('intelligence');
-    expect(answer.text).toBeUndefined();
-    expect(answer.officer.name).not.toBe('');
+    expect(answer.text).toBeDefined();
+    expect(answer.basedOnGame).toBe(queued.answerAtGame);
+    // Signed by the officer the conference tab lists, and filed once in the Staff pile.
+    expect(answer.officer).toEqual(first.view.staffOfficers!.intelligence);
+    const later = await blue.waitFor('viewUpdate', (m) =>
+      m.view.dispatches.some((d) => d.id === 'staff-qa'),
+    );
+    const papers = later.view.dispatches.filter((d) => d.id === 'staff-qa');
+    expect(papers).toEqual([
+      expect.objectContaining({ category: 'staff', from: answer.officer.name, text: answer.text }),
+    ]);
+    // The same question id again is refused, so nothing is filed twice.
+    blue.send(ask('qa', 'intelligence'));
+    await blue.waitFor('error', (m) => m.code === 'bad_question');
   });
 
   it('refuses a question once the game is over', async () => {
@@ -787,7 +805,7 @@ describe('orders', () => {
     blue.send(order('blue-1 march to the bridge'));
 
     const { dispatch } = await blue.waitFor('dispatch', (m) =>
-      m.dispatch.text.includes('received its orders'),
+      m.dispatch.text.includes('your orders'),
     );
     // The order was signed at `issuedAt`; the courier took DELIVERY_MS to reach the unit and
     // the acknowledgement took ACK_DELAY_MS to come back.

@@ -1,5 +1,6 @@
 /** Pure lobby rules, shared by the screens and their tests. */
-import type { GameInfo, SessionType } from './api.js';
+import { turnSettingsOf } from '@kriegsspiel/protocol';
+import type { GameInfo, GameSummary, SessionType } from './api.js';
 
 export const RATE_PRESETS = [1, 4, 12] as const;
 
@@ -20,6 +21,30 @@ export function parseRate(text: string): number | undefined {
 }
 
 export const rateLabel = (rate: number): string => `${rate}:1`;
+
+/**
+ * How the game is paced, for its title: the clock rate, or for a turn-mode game (D39) its turns,
+ * `turns of 20 min` or `turns of 20 min, orders due in 24 h`. A started turn game counts its turns
+ * (#429): `3 turns of 20 min` once over (no deadline then), `turn 3, turns of 20 min` while it is played.
+ */
+export function paceLabel(
+  g: Pick<GameSummary, 'rate' | 'umpire'> &
+    Partial<Pick<GameSummary, 'status'>> & { finished?: boolean; gameTimeMs?: number },
+): string {
+  const t = turnSettingsOf(g.umpire);
+  if (!t) return rateLabel(g.rate);
+  const due = t.turnDeadlineHours === undefined ? '' : `, orders due in ${t.turnDeadlineHours} h`;
+  const turns = `turns of ${t.turnMinutes} min${due}`;
+  if (g.status !== 'started' || g.gameTimeMs === undefined) return turns;
+  const turnMs = t.turnMinutes * 60_000;
+  if (g.finished) {
+    // The last turn may end early, at the time limit or at the victory.
+    const n = Math.max(1, Math.ceil(g.gameTimeMs / turnMs));
+    // No orders are due on a game that is over.
+    return `${n} ${n === 1 ? 'turn' : 'turns'} of ${t.turnMinutes} min`;
+  }
+  return `turn ${Math.floor(g.gameTimeMs / turnMs) + 1}, ${turns}`;
+}
 
 /** What the start button should do now: ready, or the reason it is not. */
 export function startBlocker(info: GameInfo): string | undefined {

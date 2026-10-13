@@ -9,12 +9,17 @@ import {
   STAFF_SCHEMA,
   STAFF_TEXT_MAX_LENGTH,
   StaffRoster,
+  CONFERENCE_ROLES,
   answerStaffQuestion,
+  cannedAnswer,
   checkAnswerText,
+  conferenceOfficers,
   checkStaffOutput,
   runStaff,
   staffInput,
   staffOfficer,
+  staffOfficerFor,
+  writeStaffAnswer,
 } from './staff.js';
 import { UmpireError } from './umpireClient.js';
 import type { UmpireClient, UmpireRequest } from './umpireClient.js';
@@ -47,6 +52,113 @@ describe('staff officers', () => {
     expect(staffOfficer(1815, 'blue', 'intelligence')).toEqual(a);
     expect(a.traits).toHaveLength(3);
     expect(staffOfficer(1815, 'blue', 'quartermaster').role).toBe('quartermaster');
+  });
+});
+
+describe('conference officers (#418)', () => {
+  it('are one officer per role, no two alike, and the one every caller names', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      for (const side of ['blue', 'red'] as const) {
+        const officers = conferenceOfficers(seed, side);
+        const names = CONFERENCE_ROLES.map((r) => officers[r].name);
+        expect(new Set(names).size).toBe(CONFERENCE_ROLES.length);
+        for (const r of CONFERENCE_ROLES)
+          expect(staffOfficerFor(seed, side, r)).toEqual(officers[r]);
+      }
+    }
+  });
+
+  it('are the officers who speak unprompted from the same posts', async () => {
+    const w = world();
+    const client = new MockUmpireClient([fixture({ messages: [] })]);
+    const turns = await runStaff(client, w, new StaffRoster('blue'));
+    const officers = conferenceOfficers(w.seed, 'blue');
+    for (const role of ['chiefOfStaff', 'intelligence', 'quartermaster'] as const)
+      expect(turns.find((t) => t.role === role)?.officer).toEqual(officers[role]);
+  });
+});
+
+describe('cannedAnswer (#418)', () => {
+  const w = world();
+  const view = viewForRole(w, 'blue', { role: 'intelligence' }, w.time);
+  const officer = (traits: string[]) => ({
+    name: 'Captain Evrard',
+    role: 'intelligence' as const,
+    traits,
+  });
+
+  it('differs by trait: terse is short, long-winded is long and signs by name', () => {
+    const terse = cannedAnswer(officer(['cautious', 'meticulous', 'terse']), 'intelligence', view);
+    const long = cannedAnswer(
+      officer(['cautious', 'meticulous', 'long-winded']),
+      'intelligence',
+      view,
+    );
+    const bold = cannedAnswer(officer(['bold', 'hasty', 'long-winded']), 'intelligence', view);
+    expect(terse).not.toBe(long);
+    expect(terse.length).toBeLessThan(long.length);
+    expect(long).toContain('Captain Evrard');
+    expect(terse).not.toContain('Captain Evrard');
+    expect(long).toMatch(/Old sightings/);
+    expect(bold).toMatch(/I would not wait on it/);
+    // Both say what is in view: one red battalion in sight.
+    expect(terse).toMatch(/1 enemy unit is in sight/);
+  });
+
+  it('is terse: the bare facts, no caveat or sign-off, and shorter than a plain officer', () => {
+    const terse = cannedAnswer(officer(['cautious', 'meticulous', 'terse']), 'intelligence', view);
+    const plain = cannedAnswer(officer(['cautious', 'meticulous', 'bold']), 'intelligence', view);
+    expect(terse).not.toMatch(/Old sightings|I would not wait/);
+    expect(plain).toMatch(/Old sightings/);
+    expect(terse.split(/(?<=\.)\s+/).length).toBeLessThanOrEqual(2);
+    expect(terse.length).toBeLessThan(plain.length);
+  });
+
+  it('gives only a contact report as the enemy’s position, not a newer report of our own', () => {
+    const report = (
+      id: string,
+      kind: 'contact' | 'lowAmmo',
+      deliveredAt: number,
+      place: string,
+    ) => ({
+      id,
+      kind,
+      observedAt: deliveredAt,
+      deliveredAt,
+      ageMs: 0,
+      from: '2nd Brigade',
+      location: { x: 0, y: 0 },
+      place,
+      uncertaintyRadius: 100,
+      confidence: 'high' as const,
+      text: '',
+      ...(kind === 'contact' ? { sizeEstimate: 'a battalion' } : {}),
+    });
+    const withReports = {
+      ...viewForRole(w, 'blue', { role: 'chiefOfStaff' }, w.time),
+      reports: [
+        report('r1', 'contact', 60_000, 'at the ford'),
+        report('r2', 'lowAmmo', 120_000, 'near the mill'),
+      ],
+    };
+    const text = cannedAnswer(officer(['bold']), 'intelligence', withReports);
+    expect(text).toMatch(/puts a battalion at the ford/);
+    expect(text).not.toMatch(/near the mill/);
+  });
+
+  it('says only what the seat can see', () => {
+    const qm = viewForRole(w, 'blue', { role: 'quartermaster' }, w.time);
+    const text = cannedAnswer(officer(['long-winded']), 'quartermaster', qm);
+    expect(text).not.toMatch(/enemy|red-/i);
+    for (const u of w.units.filter((u) => u.side === 'red')) expect(text).not.toContain(u.name);
+  });
+
+  it('is what writeStaffAnswer gives with no model, signed by the conference officer', async () => {
+    const a = await writeStaffAnswer(undefined, w, 'blue', 'intelligence', 'Where?', w.time);
+    expect(a.canned).toBe(true);
+    expect(a.records).toEqual([]);
+    expect(a.officer).toEqual(staffOfficerFor(w.seed, 'blue', 'intelligence'));
+    expect(a.text).toBe(cannedAnswer(a.officer, 'intelligence', view));
   });
 });
 

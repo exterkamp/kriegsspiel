@@ -164,11 +164,11 @@ async function logOf(store: GameStore) {
     }));
 }
 
-async function replayOf(run: Run, untilGameMs: number) {
+async function replayOf(run: Run, untilGameMs: number, seed?: number) {
   const header = (await run.store.logHeader('g1'))!;
   return replayLog(
     header,
-    loadScenario(holdTheBridge),
+    loadScenario(seed === undefined ? holdTheBridge : { ...holdTheBridge, seed }),
     await run.store.inputLog('g1'),
     createRegistry(),
     untilGameMs,
@@ -181,19 +181,20 @@ describe('the in-tray of a live game', () => {
     'holds an opening report and an order-delivered note after 10 game minutes at rate %i',
     async (rate) => {
       const run = await play(rate, 10 * MIN);
-      const blue = viewFor(run.state.world, 'blue', run.state.time).reports.map(toDispatch);
-      const opening = blue.find((d) => d.text.includes('no enemy yet in sight'));
+      const reports = viewFor(run.state.world, 'blue', run.state.time).reports;
+      const blue = reports.map(toDispatch);
+      const opening = blue.find((_, i) => reports[i]!.kind === 'situation');
       expect(opening).toMatchObject({
         from: 'Chief of staff',
         category: 'staff',
         receivedAtGame: 0,
       });
       expect(opening!.location).toBeDefined();
-      const ack = blue.find((d) => d.text.includes('received its orders'));
+      const ack = blue.find((_, i) => reports[i]!.kind === 'orderDelivered');
       expect(ack).toMatchObject({ category: 'subordinates', confidence: 'high' });
       expect(ack!.receivedAtGame).toBeLessThanOrEqual(10 * MIN);
       // Red's own opening report never reaches Blue.
-      expect(blue.filter((d) => d.text.includes('no enemy yet in sight'))).toHaveLength(1);
+      expect(reports.filter((r) => r.kind === 'situation')).toHaveLength(1);
     },
     60_000,
   );
@@ -256,8 +257,8 @@ describe('a battle is decided (#315)', () => {
         // Nothing a side could not know: no men counts or morale figures in the umpire's words.
         expect(narrative).not.toMatch(/\d/);
       }
-      const blueTexts = viewFor(w, 'blue', run.state.time).reports.map(toDispatch);
-      expect(blueTexts.some((d) => /destroyed/.test(d.text))).toBe(true);
+      const blueReports = viewFor(w, 'blue', run.state.time).reports;
+      expect(blueReports.some((r) => r.kind === 'destroyed')).toBe(true);
       const redLost = viewFor(w, 'red', run.state.time).reports.filter(
         (r) => r.kind === 'unitLost',
       );
@@ -346,4 +347,57 @@ describe('end-to-end headless game', () => {
       expect(firstDivergence('events', replayed.emitted, run.events), label).toBeNull();
     }
   }, 120_000);
+});
+
+describe('a decided battle against the time limit (#417)', () => {
+  /** Both battalions told to hold the bridge, as in the QA playthrough. */
+  const HOLD_BOTH = [
+    { atMs: 0, text: 'blue-1 hold the bridge' },
+    { atMs: 0, text: 'blue-2 hold the bridge' },
+  ];
+  const RATES = [1, 4, 12, 'fast-forward'] as const;
+
+  it('a defence ruled broken after minute 30 wins for Red at the time limit, not objective-held, at every rate and in replay', async () => {
+    // Seed 117: Blue's defence is ruled broken at about game minute 31.5, so the pursuit would
+    // close after the 50-minute limit. Before #417 the limit gave Blue "objective-held".
+    const runs = [];
+    for (const rate of RATES) {
+      const run = await play(rate, HORIZON_MS, HOLD_BOTH, 117);
+      const { battle, outcome } = run.state.world;
+      expect(battle, `rate ${rate}`).toMatchObject({ winner: 'red', reason: 'defence-broken' });
+      expect(battle!.declaredAt).toBeGreaterThan(30 * MIN);
+      expect(outcome, `rate ${rate}`).toEqual({
+        winner: 'red',
+        reason: 'defence-broken',
+        time: holdTheBridge.victory.holdMinutes * MIN,
+      });
+      const replayed = await replayOf(run, HORIZON_MS, 117);
+      expect(worldDivergence(replayed.state.world, run.state.world), `replay ${rate}`).toBeNull();
+      runs.push(run);
+    }
+    for (const run of runs.slice(1)) {
+      expect(
+        worldDivergence(
+          canonical([run.state.world])[0] as GameState,
+          canonical([runs[0]!.state.world])[0] as GameState,
+        ),
+      ).toBeNull();
+    }
+  }, 240_000);
+
+  it('a ruling stands when the winning side then leaves the field', async () => {
+    // Seed 27: Red's attack is ruled broken, then Blue's last unit breaks in the pursuit. Before
+    // #417 that gave Red the game with "attack-broken".
+    for (const rate of RATES) {
+      const run = await play(rate, HORIZON_MS, HOLD_BOTH, 27);
+      expect(run.state.world.battle, `rate ${rate}`).toMatchObject({
+        winner: 'blue',
+        reason: 'attack-broken',
+      });
+      expect(run.state.world.outcome, `rate ${rate}`).toMatchObject({
+        winner: 'blue',
+        reason: 'attack-broken',
+      });
+    }
+  }, 240_000);
 });

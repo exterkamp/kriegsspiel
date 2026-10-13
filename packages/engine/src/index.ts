@@ -75,11 +75,14 @@ export {
   OVERLAP_TOLERANCE_MM,
   PLACEMENT_EVENT,
   issuePlacement,
+  overlapsBeyondTolerance,
+  proposedArrangement,
   registerPlacement,
   validatePlacement,
 } from './placement.js';
 export type {
   Placement,
+  PlacementOptions,
   PlacementProposal,
   PlacementRuling,
   PlacementVerdict,
@@ -128,9 +131,13 @@ export {
   COURIER_MS_PER_METRE,
   COURIER_STEP_EVENT,
   choiceRisk,
+  issueForcedOrder,
   issueOrder,
   registerOrders,
 } from './orders.js';
+export type { ForcedIssue } from './orders.js';
+export { courierPass, engineTurnStart } from './engineTurn.js';
+export type { CourierPass, TurnCourier } from './engineTurn.js';
 export {
   GARBLE_MAX_M,
   GARBLE_MIN_M,
@@ -178,6 +185,8 @@ export type {
   ViewUnit,
 } from './visibility.js';
 export * from './fatigue.js';
+export { fieldNote, temperOf } from './fieldNotes.js';
+export type { NoteSender, Temper } from './fieldNotes.js';
 export {
   AMMO_PER_FIRE_TICK,
   LOW_AMMO,
@@ -222,3 +231,28 @@ export {
 export type { Deviation, Interpretation, Trait } from './personality.js';
 export { ADJUST_RANGE_M, DISCRETIONS, HOLD_RANGE_M, deputyProblems } from './deputy.js';
 export type { Discretion } from './deputy.js';
+export { heldTurn } from './held.js';
+export {
+  DEPARTURE_LOSS_SHARE,
+  DEPARTURE_TOLERANCE_M,
+  TURN_EVENT,
+  beginTurn,
+  issueTurn,
+  registerTurn,
+  validateProposal,
+} from './turn.js';
+export type {
+  AppliedOutcome,
+  TurnContext,
+  TurnCorrection,
+  TurnObservation,
+  TurnOrderResult,
+  TurnOrderStatus,
+  TurnPayload,
+  TurnProposal,
+  TurnRoll,
+  TurnRollRequest,
+  TurnUnitOutcome,
+  TurnValidation,
+} from './turn.js';
+export { turnVictory } from './combat.js';

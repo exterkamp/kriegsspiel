@@ -92,6 +92,17 @@ export {
 } from './narrate.js';
 export type { NarrateOptions, NarrateOutput, NarrateResult, NarratedDispatch } from './narrate.js';
 export {
+  BREAKER_FAILURES,
+  BREAKER_RECENT,
+  breakerAllows,
+  breakerAt,
+  breakerCooldownMs,
+  breakerSummary,
+  closedBreaker,
+  recordNarrateCall,
+} from './narrateBreaker.js';
+export type { NarrateBreakerState } from './narrateBreaker.js';
+export {
   STAFF_MESSAGE_KINDS,
   STAFF_PROMPT_VERSION,
   STAFF_SCHEMA,
@@ -100,19 +111,24 @@ export {
   STAFF_ANSWER_SYSTEM,
   StaffRoster,
   answerStaffQuestion,
+  cannedAnswer,
   checkStaffOutput,
+  conferenceOfficers,
   runStaff,
   staffInput,
   staffOfficer,
   staffOfficerFor,
+  writeStaffAnswer,
 } from './staff.js';
 export type {
+  ConferenceRole,
   StaffAnswer,
   StaffMessage,
   StaffMessageKind,
   StaffOfficer,
   StaffOptions,
   StaffOutput,
+  WrittenStaffAnswer,
   StaffSeat,
   StaffTurn,
 } from './staff.js';

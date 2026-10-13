@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import {
   DIAL_CHOICES,
+  MODE_CHOICES,
   OPPONENT_LABEL,
   PERSONA_CHOICES,
   allowedSides,
@@ -18,6 +19,9 @@ import {
   rateExplanation,
   rateOf,
   toRequest,
+  TURN_DIAL_INFO,
+  turnMinutesOf,
+  turnsLine,
   validate,
   type CreateRequest,
   type Form,
@@ -81,46 +85,105 @@ import { PageFrameComponent } from '../ui/page-frame.component';
           </fieldset>
 
           <fieldset>
-            <legend>Clock rate</legend>
-            @for (r of presets; track r) {
+            <legend>How the game is played</legend>
+            @for (m of modes; track m.id) {
+              <label class="ks-choice">
+                <input
+                  type="radio"
+                  name="mode"
+                  [value]="m.id"
+                  [checked]="form()!.mode === m.id"
+                  (change)="patch({ mode: m.id })"
+                />
+                <b>{{ m.label }}</b>
+              </label>
+            }
+            <p class="ks-muted" role="status">{{ modeLine() }}</p>
+          </fieldset>
+
+          @if (form()!.mode === 'turns') {
+            <fieldset>
+              <legend>Turns</legend>
+              <label class="ks-field">
+                Game minutes per turn
+                <input
+                  type="number"
+                  id="turn-minutes"
+                  inputmode="numeric"
+                  min="5"
+                  max="60"
+                  step="5"
+                  [value]="form()!.turnMinutes"
+                  (input)="patch({ turnMinutes: $any($event.target).value })"
+                />
+              </label>
+              <label class="ks-field">
+                Orders due within (hours, optional)
+                <input
+                  type="text"
+                  id="turn-deadline"
+                  inputmode="decimal"
+                  placeholder="no deadline"
+                  aria-describedby="turn-deadline-hint"
+                  [value]="form()!.deadlineHours"
+                  (input)="patch({ deadlineHours: $any($event.target).value })"
+                />
+              </label>
+              <p class="ks-muted" id="turn-deadline-hint">
+                With no deadline a turn waits until every side has sent its orders. With one, the
+                turn is decided when it passes, and a side that has not sent keeps its units on
+                their last orders.
+              </p>
+            </fieldset>
+          } @else {
+            <fieldset>
+              <legend>Clock rate</legend>
+              @for (r of presets; track r) {
+                <label class="ks-choice">
+                  <input
+                    type="radio"
+                    name="rate"
+                    [value]="r"
+                    [checked]="form()!.rate === r"
+                    (change)="patch({ rate: r })"
+                  />
+                  {{ r }}:1
+                </label>
+              }
               <label class="ks-choice">
                 <input
                   type="radio"
                   name="rate"
-                  [value]="r"
-                  [checked]="form()!.rate === r"
-                  (change)="patch({ rate: r })"
+                  value="custom"
+                  [checked]="form()!.rate === 'custom'"
+                  (change)="patch({ rate: 'custom' })"
                 />
-                {{ r }}:1
+                Custom
               </label>
-            }
-            <label class="ks-choice">
-              <input
-                type="radio"
-                name="rate"
-                value="custom"
-                [checked]="form()!.rate === 'custom'"
-                (change)="patch({ rate: 'custom' })"
-              />
-              Custom
-            </label>
-            @if (form()!.rate === 'custom') {
-              <label>
-                Battle hours per real hour
-                <input
-                  type="text"
-                  inputmode="decimal"
-                  aria-label="Custom clock rate"
-                  [value]="form()!.customRate"
-                  (input)="patch({ customRate: $any($event.target).value })"
-                />
-              </label>
-            }
-            <p class="ks-muted" role="status">{{ rateLine() }}</p>
-          </fieldset>
+              @if (form()!.rate === 'custom') {
+                <label>
+                  Battle hours per real hour
+                  <input
+                    type="text"
+                    inputmode="decimal"
+                    aria-label="Custom clock rate"
+                    [value]="form()!.customRate"
+                    (input)="patch({ customRate: $any($event.target).value })"
+                  />
+                </label>
+              }
+              <p class="ks-muted" role="status">{{ rateLine() }}</p>
+            </fieldset>
+          }
 
           <fieldset>
-            <legend>How strictly the umpire follows the rules</legend>
+            <legend>
+              {{
+                form()!.mode === 'turns'
+                  ? 'Who decides each turn'
+                  : 'How strictly the umpire follows the rules'
+              }}
+            </legend>
             @for (d of dials; track d.id) {
               <label class="ks-choice">
                 <input
@@ -184,7 +247,8 @@ import { PageFrameComponent } from '../ui/page-frame.component';
     .games {
       margin-top: var(--ks-space-5);
     }
-    input[type='text'] {
+    input[type='text'],
+    input[type='number'] {
       display: block;
       margin-top: 4px;
       width: 8em;
@@ -208,6 +272,7 @@ export class NewGameComponent implements OnInit {
   readonly back = output();
   protected readonly presets = ['1', '4', '12'];
   protected readonly dials = DIAL_CHOICES;
+  protected readonly modes = MODE_CHOICES;
   protected readonly personas = PERSONA_CHOICES;
   protected readonly options = signal<ScenarioOptions | undefined>(undefined);
   protected readonly form = signal<Form | undefined>(undefined);
@@ -233,8 +298,15 @@ export class NewGameComponent implements OnInit {
   );
   protected readonly length = computed(() => {
     const s = this.scenario();
-    return s ? lengthLine(s.lengthMinutes, this.rate()) : '';
+    const f = this.form();
+    if (!s) return '';
+    return f?.mode === 'turns'
+      ? turnsLine(s.lengthMinutes, turnMinutesOf(f))
+      : lengthLine(s.lengthMinutes, this.rate());
   });
+  protected readonly modeLine = computed(
+    () => MODE_CHOICES.find((m) => m.id === this.form()?.mode)?.description ?? '',
+  );
   protected readonly opponentLabel = computed(() => {
     const o = this.options()?.opponent;
     return o ? OPPONENT_LABEL[o] : undefined;
@@ -243,9 +315,12 @@ export class NewGameComponent implements OnInit {
     const r = this.rate();
     return r !== undefined ? rateExplanation(r) : 'Enter a ratio such as 6 or 6:1.';
   });
-  protected readonly dialLine = computed(
-    () => DIAL_CHOICES.find((d) => d.id === this.form()?.dial)?.description ?? '',
-  );
+  protected readonly dialLine = computed(() => {
+    const f = this.form();
+    if (!f) return '';
+    if (f.mode === 'turns') return TURN_DIAL_INFO[f.dial];
+    return DIAL_CHOICES.find((d) => d.id === f.dial)?.description ?? '';
+  });
   protected readonly personaLine = computed(
     () => PERSONA_CHOICES.find((p) => p.id === this.form()?.persona)?.description ?? '',
   );

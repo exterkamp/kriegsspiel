@@ -1,3 +1,4 @@
+import { heldTurn } from './held.js';
 import type { EventRegistry } from './events.js';
 import { EXHAUSTED_FATIGUE, FATIGUE_RECOVERY_PER_MINUTE, STRAIN_MORALE_DRAIN } from './fatigue.js';
 import { canReach } from './contact.js';
@@ -79,6 +80,9 @@ function strained(u: Unit): number {
 export function registerSupply(registry: EventRegistry<GameState>): void {
   registry.register(SUPPLY_TICK_EVENT, (world, ev) => {
     if (world.outcome) return { world };
+    if (heldTurn(world, ev.time)) {
+      return { world, schedule: [{ time: ev.time + SUPPLY_TICK_MS, type: SUPPLY_TICK_EVENT }] };
+    }
     const active = world.units.filter((u) => u.status === 'active');
     const resting = (u: Unit) =>
       (u.intent.kind === 'idle' || u.intent.kind === 'hold') &&

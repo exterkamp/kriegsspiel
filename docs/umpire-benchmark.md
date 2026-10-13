@@ -10,7 +10,7 @@ All under `server/src/umpire/eval/`:
 | --- | --- |
 | `turnCases.ts` | 12 turn cases on "Hold the Bridge": both sides' orders as written for one 20-minute turn, courier status (arrival minute, or still riding), the rules parse the projection uses, and `tests` (what the case is for; the grader sees it, the umpire does not). |
 | `turnInput.ts` | The case world (`loadScenario(holdTheBridge)` with the case's units placed), the **engine projection** of the turn, the umpire's input JSON and the prompt `adjudicate-v0`, and the canned adjudicator (the projection as the proposal, which is what the `test` provider does per D39). |
-| `turnProposal.ts` | D39's `TurnProposal` zod schema (a copy of #414's `packages/protocol/src/turn.ts` until it lands) and the JSON schema the model is asked to fill. |
+| `turnProposal.ts` | The JSON schema the model is asked to fill; "passes the schema" means the zod `TurnProposal` in `packages/protocol/src/turn.ts` (11.5). |
 | `turnChecks.ts` | The automatic checks (below), for reuse by 11.5 and 11.6. |
 | `rubric.ts` | The grader's 1-to-5 rubric and the `grades.json` shape. |
 | `bench.ts`, `benchCli.ts` | The runner: run, export, import, blind packet, report. |

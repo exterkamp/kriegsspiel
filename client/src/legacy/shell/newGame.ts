@@ -1,11 +1,17 @@
 /** Pure rules for the new-game form: state, validation and the request it makes. The DOM lives in NewGame.svelte. */
 import {
+  DEFAULT_TURN_MINUTES,
   DEFAULT_UMPIRE_DIAL,
   DEFAULT_UMPIRE_PERSONA,
   DIALS,
   DIAL_INFO,
+  MAX_TURN_DEADLINE_HOURS,
+  MAX_TURN_MINUTES,
+  MIN_TURN_DEADLINE_HOURS,
+  MIN_TURN_MINUTES,
   PERSONAS,
   PERSONA_INFO,
+  type GameMode,
   type UmpireDial,
   type UmpirePersona,
 } from '@kriegsspiel/protocol';
@@ -38,6 +44,12 @@ export interface Form {
   dial: UmpireDial;
   /** The umpire's voice (3.11). */
   persona: UmpirePersona;
+  /** Real time on the running clock, or turns the umpire decides (D39). */
+  mode: GameMode;
+  /** Turn mode: game minutes per turn, as typed. */
+  turnMinutes: string;
+  /** Turn mode: wall-clock hours each turn waits for orders, as typed; empty waits for every side. */
+  deadlineHours: string;
 }
 
 export interface CreateRequest {
@@ -47,6 +59,10 @@ export interface CreateRequest {
   dial: UmpireDial;
   persona: UmpirePersona;
   sessionType?: 'co_op_vs_ai';
+  /** Present only for a turn-mode game, so a real-time request is unchanged. */
+  mode?: 'turns';
+  turnMinutes?: number;
+  turnDeadlineHours?: number;
 }
 
 /** Sides the player may take: with a computer opponent, only those the scenario does not script. */
@@ -74,6 +90,9 @@ function formFor(s: ScenarioInfo, opponent: Opponent): Form {
     customRate: preset ? '' : String(s.defaults.rate),
     dial: DEFAULT_UMPIRE_DIAL,
     persona: DEFAULT_UMPIRE_PERSONA,
+    mode: 'realtime',
+    turnMinutes: String(DEFAULT_TURN_MINUTES),
+    deadlineHours: '',
   };
 }
 
@@ -82,11 +101,69 @@ export function chooseScenario(o: ScenarioOptions, id: string, keep?: Form): For
   const s = o.scenarios.find((x) => x.id === id);
   if (!s) return undefined;
   const next = formFor(s, o.opponent);
-  // The umpire's dial and persona are the player's taste, not the scenario's: they carry over.
-  return keep ? { ...next, dial: keep.dial, persona: keep.persona } : next;
+  // The umpire's dial and persona, and how the game is played, are the player's taste, not the scenario's.
+  return keep
+    ? {
+        ...next,
+        dial: keep.dial,
+        persona: keep.persona,
+        mode: keep.mode,
+        turnMinutes: keep.turnMinutes,
+        deadlineHours: keep.deadlineHours,
+      }
+    : next;
 }
 
 export const DIAL_CHOICES = DIALS.map((id) => ({ id, ...DIAL_INFO[id] }));
+
+/** What the dial means in a turn-mode game, where it picks who decides the turn (D39). */
+export const TURN_DIAL_INFO: Readonly<Record<UmpireDial, string>> = {
+  rigid:
+    'The tables alone decide each turn, with no umpire: the real-time rules played in fixed steps.',
+  standard:
+    'The umpire decides each turn, starting from what the tables would give and departing from them only for a stated reason.',
+  free: 'The umpire decides each turn as a free-Kriegsspiel umpire would, with the tables as advice only.',
+};
+
+export const MODE_CHOICES: ReadonlyArray<{ id: GameMode; label: string; description: string }> = [
+  {
+    id: 'realtime',
+    label: 'Real time',
+    description:
+      'The clock runs at the rate you choose; orders ride by courier while the battle goes on.',
+  },
+  {
+    id: 'turns',
+    label: 'Turns, umpire decides',
+    description:
+      'Each side writes its orders for a slice of time and sends them together; nothing moves until the turn is decided. Take as long as you like, or set a deadline.',
+  },
+];
+
+/** Game minutes per turn, or undefined when the text is not a whole number in range. */
+export function turnMinutesOf(f: Pick<Form, 'turnMinutes'>): number | undefined {
+  const n = Number(f.turnMinutes.trim());
+  return Number.isInteger(n) && n >= MIN_TURN_MINUTES && n <= MAX_TURN_MINUTES ? n : undefined;
+}
+
+/** The deadline in hours; null for none (empty), undefined when the text is unusable. */
+export function deadlineHoursOf(f: Pick<Form, 'deadlineHours'>): number | null | undefined {
+  const t = f.deadlineHours.trim();
+  if (t === '') return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= MIN_TURN_DEADLINE_HOURS && n <= MAX_TURN_DEADLINE_HOURS
+    ? n
+    : undefined;
+}
+
+/** "About 4 hours of battle in 12 turns of 20 minutes." */
+export function turnsLine(lengthMinutes: number, turnMinutes: number | undefined): string {
+  if (lengthMinutes <= 0) return '';
+  const battle = `About ${span(lengthMinutes)} of battle`;
+  if (!turnMinutes) return `${battle}.`;
+  const n = Math.ceil(lengthMinutes / turnMinutes);
+  return `${battle} in ${n} ${n === 1 ? 'turn' : 'turns'} of ${span(turnMinutes)}.`;
+}
 export const PERSONA_CHOICES = PERSONAS.map((id) => ({ id, ...PERSONA_INFO[id] }));
 
 /** The chosen clock rate, or undefined when a custom value is unusable. */
@@ -128,20 +205,43 @@ export function validate(f: Form, o: ScenarioOptions): string | undefined {
   const s = o.scenarios.find((x) => x.id === f.scenario);
   if (!s) return 'Choose a scenario.';
   if (!allowedSides(s, o.opponent).some((x) => x.id === f.side)) return 'Choose a side.';
+  if (f.mode === 'turns') {
+    if (turnMinutesOf(f) === undefined)
+      return `A turn must be a whole number of minutes from ${MIN_TURN_MINUTES} to ${MAX_TURN_MINUTES}.`;
+    if (deadlineHoursOf(f) === undefined)
+      return `The deadline must be from ${MIN_TURN_DEADLINE_HOURS} to ${MAX_TURN_DEADLINE_HOURS} hours, or empty for none.`;
+    return undefined;
+  }
   if (rateOf(f) === undefined) {
     return `Clock rate must be a number from ${MIN_RATE} to ${MAX_RATE}, for example 12 or 12:1.`;
   }
   return undefined;
 }
 
+/** The turn settings of the request, for a turn-mode form; empty for real time. */
+export function turnRequest(
+  f: Pick<Form, 'mode' | 'turnMinutes' | 'deadlineHours'>,
+): Pick<CreateRequest, 'mode' | 'turnMinutes' | 'turnDeadlineHours'> {
+  if (f.mode !== 'turns') return {};
+  const minutes = turnMinutesOf(f);
+  const hours = deadlineHoursOf(f);
+  return {
+    mode: 'turns',
+    ...(minutes === undefined ? {} : { turnMinutes: minutes }),
+    ...(hours === null || hours === undefined ? {} : { turnDeadlineHours: hours }),
+  };
+}
+
 export function toRequest(f: Form, o: ScenarioOptions): CreateRequest {
   return {
     scenario: f.scenario,
     side: f.side,
-    rate: rateOf(f)!,
+    // A turn-mode game ignores the rate (D39); a usable one is still sent, as the server expects a number.
+    rate: rateOf(f) ?? 1,
     dial: f.dial,
     persona: f.persona,
     ...(o.opponent ? { sessionType: 'co_op_vs_ai' as const } : {}),
+    ...turnRequest(f),
   };
 }
 

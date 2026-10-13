@@ -16,9 +16,12 @@ import type {
   DraftSnapshot,
   Mark,
   StaffExchange,
+  TurnCause,
+  TurnOrder,
   UmpireSettings,
 } from '@kriegsspiel/protocol';
 import type { UmpireCallRecord } from '../umpire/umpireClient.js';
+import type { NarrateBreakerState } from '../umpire/narrateBreaker.js';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
 import type { PauseTransition } from '../pause.js';
@@ -95,7 +98,10 @@ export type GameCommand =
       side: string;
       role: string;
       question: string;
-      /** The conference record, so a restart restores it (D6b). Absent in entries from before it was kept. */
+      /**
+       * The conference record, so a restart restores it (D6b). Logged when asked (no `text` yet) and
+       * again when answered at the due time, with the stored words (#418). Absent in entries from before it was kept.
+       */
       exchange?: StaffExchange;
     }
   /**
@@ -125,7 +131,56 @@ export type GameCommand =
    * over. Journal only: it never changes the engine, and is kept so a restart serves the same text
    * with no new model call; the model calls are on the entry (`calls`).
    */
-  | { kind: 'critique'; critique: Critique };
+  | { kind: 'critique'; critique: Critique }
+  /**
+   * Turn mode (D39). Turn `turn` opened: it covers game time `[startMs, endMs)` and closes by itself
+   * at `deadlineWallMs` (wall time) when the game has a deadline. Journal only: a reopened game reads
+   * its open turn and deadline from here, and replay needs nothing from it.
+   */
+  | { kind: 'openTurn'; turn: number; startMs: number; endMs: number; deadlineWallMs?: number }
+  /**
+   * Turn mode: a side held an order for the open turn, or replaced the one with the same id.
+   * Journal only (not parsed, never shown to another side), so a restart keeps the side's held orders.
+   */
+  | { kind: 'turnOrder'; side: string; turn: number; order: TurnOrder; by?: Seat }
+  /** Turn mode: a side took a held order back. Journal only. */
+  | { kind: 'withdrawTurnOrder'; side: string; turn: number; orderId: string; by?: Seat }
+  /**
+   * Turn mode: a side sent its orders for the turn. Final for the side. Journal only: the orders
+   * reach the engine through the turn's `resolveTurn` entry, which carries them.
+   */
+  | { kind: 'sendTurn'; side: string; turn: number; orders: TurnOrder[]; signer?: Seat }
+  /**
+   * Turn mode: the turn closed and was resolved. Issued by the actor (every human side sent, or the
+   * deadline passed). Everything replay needs is on the entry's `turn`; `gameMs` is the turn's start
+   * and `endGameMs` its end.
+   */
+  | { kind: 'resolveTurn'; turn: number; cause: TurnCause };
+
+/** A turn order as sent, with the seat that sent it (D6a). */
+export type SentTurnOrder = TurnOrder & { side: string; signer?: Seat };
+
+/**
+ * The record of one resolved turn, on its `resolveTurn` entry (D39, "Logged for replay"). The
+ * resolver's own output (the courier pass, a proposal, rolls, rulings) is `output`, applied on replay
+ * by the adjudicator named in `adjudicator` with no model call (see `turns.ts`).
+ */
+export interface TurnRecord {
+  n: number;
+  startMs: number;
+  endMs: number;
+  cause: TurnCause;
+  /** Every side's sent orders, in send order. A side that sent nothing has none here. */
+  orders: SentTurnOrder[];
+  /** The sides that sent, in send order. */
+  sent: string[];
+  /** Which adjudicator resolved the turn (`turns.ts`); replay applies `output` through the same one. */
+  adjudicator: string;
+  /** The adjudicator's output, whatever replay needs to apply the turn again. */
+  output?: unknown;
+  /** The umpire failed and the turn fell back to the engine (11.4, 11.6). */
+  fallback?: { error: string; attempts: number };
+}
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {
@@ -163,6 +218,13 @@ export interface InputLogEntry {
   ratio?: RatioTransition[];
   /** For `narrate` commands: every model call the stage made, so the narration replays with no network. */
   calls?: UmpireCallRecord[];
+  /**
+   * For `narrate` commands: the game's narration circuit breaker after this window (#419). A window it
+   * skipped has no calls. A reopened game starts from the last one, so the decision needs no model.
+   */
+  narrateBreaker?: NarrateBreakerState;
+  /** For `resolveTurn` commands: the turn as resolved, so replay needs no resolver call (D39). */
+  turn?: TurnRecord;
   /** The command was refused or failed; the reason. */
   error?: string;
 }

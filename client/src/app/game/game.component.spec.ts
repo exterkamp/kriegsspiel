@@ -2,6 +2,9 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { WindowAt } from '@kriegsspiel/protocol';
+import { GLIDE_MS } from '@legacy/table/glide';
+import type { ClientState } from '@legacy/net/state';
 import { DeskStore } from '../desk/desk.store';
 import { GameComponent } from './game.component';
 import { GameService } from './game.service';
@@ -26,6 +29,7 @@ function fakeScene() {
     apply: vi.fn(),
     resize: vi.fn(),
     setDesk: vi.fn(),
+    setGlide: vi.fn(),
     setOverlays: vi.fn(),
     setMarks: vi.fn(),
     panTo: vi.fn(),
@@ -195,5 +199,87 @@ describe('GameComponent without WebGL (#259)', () => {
     expect(dispose).toHaveBeenCalledTimes(1);
     expect(f.nativeElement.querySelector('ks-webgl-fallback')).not.toBeNull();
     expect(TestBed.inject(TableService).scene()).toBeUndefined();
+  });
+
+  describe('gliding pieces (D39)', () => {
+    const setState = (p: Partial<ClientState>) =>
+      (
+        TestBed.inject(GameService) as unknown as {
+          _state: { update(f: (s: ClientState) => ClientState): void };
+        }
+      )._state.update((s) => ({ ...s, ...p }));
+    const reducedMotion = (on: boolean) =>
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn((q: string) => ({
+          matches: on && q.includes('reduce'),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        })),
+      );
+    const frame = {
+      gameMs: 0,
+      units: [],
+      beliefs: {
+        blue: { visibleEnemies: [], lastKnownContacts: [] },
+        red: { visibleEnemies: [], lastKnownContacts: [] },
+      },
+      events: [],
+      rulings: [],
+    } as unknown as WindowAt;
+    /** Each `apply` with the glide set just before it. */
+    const glides = (scene: ReturnType<typeof fakeScene>) =>
+      scene.apply.mock.invocationCallOrder.map((at) => {
+        const before = scene.setGlide.mock.invocationCallOrder.filter((g) => g < at).length - 1;
+        return scene.setGlide.mock.calls[before]![0] as number;
+      });
+
+    it('sets a real-time game down at once, as before', async () => {
+      reducedMotion(false);
+      const { f, scene } = await open();
+      setState({ view: { ...TestBed.inject(GameService).state().view!, atGame: 1 } });
+      await f.whenStable();
+      expect(scene.apply).toHaveBeenCalled();
+      expect(glides(scene).every((g) => g === 0)).toBe(true);
+    });
+
+    it('glides a turn-mode game to its new places', async () => {
+      reducedMotion(false);
+      const { f, scene } = await open();
+      setState({
+        turnMode: true,
+        view: { ...TestBed.inject(GameService).state().view!, atGame: 1 },
+      });
+      await f.whenStable();
+      expect(glides(scene).at(-1)).toBe(GLIDE_MS);
+    });
+
+    it('does not glide for a player who asks for reduced motion', async () => {
+      reducedMotion(true);
+      const { f, scene } = await open();
+      setState({
+        turnMode: true,
+        view: { ...TestBed.inject(GameService).state().view!, atGame: 1 },
+      });
+      await f.whenStable();
+      expect(glides(scene).every((g) => g === 0)).toBe(true);
+    });
+
+    it("sets the umpire's window down at once, and the way back from it", async () => {
+      reducedMotion(false);
+      const { f, scene } = await open();
+      setState({ turnMode: true });
+      const desk = TestBed.inject(DeskStore);
+      desk.windowFrame.set(frame);
+      await f.whenStable();
+      expect(glides(scene).at(-1)).toBe(0);
+      desk.windowFrame.set(undefined);
+      await f.whenStable();
+      expect(glides(scene).at(-1)).toBe(0);
+      // The next turn glides again.
+      setState({ view: { ...TestBed.inject(GameService).state().view!, atGame: 2 } });
+      await f.whenStable();
+      expect(glides(scene).at(-1)).toBe(GLIDE_MS);
+    });
   });
 });

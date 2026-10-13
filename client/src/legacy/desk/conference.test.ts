@@ -180,6 +180,8 @@ describe('text-less server replies', () => {
     expect(early[0]!.answer).toBeUndefined();
     const [done] = settleTextless([marked!], 600_000, { ...fixtureView, atGame: 555_000 });
     expect(done!.answer?.basedOnGame).toBe(555_000);
+    // Signed by the officer the server named, never the fixture's (#418).
+    expect(done!.answer?.text.startsWith('Major X: ')).toBe(true);
   });
 });
 

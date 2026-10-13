@@ -12,7 +12,9 @@ import type {
   ServerMessage,
   Side,
   SideView,
+  UmpireSettings,
 } from '@kriegsspiel/protocol';
+import { turnSettingsOf } from '@kriegsspiel/protocol';
 
 /** An order this client sent that the server has not rejected. The server reports no delivery estimate yet. */
 export interface PendingOrder {
@@ -85,6 +87,9 @@ export interface PauseVote {
   proposal?: PauseProposal & { closesAtWall: number };
 }
 
+/** Turn mode (D39): the open turn as the server last reported it to this side. */
+export type TurnInfo = Omit<Extract<ServerMessage, { kind: 'turnState' }>, 'v' | 'kind'>;
+
 /** The umpire's answer to a staff question. */
 export interface StaffServerAnswer {
   text?: string;
@@ -106,6 +111,12 @@ export interface ClientState {
   staffAtWork: boolean;
   /** Absent until the server reports it; a game without voters never does. */
   pause?: PauseVote;
+  /** Turn mode only: the open turn, its sides that have sent and this side's held orders. Absent in a real-time game. */
+  turn?: TurnInfo;
+  /** Set once the server has sent a `turnState`: the game is played in turns (D39). Kept after the game ends. */
+  turnMode?: true;
+  /** Turn mode: game minutes per turn, from the game's settings (`GET /games/:id`); kept after the game ends. */
+  turnMinutes?: number;
   pending: PendingOrder[];
   /** Orders the staff could not carry out, by order id; the order itself leaves `pending`. */
   outcomes: Record<string, OrderOutcome>;
@@ -222,6 +233,35 @@ export function pauseResultText(m: Extract<ServerMessage, { kind: 'pauseResult' 
   }
 }
 
+/**
+ * Once the side has sent its turn, its held orders are with the couriers: they join `pending`, set out
+ * at the turn's start, as `sentOrders` does for them after a reload. Before that they are drafts.
+ */
+function withSentTurn(
+  s: ClientState,
+  m: Extract<ServerMessage, { kind: 'turnState' }>,
+): PendingOrder[] {
+  const side = s.view?.side;
+  if (side === undefined || !m.sent.includes(side)) return s.pending;
+  const have = new Set(s.pending.map((p) => p.orderId));
+  const fresh = m.held.filter((o) => !have.has(o.orderId));
+  if (fresh.length === 0) return s.pending;
+  const names = new Map(s.view?.ownUnits.map((u) => [u.id, u.name]));
+  return [
+    ...s.pending,
+    ...fresh.map((o) => {
+      const toName = names.get(o.to);
+      return {
+        orderId: o.orderId,
+        text: o.text,
+        sentAtGame: m.startsAt,
+        ...(toName ? { toName } : {}),
+        ...(o.courier ? { courier: o.courier } : {}),
+      };
+    }),
+  ];
+}
+
 /** The order id a rejection or clarification refers to; the server prefixes its message with `<orderId>: `. */
 export function orderIdOf(message: string): string | undefined {
   const i = message.indexOf(': ');
@@ -256,6 +296,23 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
             : {}),
         },
       };
+    case 'turnState': {
+      const { turn, startsAt, endsAt, sent, deadline, resolving, held } = m;
+      return {
+        ...s,
+        turnMode: true,
+        pending: withSentTurn(s, m),
+        turn: {
+          turn,
+          startsAt,
+          endsAt,
+          sent,
+          ...(deadline === undefined ? {} : { deadline }),
+          resolving,
+          held,
+        },
+      };
+    }
     case 'pauseResult': {
       const message = pauseResultText(m);
       const notices = [...s.notices, { code: 'pause_result', message }].slice(-MAX_NOTICES);
@@ -366,9 +423,12 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
         notices,
       };
     }
-    case 'gameOver':
+    case 'gameOver': {
+      // No turn opens after the game ends; drop the last one (often still resolving).
+      const rest = { ...s };
+      delete rest.turn;
       return {
-        ...s,
+        ...rest,
         gameOver: {
           winner: m.winner,
           reason: m.reason,
@@ -376,6 +436,7 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
           ...(m.loserOut ? { loserOut: m.loserOut } : {}),
         },
       };
+    }
     case 'notification': {
       // What would reach an away player by push or email, shown to one who has the game open.
       const notices = [
@@ -417,6 +478,24 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       };
     }
   }
+}
+
+/**
+ * What the game's settings (`GET /games/:id`) say about its mode: a turn-mode game is known as one from the
+ * start and after it ends, when the server sends no `turnState` (D39, #429). The settings are authoritative,
+ * so a real-time game drops any turn mode left from a turn game opened earlier in the session.
+ */
+export function withTurnSettings(
+  s: ClientState,
+  umpire: Partial<UmpireSettings> | undefined,
+): ClientState {
+  const t = turnSettingsOf(umpire);
+  if (t) return { ...s, turnMode: true, turnMinutes: t.turnMinutes };
+  if (!s.turnMode && s.turnMinutes === undefined) return s;
+  const rest = { ...s };
+  delete rest.turnMode;
+  delete rest.turnMinutes;
+  return rest;
 }
 
 export function withLink(s: ClientState, link: LinkStatus): ClientState {

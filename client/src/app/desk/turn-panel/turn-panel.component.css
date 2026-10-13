@@ -1,0 +1,69 @@
+.turn-panel {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+p {
+  margin: 0 0 4px;
+}
+p:last-child {
+  margin-bottom: 0;
+}
+.sides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ks-space-1) var(--ks-space-3);
+}
+.side {
+  opacity: 0.8;
+}
+.side.sent {
+  opacity: 1;
+  font-weight: bold;
+  color: var(--ks-brass-hi);
+}
+.buttons {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ks-space-2);
+}
+.decided {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ks-space-2);
+  border-bottom: 1px solid var(--ks-brass);
+  padding-bottom: 4px;
+}
+.deadline {
+  font-size: var(--ks-text-xs);
+  opacity: 0.85;
+}
+.resolving {
+  font-style: italic;
+  color: var(--ks-brass-hi);
+}
+/* A quill stroke that scratches while the umpire works; still for anyone who prefers less motion. */
+.quill {
+  display: inline-block;
+  width: 1.2em;
+  height: 2px;
+  margin-right: var(--ks-space-2);
+  vertical-align: middle;
+  background: currentColor;
+  animation: scratch 1.2s ease-in-out infinite alternate;
+  transform-origin: left center;
+}
+@keyframes scratch {
+  from {
+    transform: scaleX(0.2);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quill {
+    animation: none;
+  }
+}

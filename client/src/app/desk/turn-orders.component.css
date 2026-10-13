@@ -1,0 +1,70 @@
+.turn {
+  border: 1px solid var(--ks-rule);
+  border-radius: var(--ks-radius);
+  padding: var(--ks-space-2) var(--ks-space-3);
+  margin-bottom: var(--ks-space-3);
+}
+h3,
+h4 {
+  margin: 0 0 var(--ks-space-1);
+}
+h4 {
+  font-size: var(--ks-text-sm);
+  margin-top: var(--ks-space-2);
+}
+.sides {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ks-space-1) var(--ks-space-3);
+}
+.sides li {
+  color: var(--ks-text-muted);
+}
+.sides li.sent {
+  color: var(--ks-ink);
+  font-weight: bold;
+}
+.mark {
+  display: inline-block;
+  width: 1.1em;
+}
+.hint {
+  font-size: var(--ks-text-xs);
+  color: var(--ks-text-muted);
+  margin: 2px 0;
+}
+.status {
+  font-style: italic;
+  margin: var(--ks-space-1) 0;
+}
+.held {
+  margin: 0 0 var(--ks-space-2);
+  padding-left: 1.4em;
+}
+.held li {
+  margin-bottom: var(--ks-space-2);
+}
+.held li.editing {
+  outline: 2px dashed var(--ks-brass);
+  outline-offset: 2px;
+}
+.words {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+small {
+  font-size: var(--ks-text-xs);
+  color: var(--ks-text-muted);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ks-space-2);
+}
+.confirm p {
+  margin: 0 0 var(--ks-space-2);
+}

@@ -3,6 +3,13 @@ import type { StructuredOutputSupport } from './provider.js';
 import type { GameLimits } from './gameLimits.js';
 import type { UmpireStage } from './umpireClient.js';
 import { TEST_MODEL } from './providers/test.js';
+import { NARRATE_MAX_TOKENS } from './narrate.js';
+
+/** The keyless Ollama route's reply limit per stage, where it differs from 700. */
+const LOCAL_MAX_TOKENS: Partial<Record<UmpireStage, number>> = {
+  parse: 400,
+  narrate: NARRATE_MAX_TOKENS,
+};
 
 export const UMPIRE_STAGES: readonly UmpireStage[] = [
   'parse',
@@ -210,7 +217,7 @@ export function umpireConfigFromEnv(
             ? env.OLLAMA_MODEL || OLLAMA_DEFAULT_MODEL
             : route.model),
       // Low temperature and short outputs suit a tiny model.
-      ...(local ? { params: { temperature: 0.2, maxTokens: stage === 'parse' ? 400 : 700 } } : {}),
+      ...(local ? { params: { temperature: 0.2, maxTokens: LOCAL_MAX_TOKENS[stage] ?? 700 } } : {}),
     };
     if (!providers[stages[stage].provider]) {
       throw new Error(

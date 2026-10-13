@@ -140,10 +140,9 @@ export function reconcileExchanges(
 }
 
 /**
- * Give each exchange its answer from the umpire's reply (`staffAnswer`). A reply with no text (the
- * staff stage is off or failed) only marks the exchange `textless`: `settleTextless` builds its
- * answer once the answer is due, so it cites the newest reports. Returns the same array when
- * nothing changed.
+ * Give each exchange its answer from the server's reply (`staffAnswer`), written once at the due time
+ * and stored with the game (#418). A reply with no text (only from a server before #418) marks the
+ * exchange `textless`, and `settleTextless` answers it. Returns the same array when nothing changed.
  */
 export function applyServerAnswers(
   log: readonly Exchange[],
@@ -155,7 +154,7 @@ export function applyServerAnswers(
     const a = answers[e.questionId];
     if (!a) return e;
     changed = true;
-    if (a.text === undefined) return { ...e, textless: true };
+    if (a.text === undefined) return { ...e, textless: true, officer: a.officer };
     return {
       ...e,
       answer: { text: `${a.officer.name}: ${sirFirst(a.text)}`, basedOnGame: a.basedOnGame },
@@ -224,7 +223,9 @@ export function mergeStaffHistory(
 
 /**
  * Answer the text-less exchanges that are now due, from the view the page holds at `nowGame`, not
- * the one it held when the question went out. Returns the same array when nothing changed.
+ * the one it held when the question went out, signed by the officer who was asked. Only exchanges
+ * from before the server wrote every answer itself (#418) are text-less. Returns the same array when
+ * nothing changed.
  */
 export function settleTextless(
   log: readonly Exchange[],
@@ -240,6 +241,7 @@ export function settleTextless(
       answer: fixtureAnswer(
         { role: e.role, question: e.question, askedAtGame: e.askedAtGame },
         view,
+        e.officer ? [{ ...staffFor(e.role), ...e.officer }] : FIXTURE_STAFF,
       ),
     };
   });

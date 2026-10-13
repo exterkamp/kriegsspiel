@@ -2,7 +2,11 @@
   {{ announcement() }}
 </div>
 <div class="dock">
-  <ks-pause-panel />
+  @if (turnMode()) {
+    <ks-turn-panel />
+  } @else {
+    <ks-pause-panel />
+  }
   <ks-clock />
   <nav class="desk-bar" aria-label="Desk">
     @for (v of views; track v.id) {

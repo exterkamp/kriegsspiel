@@ -29,3 +29,11 @@ ul {
   margin: 0;
   padding-left: 18px;
 }
+/* A turn line in a turn-mode game: the break between two turns (newer above, older below). */
+li[data-kind='turn'] {
+  list-style: none;
+  margin: 8px 0 8px -18px;
+  padding: 4px 0;
+  border-block: 1px solid var(--ks-rule);
+  font-weight: bold;
+}

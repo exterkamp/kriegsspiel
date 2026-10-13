@@ -16,21 +16,34 @@ import type { JsonSchema, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
 import { hiddenIn } from './leakGuard.js';
 
-export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v5';
+export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v7';
 
-export const NARRATE_SYSTEM = `You write the notes that officers in the field send back to their general at a Napoleonic army headquarters. Each is a hasty note in the sender's own hand: first person ("we", "my men"), to the general ("Sir"), in the manner of the officer who sent it. A cautious officer hedges and asks for orders, a bold one wants to press on, a veteran is terse. The voice given at the end colours the officer's note; it does not change who writes it.
+/**
+ * Short on purpose: a 0.5b model follows a few plain rules better than many (#419). Each rule but the
+ * hedging one is enforced by the checks (`checkProse`, `checkFieldNote`), so a reply that obeys the
+ * prompt passes.
+ */
+export const NARRATE_SYSTEM = `You write one hasty note from an officer in the field to his general, in the Napoleonic wars.
 
-Input: "reports", the only things this headquarters knows. Each has an "id", the "from" officer or unit, a "kind", the "place", how many "minutesAgo" before it reached headquarters it happened, a "sizeEstimate" (contacts only), a "confidence", and how far off the location may be ("radiusM"). When known it also has the "commander" who writes, his "trait" (his manner) and the sending unit's "condition" now (morale, fatigue, ammunition).
+Input: one report. "kind" is what happened, "from" the unit, "place" where, "minutesAgo" how long before it reached the general, "sizeEstimate" and "confidence" how sure. It may also give the "commander" who writes, his "trait" (his manner) and his unit's "condition".
 
-Rules:
-- Write only from the reports. Do not add units, officers, places, numbers, times or events that are not in them. Where the report is unsure, say so.
-- Name an officer, unit or place only as it appears in the reports. Quote numbers as given; do not compute new ones.
-- Lower confidence means more hedging ("perhaps", "it is thought"); high confidence means plain statement.
-- Do not just restate the report. Give the officer's judgement of what it means for his men and, where it follows from the report and his condition, one question or concern for the general: after an enemy force is destroyed, whether to pursue; when engaged with tired men or little ammunition, whether he can hold; after heavy losses, a break, low ammunition or exhaustion, whether to fall back or be relieved; on a first sighting, whether to engage or watch. Ask nothing that does not fit this report.
-- A judgement or question adds no facts: it names only what the report names.
-- A "unitLost" or "courierLost" report is not from its unit, which is gone or never had the orders: write it as a brief note from the staff at headquarters, in the third person, and ask nothing on the unit's behalf.
-- You are given one report. Return one dispatch of two or three short sentences for it, with its id in "reportIds".
-Reply with the JSON object only.`;
+Write the note:
+- In the first person, as the officer: "Sir, we ..." or "Sir, my men ...". Never call the unit or the commander "he", "it" or by name in the third person.
+- Say what happened, using the report's own words for the kind and the place.
+- Then his judgement or one short question for the general that fits the report and his manner: pursue a beaten enemy, hold or fall back when hard pressed or tired, engage or watch an enemy sighted.
+- Use only the names, places and numbers in the report. Never say how long anything lasted, how strong a line is, or anything the report does not say.
+- If "confidence" is low or medium, hedge: "perhaps", "I think".
+- Mention his condition only if it matters, in at most one word from "condition", and never list it.
+- Two or three short sentences, under 60 words.
+- If "kind" is "unitLost", "courierLost" or "situation", the staff at headquarters write instead, in the third person, and ask nothing.
+
+Return {"dispatches":[{"reportIds":[the report's id],"text":the note}]}. Reply with the JSON object only.`;
+
+/**
+ * The longest reply a note needs, in tokens: a short note in its JSON (#419). The keyless Ollama route
+ * uses it as its narrate limit (`config.ts`); a route with its own `maxTokens` keeps that.
+ */
+export const NARRATE_MAX_TOKENS = 220;
 
 export const NARRATE_SCHEMA: JsonSchema = {
   type: 'object',
@@ -97,8 +110,15 @@ export function unitCondition(u: Pick<ViewUnit, 'morale' | 'fatigue' | 'ammo'>):
   return `${morale}, ${fatigue}, ${ammo}`;
 }
 
-/** Report kinds the named unit did not write (it is destroyed, or never had the orders): HQ writes them. */
-const STAFF_KINDS: ReadonlySet<ViewReport['kind']> = new Set(['unitLost', 'courierLost']);
+/**
+ * Report kinds the named unit did not write (it is destroyed, or never had the orders) and the chief of
+ * staff's opening situation: HQ writes them.
+ */
+const STAFF_KINDS: ReadonlySet<ViewReport['kind']> = new Set([
+  'unitLost',
+  'courierLost',
+  'situation',
+]);
 
 /**
  * What the model sees for one report. Metres and minutes, no ids of anything the side cannot know.
@@ -272,6 +292,8 @@ const SENTENCE_OPENERS = new Set([
   'for',
   'forgive',
   'from',
+  'get',
+  'give',
   'half',
   'has',
   'hasten',
@@ -288,6 +310,7 @@ const SENTENCE_OPENERS = new Set([
   'it',
   'its',
   'later',
+  'let',
   'many',
   'may',
   'men',
@@ -318,6 +341,7 @@ const SENTENCE_OPENERS = new Set([
   'red',
   'request',
   'retire',
+  'say',
   'scouts',
   'send',
   'shall',
@@ -486,6 +510,151 @@ export function checkProseAgainst(text: string, facts: ProseFacts): string[] {
   return [...new Set(problems)];
 }
 
+/** The longest dispatch accepted: the prompt asks for two or three short sentences (#419). */
+export const NARRATE_MAX_CHARS = 360;
+const NARRATE_MAX_SENTENCES = 4;
+
+/** The words `unitCondition` uses, by what they describe; one unit is only ever one of each (#419). */
+const CONDITION_GROUPS: readonly (readonly string[])[] = [
+  ['steady', 'shaken', 'wavering'],
+  ['fresh', 'tiring', 'spent'],
+  ['well supplied', 'running low', 'nearly gone'],
+];
+
+/** Condition words a report of this kind already implies, so the note may use them whatever the unit's condition. */
+const KIND_CONDITION: Partial<Record<ViewReport['kind'], readonly string[]>> = {
+  broke: ['shaken', 'wavering'],
+  heavyLosses: ['shaken', 'wavering'],
+  exhausted: ['tiring', 'spent'],
+  lowAmmo: ['running low', 'nearly gone'],
+};
+
+/**
+ * Words of which a note on a report of this kind must use one, so it is about the reported event and
+ * not about something the model made up (#419). Generous on purpose: any fair way of saying it passes.
+ */
+const EVENT_WORDS: Record<Exclude<ViewReport['kind'], 'battle'>, RegExp> = {
+  situation:
+    /\b(position|posted|placed|in place|in line|line|ready|deployed|formed|stand|standing|quiet|no enemy|nothing)\b/i,
+  contact:
+    /\b(see|seen|saw|sight|sighted|sighting|spotted|spied|observed|watch|watching|enemy|enemies|troops|column|columns|men|horse|foot|force|battalions?|squadrons?|regiments?|companies|company|brigades?|infantry|cavalry|guns|artillery|before us)\b/i,
+  orderDelivered:
+    /\b(order|orders|instructions|your note|your letter|despatch|dispatch|received|in hand|have them|obey)\b/i,
+  lowAmmo: /\b(ammunition|cartridges?|powder|ball|shot|rounds|supply|supplies|resupply)\b/i,
+  exhausted:
+    /\b(exhausted|exhaustion|tired|tiring|weary|spent|fatigue|fatigued|rest|done in|worn|dropping|can go no further)\b/i,
+  destroyed:
+    /\b(destroyed|broken|broke|routed|rout|scattered|cut down|cut up|wiped|beaten|gone|fled|flight|dispersed)\b/i,
+  engaged:
+    /\b(engaged|engage|fight|fighting|fire|firing|attack|attacked|attacking|action|contact|skirmish|presses|pressing|press|hold|holding|battle|struggle|enemy)\b/i,
+  heavyLosses:
+    /\b(loss|losses|lost|casualties|fallen|dead|killed|wounded|cut up|bled|bleeding|thinned|heavy|dearly)\b/i,
+  broke:
+    /\b(broke|broken|break|fall back|falling back|fell back|retreat|retreating|rout|routed|flee|fled|fleeing|withdraw|withdrawing|gave way|give way|given way|rally|driven back|ran)\b/i,
+  unitLost: /\b(lost|gone|destroyed|no word|silent|silence|missing|no more|cut off|perished)\b/i,
+  courierLost: /\b(courier|rider|messenger|orders?|overdue|lost|no word)\b/i,
+};
+
+const FIRST_PERSON =
+  /\b(i|i'm|i’m|i've|i’ve|i'd|i’d|we|we're|we’re|we've|we’ve|my|our|ours|me|us)\b/i;
+
+/** A span of time the note says something lasted: "for 10 minutes", "for an hour", "twenty minutes long". */
+const DURATION =
+  /\bfor (?:(?:about|some|nearly|almost|over|fully|a full|the (?:last|past)) )?(?:\d+|an?|half an?|[a-z]+(?:[- ][a-z]+)?) (?:minutes?|hours?|quarters? of an hour)\b|\b(?:minutes?|hours?) (?:long|on end)\b/i;
+
+/** Strength the reports never give: "a strong line", "a solid position". */
+const STRENGTH =
+  /\b(?:strong|solid|firm|stout|formidable|unbroken|powerful) (?:line|lines|position|front|defence|defense|force)\b/i;
+
+const COMBAT_KINDS: ReadonlySet<ViewReport['kind']> = new Set([
+  'engaged',
+  'heavyLosses',
+  'broke',
+  'destroyed',
+  'unitLost',
+]);
+
+/**
+ * The next words that make a condition word describe something other than the sender's men: "fresh
+ * troops" are the enemy's or a reinforcement, "a steady fire" is the firing, not the morale.
+ */
+const NOT_THE_MEN: Readonly<Record<string, string>> = {
+  fresh:
+    '(?:troops|regiments?|battalions?|columns?|reserves?|enemy|horses|supply|supplies|ammunition|cartridges)',
+  steady: '(?:fire|volleys?|rain|advance|pace|march)',
+  spent: '(?:balls?|shot|cartridges)',
+};
+
+/** The condition words (`CONDITION_GROUPS`) in `text` that describe the men, not the enemy or the firing. */
+function conditionWordsIn(text: string): string[] {
+  const lower = text.toLowerCase();
+  return CONDITION_GROUPS.flat().filter((w) => {
+    const not = NOT_THE_MEN[w];
+    return new RegExp(`\\b${w}\\b${not ? `(?! ${not}\\b)` : ''}`).test(lower);
+  });
+}
+
+/**
+ * The problems with one dispatch as a field note on `report` (#419), beyond the fact check of
+ * `checkProse`. The two notes a small model wrote in QA, and every rule here is aimed at them:
+ * - a note from the unit is in its officer's own voice: one that never says "I", "we", "my" or "our"
+ *   but names its own unit or commander is a third-person account, not his note;
+ * - no span of time ("held for 10 minutes"): a report has an age, never a duration;
+ * - no strength the report does not give ("a strong line"), and no fire on a report that is not a fight;
+ * - condition words agree with each other and with the unit's condition (or the report's kind), and
+ *   the note does not recite the whole condition list instead of judging it;
+ * - it says what happened (a word for the report's kind), and it is short.
+ */
+export function checkFieldNote(text: string, report: Input['reports'][number]): string[] {
+  const problems: string[] = [];
+  const kind = report.kind as ViewReport['kind'];
+  if (text.length > NARRATE_MAX_CHARS) {
+    problems.push(`too long (${text.length} characters, at most ${NARRATE_MAX_CHARS})`);
+  }
+  // "Lt. Col. Aubry" is one name, not three sentences.
+  const sentences = text
+    .replace(/\b(Lt|Col|Maj|Gen|Capt|Sgt|Brig|St)\./g, '$1')
+    .split(/[.!?]+(?:\s|$)/)
+    .filter((x) => x.trim() !== '').length;
+  if (sentences > NARRATE_MAX_SENTENCES) {
+    problems.push(`too long (${sentences} sentences, at most ${NARRATE_MAX_SENTENCES})`);
+  }
+  const lower = text.toLowerCase();
+  if (!STAFF_KINDS.has(kind) && !FIRST_PERSON.test(text)) {
+    const self = [report.from, report.commander ?? ''].filter((n) => n !== '');
+    const named = self.find((n) => lower.includes(n.toLowerCase()));
+    if (named !== undefined) {
+      problems.push(`not in the first person: names "${named}" as someone else would`);
+    }
+  }
+  const duration = text.match(DURATION);
+  if (duration) problems.push(`invented duration "${duration[0]}"`);
+  const strength = text.match(STRENGTH);
+  if (strength) problems.push(`invented strength "${strength[0]}"`);
+  if (!COMBAT_KINDS.has(kind) && /\bunder fire\b/i.test(text)) {
+    problems.push('invented event "under fire": the report is not of a fight');
+  }
+
+  const said = conditionWordsIn(text);
+  for (const group of CONDITION_GROUPS) {
+    const clash = group.filter((w) => said.includes(w));
+    if (clash.length > 1) problems.push(`contradictory condition "${clash.join('" and "')}"`);
+  }
+  if (report.condition !== undefined) {
+    const allowed = [...conditionWordsIn(report.condition), ...(KIND_CONDITION[kind] ?? [])];
+    for (const w of said) {
+      if (!allowed.includes(w)) problems.push(`condition "${w}" is not the unit’s`);
+    }
+    if (conditionWordsIn(report.condition).every((w) => said.includes(w))) {
+      problems.push('recites the unit’s condition instead of judging it');
+    }
+  }
+  if (kind !== 'battle' && !EVENT_WORDS[kind].test(text)) {
+    problems.push(`does not say what happened (${kind})`);
+  }
+  return problems;
+}
+
 /** Everything wrong with a reply: unknown or missing report ids, then the prose of each dispatch. */
 export function checkNarration(
   output: NarrateOutput,
@@ -502,6 +671,9 @@ export function checkNarration(
     }
     if (d.text.trim() === '') problems.push('empty dispatch');
     problems.push(...checkProse(d.text, input), ...hiddenIn(d.text, hidden));
+    for (const r of input.reports) {
+      if (d.reportIds.includes(r.id)) problems.push(...checkFieldNote(d.text, r));
+    }
   }
   for (const id of ids) if (!covered.has(id)) problems.push(`report "${id}" not narrated`);
   return [...new Set(problems)];
@@ -526,6 +698,11 @@ export interface NarrateOptions {
   persona?: UmpirePersona;
   /** The side's own units (`viewFor(...).ownUnits`): each sender's commander, manner and condition (#390). */
   ownUnits?: readonly ViewUnit[];
+  /**
+   * The game's circuit breaker (#419): asked before every model call, and told whether each passed. Once it
+   * stops allowing calls, the reports not yet narrated keep their template text with `reason` as the reason.
+   */
+  breaker?: { allows(): boolean; record(ok: boolean): void; reason(): string };
 }
 
 const TIMED_OUT = 'timed out';
@@ -610,6 +787,10 @@ export async function narrateReports(
     let narrated: NarratedDispatch | undefined;
     let calls = 0;
     while (calls < maxCalls && !narrated && stopped === undefined) {
+      if (opts.breaker && !opts.breaker.allows()) {
+        stopped = opts.breaker.reason();
+        break;
+      }
       calls++;
       result.calls++;
       // Tell a retry what was wrong, so it does not repeat the invention.
@@ -628,6 +809,7 @@ export async function narrateReports(
         ));
       } catch (e) {
         if (e === ABORTED) {
+          opts.breaker?.record(false);
           stopped = TIMED_OUT;
           break;
         }
@@ -639,11 +821,13 @@ export async function narrateReports(
           result.overloaded = STAFF_OVERLOADED_NOTICE;
           stopped = 'umpire budget or rate limit';
         } else {
+          opts.breaker?.record(false);
           stopped = `the model call failed (${e.kind})`;
         }
         break;
       }
       const problems = checkNarration(output, input, opts.hidden);
+      opts.breaker?.record(problems.length === 0);
       if (problems.length === 0) {
         narrated = {
           reportIds: [r.id],

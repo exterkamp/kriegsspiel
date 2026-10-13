@@ -1,0 +1,90 @@
+@let p = phase();
+<section class="turn" aria-labelledby="turn-orders-h" data-testid="turn-orders">
+  <h3 id="turn-orders-h">{{ heading() }}</h3>
+
+  <ul class="sides" aria-label="Who has sent orders">
+    @for (s of sides(); track s.side) {
+      <li [class.sent]="s.sent" [attr.data-side]="s.side">
+        <span aria-hidden="true" class="mark">{{ s.sent ? '✓' : '…' }}</span>
+        {{ s.name }}{{ s.you ? ' (you)' : '' }}: {{ s.sent ? 'sent' : 'writing orders' }}
+      </li>
+    }
+  </ul>
+  @if (deadline(); as d) {
+    <p class="hint" data-testid="turn-deadline">{{ d }}</p>
+  }
+
+  @if (p === 'resolving') {
+    <p class="status" role="status">The umpire is considering the turn.</p>
+  } @else if (p === 'sent') {
+    <p class="status" role="status" data-testid="turn-sent">
+      Your orders for this turn have gone to the couriers.
+      @if (waitingOn().length > 0) {
+        Waiting for {{ waitingOn().join(' and ') }}.
+      }
+    </p>
+  }
+
+  <h4>{{ p === 'writing' ? 'Held for this turn' : 'Sent this turn' }}</h4>
+  @if (held().length === 0) {
+    <p class="hint" data-testid="turn-none">
+      @if (p === 'writing') {
+        No orders held yet. Write one below and hold it for the turn; a side that sends none keeps
+        its units on their last orders.
+      } @else {
+        No orders: the units carry on with their last orders.
+      }
+    </p>
+  } @else {
+    <ol class="held" data-testid="turn-held">
+      @for (o of held(); track o.orderId) {
+        <li [class.editing]="editing() === o.orderId">
+          <small>{{ line(o) }}</small>
+          <p class="words">{{ o.text }}</p>
+          @if (p === 'writing') {
+            <div class="row">
+              <button type="button" class="ks-quiet" (click)="edit.emit(o)">
+                {{ editing() === o.orderId ? 'Editing below' : 'Edit' }}
+              </button>
+              <button type="button" class="ks-quiet" (click)="withdraw(o)">Withdraw</button>
+            </div>
+          }
+        </li>
+      }
+    </ol>
+  }
+
+  @if (p === 'writing') {
+    @if (confirming()) {
+      <div class="confirm" role="group" aria-labelledby="turn-confirm-q">
+        <p id="turn-confirm-q">
+          Send
+          {{
+            held().length === 0
+              ? 'no orders'
+              : held().length === 1
+                ? 'this order'
+                : 'these ' + held().length + ' orders'
+          }}
+          for the turn? This is final for your side.
+          @if (unheldWords()) {
+            <b>The words still in the order box have not been held and will not go.</b>
+          }
+        </p>
+        <div class="row">
+          <button type="button" class="ks-primary" id="turn-send-confirm" (click)="send()">
+            Send orders
+          </button>
+          <button type="button" (click)="confirming.set(false)">Not yet</button>
+        </div>
+      </div>
+    } @else {
+      <button type="button" class="ks-primary" id="turn-send" (click)="send()">
+        Send orders for this turn
+      </button>
+    }
+  }
+  @if (problem()) {
+    <p class="ks-error" role="alert">{{ problem() }}</p>
+  }
+</section>

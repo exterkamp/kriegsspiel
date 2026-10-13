@@ -1,3 +1,4 @@
+import type { Json } from './events.js';
 import type { Pace } from './fatigue.js';
 import type { Order, OrderIntent } from './orders.js';
 import type { Trait } from './personality.js';
@@ -298,6 +299,8 @@ export interface Report {
   subject?: string;
   /** The wording itself, for a report that is the umpire's own (`battle`). */
   text?: string;
+  /** For `courierLost`: when the lost order should have reached the unit. */
+  orderDueAt?: GameTime;
 }
 
 /**
@@ -320,6 +323,21 @@ export interface Courier {
    * due arrival, so the sender's view cannot tell it has gone (the report comes later).
    */
   lostAt?: GameTime;
+  /**
+   * Set in a turn the engine resolves (D39, 11.4): the turn's courier pass already decided this
+   * ride, so through `untilMs` its interception checks roll nothing and it is taken exactly where
+   * the pass had it taken. Absent in real-time play.
+   */
+  forced?: ForcedRide;
+}
+
+/** A ride's outcome in a turn, fixed by the turn's courier pass (see `courierPass`). */
+export interface ForcedRide {
+  /** The turn's end: after it the courier rolls its checks again. */
+  untilMs: GameTime;
+  /** The check at which an enemy unit takes it, and which unit. */
+  takenAt?: GameTime;
+  takenBy?: string;
 }
 
 /** An enemy dispatch a side has taken from a courier. Belongs to the capturing side's intel. */
@@ -382,13 +400,54 @@ export interface GameState {
   /** Weather hook: multiplies every unit's sight range (1 when absent, 0.5 in fog). */
   sightFactor?: number;
   /** Every umpire placement ruling so far, in order. Master state only: never sent to a client. */
-  rulings: Array<Ruling | BattleRuling | JudgmentRuling>;
+  rulings: Array<Ruling | BattleRuling | JudgmentRuling | TurnRuling>;
   /** The rigid-to-free dial chosen for this game; absent counts as 'standard'. Sets the judgment cap only. */
   dial?: Dial;
   /** Men each unit started with, the yardstick for a broken force (D13). Absent: no unit counts as broken. */
   startStrength?: Record<string, number>;
   /** Set once, when the umpire has declared one side's force broken; the game closes soon after (D13). */
   battle?: { winner: SideId; reason: 'attack-broken' | 'defence-broken'; declaredAt: GameTime };
+  /**
+   * The turn of a turn-mode game being resolved, or the last one, until the next begins (D39).
+   * Under the umpire (`adjudicator: 'umpire'`) the turn is held: units stay where they stood at
+   * `startMs` while the couriers ride, `umpire.turn` sets the outcome at `endMs`, and nothing else
+   * moves the world up to `endMs`. Absent in real time.
+   */
+  turn?: TurnFlag;
+}
+
+/**
+ * The turn being resolved: turn `n` covers game time `[startMs, endMs]`. Under the umpire,
+ * `endMs` itself is held too, so no other event at `T1` can undo what `umpire.turn` applied.
+ */
+export interface TurnFlag {
+  n: number;
+  startMs: GameTime;
+  endMs: GameTime;
+  adjudicator: 'engine' | 'umpire';
+}
+
+/**
+ * One correction the engine made to an umpire's turn proposal (D39): a field of one unit's
+ * outcome, or an observation, that broke a hard limit. Master state only.
+ */
+export interface TurnRuling {
+  id: string;
+  /** The turn's end, when the outcome was applied. */
+  time: GameTime;
+  kind: 'turn';
+  turn: number;
+  unitId: string;
+  /** The outcome field corrected (`position`, `strength`, `status`, `observation`...). */
+  field: string;
+  proposed: Json;
+  applied: Json;
+  /** The limit it broke, in words. */
+  reason: string;
+  /** The same reason, for readers of every ruling kind (the window, the critique). */
+  rationale: string;
+  /** One plain sentence on what was corrected. */
+  narrative: string;
 }
 
 /**

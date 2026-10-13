@@ -3,6 +3,7 @@ import { pointInPolygon } from './geometry.js';
 import { beginMarch, updateUnit } from './movement.js';
 import type { OrderIntent } from './orders.js';
 import { canSee } from './visibility.js';
+import { heldTurn } from './held.js';
 import type { GameState, GameTime, StandingOrder, Trigger, Unit } from './types.js';
 
 /** Fires when a `timeReached` trigger's moment comes; judges every standing order then. */
@@ -164,5 +165,12 @@ export function fireOnReceipt(
 
 /** Register the `timeReached` check. Called from `registerOrders`, which schedules it. */
 export function registerStanding(registry: EventRegistry<GameState>): void {
-  registry.register(STANDING_EVENT, (world, ev) => evaluateStanding(world, ev.time));
+  registry.register(STANDING_EVENT, (world, ev) => {
+    // In an umpire turn no standing order fires (the umpire decides what each unit does, D39):
+    // the check waits until just past the turn's end, so the order is kept for later turns.
+    if (heldTurn(world, ev.time)) {
+      return { world, schedule: [{ time: world.turn!.endMs + 1, type: STANDING_EVENT }] };
+    }
+    return evaluateStanding(world, ev.time);
+  });
 }

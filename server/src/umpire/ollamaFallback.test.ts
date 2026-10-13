@@ -5,6 +5,7 @@ import { llmOrderParserEnabled, usesTestUmpire } from '../config.js';
 import { CORPUS_CONTEXT } from '../orders/eval/corpus.js';
 import { LlmOrderParser } from '../orders/llmParser.js';
 import { umpireConfigFromEnv } from './config.js';
+import { NARRATE_MAX_TOKENS } from './narrate.js';
 import { createUmpireClient } from './createUmpireClient.js';
 import type { UmpireFallback } from './fallbackUmpireClient.js';
 import { NARRATE_SCHEMA, narrateInput, narrateReports } from './narrate.js';
@@ -67,6 +68,10 @@ describe('keyless Ollama configuration', () => {
       expect(config.stages[s]).toMatchObject({ provider: 'ollama', model: 'tiny:1b' });
       expect(config.stages[s].params?.temperature).toBeLessThanOrEqual(0.3);
     }
+    // A short note needs few tokens; the request sets none, so a route's own limit wins (#419).
+    expect(config.stages.narrate.params?.maxTokens).toBe(NARRATE_MAX_TOKENS);
+    expect(config.stages.parse.params?.maxTokens).toBe(400);
+    expect(config.stages.staff.params?.maxTokens).toBe(700);
     expect(config.stages.judge.provider).toBe('test');
     expect(config.providers.ollama).toMatchObject({
       type: 'ollama',

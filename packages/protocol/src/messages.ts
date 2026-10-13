@@ -4,6 +4,7 @@ import { Briefing, Dissent, MAX_DISSENT } from './dissent.js';
 import { DraftEntry, DraftSnapshot, MAX_COMMENT, MAX_DRAFT_TEXT, TextOp } from './drafts.js';
 import { DeputySettings } from './deputy.js';
 import { Mark } from './marks.js';
+import { TurnOrder, TurnStateMessage } from './turns.js';
 import { Dispatch, SideView, StaffRole } from './view.js';
 
 const Id = z.string().min(1);
@@ -199,6 +200,13 @@ export const Command = z.discriminatedUnion('kind', [
   z.object({ ...Envelope, kind: z.literal('setDeputy'), settings: DeputySettings }).strict(),
   // A subordinate sends a report their own formation filed up to HQ. In a chain of command HQ sees it only once it has ridden there.
   z.object({ ...Envelope, kind: z.literal('forwardReport'), reportId: Id }).strict(),
+  // Turn mode (D39): hold an order for the open turn, or replace the held order with the same id.
+  // Shared by the side's seats until one sends. Errors for it are prefixed `<orderId>: `.
+  z.object({ ...Envelope, kind: z.literal('holdTurnOrder'), order: TurnOrder }).strict(),
+  // Turn mode: take a held order back before the side sends.
+  z.object({ ...Envelope, kind: z.literal('withdrawTurnOrder'), orderId: Id }).strict(),
+  // Turn mode: send the side's held orders for the open turn. Final for the side; a seat that may sign orders sends.
+  z.object({ ...Envelope, kind: z.literal('sendTurn') }).strict(),
 ]);
 export type Command = z.infer<typeof Command>;
 
@@ -288,9 +296,9 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       costMs: GameMs,
     })
     .strict(),
-  // The umpire's answer to a staff question, written from the asking seat's view at `basedOnGame`. The
-  // client shows it once game time reaches the question's `answerAtGame`. No `text`: the staff stage is
-  // off or failed, and the client falls back to its own canned answer.
+  // An officer's answer to a staff question, written once when game time reaches the question's
+  // `answerAtGame`, from the officer's view then, and stored with the game (#418). The server always
+  // sends `text` (the model's, or the officer's canned answer); it is optional only for older servers.
   z
     .object({
       ...Envelope,
@@ -347,6 +355,9 @@ export const ServerMessage = z.discriminatedUnion('kind', [
     })
     .strict(),
   z.object({ ...Envelope, kind: z.literal('clockState'), clock: ClockState }).strict(),
+  // Turn mode (D39): the open turn, sent on connect and on every change (an order held or withdrawn,
+  // a side sending, the turn resolving, the next turn opening). Never sent in a real-time game.
+  z.object({ ...Envelope, kind: z.literal('turnState'), ...TurnStateMessage }).strict(),
   // The pause vote. Sent on connect (only to a game that has voters) and whenever the phase or the
   // open proposal changes, including each vote. Absent `proposal` means nothing is being voted on.
   z

@@ -341,12 +341,54 @@ describe('couriers on the table (#196)', () => {
     const later = advanceTo(foggy(seed), overdue.deliverAt, registry()).state;
     const told = viewFor(later.world, 'blue', later.time);
     const report = told.reports.find((x) => x.kind === 'courierLost')!;
-    expect(report.text).toMatch(/^Sir, no word from Unit|^Sir, no word from /);
+    expect(report.text).toMatch(/^Sir, .*no word from /);
     expect(report.observedAt).toBeGreaterThanOrEqual(view.couriers[0]!.arriveAt);
     expect(told.couriers).toEqual([]);
     expect(
       viewFor(later.world, 'red', later.time).reports.some((x) => x.kind === 'courierLost'),
     ).toBe(false);
+  });
+
+  it('does not say "no word" from a unit that has reported since its orders were due (#417)', () => {
+    const r = lostRun();
+    const overdue = r.state.world.intel.blue.reports.find((x) => x.kind === 'courierLost')!;
+    expect(overdue.orderDueAt).toBeLessThanOrEqual(overdue.observedAt);
+    const later = advanceTo(foggy(seed), overdue.deliverAt, registry()).state;
+    const textOf = (w: typeof later.world) =>
+      viewFor(w, 'blue', later.time).reports.find((x) => x.kind === 'courierLost')!.text;
+    expect(textOf(later.world)).toMatch(/no word from/);
+    // The unit reports itself engaged after its orders should have come, and HQ has that report.
+    const engaged = {
+      ...overdue,
+      id: 'blue-engaged',
+      kind: 'engaged' as const,
+      observedAt: overdue.orderDueAt! + 1,
+      deliverAt: overdue.deliverAt,
+    };
+    delete (engaged as { orderDueAt?: number }).orderDueAt;
+    const heard = {
+      ...later.world,
+      intel: {
+        ...later.world.intel,
+        blue: { ...later.world.intel.blue, reports: [...later.world.intel.blue.reports, engaged] },
+      },
+    };
+    expect(textOf(heard)).not.toMatch(/no word/);
+    expect(textOf(heard)).toMatch(/courier.*(overdue|lost)/);
+    // A report from before the orders were due, or one still on the road, does not count.
+    for (const early of [
+      { ...engaged, observedAt: overdue.orderDueAt! - 1 },
+      { ...engaged, deliverAt: overdue.deliverAt + 1 },
+    ]) {
+      const w = {
+        ...later.world,
+        intel: {
+          ...later.world.intel,
+          blue: { ...later.world.intel.blue, reports: [...later.world.intel.blue.reports, early] },
+        },
+      };
+      expect(textOf(w)).toMatch(/no word from/);
+    }
   });
 
   it('does the same at any stepping of the clock (replay)', () => {

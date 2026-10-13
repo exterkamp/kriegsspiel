@@ -2,7 +2,7 @@ import { refusalText } from './orders.js';
 import type { ClockState, Dispatch } from '@kriegsspiel/protocol';
 import { formatGameTime, type OrderOutcome, type PendingOrder } from '../net/state.js';
 
-export type JournalKind = 'order' | 'dispatch' | 'pause' | 'note';
+export type JournalKind = 'order' | 'dispatch' | 'pause' | 'note' | 'turn';
 
 export const JOURNAL_KINDS: readonly { id: JournalKind; label: string }[] = [
   { id: 'order', label: 'Orders' },
@@ -10,6 +10,9 @@ export const JOURNAL_KINDS: readonly { id: JournalKind; label: string }[] = [
   { id: 'pause', label: 'Pauses' },
   { id: 'note', label: 'Notes' },
 ];
+
+/** The filter for turn headings, offered only in a turn-mode game (D39). */
+export const TURN_KIND: { id: JournalKind; label: string } = { id: 'turn', label: 'Turns' };
 
 /** One line of the war diary. `at` is game ms; `id` is stable so a line is never recorded twice. */
 export interface JournalEntry {
@@ -119,6 +122,7 @@ const LABEL: Record<JournalKind, string> = {
   dispatch: 'DISPATCH',
   pause: 'PAUSE',
   note: 'NOTE',
+  turn: 'TURN',
 };
 
 /** The diary as plain text, oldest first, one entry per paragraph. */
@@ -139,7 +143,7 @@ function safeStorage(): Storage | undefined {
   }
 }
 
-const KINDS = new Set<string>(JOURNAL_KINDS.map((k) => k.id));
+const KINDS = new Set<string>([...JOURNAL_KINDS, TURN_KIND].map((k) => k.id));
 
 /** The saved diary for this game, or empty when there is none or storage is unavailable or damaged. */
 export function loadJournal(game: string): JournalEntry[] {

@@ -41,8 +41,14 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import { spaFallback } from './spaFallback.js';
 import {
   DEFAULT_UMPIRE_DIAL,
+  DEFAULT_TURN_MINUTES,
   DEFAULT_UMPIRE_PERSONA,
   DIALS,
+  GAME_MODES,
+  MAX_TURN_DEADLINE_HOURS,
+  MAX_TURN_MINUTES,
+  MIN_TURN_DEADLINE_HOURS,
+  MIN_TURN_MINUTES,
   PERSONAS,
 } from '@kriegsspiel/protocol';
 import { z } from 'zod';
@@ -125,6 +131,15 @@ const CreateGame = z
     /** The rigid-to-free dial and the umpire's persona (3.11); both optional, defaulting to standard and dry. */
     dial: z.enum(DIALS).optional(),
     persona: z.enum(PERSONAS).optional(),
+    /** Real-time (the default) or turn-based play (D39); the turn settings apply only to the latter. */
+    mode: z.enum(GAME_MODES).optional(),
+    turnMinutes: z.number().int().min(MIN_TURN_MINUTES).max(MAX_TURN_MINUTES).optional(),
+    turnDeadlineHours: z
+      .number()
+      .finite()
+      .min(MIN_TURN_DEADLINE_HOURS)
+      .max(MAX_TURN_DEADLINE_HOURS)
+      .optional(),
     hierarchy: z.enum(['shared', 'chain']).optional(),
     lobby: z.boolean().optional(),
   })
@@ -622,6 +637,16 @@ export async function buildApp(options: AppOptions): Promise<App> {
       umpire: {
         dial: body.data.dial ?? DEFAULT_UMPIRE_DIAL,
         persona: body.data.persona ?? DEFAULT_UMPIRE_PERSONA,
+        // Turn mode only: a real-time game's record and header stay as before (D39).
+        ...(body.data.mode === 'turns'
+          ? {
+              mode: 'turns' as const,
+              turnMinutes: body.data.turnMinutes ?? DEFAULT_TURN_MINUTES,
+              ...(body.data.turnDeadlineHours === undefined
+                ? {}
+                : { turnDeadlineHours: body.data.turnDeadlineHours }),
+            }
+          : {}),
       },
       ...(body.data.hierarchy ? { hierarchy: body.data.hierarchy } : {}),
       creator: user.id,
