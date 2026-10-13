@@ -14,10 +14,11 @@
  *   MAIL_WEBHOOK_URL    POST `{to, subject, text}` here to send the magic link; unset logs the link instead (dev only)
  *   MAIL_WEBHOOK_TOKEN  optional bearer token for the mail webhook
  *   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT  enable web push (generate a pair with `npx web-push generate-vapid-keys`); unset: email and WebSocket only
+ *   ADMIN_OPEN         `1` (with ADMIN_ENABLED) lets any caller use /admin with no token; refused under NODE_ENV=production unless ADMIN_OPEN_FORCE=1
  *   ADMIN_TOKEN         lets non-loopback callers use /admin/api with this bearer token
  */
 import { buildApp } from './api/app.js';
-import { adminFromEnv } from './admin/adminApi.js';
+import { ADMIN_OPEN_WARNING, adminFromEnv } from './admin/adminApi.js';
 import { SqliteNotifyStore, pushFromEnv } from './notify/index.js';
 import { allowedOriginsFromEnv } from './auth/origin.js';
 import { SqliteAuthStore } from './auth/store.js';
@@ -152,6 +153,8 @@ const { server } = await buildApp({
     guestPerIp: guestPerHourFromEnv(process.env),
   },
 });
+
+if (admin.open) server.log.warn(ADMIN_OPEN_WARNING);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(

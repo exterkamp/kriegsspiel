@@ -6,6 +6,7 @@ import {
   renderDocument,
   viewFor,
   viewForRole,
+  type ChainOfCommand,
   type EngineRoleView,
   type EngineSideView,
   type EngineState,
@@ -267,6 +268,7 @@ export function sideViewOf(
   staff: readonly StaffExchange[] = [],
   overloaded?: string,
   deputy?: DeputyState,
+  chain?: ChainOfCommand,
 ): SideView {
   // The deputy writes to the player who runs HQ: the commander, the chief of staff, or the whole side in shared-HQ play.
   const hqDeputy =
@@ -276,7 +278,7 @@ export function sideViewOf(
   // `world.time` only moves when an event fires; the engine's own time is the real "now".
   if (seat) {
     return toSideView(
-      viewForRole(state.world, side, seat, state.time, forwarded),
+      viewForRole(state.world, side, seat, state.time, forwarded, chain),
       clock,
       narration,
       staffFor(seat, staff),

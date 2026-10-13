@@ -105,7 +105,10 @@ export function replayLog(
   if (world.scenarioId !== header.scenarioId) {
     throw new Error(`log is for scenario ${header.scenarioId}, got ${world.scenarioId}`);
   }
-  const state0 = createState(header.seed, structuredClone(world), 0);
+  // The dial chosen at creation is part of the starting world, as the host built it.
+  const start = structuredClone(world);
+  if (header.settings) start.dial = header.settings.dial;
+  const state0 = createState(header.seed, start, 0);
   return replayFrom(init?.(state0) ?? state0, header.gameId, entries, registry, untilGameMs);
 }
 

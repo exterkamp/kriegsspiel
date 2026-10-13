@@ -6,3 +6,5 @@ export * from './marks.js';
 export * from './drafts.js';
 export * from './window.js';
 export * from './deputy.js';
+export * from './dissent.js';
+export * from './umpireSettings.js';

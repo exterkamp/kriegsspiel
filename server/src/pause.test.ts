@@ -103,3 +103,17 @@ describe('PauseVoting', () => {
     expect(() => m.vote('zed', 'p1', true, 0)).toThrow(/not a voter/);
   });
 });
+
+describe('PauseVoting.setVoters', () => {
+  it('lets a joiner vote, and drops the vote of one who left', () => {
+    const m = make();
+    m.propose('p1', 'a', 0);
+    m.vote('b', 'p1', true, 5);
+    m.setVoters(['a', 'c', 'd']);
+    expect(m.voterCount).toBe(3);
+    expect(m.open?.votes).toEqual({ a: true });
+    expect(() => m.vote('b', 'p1', true, 6)).toThrow(/not a voter/);
+    expect(m.vote('d', 'p1', true, 7)).toEqual([]);
+    expect(m.vote('c', 'p1', true, 8)).toMatchObject([{ to: 'paused', cause: 'all-yes' }]);
+  });
+});

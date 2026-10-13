@@ -9,6 +9,7 @@ import { ListPanel } from './listPanel.js';
 import { EVENTS_PANEL, REQUESTS_PANEL } from './panels.js';
 import {
   PANELS,
+  adminGame,
   adminToken,
   apiUrl,
   backoffMs,
@@ -77,6 +78,7 @@ export class AdminPage {
     private readonly fetchFn: typeof fetch = (...a) => fetch(...a),
   ) {
     this.token = adminToken(search) ?? storedToken();
+    this.gameId = adminGame(search);
     root.innerHTML = `
       <header>
         <h1>kriegsspiel admin</h1>

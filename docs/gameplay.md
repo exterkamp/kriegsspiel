@@ -12,6 +12,15 @@
 6. **Resolution.** Dice and tables (rigid) or the umpire's judgment (free).
 7. **Critique.** The umpire ends the game and runs a discussion of what happened and why. This is where much of the learning happened.
 
+### Rigid to free, and the umpire's manner
+
+Two settings are chosen on the new-game screen and fixed for the game (D14, story 3.11):
+
+- **How strictly the umpire follows the rules** (the dial). *Rigid*: the tables decide; the umpire never adjusts a result. *Standard*: where the rules are silent the umpire may nudge a result by up to a quarter either way. *Free*: the umpire has wider room, up to two fifths. In every setting each ruling is bounded by the engine, recorded and followed in like cases (the game's case law). The dial changes only that bound.
+- **The umpire's manner** (the persona): a dry staff officer (the default), a pedantic umpire, or a dramatic correspondent. It changes only the voice and strictness of the umpire's prose, never what happens: the same orders and dice give the same outcome under any persona.
+
+Both are recorded with the game, so the umpire's window and a replay agree with how it was played.
+
 ## Our model
 
 ### A continuous game clock
@@ -94,7 +103,7 @@ Real life happens. The game can be **paused by a vote of all human players** acr
 - Any player can propose a pause, with an optional reason. A single "no" or a timeout cancels the proposal. The host can instead allow a majority.
 - While paused, game time stops. Players can still read, draft and sign orders, but a signed order's courier only leaves when the clock resumes, so nothing can be gained from a pause.
 - Resuming needs everyone to mark themselves ready, or a host-set maximum pause length.
-- An **emergency hold** lets any one player stop the clock for a few minutes, a limited number of times per game, unless a vote ratifies it.
+- An **emergency hold** lets any one player stop the clock at once for five minutes by default, twice per player and six times per game by default (the host can change these), unless the other players ratify it with a vote, which makes it an ordinary pause (D5).
 - If the server was ever down, the game comes back paused and asks everyone to confirm. We never skip game time silently.
 - Pauses are recorded in the journal.
 
@@ -119,9 +128,13 @@ In the lobby the commander's table fills as players join the side with a role; a
 ### Drafting orders together
 
 - Each order is a **shared draft**. Anyone with access can propose text, comment, or suggest a change. Edits are tracked.
-- Only the holder of command authority for that formation can **sign and stamp** an order to send it. This is the stamp moment from the Papers Please-style desk.
-- An **LLM staff check** reads a draft before it goes and reports how a subordinate will likely read it: "the bridge is not mentioned", "this contradicts the timing in Order 3". It costs a little in-game time (staff work), so it is a tool and not a free preview.
+- Only the holder of command authority for that formation can **sign and stamp** an order to send it. This is the stamp moment from the Papers Please-style desk. Staff and other players can propose on the draft but a stamp from them is refused; a subordinate stamps only for their own formations. A stamped draft is closed to edits (fork it for another plan).
+- An **LLM staff check** reads a draft before it goes and reports how a subordinate will likely read it: "the bridge is not mentioned", "this contradicts the timing in Order 3". It costs a little in-game time (staff work: the chief of staff is busy for ten game minutes, the same at every clock rate), so it is a tool and not a free preview. It sees only what your side knows (your own units, the named places, the orders you have sent), and it is advice, not a promise: the order is read afresh when it is signed (D6d).
 - Drafts can be **forked**, so the staff can write alternative plans and the commander chooses.
+
+### Dissent
+
+A teammate who disagrees with a signed order says so on the record: the dissent is kept with the order, shown to the side and read in the post-game critique. It does not stop or change the order.
 
 ### Information sharing is gameplay
 
@@ -131,7 +144,11 @@ A wing commander's scout report reaches HQ only if they send it, and it takes ti
 
 Both supported, set in the lobby:
 - **Shared HQ.** Everyone on the side sees the same desk and map. Simpler, and good for friends planning together.
-- **Chain of command.** Each human has their own desk and sector. Messages between players take in-game time. Human subordinates can misread or improvise.
+- **Chain of command.** Each human has their own desk and sector. Messages between players take in-game time. Human subordinates can misread or improvise. A subordinate's reports reach HQ only when the subordinate forwards them, and they ride there (distance at courier pace); in shared HQ forwarding takes no time (#79).
+
+### Joining mid-game
+
+A player may take a role nobody holds, also after the game has begun (a teammate left, or a staff officer was being played by the LLM). They are briefed from the journal of the seat they take over, and vote on pauses from then on.
 
 ### Session shapes
 
@@ -148,6 +165,6 @@ Both supported, set in the lobby:
 
 ## Open questions
 
-- How are disputes between teammates settled? (Suggestion: the commander decides, and dissent is recorded in the journal and appears in the critique.)
+- ~~How are disputes between teammates settled?~~ Settled (D6e): the commander decides. A teammate files a **dissent** against a signed order; it is kept in the side's journal and handed to the critique, and changes nothing in the game.
 - Should players be able to refuse or modify an order from a superior? (Suggestion: yes, with consequences the umpire records.)
-- How does a new player join mid-game? (Suggestion: they take over a role and receive a briefing from the previous holder's journal.)
+- ~~How does a new player join mid-game?~~ Settled (D6e): they take over a free role and receive a briefing built from the journal of that seat (orders signed, dissents, drafts, staff questions). The commander seat is not yet handed over.

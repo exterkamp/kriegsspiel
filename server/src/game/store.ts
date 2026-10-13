@@ -11,9 +11,11 @@ import type { Discretion, Seat } from '@kriegsspiel/engine';
 import type {
   DeputyAccount,
   DeputySettings,
+  Dissent,
   DraftSnapshot,
   Mark,
   StaffExchange,
+  UmpireSettings,
 } from '@kriegsspiel/protocol';
 import type { UmpireCallRecord } from '../umpire/umpireClient.js';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
@@ -51,6 +53,8 @@ export type GameCommand =
   /** Pause voting (docs/architecture.md). `by` is a voter's player id. */
   | { kind: 'proposePause'; by: string; reason?: string }
   | { kind: 'proposeResume'; by: string }
+  /** Emergency hold (D5): stops the clock now; lapses unless the voters ratify it in time. */
+  | { kind: 'proposeHold'; by: string; reason?: string }
   | { kind: 'vote'; by: string; proposal: string; yes: boolean }
   /** A vote or the maximum pause length ran out. Issued by the actor's own timer. */
   | { kind: 'pauseExpire' }
@@ -73,6 +77,11 @@ export type GameCommand =
    * A staff officer answered a player's question on the `staff` stage. Journal only: the answer is
    * advice text and never changes the engine; the model calls are on the entry (`calls`).
    */
+  /**
+   * A seat holder put a dissent on record against an order the side signed. Journal only: it never
+   * changes the engine; it is shown to the side and handed to the post-game critique (D6e).
+   */
+  | { kind: 'dissent'; side: string; by: string; dissent: Dissent }
   | {
       kind: 'staffAnswer';
       side: string;
@@ -82,12 +91,27 @@ export type GameCommand =
       exchange?: StaffExchange;
     }
   /**
-   * A player set (or switched off) what their deputy may do (D6d). Journal only: the settings are
+   * A player set (or switched off) what their deputy may do (D6f). Journal only: the settings are
    * the player's input, not engine state. `seat` is the player's own, absent in shared-HQ play.
    */
   | { kind: 'deputySet'; side: string; settings: DeputySettings; seat?: Seat }
   /** The deputy's turn as the player reads it on return. Journal only; the orders it signed are logged on their own. */
-  | { kind: 'deputyTurn'; side: string; account: DeputyAccount };
+  | { kind: 'deputyTurn'; side: string; account: DeputyAccount }
+  /**
+   * The chief of staff read a shared draft (the staff check, D6d). Journal only: the reading is
+   * advice and never changes the engine. `text` is the draft as read and `earlier` the side's own
+   * earlier orders shown to the model; the model calls are on the entry (`calls`), so replay needs
+   * no model.
+   */
+  | {
+      kind: 'draftCheck';
+      side: string;
+      checkId: string;
+      draft: string;
+      rev: number;
+      text: string;
+      earlier: Array<{ id: string; text: string; sentAtGame: number }>;
+    };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {
@@ -95,6 +119,8 @@ export interface InputLogHeader {
   scenarioId: string;
   /** Seed of the game's RNG. */
   seed: number;
+  /** Umpire settings chosen at creation (3.11). Absent on older games: the defaults. Replay applies the dial. */
+  settings?: UmpireSettings;
 }
 
 export interface InputLogEntry {
@@ -113,7 +139,7 @@ export interface InputLogEntry {
   fallback?: { attempts: number; error: string };
   /** Issued by a scripted side's agent, not a player. Replay applies it at `gameMs` before any command at the same instant. */
   agent?: boolean;
-  /** Written by a player's deputy, within this discretion (D6d). Always set with `agent`. */
+  /** Written by a player's deputy, within this discretion (D6f). Always set with `agent`. */
   deputy?: { discretion: Discretion };
   /** Pause-voting steps this command caused, for the journal. */
   pause?: PauseTransition[];

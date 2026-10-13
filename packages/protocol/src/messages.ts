@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PROTOCOL_VERSION, ClockState, GameMs, Side } from './common.js';
+import { Briefing, Dissent, MAX_DISSENT } from './dissent.js';
 import { DraftEntry, DraftSnapshot, MAX_COMMENT, MAX_DRAFT_TEXT, TextOp } from './drafts.js';
 import { DeputySettings } from './deputy.js';
 import { Mark } from './marks.js';
@@ -14,6 +15,21 @@ export const MAX_PAUSE_REASON = 200;
 /** Longest question put to a staff officer. */
 export const MAX_STAFF_QUESTION = 400;
 
+/** Longest reading or finding in a staff check. */
+export const MAX_DRAFT_CHECK_TEXT = 600;
+
+/** What a staff check can flag in a draft order (D6d). */
+export const DraftCheckKind = z.enum([
+  'ambiguity',
+  'missing_place',
+  'missing_time',
+  'timing',
+  'condition',
+  'contradiction',
+  'unknown_reference',
+]);
+export type DraftCheckKind = z.infer<typeof DraftCheckKind>;
+
 /** Where the pause vote stands, as the server's state machine has it (docs/architecture.md). */
 export const PausePhase = z.enum(['running', 'pause_proposed', 'paused', 'resume_proposed']);
 export type PausePhase = z.infer<typeof PausePhase>;
@@ -27,6 +43,8 @@ export const PauseProposal = z
     bySide: Side.optional(),
     /** This player asked. */
     byYou: z.boolean(),
+    /** An emergency hold: the clock is already stopped and the vote ratifies it before it lapses. */
+    hold: z.boolean().optional(),
     reason: z.string().optional(),
     yes: z.number().int().nonnegative(),
     no: z.number().int().nonnegative(),
@@ -66,6 +84,15 @@ export const Command = z.discriminatedUnion('kind', [
       reason: z.string().max(MAX_PAUSE_REASON).optional(),
     })
     .strict(),
+  // Emergency hold (D5): stop the clock now for a short wall-clock time. It lapses unless the other
+  // players ratify it with `vote`. Each player and each game has a fixed number of holds.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('proposeHold'),
+      reason: z.string().max(MAX_PAUSE_REASON).optional(),
+    })
+    .strict(),
   // Ask to resume a paused game. Voted on with `vote`, like a pause.
   z.object({ ...Envelope, kind: z.literal('proposeResume') }).strict(),
   z.object({ ...Envelope, kind: z.literal('vote'), proposal: Id, yes: z.boolean() }).strict(),
@@ -84,6 +111,10 @@ export const Command = z.discriminatedUnion('kind', [
       question: z.string().trim().min(1).max(MAX_STAFF_QUESTION),
     })
     .strict(),
+  // Ask the chief of staff to read a shared draft before it is signed (the LLM staff check, D6d). The
+  // server reads the draft's current text itself and charges the officer's game-time cost: the
+  // officer is busy until `draftCheckQueued.answerAtGame`. Errors for it are prefixed `<checkId>: `.
+  z.object({ ...Envelope, kind: z.literal('checkDraft'), checkId: Id.max(64), draft: Id }).strict(),
   // Shared order drafts (D6c). None of these reach the engine or the input log. Drafts belong to the
   // sender's side; ids are chosen by the client and unique within a side.
   z
@@ -148,10 +179,23 @@ export const Command = z.discriminatedUnion('kind', [
   z.object({ ...Envelope, kind: z.literal('forkDraft'), draft: Id, newDraft: Id.max(64) }).strict(),
   // Fold a fork's edits back into the draft it came from.
   z.object({ ...Envelope, kind: z.literal('mergeDraft'), draft: Id }).strict(),
+  // A seat holder puts a dissent on record against an order the side signed. It never changes the engine;
+  // it is journalled and shown to the critique. `dissentId` is chosen by the client.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('dissent'),
+      dissentId: Id.max(64),
+      orderId: Id.max(64),
+      body: z.string().trim().min(1).max(MAX_DISSENT),
+    })
+    .strict(),
   // HQ (commander, chief of staff) passes a paper in its own view on to the subordinate commanding `unit`.
   z.object({ ...Envelope, kind: z.literal('forwardDispatch'), dispatchId: Id, unit: Id }).strict(),
-  // Set what the LLM deputy may do while the sender is away (D6d). Commander only, or anyone on a shared-HQ side.
+  // Set what the LLM deputy may do while the sender is away (D6f). Commander only, or anyone on a shared-HQ side.
   z.object({ ...Envelope, kind: z.literal('setDeputy'), settings: DeputySettings }).strict(),
+  // A subordinate sends a report their own formation filed up to HQ. In a chain of command HQ sees it only once it has ridden there.
+  z.object({ ...Envelope, kind: z.literal('forwardReport'), reportId: Id }).strict(),
 ]);
 export type Command = z.infer<typeof Command>;
 
@@ -193,6 +237,10 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       ),
     })
     .strict(),
+  // Every dissent the side has on record, oldest first, sent on connect and again after each new one.
+  z.object({ ...Envelope, kind: z.literal('dissents'), dissents: z.array(Dissent) }).strict(),
+  // Sent on connect to a player who took over a role mid-game: the journal of the seat they now hold.
+  z.object({ ...Envelope, kind: z.literal('briefing'), briefing: Briefing }).strict(),
   // Every draft the side has, sent on connect. A player back after a while catches up from this.
   z.object({ ...Envelope, kind: z.literal('drafts'), drafts: z.array(DraftSnapshot) }).strict(),
   // One draft in full: sent when it is created or forked, and when a merge closes a fork.
@@ -238,6 +286,50 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       officer: z.object({ name: z.string(), traits: z.array(z.string()) }).strict(),
     })
     .strict(),
+  // The server took a staff check and charged the chief of staff's time: the reading is due at
+  // `answerAtGame` (game time, so a paused game does not move it). `rev` is the draft's rev that is read.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('draftCheckQueued'),
+      checkId: Id,
+      draft: Id,
+      rev: z.number().int().nonnegative(),
+      askedAtGame: GameMs,
+      answerAtGame: GameMs,
+      costMs: GameMs,
+    })
+    .strict(),
+  // How a subordinate would likely read the draft at `rev`, what it leaves out and where it clashes
+  // with an order already sent. To every connection of the side; the client shows it once game time
+  // reaches the check's `answerAtGame`. `unavailable`: the staff stage is off or gave nothing usable,
+  // so there is no reading. `caveat` always says the reading is not a guarantee of the real parse.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('draftCheck'),
+      checkId: Id,
+      draft: Id,
+      rev: z.number().int().nonnegative(),
+      basedOnGame: GameMs,
+      officer: z.object({ name: z.string(), traits: z.array(z.string()) }).strict(),
+      reading: z.string().max(MAX_DRAFT_CHECK_TEXT).optional(),
+      unitId: z.string().optional(),
+      findings: z
+        .array(
+          z
+            .object({
+              kind: DraftCheckKind,
+              text: z.string().max(MAX_DRAFT_CHECK_TEXT),
+              earlierOrder: z.string().optional(),
+            })
+            .strict(),
+        )
+        .max(8),
+      unavailable: z.literal(true).optional(),
+      caveat: z.string(),
+    })
+    .strict(),
   z.object({ ...Envelope, kind: z.literal('clockState'), clock: ClockState }).strict(),
   // The pause vote. Sent on connect (only to a game that has voters) and whenever the phase or the
   // open proposal changes, including each vote. Absent `proposal` means nothing is being voted on.
@@ -247,6 +339,8 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       kind: z.literal('pauseState'),
       phase: PausePhase,
       proposal: PauseProposal.optional(),
+      /** Emergency holds this player may still call (their own allowance or the game's, the smaller). */
+      holdsLeft: z.number().int().nonnegative().optional(),
     })
     .strict(),
   // A pause or resume vote has been settled, or the pause was ended some other way.
