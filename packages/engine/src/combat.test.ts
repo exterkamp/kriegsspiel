@@ -490,6 +490,42 @@ describe('victory conditions', () => {
     expect(later.emitted).toEqual([]);
   });
 
+  it('hands in at the end a dispatch captured before it, but not one dated after (#438)', () => {
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'red-1', side: 'red', x: 3, y: 2 },
+    ]);
+    s = issueMove(s, 'red-1', T(5, 2));
+    const doc = (id: string, capturedMin: number) => ({
+      id,
+      kind: 'capturedDispatch' as const,
+      capturedAt: capturedMin * MS_PER_MINUTE,
+      deliverAt: 40 * MS_PER_MINUTE,
+      issuedAt: 0,
+      fromSide: 'blue' as const,
+      addressedTo: 'blue-1',
+      location: T(9, 4),
+      place: '',
+      text: 'Hold',
+    });
+    const red = s.world.intel.red;
+    s = {
+      ...s,
+      world: {
+        ...s.world,
+        intel: {
+          ...s.world.intel,
+          red: { ...red, documents: [doc('before', 10), doc('after', 13)] },
+        },
+      },
+    };
+    const end = run(s, 30).state.world;
+    expect(end.outcome).toMatchObject({ reason: 'objective-taken', time: 12 * MS_PER_MINUTE });
+    const byId = new Map(end.intel.red.documents.map((d) => [d.id, d.deliverAt]));
+    expect(byId.get('before')).toBe(12 * MS_PER_MINUTE);
+    expect(byId.get('after')).toBe(40 * MS_PER_MINUTE);
+  });
+
   it('defender wins by keeping the attacker off the objective until the time is up', () => {
     const s = field(
       [
