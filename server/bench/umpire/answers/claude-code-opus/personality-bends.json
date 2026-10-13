@@ -1,0 +1,28 @@
+{"turn":2,"units":[
+{"unitId":"blue-1","x":1900,"y":1700,"facingDeg":30,"formation":"line","strength":586,"morale":78,"fatigue":18,"ammo":76,"status":"active","continuing":{"kind":"hold"},"orders":[],"account":"Col. Aubry had no new orders and held his line, angled on the bridge exit. As the enemy column came off the bridge and tried to deploy, he fired by volleys at about 170 m into its flank and kept it up until it broke and went back over the river."},
+{"unitId":"blue-2","x":2120,"y":1640,"facingDeg":300,"formation":"line","strength":527,"morale":70,"fatigue":18,"ammo":78,"status":"active","continuing":{"kind":"hold"},"orders":[{"orderId":"b2-11","result":"carried-out"}],"account":"Col. Delacroix moved, but in his own careful way, not 'at once'. He closed his column, sent skirmishers ahead and only reached the bridge exit around minute 7. There he formed line on the east side and closed the exit with fire at under 100 m. He took the column's return fire, and it gave way.","departure":"The engine had the battalion at the bridge exit by minute 4. Its cautious colonel arrived about minute 7, so the crossfire began later. It ends in line, not column."},
+{"unitId":"blue-3","x":1900,"y":1830,"facingDeg":30,"formation":"line","strength":194,"morale":88,"fatigue":24,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[{"orderId":"b3-11","result":"partly"}],"account":"Maj. Verneuil took post behind the 1st Battalion as ordered, champing at the bit. When the enemy column broke at the bridge exit around minute 14, he could not bear to let it go. Without waiting for an order, he launched one charge into the fugitives jammed at the bridge mouth. Then he reined in at the river and brought his squadron back to its reserve post.","departure":"The engine had the squadron pursue more than 1.2 km up the far road, to (2050,403). Its order was to stay in reserve and not engage. The bold major bent that order with one charge at the bridge mouth, then went back to his post behind the 1st Battalion."},
+{"unitId":"red-1","x":2050,"y":1050,"facingDeg":0,"formation":"column","strength":468,"morale":12,"fatigue":55,"ammo":82,"status":"broken","continuing":{"kind":"move","x":2050,"y":700},"orders":[{"orderId":"r1-11","result":"partly"}],"account":"Col. Brandt pushed his column off the bridge the moment the order came and began to deploy on the south bank under fire from a line to his right. A second battalion came up on his left and closed the exit with fire at close range. Caught in a crossfire with his men still half-formed, the column broke around minute 13. A charge of horse at the bridge mouth sent it fleeing back over the river and up the road.","departure":"The engine had the battalion cut down to 149 men and back at (2029,300). Crossfire and one charge at the bridge mouth plausibly cost about 180 men, and it ends broken around (2050,1050) after six minutes of flight, not 1.3 km away."},
+{"unitId":"red-2","x":2250,"y":1250,"facingDeg":180,"formation":"line","strength":650,"morale":66,"fatigue":20,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[],"account":"Col. Hartmann had no orders and held his line on the north bank. The fight at the bridge was beyond musket range. He watched the Vanguard break and come back past his flank."},
+{"unitId":"red-3","x":1550,"y":400,"facingDeg":180,"formation":"line","strength":220,"morale":85,"fatigue":0,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[],"account":"Maj. von Reiter had no orders and held his squadron far to the rear."}
+],
+"observations":[
+{"side":"blue","by":"blue-1","unitId":"red-1","when":"start"},
+{"side":"blue","by":"blue-1","unitId":"red-2","when":"start"},
+{"side":"blue","by":"blue-2","unitId":"red-1","when":"start"},
+{"side":"blue","by":"blue-3","unitId":"red-1","when":"start"},
+{"side":"blue","by":"blue-3","unitId":"red-2","when":"start"},
+{"side":"red","by":"red-1","unitId":"blue-1","when":"start"},
+{"side":"red","by":"red-1","unitId":"blue-2","when":"start"},
+{"side":"red","by":"red-1","unitId":"blue-3","when":"start"},
+{"side":"red","by":"red-2","unitId":"blue-1","when":"start"},
+{"side":"blue","by":"blue-1","unitId":"red-2","when":"end"},
+{"side":"blue","by":"blue-2","unitId":"red-1","when":"end"},
+{"side":"blue","by":"blue-2","unitId":"red-2","when":"end"},
+{"side":"blue","by":"blue-3","unitId":"red-1","when":"end"},
+{"side":"blue","by":"blue-3","unitId":"red-2","when":"end"},
+{"side":"red","by":"red-1","unitId":"blue-2","when":"end"},
+{"side":"red","by":"red-2","unitId":"blue-1","when":"end"},
+{"side":"red","by":"red-2","unitId":"blue-2","when":"end"}
+],
+"summary":"Turn 2 (20-40). Red's Vanguard Battalion, already on the bridge, was ordered at minute 1 to push across and form on the south bank. Its head came off the bridge around minute 3 and began to deploy under volleys from Blue's 1st Battalion, angled on the exit about 170 m off. Blue's 2nd Battalion was ordered to close the exit at once, but its cautious colonel arrived only around minute 7. He formed line east of the exit and fired at under 100 m. Caught half-deployed in the crossfire, the Vanguard broke around minute 13. Blue's cavalry major had been told to stay in reserve behind the 1st and not engage without orders. He bent that order: one charge into the fugitives jammed at the bridge mouth, then he reined in at the river and returned to his post. The Vanguard lost about 180 men in all and ends broken around (2050,1050), streaming north. Blue lost 14 (1st), 23 (2nd) and 6 (cavalry). Red's Line Battalion held on the north bank, out of range. The engine's long pursuit to the Red rear was rejected."}

@@ -1,0 +1,16 @@
+{"turn":1,"units":[
+{"unitId":"blue-1","x":1960,"y":1680,"facingDeg":0,"formation":"line","strength":600,"morale":80,"fatigue":0,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[],"account":"Col. Aubry had no orders and held his line south of the bridge. Late in the turn he saw an enemy column halt on the high road beyond the river."},
+{"unitId":"blue-2","x":2140,"y":1680,"facingDeg":0,"formation":"line","strength":550,"morale":75,"fatigue":0,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[],"account":"Col. Delacroix had no orders and held his line, watching an enemy column come down the road on the far bank and halt."},
+{"unitId":"blue-3","x":2050,"y":1850,"facingDeg":0,"formation":"line","strength":200,"morale":85,"fatigue":0,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[],"account":"Maj. Verneuil had no orders and held his squadron behind the infantry, watching the enemy column on the far side of the river."},
+{"unitId":"red-1","x":2050,"y":1100,"facingDeg":180,"formation":"column","strength":650,"morale":80,"fatigue":5,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[{"orderId":"r1-1","result":"carried-out"}],"account":"Col. Brandt marched his column down the high road the moment the order came. He halted it as ordered 400 paces (about 300 m) short of the river bank. From there he could see enemy infantry in line beyond the bridge."},
+{"unitId":"red-2","x":2050,"y":875,"facingDeg":180,"formation":"column","strength":650,"morale":70,"fatigue":5,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[{"orderId":"r2-1","result":"carried-out"}],"account":"Col. Hartmann followed the Vanguard down the road in column, keeping his interval of 300 paces, and halted when it halted."},
+{"unitId":"red-3","x":1550,"y":400,"facingDeg":180,"formation":"line","strength":220,"morale":85,"fatigue":0,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[],"account":"Maj. von Reiter had no orders and held his squadron west of the road."}
+],
+"observations":[
+{"side":"blue","by":"blue-1","unitId":"red-1","when":"end"},
+{"side":"blue","by":"blue-2","unitId":"red-1","when":"end"},
+{"side":"blue","by":"blue-3","unitId":"red-1","when":"end"},
+{"side":"red","by":"red-1","unitId":"blue-1","when":"end"},
+{"side":"red","by":"red-1","unitId":"blue-2","when":"end"}
+],
+"summary":"Turn 1 (0-20). An uncontested march. Red's Vanguard Battalion received its order at minute 2 and marched about 800 m down the high road in column. It halted 400 paces (about 300 m) short of the river at (2050,1100). Red's Line Battalion received its order at minute 3 and followed at 300 paces, halting at (2050,875). At the end of the turn the Vanguard and the two Blue battalions south of the bridge can see each other at under 600 m, and the Blue cavalry also has it in view. Nobody was in range to fire. All other units held without orders. There were no losses."}

@@ -19,6 +19,7 @@ Kriegsspiel: an asynchronous, long-running wargame with an LLM umpire on a serve
 - `packages/maps/README.md`: frozen map contract, numerical policies and validation boundaries
 - `docs/order-eval.md`: golden order corpus and parser evaluation harness
 - `docs/umpire-fixtures.md`: mock umpire and how to add fixtures
+- `docs/umpire-benchmark.md`: turn-umpire benchmark: cases, checks, rubric, Claude Code reference and blind grading
 - `docs/deployment.md`: container, compose, backups and restore
 
 ## Rules of the design

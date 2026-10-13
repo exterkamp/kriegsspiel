@@ -1,0 +1,32 @@
+{
+  "caseId": "courier-mid-turn",
+  "model": "llama3.1:8b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 1212108,
+  "usage": {
+    "inputTokens": 2965,
+    "outputTokens": 1040
+  },
+  "raw": "{\n  \"turn\": 2,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 1960,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 600,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\"orderId\": \"b1-7\", \"result\": \"not-arrived\"}\n      ],\n      \"account\": \"Colonel Aubry held his line as ordered, but his men are getting restless.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 1820,\n      \"y\": 1700,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 550,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"move\", \"x\": 2050, \"y\": 1680},\n      \"orders\": [\n        {\"orderId\": \"b2-7\", \"result\": \"carried-out\"}\n      ],\n      \"account\": \"Colonel Delacroix moved his battalion as ordered, but it's a bit of a tight squeeze.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 2050,\n      \"y\": 1850,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 200,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [],\n      \"account\": \"Major Verneuil held his ground, but his men are getting a bit anxious.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 2050,\n      \"y\": 1380,\n      \"facingDeg\": 180,\n      \"formation\": \"column\",\n      \"strength\": 650,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"move\", \"x\": 2050, \"y\": 1500},\n      \"orders\": [\n        {\"orderId\": \"r1-7\", \"result\": \"carried-out\"}\n      ],\n      \"account\": \"Colonel Brandt moved his battalion as ordered, but it's a bit of a tight squeeze.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2250,\n      \"y\": 700,\n      \"facingDeg\": 180,\n      \"formation\": \"column\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [],\n      \"account\": \"Colonel Hartmann held his ground, but his men are getting a bit anxious.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 1550,\n      \"y\": 400,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 220,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"move\", \"x\": 2050, \"y\": 1500},\n      \"orders\": [],\n      \"account\": \"Major von Reiter moved his squadron as ordered, but it's a bit of a long way.\",\n      \"departure\": \"\"\n    }\n  ],\n  \"observations\": [\n    {\"side\": \"blue\", \"unitId\": \"blue-1\", \"by\": \"blue-1\", \"when\": \"end\"},\n    {\"side\": \"blue\", \"unitId\": \"blue-2\", \"by\": \"blue-2\", \"when\": \"end\"},\n    {\"side\": \"blue\", \"unitId\": \"blue-3\", \"by\": \"blue-3\", \"when\": \"end\"},\n    {\"side\": \"red\", \"unitId\": \"red-1\", \"by\": \"red-1\", \"when\": \"end\"},\n    {\"side\": \"red\", \"unitId\": \"red-2\", \"by\": \"red-2\", \"when\": \"end\"},\n    {\"side\": \"red\", \"unitId\": \"red-3\", \"by\": \"red-3\", \"when\": \"end\"}\n  ],\n  \"summary\": \"The battle continues with both sides holding their ground. The Blue forces are trying to outflank the Red forces, while the Red forces are trying to seize the bridge. The cavalry on both sides are getting restless, but so far no one has made a decisive move.\"\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [],
+      "limits": [],
+      "ammo": [],
+      "observations": [
+        "blue-1 saw blue-1: not blue's unit watching an enemy",
+        "blue-2 saw blue-2: not blue's unit watching an enemy",
+        "blue-3 saw blue-3: not blue's unit watching an enemy",
+        "red-1 saw red-1: not red's unit watching an enemy",
+        "red-2 saw red-2: not red's unit watching an enemy",
+        "red-3 saw red-3: not red's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

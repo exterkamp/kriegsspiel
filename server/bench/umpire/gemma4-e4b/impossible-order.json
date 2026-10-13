@@ -1,0 +1,29 @@
+{
+  "caseId": "impossible-order",
+  "model": "gemma4:e4b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 1884933,
+  "usage": {
+    "inputTokens": 4100,
+    "outputTokens": 3800
+  },
+  "raw": "{\n  \"turn\": 1,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 1960,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 589,\n      \"morale\": 76,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"The battalion held its ground, maintaining a steady line as the enemy cavalry pressed the attack. Despite heavy fire, the discipline held, absorbing the initial shock of the charge.\",\n      \"departure\": \"The projection showed a slight increase in fatigue (5) and ammo loss (5), which is consistent with holding a line under fire.\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 2050,\n      \"y\": 200,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 541,\n      \"morale\": 72,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"move\",\n        \"x\": 2050,\n        \"y\": 50\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"b2-9\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Delacroix, being cautious, utilized the bridge to cross the river safely. He then advanced slowly and methodically towards the enemy headquarters, fulfilling the core objective of the order while maintaining formation.\",\n      \"departure\": \"The unit advanced significantly towards the HQ, successfully crossing the river barrier and engaging the enemy line.\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 1650,\n      \"y\": 400,\n      \"facingDeg\": 270,\n      \"formation\": \"line\",\n      \"strength\": 200,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"idle\"\n      },\n      \"orders\": [],\n      \"account\": \"The cavalry squadron maintained its position, observing the movements of the enemy forces and preparing for potential counter-attacks, remaining in reserve.\",\n      \"departure\": \"The projection showed a slight movement (1650, 400) and fatigue increase (3), consistent with maintaining a ready position.\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 1950,\n      \"y\": 300,\n      \"facingDeg\": 145,\n      \"formation\": \"line\",\n      \"strength\": 647,\n      \"morale\": 79,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"The Vanguard Battalion held its position, engaging the advancing Blue forces. Col. Brandt pressed the attack hard, maintaining fire discipline while absorbing the pressure from the enemy.\",\n      \"departure\": \"The unit engaged Blue-2, resulting in minor losses and morale fluctuation, consistent with the projection.\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2250,\n      \"y\": 150,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"Col. Hartmann maintained strict adherence to the defensive plan, holding the line and waiting for further orders, refusing to commit reserves prematurely.\",\n      \"departure\": \"The unit remained static, maintaining its defensive posture.\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 1550,\n      \"y\": 400,\n      \"facingDeg\": 283,\n      \"formation\": \"line\",\n      \"strength\": 0,\n      \"morale\": 0,\n      \"status\": \"destroyed\",\n      \"continuing\": {\n        \"kind\": \"idle\"\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"r3-9\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Maj. von Reiter, driven by his aggressive nature and desire for glory, launched a full-speed charge against the enemy line. The charge was costly, and the unit was ultimately broken and destroyed by the sustained fire and melee engagement.\",\n      \"departure\": \"The unit was destroyed in combat, matching the projection. The aggressive order led to a catastrophic engagement.\"\n    }\n  ],\n  \"observations\": [\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-1\",\n      \"by\": \"blue-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-2\",\n      \"by\": \"blue-2\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-3\",\n      \"by\": \"blue-3\",\n      \"when\": \"end\"\n    }\n  ],\n  \"summary\": \"The turn saw significant action centered around the defensive line. Blue-2 successfully crossed the river via the bridge and advanced towards the enemy headquarters, fulfilling the aggressive order given by its commander. Red-3, driven by its aggressive nature, launched a full-scale charge against the Blue line. This charge proved disastrous, resulting in the complete destruction of the Hussar Squadron. Blue-1 held its position against the cavalry assault, while Blue-3 maintained its observation post. The overall strategic situation remains tense, with Blue-2 having penetrated the defensive perimeter.\"\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [],
+      "limits": [],
+      "ammo": [],
+      "observations": [
+        "blue-1 saw blue-1: not blue's unit watching an enemy",
+        "blue-2 saw blue-2: not blue's unit watching an enemy",
+        "blue-3 saw blue-3: not blue's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

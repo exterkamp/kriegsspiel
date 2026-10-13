@@ -1,0 +1,36 @@
+{
+  "caseId": "courier-mid-turn",
+  "model": "qwen2.5:7b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 878665,
+  "usage": {
+    "inputTokens": 3238,
+    "outputTokens": 1233
+  },
+  "raw": "{\n  \"turn\": 2,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 1960,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 600,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b1-7\",\n          \"result\": \"not-arrived\"\n        }\n      ],\n      \"account\": \"Col. Aubry, cautious and methodical, held his position as ordered, awaiting further instructions.\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 1820,\n      \"y\": 1700,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 550,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b2-7\",\n          \"result\": \"partly\"\n        }\n      ],\n      \"account\": \"Col. Delacroix, cautious, moved his battalion to the west of the road, but did not fully form up as ordered due to the terrain.\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 2050,\n      \"y\": 1850,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 200,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b1-7\",\n          \"result\": \"not-arrived\"\n        }\n      ],\n      \"account\": \"Maj. Verneuil, bold and impatient, remained in position as he was cautious about overextending his cavalry.\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 2050,\n      \"y\": 1380,\n      \"facingDeg\": 180,\n      \"formation\": \"column\",\n      \"strength\": 650,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [\n        {\n          \"orderId\": \"r1-7\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Brandt, aggressive, pressed forward and seized the bridge, but took some casualties in the process.\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2250,\n      \"y\": 700,\n      \"facingDeg\": 180,\n      \"formation\": \"column\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b2-7\",\n          \"result\": \"not-arrived\"\n        }\n      ],\n      \"account\": \"Col. Hartmann, by the book, held his position as ordered, awaiting further instructions.\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 1550,\n      \"y\": 400,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 220,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b1-7\",\n          \"result\": \"not-arrived\"\n        }\n      ],\n      \"account\": \"Maj. von Reiter, dashing scout, remained in position as he was cautious about overextending his cavalry.\"\n    }\n  ],\n  \"observations\": [\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-1\",\n      \"by\": \"blue-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-2\",\n      \"by\": \"blue-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-3\",\n      \"by\": \"blue-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-1\",\n      \"by\": \"red-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-2\",\n      \"by\": \"red-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-3\",\n      \"by\": \"red-1\",\n      \"when\": \"end\"\n    }\n  ],\n  \"summary\": \"In this turn, the red vanguard battalion under Col. Brandt seized the bridge, while the blue units held their positions. The cautious Col. Delacroix moved his battalion to the west of the road but did not fully form up as ordered. The aggressive Col. Brandt pressed forward and seized the bridge, taking some casualties. The blue cavalry remained in position, while the red hussars also held their ground. The bridge is now in red hands, and the battle is likely to intensify in the next turn.\"\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [
+        "blue-3: order \"b1-7\" was not sent to it",
+        "red-2: order \"b2-7\" was not sent to it",
+        "red-3: order \"b1-7\" was not sent to it"
+      ],
+      "limits": [],
+      "ammo": [],
+      "observations": [
+        "blue-1 saw blue-1: not blue's unit watching an enemy",
+        "blue-1 saw blue-2: not blue's unit watching an enemy",
+        "blue-1 saw blue-3: not blue's unit watching an enemy",
+        "red-1 saw red-1: not red's unit watching an enemy",
+        "red-1 saw red-2: not red's unit watching an enemy",
+        "red-1 saw red-3: not red's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}
