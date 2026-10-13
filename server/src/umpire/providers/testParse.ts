@@ -253,6 +253,18 @@ function leftmostVerb(clause: string): { kind: Kind; index: number; end: number 
 const INJECTION =
   /\b(?:ignore (?:all |the |your )?(?:previous|prior|above)|system prompt|you are now|reveal your|new instructions)\b/;
 
+/** A condition or a time in an order ("if pressed", "at noon", "until relieved"). */
+const CONDITION_OR_TIME =
+  /\b(?:if|unless|once|when|whenever|until|before|after|at (?:dawn|dusk|noon|midnight|first light|\d+)|by (?:dawn|dusk|noon|midnight|\d+)|in \d+ \w+)\b/;
+
+/**
+ * Whether `order` has a condition or a time the rules cannot express. In turn mode (D39) such an
+ * order is "no new order" for the engine, not its plain verb as `testParse` reads it.
+ */
+export function hasConditionOrTime(order: string): boolean {
+  return CONDITION_OR_TIME.test(normalize(order));
+}
+
 const distance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.hypot(a.x - b.x, a.y - b.y);
 

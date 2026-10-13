@@ -47,6 +47,7 @@ import type { AgentOrder, SideAgent } from '../opponent/index.js';
 import { PauseVoting, type PauseConfig, type PauseTransition } from '../pause.js';
 import { RatioVoting, type RatioTransition } from '../ratioVote.js';
 import { advanceUntilOver, applyLoggedOrder } from './replay.js';
+import { parseContextOf } from './parseContext.js';
 import { hiddenTerms } from '../umpire/leakGuard.js';
 import {
   answerStaffQuestion,
@@ -209,7 +210,7 @@ export interface GameActorOptions {
   turns?: {
     turnMs: number;
     deadlineHours?: number;
-    /** Resolves a closed turn. Default `NO_ORDERS_RESOLVER` (until 11.4). */
+    /** Resolves a closed turn. Default `NO_ORDERS_RESOLVER` (`GameHost` passes the engine's). */
     resolver?: TurnResolver;
     open?: OpenTurn;
     /** The order ids each side sent in earlier turns of a reopened game (`sentTurnIdsFromLog`). */
@@ -732,7 +733,9 @@ export class GameActor {
       if (res.emitted.length > 0) for (const a of this.agents) a.idle = false;
     };
     try {
-      for (;;) {
+      // In turn mode agents think when a turn opens (`openNextTurn`), never inside one, so the turn
+      // runs exactly as its resolver projected it (D39).
+      while (!this.turns) {
         const due = this.nextAgent();
         if (!due || due.nextAt > target || this.engine.world.outcome) break;
         step(due.nextAt);
@@ -743,8 +746,7 @@ export class GameActor {
           due.idle = true;
           continue;
         }
-        // No LLM commander in turn mode yet (D39): nothing may hold the turn's clock, so it plays by its script.
-        if (due.agent.decide && !this.turns) this.beginDecision(due);
+        if (due.agent.decide) this.beginDecision(due);
         else due.idle = !this.think(due.agent) && (due.agent.settled?.() ?? true);
       }
       step(target);
@@ -1627,6 +1629,13 @@ export class GameActor {
       },
     };
     if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+    // Scripted sides send when the turn opens (D39): each agent thinks once, now, and its orders
+    // are issued at the turn's start and logged as in real time. No LLM commander plays turn mode
+    // yet (nothing may hold the turn's clock), so it plays by its script.
+    for (const slot of this.agents) {
+      if (slot.pending || slot.retired || slot.agent.dormant?.()) continue;
+      this.think(slot.agent);
+    }
     await this.commit(entry);
   }
 
@@ -1758,26 +1767,7 @@ export class GameActor {
 
   /** What the parser may read: the issuing side, named places and the side's own units. */
   private parseContext(side: string): ParseContext {
-    const { map, units } = this.engine.world;
-    return {
-      side,
-      map: {
-        features: map.features.map((f) => ({
-          id: f.id,
-          kind: f.kind,
-          ...(f.name === undefined ? {} : { name: f.name }),
-          anchor: featureAnchor(f.geometry),
-        })),
-      },
-      units: units.map((u) => ({
-        id: u.id,
-        side: u.side,
-        name: u.name,
-        center: u.center,
-        ...(u.personality && u.side === side ? { personality: u.personality } : {}),
-      })),
-      hidden: hiddenTerms(this.engine.world, side as SideId),
-    };
+    return parseContextOf(this.engine.world, side);
   }
 
   /**

@@ -25,4 +25,11 @@ export { createRegistry, loadScenarioById, scenarioList, startingState } from '.
 export { PauseVoting } from '../pause.js';
 export type { PauseConfig, PauseTransition } from '../pause.js';
 export { NO_ADJUDICATOR, NO_ORDERS_RESOLVER, applyTurn, registerTurnAdjudicator } from './turns.js';
+export {
+  ENGINE_ADJUDICATOR,
+  EngineTurnResolver,
+  projectTurn,
+  rulesParseTurnOrder,
+} from './engineTurn.js';
+export type { EngineTurnOutput, Projection, ProjectionSummary, RulesOrder } from './engineTurn.js';
 export type { TurnAdjudicator, TurnInput, TurnResolution, TurnResolver } from './turns.js';

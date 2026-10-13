@@ -321,6 +321,21 @@ export interface Courier {
    * due arrival, so the sender's view cannot tell it has gone (the report comes later).
    */
   lostAt?: GameTime;
+  /**
+   * Set in a turn the engine resolves (D39, 11.4): the turn's courier pass already decided this
+   * ride, so through `untilMs` its interception checks roll nothing and it is taken exactly where
+   * the pass had it taken. Absent in real-time play.
+   */
+  forced?: ForcedRide;
+}
+
+/** A ride's outcome in a turn, fixed by the turn's courier pass (see `courierPass`). */
+export interface ForcedRide {
+  /** The turn's end: after it the courier rolls its checks again. */
+  untilMs: GameTime;
+  /** The check at which an enemy unit takes it, and which unit. */
+  takenAt?: GameTime;
+  takenBy?: string;
 }
 
 /** An enemy dispatch a side has taken from a courier. Belongs to the capturing side's intel. */

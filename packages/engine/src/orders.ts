@@ -23,6 +23,7 @@ import { COURIER_DELAY_MS, REPORT_EVENT, fileReport } from './visibility.js';
 import {
   MS_PER_MINUTE,
   type Courier,
+  type ForcedRide,
   type GameState,
   type GameTime,
   type Leg,
@@ -64,6 +65,12 @@ export interface Order {
   interpretation?: Interpretation;
   /** Written by the player's deputy while they were away (deputy.ts), not by the player. */
   deputy?: true;
+  /**
+   * Turn mode (D39): an order the rules parser could not turn into intents (a condition, a time,
+   * a question). Its courier still rides, and it is delivered and acknowledged, but the unit takes
+   * it as "no new order" and carries on as before. `intents` is then empty.
+   */
+  textOnly?: true;
 }
 
 /** A fast courier rides hard and is more likely to be lost or to garble; a safe one takes the quiet way. */
@@ -127,7 +134,7 @@ function undeliverable(world: GameState, order: Order): string | undefined {
   if (!unit) return 'unit does not exist';
   if (unit.strength <= 0) return 'unit destroyed';
   if (unit.side !== order.side) return 'unit belongs to another side';
-  if (order.intents.length === 0) return 'order has no intents';
+  if (order.intents.length === 0 && !order.textOnly) return 'order has no intents';
   return undefined;
 }
 
@@ -152,6 +159,31 @@ function ridesAlong(
     from = arriveAt;
   }
   return legs;
+}
+
+/**
+ * A ride the turn's courier pass already decided (D39, 11.4), carried on an `order.issue` payload:
+ * the courier is lost at `lostAt` and garbled to `garbled` as the pass rolled it, and draws nothing.
+ */
+export interface ForcedIssue extends ForcedRide {
+  lostAt?: GameTime;
+  garbled?: OrderIntent[];
+}
+
+/** Queue `order` to leave HQ at `time` on a ride the turn's courier pass already decided. */
+export function issueForcedOrder(
+  state: EngineState<GameState>,
+  order: Order,
+  forced: ForcedIssue,
+  time = state.time,
+): EngineState<GameState> {
+  return schedule(state, [
+    {
+      time,
+      type: ORDER_ISSUE_EVENT,
+      payload: { ...order, issuedAt: time, forced } as unknown as Json,
+    },
+  ]);
 }
 
 const courierOf = (world: GameState, id: unknown) => world.couriers.find((c) => c.id === id);
@@ -194,7 +226,7 @@ const arrivalOf = (c: Courier, issuedAt: number) => c.legs.at(-1)?.arriveAt ?? i
 export function registerOrders(registry: EventRegistry<GameState>): void {
   registerStanding(registry);
   registry.register(ORDER_ISSUE_EVENT, (world, ev, rng) => {
-    const order = ev.payload as unknown as Order;
+    const { forced, ...order } = ev.payload as unknown as Order & { forced?: ForcedIssue };
     const reason = undeliverable(world, order);
     if (reason) return failed(world, order, reason);
     const unit = world.units.find((u) => u.id === order.to)!;
@@ -219,12 +251,21 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     const arrival = arrivalOf(courier, ev.time);
 
     const later: NewEvent[] = [];
+    if (forced) {
+      // The turn's courier pass rolled this ride already: replay its outcome, drawing nothing.
+      const { lostAt, garbled, ...ride } = forced;
+      courier.forced = ride;
+      if (garbled) courier.garbled = garbled;
+      if (lostAt !== undefined) {
+        later.push({ time: lostAt, type: COURIER_LOST_EVENT, payload: { courierId: courier.id } });
+      }
+    }
     // Lost on the road: the point is drawn along the ride, so the loss can be before or after a check.
-    if (rng.next() < risk.loss) {
+    if (!forced && rng.next() < risk.loss) {
       const at = ev.time + Math.floor(rng.next() * (arrival - ev.time));
       later.push({ time: at, type: COURIER_LOST_EVENT, payload: { courierId: courier.id } });
     }
-    if (rng.next() < risk.garble) {
+    if (!forced && rng.next() < risk.garble) {
       // All draws are taken whatever the order holds, so the RNG stream does not depend on it.
       const angle = rng.next() * 2 * Math.PI;
       const away = (GARBLE_MIN_M + rng.next() * (GARBLE_MAX_M - GARBLE_MIN_M)) * 1000;
@@ -263,14 +304,21 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     const c = courierOf(world, (ev.payload as { courierId?: unknown }).courierId);
     if (!c || c.lostAt !== undefined) return { world };
     const at = courierPosition(c, ev.time);
+    // In a turn the engine resolves, the courier pass decided the ride: taken where it was taken
+    // then, by the same unit, and otherwise not, with no roll.
+    const forcedRide = c.forced && ev.time <= c.forced.untilMs ? c.forced : undefined;
     // One roll per enemy unit in reach, in unit order; the first to succeed takes the courier.
     // Rolls stop at the first success, so draws per step depend on who captured: still fixed by
     // the seed, but keep every roll inside this handler or the clock-invariance rule breaks.
-    const captor = world.units.find((u) => {
-      if (u.side === c.side) return false;
-      const chance = interceptChance(world, u, at);
-      return chance > 0 && rng.next() < chance;
-    });
+    const captor = forcedRide
+      ? forcedRide.takenAt === ev.time
+        ? world.units.find((u) => u.id === forcedRide.takenBy && u.side !== c.side)
+        : undefined
+      : world.units.find((u) => {
+          if (u.side === c.side) return false;
+          const chance = interceptChance(world, u, at);
+          return chance > 0 && rng.next() < chance;
+        });
     if (!captor) return { world };
     const doc = {
       id: `${captor.side}-d${world.intel[captor.side].documents.length + 1}`,
@@ -329,7 +377,8 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     };
     // In an umpire turn the order is delivered and acknowledged, but the umpire decides what
     // the unit makes of it: no intent is adopted (D39).
-    if (heldTurn(world, ev.time)) {
+    // An order the rules could not read (turn mode) is "no new order": the unit carries on.
+    if (heldTurn(world, ev.time) || order.textOnly) {
       const garbledHeld = c.garbled
         ? [{ type: 'order_garbled', payload: { orderId: order.id, unitId: unit.id } }]
         : [];
