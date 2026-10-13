@@ -447,7 +447,19 @@ function parseOrder(input: ParseInput): ParseOrdersOutput {
     const refersBack =
       phrase.length === 0 ||
       phrase.every((w) =>
-        ['it', 'there', 'them', 'here', 'position', 'ground', 'your', 'our', 'current'].includes(w),
+        [
+          'it',
+          'there',
+          'them',
+          'here',
+          'position',
+          'ground',
+          'your',
+          'our',
+          'current',
+          'fast',
+          'firm',
+        ].includes(w),
       );
     if (!found && refersBack) continue;
     let place: Place | undefined;
