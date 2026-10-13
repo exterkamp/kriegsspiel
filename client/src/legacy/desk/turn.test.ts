@@ -5,6 +5,8 @@ import { clockSummary, clockView } from './clock.js';
 import {
   deadlineText,
   heldLine,
+  howTurnsWork,
+  lastTurnText,
   pursuitText,
   resolvedText,
   sidesSent,
@@ -12,6 +14,7 @@ import {
   turnEntry,
   turnLine,
   turnPhase,
+  turnsInBattle,
 } from './turn.js';
 
 const v = PROTOCOL_VERSION;
@@ -203,5 +206,47 @@ describe('the pursuit after a ruling (#438)', () => {
     expect(pursuitText(s.turn)).toBe(
       'The battle is decided; this turn is the pursuit. The game closes by 08:51 at the latest. You may send this turn with no orders.',
     );
+  });
+});
+
+describe('the turn explained (#439)', () => {
+  it('counts the battle in turns, the last one short', () => {
+    expect(turnsInBattle(50, 20)).toBe(3);
+    expect(turnsInBattle(60, 20)).toBe(3);
+    expect(turnsInBattle(undefined, 20)).toBeUndefined();
+    expect(turnLine({ turn: 2, startsAt: 20 * MIN, endsAt: 40 * MIN }, 3)).toBe(
+      'Turn 2 of about 3: 00:20 to 00:40',
+    );
+    expect(turnLine({ turn: 3, startsAt: 40 * MIN, endsAt: 50 * MIN }, 3)).toBe(
+      'Turn 3 of 3: 00:40 to 00:50',
+    );
+  });
+
+  it('says what a turn is and that each side sends once and the umpire decides', () => {
+    const text = howTurnsWork(20, 50);
+    expect(text).toContain('Each turn is 20 minutes of the battle.');
+    expect(text).toContain('send them once for your whole side');
+    expect(text).toContain('the umpire decides what happened in those 20 minutes');
+    expect(text).toContain('about 50 minutes, so about 3 turns');
+    expect(howTurnsWork(20)).not.toContain('battle lasts');
+  });
+
+  it('explains a short last turn, and names the last full one', () => {
+    expect(lastTurnText({ turn: 3, startsAt: 40 * MIN, endsAt: 50 * MIN }, 20, 50)).toBe(
+      "This is the last turn, and it is 10 minutes, not 20: the battle's time limit is at 00:50.",
+    );
+    expect(lastTurnText({ turn: 3, startsAt: 40 * MIN, endsAt: 60 * MIN }, 20, 60)).toBe(
+      "This is the last turn: the battle's time limit is at 01:00.",
+    );
+    expect(lastTurnText({ turn: 2, startsAt: 20 * MIN, endsAt: 40 * MIN }, 20, 50)).toBeUndefined();
+  });
+
+  it('puts the count on the desk clock once the battle length is known', () => {
+    const s = applyServerMessage(
+      { ...withView(initialState), turnMinutes: 20, battleMinutes: 50 },
+      turnState({ turn: 2, startsAt: 20 * MIN, endsAt: 40 * MIN }),
+      0,
+    );
+    expect(clockView(s, 0).time).toBe('Turn 2 of about 3: 00:20 to 00:40');
   });
 });

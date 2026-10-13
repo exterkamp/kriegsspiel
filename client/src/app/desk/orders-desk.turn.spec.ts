@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 import type { TurnOrder } from '@kriegsspiel/protocol';
 import { fixtureView } from '@legacy/table/fixture';
-import type { TurnInfo } from '@legacy/net/state';
+import type { ClientState, TurnInfo } from '@legacy/net/state';
 import { ORDER_SENDER, TURN_ACTIONS, type TurnActions } from '../game/ports';
 import { fakeGame } from './fake-game';
 import { DeskStore } from './desk.store';
@@ -23,8 +23,17 @@ const turn = (over: Partial<TurnInfo> = {}): TurnInfo => ({
 });
 
 /** The orders desk in a turn-mode game (D39, 11.10), with the turn's server actions faked. */
-async function open(t: TurnInfo = turn(), hold: TurnActions['hold'] = () => true) {
-  const g = fakeGame({ view: { ...fixtureView, hq: { x: 0, y: 0 } }, turnMode: true, turn: t });
+async function open(
+  t: TurnInfo = turn(),
+  hold: TurnActions['hold'] = () => true,
+  more: Partial<ClientState> = {},
+) {
+  const g = fakeGame({
+    view: { ...fixtureView, hq: { x: 0, y: 0 } },
+    turnMode: true,
+    turn: t,
+    ...more,
+  });
   g.fake.sides.set(['blue', 'red']);
   const actions = {
     hold: vi.fn<TurnActions['hold']>(hold),
@@ -314,5 +323,62 @@ describe('OrdersDeskComponent in a turn-mode game', () => {
     t.game.set({ notices: [{ code: 'turn_refused', message: 't-9: not yours' }] });
     await t.settle();
     expect(t.desk.orderDraft().text).toBe('');
+  });
+});
+
+describe('the turn desk for a first-time player (#439)', () => {
+  it('counts the turns and says why the last one is short', async () => {
+    const t = await open(turn({ turn: 3, startsAt: 40 * MIN, endsAt: 50 * MIN }), undefined, {
+      turnMinutes: 20,
+      battleMinutes: 50,
+    });
+    expect(t.q('#turn-orders-h').textContent).toContain('Turn 3 of 3: 00:40 to 00:50');
+    expect(t.q('[data-testid=turn-orders-last]').textContent).toContain('it is 10 minutes, not 20');
+  });
+
+  it('shows each own unit: what it was told, where it is, what it does, men and morale', async () => {
+    const t = await open(turn({ held: [held] }));
+    const strip = t.q('[data-testid=turn-units]');
+    const first = strip.querySelector(`[data-unit="${unit.id}"]`)!;
+    expect(first.querySelector('b')!.textContent).toBe(unit.name);
+    const dts = [...first.querySelectorAll('dt')].map((x) => x.textContent!.trim());
+    const dds = [...first.querySelectorAll('dd')].map((x) =>
+      x.textContent!.replace(/\s+/g, ' ').trim(),
+    );
+    expect(dts).toEqual(['Told', 'Where', 'Doing', 'Strength']);
+    expect(dds[0]).toBe('Hold the bridge. (Held for this turn)');
+    expect(dds[3]).toMatch(/^(about \d+ men|not reported), /);
+    expect(strip.querySelectorAll('li')).toHaveLength(fixtureView.ownUnits.length);
+  });
+
+  it('lists the orders sent in earlier turns with where each stands', async () => {
+    const t = await open(turn(), undefined, {
+      pending: [
+        { orderId: 't-0', text: 'March to the bridge.', sentAtGame: 0, toName: unit.name },
+        { orderId: 't-9', text: 'Scout the wood.', sentAtGame: 0, toName: 'Someone' },
+      ],
+      dispatches: [
+        {
+          id: 'ack',
+          from: unit.name,
+          kind: 'orderDelivered',
+          orderId: 't-0',
+          writtenAtGame: 4 * MIN,
+          receivedAtGame: 20 * MIN,
+          category: 'subordinates',
+          text: 'Sir, we have your orders.',
+        },
+      ],
+    });
+    const earlier = t.q('[data-testid=turn-earlier]');
+    expect(earlier.querySelector('summary')!.textContent).toContain('Sent in earlier turns (2)');
+    // Newest first.
+    const items = [...earlier.querySelectorAll('li')].map((li) =>
+      [...li.children].map((c) => c.textContent!.trim()),
+    );
+    expect(items).toEqual([
+      ['To Someone, sent at 00:00', 'Scout the wood.', 'With the courier; no word yet'],
+      [`To ${unit.name}, sent at 00:00`, 'March to the bridge.', 'Delivered at 00:04'],
+    ]);
   });
 });
