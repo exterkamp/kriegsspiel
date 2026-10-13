@@ -40,6 +40,7 @@ import {
   DEFAULT_TAKE_MS,
   MS_PER_MINUTE,
   type BattleRuling,
+  type GameTime,
   type GameState,
   type Outcome,
   type Point,
