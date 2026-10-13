@@ -37,7 +37,7 @@ export interface TurnInput {
 }
 
 /** What a resolver may run beside the turn's data; not logged, and not plain data. */
-export interface TurnContext {
+export interface TurnResolveContext {
   /**
    * Fresh copies of the scripted sides, for a resolution that runs the turn under the engine: they
    * think inside it at their interval as the live agents will (#430). What the live agents order
@@ -80,7 +80,7 @@ export interface TurnResolver {
   resolve(
     state: EngineState<GameState>,
     input: TurnInput,
-    context?: TurnContext,
+    context?: TurnResolveContext,
   ): Promise<TurnResolution>;
 }
 

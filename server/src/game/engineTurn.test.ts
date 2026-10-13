@@ -12,7 +12,7 @@ import {
 import { GameHost, MemoryGameStore, createRegistry, startingState } from './index.js';
 import { replayLog } from './replay.js';
 import { FakeTime } from './testing.js';
-import type { TurnContext, TurnInput, TurnResolver } from './turns.js';
+import type { TurnResolveContext, TurnInput, TurnResolver } from './turns.js';
 
 const MINUTE = 60_000;
 
@@ -54,7 +54,7 @@ class Watching implements TurnResolver {
   constructor(private readonly registry = createRegistry()) {
     this.inner = new EngineTurnResolver(this.registry);
   }
-  async resolve(state: EngineState<GameState>, input: TurnInput, context?: TurnContext) {
+  async resolve(state: EngineState<GameState>, input: TurnInput, context?: TurnResolveContext) {
     const before = structuredClone(state);
     this.projections.push(projectTurn(state, input, this.registry, context));
     // The projection never touches the live world.
@@ -204,6 +204,53 @@ describe('the engine adjudicator: rigid turn mode (D39, 11.4)', () => {
       expect(units).toEqual(JSON.parse(JSON.stringify(p.state.world.units)));
     }
     expect(JSON.stringify(run.replayed.state.world)).toBe(JSON.stringify(run.game.state.world));
+  });
+
+  it('gives two scripted sides’ copies orders of their own, so a turn they both order in still ends as projected', async () => {
+    const time = new FakeTime();
+    const watching = new Watching();
+    host = new GameHost({
+      store: new MemoryGameStore(),
+      parser,
+      registry: createRegistry(),
+      wallNow: time.now,
+      timers: time,
+      init: startingState,
+      scriptedOpponents: true,
+      turnResolver: () => watching,
+    });
+    // No human side, so each turn closes at its deadline.
+    const settings: UmpireSettings = {
+      dial: 'rigid',
+      persona: 'dry',
+      mode: 'turns',
+      turnMinutes: 20,
+      turnDeadlineHours: 1,
+    };
+    const base = loadScenario(holdTheBridge);
+    const scenario = {
+      ...base,
+      seed: 1815,
+      sides: base.sides.map((s) => ({ ...s, controller: 'scripted' as const })),
+    };
+    const game = await host.create('g1', scenario, { settings });
+    const ends: string[] = [];
+    for (let guard = 0; guard < 30 && !game.state.world.outcome; guard++) {
+      await time.advance(3_600_000);
+      ends.push(JSON.stringify(game.state.world.units));
+    }
+    expect(watching.projections.length).toBe(ends.length);
+    // Both copies' orders reached their units inside one projection: their couriers must not share an id.
+    const both = watching.projections.some((p) => {
+      const units = p.emitted
+        .filter((e) => e.type === 'order_delivered')
+        .map((e) => (e.payload as { unitId: string }).unitId);
+      return units.some((u) => u.startsWith('blue')) && units.some((u) => u.startsWith('red'));
+    });
+    expect(both).toBe(true);
+    for (const [i, p] of watching.projections.entries()) {
+      expect(JSON.parse(ends[i]!)).toEqual(JSON.parse(JSON.stringify(p.state.world.units)));
+    }
   });
 
   it('keeps the projection summary of a 20-minute Hold the Bridge turn under 2,000 tokens', async () => {

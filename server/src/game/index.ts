@@ -35,7 +35,7 @@ export type { EngineTurnOutput, Projection, ProjectionSummary, RulesOrder } from
 export type {
   TurnAdjudicator,
   TurnAgent,
-  TurnContext,
+  TurnResolveContext,
   TurnInput,
   TurnResolution,
   TurnResolver,

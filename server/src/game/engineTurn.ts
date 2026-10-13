@@ -37,7 +37,13 @@ import { hasConditionOrTime, testParse } from '../umpire/providers/testParse.js'
 import { parseContextOf } from './parseContext.js';
 import { advanceUntilOver } from './advance.js';
 import type { SentTurnOrder, TurnRecord } from './store.js';
-import type { TurnAgent, TurnContext, TurnInput, TurnResolution, TurnResolver } from './turns.js';
+import type {
+  TurnAgent,
+  TurnResolveContext,
+  TurnInput,
+  TurnResolution,
+  TurnResolver,
+} from './turns.js';
 
 /** The name a resolver logs for a turn the engine resolved. */
 export const ENGINE_ADJUDICATOR = 'engine';
@@ -280,8 +286,9 @@ function runEngineTurn(
     emitted.push(...res.emitted);
     if (res.emitted.length > 0) for (const a of agents) a.idle = false;
   };
-  // The scripted sides think at their interval, as the actor runs them (`advanceEngine`): the one
-  // due soonest, leaving out idle ones while no event is queued to wake them.
+  // The scripted sides think at their interval, as the actor runs them (`advanceEngine` and
+  // `nextAgent` in `actor.ts`): the one due soonest, leaving out idle ones while no event is queued
+  // to wake them. Keep the two the same, or a rigid turn no longer ends as projected.
   const nextAgent = () =>
     agents.reduce<TurnAgent | undefined>(
       (best, a) =>
@@ -314,7 +321,7 @@ export function projectTurn(
   state: EngineState<GameState>,
   input: Pick<TurnInput, 'n' | 'startMs' | 'endMs' | 'orders'>,
   registry: EventRegistry<GameState>,
-  context: TurnContext = {},
+  context: TurnResolveContext = {},
 ): Projection {
   const parsed = input.orders.map((o) => rulesParseTurnOrder(state.world, o));
   const orders = engineOrdersOf(parsed, input.orders, input.startMs);
@@ -335,7 +342,7 @@ export class EngineTurnResolver implements TurnResolver {
   async resolve(
     state: EngineState<GameState>,
     input: TurnInput,
-    context?: TurnContext,
+    context?: TurnResolveContext,
   ): Promise<TurnResolution> {
     const p = projectTurn(state, input, this.registry, context);
     const output: EngineTurnOutput = {

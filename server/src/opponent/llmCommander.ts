@@ -159,7 +159,11 @@ export class LlmCommander implements SideAgent {
     return this.cfg.fallback.think(view);
   }
 
-  /** In turn mode it plays by its script (D39), so a copy is a commander over a copy of that. */
+  /**
+   * In turn mode it plays by its script (D39), so a copy is a commander over a copy of that. The
+   * model's memory (`lastKey`, `quiet`) is not copied: only `decide` writes it, and turn mode never
+   * calls `decide`, so the live commander's is still unset and the copy's matches it.
+   */
   fork(): LlmCommander | undefined {
     const fallback = this.cfg.fallback.fork?.();
     return fallback && new LlmCommander({ ...this.cfg, fallback });
