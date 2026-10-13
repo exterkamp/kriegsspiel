@@ -1,6 +1,7 @@
 import type { OrderParser } from '../orders/index.js';
 import { LlmOrderParser } from '../orders/llmParser.js';
 import { StubOrderParser } from '../orders/stubParser.js';
+import { InterpretingParser } from '../orders/interpret.js';
 import type { UmpireClient } from './index.js';
 
 /**
@@ -47,9 +48,15 @@ export function orderParserFor(
   o: ParserWiringOptions,
 ): OrderParser | ((gameId: string) => OrderParser) {
   if (!o.llm) return new StubOrderParser();
-  return (gameId) =>
-    new LlmOrderParser(o.clientFor(gameId), {
-      fallbackParser: o.cannedParser ?? new StubOrderParser(),
-      onFallback: (f) => o.onFallback?.(gameId, f.reason),
-    });
+  return (gameId) => {
+    const client = o.clientFor(gameId);
+    return new InterpretingParser(
+      new LlmOrderParser(client, {
+        fallbackParser: o.cannedParser ?? new StubOrderParser(),
+        onFallback: (f) => o.onFallback?.(gameId, f.reason),
+      }),
+      client,
+      { onFallback: (reason) => o.onFallback?.(gameId, reason) },
+    );
+  };
 }

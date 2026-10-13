@@ -1,6 +1,6 @@
 # LLM providers
 
-The umpire stages (`parse`, `judge`, `narrate`, `staff`, and `command` for the AI commander) call the `UmpireClient` interface in `server/src/umpire/`. Which model answers is configuration. See D14 in [decisions.md](decisions.md).
+The umpire stages (`parse`, `judge`, `narrate`, `staff`, `critique` after the game, and `command` for the AI commander) call the `UmpireClient` interface in `server/src/umpire/`. Which model answers is configuration. See D14 in [decisions.md](decisions.md).
 
 ## Configuration
 
@@ -53,6 +53,7 @@ Select it with `UMPIRE_PROVIDER=test` (every stage), `UMPIRE_PROVIDER_<STAGE>=te
 | `staff` | One short piece of advice, chosen by the topic keywords of an optional `question` (enemy, supply, fatigue, ground, orders) or else by the officer's role, from counts in the officer's view. |
 | `judge` | No placements. |
 | `command` | Every unit holds the named place nearest the objective. |
+| `critique` | Quotes the digest's own facts as points (result, a report per side, misreadings, pauses, a delivery), so it passes `checkCritique`. |
 
 Its output is deterministic and validated like any model's, and recorded through `CallRecorder`. The game shows a "Test umpire (canned responses)" badge (`GET /scenarios` carries `umpire: "test"`), and the admin LLM panel shows its calls with mode `test`.
 

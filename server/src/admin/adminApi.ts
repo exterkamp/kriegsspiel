@@ -11,7 +11,8 @@
  *
  * Gating: `buildApp` registers this plugin only when the admin view is enabled, so otherwise every
  * `/admin` path is an ordinary 404. When enabled, a request must come from a loopback address or
- * carry the admin token (`Authorization: Bearer` or `?token=`). Only GET routes exist, and they
+ * carry the admin token (`Authorization: Bearer` or `?token=`), unless open mode (`ADMIN_OPEN`, #387)
+ * lets any caller in for debugging a demo stack. Only GET routes exist, and they
  * never feed the game clients' hub (`api/hub.ts`); `/state` only reads `api/sideView.ts` to show what a side is sent.
  */
 import { timingSafeEqual } from 'node:crypto';
@@ -36,16 +37,35 @@ export interface AdminOptions {
   store: GameStore;
   /** Lets non-loopback callers in when they present it. Unset: loopback only. */
   token?: string;
+  /** Open mode: every caller passes, with no token and no loopback check. Redaction still applies. */
+  open?: boolean;
 }
 
-/** Settings read from the environment: `ADMIN_ENABLED` turns the view on, `ADMIN_TOKEN` is the optional remote token. */
+export const ADMIN_OPEN_WARNING =
+  'admin is open: anyone who can reach this port can read all hidden game state and LLM prompts';
+
+const isOn = (v: string | undefined): boolean => {
+  const f = v?.trim().toLowerCase();
+  return f === '1' || f === 'true' || f === 'on';
+};
+
+/**
+ * Settings read from the environment: `ADMIN_ENABLED` turns the view on, `ADMIN_TOKEN` is the optional remote token,
+ * `ADMIN_OPEN` (with `ADMIN_ENABLED`) lets anyone in. Open mode with `NODE_ENV=production` throws unless `ADMIN_OPEN_FORCE` is on.
+ */
 export function adminFromEnv(env: Record<string, string | undefined>): {
   enabled: boolean;
   token?: string;
+  open: boolean;
 } {
-  const flag = env.ADMIN_ENABLED?.trim().toLowerCase();
-  const enabled = flag === '1' || flag === 'true' || flag === 'on';
-  return { enabled, token: env.ADMIN_TOKEN?.trim() || undefined };
+  const enabled = isOn(env.ADMIN_ENABLED);
+  const open = enabled && isOn(env.ADMIN_OPEN);
+  if (open && env.NODE_ENV === 'production' && !isOn(env.ADMIN_OPEN_FORCE)) {
+    throw new Error(
+      'ADMIN_OPEN is set with NODE_ENV=production: refusing to start. Unset ADMIN_OPEN, or set ADMIN_OPEN_FORCE=1 if you really mean it.',
+    );
+  }
+  return { enabled, token: env.ADMIN_TOKEN?.trim() || undefined, open };
 }
 
 export function isLoopback(address: string | undefined): boolean {
@@ -89,6 +109,7 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
 
   server.addHook('onRequest', async (req, reply) => {
     if (!req.url.startsWith(ADMIN_PREFIX)) return;
+    if (options.open) return;
     // A proxy on the same host connects over loopback, but always forwards the caller's address in a header.
     const proxied =
       req.headers['x-forwarded-for'] !== undefined || req.headers.forwarded !== undefined;

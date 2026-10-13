@@ -52,6 +52,11 @@ export function pickGame(games: GameSummary[], current: string | undefined): str
   return games[0]?.id;
 }
 
+/** The game to open on, from `?game=` on the page URL (the "Debug this game" links). */
+export function adminGame(search: string): string | undefined {
+  return new URLSearchParams(search).get('game') || undefined;
+}
+
 /** Token for the admin API, from `?token=` on the page URL. */
 export function adminToken(search: string): string | undefined {
   return new URLSearchParams(search).get('token') || undefined;

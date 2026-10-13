@@ -6,8 +6,8 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import type { WindowTimeline } from '@kriegsspiel/protocol';
-import { fetchWindowAt, fetchWindowTimeline } from '@legacy/window/api';
+import type { Critique, CritiqueKind, WindowTimeline } from '@kriegsspiel/protocol';
+import { fetchCritique, fetchWindowAt, fetchWindowTimeline } from '@legacy/window/api';
 import { stepMark, unitNotes, type BeliefChoice } from '@legacy/window/model';
 import { formatGameTime } from '@legacy/net/state';
 import { GameService } from '../game/game.service';
@@ -18,6 +18,14 @@ const BELIEFS: { id: BeliefChoice; label: string }[] = [
   { id: 'blue', label: 'Blue believed' },
   { id: 'red', label: 'Red believed' },
 ];
+
+const KIND_LABELS: Record<CritiqueKind, string> = {
+  knowledge: 'What was known',
+  decision: 'Decision',
+  misreading: 'Misreading',
+  pause: 'Pause',
+  outcome: 'Result',
+};
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -39,6 +47,10 @@ export class UmpireWindowComponent {
   protected readonly timeline = signal<WindowTimeline | undefined>(undefined);
   protected readonly at = signal(0);
   protected readonly error = signal('');
+  /** The umpire's critique; it loads after the timeline and may take a while the first time. */
+  protected readonly critique = signal<Critique | undefined>(undefined);
+  protected readonly critiqueError = signal('');
+  protected readonly kindLabels = KIND_LABELS;
   protected readonly beliefs = BELIEFS;
   protected readonly Math = Math;
   protected readonly formatGameTime = formatGameTime;
@@ -66,6 +78,7 @@ export class UmpireWindowComponent {
         .then((tl) => {
           if (this.destroyed) return;
           this.timeline.set(tl);
+          void this.loadCritique(game);
           return this.load(tl.endMs);
         })
         .catch((e: unknown) => this.error.set(messageOf(e)));
@@ -75,6 +88,15 @@ export class UmpireWindowComponent {
       this.desk.windowFrame.set(undefined);
       this.desk.windowHover.set(undefined);
     });
+  }
+
+  private async loadCritique(game: string): Promise<void> {
+    try {
+      const c = await fetchCritique(game);
+      if (!this.destroyed) this.critique.set(c);
+    } catch (e) {
+      if (!this.destroyed) this.critiqueError.set(messageOf(e));
+    }
   }
 
   protected async load(ms: number): Promise<void> {

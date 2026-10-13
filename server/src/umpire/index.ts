@@ -67,6 +67,7 @@ export {
   JUDGE_SITUATION_PROMPT_VERSION,
   JUDGE_SITUATION_SCHEMA,
   JUDGE_SITUATION_SYSTEM,
+  judgeSituationSystem,
   judgeSituation,
   judgeSituationInput,
 } from './judgeSituation.js';
@@ -115,3 +116,4 @@ export type {
   StaffSeat,
   StaffTurn,
 } from './staff.js';
+export { PERSONA_PROMPT, withPersona } from './persona.js';

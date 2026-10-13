@@ -35,6 +35,7 @@ export type DraftErrorCode =
   | 'draft_unknown'
   | 'draft_exists'
   | 'draft_closed'
+  | 'draft_sent'
   | 'draft_full'
   | 'too_many_drafts'
   | 'bad_op'
@@ -85,6 +86,7 @@ export class DraftBook {
 
   private open(id: string): DraftSnapshot {
     const d = this.need(id);
+    if (d.sent) throw new DraftError('draft_sent', `draft ${id} was already signed and sent`);
     if (d.mergedInto !== undefined)
       throw new DraftError('draft_closed', `draft ${id} was merged into ${d.mergedInto}`);
     if (d.history.length >= MAX_DRAFT_REVS)
@@ -274,6 +276,31 @@ export class DraftBook {
     if (seen <= (d.receipts[by] ?? 0)) return undefined;
     d.receipts[by] = seen;
     return seen;
+  }
+
+  /** The draft to sign. One merged away or already sent cannot be signed. */
+  signable(id: string): DraftSnapshot {
+    const d = this.need(id);
+    if (d.mergedInto !== undefined)
+      throw new DraftError('draft_closed', `draft ${id} was merged into ${d.mergedInto}`);
+    if (d.sent) throw new DraftError('draft_sent', `draft ${id} was already signed and sent`);
+    return d;
+  }
+
+  /** Stamp a draft as sent: `by` signed it as `role` and it became order `orderId`. It takes no more edits. */
+  stamp(
+    id: string,
+    now: number,
+    sent: { orderId: string; by: string; role?: NonNullable<DraftSnapshot['sent']>['role'] },
+  ): DraftSnapshot {
+    const d = this.signable(id);
+    d.sent = {
+      orderId: sent.orderId,
+      by: sent.by,
+      ...(sent.role ? { role: sent.role } : {}),
+      at: now,
+    };
+    return d;
   }
 
   /** Copy a draft's current wording into a new draft, to write an alternative plan. */

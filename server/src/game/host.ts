@@ -7,6 +7,7 @@ import {
   type EngineState,
   type EventRegistry,
   type GameState,
+  type Seat,
 } from '@kriegsspiel/engine';
 import { GameClock, type WallClock } from '../clock.js';
 import { scriptedAgents, type SideAgent } from '../opponent/index.js';
@@ -16,8 +17,39 @@ import { GameActor, type GameActorOptions, type StaffAtWork, type Timers } from 
 import type { UmpireClient } from '../umpire/index.js';
 import type { TraceSink } from '../debug/trace.js';
 import { replayFrom } from './replay.js';
-import type { StaffExchange } from '@kriegsspiel/protocol';
-import type { GameStore } from './store.js';
+import type {
+  DeputyAccount,
+  DeputySettings,
+  Dissent,
+  StaffExchange,
+  UmpireSettings,
+} from '@kriegsspiel/protocol';
+import type { GameStore, InputLogEntry } from './store.js';
+
+/** Each side's deputy settings (the last set) and the account of its turns, from a game's whole input log (D6f). */
+export function deputiesFromLog(
+  log: readonly InputLogEntry[],
+): Map<string, { settings: DeputySettings; seat?: Seat; account: DeputyAccount[] }> {
+  const out = new Map<
+    string,
+    { settings: DeputySettings; seat?: Seat; account: DeputyAccount[] }
+  >();
+  for (const e of log) {
+    const c = e.command;
+    if (c.kind === 'deputySet') {
+      const had = out.get(c.side);
+      out.set(c.side, {
+        settings: c.settings,
+        ...(c.seat ? { seat: c.seat } : {}),
+        account: had?.account ?? [],
+      });
+    } else if (c.kind === 'deputyTurn') {
+      const had = out.get(c.side);
+      if (had) had.account.push(c.account);
+    }
+  }
+  return out;
+}
 
 export interface GameHostOptions {
   store: GameStore;
@@ -50,6 +82,8 @@ export interface GameHostOptions {
   aiAgents?: (gameId: string, world: GameState, scripted: SideAgent[]) => SideAgent[];
   /** The umpire client that narrates a game's dispatches (one per game, so caps are per game). Unset: players see the engine's template text. */
   narrator?: (gameId: string) => UmpireClient | undefined;
+  /** Whether the player who appointed a side's deputy is away from the table now (D6f). Unset: always. */
+  deputyAway?: (gameId: string, side: string, seat: Seat | undefined) => boolean;
   /** Pause voting for a game: who votes and the host's rules. Unset: players cannot vote to pause. */
   pause?: (id: string, world: GameState) => PauseConfig | undefined;
 }
@@ -90,6 +124,7 @@ export class GameHost {
       onEmitted: (events) => o.onEmitted?.(id, events),
       onStaffAtWork: (state) => o.onStaffAtWork?.(id, state),
       umpire: o.narrator?.(id),
+      deputyAway: o.deputyAway ? (side, seat) => o.deputyAway!(id, side, seat) : undefined,
       parseRetries: o.parseRetries,
       parseTimeoutMs: o.parseTimeoutMs,
       narrateTimeoutMs: o.narrateTimeoutMs,
@@ -107,7 +142,11 @@ export class GameHost {
   }
 
   /** Start a new game from a loaded scenario. The clock starts running at game time 0. */
-  create(id: string, world: GameState, clock: { rate?: number } = {}): Promise<GameActor> {
+  create(
+    id: string,
+    world: GameState,
+    clock: { rate?: number; settings?: UmpireSettings } = {},
+  ): Promise<GameActor> {
     if (this.games.has(id) || this.pending.has(id)) {
       return Promise.reject(new Error(`game already exists: ${id}`));
     }
@@ -123,24 +162,29 @@ export class GameHost {
 
   private async doCreate(
     id: string,
-    world: GameState,
-    clock: { rate?: number },
+    scenario: GameState,
+    clock: { rate?: number; settings?: UmpireSettings },
   ): Promise<GameActor> {
     if (await this.options.store.loadSnapshot(id)) {
       throw new Error(`game already exists: ${id}`);
     }
+    // The dial is part of the world (it sets the judgment cap); the persona is only prose.
+    const { settings } = clock;
+    const world: GameState = settings ? { ...scenario, dial: settings.dial } : scenario;
     const state0 = createState(world.seed, world, 0);
     const state = this.options.init?.(state0) ?? state0;
     await this.options.store.saveLogHeader({
       gameId: id,
       scenarioId: world.scenarioId,
       seed: world.seed,
+      ...(settings ? { settings } : {}),
     });
     const actor = new GameActor({
       ...this.actorOptions(id),
       state,
       agents: this.agentsFor(id, world),
       pause: this.options.pause?.(id, world),
+      persona: settings?.persona,
       clock: new GameClock(this.options.wallNow, { rate: clock.rate }),
     });
     this.games.set(id, actor);
@@ -189,20 +233,33 @@ export class GameHost {
       status: snap.clock.status === 'stopped' ? 'stopped' : 'paused',
     });
     // The conference is not in a snapshot, so it comes from the whole log.
+    const log = await store.inputLog(id);
     const staffHistory = new Map<string, StaffExchange[]>();
-    for (const e of await store.inputLog(id)) {
+    const dissents = new Map<string, Dissent[]>();
+    // Holds already called stay used: a restart does not refund them.
+    const holdsUsed: Record<string, number> = {};
+    for (const e of log) {
+      if (!e.error && e.command.kind === 'proposeHold') {
+        holdsUsed[e.command.by] = (holdsUsed[e.command.by] ?? 0) + 1;
+      }
       const c = e.command;
+      if (c.kind === 'dissent') dissents.set(c.side, [...(dissents.get(c.side) ?? []), c.dissent]);
       if (c.kind !== 'staffAnswer' || !c.exchange) continue;
       staffHistory.set(c.side, [...(staffHistory.get(c.side) ?? []), c.exchange]);
     }
+    const deputies = deputiesFromLog(log);
     const actor = new GameActor({
       ...this.actorOptions(id),
       state,
       staffHistory,
+      deputies,
+      dissents,
+      holdsUsed,
       clock,
       agents: this.agentsFor(id, state.world),
       pause: this.options.pause?.(id, state.world),
       restart: { downMs },
+      persona: (await store.logHeader(id))?.settings?.persona,
       // The log is in insertion order, which is not always seq order (see D14b).
       seq: tail.reduce((max, e) => Math.max(max, e.seq), snap.seq),
     });

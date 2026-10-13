@@ -25,6 +25,7 @@ import {
   type EngineState,
   type EventRegistry,
   type GameState,
+  type Seat,
   type SideId,
 } from '@kriegsspiel/engine';
 import { GameClock, type WallClock } from '../clock.js';
@@ -36,6 +37,11 @@ import {
   type TraceSink,
 } from '../debug/trace.js';
 import type { OrderParser, ParseContext, ParseResult } from '../orders/index.js';
+import {
+  checkDraftWithStaff,
+  type EarlierOrder,
+  type StaffCheckReport,
+} from '../orders/staffCheck.js';
 import type { AgentOrder, SideAgent } from '../opponent/index.js';
 import { PauseVoting, type PauseConfig, type PauseTransition } from '../pause.js';
 import { RatioVoting, type RatioTransition } from '../ratioVote.js';
@@ -53,7 +59,14 @@ import {
   type UmpireRequest,
   type UmpireClient,
 } from '../umpire/index.js';
-import type { StaffExchange } from '@kriegsspiel/protocol';
+import type {
+  DeputyAccount,
+  DeputySettings,
+  Dissent,
+  StaffExchange,
+  UmpirePersona,
+} from '@kriegsspiel/protocol';
+import { DeputyAgent } from '../deputy/deputy.js';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
 /** Timer functions, injectable so tests can run on a fake clock. */
@@ -118,6 +131,15 @@ export interface GameActorOptions {
   onStaffAtWork?: (state: StaffAtWork) => void;
   /** The conference records of a reopened game, from its input log (D6b). */
   staffHistory?: ReadonlyMap<string, readonly StaffExchange[]>;
+  /** Each side's deputy settings and account for a reopened game, from its input log (D6f). */
+  deputies?: ReadonlyMap<
+    string,
+    { settings: DeputySettings; seat?: Seat; account: readonly DeputyAccount[] }
+  >;
+  /** Whether the player who set a side's deputy has no connection open now. Unset: always away. */
+  deputyAway?: (side: string, seat: Seat | undefined) => boolean;
+  /** The dissents on record for a reopened game, from its input log (D6e). */
+  dissents?: ReadonlyMap<string, readonly Dissent[]>;
   /** Extra parse attempts after a failure or timeout, before the fallback. Default 2. */
   parseRetries?: number;
   /** Wall ms to wait for one parse attempt. Default 60,000. */
@@ -136,10 +158,14 @@ export interface GameActorOptions {
    * in its view. Unset: players see the template text.
    */
   umpire?: UmpireClient;
+  /** The umpire's voice for narration (3.11); tone only. Default the dry staff officer. */
+  persona?: UmpirePersona;
   /** Server-side agents that play scripted sides (see `opponent/`). */
   agents?: SideAgent[];
   /** Pause voting: who votes and the host's rules. Unset: the vote commands are refused. */
   pause?: PauseConfig;
+  /** Emergency holds each voter has already called, from the input log of a reopened game. */
+  holdsUsed?: Readonly<Record<string, number>>;
   /** Set when the game was reopened after the server went down: wall ms it was down (estimated). */
   restart?: { downMs: number };
 }
@@ -155,6 +181,8 @@ interface AgentSlot {
   idle: boolean;
   /** An async decision is in flight (the LLM barrier holds game time meanwhile). */
   pending: boolean;
+  /** The deputy was replaced or switched off; a decision still in flight is dropped. */
+  retired?: boolean;
 }
 
 interface Dependency {
@@ -200,7 +228,11 @@ export class GameActor {
   private readonly narrateTimeoutMs: number;
   private readonly parseRetryDelayMs: number;
   private seq: number;
-  private readonly agents: AgentSlot[];
+  private agents: AgentSlot[];
+  private readonly deputyAway: ((side: string, seat: Seat | undefined) => boolean) | undefined;
+  /** Each side's deputy settings, as last set (D6f), and the account of what it has done. */
+  private readonly deputySettings = new Map<string, { settings: DeputySettings; seat?: Seat }>();
+  private readonly deputyAccounts = new Map<string, DeputyAccount[]>();
   /** Agent orders issued since the last flush, to be appended to the input log in order. */
   private agentLog: InputLogEntry[] = [];
   private readonly snapshotEvery: number;
@@ -214,6 +246,7 @@ export class GameActor {
   private readonly dependencies = new Map<number, Dependency>();
   private nextDependency = 1;
   private readonly umpire: UmpireClient | undefined;
+  private readonly persona: UmpirePersona | undefined;
   /** Game time up to which each side's reports have been handed to the narrate stage. */
   private readonly narratedUntil = new Map<string, number>();
   private readonly narrations = new Map<string, SideNarration>();
@@ -222,6 +255,7 @@ export class GameActor {
   private readonly overloaded = new Set<string>();
   /** Each side's questions to its staff officers and their answers (D6b), oldest first. */
   private readonly staffHistory = new Map<string, StaffExchange[]>();
+  private readonly dissents = new Map<string, Dissent[]>();
 
   /** The pause state machine; absent when the game has no voters configured. */
   private readonly pauseVoting: PauseVoting | undefined;
@@ -258,10 +292,17 @@ export class GameActor {
     this.parseRetryDelayMs = options.parseRetryDelayMs ?? DEFAULT_PARSE_RETRY_DELAY_MS;
     this.seq = options.seq ?? 0;
     this.umpire = options.umpire;
+    this.persona = options.persona;
     for (const [side, list] of options.staffHistory ?? []) this.staffHistory.set(side, [...list]);
+    for (const [side, list] of options.dissents ?? []) this.dissents.set(side, [...list]);
     // Reports from before this actor started (a reopened game) keep their template text.
     for (const side of this.engine.world.sides) this.narratedUntil.set(side.id, this.engine.time);
     this.restartInfo = options.restart;
+    this.deputyAway = options.deputyAway;
+    for (const [side, d] of options.deputies ?? []) {
+      this.deputySettings.set(side, { settings: d.settings, ...(d.seat ? { seat: d.seat } : {}) });
+      this.deputyAccounts.set(side, [...d.account]);
+    }
     // Decisions fall on multiples of the interval; a resumed game picks up at the next one.
     const t = this.engine.time;
     this.agents = (options.agents ?? []).map((agent) => ({
@@ -270,10 +311,12 @@ export class GameActor {
       idle: false,
       pending: false,
     }));
+    for (const [side, d] of this.deputySettings) this.installDeputy(side, d.settings, d.seat);
     if (options.pause) {
       this.pauseVoting = new PauseVoting(options.pause, {
         phase: this.clock.status === 'running' ? 'running' : 'paused',
         nowMs: this.wallNow(),
+        ...(options.holdsUsed ? { holdsUsed: options.holdsUsed } : {}),
       });
       this.ratioVoting = new RatioVoting(options.pause);
     }
@@ -291,9 +334,28 @@ export class GameActor {
     return this.overloaded.has(side) ? STAFF_OVERLOADED_NOTICE : undefined;
   }
 
+  /** `side`'s deputy, for `sideViewOf` (D6f). Undefined when none was ever set. */
+  deputyFor(
+    side: string,
+  ): { settings: DeputySettings; account: readonly DeputyAccount[] } | undefined {
+    const d = this.deputySettings.get(side);
+    return d ? { settings: d.settings, account: this.deputyAccounts.get(side) ?? [] } : undefined;
+  }
+
   /** `side`'s conference with its staff officers, for `sideViewOf`. */
   staffHistoryFor(side: string): readonly StaffExchange[] {
     return this.staffHistory.get(side) ?? [];
+  }
+
+  /** The players who may vote changed (D6e). Without voting set up, nothing happens. */
+  setVoters(voters: readonly string[]): void {
+    this.pauseVoting?.setVoters(voters);
+    this.ratioVoting?.setVoters(voters);
+  }
+
+  /** The dissents `side` has put on record, oldest first. */
+  dissentsFor(side: string): readonly Dissent[] {
+    return this.dissents.get(side) ?? [];
   }
 
   /** Whether the game is waiting on the umpire. */
@@ -323,6 +385,11 @@ export class GameActor {
         nowMs: this.wallNow(),
       }
     );
+  }
+
+  /** Emergency holds `player` may still call; zero without voters. */
+  holdsLeftFor(player: string): number {
+    return this.pauseVoting?.holdsLeft(player) ?? 0;
   }
 
   /**
@@ -452,6 +519,7 @@ export class GameActor {
       const work = narrateReports(client, side.id as SideId, due, {
         hidden: hiddenTerms(this.engine.world, side.id as SideId),
         signal: abort.signal,
+        persona: this.persona,
       }).then(
         (result) => {
           this.clearParseTimer(deadline);
@@ -558,6 +626,11 @@ export class GameActor {
         step(due.nextAt);
         due.nextAt += due.agent.intervalMs;
         if (this.engine.world.outcome) continue;
+        if (due.agent.dormant?.()) {
+          // The player is back: nothing to decide until an event wakes it, so a quiet field spins no clock.
+          due.idle = true;
+          continue;
+        }
         if (due.agent.decide) this.beginDecision(due);
         else due.idle = !this.think(due.agent) && (due.agent.settled?.() ?? true);
       }
@@ -634,6 +707,91 @@ export class GameActor {
     return answer;
   }
 
+  /**
+   * Puts a dissent on record: kept for the side and logged as a journal-only entry, so a restart
+   * and a replay have it. It never touches the engine. The caller has checked the order exists.
+   */
+  async recordDissent(
+    side: SideId,
+    dissent: Omit<Dissent, 'atGame'>,
+  ): Promise<Dissent | undefined> {
+    const filed: Dissent = { ...dissent, atGame: this.engine.time };
+    let duplicate = false;
+    await this.enqueueCompletion(async () => {
+      // Two filings with one id can both pass the caller's check before either lands.
+      duplicate = (this.dissents.get(side) ?? []).some((d) => d.id === filed.id);
+      if (duplicate) return;
+      this.dissents.set(side, [...(this.dissents.get(side) ?? []), filed]);
+      const entry: InputLogEntry = {
+        seq: ++this.seq,
+        wallMs: this.wallNow(),
+        gameMs: this.engine.time,
+        endGameMs: this.engine.time,
+        command: { kind: 'dissent', side, by: filed.seat, dissent: filed },
+      };
+      if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+      await this.commit(entry);
+      this.notify();
+    });
+    return duplicate ? undefined : filed;
+  }
+
+  /**
+   * The chief of staff reads a shared draft on the `staff` stage (the staff check, D6d). Like a
+   * conference answer it is off the clock's critical path: game time does not wait for it, and the
+   * hub holds the result until the officer's cost has elapsed. It sees the side's own units, the
+   * named places and the orders the side already sent, never master state. Logged as a
+   * journal-only entry with its model calls, so replay needs no model. Undefined when there is no
+   * umpire or the stage gave nothing usable.
+   */
+  async checkDraft(
+    side: SideId,
+    check: { checkId: string; draft: string; rev: number; text: string },
+    earlier: readonly EarlierOrder[],
+  ): Promise<StaffCheckReport | undefined> {
+    const umpire = this.umpire;
+    if (!umpire || this.closed || this.engine.world.outcome) return undefined;
+    let report: StaffCheckReport | undefined;
+    let failure: string | undefined;
+    try {
+      report = await checkDraftWithStaff(
+        umpire,
+        this.parseContext(side),
+        this.engine.world.seed,
+        side,
+        check.text,
+        earlier,
+        this.engine.time,
+      );
+    } catch (e) {
+      failure = e instanceof Error ? e.message : 'staff check failed';
+    }
+    if (this.closed) return undefined;
+    await this.enqueueCompletion(async () => {
+      const entry: InputLogEntry = {
+        seq: ++this.seq,
+        wallMs: this.wallNow(),
+        gameMs: this.engine.time,
+        endGameMs: this.engine.time,
+        command: {
+          kind: 'draftCheck',
+          side,
+          checkId: check.checkId,
+          draft: check.draft,
+          rev: check.rev,
+          text: check.text,
+          earlier: earlier.map((o) => ({ id: o.id, text: o.text, sentAtGame: o.sentAtGame })),
+        },
+        calls: report?.records ?? [],
+        ...(report === undefined ? { error: failure ?? 'staff check unusable' } : {}),
+      };
+      if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+      await this.commit(entry);
+      this.notify();
+    });
+    return report;
+  }
+
   /** Game time the soonest narration window closes, when the narrate stage is on. */
   private nextNarrationAt(): number | undefined {
     if (!this.umpire || this.engine.world.outcome) return undefined;
@@ -652,7 +810,9 @@ export class GameActor {
     const waiting = this.engine.queue.length > 0;
     return this.agents.reduce<AgentSlot | undefined>(
       (best, a) =>
-        a.pending || (a.idle && !waiting) || (best && best.nextAt <= a.nextAt) ? best : a,
+        a.pending || a.retired || (a.idle && !waiting) || (best && best.nextAt <= a.nextAt)
+          ? best
+          : a,
       undefined,
     );
   }
@@ -714,11 +874,18 @@ export class GameActor {
       this.sync();
       if (!this.engine.world.outcome) {
         const agent = slot.agent;
-        const orders =
-          decided ??
-          agent.think(viewFor(this.engine.world, agent.side as SideId, this.engine.time));
-        const changed = this.issueAgentOrders(agent, orders);
-        slot.idle = !changed && (agent.settled?.() ?? true);
+        if (slot.retired) {
+          // The player changed or switched off the deputy while it was thinking: its answer is dropped.
+        } else {
+          const orders =
+            decided ??
+            agent.think(viewFor(this.engine.world, agent.side as SideId, this.engine.time));
+          const issued: DeputyAccount['issued'] = [];
+          const changed = this.issueAgentOrders(agent, orders, issued);
+          slot.idle = !changed && (agent.settled?.() ?? true);
+          if (agent instanceof DeputyAgent) this.fileDeputyTurn(agent, issued);
+        }
+        if (slot.retired) this.agents = this.agents.filter((s) => s !== slot);
       }
       await this.persistProgress();
     } finally {
@@ -728,7 +895,11 @@ export class GameActor {
   }
 
   /** Issue an agent's orders through the human order path, logging each for replay. */
-  private issueAgentOrders(agent: SideAgent, orders: AgentOrder[]): boolean {
+  private issueAgentOrders(
+    agent: SideAgent,
+    orders: AgentOrder[],
+    issued?: DeputyAccount['issued'],
+  ): boolean {
     let changed = false;
     for (const o of orders) {
       const parsed: ParseResult = {
@@ -745,17 +916,135 @@ export class GameActor {
         command: { kind: 'order', side: agent.side, text: o.text },
         parse: parsed,
         agent: true,
+        ...(agent instanceof DeputyAgent ? { deputy: { discretion: agent.discretion } } : {}),
       };
-      const applied = applyLoggedOrder(this.engine, this.id, entry.seq, agent.side, parsed);
+      const applied = applyLoggedOrder(
+        this.engine,
+        this.id,
+        entry.seq,
+        agent.side,
+        parsed,
+        undefined,
+        agent instanceof DeputyAgent,
+      );
       if ('reason' in applied) entry.error = applied.reason;
       else {
         this.engine = applied.state;
         changed = true;
+        const unit = this.engine.world.units.find((u) => u.id === o.unitId);
+        issued?.push({ unitId: o.unitId, unit: unit?.name ?? o.unitId, text: o.text });
       }
       if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
       this.agentLog.push(entry);
     }
     return changed;
+  }
+
+  /**
+   * Set what a side's deputy may do (D6f), or switch it off. Logged as a journal entry so a
+   * reopened game has it; the deputy's orders are logged as they are issued. Refused when the
+   * game has no umpire to run it on.
+   */
+  async setDeputy(
+    side: SideId,
+    seat: Seat | undefined,
+    settings: DeputySettings,
+  ): Promise<{ ok: true } | { ok: false; reason: string }> {
+    if (this.closed || this.engine.world.outcome) return { ok: false, reason: 'the game is over' };
+    if (settings.enabled && !this.umpire) {
+      return { ok: false, reason: 'this game has no staff to appoint a deputy from' };
+    }
+    await this.enqueueCompletion(async () => {
+      this.deputySettings.set(side, { settings, ...(seat ? { seat } : {}) });
+      this.installDeputy(side, settings, seat);
+      const entry: InputLogEntry = {
+        seq: ++this.seq,
+        wallMs: this.wallNow(),
+        gameMs: this.engine.time,
+        endGameMs: this.engine.time,
+        command: { kind: 'deputySet', side, settings, ...(seat ? { seat } : {}) },
+      };
+      if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+      await this.commit(entry);
+    });
+    return { ok: true };
+  }
+
+  /** A player came or went: a deputy that stood down because the table was occupied may have work to do now. */
+  noteDeputyPresence(): void {
+    if (this.closed) return;
+    let woke = false;
+    for (const s of this.agents) {
+      if (s.agent.dormant && s.idle) {
+        s.idle = false;
+        woke = true;
+      }
+    }
+    if (woke) this.reschedule();
+  }
+
+  /** Retire the side's deputy, and start a new one when the settings switch it on. */
+  private installDeputy(side: string, settings: DeputySettings, seat: Seat | undefined): void {
+    for (const s of this.agents) {
+      if (s.agent instanceof DeputyAgent && s.agent.side === side) s.retired = true;
+    }
+    this.agents = this.agents.filter((s) => !s.retired || s.pending);
+    if (!settings.enabled || !this.umpire) return;
+    const principal: Seat = seat ?? { role: 'commander' };
+    const agent = new DeputyAgent({
+      side: side as SideId,
+      seat: principal,
+      discretion: settings.discretion,
+      intent: settings.intent,
+      client: this.umpire,
+      parser: this.parser,
+      world: () => this.engine.world,
+      away: () => this.deputyAway?.(side, seat) ?? true,
+      hidden: (view) => {
+        const world = this.engine.world;
+        const seen = new Set([
+          ...view.visibleEnemies.map((e) => e.id),
+          ...view.lastKnownContacts.map((c) => c.id),
+        ]);
+        return [
+          ...hiddenTerms(world, side as SideId),
+          ...world.units.filter((u) => u.side !== side && !seen.has(u.id)).map((u) => u.id),
+        ];
+      },
+    });
+    const t = this.engine.time;
+    this.agents.push({
+      agent,
+      nextAt: (Math.floor(t / agent.intervalMs) + 1) * agent.intervalMs,
+      idle: false,
+      pending: false,
+    });
+  }
+
+  /** File the deputy's turn in the side's account, and journal it so a reopened game has it. */
+  private fileDeputyTurn(agent: DeputyAgent, issued: DeputyAccount['issued']): void {
+    const turn = agent.takeTurn();
+    if (!turn || (issued.length === 0 && turn.refused.length === 0 && turn.report === '')) return;
+    const seq = ++this.seq;
+    const account: DeputyAccount = {
+      id: `deputy-${this.id}-${seq}`,
+      atGame: this.engine.time,
+      discretion: agent.discretion,
+      issued,
+      refused: turn.refused,
+      report: turn.report,
+    };
+    this.deputyAccounts.set(agent.side, [...(this.deputyAccounts.get(agent.side) ?? []), account]);
+    const entry: InputLogEntry = {
+      seq,
+      wallMs: this.wallNow(),
+      gameMs: this.engine.time,
+      endGameMs: this.engine.time,
+      command: { kind: 'deputyTurn', side: agent.side, account },
+      calls: turn.records,
+    };
+    if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+    this.agentLog.push(entry);
   }
 
   /** Append the agent orders issued so far, before anything logged after them. */
@@ -963,8 +1252,10 @@ export class GameActor {
       (entry.pause ??= []).push(t);
       this.pauseLog.push({ n: ++this.pauseStepCount, step: t });
       if (this.pauseLog.length > 20) this.pauseLog.shift();
-      if (t.to === 'paused' && t.from !== 'resume_proposed') this.clock.pause();
-      else if (t.to === 'running' && t.from !== 'pause_proposed') this.clock.resume();
+      // A hold stops the clock when it is called and starts it again if it lapses or is refused.
+      if (t.hold && t.to === 'pause_proposed') this.clock.pause();
+      else if (t.to === 'paused' && t.from !== 'resume_proposed') this.clock.pause();
+      else if (t.to === 'running' && (t.from !== 'pause_proposed' || t.hold)) this.clock.resume();
     }
   }
 
@@ -997,6 +1288,13 @@ export class GameActor {
         if (pv.phase !== want) throw new Error(`cannot ${command.kind} while ${pv.phase}`);
         const reason = command.kind === 'proposePause' ? command.reason : undefined;
         this.applyPause(entry, [pv.propose(`p${entry.seq}`, command.by, this.wallNow(), reason)]);
+        return { ok: true };
+      }
+      case 'proposeHold': {
+        const pv = this.requirePauseVoting();
+        if (pv.phase !== 'running') throw new Error(`cannot proposeHold while ${pv.phase}`);
+        const id = `p${entry.seq}`;
+        this.applyPause(entry, [pv.callHold(id, command.by, this.wallNow(), command.reason)]);
         return { ok: true };
       }
       case 'vote': {
@@ -1055,6 +1353,15 @@ export class GameActor {
         throw new Error('narration is logged by the scheduler');
       case 'staffAnswer':
         throw new Error('staff answers are logged by answerStaff');
+      case 'critique':
+        throw new Error('the critique is logged by the critique route');
+      case 'deputySet':
+      case 'deputyTurn':
+        throw new Error('deputy entries are logged by setDeputy and the deputy itself');
+      case 'dissent':
+        throw new Error('dissents are logged by recordDissent');
+      case 'draftCheck':
+        throw new Error('staff checks are logged by checkDraft');
     }
   }
 
@@ -1071,7 +1378,13 @@ export class GameActor {
           anchor: featureAnchor(f.geometry),
         })),
       },
-      units: units.map((u) => ({ id: u.id, side: u.side, name: u.name, center: u.center })),
+      units: units.map((u) => ({
+        id: u.id,
+        side: u.side,
+        name: u.name,
+        center: u.center,
+        ...(u.personality && u.side === side ? { personality: u.personality } : {}),
+      })),
       hidden: hiddenTerms(this.engine.world, side as SideId),
     };
   }

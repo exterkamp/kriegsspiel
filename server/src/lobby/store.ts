@@ -8,6 +8,7 @@
  */
 import { DatabaseSync } from 'node:sqlite';
 import type { Role } from '@kriegsspiel/engine';
+import type { UmpireSettings } from '@kriegsspiel/protocol';
 
 export type SessionType = 'team_vs_team' | 'co_op_vs_ai' | 'hot_seat';
 
@@ -18,6 +19,9 @@ export interface PauseSettings {
   rule: 'unanimous' | 'majority';
   voteTimeoutMs?: number;
   maxPauseMs?: number;
+  holdMs?: number;
+  holdsPerPlayer?: number;
+  holdsPerGame?: number;
 }
 
 /**
@@ -30,6 +34,20 @@ export interface RoleSeat {
   role: Exclude<Role, 'commander'>;
   /** Subordinate only: the ids of the units they command. */
   units?: string[];
+  /**
+   * Set when the player took the role after the game started (D6e): the accounts that held the
+   * same seat before, whose journal is the briefing. Empty if no one did.
+   */
+  succeeds?: string[];
+}
+
+/** Someone who gave up a role after the game started. Their seat's journal briefs the next holder. */
+export interface PastHolder {
+  userId: string;
+  side: string;
+  role: RoleSeat['role'];
+  units?: string[];
+  leftAtMs: number;
 }
 
 /** A paper HQ passed on to the subordinate commanding `unit`: an id from HQ's own view. */
@@ -37,6 +55,11 @@ export interface Forward {
   side: string;
   dispatchId: string;
   unit: string;
+  /** `down` (the default, for records made before reports could go up) or `up` to HQ. */
+  direction?: 'down' | 'up';
+  /** Game time it was sent and when it arrives; absent on older records, which arrived at once. */
+  sentAt?: number;
+  deliverAt?: number;
 }
 
 export interface LobbyGame {
@@ -46,6 +69,8 @@ export interface LobbyGame {
   rate: number;
   sessionType: SessionType;
   pause?: PauseSettings;
+  /** The rigid-to-free dial and the umpire's persona chosen at creation (3.11). Absent: the defaults. */
+  umpire?: UmpireSettings;
   /** The account that made the game; only they may start it. In hot-seat they play every side. */
   creator: string;
   status: 'lobby' | 'started';
@@ -55,8 +80,12 @@ export interface LobbyGame {
   removed?: string[];
   /** Players holding a staff or subordinate role beside the side's commander. None: shared HQ. */
   roles?: RoleSeat[];
-  /** Papers HQ forwarded to subordinates. */
+  /** Papers passed along the chain (HQ to a subordinate, or a subordinate's report up to HQ). */
   forwards?: Forward[];
+  /** Players who gave up a role after the start, oldest first (D6e). */
+  past?: PastHolder[];
+  /** How the humans of a side are organised. Unset: shared HQ, so forwarding takes no time. */
+  hierarchy?: 'shared' | 'chain';
   createdAtMs: number;
 }
 

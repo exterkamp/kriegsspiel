@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseCommand } from '@kriegsspiel/protocol';
 import { GameClock } from '../clock.js';
-import { STAFF_QUESTION_COST_MS, StaffDesk } from './conference.js';
+import { DRAFT_CHECK_COST_MS, STAFF_QUESTION_COST_MS, StaffDesk } from './conference.js';
 
 function fakeWall() {
   let t = 1_000_000;
@@ -70,5 +70,27 @@ describe('askStaff command', () => {
     expect(parseCommand(JSON.stringify(ok)).ok).toBe(true);
     expect(parseCommand(JSON.stringify({ ...ok, role: 'cook' })).ok).toBe(false);
     expect(parseCommand(JSON.stringify({ ...ok, question: '  ' })).ok).toBe(false);
+  });
+});
+
+describe('checkDraft command', () => {
+  it('parses over the wire and rejects a missing draft or an unknown field', () => {
+    const ok = { v: 1, kind: 'checkDraft', checkId: 'c1', draft: 'd1' };
+    expect(parseCommand(JSON.stringify(ok)).ok).toBe(true);
+    expect(parseCommand(JSON.stringify({ ...ok, draft: '' })).ok).toBe(false);
+    expect(parseCommand(JSON.stringify({ ...ok, text: 'client supplied text' })).ok).toBe(false);
+  });
+
+  it('charges its own cost against the chief of staff’s time', () => {
+    const desk = new StaffDesk();
+    const charge = desk.ask('g', 'blue', 'chiefOfStaff', 5_000, DRAFT_CHECK_COST_MS);
+    expect(charge).toEqual({
+      ok: true,
+      askedAtGame: 5_000,
+      answerAtGame: 5_000 + DRAFT_CHECK_COST_MS,
+      costMs: DRAFT_CHECK_COST_MS,
+    });
+    // A conference question to the same officer waits for the check.
+    expect(desk.ask('g', 'blue', 'chiefOfStaff', 6_000).ok).toBe(false);
   });
 });

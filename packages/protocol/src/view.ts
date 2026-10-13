@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DeputyView } from './deputy.js';
 import { ClockState, Coord, Facing, Footprint, Formation, GameMs, Side, UnitId } from './common.js';
 
 /** The officers a player can put a question to in the staff conference (docs/staff-conference.md). */
@@ -163,6 +164,8 @@ export const SideView = z
     staffOfficers: z
       .record(StaffRole, z.object({ name: z.string(), traits: z.array(z.string()) }).strict())
       .optional(),
+    /** The side's deputy, for the seats that run its HQ: the standing setting and the account of what it did. Absent when none was ever set. */
+    deputy: DeputyView.optional(),
     /** In-fiction notice shown while the umpire's per-game budget or rate limit is refusing narration. Never carries the figures. */
     staffOverloaded: z.string().optional(),
     clock: ClockState,

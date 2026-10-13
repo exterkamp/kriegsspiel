@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminPage } from './admin.js';
-import { adminToken, apiUrl, backoffMs, pickGame, panelForKey, stepPanel } from './model.js';
+import {
+  adminGame,
+  adminToken,
+  apiUrl,
+  backoffMs,
+  pickGame,
+  panelForKey,
+  stepPanel,
+} from './model.js';
 
 const games = [
   { id: 'aaaaaaaa-1', open: true, clock: { rate: 4 }, entries: 3 },
@@ -49,6 +57,8 @@ describe('model', () => {
   });
   it('builds admin URLs with the token, and backs off to a cap', () => {
     expect(adminToken('?token=abc')).toBe('abc');
+    expect(adminGame('?game=g%201&token=x')).toBe('g 1');
+    expect(adminGame('')).toBeUndefined();
     expect(apiUrl('games', 'abc')).toBe('/admin/api/games?token=abc');
     expect(apiUrl('games', undefined)).toBe('/admin/api/games');
     expect([0, 1, 2, 10].map(backoffMs)).toEqual([1000, 2000, 4000, 10_000]);
@@ -59,11 +69,11 @@ describe('model', () => {
 const frame = () => ({ data: JSON.stringify({ seq: 1, ts: 1, kind: 'engine', data: {} }) });
 
 describe('AdminPage', () => {
-  function mount(fetchFn: typeof fetch) {
+  function mount(fetchFn: typeof fetch, search = '') {
     vi.stubGlobal('EventSource', FakeES);
     vi.useFakeTimers();
     document.body.innerHTML = '<div id="app"></div>';
-    return new AdminPage(document.getElementById('app')!, '', fetchFn);
+    return new AdminPage(document.getElementById('app')!, search, fetchFn);
   }
 
   it('renders five empty panels and shows one at a time', () => {
@@ -94,6 +104,30 @@ describe('AdminPage', () => {
     expect(document.querySelector<HTMLElement>('#live')!.dataset.status).toBe('live');
     FakeES.last!.onerror!();
     expect(page.linkStatus).toBe('reconnecting');
+    page.stop();
+  });
+
+  it('opens on the ?game= game when it is not the first (#387)', async () => {
+    const page = mount(
+      vi.fn(() => ok({ games })),
+      '?game=bbbbbbbb-2',
+    );
+    page.start();
+    await flush();
+    expect(document.querySelector<HTMLSelectElement>('#game')!.value).toBe('bbbbbbbb-2');
+    expect(FakeES.last!.url).toBe('/admin/api/games/bbbbbbbb-2/stream');
+    page.stop();
+  });
+
+  it('falls back to the first game when ?game= is unknown (#387)', async () => {
+    const page = mount(
+      vi.fn(() => ok({ games })),
+      '?game=gone',
+    );
+    page.start();
+    await flush();
+    expect(document.querySelector<HTMLSelectElement>('#game')!.value).toBe('aaaaaaaa-1');
+    expect(FakeES.last!.url).toBe('/admin/api/games/aaaaaaaa-1/stream');
     page.stop();
   });
 

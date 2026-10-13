@@ -12,6 +12,7 @@ import {
   rideRisk,
 } from './courier.js';
 import { distance } from './geometry.js';
+import { shapeIntents, type Interpretation } from './personality.js';
 import type { Pace } from './fatigue.js';
 import { findPath, legCost } from './navigation.js';
 import { describePlace } from './place.js';
@@ -58,6 +59,10 @@ export interface Order {
   intents: OrderIntent[];
   /** The courier the sender chose. Absent means the ordinary ride. */
   courier?: CourierChoice;
+  /** How the addressee's commander read the order (personality.ts). Absent: as written. */
+  interpretation?: Interpretation;
+  /** Written by the player's deputy while they were away (deputy.ts), not by the player. */
+  deputy?: true;
 }
 
 /** A fast courier rides hard and is more likely to be lost or to garble; a safe one takes the quiet way. */
@@ -299,7 +304,7 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     };
   });
 
-  registry.register(ORDER_DELIVER_EVENT, (world, ev) => {
+  registry.register(ORDER_DELIVER_EVENT, (world, ev, rng) => {
     const c = courierOf(world, (ev.payload as { courierId?: unknown }).courierId);
     // Lost or taken on the way: this arrival never happens.
     if (!c) return { world };
@@ -317,7 +322,17 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     };
     // Standing orders already carried may fire on this arrival; the new order's own may not.
     const had = unit.standing ?? [];
-    const res = applyIntents(world, unit, c.garbled ?? order.intents, ev.time, order.id);
+    // One draw whenever the umpire proposed a deviation, whatever the traits, so the RNG stream
+    // does not depend on them.
+    const interp = order.interpretation;
+    const shaped = shapeIntents(
+      unit,
+      c.garbled ?? order.intents,
+      interp,
+      interp && interp.action !== 'none' ? rng.next() : 1,
+      world.map,
+    );
+    const res = applyIntents(world, unit, shaped.intents, ev.time, order.id);
     const fired = fireOnReceipt(res.world, unit.id, had, order.from ?? 'hq', ev.time);
     // The unit's courier rides back: HQ hears of the delivery after the usual report delay.
     const ack = {
@@ -325,6 +340,14 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       type: REPORT_EVENT,
       payload: { kind: 'orderDelivered', unitId: unit.id },
     };
+    const interpreted = shaped.deviation
+      ? [
+          {
+            type: 'order_interpreted',
+            payload: { orderId: order.id, unitId: unit.id, ...shaped.deviation },
+          },
+        ]
+      : [];
     const garbled = c.garbled
       ? [{ type: 'order_garbled', payload: { orderId: order.id, unitId: unit.id } }]
       : [];
@@ -332,7 +355,7 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       ...res,
       world: fired.world,
       schedule: [ack, ...(res.schedule ?? []), ...(fired.schedule ?? [])],
-      emit: [delivered, ...garbled, ...(res.emit ?? []), ...(fired.emit ?? [])],
+      emit: [delivered, ...garbled, ...interpreted, ...(res.emit ?? []), ...(fired.emit ?? [])],
     };
   });
 }

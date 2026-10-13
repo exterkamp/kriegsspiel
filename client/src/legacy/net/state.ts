@@ -1,9 +1,11 @@
 import { withMark } from '../table/marks.js';
 import { applyDraftEntry } from '../desk/drafts.js';
 import type {
+  Briefing,
   ClockState,
   Dispatch,
   DraftSnapshot,
+  Dissent,
   Mark,
   PausePhase,
   PauseProposal,
@@ -124,6 +126,10 @@ export interface ClientState {
   draftPresence?: DraftPresence;
   /** Every label the server has given a player id, kept so an author who has gone offline is still named. */
   draftLabels: Record<string, string>;
+  /** Dissents on record against the side's orders, oldest first (D6e). No desk shows them yet. */
+  dissents: Dissent[];
+  /** Set for a player who took over a role mid-game: the journal of that seat (D6e). */
+  briefing?: Briefing;
   /** Set when the server reports a return after an absence. */
   catchUp?: CatchUp;
   /** Newest last; the HUD shows the latest few. */
@@ -143,6 +149,7 @@ export const initialState: ClientState = {
   drafts: [],
   draftsStale: false,
   draftLabels: {},
+  dissents: [],
   notices: [],
 };
 
@@ -280,6 +287,10 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       };
     case 'marks':
       return { ...s, marks: m.marks };
+    case 'dissents':
+      return { ...s, dissents: m.dissents };
+    case 'briefing':
+      return { ...s, briefing: m.briefing };
     case 'sentOrders': {
       // The server's record of what this side has sent: fills in orders a reload (or another device) lost (#343).
       const have = new Set(s.pending.map((p) => p.orderId));
@@ -330,6 +341,10 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
           ...Object.fromEntries(m.people.map((p) => [p.id, p.label])),
         },
       };
+    case 'draftCheckQueued':
+    case 'draftCheck':
+      // The staff check has no desk yet (a follow-up); the server sends these to the side.
+      return s;
     case 'staffAtWork':
       return { ...s, staffAtWork: m.working };
     case 'serverRestarted': {

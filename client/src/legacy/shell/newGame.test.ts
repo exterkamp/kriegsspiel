@@ -5,6 +5,8 @@ import {
   createErrorMessage,
   initialForm,
   lengthLine,
+  DIAL_CHOICES,
+  PERSONA_CHOICES,
   rateExplanation,
   rateOf,
   toRequest,
@@ -42,7 +44,14 @@ const o: ScenarioOptions = {
 
 describe('new game form', () => {
   it('defaults to the first scenario, Blue and 12:1', () => {
-    expect(initialForm(o)).toEqual({ scenario: 'a', side: 'blue', rate: '12', customRate: '' });
+    expect(initialForm(o)).toEqual({
+      scenario: 'a',
+      side: 'blue',
+      rate: '12',
+      customRate: '',
+      dial: 'standard',
+      persona: 'dry',
+    });
     expect(initialForm({ scenarios: [], opponent: undefined })).toBeUndefined();
   });
   it('switching scenario takes its defaults, a non-preset rate becoming custom', () => {
@@ -51,6 +60,8 @@ describe('new game form', () => {
       side: 'y',
       rate: 'custom',
       customRate: '7',
+      dial: 'standard',
+      persona: 'dry',
     });
     expect(chooseScenario(o, 'nope')).toBeUndefined();
   });
@@ -77,11 +88,27 @@ describe('new game form', () => {
       scenario: 'a',
       side: 'blue',
       rate: 12,
+      dial: 'standard',
+      persona: 'dry',
       sessionType: 'co_op_vs_ai',
     });
     expect(toRequest(initialForm(o)!, { ...o, opponent: undefined })).not.toHaveProperty(
       'sessionType',
     );
+  });
+  it('sends the chosen dial and persona, and keeps them when the scenario changes', () => {
+    const f = { ...initialForm(o)!, dial: 'free' as const, persona: 'dramatic' as const };
+    expect(toRequest(f, o)).toMatchObject({ dial: 'free', persona: 'dramatic' });
+    expect(chooseScenario(o, 'a', f)).toMatchObject({ dial: 'free', persona: 'dramatic' });
+    expect(chooseScenario(o, 'a')).toMatchObject({ dial: 'standard', persona: 'dry' });
+  });
+  it('describes every dial and persona in plain language', () => {
+    expect(DIAL_CHOICES.map((d) => d.id)).toEqual(['rigid', 'standard', 'free']);
+    expect(PERSONA_CHOICES.map((p) => p.id)).toEqual(['dry', 'pedantic', 'dramatic']);
+    for (const c of [...DIAL_CHOICES, ...PERSONA_CHOICES]) {
+      expect(c.label.length).toBeGreaterThan(0);
+      expect(c.description.length).toBeGreaterThan(30);
+    }
   });
   it('explains rates in plain language', () => {
     expect(rateExplanation(12)).toBe('12:1 means one hour of battle passes in five minutes.');
