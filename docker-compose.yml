@@ -30,8 +30,14 @@ services:
       # The demo lets visitors play as a guest; set GUEST_PLAY=0 on a public deployment that needs accounts.
       GUEST_PLAY: ${GUEST_PLAY:-1}
       # The demo shows the menu's Developer tools section; set DEV_TOOLS=0 on a public deployment.
-      # The menu's Admin view link also needs ADMIN_ENABLED=1 (and a token); without it the admin page reports itself disabled.
       DEV_TOOLS: ${DEV_TOOLS:-1}
+      # The demo's admin view is open: anyone who can reach this port can read all hidden game state and LLM prompts,
+      # with no token. NEVER expose this port publicly. On a public deployment set ADMIN_ENABLED=0 (or ADMIN_OPEN=0 and
+      # an ADMIN_TOKEN). The image runs with NODE_ENV=production, so open mode needs the ADMIN_OPEN_FORCE acknowledgement.
+      ADMIN_ENABLED: ${ADMIN_ENABLED:-1}
+      ADMIN_OPEN: ${ADMIN_OPEN:-1}
+      ADMIN_OPEN_FORCE: ${ADMIN_OPEN_FORCE:-1}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       GUEST_PER_HOUR: ${GUEST_PER_HOUR:-}
       GUEST_IDLE_HOURS: ${GUEST_IDLE_HOURS:-}
     volumes:

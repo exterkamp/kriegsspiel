@@ -1,7 +1,9 @@
 import { withMark } from '../table/marks.js';
 import type {
+  Briefing,
   ClockState,
   Dispatch,
+  Dissent,
   Mark,
   PausePhase,
   PauseProposal,
@@ -108,6 +110,10 @@ export interface ClientState {
   gameOver?: GameOver;
   /** The side's marks on the table, as the server last sent them plus this client's own edits. */
   marks: Mark[];
+  /** Dissents on record against the side's orders, oldest first (D6e). No desk shows them yet. */
+  dissents: Dissent[];
+  /** Set for a player who took over a role mid-game: the journal of that seat (D6e). */
+  briefing?: Briefing;
   /** Set when the server reports a return after an absence. */
   catchUp?: CatchUp;
   /** Newest last; the HUD shows the latest few. */
@@ -124,6 +130,7 @@ export const initialState: ClientState = {
   staffCharges: {},
   staffAnswers: {},
   marks: [],
+  dissents: [],
   notices: [],
 };
 
@@ -261,6 +268,10 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
       };
     case 'marks':
       return { ...s, marks: m.marks };
+    case 'dissents':
+      return { ...s, dissents: m.dissents };
+    case 'briefing':
+      return { ...s, briefing: m.briefing };
     case 'sentOrders': {
       // The server's record of what this side has sent: fills in orders a reload (or another device) lost (#343).
       const have = new Set(s.pending.map((p) => p.orderId));
@@ -285,6 +296,8 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
     case 'draftState':
     case 'draftEntry':
     case 'draftReceipt':
+    case 'draftCheckQueued':
+    case 'draftCheck':
       // The drafting desk is not built yet (a follow-up story); the server sends these to the side.
       return s;
     case 'staffAtWork':

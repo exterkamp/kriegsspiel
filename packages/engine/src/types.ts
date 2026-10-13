@@ -2,6 +2,7 @@ import type { Pace } from './fatigue.js';
 import type { Order, OrderIntent } from './orders.js';
 import type { Trait } from './personality.js';
 import type { PlacementProposal, PlacementVerdict } from './placement.js';
+import type { Dial } from './judgment.js';
 
 /** Game time in integer milliseconds since the scenario start. Never derived from the wall clock. */
 export type GameTime = number;
@@ -382,6 +383,8 @@ export interface GameState {
   sightFactor?: number;
   /** Every umpire placement ruling so far, in order. Master state only: never sent to a client. */
   rulings: Array<Ruling | BattleRuling | JudgmentRuling>;
+  /** The rigid-to-free dial chosen for this game; absent counts as 'standard'. Sets the judgment cap only. */
+  dial?: Dial;
   /** Men each unit started with, the yardstick for a broken force (D13). Absent: no unit counts as broken. */
   startStrength?: Record<string, number>;
   /** Set once, when the umpire has declared one side's force broken; the game closes soon after (D13). */

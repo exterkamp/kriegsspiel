@@ -67,6 +67,7 @@ const SUPPLY_REPORTS: Array<ViewReport['kind']> = ['lowAmmo', 'exhausted'];
  * - subordinate: only their own units, the enemy those units can see themselves, and the
  *   reports their own units filed, plus any paper (report or captured dispatch) HQ forwarded to
  *   them. `forwarded` is the ids HQ passed to this seat; an id not in the side's own view is ignored.
+ * With `chain`, every HQ role also loses the reports of subordinate-held formations until forwarded up.
  */
 export function viewForRole(
   world: GameState,
@@ -74,6 +75,34 @@ export function viewForRole(
   seat: Seat,
   now: GameTime = world.time,
   forwarded: readonly string[] = [],
+  chain?: ChainOfCommand,
+): EngineRoleView {
+  const view = roleView(world, side, seat, now, forwarded);
+  if (!chain || seat.role === 'subordinate') return view;
+  // Chain of command: what a subordinate's formations file stays on the subordinate's desk until
+  // they forward it and it has ridden to HQ. Every HQ role is held to the same rule.
+  const held = new Set(
+    world.units.filter((u) => chain.subordinateUnits.includes(u.id)).map((u) => u.name),
+  );
+  const arrived = new Set(chain.deliveredUp);
+  return { ...view, reports: view.reports.filter((r) => !held.has(r.from) || arrived.has(r.id)) };
+}
+
+/**
+ * A side whose humans sit in a chain of command. `subordinateUnits` are the units human
+ * subordinates command; `deliveredUp` the ids of their reports forwarded to HQ and arrived.
+ */
+export interface ChainOfCommand {
+  subordinateUnits: readonly string[];
+  deliveredUp: readonly string[];
+}
+
+function roleView(
+  world: GameState,
+  side: SideId,
+  seat: Seat,
+  now: GameTime,
+  forwarded: readonly string[],
 ): EngineRoleView {
   const full = viewFor(world, side, now);
   const { role } = seat;

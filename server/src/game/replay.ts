@@ -42,6 +42,7 @@ export function applyLoggedOrder(
   side: string,
   parsed: ParseResult,
   courier?: Order['courier'],
+  deputy?: boolean,
 ): { state: EngineState<GameState>; orderId: string } | { reason: string } {
   if (parsed.kind === 'clarification') return { reason: parsed.question };
   if (parsed.kind === 'rejection') return { reason: parsed.reason };
@@ -56,6 +57,7 @@ export function applyLoggedOrder(
     text: parsed.text,
     intents,
     ...(courier ? { courier } : {}),
+    ...(deputy ? { deputy: true as const } : {}),
     ...(parsed.interpretation ? { interpretation: parsed.interpretation } : {}),
   };
   return { state: issueOrder(state, order, state.time), orderId: order.id };
@@ -103,7 +105,10 @@ export function replayLog(
   if (world.scenarioId !== header.scenarioId) {
     throw new Error(`log is for scenario ${header.scenarioId}, got ${world.scenarioId}`);
   }
-  const state0 = createState(header.seed, structuredClone(world), 0);
+  // The dial chosen at creation is part of the starting world, as the host built it.
+  const start = structuredClone(world);
+  if (header.settings) start.dial = header.settings.dial;
+  const state0 = createState(header.seed, start, 0);
   return replayFrom(init?.(state0) ?? state0, header.gameId, entries, registry, untilGameMs);
 }
 
@@ -156,6 +161,7 @@ export function replayFrom(
           command.side,
           entry.parse,
           command.courier,
+          entry.deputy !== undefined,
         );
         if ('state' in res) state = res.state;
       }

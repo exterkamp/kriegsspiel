@@ -87,6 +87,7 @@ function api(over: Partial<ShellApi> = {}): ShellApi {
     deleteAccount: async () => true,
     guestEnabled: async () => false,
     devToolsEnabled: async () => false,
+    adminMode: async () => undefined,
     startGuest: async () => undefined,
     fetchGame: async () => info(),
     joinSide: async () => undefined,
@@ -184,6 +185,17 @@ describe('main menu', () => {
       ['Style guide', '/style-guide'],
       ['Admin view', '/admin/'],
     ]);
+    expect(el.querySelector('section.dev')?.textContent).toContain('off on this server');
+  });
+
+  it('labels the Admin view link by how the server gates it', async () => {
+    await open('/', { devToolsEnabled: async () => true, adminMode: async () => 'open' });
+    expect(el.querySelector('section.dev a[href="/admin/"] b')?.textContent).toBe(
+      'Admin view (open)',
+    );
+    TestBed.resetTestingModule();
+    await open('/', { devToolsEnabled: async () => true, adminMode: async () => 'token' });
+    expect(el.querySelector('section.dev a[href="/admin/"] b')?.textContent).toBe('Admin view');
     expect(el.querySelector('section.dev')?.textContent).toContain('admin token');
   });
 
@@ -371,13 +383,19 @@ describe('moving between screens', () => {
     const createGame = vi.fn(async () => 'new1');
     await open('/?lobby=1', { createGame });
     radio('input[name=rate][value="4"]').click();
+    radio('input[name=dial][value=free]').click();
+    radio('input[name=persona][value=dramatic]').click();
     await settle();
+    expect(el.textContent).toContain('wider room');
+    expect(el.textContent).toContain('war correspondent');
     click('Start');
     await settle();
     expect(createGame).toHaveBeenCalledWith({
       scenario: 'hold-the-bridge',
       side: 'blue',
       rate: 4,
+      dial: 'free',
+      persona: 'dramatic',
       sessionType: 'co_op_vs_ai',
     });
     expect(window.location.search).toBe('?game=new1');
@@ -613,6 +631,37 @@ describe('lobby room: leaving and removing', () => {
     });
     expect(el.querySelector('#lobby-msg')?.textContent).toContain('removed you');
     expect(button('Take red')).toBeUndefined();
+  });
+});
+
+describe('Debug this game (#387)', () => {
+  it('links each game in Your games to its admin view when admin is on', async () => {
+    await open('/?lobby=1', { adminMode: async () => 'open' });
+    const links = [...el.querySelectorAll<HTMLAnchorElement>('#game-list a.debug')];
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0]!.textContent).toBe('Debug this game');
+    expect(links[0]!.getAttribute('href')).toBe('/admin/?game=g1');
+  });
+
+  it('shows no link in Your games when admin is off', async () => {
+    await open('/?lobby=1');
+    expect(el.querySelector('#game-list a.debug')).toBeNull();
+  });
+
+  it('adds it to the in-game menu only when admin is on', async () => {
+    await open('/?game=g1', { adminMode: async () => 'token' });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await settle();
+    const link = el.querySelector<HTMLAnchorElement>('[role=dialog] a[href^="/admin/"]');
+    expect(link?.textContent).toBe('Debug this game');
+    expect(link?.getAttribute('href')).toBe('/admin/?game=g1');
+  });
+
+  it('leaves it out of the in-game menu when admin is off', async () => {
+    await open('/?game=g1');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await settle();
+    expect(el.querySelector('[role=dialog] a[href^="/admin/"]')).toBeNull();
   });
 });
 

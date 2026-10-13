@@ -352,3 +352,20 @@ describe('issueOrder courier', () => {
     expect(parseCommand(JSON.stringify({ ...base, courier: 'pigeon' })).ok).toBe(false);
   });
 });
+
+describe('setDeputy', () => {
+  const ok = {
+    v,
+    kind: 'setDeputy',
+    settings: { enabled: true, discretion: 'hold', intent: 'Hold.' },
+  };
+  it('round-trips, and refuses a discretion it does not know or an extra field', () => {
+    expect(parseCommand(JSON.stringify(ok))).toEqual({ ok: true, value: ok });
+    const bad = { ...ok, settings: { ...ok.settings, discretion: 'anything' } };
+    expect(parseCommand(JSON.stringify(bad)).ok).toBe(false);
+    const extra = { ...ok, settings: { ...ok.settings, units: ['blue-1'] } };
+    expect(parseCommand(JSON.stringify(extra)).ok).toBe(false);
+    const long = { ...ok, settings: { ...ok.settings, intent: 'x'.repeat(601) } };
+    expect(parseCommand(JSON.stringify(long)).ok).toBe(false);
+  });
+});

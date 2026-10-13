@@ -1,3 +1,4 @@
+import type { AdminMode } from '@legacy/auth';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -69,6 +70,7 @@ type Prep =
             [guest]="me()?.guest === true"
             [load]="loadRows"
             [devTools]="devTools()"
+            [admin]="admin()"
             (newGame)="go({ name: 'new-game' })"
             (continueGame)="go({ name: 'game', game: $event })"
             (signOut)="signedOut()"
@@ -87,7 +89,11 @@ type Prep =
           @switch (prep().step) {
             @case ('ready') {
               <ks-game />
-              <ks-game-menu (leave)="go({ name: 'menu' })" (signOut)="signedOut()">
+              <ks-game-menu
+                [debugGame]="admin() ? liveId() : undefined"
+                (leave)="go({ name: 'menu' })"
+                (signOut)="signedOut()"
+              >
                 @if (me(); as m) {
                   <ks-account-bar [me]="m" (gone)="goHome()" />
                 }
@@ -133,6 +139,9 @@ export class ShellComponent implements OnInit, OnDestroy {
   protected readonly me = signal<Me | undefined>(undefined);
   protected readonly guestOn = signal(false);
   protected readonly devTools = signal(false);
+  protected readonly admin = signal<AdminMode | undefined>(undefined);
+  /** The game being opened, for its "Debug this game" link. */
+  protected readonly liveId = signal<string | undefined>(undefined);
   protected readonly prep = signal<Prep>({ step: 'working' });
   protected readonly roomInfo = signal<GameInfo | undefined>(undefined);
   protected readonly failure = signal('');
@@ -158,6 +167,10 @@ export class ShellComponent implements OnInit, OnDestroy {
     this.me.set(me);
     this.api.devToolsEnabled().then(
       (on) => this.devTools.set(on),
+      () => undefined,
+    );
+    this.api.adminMode().then(
+      (m) => this.admin.set(m),
       () => undefined,
     );
     if (me === undefined) this.guestOn.set(await this.api.guestEnabled().catch(() => false));
@@ -240,6 +253,7 @@ export class ShellComponent implements OnInit, OnDestroy {
         side = undefined;
         this.win.history.replaceState(null, '', `?game=${id}`);
       }
+      this.liveId.set(id);
       let info = await this.api.fetchGame(id);
       if (!info.you) {
         const pick = side ?? info.sides.find((s) => !s.taken)?.side;

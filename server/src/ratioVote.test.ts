@@ -57,3 +57,16 @@ describe('RatioVoting', () => {
     expect(() => v.vote('b', 'nope', true, 1)).toThrow(/no open/);
   });
 });
+
+describe('RatioVoting.setVoters', () => {
+  it('lets a joiner vote, and drops the vote of one who left', () => {
+    const v = new RatioVoting(cfg);
+    v.propose('r1', 'a', 4, 1, 0);
+    v.vote('b', 'r1', true, 1);
+    v.setVoters(['a', 'c', 'd']);
+    expect(v.open?.votes).toEqual({ a: true });
+    expect(() => v.vote('b', 'r1', true, 2)).toThrow(/not a voter/);
+    v.vote('d', 'r1', true, 3);
+    expect(v.vote('c', 'r1', true, 4)).toMatchObject([{ outcome: 'passed' }]);
+  });
+});

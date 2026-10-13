@@ -2,6 +2,8 @@ import { InjectionToken } from '@angular/core';
 import {
   deleteAccount,
   devToolsEnabled,
+  adminMode,
+  type AdminMode,
   fetchMe,
   guestEnabled,
   requestLink,
@@ -38,6 +40,8 @@ export interface ShellApi {
   deleteAccount: () => Promise<boolean>;
   guestEnabled: () => Promise<boolean>;
   devToolsEnabled: () => Promise<boolean>;
+  /** Whether the admin view is on, and whether it is open to anyone (`ADMIN_OPEN`). */
+  adminMode: () => Promise<AdminMode | undefined>;
   startGuest: () => Promise<string | undefined>;
   fetchGame: (id: string) => Promise<GameInfo>;
   joinSide: (id: string, side: string) => Promise<void>;
@@ -72,6 +76,7 @@ export const SHELL_API = new InjectionToken<ShellApi>('SHELL_API', {
     deleteAccount: () => deleteAccount(),
     guestEnabled: () => guestEnabled(),
     devToolsEnabled: () => devToolsEnabled(),
+    adminMode: () => adminMode(),
     startGuest: () => startGuest(),
     fetchGame: (id) => fetchGame(id),
     joinSide: (id, side) => joinSide(id, side),

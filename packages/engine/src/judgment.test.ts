@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DIALS,
+  DIAL_CAPS,
   JUDGMENT_CAP,
+  judgmentCap,
   advanceTo,
   caseLaw,
   clampModifier,
@@ -58,5 +61,35 @@ describe('judgment rulings', () => {
     expect(judgmentModifier(world, 'other')).toBe(0);
     expect(caseLaw(world)).toHaveLength(1);
     expect(caseLaw(rule(0, { fallback: true }))).toHaveLength(0);
+  });
+});
+
+describe('the rigid-to-free dial', () => {
+  it('sets only the cap: rigid 0, standard 0.25, free 0.4, absent means standard', () => {
+    expect(DIALS.map((d) => DIAL_CAPS[d])).toEqual([0, 0.25, 0.4]);
+    expect(judgmentCap({})).toBe(JUDGMENT_CAP);
+    expect(judgmentCap({ dial: 'free' })).toBe(0.4);
+    expect(clampModifier(0.3, 0.4).modifier).toBe(0.3);
+    expect(clampModifier(-0.3, 0).modifier).toBe(0);
+    expect(Object.is(clampModifier(-0.3, 0).modifier, 0)).toBe(true);
+  });
+
+  it('a game’s dial clamps its rulings', () => {
+    const registry = new EventRegistry<GameState>();
+    registerJudgment(registry);
+    for (const [dial, kept] of [
+      ['rigid', 0],
+      ['standard', 0.25],
+      ['free', 0.4],
+    ] as const) {
+      const world = { ...loadScenario(holdTheBridge), dial };
+      const state = issueJudgment(
+        createState(world.seed, world, 0),
+        { request, modifier: 5, rationale: 'r', narrative: 'n' },
+        0,
+      );
+      const r = advanceTo(state, 0, registry).state.world.rulings[0] as JudgmentRuling;
+      expect(r.modifier).toBe(kept);
+    }
   });
 });

@@ -66,3 +66,6 @@ The checked-in recording is a hand-authored seed (`model: hand-authored-seed`, z
 
 ## Evaluating another parser
 Construct it in `cli.ts` in place of `StubOrderParser` and give it its own baseline file. Stored outputs for an LLM run should come from the recorded LLM outputs, so the regression check needs no model calls.
+
+## The staff check
+`server/src/orders/staffCheck.test.ts` reuses this corpus for the LLM staff check (D6d, `server/src/orders/staffCheck.ts`). With the offline test provider it requires no findings on the clear orders (except clear-10, which the test parser cannot read), and a finding of the expected kind on each known ambiguity: a missing place or an ambiguous name (vague), a contradiction, an unknown reference (impossible), a condition, and a stated time. It is not scored against the parser's expectations: the check warns where a subordinate would have to guess, and need not agree with the parse. A live-model run with a recorded baseline, as for the parser, is not built.

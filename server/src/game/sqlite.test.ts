@@ -86,6 +86,15 @@ describe('SqliteGameStore', () => {
     expect(open(path).schemaVersion).toBe(MIGRATIONS.length);
   });
 
+  it('keeps the umpire settings in the log header', async () => {
+    const store = open(':memory:');
+    const settings = { dial: 'free', persona: 'pedantic' } as const;
+    await store.saveLogHeader({ gameId: 'a', scenarioId: 's', seed: 1, settings });
+    await store.saveLogHeader({ gameId: 'b', scenarioId: 's', seed: 2 });
+    expect((await store.logHeader('a'))?.settings).toEqual(settings);
+    expect(await store.logHeader('b')).not.toHaveProperty('settings');
+  });
+
   it('stores header, log, progress, clock history and views', async () => {
     const store = open(':memory:');
     await store.saveLogHeader({ gameId: 'g', scenarioId: 's', seed: 7 });

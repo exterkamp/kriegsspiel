@@ -5,6 +5,7 @@ import type {
   ProviderResponse,
 } from '../provider.js';
 import { testParse } from './testParse.js';
+import { testStaffCheck } from './testStaffCheck.js';
 
 /** The model name the test provider reports. Priced at zero, so no budget limit trips. */
 export const TEST_MODEL = 'test';
@@ -17,12 +18,13 @@ const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v)
 /** Which stage asked, from the output schema it wants. The request carries no stage name. */
 function stageOf(
   schema: Json,
-): 'parse' | 'interpret' | 'narrate' | 'staff' | 'judge' | 'command' | 'critique' | undefined {
+): 'parse' | 'interpret' | 'narrate' | 'staff' | 'staffCheck' | 'judge' | 'command' | 'critique' | undefined {
   const keys = Object.keys((schema.properties as Json | undefined) ?? {});
   if (keys.includes('result')) return 'parse';
   if (keys.includes('action')) return 'interpret';
   if (keys.includes('dispatches')) return 'narrate';
   if (keys.includes('messages')) return 'staff';
+  if (keys.includes('findings')) return 'staffCheck';
   if (keys.includes('placements') || keys.includes('modifier')) return 'judge';
   if (keys.includes('orders')) return 'command';
   if (keys.includes('points')) return 'critique';
@@ -259,6 +261,8 @@ export function testReply(schema: Json, input: Json): unknown {
       return narrate(input);
     case 'staff':
       return staff(input);
+    case 'staffCheck':
+      return testStaffCheck(input as never);
     case 'command':
       return command(input);
     case 'critique':

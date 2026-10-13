@@ -25,6 +25,8 @@ import {
 } from '../game/index.js';
 import { FakeTime } from '../game/testing.js';
 import { StubOrderParser } from '../orders/stubParser.js';
+import { umpireConfigFromEnv } from '../umpire/config.js';
+import { createUmpireClient } from '../umpire/createUmpireClient.js';
 import { scriptedOpponentsFromEnv } from '../config.js';
 import { buildApp, type App } from './app.js';
 import { MAX_ORDERS_IN_FLIGHT, MAX_ORDERS_PER_MINUTE } from './hub.js';
@@ -665,6 +667,115 @@ describe('staff questions', () => {
   });
 });
 
+describe('staff check on a draft', () => {
+  const cmd = (c: Record<string, unknown>) => JSON.stringify({ v, ...c });
+  const check = (checkId: string, draft = 'd1') => cmd({ kind: 'checkDraft', checkId, draft });
+
+  async function startWithStaff() {
+    store = new MemoryGameStore();
+    const umpire = createUmpireClient({
+      config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }),
+      env: {},
+    });
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      store,
+      auth: { mailer },
+      narrator: () => umpire,
+    });
+    const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+    return { base, ws: base.replace('http', 'ws') };
+  }
+
+  it('reads the server’s copy of the draft, charges the chief of staff, and tells the whole side', async () => {
+    const { base, ws } = await startWithStaff();
+    const game = (await createGame(base, { rate: 1 })).json;
+    const a = await join(ws, game, 'blue');
+    const b = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    await a.waitFor('drafts');
+    a.send(cmd({ kind: 'createDraft', draft: 'd1', text: 'Move up' }));
+    await b.waitFor('draftState', (m) => m.draft.id === 'd1');
+
+    a.send(check('c1'));
+    for (const c of [a, b]) {
+      const queued = await c.waitFor('draftCheckQueued', (m) => m.checkId === 'c1');
+      expect(queued.answerAtGame).toBe(queued.askedAtGame + queued.costMs);
+      expect(queued.costMs).toBeGreaterThan(0);
+      const report = await c.waitFor('draftCheck', (m) => m.checkId === 'c1');
+      expect(report.rev).toBe(queued.rev);
+      expect(report.unavailable).toBeUndefined();
+      expect(report.findings.map((f) => f.kind)).toContain('missing_place');
+      expect(report.caveat).toMatch(/not a guarantee/);
+    }
+    // The other side hears nothing of it.
+    expect(red.messages.some((m) => m.kind === 'draftCheck' || m.kind === 'draftCheckQueued')).toBe(
+      false,
+    );
+    // It is a journal-only entry with its model call, so replay needs no model.
+    const entry = (await store.inputLog(game.id)).find((e) => e.command.kind === 'draftCheck')!;
+    expect(entry.command).toMatchObject({ side: 'blue', draft: 'd1', text: 'Move up', rev: 0 });
+    expect(entry.calls).toHaveLength(1);
+    expect(entry.calls![0]!.stage).toBe('staff');
+  });
+
+  it('keeps the chief of staff busy for a second request, per side', async () => {
+    const { base, ws } = await startWithStaff();
+    const game = (await createGame(base, { rate: 1 })).json;
+    const blue = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    await blue.waitFor('drafts');
+    blue.send(cmd({ kind: 'createDraft', draft: 'd1', text: '1st Battalion hold' }));
+    red.send(cmd({ kind: 'createDraft', draft: 'd1', text: '1st Battalion hold' }));
+    await blue.waitFor('draftState');
+    await red.waitFor('draftState');
+    blue.send(check('c1'));
+    await blue.waitFor('draftCheckQueued');
+    blue.send(check('c2'));
+    const busy = await blue.waitFor('error', (m) => m.code === 'staff_busy');
+    expect(busy.message.startsWith('c2: ')).toBe(true);
+    red.send(check('c3'));
+    await red.waitFor('draftCheckQueued', (m) => m.checkId === 'c3');
+  });
+
+  it('refuses an unknown or empty draft without charging for it', async () => {
+    const { base, ws } = await startWithStaff();
+    const game = (await createGame(base, { rate: 1 })).json;
+    const blue = await join(ws, game, 'blue');
+    await blue.waitFor('drafts');
+    blue.send(check('c1', 'nope'));
+    expect((await blue.waitFor('error', (m) => m.code === 'draft_unknown')).message).toMatch(
+      /^c1: /,
+    );
+    blue.send(cmd({ kind: 'createDraft', draft: 'd1' }));
+    await blue.waitFor('draftState');
+    blue.send(check('c2'));
+    expect((await blue.waitFor('error', (m) => m.code === 'bad_draft')).message).toMatch(/^c2: /);
+    // A refusal charges nothing: the next real request is not busy.
+    blue.send(
+      cmd({ kind: 'draftEdit', draft: 'd1', baseRev: 0, op: ['Hold the bridge'], opId: 'e1' }),
+    );
+    await blue.waitFor('draftEntry');
+    blue.send(check('c3'));
+    await blue.waitFor('draftCheckQueued', (m) => m.checkId === 'c3');
+  });
+
+  it('says the staff could not look when there is no umpire, and changes nothing', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base, { rate: 1 })).json;
+    const blue = await join(ws, game, 'blue');
+    await blue.waitFor('drafts');
+    blue.send(cmd({ kind: 'createDraft', draft: 'd1', text: 'Hold the bridge' }));
+    await blue.waitFor('draftState');
+    blue.send(check('c1'));
+    const report = await blue.waitFor('draftCheck');
+    expect(report.unavailable).toBe(true);
+    expect(report.reading).toBeUndefined();
+    expect(report.findings).toEqual([]);
+    expect(report.officer.name).not.toBe('');
+  });
+});
+
 describe('orders', () => {
   it('delivers the order after the courier ride, then sends the dispatch', async () => {
     const { base, ws } = await start();
@@ -790,13 +901,13 @@ describe('orders', () => {
     expect(app!.host.get(game.id)!.state.queue.some((e) => e.type === 'order.issue')).toBe(false);
   });
 
-  it('says drafts and other commands are not supported yet', async () => {
+  it('refuses a draft that does not exist, and says other commands are not supported yet', async () => {
     const { base, ws } = await start();
     const game = (await createGame(base)).json;
     const blue = await join(ws, game, 'blue');
     blue.send(JSON.stringify({ v, kind: 'issueOrder', orderId: 'o', draft: 'd1' }));
     blue.send(JSON.stringify({ v, kind: 'setReady', ready: true }));
-    await blue.waitFor('error', (m) => m.code === 'not_implemented' && m.message.includes('draft'));
+    await blue.waitFor('error', (m) => m.code === 'draft_unknown' && m.message.includes('o:'));
     await blue.waitFor(
       'error',
       (m) => m.code === 'not_implemented' && m.message.includes('setReady'),
@@ -1485,6 +1596,34 @@ describe('pause voting over the WebSocket', () => {
     expect((await c.waitFor('error')).code).toBe('pause_unavailable');
     expect(c.messages.some((m) => m.kind === 'pauseState')).toBe(false);
   });
+
+  it('emergency hold: stops the clock, shows tallies only, and refuses with fixed wording when spent', async () => {
+    const { game, blue, red } = await votingGame({
+      rule: 'unanimous',
+      holdMs: 1000,
+      holdsPerPlayer: 1,
+    });
+    await blue.waitFor('pauseState', (m) => m.phase === 'running' && m.holdsLeft === 1);
+    blue.send(cmd({ kind: 'proposeHold', reason: 'phone' }));
+    const open = await red.waitFor('pauseState', (m) => m.phase === 'pause_proposed');
+    expect(open.proposal).toMatchObject({
+      hold: true,
+      kind: 'pause',
+      bySide: 'blue',
+      yes: 1,
+      no: 0,
+    });
+    expect(JSON.stringify(open)).not.toContain('vote-blue');
+    expect(app!.host.get(game.id)!.gameClock.status).toBe('paused');
+    // Nobody ratifies: it lapses and the clock runs again.
+    const r = await red.waitFor('pauseResult', () => true, 8000);
+    expect(r).toMatchObject({ outcome: 'cancelled', cause: 'timeout', proposalKind: 'pause' });
+    await blue.waitFor('pauseState', (m) => m.phase === 'running' && m.holdsLeft === 0);
+    expect(app!.host.get(game.id)!.gameClock.status).toBe('running');
+    blue.send(cmd({ kind: 'proposeHold' }));
+    const refused = await blue.waitFor('error', (m) => m.code === 'hold_refused');
+    expect(refused.message).toBe('no emergency hold is left to you in this game');
+  }, 20_000);
 
   it('refuses a vote on a proposal that is not open', async () => {
     const { blue } = await votingGame();
