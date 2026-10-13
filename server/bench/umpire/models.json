@@ -6,5 +6,9 @@
   "llama3.1:8b": {
     "diskGb": 4.9,
     "note": "resident memory not recorded: the Docker daemon crashed during its last case"
+  },
+  "gemma4:e4b": {
+    "diskGb": 6.6,
+    "memGb": 1.9
   }
 }
