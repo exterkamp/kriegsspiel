@@ -18,7 +18,7 @@ import {
   type ServerMessage,
 } from '@kriegsspiel/protocol';
 import { Buffer } from 'node:buffer';
-import type { GameActor, GameStore } from '../game/index.js';
+import { TURN_MODE_REFUSAL, type GameActor, type GameStore } from '../game/index.js';
 import { NOOP_TRACE, traceRequest, type TraceSink } from '../debug/trace.js';
 import type { PauseTransition } from '../pause.js';
 import { DraftBook, DraftError } from '../drafts/book.js';
@@ -71,6 +71,8 @@ interface Connection {
   lastPause: string;
   /** The newest pause step this connection has been told about. */
   pauseSeen: number;
+  /** The last `turnState` sent (turn mode), so only a change is sent again. */
+  lastTurn: string;
   /** Total bytes sent on this connection, counted in `Hub.send`; the trace reads deltas of it. */
   sentBytes: number;
   /** Orders being parsed now, and the wall-clock times of recent ones (#160). */
@@ -530,6 +532,7 @@ export class Hub {
       gameOverSent: false,
       lastPause: '',
       pauseSeen: this.lookup(gameId)?.pauseSteps.at(-1)?.n ?? 0,
+      lastTurn: '',
       sentBytes: 0,
       ordersInFlight: 0,
       orderTimes: [],
@@ -668,6 +671,20 @@ export class Hub {
     const out = [];
     for (const e of await this.store.inputLog(gameId)) {
       const c = e.command;
+      // Turn mode (D39): the orders a side sent for a turn, set out at the turn's start.
+      if (c.kind === 'sendTurn' && c.side === conn.side && !e.error) {
+        for (const o of c.orders) {
+          const toName = names.get(o.to);
+          out.push({
+            id: o.orderId,
+            text: o.text,
+            sentAtGame: e.gameMs,
+            ...(toName ? { toName } : {}),
+            ...(o.courier ? { courier: o.courier } : {}),
+          });
+        }
+        continue;
+      }
       if (c.kind !== 'order' || c.side !== conn.side || e.agent || e.error) continue;
       if (e.parse?.kind !== 'intents') continue;
       const toName = names.get(e.parse.unitId);
@@ -755,6 +772,7 @@ export class Hub {
         conn.lastClock = clockJson;
       }
       this.pushPause(gameId, game, conn);
+      this.pushTurn(game, conn);
       const first = conn.lastView === '';
       // Only while the game is still waiting on the confirm: later joiners must not be told it is paused.
       if (first && game.restart && clock.status === 'paused' && !game.state.world.outcome) {
@@ -790,6 +808,83 @@ export class Hub {
       }
     } catch (e) {
       this.onError(gameId, e);
+    }
+  }
+
+  /**
+   * Turn mode (D39): tell a connection where the open turn stands. Its side's held orders are in it;
+   * another side's never are, only that it has sent. Intelligence does not see orders (as with
+   * `sentOrders`), so it is told the turn without them.
+   */
+  private pushTurn(game: GameActor, conn: Connection): void {
+    const state = game.turnStateFor(conn.side);
+    if (!state) return;
+    const message: ServerMessage = {
+      v: PROTOCOL_VERSION,
+      kind: 'turnState',
+      ...state,
+      held: conn.seat?.role === 'intelligence' ? [] : state.held,
+    };
+    const key = JSON.stringify(message);
+    if (key === conn.lastTurn) return;
+    conn.lastTurn = key;
+    this.send(conn, message);
+  }
+
+  /** Turn mode: hold, withdraw or send the side's orders for the open turn. */
+  private async handleTurnCommand(
+    game: GameActor,
+    conn: Connection,
+    command: Extract<Command, { kind: 'holdTurnOrder' | 'withdrawTurnOrder' | 'sendTurn' }>,
+  ): Promise<void> {
+    const prefix =
+      command.kind === 'holdTurnOrder'
+        ? `${command.order.orderId}: `
+        : command.kind === 'withdrawTurnOrder'
+          ? `${command.orderId}: `
+          : '';
+    const fail = (code: string, message: string) => this.send(conn, error(code, prefix + message));
+    if (!game.turnMode) return fail('not_turn_mode', 'this game is played in real time');
+    if (game.state.world.outcome) return fail('game_over', 'the game has ended');
+    if (conn.seat?.role === 'intelligence') {
+      return fail('not_permitted', 'the intelligence officer does not write orders');
+    }
+    // Any seat may hold or withdraw (the side's held orders are shared); only a seat that signs may send.
+    if (
+      command.kind === 'sendTurn' &&
+      conn.seat &&
+      conn.seat.role !== 'commander' &&
+      conn.seat.role !== 'subordinate'
+    ) {
+      return fail('not_permitted', 'staff officers draft orders; the commander sends them');
+    }
+    const by = conn.seat ? { by: conn.seat } : {};
+    let result;
+    try {
+      result = await game.submit(
+        command.kind === 'holdTurnOrder'
+          ? { kind: 'turnOrder', side: conn.side, turn: 0, order: command.order, ...by }
+          : command.kind === 'withdrawTurnOrder'
+            ? {
+                kind: 'withdrawTurnOrder',
+                side: conn.side,
+                turn: 0,
+                orderId: command.orderId,
+                ...by,
+              }
+            : {
+                kind: 'sendTurn',
+                side: conn.side,
+                turn: 0,
+                orders: [],
+                ...(conn.seat ? { signer: conn.seat } : {}),
+              },
+      );
+    } catch (e) {
+      return fail('game_closed', e instanceof Error ? e.message : 'game is closed');
+    }
+    if (!result.ok) {
+      fail('turn_refused', result.kind === 'rejection' ? result.reason : result.question);
     }
   }
 
@@ -1222,7 +1317,19 @@ export class Hub {
       command.kind === 'proposeResume' ||
       command.kind === 'vote'
     ) {
+      if (game.turnMode) {
+        this.send(conn, error('turn_mode', TURN_MODE_REFUSAL));
+        return;
+      }
       await this.handlePauseCommand(game, conn, command);
+      return;
+    }
+    if (
+      command.kind === 'holdTurnOrder' ||
+      command.kind === 'withdrawTurnOrder' ||
+      command.kind === 'sendTurn'
+    ) {
+      await this.handleTurnCommand(game, conn, command);
       return;
     }
     if (command.kind === 'dissent') {
@@ -1288,6 +1395,16 @@ export class Hub {
     }
     if (command.kind !== 'issueOrder') {
       this.send(conn, error('not_implemented', `${command.kind} is not supported yet`));
+      return;
+    }
+    if (game.turnMode) {
+      this.send(
+        conn,
+        error(
+          'turn_mode',
+          `${command.orderId}: in a turn-based game orders are held for the turn (holdTurnOrder) and sent with it`,
+        ),
+      );
       return;
     }
     // The client disables the order box once the game ends, but the guarantee belongs here:
