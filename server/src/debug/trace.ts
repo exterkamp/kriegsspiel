@@ -14,7 +14,8 @@ import { randomUUID } from 'node:crypto';
 import { createWriteStream, type WriteStream } from 'node:fs';
 import { Redactor } from './redact.js';
 
-export type TraceKind = 'request' | 'command' | 'engine' | 'clock' | 'error' | 'llm';
+/** `order` notes a step of the order pipeline that fell back (`OrderTraceNote`, #395). */
+export type TraceKind = 'request' | 'command' | 'engine' | 'clock' | 'error' | 'llm' | 'order';
 
 export interface TraceEntry {
   /** Per-store, strictly increasing. */
