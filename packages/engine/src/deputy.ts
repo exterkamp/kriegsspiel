@@ -8,7 +8,7 @@ import type { GameState, SideId } from './types.js';
  * How much latitude a player gives their deputy (docs/gameplay.md, "When you are away"), least
  * first. Each level allows what the one before it does, and more:
  * - `hold`: stand fast or fall back. No order may send a unit more than `HOLD_RANGE_M` from where
- *   it stands now, except a withdrawal.
+ *   it stands now, except a withdrawal toward the side's own HQ.
  * - `adjust`: also reposition a unit by up to `ADJUST_RANGE_M` at the ordinary pace.
  * - `act`: any order the player could sign themselves, a forced march included.
  */
@@ -48,8 +48,14 @@ export function deputyProblems(
   const check = (list: readonly OrderIntent[]): void => {
     for (const i of list) {
       switch (i.kind) {
-        case 'withdraw':
+        case 'withdraw': {
+          // Falling back means toward our own HQ; a "withdrawal" toward the enemy is a move.
+          const hq = world.sides.find((s) => s.id === side)?.hq;
+          if (discretion !== 'act' && hq && distance(i.toward, hq) >= distance(unit.center, hq)) {
+            problems.push('a withdrawal must fall back toward our own HQ');
+          }
           break;
+        }
         case 'hold': {
           if (discretion === 'hold' && distance(unit.center, i.at) > HOLD_RANGE_M) {
             problems.push(`holding ${Math.round(distance(unit.center, i.at))} m away is a move`);

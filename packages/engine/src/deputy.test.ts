@@ -12,6 +12,7 @@ const world = miniWorld({
   ],
 });
 const b1 = world.units.find((u) => u.id === 'b1')!;
+
 const commander: Seat = { role: 'commander' };
 const near = (m: number) => ({ x: b1.center.x + m, y: b1.center.y });
 const check = (
@@ -21,12 +22,26 @@ const check = (
   id = 'b1',
 ) => deputyProblems(world, 'blue', seat, d, id, intents);
 
+/** A point on the HQ side of b1 (-1) or away from it (+1), well clear of it. */
+function hqSide(dir: -1 | 1) {
+  const hq = world.sides.find((s) => s.id === 'blue')!.hq;
+  const away = Math.sign(b1.center.x - hq.x) || 1;
+  return { x: b1.center.x + dir * away * 400, y: b1.center.y };
+}
+
 describe('deputy discretion', () => {
   it('hold: refuses a move, allows a withdrawal and holding where it stands', () => {
     expect(check('hold', [{ kind: 'move', to: near(100) }])).toHaveLength(1);
-    expect(check('hold', [{ kind: 'withdraw', toward: near(-5000) }])).toEqual([]);
+    expect(check('hold', [{ kind: 'withdraw', toward: hqSide(-1) }])).toEqual([]);
     expect(check('hold', [{ kind: 'hold', at: near(HOLD_RANGE_M - 10) }])).toEqual([]);
     expect(check('hold', [{ kind: 'hold', at: near(HOLD_RANGE_M + 100) }])).toHaveLength(1);
+  });
+
+  it('a withdrawal toward the enemy is a move, not a fall back, short of full discretion', () => {
+    const toward = { kind: 'withdraw', toward: hqSide(1) } as const;
+    expect(check('hold', [toward])).toHaveLength(1);
+    expect(check('adjust', [toward])).toHaveLength(1);
+    expect(check('act', [toward])).toEqual([]);
   });
 
   it('adjust: moves a short way at the ordinary pace, not further or forced', () => {
@@ -66,7 +81,7 @@ describe('deputy discretion', () => {
 
   it('is monotone: whatever hold allows, adjust and act allow', () => {
     const intents: OrderIntent[][] = [
-      [{ kind: 'withdraw', toward: near(-3000) }],
+      [{ kind: 'withdraw', toward: hqSide(-1) }],
       [{ kind: 'hold', at: near(50) }],
     ];
     for (const i of intents) {
