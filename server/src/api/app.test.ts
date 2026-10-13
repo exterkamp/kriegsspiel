@@ -787,7 +787,7 @@ describe('orders', () => {
     blue.send(order('blue-1 march to the bridge'));
 
     const { dispatch } = await blue.waitFor('dispatch', (m) =>
-      m.dispatch.text.includes('received its orders'),
+      m.dispatch.text.includes('your orders'),
     );
     // The order was signed at `issuedAt`; the courier took DELIVERY_MS to reach the unit and
     // the acknowledgement took ACK_DELAY_MS to come back.

@@ -6,6 +6,7 @@ import { courierPosition, destinationOf } from './courier.js';
 import { findPath } from './navigation.js';
 import { distance, metres } from './geometry.js';
 import { describePlace } from './place.js';
+import { fieldNote, type NoteSender } from './fieldNotes.js';
 import { evaluateStanding } from './standing.js';
 import { unitTypeOf } from './unitTypes.js';
 import { BLOCKS_SIGHT, profileAlong, terrainAt } from './terrain.js';
@@ -83,6 +84,12 @@ export function contactAgedOut(world: GameState, c: Contact, now: GameTime): boo
  * orders were due, by the time the lost-courier report did. Fixed once delivered, so the text does
  * not change between readings.
  */
+/** The public trait of the unit that sent `r`, for its note's manner (#419). */
+function senderOf(state: GameState, side: SideId, r: Report): NoteSender {
+  const u = state.units.find((x) => x.side === side && x.name === r.from);
+  return u?.trait === undefined ? {} : { trait: u.trait };
+}
+
 function heardFromSince(reports: Report[], r: Report): boolean {
   if (r.kind !== 'courierLost' || r.orderDueAt === undefined) return false;
   const due = r.orderDueAt;
@@ -340,56 +347,20 @@ export interface EngineSideView {
 }
 
 /**
- * Plain template prose for a report. The LLM replaces this later. `leadMs` is the report's age when
- * it reached HQ (not travel time), so the text is the same whenever it is read and agrees with the
- * "received" time shown beside it (#318); never an age measured against the clock at read time.
- * Every kind says it one way: "about N minutes ago", or "just now" (#325).
+ * The engine's prose for a report, as a field note from its sender (`fieldNote`, #419); the narrate
+ * stage may replace it. `leadMs` is the report's age when it reached HQ (not travel time), so the text
+ * is the same whenever it is read and agrees with the "received" time shown beside it (#318); never an
+ * age measured against the clock at read time. Every kind says it one way: "about N minutes ago", or
+ * "just now" (#325). `sender` and `seed` choose the manner and wording; without them, the first wording.
  */
-export function renderReport(r: Report, leadMs: number, heardSince = false): string {
-  const mins = Math.round(leadMs / MS_PER_MINUTE);
-  const where = r.place;
-  const when = mins === 0 ? 'just now' : `about ${mins} ${mins === 1 ? 'minute' : 'minutes'} ago`;
-  // Every report opens the same way, and says its age the same way (#323). The umpire's own words stand as written.
-  const sir = (text: string) => `Sir, ${text}`;
-  switch (r.kind) {
-    case 'situation':
-      return sir(
-        `${r.from} reports ${r.sizeEstimate ?? 'the formations'} in position ${where}; no enemy yet in sight.`,
-      );
-    case 'contact':
-      return sir(
-        `${r.from} sighted ${r.sizeEstimate ?? 'enemy troops'} ${where}, ${when} (${r.confidence} confidence).`,
-      );
-    case 'unitLost':
-      return sir(`${r.from} is lost ${where}, ${when}.`);
-    case 'courierLost':
-      // A unit that has sent word since its orders were due is not silent, only without them (#417).
-      return heardSince
-        ? sir(
-            `${r.from} ${where} has sent word, but not that it has its orders: the courier carrying them is overdue and must be given up for lost. Send the orders again.`,
-          )
-        : sir(
-            `no word from ${r.from} ${where}: the courier carrying its orders is overdue and must be given up for lost. Send the orders again.`,
-          );
-    case 'orderDelivered':
-      return sir(`${r.from} received its orders ${where}, ${when}.`);
-    case 'lowAmmo':
-      return sir(`${r.from} is running short of ammunition ${where}, ${when}.`);
-    case 'exhausted':
-      return sir(`${r.from} is exhausted ${where}, ${when}.`);
-    case 'destroyed':
-      return sir(
-        `${r.from} reports ${r.sizeEstimate ?? 'enemy troops'} destroyed ${where}, ${when}.`,
-      );
-    case 'engaged':
-      return sir(`${r.from} is engaged ${where}, ${when}.`);
-    case 'heavyLosses':
-      return sir(`${r.from} is taking heavy losses ${where}, ${when}.`);
-    case 'broke':
-      return sir(`${r.from} has broken and is falling back ${where}, ${when}.`);
-    case 'battle':
-      return r.text ?? `The umpire has decided the battle ${where}.`;
-  }
+export function renderReport(
+  r: Report,
+  leadMs: number,
+  heardSince = false,
+  sender?: NoteSender,
+  seed?: number,
+): string {
+  return fieldNote(r, leadMs, heardSince, sender, seed);
 }
 
 /** Prose for the table: where and when the dispatch was taken, then the enemy's own words. */
@@ -550,7 +521,13 @@ export function viewFor(
           uncertaintyRadius: metres(r.uncertainty),
           ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
           confidence: r.confidence,
-          text: renderReport(r, r.deliverAt - r.observedAt, heardFromSince(intel.reports, r)),
+          text: renderReport(
+            r,
+            r.deliverAt - r.observedAt,
+            heardFromSince(intel.reports, r),
+            senderOf(state, side, r),
+            state.seed,
+          ),
         };
       }),
     documents: intel.documents

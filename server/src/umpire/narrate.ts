@@ -97,8 +97,15 @@ export function unitCondition(u: Pick<ViewUnit, 'morale' | 'fatigue' | 'ammo'>):
   return `${morale}, ${fatigue}, ${ammo}`;
 }
 
-/** Report kinds the named unit did not write (it is destroyed, or never had the orders): HQ writes them. */
-const STAFF_KINDS: ReadonlySet<ViewReport['kind']> = new Set(['unitLost', 'courierLost']);
+/**
+ * Report kinds the named unit did not write (it is destroyed, or never had the orders) and the chief of
+ * staff's opening situation: HQ writes them.
+ */
+const STAFF_KINDS: ReadonlySet<ViewReport['kind']> = new Set([
+  'unitLost',
+  'courierLost',
+  'situation',
+]);
 
 /**
  * What the model sees for one report. Metres and minutes, no ids of anything the side cannot know.
@@ -272,6 +279,8 @@ const SENTENCE_OPENERS = new Set([
   'for',
   'forgive',
   'from',
+  'get',
+  'give',
   'half',
   'has',
   'hasten',
@@ -288,6 +297,7 @@ const SENTENCE_OPENERS = new Set([
   'it',
   'its',
   'later',
+  'let',
   'many',
   'may',
   'men',
@@ -318,6 +328,7 @@ const SENTENCE_OPENERS = new Set([
   'red',
   'request',
   'retire',
+  'say',
   'scouts',
   'send',
   'shall',
@@ -513,7 +524,7 @@ const EVENT_WORDS: Record<Exclude<ViewReport['kind'], 'battle'>, RegExp> = {
   situation:
     /\b(position|posted|placed|in place|in line|line|ready|deployed|formed|stand|standing|quiet|no enemy|nothing)\b/i,
   contact:
-    /\b(see|seen|saw|sight|sighted|sighting|spotted|spied|observed|watch|watching|enemy|enemies|troops|column|columns|men|horse|foot|force)\b/i,
+    /\b(see|seen|saw|sight|sighted|sighting|spotted|spied|observed|watch|watching|enemy|enemies|troops|column|columns|men|horse|foot|force|battalions?|squadrons?|regiments?|companies|company|brigades?|infantry|cavalry|guns|artillery|before us)\b/i,
   orderDelivered:
     /\b(order|orders|instructions|your note|your letter|despatch|dispatch|received|in hand|have them|obey)\b/i,
   lowAmmo: /\b(ammunition|cartridges?|powder|ball|shot|rounds|supply|supplies|resupply)\b/i,
@@ -526,7 +537,7 @@ const EVENT_WORDS: Record<Exclude<ViewReport['kind'], 'battle'>, RegExp> = {
   heavyLosses:
     /\b(loss|losses|lost|casualties|fallen|dead|killed|wounded|cut up|bled|bleeding|thinned|heavy|dearly)\b/i,
   broke:
-    /\b(broke|broken|break|fall back|falling back|fell back|retreat|retreating|rout|routed|flee|fled|fleeing|withdraw|withdrawing|gave way|give way|ran)\b/i,
+    /\b(broke|broken|break|fall back|falling back|fell back|retreat|retreating|rout|routed|flee|fled|fleeing|withdraw|withdrawing|gave way|give way|given way|rally|driven back|ran)\b/i,
   unitLost: /\b(lost|gone|destroyed|no word|silent|silence|missing|no more|cut off|perished)\b/i,
   courierLost: /\b(courier|rider|messenger|orders?|overdue|lost|no word)\b/i,
 };

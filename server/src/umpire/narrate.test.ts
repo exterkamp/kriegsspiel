@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LOW_AMMO, MS_PER_MINUTE } from '@kriegsspiel/engine';
+import { LOW_AMMO, MS_PER_MINUTE, fieldNote } from '@kriegsspiel/engine';
 import type { ViewReport, ViewUnit } from '@kriegsspiel/engine';
 import { MockUmpireClient } from './mockUmpireClient.js';
 import type { UmpireFixture } from './mockUmpireClient.js';
@@ -523,6 +523,59 @@ describe('field-note checks (#419)', () => {
       report({ id: 'blue-r6', kind: 'unitLost', from: '1st Battalion', sizeEstimate: undefined }),
     ]);
     expect(checkFieldNote('The 1st Battalion is lost, sir.', lost.reports[0]!)).toEqual([]);
+  });
+});
+
+describe('the engine’s field notes as fallback (#419)', () => {
+  it('pass the same checks a model’s note must, for every kind, wording and manner', () => {
+    const kinds = [
+      'situation',
+      'contact',
+      'unitLost',
+      'courierLost',
+      'orderDelivered',
+      'lowAmmo',
+      'exhausted',
+      'destroyed',
+      'engaged',
+      'heavyLosses',
+      'broke',
+    ] as const;
+    const unit = {
+      id: 'blue-1',
+      name: '1st Battalion',
+      strength: 500,
+      morale: 80,
+      fatigue: 10,
+      ammo: 90,
+    } as ViewUnit;
+    for (const kind of kinds) {
+      for (const trait of [undefined, 'bold', 'cautious', 'steady and methodical']) {
+        for (let i = 0; i < 30; i++) {
+          const r = report({
+            id: `blue-r${i}`,
+            kind,
+            from: '1st Battalion',
+            place: 'at the bridge, on the High road',
+            observedAt: 0,
+            deliveredAt: 3 * MS_PER_MINUTE,
+            ...(kind === 'contact' || kind === 'destroyed' ? {} : { sizeEstimate: undefined }),
+          });
+          const text = fieldNote(
+            { ...r, deliverAt: r.deliveredAt, uncertainty: 0 },
+            3 * MS_PER_MINUTE,
+            false,
+            trait === undefined ? {} : { trait },
+            11,
+          );
+          const input = narrateInput('blue', [r], [{ ...unit, ...(trait ? { trait } : {}) }]);
+          expect(
+            checkNarration({ dispatches: [{ reportIds: [r.id], text }] }, input),
+            text,
+          ).toEqual([]);
+        }
+      }
+    }
   });
 });
 

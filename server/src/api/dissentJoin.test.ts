@@ -129,7 +129,7 @@ async function startedTable(): Promise<Table> {
 async function sign(lead: Tap, orderId: string): Promise<void> {
   lead.send({ kind: 'issueOrder', orderId, text: 'blue-1 march to the bridge' });
   await lead.until((m) =>
-    m.find((x) => x.kind === 'dispatch' && x.dispatch.text.includes('received its orders')),
+    m.find((x) => x.kind === 'dispatch' && x.dispatch.text.includes('your orders')),
   );
 }
 

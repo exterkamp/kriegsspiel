@@ -341,7 +341,7 @@ describe('couriers on the table (#196)', () => {
     const later = advanceTo(foggy(seed), overdue.deliverAt, registry()).state;
     const told = viewFor(later.world, 'blue', later.time);
     const report = told.reports.find((x) => x.kind === 'courierLost')!;
-    expect(report.text).toMatch(/^Sir, no word from Unit|^Sir, no word from /);
+    expect(report.text).toMatch(/^Sir, .*no word from /);
     expect(report.observedAt).toBeGreaterThanOrEqual(view.couriers[0]!.arriveAt);
     expect(told.couriers).toEqual([]);
     expect(
@@ -374,7 +374,7 @@ describe('couriers on the table (#196)', () => {
       },
     };
     expect(textOf(heard)).not.toMatch(/no word/);
-    expect(textOf(heard)).toMatch(/has sent word, but not that it has its orders/);
+    expect(textOf(heard)).toMatch(/courier.*(overdue|lost)/);
     // A report from before the orders were due, or one still on the road, does not count.
     for (const early of [
       { ...engaged, observedAt: overdue.orderDueAt! - 1 },
