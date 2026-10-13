@@ -30,7 +30,7 @@ export function dissentNotes(entries: readonly InputLogEntry[]): DissentNote[] {
   for (const e of entries) {
     const c = e.command;
     if (c.kind !== 'dissent') continue;
-    const key = `${c.side}\|${c.dissent.orderId}`;
+    const key = `${c.side}|${c.dissent.orderId}`;
     let note = notes.get(key);
     if (!note) {
       const o = orders.get(key);
