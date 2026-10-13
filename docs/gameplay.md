@@ -31,6 +31,8 @@ Quiet marches cost nothing, because the simulation jumps between events. Fights 
 
 A turn-based game is just a clock that only advances when stepped. That mode exists for testing and for anyone who wants it, but it is not the main design.
 
+The turn-based umpire game is a separate mode chosen when the game is made; see [Turn-based play](#turn-based-play) below and D39. Nothing in this section changes for real-time games.
+
 ### What a session feels like
 
 1. Check in, read the new dispatches in the in-tray, and update the map.
@@ -73,6 +75,21 @@ The umpire's window reveals true positions, dice and rulings. The umpire then wr
 The critique is a section of the window (`GET /games/:id/critique`, D38). The umpire writes it from the log: every point is dated and cites the logged events it rests on (orders and their delivery times, reports as they reached headquarters, rulings, losses, pauses and votes), and the server refuses any point that cites an event that does not exist. If no umpire is available the same facts are quoted plainly. It is written once and kept in the input log.
 
 The window is the same map table with a scrubber over the whole game. It shows every unit's true position at the scrubbed time, can overlay what either side believed (live sightings and aged ghosts), and shows the dice, modifiers and umpire rulings for a unit under the pointer. It is rebuilt from the input log with no model call, and the server refuses it (`403 game_not_over`) until the game has ended (`GET /games/:id/window`, `/window/at`).
+
+## Turn-based play
+
+A second way to play, chosen on the new-game screen next to the dial and the umpire's manner and fixed for the game (D39, Epic #393). It plays like the original Kriegsspiel: both sides write their orders for a slice of time, hand them in together, and the umpire tells each side what happened. Everything else is the same game: the scenario, lobby, seats and roles, the desk, the in-tray, the map table, the umpire's window and replay.
+
+**A turn** is a fixed slice of game time, 20 game minutes unless the game says otherwise. Nothing moves between turns: the clock only advances when a turn is resolved, so you can take as long as you like over your orders, or set a deadline ("orders due by Thursday") for a game played over days.
+
+1. **Write orders for the turn.** At the orders desk, as in real-time play: each order is addressed to a unit, in your own words, with a fast or a safe courier. Write as you would to a subordinate who knows the ground: "Push the light company along the stream until they see the enemy, then report and hold", or "if the bridge is lost, fall back to the mill". The umpire reads the text as written; there is no "staff could not understand" in this mode. Orders still go by courier: a far unit may not get its order this turn, and a courier may be lost, read by the enemy or garbled on the way, as in real-time play. (11.3, #399; desk and lobby in 11.10, #406.)
+2. **Send.** When your orders are ready you send them for the turn. You can revise them until you send; after that they are with the couriers. A side that sends nothing keeps its units on their last orders. (11.3, #399.)
+3. **Wait for the umpire.** When every side has sent, or the deadline has passed, the umpire adjudicates the turn. It sees both sides' orders and the whole field and decides what each unit did, how commanders read their orders (a cautious colonel may stop short, an eager one may go too far, D36), where they stood at the end, what they saw, and what each fight cost. Where the outcome is genuinely uncertain it asks for a die roll with stated odds, and the server rolls it. The engine then checks the result against hard limits (no unit marches farther than it could over that ground, loses more men than it has, or sees what it could not have seen) and clamps anything that breaks them. If the umpire cannot answer, the turn is resolved by the tables instead and your in-tray says so: a turn always resolves. (Adjudication 11.6, #402; the engine's resolution 11.4, #400; the checks 11.5, #401; dice 11.7, #403; the umpire's memory across turns 11.8, #404.)
+4. **Read the turn's reports.** Each side gets its own papers in the in-tray: what its units did and why, in their officers' voices, and what they saw of the enemy, never more than they could have seen. The map table moves your units to where they stand and updates your contacts. Then you write the next turn's orders. (11.9, #405.)
+
+**The dial** picks who adjudicates. *Rigid*: the tables alone, no umpire (real-time rules played in fixed steps). *Standard*: the umpire decides, starting from what the tables would give and departing only for a stated reason. *Free*: the umpire decides as a free-Kriegsspiel umpire would, with the tables as advice. In every setting the engine's hard limits apply. The keyless demo plays turn mode with the tables at every dial until a local model is good enough (the benchmark, 11.2, #398).
+
+The game ends as a real-time game does (an objective held, a broken force, or the time limit); the last turn ends at the time limit, so it falls at the same minute in every mode. After it, the umpire's window replays it turn by turn with each turn's orders, rolls and rulings, and needs no model to do so (11.11, #407). The first full game in this mode is the playtest of 11.12 (#408).
 
 ## Pace: the clock ratio
 
