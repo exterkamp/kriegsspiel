@@ -97,7 +97,10 @@ export type GameCommand =
       side: string;
       role: string;
       question: string;
-      /** The conference record, so a restart restores it (D6b). Absent in entries from before it was kept. */
+      /**
+       * The conference record, so a restart restores it (D6b). Logged when asked (no `text` yet) and
+       * again when answered at the due time, with the stored words (#418). Absent in entries from before it was kept.
+       */
       exchange?: StaffExchange;
     }
   /**
