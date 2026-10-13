@@ -707,5 +707,6 @@ A proposal with problems is sent back **once** with the problems listed (as narr
 - How a side's reports are timed within the turn (all at `T1`, or each at the minute it would have reached HQ) is for 11.9; the first version delivers all at `T1`.
 - Whether turn mode keeps the post-game critique's real-time facts (deliveries, misreadings) unchanged or needs turn facts is for 11.11.
 - Whether the turn length may vary (Verdy's umpire made turns shorter in contact) is not decided; the first version keeps `turnMinutes` fixed.
+- The admin clock controls (D38, #128) can `step` game time in any mode. In turn mode a step inside a turn would move the world outside the pipeline, so 11.3 should refuse `step` and `setRate` on a turn-mode game (or turn `step` into "resolve the open turn now"); not decided here.
 - The LLM commander (#70) and deputy (D6f) do not play turn mode yet; scripted Red sends its orders when each turn opens.
 **See.** [gameplay.md](gameplay.md#turn-based-play), [architecture.md](architecture.md#turn-based-mode-the-turn-pipeline), Epic #393
