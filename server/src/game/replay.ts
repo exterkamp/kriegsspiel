@@ -8,7 +8,6 @@
  * mode) need no step of their own, because the log carries the game time of every input.
  */
 import {
-  advanceTo,
   createState,
   issueOrder,
   type EmittedEvent,
@@ -20,7 +19,10 @@ import {
 } from '@kriegsspiel/engine';
 import type { ParseResult } from '../orders/index.js';
 import type { InputLogEntry, InputLogHeader } from './store.js';
+import { advanceUntilOver } from './advance.js';
 import { applyTurn } from './turns.js';
+
+export { advanceUntilOver };
 
 /** Maps a parsed intent to one the engine knows, or the reason it cannot. */
 function toEngineIntents(intents: ParseResult & { kind: 'intents' }): EngineIntent[] | string {
@@ -62,24 +64,6 @@ export function applyLoggedOrder(
     ...(parsed.interpretation ? { interpretation: parsed.interpretation } : {}),
   };
   return { state: issueOrder(state, order, state.time), orderId: order.id };
-}
-
-/**
- * `advanceTo`, except that a finished game does not run on: nothing happens once the world has an
- * outcome, and an advance that crosses the outcome stops at its game time. The live actor and
- * replay both advance through this, so the final time does not depend on how the advance was
- * chunked (rate, fast-forward, a late tick).
- */
-export function advanceUntilOver(
-  state: EngineState<GameState>,
-  t: number,
-  registry: EventRegistry<GameState>,
-): { state: EngineState<GameState>; emitted: EmittedEvent[] } {
-  if (state.world.outcome) return { state, emitted: [] };
-  const res = advanceTo(state, t, registry);
-  const outcome = res.state.world.outcome;
-  // Advancing is pure, so re-running to the outcome time gives the state as it stood then.
-  return outcome && outcome.time < t ? advanceTo(state, outcome.time, registry) : res;
 }
 
 export interface ReplayResult {

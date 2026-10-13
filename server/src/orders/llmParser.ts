@@ -220,22 +220,33 @@ export class LlmOrderParser implements OrderParser {
     const unit = ctx.units.find((u) => u.id === out.unitId && u.side === ctx.side);
     if (!unit) return `unit "${out.unitId}" is not one of the side's units`;
     if (!out.intents?.length) return 'no intents';
-    const intents: OrderIntent[] = [];
-    for (const i of out.intents) {
-      const to = i.place === 'here' && i.kind === 'hold' ? unit.center : placeAnchor(ctx, i.place);
-      if (!to) return `unknown place "${i.place}"`;
-      intents.push(
-        i.kind === 'move'
-          ? { kind: 'move', to }
-          : i.kind === 'hold'
-            ? { kind: 'hold', at: to }
-            : i.kind === 'attack'
-              ? { kind: 'attack', target: to }
-              : { kind: 'withdraw', toward: to },
-      );
-    }
+    const intents = placeIntents(out.intents, unit, ctx);
+    if (typeof intents === 'string') return intents;
     return { kind: 'intents', text, unitId: unit.id, intents };
   }
+}
+
+/** The parse stage's intents (places by id) as points, or why one cannot be placed. */
+export function placeIntents(
+  out: NonNullable<ParseOrdersOutput['intents']>,
+  unit: { center: Coord },
+  ctx: ParseContext,
+): OrderIntent[] | string {
+  const intents: OrderIntent[] = [];
+  for (const i of out) {
+    const to = i.place === 'here' && i.kind === 'hold' ? unit.center : placeAnchor(ctx, i.place);
+    if (!to) return `unknown place "${i.place}"`;
+    intents.push(
+      i.kind === 'move'
+        ? { kind: 'move', to }
+        : i.kind === 'hold'
+          ? { kind: 'hold', at: to }
+          : i.kind === 'attack'
+            ? { kind: 'attack', target: to }
+            : { kind: 'withdraw', toward: to },
+    );
+  }
+  return intents;
 }
 
 function placeAnchor(ctx: ParseContext, id: string): Coord | undefined {
