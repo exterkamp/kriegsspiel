@@ -9,6 +9,7 @@ import {
   withMarkPut,
   withPendingOrder,
   withRead,
+  withTurnSettings,
   type ClientState,
   type PendingOrder,
 } from '@legacy/net/state';
@@ -52,7 +53,10 @@ export class GameService {
     const game = params.game;
     fetchGame(game).then(
       (info) => {
-        if (this._gameId() === game) this._sides.set(info.sides.map((x) => x.side));
+        if (this._gameId() !== game) return;
+        this._sides.set(info.sides.map((x) => x.side));
+        // The mode comes with the game, so a finished turn game reloads in turn dress (#429, #427).
+        this._state.update((s) => withTurnSettings(s, info.umpire));
       },
       () => undefined,
     );

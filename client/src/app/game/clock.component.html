@@ -8,11 +8,11 @@
 >
   <b class="time">{{ v().time }}</b>
   @if (!v().turn) {
-    <span class="rate" data-testid="clock-rate">{{ v().rate }}</span>
+    <span class="rate" data-testid="clock-rate">{{ v().turnLength ?? v().rate }}</span>
   }
   <span class="status" data-testid="clock-status" role="status">
     <span aria-hidden="true">{{
-      v().turn
+      v().turn || v().turnLength
         ? ''
         : v().status === 'paused'
           ? '⏸'

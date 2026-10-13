@@ -28,7 +28,13 @@ import {
 } from './index.js';
 import { COMBAT_CHECK_EVENT, RALLY_EVENT } from './contact.js';
 import { schedule } from './queue.js';
-import { BATTLE_CLOSE_MS, forceBroken, evaluateVictory, turnVictory } from './combat.js';
+import {
+  BATTLE_CLOSE_MS,
+  forceBroken,
+  evaluateVictory,
+  outcomeText,
+  turnVictory,
+} from './combat.js';
 import { viewFor } from './index.js';
 import type { BattleRuling } from './types.js';
 import { polygonCentroid } from './geometry.js';
@@ -1065,6 +1071,40 @@ describe('a decided battle against the time limit (#417)', () => {
     expect(declared.world.battle).toMatchObject({ winner: 'red', reason: 'defence-broken' });
     const res = turnVictory(declared.world, HOLD * MS_PER_MINUTE);
     expect(res.world.outcome).toMatchObject({ winner: 'red', reason: 'defence-broken' });
+  });
+
+  it('files the outcome as the umpire’s paper to both sides in turn mode only (#429)', () => {
+    const s = brokenDefenceAt(HOLD - 10);
+    const declared = advanceTo(s, s.time + 1, registry()).state;
+    const end = HOLD * MS_PER_MINUTE;
+    const closing = (w: typeof declared.world) =>
+      w.sides.map((side) =>
+        w.intel[side.id].reports.filter((r) => r.text?.includes('The game is over')),
+      );
+    const turn = { n: 3, startMs: end - 20 * MS_PER_MINUTE, endMs: end, adjudicator: 'umpire' };
+    const inTurn = turnVictory({ ...declared.world, turn } as typeof declared.world, end).world;
+    for (const papers of closing(inTurn)) {
+      expect(papers).toHaveLength(1);
+      expect(papers[0]).toMatchObject({ kind: 'battle', observedAt: end, deliverAt: end });
+      expect(papers[0]!.text).toMatch(/defence has been broken .*The game is over: \w+ wins\./);
+    }
+    // A real-time game ends on the game-over screen alone, as before.
+    for (const papers of closing(turnVictory(declared.world, end).world)) {
+      expect(papers).toHaveLength(0);
+    }
+  });
+
+  it('the time-limit paper does not say the defender holds ground the attacker may stand on', () => {
+    const s = brokenDefenceAt(HOLD - 10);
+    const outcome = {
+      winner: 'blue',
+      reason: 'objective-held',
+      time: HOLD * MS_PER_MINUTE,
+    } as const;
+    const text = outcomeText(s.world, outcome);
+    expect(text).toMatch(/^The time limit is reached and Red has not taken the objective /);
+    expect(text).toMatch(/The game is over: Blue wins\.$/);
+    expect(text).not.toMatch(/holding/);
   });
 
   it("a defence broken by the combat tick on the time limit's own minute goes to the ruling", () => {

@@ -15,6 +15,8 @@ export interface ClockView {
   label: string;
   /** Turn mode (D39): the open turn, `Turn 3: 08:20 to 08:40`; `time` then holds it and `rate` is empty. */
   turn?: string;
+  /** Turn mode: the turn length, `20-min turns`, shown in place of the rate once no turn is open. */
+  turnLength?: string;
 }
 
 const LABEL = { running: 'Running', paused: 'Paused', stopped: 'Stopped', none: 'No clock' };
@@ -25,6 +27,9 @@ const TURN_LABEL = {
   resolving: 'Turn being decided',
   over: 'Game over',
 };
+
+/** Turn mode is known from the game's settings but the server has not yet sent the open turn. */
+const TURN_WAITING = 'Waiting for the turn';
 
 /** What the desk clock shows, from the client state at a local wall time. Pure, so it needs no DOM. */
 export function clockView(state: ClientState, nowWall: number): ClockView {
@@ -50,15 +55,18 @@ export function clockView(state: ClientState, nowWall: number): ClockView {
 function turnClockView(state: ClientState): ClockView {
   const phase = turnPhase(state);
   const t = state.turn;
+  // Only the server's game over ends the game; no `turnState` yet means it has not arrived (#429).
+  const waiting = !t && !state.gameOver;
   const end = state.gameOver?.atGame ?? state.clock?.gameMs ?? state.view?.atGame;
   return {
     time: t && !state.gameOver ? turnLine(t) : end === undefined ? '--' : formatGameTime(end),
     rate: '',
-    status: phase === 'over' ? 'stopped' : 'paused',
+    status: phase === 'over' && !waiting ? 'stopped' : 'paused',
     // The status label says the turn is being decided; the desk shows the umpire at work.
     staffAtWork: false,
-    label: TURN_LABEL[phase],
+    label: waiting ? TURN_WAITING : TURN_LABEL[phase],
     ...(t && !state.gameOver ? { turn: turnLine(t) } : {}),
+    ...(state.turnMinutes ? { turnLength: `${state.turnMinutes}-min turns` } : {}),
   };
 }
 
@@ -67,7 +75,12 @@ export function clockSummary(v: ClockView): string {
   if (v.turn) return [v.turn, v.label.toLowerCase()].join(', ');
   if (v.status === 'none') return 'No clock yet';
   // A finished turn-mode game has no rate to give.
-  const parts = [v.time, v.label.toLowerCase(), ...(v.rate ? [`rate ${v.rate}`] : [])];
+  const parts = [
+    v.time,
+    v.label.toLowerCase(),
+    ...(v.rate ? [`rate ${v.rate}`] : []),
+    ...(v.turnLength ? [v.turnLength] : []),
+  ];
   if (v.vote) parts.push(`${v.vote} proposed`);
   if (v.staffAtWork) parts.push('staff at work');
   return parts.join(', ');

@@ -151,9 +151,11 @@ export function replayFrom(
           entry.deputy !== undefined,
         );
         if ('state' in res) state = res.state;
-      } else if (command.kind === 'resolveTurn' && entry.turn) {
+      } else if (command.kind === 'resolveTurn' && entry.turn && !state.world.outcome) {
         // Turn mode (D39): the logged resolution, applied at the turn's start by the adjudicator that
         // made it, with no model call; the settle below runs the world on to the turn's end.
+        // A turn logged after the outcome (a log from before #429 had one) is not replayed: the game
+        // was over, and its courier pass would not match the stopped world.
         state = applyTurn(state, entry.turn, { gameId, registry });
       }
     }

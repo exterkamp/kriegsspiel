@@ -255,4 +255,55 @@ describe('turn mode over the socket', () => {
     expect(turnRows).toHaveLength(MAX_TURN_COMMANDS_PER_MINUTE);
     app!.hub.closeAll();
   });
+
+  it('ends the game on the wire with the turn that decided it: no further turn, then gameOver (#429)', async () => {
+    store = new MemoryGameStore();
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      store,
+      auth: { mailer },
+      scriptedOpponents: true,
+    });
+    const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+    const lead = await signIn(base, 'solo@example.test');
+    const created = await fetch(
+      `${base}/games`,
+      post(lead, { sessionType: 'co_op_vs_ai', side: 'blue', mode: 'turns', dial: 'rigid' }),
+    );
+    const { id } = (await created.json()) as { id: string };
+    const tap = await Tap.open(`${base.replace('http', 'ws')}/games/${id}/ws`, lead);
+    const over = () => tap.messages.find((x) => x.kind === 'gameOver');
+    // Blue sends empty turns until the scripted Red decides the game.
+    for (let n = 1; n < 20 && !over(); n++) {
+      await tap.until((m) => (lastTurn(m)?.turn === n || over() ? true : undefined));
+      if (over()) break;
+      tap.send({ kind: 'sendTurn' });
+      await tap.until((m) => (lastTurn(m)?.turn === n + 1 || over() ? true : undefined));
+    }
+    const end = over() as Extract<ServerMessage, { kind: 'gameOver' }>;
+    expect(end).toBeDefined();
+    // The game ended inside the last turn announced, or at its end; no turn opened at or after it.
+    const turns = tap.messages.filter((x): x is TurnStateMsg => x.kind === 'turnState');
+    const last = turns.at(-1)!;
+    expect(end.atGame).toBeGreaterThan(last.startsAt);
+    expect(end.atGame).toBeLessThanOrEqual(last.endsAt);
+    expect(turns.every((x) => x.startsAt < end.atGame)).toBe(true);
+    // Decided at a minute the clock shows, not a fraction of a second into a phantom next turn (#429).
+    expect(end.atGame % 60_000).toBe(0);
+    // Nothing about a turn follows the game over, and the clock stands stopped at its time.
+    expect(tap.messages.slice(tap.messages.indexOf(end)).some((x) => x.kind === 'turnState')).toBe(
+      false,
+    );
+    const clocks = tap.messages.filter((x) => x.kind === 'clockState');
+    expect(clocks.at(-1)).toMatchObject({
+      clock: { status: 'stopped', gameMsAtAnchor: end.atGame },
+    });
+    // The decisive turn's ruling is the last paper in the in-tray.
+    const papers = tap.messages.flatMap((x) => (x.kind === 'dispatch' ? [x.dispatch] : []));
+    expect(papers.at(-1)).toMatchObject({
+      from: "The umpire's ruling",
+      receivedAtGame: end.atGame,
+    });
+    app!.hub.closeAll();
+  });
 });

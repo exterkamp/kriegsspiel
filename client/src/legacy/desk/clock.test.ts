@@ -14,7 +14,12 @@ vi.mock('three', async (importOriginal) => {
 
 import { PROTOCOL_VERSION, type ClockState } from '@kriegsspiel/protocol';
 import { clockSummary, clockView } from './clock.js';
-import { applyServerMessage, initialState, type ClientState } from '../net/state.js';
+import {
+  applyServerMessage,
+  initialState,
+  withTurnSettings,
+  type ClientState,
+} from '../net/state.js';
 
 const v = PROTOCOL_VERSION;
 const withClock = (s: ClientState, clock: ClockState, at = 0): ClientState =>
@@ -84,5 +89,63 @@ describe('clockView', () => {
       gameOver: { winner: 'blue', reason: 'eliminated', atGame: 3_000_000 },
     };
     expect(clockSummary(clockView(s, 0))).toBe('Day 1 00:50, game over');
+  });
+
+  it('shows a finished turn game reloaded from its settings as over, with its turn length (#429)', () => {
+    // A reload after the end: the server sends no turnState, only the clock and the outcome.
+    let s = withClock(initialState, clock(1, 'stopped'));
+    s = applyServerMessage(
+      s,
+      { v, kind: 'gameOver', winner: 'red', reason: 'objective-taken', atGame: 2_400_000 },
+      0,
+    );
+    expect(clockView(s, 0)).toMatchObject({ rate: '1:1', label: 'Stopped' });
+    s = withTurnSettings(s, { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 20 });
+    const view = clockView(s, 0);
+    expect(view).toMatchObject({
+      time: 'Day 1 00:40',
+      rate: '',
+      turnLength: '20-min turns',
+      status: 'stopped',
+      label: 'Game over',
+    });
+    expect(clockSummary(view)).toBe('Day 1 00:40, game over, 20-min turns');
+  });
+
+  it('shows a live turn game as waiting, not over, before its first turnState (#429)', () => {
+    // The settings can arrive before the socket's turnState, or while the socket is down.
+    const s = withTurnSettings(withClock(initialState, clock(1, 'paused')), {
+      dial: 'rigid',
+      persona: 'dry',
+      mode: 'turns',
+      turnMinutes: 20,
+    });
+    const view = clockView(s, 0);
+    expect(view).toMatchObject({
+      rate: '',
+      status: 'paused',
+      label: 'Waiting for the turn',
+      turnLength: '20-min turns',
+    });
+    expect(view.label).not.toBe('Game over');
+  });
+
+  it('leaves a real-time game as it was when its settings arrive', () => {
+    const s = withClock(initialState, clock(4, 'running'));
+    expect(withTurnSettings(s, { dial: 'standard', persona: 'dry' })).toBe(s);
+    expect(withTurnSettings(s, undefined)).toBe(s);
+  });
+
+  it('drops turn mode left from an earlier turn game when a real-time game is opened', () => {
+    const turns = withTurnSettings(withClock(initialState, clock(4, 'running')), {
+      dial: 'rigid',
+      persona: 'dry',
+      mode: 'turns',
+      turnMinutes: 20,
+    });
+    const s = withTurnSettings(turns, { dial: 'standard', persona: 'dry' });
+    expect(s.turnMode).toBeUndefined();
+    expect(s.turnMinutes).toBeUndefined();
+    expect(clockView(s, 0)).toMatchObject({ rate: '4:1', label: 'Running' });
   });
 });
