@@ -790,13 +790,13 @@ describe('orders', () => {
     expect(app!.host.get(game.id)!.state.queue.some((e) => e.type === 'order.issue')).toBe(false);
   });
 
-  it('says drafts and other commands are not supported yet', async () => {
+  it('refuses a draft that does not exist, and says other commands are not supported yet', async () => {
     const { base, ws } = await start();
     const game = (await createGame(base)).json;
     const blue = await join(ws, game, 'blue');
     blue.send(JSON.stringify({ v, kind: 'issueOrder', orderId: 'o', draft: 'd1' }));
     blue.send(JSON.stringify({ v, kind: 'setReady', ready: true }));
-    await blue.waitFor('error', (m) => m.code === 'not_implemented' && m.message.includes('draft'));
+    await blue.waitFor('error', (m) => m.code === 'draft_unknown' && m.message.includes('o:'));
     await blue.waitFor(
       'error',
       (m) => m.code === 'not_implemented' && m.message.includes('setReady'),

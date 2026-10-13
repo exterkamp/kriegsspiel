@@ -1088,7 +1088,13 @@ export class GameActor {
           anchor: featureAnchor(f.geometry),
         })),
       },
-      units: units.map((u) => ({ id: u.id, side: u.side, name: u.name, center: u.center })),
+      units: units.map((u) => ({
+        id: u.id,
+        side: u.side,
+        name: u.name,
+        center: u.center,
+        ...(u.personality && u.side === side ? { personality: u.personality } : {}),
+      })),
       hidden: hiddenTerms(this.engine.world, side as SideId),
     };
   }

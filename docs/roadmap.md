@@ -99,7 +99,7 @@ Historical annotation remains #85/#88. Detailed erosion, elaborate cities, a ful
 ## M4: Judgment and personality
 - [x] `judge` placement: arbitrary unit configurations validated by the engine (#117)
 - [ ] `judge` stage with capped modifiers for unruled situations; case-law file
-- [ ] Subordinate commander traits
+- [x] Subordinate commander traits (#45, D36)
 - [ ] Rigid ↔ free dial; umpire personas
 - [ ] Post-game reveal (full log, dice, rulings)
 

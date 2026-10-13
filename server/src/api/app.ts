@@ -489,6 +489,12 @@ export async function buildApp(options: AppOptions): Promise<App> {
     return undefined;
   };
 
+  // Command authority follows the lobby record, so a role that changed hands is not signed for by its old holder (#77).
+  hub.setSeatResolver((gameId, userId) => {
+    const rec = lobby.get(gameId);
+    return rec ? seatFor(rec, userId) : undefined;
+  });
+
   /** A started game is reopened (paused) if the server restarted since it was last used. */
   const running = async (rec: LobbyGame): Promise<boolean> => {
     if (rec.status !== 'started') return false;
