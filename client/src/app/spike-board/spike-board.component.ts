@@ -1,6 +1,8 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
+  afterNextRender,
   ElementRef,
   computed,
   inject,
@@ -74,6 +76,8 @@ interface Piece {
   strength?: number;
   morale?: number;
   size?: string;
+  /** Unit vector from the counter to where its label goes: below, or away from the enemy it is in contact with. */
+  away: Point;
 }
 
 /**
@@ -133,8 +137,13 @@ export class SpikeBoardComponent {
     const v = this.view();
     return `${v.x} ${v.y} ${v.w} ${(v.w * this.scenario.height) / this.scenario.width}`;
   });
-  /** Counter size in metres, so counters keep one size on the screen whatever the zoom. */
-  readonly cw = computed(() => this.view().w * 0.03);
+  /** The board's width on the screen, in pixels. */
+  private readonly boardPx = signal(1000);
+  /**
+   * Counter width in metres, so counters keep one size on the screen whatever the zoom: 3% of the view, and never under
+   * 26 pixels, so a counter can still be read and tapped on a phone.
+   */
+  readonly cw = computed(() => Math.max(this.view().w * 0.03, (this.view().w / this.boardPx()) * 26));
   readonly ch = computed(() => this.cw() * 0.66);
 
   readonly report = computed<Report | null>(() =>
@@ -160,6 +169,7 @@ export class SpikeBoardComponent {
         stage: stageOf(u),
         strength: u.strength / u.startStrength,
         morale: u.morale,
+        away: awayFrom(u.pos, t.units.find((x) => x.id === u.contact)?.pos),
       }));
     const enemy: Piece[] = t.contacts.map((c) => ({
       id: c.id,
@@ -174,11 +184,13 @@ export class SpikeBoardComponent {
       short: `${c.letter} ${c.size[0]}–${c.size[1]}`,
       stage: c.stage,
       size: `${c.size[0]}–${c.size[1]}`,
+      away: awayFrom(c.pos, contactOf(t, c.id)),
     }));
     const all = [...own, ...enemy];
     if (v.pieces === 'labels') return all;
     const pin = new Set(this.selected() ? [this.selected()!] : []);
-    const placed = separate(all, this.cw(), this.ch() * 1.5, pin);
+    // Room for the counter, its strength bar and its label.
+    const placed = separate(all, this.cw() * 1.2, this.ch() * 2, pin);
     return all.map((p, i) => ({ ...p, at: placed[i]!.at }));
   });
 
@@ -266,6 +278,14 @@ export class SpikeBoardComponent {
   private drag: { x: number; y: number; vx: number; vy: number; moved: boolean } | null = null;
 
   constructor() {
+    const destroy = inject(DestroyRef);
+    afterNextRender(() => {
+      const el = this.svg()?.nativeElement;
+      if (!el || typeof ResizeObserver === 'undefined') return;
+      const ro = new ResizeObserver(() => this.boardPx.set(el.getBoundingClientRect().width || 1000));
+      ro.observe(el);
+      destroy.onDestroy(() => ro.disconnect());
+    });
     const q = inject(ActivatedRoute).snapshot.queryParamMap;
     const pick = <K extends keyof Variants>(k: K, allowed: Variants[K][]): Variants[K] => {
       const v = q.get(k) as Variants[K] | null;
@@ -381,6 +401,9 @@ export class SpikeBoardComponent {
   orderLine(o: Order): string {
     const where = o.waypoints.length ? placeName(this.scenario, o.waypoints[o.waypoints.length - 1]!) : '';
     const via = o.waypoints.length > 1 ? ` via ${o.waypoints.length - 1} waypoint${o.waypoints.length > 2 ? 's' : ''}` : '';
+    if (o.verb !== 'hold' && o.verb !== 'attack' && o.waypoints.length === 0) {
+      return `${o.verb[0]!.toUpperCase()}${o.verb.slice(1)}: done, halted`;
+    }
     switch (o.verb) {
       case 'hold':
         return 'Hold';
@@ -491,8 +514,26 @@ export class SpikeBoardComponent {
 
   /** The uncertainty ring of a last-known enemy: 12 m for every minute since it was seen, at most 300 m. */
   uncertainty(p: Piece): number {
-    return Math.min(300, 40 + p.age * 12);
+    return Math.min(200, 30 + p.age * 8);
   }
+
+  /** Where a counter's label goes: the label's centre, relative to the counter. */
+  labelAt(p: Piece): Point {
+    const r = this.ch() * 1.45;
+    return { x: p.away.x * r * 1.4, y: p.away.y * r + this.ch() * 0.18 };
+  }
+}
+
+/** Straight down, or straight away from the enemy a unit is in contact with. */
+function awayFrom(at: Point, foe: Point | undefined): Point {
+  if (!foe) return { x: 0, y: 1 };
+  const d = dist(at, foe) || 1;
+  return { x: (at.x - foe.x) / d, y: (at.y - foe.y) / d };
+}
+
+/** Where the blue unit in contact with enemy `id` stands, if one is. */
+function contactOf(t: Turn, id: string): Point | undefined {
+  return t.units.find((u) => u.side === 'blue' && u.contact === id)?.pos;
 }
 
 function round(n: number): number {

@@ -160,11 +160,20 @@ for (const v of VARIANTS) {
   console.log(`\n${v.name}`);
   console.log(`  ${'case'.padEnd(30)}${'losses'.padEnd(13)}${'wavering'.padEnd(13)}${'broken'.padEnd(13)}breaks  melee`);
   for (const [label, make] of CASES) {
-    const runs = Array.from({ length: SEEDS }, (_, i) => stages(e, make(e, i + 1)));
+    // A run the engine throws on is counted, not fatal: see the follow-up issue on zero-casualty shots.
+    let crashed = 0;
+    const runs = [];
+    for (let i = 1; i <= SEEDS; i++) {
+      try {
+        runs.push(stages(e, make(e, i)));
+      } catch {
+        crashed++;
+      }
+    }
     const all = (k) => runs.flatMap((r) => r[k]);
     const breaks = all('broken').length;
     console.log(
-      `  ${label.padEnd(30)}${band(all('losses'))} ${band(all('wavering'))} ${band(all('broken'))} ${String(breaks).padEnd(7)} ${Math.round(pct(runs.map((r) => r.melee), 50) * 100)}%`,
+      `  ${label.padEnd(30)}${band(all('losses'))} ${band(all('wavering'))} ${band(all('broken'))} ${String(breaks).padEnd(7)} ${Math.round(pct(runs.map((r) => r.melee), 50) * 100)}%${crashed ? `  (${crashed} runs threw)` : ''}`,
     );
   }
   cleanup();

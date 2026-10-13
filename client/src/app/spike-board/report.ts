@@ -14,8 +14,13 @@ export interface Report {
   heading: string;
   /** One line that says what matters most this turn. */
   gist: string;
+  /** Our fights, one paragraph each, then one for the units not fighting. */
   paragraphs: Piece[][];
+  /** One line per enemy body known, newest sighting first. */
+  enemy: Piece[][];
 }
+
+const men = (n: number) => `${n} ${n === 1 ? 'man' : 'men'}`;
 
 const STAGE_WORDS: Record<string, string> = {
   fresh: 'is fresh',
@@ -84,17 +89,22 @@ export function chiefOfStaffReport(s: Scenario, prev: Turn, turn: Turn): Report 
       fights.push([
         unitPiece(u),
         { text: ` broke at ${clock(turn.events.find((e) => e.kind === 'broken' && e.unit === u.id)?.minute ?? turn.to)}` },
-        { text: lost > 0 ? ` after losing ${lost} men this turn` : '' },
+        { text: lost > 0 ? ` after losing ${men(lost)} this turn` : '' },
         { text: ` and is falling back ${placeName(s, u.pos)}.` },
       ]);
-    } else if (u.contact || lost > 0) {
-      const foe = u.contact ?? was.contact;
+    } else if (u.contact || was.contact) {
+      const foe = (u.contact ?? was.contact)!;
       fights.push([
         unitPiece(u),
         { text: contact ? ` met ` : ` is fighting ` },
-        ...(foe ? [enemyPiece(foe)] : [{ text: 'the enemy' }]),
+        enemyPiece(foe),
         { text: ` ${placeName(s, u.pos)}` },
-        { text: `${contact ? ` at ${clock(contact.minute)}` : ''}; ${lost > 0 ? `lost ${lost} men, ` : ''}it ${STAGE_WORDS[stage]}.` },
+        { text: `${contact ? ` at ${clock(contact.minute)}` : ''}; ${lost > 0 ? `lost ${men(lost)}, ` : ''}it ${STAGE_WORDS[stage]}.` },
+      ]);
+    } else if (lost > 0) {
+      fights.push([
+        unitPiece(u),
+        { text: ` came under fire ${placeName(s, u.pos)} and lost ${men(lost)}; it ${STAGE_WORDS[stage]}.` },
       ]);
     } else {
       const metres = turn.events.find((e) => e.unit === u.id && e.kind === 'moved')?.metres;
@@ -104,21 +114,22 @@ export function chiefOfStaffReport(s: Scenario, prev: Turn, turn: Turn): Report 
     }
   }
 
-  const enemy: Piece[] = [];
-  for (const c of turn.contacts) {
+  const enemy: Piece[][] = [];
+  const known = [...turn.contacts].sort((a, b) => b.seenAt - a.seenAt);
+  for (const c of known) {
     const age = turn.to - c.seenAt;
     const moved = turn.events.find((e) => e.kind === 'enemy-moved' && e.unit === c.id);
-    const spotted = turn.events.find((e) => e.kind === 'spotted' && e.unit === c.id) && !prev.contacts.some((p) => p.id === c.id);
-    enemy.push(
-      { text: spotted ? 'New: ' : '' },
+    const isNew = !prev.contacts.some((p) => p.id === c.id);
+    enemy.push([
+      { text: isNew ? 'New: ' : '' },
       enemyPiece(c.id),
       {
         text:
           age === 0
-            ? ` ${placeName(s, c.pos)}${moved ? `, ${Math.round((moved.metres ?? 0) / 50) * 50} m moved this turn` : ', not moving'}${c.stage === 'broken' ? ', in flight' : ''}; `
-            : ` last seen ${placeName(s, c.pos)} at ${clock(c.seenAt)}, ${age} min ago; `,
+            ? ` ${placeName(s, c.pos)}${moved ? `, moved ${Math.round((moved.metres ?? 0) / 50) * 50} m this turn` : ', not moving'}${c.stage === 'broken' ? ', in flight' : ''}.`
+            : ` last seen ${placeName(s, c.pos)} at ${clock(c.seenAt)} (${age} min ago).`,
       },
-    );
+    ]);
   }
 
   const broken = own.filter((u) => stageOf(u) === 'broken' && before.get(u.id)!.stage !== 'broken');
@@ -139,8 +150,7 @@ export function chiefOfStaffReport(s: Scenario, prev: Turn, turn: Turn): Report 
 
   const paragraphs: Piece[][] = [...fights];
   if (quiet.length) paragraphs.push(trimTail(quiet));
-  if (enemy.length) paragraphs.push(trimTail(enemy));
-  return { heading: `Turn ${turn.n}, ${clock(turn.from)} to ${clock(turn.to)}`, gist, paragraphs };
+  return { heading: `Turn ${turn.n}, ${clock(turn.from)} to ${clock(turn.to)}`, gist, paragraphs, enemy };
 }
 
 /** End a run of "…; " pieces with a full stop. */

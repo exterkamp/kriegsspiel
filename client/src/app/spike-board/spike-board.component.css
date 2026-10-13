@@ -230,7 +230,8 @@
   stroke: var(--ks-map-route);
   stroke-width: 4;
 }
-.counter:focus-visible {
+.counter:focus,
+.old-piece:focus {
   outline: none;
 }
 .counter:focus-visible .body {
@@ -509,4 +510,15 @@
 }
 .hint {
   margin: 0;
+}
+.report h3 {
+  margin: var(--ks-space-2) 0 var(--ks-space-1);
+  font-size: var(--ks-text-md);
+}
+.enemy-list {
+  margin: 0;
+  padding-left: var(--ks-space-4);
+}
+.enemy-list li {
+  margin-bottom: var(--ks-space-1);
 }
