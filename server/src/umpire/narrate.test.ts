@@ -125,6 +125,43 @@ describe('narrate input: the sender (#390)', () => {
     ]);
   });
 
+  it('gives no sender for the kinds headquarters writes: a lost unit or a lost courier', () => {
+    const staff = narrateInput(
+      'blue',
+      [
+        report({ id: 'blue-r4', kind: 'courierLost', sizeEstimate: undefined }),
+        report({ id: 'blue-r5', kind: 'unitLost', sizeEstimate: undefined }),
+      ],
+      [hussars],
+    );
+    for (const r of staff.reports) {
+      expect(r).not.toHaveProperty('commander');
+      expect(r).not.toHaveProperty('trait');
+      expect(r).not.toHaveProperty('condition');
+    }
+  });
+
+  it('passes the field notes the prompt asks for, in the officer’s own words', () => {
+    const engaged = narrateInput(
+      'blue',
+      [report({ id: 'blue-r3', kind: 'engaged', place: 'at the bridge on the High road' })],
+      [hussars],
+    );
+    const notes = [
+      'Sir, we are engaged at the bridge. Spent as we are, I doubt we can hold. Shall we fall back?',
+      'Sir, we are engaged at the bridge. Pursue them or hold? Your orders, sir.',
+      'Ammunition is nearly gone. Hold or fall back?',
+      'Engaged at the bridge on the High road. Men are spent and wavering. Request relief.',
+      'The enemy presses us at the bridge. Wavering men will not stand long. Send help, I beg you.',
+      'We hold the bridge for now. Is the reserve coming? Advise, sir.',
+      'Sir, we hold the bridge for now. Unless relieved within the hour we must give way. Orders?',
+      'Sir, we hold. Nothing more can be asked of these men. Shall I withdraw? Yours, Maj. von Reiter',
+      'Sir, we are hotly engaged at the bridge. Our powder is nearly gone. Can we be relieved?',
+    ];
+    for (const note of notes) expect(checkProse(note, engaged), note).toEqual([]);
+    expect(checkProse('Advance on Hohenau?', engaged)).toEqual(['unknown name "Hohenau"']);
+  });
+
   it('passes the side’s units through to each call', async () => {
     const client = fakeModel([one('blue-r1', good.dispatches[0]!.text)]);
     await narrateReports(client as never, 'blue', [reports[0]!], { ownUnits: [hussars] });

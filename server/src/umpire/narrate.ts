@@ -8,7 +8,7 @@
  * again. If every attempt is rejected the report keeps the engine's plain template text, so a
  * dispatch is never lost and never invented. One call covers one report (#359).
  */
-import { MS_PER_MINUTE } from '@kriegsspiel/engine';
+import { EXHAUSTED_FATIGUE, LOW_AMMO, MS_PER_MINUTE } from '@kriegsspiel/engine';
 import type { SideId, ViewReport, ViewUnit } from '@kriegsspiel/engine';
 import type { UmpirePersona } from '@kriegsspiel/protocol';
 import { withPersona } from './persona.js';
@@ -16,9 +16,9 @@ import type { JsonSchema, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
 import { hiddenIn } from './leakGuard.js';
 
-export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v4';
+export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v5';
 
-export const NARRATE_SYSTEM = `You write the notes that officers in the field send back to their general at a Napoleonic army headquarters. Each is a hasty note in the sender's own hand: first person ("we", "my men"), to the general ("Sir"), in the manner of the officer who sent it. A cautious officer hedges and asks for orders, a bold one wants to press on, a veteran is terse.
+export const NARRATE_SYSTEM = `You write the notes that officers in the field send back to their general at a Napoleonic army headquarters. Each is a hasty note in the sender's own hand: first person ("we", "my men"), to the general ("Sir"), in the manner of the officer who sent it. A cautious officer hedges and asks for orders, a bold one wants to press on, a veteran is terse. The voice given at the end colours the officer's note; it does not change who writes it.
 
 Input: "reports", the only things this headquarters knows. Each has an "id", the "from" officer or unit, a "kind", the "place", how many "minutesAgo" before it reached headquarters it happened, a "sizeEstimate" (contacts only), a "confidence", and how far off the location may be ("radiusM"). When known it also has the "commander" who writes, his "trait" (his manner) and the sending unit's "condition" now (morale, fatigue, ammunition).
 
@@ -28,6 +28,7 @@ Rules:
 - Lower confidence means more hedging ("perhaps", "it is thought"); high confidence means plain statement.
 - Do not just restate the report. Give the officer's judgement of what it means for his men and, where it follows from the report and his condition, one question or concern for the general: after an enemy force is destroyed, whether to pursue; when engaged with tired men or little ammunition, whether he can hold; after heavy losses, a break, low ammunition or exhaustion, whether to fall back or be relieved; on a first sighting, whether to engage or watch. Ask nothing that does not fit this report.
 - A judgement or question adds no facts: it names only what the report names.
+- A "unitLost" or "courierLost" report is not from its unit, which is gone or never had the orders: write it as a brief note from the staff at headquarters, in the third person, and ask nothing on the unit's behalf.
 - You are given one report. Return one dispatch of two or three short sentences for it, with its id in "reportIds".
 Reply with the JSON object only.`;
 
@@ -82,14 +83,15 @@ export const STAFF_OVERLOADED_NOTICE =
 /**
  * How a unit stands, in words and never in figures, so its note can say whether it can hold or
  * should fall back (#390). The side already sees its own units' state; no number reaches the prose.
+ * "Spent" and "nearly gone" start where the engine files its `exhausted` and `lowAmmo` reports.
  */
 export function unitCondition(u: Pick<ViewUnit, 'morale' | 'fatigue' | 'ammo'>): string {
   const morale = u.morale >= 70 ? 'steady' : u.morale >= 40 ? 'shaken' : 'wavering';
-  const fatigue = u.fatigue < 30 ? 'fresh' : u.fatigue < 70 ? 'tiring' : 'spent';
+  const fatigue = u.fatigue < 30 ? 'fresh' : u.fatigue < EXHAUSTED_FATIGUE ? 'tiring' : 'spent';
   const ammo =
     u.ammo > 50
       ? 'well supplied'
-      : u.ammo > 20
+      : u.ammo > LOW_AMMO
         ? 'ammunition running low'
         : 'ammunition nearly gone';
   return `${morale}, ${fatigue}, ${ammo}`;
@@ -98,8 +100,11 @@ export function unitCondition(u: Pick<ViewUnit, 'morale' | 'fatigue' | 'ammo'>):
 /**
  * What the model sees for one report. Metres and minutes, no ids of anything the side cannot know.
  * `ownUnits` (the side's own, from its view) gives the sender's commander, manner and condition,
- * so the note can carry his voice and judgement; a sender not among them gets none.
+ * so the note can carry his voice and judgement; a sender not among them gets none. Nor do the
+ * kinds the unit did not write (`STAFF_KINDS`): HQ writes those.
  */
+const STAFF_KINDS: ReadonlySet<ViewReport['kind']> = new Set(['unitLost', 'courierLost']);
+
 export function narrateInput(
   side: SideId,
   reports: readonly ViewReport[],
@@ -108,7 +113,9 @@ export function narrateInput(
   return {
     side,
     reports: reports.map((r) => {
-      const sender = ownUnits.find((u) => u.name === r.from && u.strength > 0);
+      const sender = STAFF_KINDS.has(r.kind)
+        ? undefined
+        : ownUnits.find((u) => u.name === r.from && u.strength > 0);
       return {
         id: r.id,
         kind: r.kind,
@@ -229,9 +236,11 @@ const COMMON_CAPITALISED = new Set([
 const SENTENCE_OPENERS = new Set([
   'a',
   'about',
+  'advance',
+  'advise',
   'after',
-  'all',
   'alas',
+  'all',
   'although',
   'am',
   'an',
@@ -240,26 +249,36 @@ const SENTENCE_OPENERS = new Set([
   'are',
   'as',
   'at',
+  'attack',
+  'await',
+  'awaiting',
   'before',
+  'blue',
   'both',
   'but',
   'by',
   'can',
+  'come',
   'could',
   'did',
   'do',
   'does',
   'each',
   'enemy',
+  'engaged',
   'every',
+  'fall',
   'for',
+  'forgive',
   'from',
   'half',
   'has',
+  'hasten',
   'have',
   'he',
   'her',
   'his',
+  'hold',
   'how',
   'i',
   'if',
@@ -270,6 +289,7 @@ const SENTENCE_OPENERS = new Set([
   'later',
   'many',
   'may',
+  'men',
   'might',
   'more',
   'most',
@@ -280,19 +300,25 @@ const SENTENCE_OPENERS = new Set([
   'none',
   'nor',
   'not',
+  'nothing',
   'now',
   'of',
   'on',
   'one',
   'only',
   'or',
+  'orders',
   'other',
   'our',
   'out',
   'perhaps',
   'pray',
+  'pursue',
+  'red',
   'request',
+  'retire',
   'scouts',
+  'send',
   'shall',
   'she',
   'should',
@@ -314,13 +340,12 @@ const SENTENCE_OPENERS = new Set([
   'though',
   'to',
   'under',
+  'unless',
   'until',
   'upon',
   'us',
   'was',
   'we',
-  'blue',
-  'red',
   'were',
   'what',
   'when',
@@ -332,12 +357,14 @@ const SENTENCE_OPENERS = new Set([
   'why',
   'will',
   'with',
+  'withdraw',
   'within',
   'without',
   'would',
   'yet',
   'you',
   'your',
+  'yours',
 ]);
 
 const ID_PATTERN = /\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/gi;
@@ -367,6 +394,7 @@ export function checkProse(text: string, input: Input): string[] {
     r.sizeEstimate ?? '',
     r.commander ?? '',
     r.trait ?? '',
+    r.condition ?? '',
   ]);
   const factText = facts.join('\n');
   return checkProseAgainst(text, {
