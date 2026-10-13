@@ -209,6 +209,19 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
     const o = sideOut(world, s.id);
     if (o) out.set(s.id, o);
   }
+  // A declared battle decides the game (D13, #417): it closes after the pursuit, or at once when
+  // a side has nobody left, and a side leaving the field after the ruling does not overturn it.
+  if (battle) {
+    const loser = world.sides.find((s) => s.id !== battle.winner)!.id;
+    const loserOut = out.get(loser);
+    if (out.size === 0 && time < battle.declaredAt + BATTLE_CLOSE_MS) return null;
+    return {
+      winner: battle.winner,
+      reason: battle.reason,
+      time,
+      ...(loserOut ? { loserOut } : {}),
+    };
+  }
   if (out.size === world.sides.length) {
     const reason = [...out.values()].every((r) => r === 'eliminated') ? 'eliminated' : 'withdrawn';
     return { winner: null, reason, time };
@@ -218,13 +231,6 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
     if (reason) {
       return { winner: world.sides.find((o) => o.id !== s.id)!.id, reason, time };
     }
-  }
-  // A side with nobody left ends the game at once; one whose force broke closes after the pursuit.
-  if (battle) {
-    // A declared battle plays out its pursuit, then closes.
-    return time >= battle.declaredAt + BATTLE_CLOSE_MS
-      ? { winner: battle.winner, reason: battle.reason, time }
-      : null;
   }
   const since = world.heldSince ?? null;
   if (
@@ -246,18 +252,30 @@ export function turnVictory(world: GameState, time: number): HandlerResult<GameS
   if (world.outcome) return { world };
   const held = trackHold(world, time);
   world = held.world;
+  // A force broken in this turn is ruled on before the time limit is read (#417).
+  const declared = declareBattle(world, time);
+  if (declared) world = declared.world;
+  const emit = declared?.emit ?? [];
   const outcome =
     evaluateVictory(world, time) ??
-    (time >= world.victory.holdMs
-      ? { winner: world.victory.defender, reason: 'objective-held' as const, time }
-      : null);
-  if (outcome) return conclude(world, outcome);
-  const declared = declareBattle(world, time);
-  return {
-    world: declared?.world ?? world,
-    schedule: [...held.schedule, ...(declared?.schedule ?? [])],
-    emit: declared?.emit ?? [],
-  };
+    (time >= world.victory.holdMs ? timeLimitOutcome(world, time) : null);
+  if (outcome) {
+    const end = conclude(world, outcome);
+    return { ...end, emit: [...emit, ...(end.emit ?? [])] };
+  }
+  return { world, schedule: [...held.schedule, ...(declared?.schedule ?? [])], emit };
+}
+
+/**
+ * The result when the clock reaches the time limit and `evaluateVictory` found none (D13, #417).
+ * A declared battle is decided: its ruling closes the game now, cutting the pursuit short, so
+ * the hold timer never overrides it. Only a game with no ruling goes to the defender.
+ */
+function timeLimitOutcome(world: GameState, time: number): Outcome {
+  const battle = world.battle;
+  return battle
+    ? { winner: battle.winner, reason: battle.reason, time }
+    : { winner: world.victory.defender, reason: 'objective-held', time };
 }
 
 /**
@@ -557,12 +575,23 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
 
   registry.register(VICTORY_DEADLINE_EVENT, (world, ev) => {
     if (world.outcome || heldTurn(world, ev.time)) return { world };
-    const outcome = evaluateVictory(world, ev.time) ?? {
-      winner: world.victory.defender,
-      reason: 'objective-held' as const,
-      time: ev.time,
-    };
-    return conclude(world, outcome);
+    // The deadline was queued at the start, before this minute's combat tick, so it steps
+    // behind whatever is already queued for the minute: a break that tick makes is ruled on
+    // first (#417). A tick queues its successor 2 minutes on, so one step back is enough.
+    if (!(ev.payload as { last?: boolean } | null)?.last) {
+      return {
+        world,
+        schedule: [{ time: ev.time, type: VICTORY_DEADLINE_EVENT, payload: { last: true } }],
+      };
+    }
+    // A force broken at this very minute is ruled on before the time limit is read (#417).
+    const declared = declareBattle(world, ev.time);
+    if (declared) world = declared.world;
+    const end = conclude(
+      world,
+      evaluateVictory(world, ev.time) ?? timeLimitOutcome(world, ev.time),
+    );
+    return { ...end, emit: [...(declared?.emit ?? []), ...(end.emit ?? [])] };
   });
 
   registry.register(RALLY_EVENT, (world, ev, rng) => {

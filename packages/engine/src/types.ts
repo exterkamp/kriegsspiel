@@ -299,6 +299,8 @@ export interface Report {
   subject?: string;
   /** The wording itself, for a report that is the umpire's own (`battle`). */
   text?: string;
+  /** For `courierLost`: when the lost order should have reached the unit. */
+  orderDueAt?: GameTime;
 }
 
 /**
