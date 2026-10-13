@@ -94,7 +94,7 @@ Real life happens. The game can be **paused by a vote of all human players** acr
 - Any player can propose a pause, with an optional reason. A single "no" or a timeout cancels the proposal. The host can instead allow a majority.
 - While paused, game time stops. Players can still read, draft and sign orders, but a signed order's courier only leaves when the clock resumes, so nothing can be gained from a pause.
 - Resuming needs everyone to mark themselves ready, or a host-set maximum pause length.
-- An **emergency hold** lets any one player stop the clock for a few minutes, a limited number of times per game, unless a vote ratifies it.
+- An **emergency hold** lets any one player stop the clock at once for five minutes by default, twice per player and six times per game by default (the host can change these), unless the other players ratify it with a vote, which makes it an ordinary pause (D5).
 - If the server was ever down, the game comes back paused and asks everyone to confirm. We never skip game time silently.
 - Pauses are recorded in the journal.
 
@@ -119,7 +119,7 @@ In the lobby the commander's table fills as players join the side with a role; a
 ### Drafting orders together
 
 - Each order is a **shared draft**. Anyone with access can propose text, comment, or suggest a change. Edits are tracked.
-- Only the holder of command authority for that formation can **sign and stamp** an order to send it. This is the stamp moment from the Papers Please-style desk.
+- Only the holder of command authority for that formation can **sign and stamp** an order to send it. This is the stamp moment from the Papers Please-style desk. Staff and other players can propose on the draft but a stamp from them is refused; a subordinate stamps only for their own formations. A stamped draft is closed to edits (fork it for another plan).
 - An **LLM staff check** reads a draft before it goes and reports how a subordinate will likely read it: "the bridge is not mentioned", "this contradicts the timing in Order 3". It costs a little in-game time (staff work: the chief of staff is busy for ten game minutes, the same at every clock rate), so it is a tool and not a free preview. It sees only what your side knows (your own units, the named places, the orders you have sent), and it is advice, not a promise: the order is read afresh when it is signed (D6d).
 - Drafts can be **forked**, so the staff can write alternative plans and the commander chooses.
 
@@ -131,7 +131,7 @@ A wing commander's scout report reaches HQ only if they send it, and it takes ti
 
 Both supported, set in the lobby:
 - **Shared HQ.** Everyone on the side sees the same desk and map. Simpler, and good for friends planning together.
-- **Chain of command.** Each human has their own desk and sector. Messages between players take in-game time. Human subordinates can misread or improvise.
+- **Chain of command.** Each human has their own desk and sector. Messages between players take in-game time. Human subordinates can misread or improvise. A subordinate's reports reach HQ only when the subordinate forwards them, and they ride there (distance at courier pace); in shared HQ forwarding takes no time (#79).
 
 ### Session shapes
 

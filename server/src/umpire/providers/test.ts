@@ -18,9 +18,10 @@ const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v)
 /** Which stage asked, from the output schema it wants. The request carries no stage name. */
 function stageOf(
   schema: Json,
-): 'parse' | 'narrate' | 'staff' | 'staffCheck' | 'judge' | 'command' | undefined {
+): 'parse' | 'interpret' | 'narrate' | 'staff' | 'staffCheck' | 'judge' | 'command' | undefined {
   const keys = Object.keys((schema.properties as Json | undefined) ?? {});
   if (keys.includes('result')) return 'parse';
+  if (keys.includes('action')) return 'interpret';
   if (keys.includes('dispatches')) return 'narrate';
   if (keys.includes('messages')) return 'staff';
   if (keys.includes('findings')) return 'staffCheck';
@@ -182,6 +183,25 @@ function command(input: Json) {
   };
 }
 
+/**
+ * The interpret task, canned: a cautious officer halts a fifth short and an aggressive or
+ * initiative one goes 150 m past, unless the order says what it is for. Others do as written.
+ */
+function interpret(input: Json) {
+  const sub = (input.subordinate ?? {}) as Json;
+  const traits = Array.isArray(sub.traits) ? sub.traits.map(str) : [];
+  const intentStated =
+    /\b(so that|in order to|to (?:cover|protect|prevent|screen|secure)|because)\b/i.test(
+      str(input.order),
+    );
+  if (!arr(input.legs).some((l) => str(l.kind) === 'move') || traits.includes('literal'))
+    return { action: 'none', intentStated };
+  if (traits.includes('cautious')) return { action: 'halt_short', amount: 0.2, intentStated };
+  if (traits.includes('aggressive') || traits.includes('initiative'))
+    return { action: 'exceed', amount: 150, intentStated };
+  return { action: 'none', intentStated };
+}
+
 /** The standard rule stands: modifier 0, worded from the situation alone. Same situation, same ruling. */
 function judgeSituation() {
   return {
@@ -195,6 +215,8 @@ export function testReply(schema: Json, input: Json): unknown {
   switch (stageOf(schema)) {
     case 'parse':
       return testParse(input as never);
+    case 'interpret':
+      return interpret(input);
     case 'narrate':
       return narrate(input);
     case 'staff':

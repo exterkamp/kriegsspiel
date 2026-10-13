@@ -190,7 +190,12 @@ export class GameHost {
     });
     // The conference is not in a snapshot, so it comes from the whole log.
     const staffHistory = new Map<string, StaffExchange[]>();
+    // Holds already called stay used: a restart does not refund them.
+    const holdsUsed: Record<string, number> = {};
     for (const e of await store.inputLog(id)) {
+      if (!e.error && e.command.kind === 'proposeHold') {
+        holdsUsed[e.command.by] = (holdsUsed[e.command.by] ?? 0) + 1;
+      }
       const c = e.command;
       if (c.kind !== 'staffAnswer' || !c.exchange) continue;
       staffHistory.set(c.side, [...(staffHistory.get(c.side) ?? []), c.exchange]);
@@ -199,6 +204,7 @@ export class GameHost {
       ...this.actorOptions(id),
       state,
       staffHistory,
+      holdsUsed,
       clock,
       agents: this.agentsFor(id, state.world),
       pause: this.options.pause?.(id, state.world),

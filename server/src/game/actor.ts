@@ -145,6 +145,8 @@ export interface GameActorOptions {
   agents?: SideAgent[];
   /** Pause voting: who votes and the host's rules. Unset: the vote commands are refused. */
   pause?: PauseConfig;
+  /** Emergency holds each voter has already called, from the input log of a reopened game. */
+  holdsUsed?: Readonly<Record<string, number>>;
   /** Set when the game was reopened after the server went down: wall ms it was down (estimated). */
   restart?: { downMs: number };
 }
@@ -279,6 +281,7 @@ export class GameActor {
       this.pauseVoting = new PauseVoting(options.pause, {
         phase: this.clock.status === 'running' ? 'running' : 'paused',
         nowMs: this.wallNow(),
+        ...(options.holdsUsed ? { holdsUsed: options.holdsUsed } : {}),
       });
       this.ratioVoting = new RatioVoting(options.pause);
     }
@@ -328,6 +331,11 @@ export class GameActor {
         nowMs: this.wallNow(),
       }
     );
+  }
+
+  /** Emergency holds `player` may still call; zero without voters. */
+  holdsLeftFor(player: string): number {
+    return this.pauseVoting?.holdsLeft(player) ?? 0;
   }
 
   /**
@@ -1024,8 +1032,10 @@ export class GameActor {
       (entry.pause ??= []).push(t);
       this.pauseLog.push({ n: ++this.pauseStepCount, step: t });
       if (this.pauseLog.length > 20) this.pauseLog.shift();
-      if (t.to === 'paused' && t.from !== 'resume_proposed') this.clock.pause();
-      else if (t.to === 'running' && t.from !== 'pause_proposed') this.clock.resume();
+      // A hold stops the clock when it is called and starts it again if it lapses or is refused.
+      if (t.hold && t.to === 'pause_proposed') this.clock.pause();
+      else if (t.to === 'paused' && t.from !== 'resume_proposed') this.clock.pause();
+      else if (t.to === 'running' && (t.from !== 'pause_proposed' || t.hold)) this.clock.resume();
     }
   }
 
@@ -1058,6 +1068,13 @@ export class GameActor {
         if (pv.phase !== want) throw new Error(`cannot ${command.kind} while ${pv.phase}`);
         const reason = command.kind === 'proposePause' ? command.reason : undefined;
         this.applyPause(entry, [pv.propose(`p${entry.seq}`, command.by, this.wallNow(), reason)]);
+        return { ok: true };
+      }
+      case 'proposeHold': {
+        const pv = this.requirePauseVoting();
+        if (pv.phase !== 'running') throw new Error(`cannot proposeHold while ${pv.phase}`);
+        const id = `p${entry.seq}`;
+        this.applyPause(entry, [pv.callHold(id, command.by, this.wallNow(), command.reason)]);
         return { ok: true };
       }
       case 'vote': {
@@ -1134,7 +1151,13 @@ export class GameActor {
           anchor: featureAnchor(f.geometry),
         })),
       },
-      units: units.map((u) => ({ id: u.id, side: u.side, name: u.name, center: u.center })),
+      units: units.map((u) => ({
+        id: u.id,
+        side: u.side,
+        name: u.name,
+        center: u.center,
+        ...(u.personality && u.side === side ? { personality: u.personality } : {}),
+      })),
       hidden: hiddenTerms(this.engine.world, side as SideId),
     };
   }

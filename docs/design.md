@@ -36,7 +36,7 @@ The LLM may propose any arrangement of units it judges realistic, subject only t
 
 ### Differentiators
 
-- **Subordinate personalities.** Each commander has traits (aggressive, cautious, literal, initiative-taking) which colour how orders are interpreted. A cautious general may halt short; an aggressive one may exceed his orders. Trait reputations are learned by the player over a campaign.
+- **Subordinate personalities.** Each commander has traits (aggressive, cautious, literal, initiative-taking) which colour how orders are interpreted. A cautious general may halt short; an aggressive one may exceed his orders. Trait reputations are learned by the player over a campaign. Implemented as hidden traits that bound how a move is read, softened when the order states its intent (D36).
 - **Commander's intent matters.** Orders that explain *why* are executed more sensibly when circumstances change (Auftragstaktik vs literal obedience). The umpire grades this.
 - **Written reports as the only sensor.** Player maps are reconstructed from reports, with the player free to annotate. No omniscient minimap.
 - **Courier and signal layer.** Couriers can be intercepted by enemy cavalry, and captured dispatches can be read by the other side (the umpire hands them over in-fiction). Implemented as courier model v2 (see "Courier model v2" in [decisions.md](decisions.md)).

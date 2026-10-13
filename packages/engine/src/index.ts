@@ -187,6 +187,15 @@ export {
   wagonsReach,
 } from './supply.js';
 export { ROLES, maySign, mayDraft, mayForward, viewForRole } from './roles.js';
+export type { ChainOfCommand } from './roles.js';
+export {
+  FORWARD_HANDLING_MS,
+  arrivedForwards,
+  forwardDelayMs,
+  sendForward,
+  type ForwardedPaper,
+  type Hierarchy,
+} from './forwarding.js';
 export type { EngineRoleView, Role, Seat, ViewUnitOutline } from './roles.js';
 export {
   COMBAT_DATA,
@@ -197,3 +206,13 @@ export {
   parseCombatData,
 } from './combatRules.js';
 export type { CombatData } from './combatRules.js';
+export {
+  DEVIATION_CHANCE,
+  EXCEED_MAX_M,
+  HALT_SHORT_MAX,
+  INTENT_CHANCE,
+  INTENT_DAMPING,
+  TRAITS,
+  shapeIntents,
+} from './personality.js';
+export type { Deviation, Interpretation, Trait } from './personality.js';

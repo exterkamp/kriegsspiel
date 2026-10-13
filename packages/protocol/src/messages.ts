@@ -41,6 +41,8 @@ export const PauseProposal = z
     bySide: Side.optional(),
     /** This player asked. */
     byYou: z.boolean(),
+    /** An emergency hold: the clock is already stopped and the vote ratifies it before it lapses. */
+    hold: z.boolean().optional(),
     reason: z.string().optional(),
     yes: z.number().int().nonnegative(),
     no: z.number().int().nonnegative(),
@@ -77,6 +79,15 @@ export const Command = z.discriminatedUnion('kind', [
     .object({
       ...Envelope,
       kind: z.literal('proposePause'),
+      reason: z.string().max(MAX_PAUSE_REASON).optional(),
+    })
+    .strict(),
+  // Emergency hold (D5): stop the clock now for a short wall-clock time. It lapses unless the other
+  // players ratify it with `vote`. Each player and each game has a fixed number of holds.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('proposeHold'),
       reason: z.string().max(MAX_PAUSE_REASON).optional(),
     })
     .strict(),
@@ -168,6 +179,8 @@ export const Command = z.discriminatedUnion('kind', [
   z.object({ ...Envelope, kind: z.literal('mergeDraft'), draft: Id }).strict(),
   // HQ (commander, chief of staff) passes a paper in its own view on to the subordinate commanding `unit`.
   z.object({ ...Envelope, kind: z.literal('forwardDispatch'), dispatchId: Id, unit: Id }).strict(),
+  // A subordinate sends a report their own formation filed up to HQ. In a chain of command HQ sees it only once it has ridden there.
+  z.object({ ...Envelope, kind: z.literal('forwardReport'), reportId: Id }).strict(),
 ]);
 export type Command = z.infer<typeof Command>;
 
@@ -307,6 +320,8 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       kind: z.literal('pauseState'),
       phase: PausePhase,
       proposal: PauseProposal.optional(),
+      /** Emergency holds this player may still call (their own allowance or the game's, the smaller). */
+      holdsLeft: z.number().int().nonnegative().optional(),
     })
     .strict(),
   // A pause or resume vote has been settled, or the pause was ended some other way.
