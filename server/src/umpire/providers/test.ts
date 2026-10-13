@@ -18,7 +18,16 @@ const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v)
 /** Which stage asked, from the output schema it wants. The request carries no stage name. */
 function stageOf(
   schema: Json,
-): 'parse' | 'interpret' | 'narrate' | 'staff' | 'staffCheck' | 'judge' | 'command' | 'critique' | undefined {
+):
+  | 'parse'
+  | 'interpret'
+  | 'narrate'
+  | 'staff'
+  | 'staffCheck'
+  | 'judge'
+  | 'command'
+  | 'critique'
+  | undefined {
   const keys = Object.keys((schema.properties as Json | undefined) ?? {});
   if (keys.includes('result')) return 'parse';
   if (keys.includes('action')) return 'interpret';
