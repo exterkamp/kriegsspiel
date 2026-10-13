@@ -149,7 +149,8 @@ export function withdrawOrder(turn: OpenTurn, side: string, orderId: string): bo
 export function openTurnFromLog(log: readonly InputLogEntry[]): OpenTurn | undefined {
   let turn: OpenTurn | undefined;
   for (const e of log) {
-    if (e.error) continue;
+    // A turn whose adjudicator threw was still closed: time moved on to its end (see `completeTurn`).
+    if (e.error && e.command.kind !== 'resolveTurn') continue;
     const c = e.command;
     if (c.kind === 'openTurn') {
       turn = {
@@ -172,6 +173,19 @@ export function openTurnFromLog(log: readonly InputLogEntry[]): OpenTurn | undef
     }
   }
   return turn;
+}
+
+/** The order ids each side has sent in any turn, from a reopened game's input log. */
+export function sentTurnIdsFromLog(log: readonly InputLogEntry[]): Map<string, Set<string>> {
+  const ids = new Map<string, Set<string>>();
+  for (const e of log) {
+    const c = e.command;
+    if (e.error || c.kind !== 'sendTurn') continue;
+    const set = ids.get(c.side) ?? new Set<string>();
+    for (const o of c.orders) set.add(o.orderId);
+    ids.set(c.side, set);
+  }
+  return ids;
 }
 
 /** Every side's sent orders, in send order, as the turn record carries them. */

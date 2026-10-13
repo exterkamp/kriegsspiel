@@ -174,6 +174,15 @@ describe('applyServerMessage', () => {
       resolving: false,
       held: [],
     });
+    // The game is over: no turn follows the last one, which was still resolving.
+    s = applyServerMessage(s, { v, kind: 'turnState', ...s.turn!, resolving: true }, 0);
+    s = applyServerMessage(
+      s,
+      { v, kind: 'gameOver', winner: 'blue', reason: 'objective-held', atGame: 2_400_000 },
+      0,
+    );
+    expect(s.turn).toBeUndefined();
+    expect(s.gameOver).toBeDefined();
   });
 
   it('stores the view, merges its dispatches and anchors the clock', () => {

@@ -26,7 +26,7 @@ import type {
 } from '@kriegsspiel/protocol';
 import { turnSettingsOf } from '@kriegsspiel/protocol';
 import type { GameStore, InputLogEntry } from './store.js';
-import { openTurnFromLog, type TurnResolver } from './turns.js';
+import { openTurnFromLog, sentTurnIdsFromLog, type TurnResolver } from './turns.js';
 
 /** Each side's deputy settings (the last set) and the account of its turns, from a game's whole input log (D6f). */
 export function deputiesFromLog(
@@ -271,7 +271,11 @@ export class GameHost {
     }
     const deputies = deputiesFromLog(log);
     const open = turnOptions ? openTurnFromLog(log) : undefined;
-    const turns = turnOptions && { ...turnOptions, ...(open ? { open } : {}) };
+    const turns = turnOptions && {
+      ...turnOptions,
+      ...(open ? { open } : {}),
+      sentIds: sentTurnIdsFromLog(log),
+    };
     const actor = new GameActor({
       ...this.actorOptions(id),
       state,

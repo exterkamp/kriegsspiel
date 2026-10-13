@@ -78,11 +78,15 @@ interface Connection {
   /** Orders being parsed now, and the wall-clock times of recent ones (#160). */
   ordersInFlight: number;
   orderTimes: number[];
+  /** Wall-clock times of recent turn commands (hold, withdraw, send); each is journaled. */
+  turnTimes: number[];
 }
 
 /** Orders one connection may have parsing at once, and per minute; each costs a model call. */
 export const MAX_ORDERS_IN_FLIGHT = 3;
 export const MAX_ORDERS_PER_MINUTE = 30;
+/** Turn commands one connection may send per minute (D39): held orders are edits, so more than orders. */
+export const MAX_TURN_COMMANDS_PER_MINUTE = 120;
 
 type PauseResult = Extract<ServerMessage, { kind: 'pauseResult' }>;
 
@@ -536,6 +540,7 @@ export class Hub {
       sentBytes: 0,
       ordersInFlight: 0,
       orderTimes: [],
+      turnTimes: [],
     };
     const set = this.conns.get(gameId) ?? new Set();
     // A side with a connection already open is not away, so it gets no catch-up.
@@ -858,6 +863,13 @@ export class Hub {
     ) {
       return fail('not_permitted', 'staff officers draft orders; the commander sends them');
     }
+    // Every turn command is journaled and snapshotted, so a connection gets a budget of them.
+    const now = Date.now();
+    conn.turnTimes = conn.turnTimes.filter((t) => now - t < 60_000);
+    if (conn.turnTimes.length >= MAX_TURN_COMMANDS_PER_MINUTE) {
+      return fail('rate_limited', 'too many turn commands; wait a moment');
+    }
+    conn.turnTimes.push(now);
     const by = conn.seat ? { by: conn.seat } : {};
     let result;
     try {

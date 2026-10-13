@@ -18,6 +18,7 @@
 import {
   deserialize,
   featureAnchor,
+  mayDraft,
   maySign,
   serialize,
   viewFor,
@@ -211,6 +212,8 @@ export interface GameActorOptions {
     /** Resolves a closed turn. Default `NO_ORDERS_RESOLVER` (until 11.4). */
     resolver?: TurnResolver;
     open?: OpenTurn;
+    /** The order ids each side sent in earlier turns of a reopened game (`sentTurnIdsFromLog`). */
+    sentIds?: ReadonlyMap<string, ReadonlySet<string>>;
   };
 }
 
@@ -316,6 +319,8 @@ export class GameActor {
     | { turnMs: number; deadlineHours?: number; resolver: TurnResolver; humans: string[] }
     | undefined;
   private openTurn: OpenTurn | undefined;
+  /** Order ids each side has sent in any turn; an id is not reused across turns. */
+  private readonly turnSentIds = new Map<string, Set<string>>();
   private turnTimer: unknown;
   private turnTimerSet = false;
 
@@ -386,6 +391,8 @@ export class GameActor {
         humans: humanSides(this.engine.world.sides, agentSides),
       };
       this.openTurn = options.turns.open;
+      for (const [side, ids] of options.turns.sentIds ?? [])
+        this.turnSentIds.set(side, new Set(ids));
     }
   }
 
@@ -513,7 +520,7 @@ export class GameActor {
       this.reschedule();
       // A reopened game whose sides had all sent before the stop resolves that turn now.
       if (this.turnReady())
-        void this.enqueue(() => this.closeTurn('all-sent')).catch(() => undefined);
+        void this.enqueue(() => this.closeTurn('all-sent')).catch((e) => this.onError?.(e));
     });
   }
 
@@ -1407,6 +1414,16 @@ export class GameActor {
         const t = this.writableTurn(command.side);
         const unit = this.engine.world.units.find((u) => u.id === command.order.to);
         if (!unit || unit.side !== command.side) throw new Error('that is not one of your units');
+        // A held order is as good as drafted: a seat holds only for units it may draft for (D6a).
+        if (
+          command.by &&
+          !mayDraft(this.engine.world, command.side as SideId, command.by, unit.id)
+        ) {
+          throw new Error(`You may not write orders to ${unit.name}.`);
+        }
+        if (this.turnSentIds.get(command.side)?.has(command.order.orderId)) {
+          throw new Error('that order id was already sent in an earlier turn');
+        }
         entry.command = { ...command, turn: t.n };
         holdOrder(t, command.side, structuredClone(command.order));
         return { ok: true, orderId: command.order.orderId };
@@ -1414,6 +1431,15 @@ export class GameActor {
       case 'withdrawTurnOrder': {
         const t = this.writableTurn(command.side);
         entry.command = { ...command, turn: t.n };
+        const held = t.held.get(command.side)?.find((o) => o.orderId === command.orderId);
+        if (
+          held &&
+          command.by &&
+          !mayDraft(this.engine.world, command.side as SideId, command.by, held.to)
+        ) {
+          const unit = this.engine.world.units.find((u) => u.id === held.to);
+          throw new Error(`You may not write orders to ${unit?.name ?? held.to}.`);
+        }
         if (!withdrawOrder(t, command.side, command.orderId)) {
           throw new Error('no such order is held for this turn');
         }
@@ -1432,6 +1458,9 @@ export class GameActor {
           }
         }
         t.sent.set(command.side, { orders, ...(signer ? { signer } : {}) });
+        const ids = this.turnSentIds.get(command.side) ?? new Set<string>();
+        for (const o of orders) ids.add(o.orderId);
+        this.turnSentIds.set(command.side, ids);
         entry.command = { ...command, turn: t.n, orders };
         // Closed after this send is logged, in its own job.
         if (this.turnReady()) {
@@ -1686,8 +1715,13 @@ export class GameActor {
       this.onStaffAtWork?.({ working: false });
     }
     if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
-    await this.commit(entry);
-    await this.openNextTurn(t.n);
+    try {
+      await this.commit(entry);
+    } finally {
+      // The turn is resolved in memory whether or not the store took it; a failed commit must not
+      // leave the live game with no turn open (a restart would re-resolve it from the log).
+      await this.openNextTurn(t.n);
+    }
   }
 
   private clearTurnTimer(): void {

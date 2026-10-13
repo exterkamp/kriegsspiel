@@ -3,6 +3,7 @@ import { PROTOCOL_VERSION, parseServerMessage, type ServerMessage } from '@krieg
 import { MemoryGameStore } from '../game/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { buildApp, type App } from './app.js';
+import { MAX_TURN_COMMANDS_PER_MINUTE } from './hub.js';
 
 const v = PROTOCOL_VERSION;
 const RATE = 3600;
@@ -227,6 +228,31 @@ describe('turn mode over the socket', () => {
     expect(sent).toMatchObject({
       orders: [{ id: 'o1', text: 'Hold the north wood', sentAtGame: 0 }],
     });
+    app!.hub.closeAll();
+  });
+
+  it('limits how many turn commands a connection may send in a minute', async () => {
+    const t = await startedTable();
+    const lead = await Tap.open(t.url, t.lead);
+    await lead.until(lastTurn);
+    const before = (await store.inputLog(t.id)).length;
+    for (let i = 0; i <= MAX_TURN_COMMANDS_PER_MINUTE; i++) {
+      lead.send({
+        kind: 'holdTurnOrder',
+        order: { orderId: 'o1', to: 'blue-1', text: `rev ${i}` },
+      });
+    }
+    const refused = await lead.until((m) =>
+      m.find((x) => x.kind === 'error' && x.code === 'rate_limited'),
+    );
+    expect(refused).toMatchObject({ message: 'o1: too many turn commands; wait a moment' });
+    await lead.until((m) =>
+      lastTurn(m)?.held[0]?.text === `rev ${MAX_TURN_COMMANDS_PER_MINUTE - 1}` ? true : undefined,
+    );
+    const turnRows = (await store.inputLog(t.id))
+      .slice(before)
+      .filter((e) => e.command.kind === 'turnOrder');
+    expect(turnRows).toHaveLength(MAX_TURN_COMMANDS_PER_MINUTE);
     app!.hub.closeAll();
   });
 });

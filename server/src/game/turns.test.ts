@@ -370,6 +370,181 @@ describe('turn mode: the turn clock (D39, 11.3)', () => {
     expect(back.state.time).toBe(20 * MINUTE);
   });
 
+  it('reopens a game whose sides had all sent and resolves that turn at once', async () => {
+    const store = new MemoryGameStore();
+    const first = setUp({}, store);
+    // The first server never answers: it goes down while the turn is being resolved.
+    const stuck: TurnResolver = { resolve: () => new Promise(() => {}) };
+    await first.host.shutdown();
+    const down = new GameHost({
+      store,
+      parser,
+      registry: createRegistry(),
+      wallNow: first.time.now,
+      timers: first.time,
+      init: startingState,
+      turnResolver: () => stuck,
+    });
+    const game = await down.create('g1', loadScenario(holdTheBridge), {
+      settings: first.settings,
+    });
+    await game.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order('b1', 'blue-1') });
+    await game.submit({ kind: 'sendTurn', side: 'blue', turn: 0, orders: [] });
+    await game.submit({ kind: 'sendTurn', side: 'red', turn: 0, orders: [] });
+    await first.time.flush();
+    expect(game.turnStateFor('blue')).toMatchObject({ turn: 1, resolving: true });
+    await down.shutdown();
+
+    host = new GameHost({
+      store,
+      parser,
+      registry: createRegistry(),
+      wallNow: first.time.now,
+      timers: first.time,
+      init: startingState,
+      turnResolver: () => first.resolver,
+    });
+    const back = await host.open('g1');
+    await first.time.flush();
+    expect(first.resolver.calls).toHaveLength(1);
+    expect(first.resolver.calls[0]).toMatchObject({
+      n: 1,
+      cause: 'all-sent',
+      sent: ['blue', 'red'],
+      orders: [{ orderId: 'b1', to: 'blue-1' }],
+    });
+    expect(back.state.time).toBe(20 * MINUTE);
+    expect(back.turnStateFor('blue')).toMatchObject({ turn: 2, resolving: false });
+  });
+
+  it('opens the next turn even when the store fails to take the resolved one', async () => {
+    class FlakyStore extends MemoryGameStore {
+      failed = false;
+      override async appendInput(gameId: string, entry: InputLogEntry): Promise<void> {
+        if (entry.command.kind === 'resolveTurn' && !this.failed) {
+          this.failed = true;
+          throw new Error('disk full');
+        }
+        return super.appendInput(gameId, entry);
+      }
+    }
+    const store = new FlakyStore();
+    const t = setUp({}, store);
+    await t.host.shutdown();
+    const errors: unknown[] = [];
+    host = new GameHost({
+      store,
+      parser,
+      registry: createRegistry(),
+      wallNow: t.time.now,
+      timers: t.time,
+      init: startingState,
+      turnResolver: () => t.resolver,
+      onError: (_id, e) => errors.push(e),
+    });
+    const game = await host.create('g1', loadScenario(holdTheBridge), { settings: t.settings });
+    await game.submit({ kind: 'sendTurn', side: 'blue', turn: 0, orders: [] });
+    await game.submit({ kind: 'sendTurn', side: 'red', turn: 0, orders: [] });
+    await t.time.flush();
+    expect(store.failed).toBe(true);
+    expect(errors).toHaveLength(1);
+    expect(game.state.time).toBe(20 * MINUTE);
+    expect(game.turnStateFor('blue')).toMatchObject({ turn: 2, resolving: false });
+    expect(
+      await game.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order('b1', 'blue-1') }),
+    ).toMatchObject({ ok: true });
+  });
+
+  it('lets a seat hold or withdraw only orders to units it may draft for (D6a)', async () => {
+    const { game } = await create();
+    const sub = { role: 'subordinate', units: ['blue-1'] } as const;
+    expect(
+      await game.submit({
+        kind: 'turnOrder',
+        side: 'blue',
+        turn: 0,
+        order: order('s1', 'blue-1'),
+        by: { ...sub, units: [...sub.units] },
+      }),
+    ).toMatchObject({ ok: true });
+    const outside = await game.submit({
+      kind: 'turnOrder',
+      side: 'blue',
+      turn: 0,
+      order: order('s2', 'blue-2'),
+      by: { ...sub, units: [...sub.units] },
+    });
+    expect(outside).toMatchObject({ ok: false, kind: 'rejection' });
+    expect((outside as { reason: string }).reason).toMatch(/^You may not write orders to /);
+    // The commander's order to another formation cannot be replaced or withdrawn by the subordinate.
+    await game.submit({
+      kind: 'turnOrder',
+      side: 'blue',
+      turn: 0,
+      order: order('c1', 'blue-2'),
+      by: { role: 'commander' },
+    });
+    expect(
+      await game.submit({
+        kind: 'turnOrder',
+        side: 'blue',
+        turn: 0,
+        order: order('c1', 'blue-2', 'retreat'),
+        by: { ...sub, units: [...sub.units] },
+      }),
+    ).toMatchObject({ ok: false });
+    expect(
+      await game.submit({
+        kind: 'withdrawTurnOrder',
+        side: 'blue',
+        turn: 0,
+        orderId: 'c1',
+        by: { ...sub, units: [...sub.units] },
+      }),
+    ).toMatchObject({ ok: false });
+    expect(game.turnStateFor('blue')!.held).toEqual([order('s1', 'blue-1'), order('c1', 'blue-2')]);
+  });
+
+  it('refuses an order id the side already sent in an earlier turn, across a reopen', async () => {
+    const store = new MemoryGameStore();
+    const first = setUp({}, store);
+    const game = await first.host.create('g1', loadScenario(holdTheBridge), {
+      settings: first.settings,
+    });
+    await game.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order('o1', 'blue-1') });
+    await game.submit({ kind: 'sendTurn', side: 'blue', turn: 0, orders: [] });
+    await game.submit({ kind: 'sendTurn', side: 'red', turn: 0, orders: [] });
+    await first.time.flush();
+    const reuse = {
+      kind: 'turnOrder',
+      side: 'blue',
+      turn: 0,
+      order: order('o1', 'blue-2'),
+    } as const;
+    expect(await game.submit(reuse)).toEqual({
+      ok: false,
+      kind: 'rejection',
+      reason: 'that order id was already sent in an earlier turn',
+    });
+    // Red never sent o1, so red may use it.
+    expect(
+      await game.submit({ kind: 'turnOrder', side: 'red', turn: 0, order: order('o1', 'red-1') }),
+    ).toMatchObject({ ok: true });
+    await first.host.shutdown();
+
+    host = new GameHost({
+      store,
+      parser,
+      registry: createRegistry(),
+      wallNow: first.time.now,
+      timers: first.time,
+      init: startingState,
+      turnResolver: () => first.resolver,
+    });
+    const back = await host.open('g1');
+    expect(await back.submit(reuse)).toMatchObject({ ok: false });
+  });
+
   it('counts only human sides: a scripted side does not have to send', async () => {
     const store = new MemoryGameStore();
     const time = new FakeTime();
@@ -446,5 +621,11 @@ describe('turn bookkeeping', () => {
     expect(t.held.get('blue')).toEqual([]);
     expect([...t.sent.keys()]).toEqual([]);
     expect(openTurnFromLog(log.slice(0, 3))).toBeUndefined();
+    // A turn whose adjudicator failed was still closed and resolved: it is not reopened.
+    const failed = [
+      ...log.slice(0, 2),
+      e(3, { kind: 'resolveTurn', turn: 1, cause: 'all-sent' }, 'unknown adjudicator'),
+    ];
+    expect(openTurnFromLog(failed)).toBeUndefined();
   });
 });

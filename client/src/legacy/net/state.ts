@@ -386,9 +386,12 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
         notices,
       };
     }
-    case 'gameOver':
+    case 'gameOver': {
+      // No turn opens after the game ends; drop the last one (often still resolving).
+      const rest = { ...s };
+      delete rest.turn;
       return {
-        ...s,
+        ...rest,
         gameOver: {
           winner: m.winner,
           reason: m.reason,
@@ -396,6 +399,7 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
           ...(m.loserOut ? { loserOut: m.loserOut } : {}),
         },
       };
+    }
     case 'notification': {
       // What would reach an away player by push or email, shown to one who has the game open.
       const notices = [
