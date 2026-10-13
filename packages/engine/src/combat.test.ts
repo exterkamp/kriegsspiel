@@ -1067,6 +1067,32 @@ describe('a decided battle against the time limit (#417)', () => {
     expect(res.world.outcome).toMatchObject({ winner: 'red', reason: 'defence-broken' });
   });
 
+  it("a defence broken by the combat tick on the time limit's own minute goes to the ruling", () => {
+    // Two weak Blue battalions in contact with two strong Red ones from the start, no orders.
+    const fight = (holdMinutes: number) =>
+      field(
+        [
+          { id: 'blue-1', side: 'blue', x: 1, y: 4, strength: 300 },
+          { id: 'blue-2', side: 'blue', x: 1, y: 3, strength: 300 },
+          { id: 'red-1', side: 'red', x: 2, y: 4, strength: 800 },
+          { id: 'red-2', side: 'red', x: 2, y: 3, strength: 800 },
+        ],
+        { holdMinutes, seed: 9 },
+      );
+    const long = advanceTo(fight(180), 180 * MS_PER_MINUTE, registry()).state;
+    const breakAt = long.world.battle?.declaredAt;
+    expect(long.world.battle).toMatchObject({ winner: 'red', reason: 'defence-broken' });
+    // The break falls on a combat tick, which is queued after the deadline for the same minute.
+    expect(breakAt! % COMBAT_TICK_MS).toBe(0);
+    const { state } = advanceTo(fight(breakAt! / MS_PER_MINUTE), END, registry());
+    expect(state.world.outcome).toMatchObject({
+      winner: 'red',
+      reason: 'defence-broken',
+      time: breakAt,
+    });
+    expect(state.world.rulings).toHaveLength(1);
+  });
+
   it('an umpire turn ending at the time limit with a defence just broken rules it, not objective-held', () => {
     const s = brokenDefenceAt(HOLD - 10);
     const res = turnVictory(s.world, HOLD * MS_PER_MINUTE);

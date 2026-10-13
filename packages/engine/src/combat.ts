@@ -575,6 +575,15 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
 
   registry.register(VICTORY_DEADLINE_EVENT, (world, ev) => {
     if (world.outcome || heldTurn(world, ev.time)) return { world };
+    // The deadline was queued at the start, before this minute's combat tick, so it steps
+    // behind whatever is already queued for the minute: a break that tick makes is ruled on
+    // first (#417). A tick queues its successor 2 minutes on, so one step back is enough.
+    if (!(ev.payload as { last?: boolean } | null)?.last) {
+      return {
+        world,
+        schedule: [{ time: ev.time, type: VICTORY_DEADLINE_EVENT, payload: { last: true } }],
+      };
+    }
     // A force broken at this very minute is ruled on before the time limit is read (#417).
     const declared = declareBattle(world, ev.time);
     if (declared) world = declared.world;

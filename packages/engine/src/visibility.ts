@@ -78,7 +78,6 @@ export function contactAgedOut(world: GameState, c: Contact, now: GameTime): boo
   return Math.ceil((now - c.seenAt) / MS_PER_MINUTE) * UNCERTAINTY_MM_PER_MINUTE > capMm;
 }
 
-/** Whether a delivered report has told this side that enemy `unitId` is destroyed (#110). */
 /**
  * True when a lost-courier report's unit had a report of its own reach HQ, about something after its
  * orders were due, by the time the lost-courier report did. Fixed once delivered, so the text does
@@ -97,6 +96,7 @@ function heardFromSince(reports: Report[], r: Report): boolean {
   );
 }
 
+/** Whether a delivered report has told this side that enemy `unitId` is destroyed (#110). */
 function destructionDelivered(reports: Report[], unitId: string, now: GameTime): boolean {
   return reports.some((r) => r.kind === 'destroyed' && r.subject === unitId && r.deliverAt <= now);
 }
@@ -663,6 +663,7 @@ export function fileReport(
   unit: Unit,
   time: GameTime,
   delayMs: number = COURIER_DELAY_MS,
+  extra: Partial<Report> = {},
 ): GameState {
   const report: Report = {
     id: reportId(world, unit.side),
@@ -674,6 +675,7 @@ export function fileReport(
     place: describePlace(world.map, unit.center),
     uncertainty: 0,
     confidence: 'high',
+    ...extra,
   };
   return withIntel(world, unit.side, { reports: [...world.intel[unit.side].reports, report] });
 }
