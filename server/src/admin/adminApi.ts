@@ -8,6 +8,8 @@
  *   GET /admin/api/games/:id/replay            timeline of the input log: end time and marks to jump to
  *   GET /admin/api/games/:id/replay/at?at=ms   master state, both side views and events at a game time
  *   GET /admin/api/games/:id/stream            server-sent events of new entries; ?after= replays first
+ *   …/games/:id/orders, …/orders/playground    order interpretation history and the dry-run playground
+ *                                              (`orderDebug.ts`, #395; its one POST never touches a game)
  *
  * Gating: `buildApp` registers this plugin only when the admin view is enabled, so otherwise every
  * `/admin` path is an ordinary 404. When enabled, a request must come from a loopback address or
@@ -24,6 +26,7 @@ import { sideViewOf } from '../api/sideView.js';
 import type { TraceEntry, TraceStore } from '../debug/trace.js';
 import type { GameStore } from '../game/store.js';
 import { loadReplayInput, replayAt, replayTimeline } from './replayView.js';
+import { OrderPlayground, orderDebugRoutes } from './orderDebug.js';
 
 export const ADMIN_PREFIX = '/admin/api';
 export const DEFAULT_ENTRY_LIMIT = 200;
@@ -39,6 +42,8 @@ export interface AdminOptions {
   token?: string;
   /** Open mode: every caller passes, with no token and no loopback check. Redaction still applies. */
   open?: boolean;
+  /** The order playground's dry runs (#395). Absent: a playground with the rules parser only. */
+  playground?: OrderPlayground;
 }
 
 export const ADMIN_OPEN_WARNING =
@@ -89,7 +94,7 @@ function givenToken(req: FastifyRequest): string | undefined {
   return typeof q === 'string' ? q : undefined;
 }
 
-const KINDS = ['request', 'command', 'engine', 'clock', 'error', 'llm'] as const;
+const KINDS = ['request', 'command', 'engine', 'clock', 'error', 'llm', 'order'] as const;
 const EntryQuery = z.object({
   kind: z.enum(KINDS).optional(),
   correlationId: z.string().min(1).optional(),
@@ -190,6 +195,13 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
       };
     },
   );
+
+  orderDebugRoutes(server, ADMIN_PREFIX, {
+    host,
+    trace,
+    store: options.store,
+    playground: options.playground ?? new OrderPlayground(),
+  });
 
   const replayInput = (id: string) => loadReplayInput(options.store, id);
 

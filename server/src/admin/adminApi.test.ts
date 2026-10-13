@@ -391,14 +391,19 @@ describe('read-only', () => {
     expect(after).toBe(seq); // reading records nothing
   });
 
-  it('exposes no admin-registered routes other than GET', () => {
-    // Every route the plugin registers is listed by printRoutes; none but GET (and Fastify's HEAD) appear.
+  it('exposes no admin-registered routes other than GET, but the order dry run', () => {
+    // Every route the plugin registers is listed by printRoutes; none but GET (and Fastify's HEAD) appear,
+    // except the dry run, which never reaches a game (orderDebug.test.ts).
     return start({ enabled: true }).then(() => {
       const routes = app!.server.printRoutes({ commonPrefix: false });
       const adminSection = routes
         .split('\n')
-        .filter((l) => /admin/.test(l) || /stream|state|entries/.test(l));
+        .filter((l) => /admin/.test(l) || /stream|state|entries/.test(l))
+        .filter((l) => !/orders\/dry-run/.test(l));
       expect(adminSection.join('\n')).not.toMatch(/POST|PUT|PATCH|DELETE/);
+      expect(
+        app!.server.hasRoute({ method: 'POST', url: '/admin/api/games/:id/orders/dry-run' }),
+      ).toBe(true);
     });
   });
 });
