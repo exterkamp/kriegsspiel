@@ -288,6 +288,8 @@ describe('turn mode over the socket', () => {
     expect(end.atGame).toBeGreaterThan(last.startsAt);
     expect(end.atGame).toBeLessThanOrEqual(last.endsAt);
     expect(turns.every((x) => x.startsAt < end.atGame)).toBe(true);
+    // Decided at a minute the clock shows, not a fraction of a second into a phantom next turn (#429).
+    expect(end.atGame % 60_000).toBe(0);
     // Nothing about a turn follows the game over, and the clock stands stopped at its time.
     expect(tap.messages.slice(tap.messages.indexOf(end)).some((x) => x.kind === 'turnState')).toBe(
       false,

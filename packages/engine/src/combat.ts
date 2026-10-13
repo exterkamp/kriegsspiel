@@ -42,6 +42,7 @@ import {
   type BattleRuling,
   type GameState,
   type Outcome,
+  type Point,
   type Report,
   type SideId,
   type Unit,
@@ -310,11 +311,8 @@ function declareBattle(
   const loser = brokenA ? attacker : defender;
   const winner = brokenA ? defender : attacker;
   const reason = brokenA ? 'attack-broken' : 'defence-broken';
-  const name = (id: SideId) => world.sides.find((s) => s.id === id)?.name ?? id;
-  const where = describePlace(world.map, polygonCentroid(world.victory.objective));
-  // `where` reads "at the bridge, on the High road": it carries its own preposition.
-  // A place with a clause in it ("at the bridge, on the High road") is closed by a comma.
-  const closed = where.includes(',') ? `${where},` : where;
+  const name = sideName(world);
+  const { centre, where, closed } = objectivePlace(world);
   const narrative = brokenA
     ? `${name(loser)}'s attack ${closed} has been broken; ${name(winner)} holds the field.`
     : `${name(loser)}'s defence ${closed} has been broken; ${name(winner)} holds the field.`;
@@ -331,33 +329,18 @@ function declareBattle(
     rationale,
     narrative,
   };
-  let w: GameState = {
+  const w: GameState = {
     ...world,
     rulings: [...world.rulings, ruling],
     battle: { winner, reason, declaredAt: time },
-  };
-  const centre = polygonCentroid(world.victory.objective);
-  for (const side of world.sides) {
-    const report: Report = {
-      id: `${side.id}-r${w.intel[side.id].reports.length + 1}`,
-      kind: 'battle',
-      observedAt: time,
-      deliverAt: time,
+    intel: fileToAll(world, {
       from: 'Dispatch from the field',
-      location: { ...centre },
+      time,
+      centre,
       place: where,
-      uncertainty: 0,
-      confidence: 'high',
       text: narrative,
-    };
-    w = {
-      ...w,
-      intel: {
-        ...w.intel,
-        [side.id]: { ...w.intel[side.id], reports: [...w.intel[side.id].reports, report] },
-      },
-    };
-  }
+    }),
+  };
   return {
     world: w,
     schedule: [
@@ -429,34 +412,59 @@ function finish(world: GameState, outcome: Outcome): HandlerResult<GameState> {
  * names no unit and no figure. Real-time play has the game-over screen alone, as before.
  */
 function outcomePapers(world: GameState, outcome: Outcome): GameState['intel'] {
-  const text = outcomeText(world, outcome);
+  const place = objectivePlace(world);
+  return fileToAll(world, {
+    from: "The umpire's ruling",
+    time: outcome.time,
+    centre: place.centre,
+    place: place.where,
+    text: outcomeText(world, outcome, place),
+  });
+}
+
+/** The objective's centre and how it reads in a paper: `where` carries its own preposition. */
+function objectivePlace(world: GameState): { centre: Point; where: string; closed: string } {
   const centre = polygonCentroid(world.victory.objective);
-  const place = describePlace(world.map, centre);
-  return Object.fromEntries(
-    Object.entries(world.intel).map(([side, i]) => {
-      const report: Report = {
-        id: `${side}-r${i.reports.length + 1}`,
-        kind: 'battle',
-        observedAt: outcome.time,
-        deliverAt: outcome.time,
-        from: "The umpire's ruling",
-        location: { ...centre },
-        place,
-        uncertainty: 0,
-        confidence: 'high',
-        text,
-      };
-      return [side, { ...i, reports: [...i.reports, report] }];
-    }),
-  ) as GameState['intel'];
+  const where = describePlace(world.map, centre);
+  // A place with a clause in it ("at the bridge, on the High road") is closed by a comma.
+  return { centre, where, closed: where.includes(',') ? `${where},` : where };
+}
+
+const sideName = (world: GameState) => (id: SideId) =>
+  world.sides.find((s) => s.id === id)?.name ?? id;
+
+/** One public paper, delivered at once to every side's in-tray as its next report. */
+function fileToAll(
+  world: GameState,
+  paper: { from: string; time: number; centre: Point; place: string; text: string },
+): GameState['intel'] {
+  const intel = { ...world.intel };
+  for (const { id: side } of world.sides) {
+    const i = intel[side];
+    const report: Report = {
+      id: `${side}-r${i.reports.length + 1}`,
+      kind: 'battle',
+      observedAt: paper.time,
+      deliverAt: paper.time,
+      from: paper.from,
+      location: { ...paper.centre },
+      place: paper.place,
+      uncertainty: 0,
+      confidence: 'high',
+      text: paper.text,
+    };
+    intel[side] = { ...i, reports: [...i.reports, report] };
+  }
+  return intel;
 }
 
 /** How the game was decided, in the umpire's words. Exported for tests only. */
-export function outcomeText(world: GameState, outcome: Outcome): string {
-  const name = (id: SideId) => world.sides.find((s) => s.id === id)?.name ?? id;
-  const where = describePlace(world.map, polygonCentroid(world.victory.objective));
-  // `where` may carry a clause ("at the bridge, on the High road"), closed by a comma.
-  const closed = where.includes(',') ? `${where},` : where;
+export function outcomeText(
+  world: GameState,
+  outcome: Outcome,
+  { closed } = objectivePlace(world),
+): string {
+  const name = sideName(world);
   const winner = outcome.winner === null ? null : name(outcome.winner);
   const loserId = world.sides.find((s) => s.id !== outcome.winner)?.id;
   const loser = loserId === undefined ? '' : name(loserId);
@@ -464,7 +472,8 @@ export function outcomeText(world: GameState, outcome: Outcome): string {
     case 'objective-taken':
       return `${winner} has taken the objective ${closed} and held it. The game is over: ${winner} wins.`;
     case 'objective-held':
-      return `The time limit is reached with ${winner} still holding the objective ${where}. The game is over: ${winner} wins.`;
+      // Also the outcome when the attacker stands on it with the take not complete: say only what is true.
+      return `The time limit is reached and ${loser} has not taken the objective ${closed}. The game is over: ${winner} wins.`;
     case 'attack-broken':
     case 'defence-broken': {
       const what = outcome.reason === 'attack-broken' ? 'attack' : 'defence';

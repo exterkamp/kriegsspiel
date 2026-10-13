@@ -1,10 +1,12 @@
 import { holdTheBridge, loadScenario } from '@kriegsspiel/engine';
 import type { UmpireSettings } from '@kriegsspiel/protocol';
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser } from '../orders/index.js';
 import { sideViewOf } from '../api/sideView.js';
 import { GameHost, MemoryGameStore, createRegistry, startingState } from './index.js';
-import type { InputLogEntry } from './store.js';
+import { loadReplayInput, replayAt, replayTimeline } from '../admin/replayView.js';
+import type { InputLogEntry, InputLogHeader } from './store.js';
 import { FakeTime } from './testing.js';
 
 const MINUTE = 60_000;
@@ -173,5 +175,27 @@ describe('turn mode: the game ends in the turn that decides it (#429)', () => {
     expect(at).toBeLessThan(last.endMs);
     expectOver(game, at);
     expect(resolved(log).at(-1)?.endGameMs).toBe(at);
+  });
+
+  it('replays a turn log from before #429 to the corrected end, past its phantom turn', async () => {
+    // The 20-minute game as main logged it: the hold fell 0.268 s into turn 3, which was opened,
+    // sent and resolved. Replayed under the minute rule the game is over at 00:40, and the logged
+    // turn 3 is not applied to the stopped world.
+    const { header, entries } = JSON.parse(
+      readFileSync(new URL('./turnEnd.before429.json', import.meta.url), 'utf8'),
+    ) as { header: InputLogHeader; entries: InputLogEntry[] };
+    expect(opened(entries).map((t) => t.turn)).toEqual([1, 2, 3]);
+    const store = new MemoryGameStore();
+    await store.saveLogHeader(header);
+    for (const e of entries) await store.appendInput(header.gameId, e);
+    const input = (await loadReplayInput(store, header.gameId))!;
+    const tl = replayTimeline(input);
+    expect(tl.outcome).toMatchObject({
+      winner: 'red',
+      reason: 'objective-taken',
+      time: 40 * MINUTE,
+    });
+    expect(tl.endMs).toBe(40 * MINUTE);
+    expect(replayAt(input, tl.endMs).views.blue).toBeDefined();
   });
 });

@@ -30,6 +30,12 @@ describe('paceLabel', () => {
     expect(paceLabel({ ...g, finished: false, gameTimeMs: 40 * MIN })).toBe(
       'turn 3, turns of 20 min',
     );
+    // A finished game with a deadline has no orders due; a live one still does.
+    const due = { ...g, umpire: { ...umpire, turnDeadlineHours: 24 } };
+    expect(paceLabel({ ...due, finished: true, gameTimeMs: 40 * MIN })).toBe('2 turns of 20 min');
+    expect(paceLabel({ ...due, finished: false, gameTimeMs: 40 * MIN })).toBe(
+      'turn 3, turns of 20 min, orders due in 24 h',
+    );
     // In the lobby, and a real-time game, as before.
     expect(paceLabel({ ...g, status: 'lobby', gameTimeMs: 0 })).toBe('turns of 20 min');
     expect(paceLabel({ rate: 4, status: 'started', finished: true, gameTimeMs: 40 * MIN })).toBe(

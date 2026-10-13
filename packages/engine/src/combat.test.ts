@@ -28,7 +28,13 @@ import {
 } from './index.js';
 import { COMBAT_CHECK_EVENT, RALLY_EVENT } from './contact.js';
 import { schedule } from './queue.js';
-import { BATTLE_CLOSE_MS, forceBroken, evaluateVictory, turnVictory } from './combat.js';
+import {
+  BATTLE_CLOSE_MS,
+  forceBroken,
+  evaluateVictory,
+  outcomeText,
+  turnVictory,
+} from './combat.js';
 import { viewFor } from './index.js';
 import type { BattleRuling } from './types.js';
 import { polygonCentroid } from './geometry.js';
@@ -1086,6 +1092,19 @@ describe('a decided battle against the time limit (#417)', () => {
     for (const papers of closing(turnVictory(declared.world, end).world)) {
       expect(papers).toHaveLength(0);
     }
+  });
+
+  it('the time-limit paper does not say the defender holds ground the attacker may stand on', () => {
+    const s = brokenDefenceAt(HOLD - 10);
+    const outcome = {
+      winner: 'blue',
+      reason: 'objective-held',
+      time: HOLD * MS_PER_MINUTE,
+    } as const;
+    const text = outcomeText(s.world, outcome);
+    expect(text).toMatch(/^The time limit is reached and Red has not taken the objective /);
+    expect(text).toMatch(/The game is over: Blue wins\.$/);
+    expect(text).not.toMatch(/holding/);
   });
 
   it("a defence broken by the combat tick on the time limit's own minute goes to the ruling", () => {

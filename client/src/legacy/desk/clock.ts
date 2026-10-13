@@ -28,6 +28,9 @@ const TURN_LABEL = {
   over: 'Game over',
 };
 
+/** Turn mode is known from the game's settings but the server has not yet sent the open turn. */
+const TURN_WAITING = 'Waiting for the turn';
+
 /** What the desk clock shows, from the client state at a local wall time. Pure, so it needs no DOM. */
 export function clockView(state: ClientState, nowWall: number): ClockView {
   if (state.turnMode) return turnClockView(state);
@@ -52,14 +55,16 @@ export function clockView(state: ClientState, nowWall: number): ClockView {
 function turnClockView(state: ClientState): ClockView {
   const phase = turnPhase(state);
   const t = state.turn;
+  // Only the server's game over ends the game; no `turnState` yet means it has not arrived (#429).
+  const waiting = !t && !state.gameOver;
   const end = state.gameOver?.atGame ?? state.clock?.gameMs ?? state.view?.atGame;
   return {
     time: t && !state.gameOver ? turnLine(t) : end === undefined ? '--' : formatGameTime(end),
     rate: '',
-    status: phase === 'over' ? 'stopped' : 'paused',
+    status: phase === 'over' && !waiting ? 'stopped' : 'paused',
     // The status label says the turn is being decided; the desk shows the umpire at work.
     staffAtWork: false,
-    label: TURN_LABEL[phase],
+    label: waiting ? TURN_WAITING : TURN_LABEL[phase],
     ...(t && !state.gameOver ? { turn: turnLine(t) } : {}),
     ...(state.turnMinutes ? { turnLength: `${state.turnMinutes}-min turns` } : {}),
   };

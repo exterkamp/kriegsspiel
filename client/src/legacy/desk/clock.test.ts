@@ -112,9 +112,40 @@ describe('clockView', () => {
     expect(clockSummary(view)).toBe('Day 1 00:40, game over, 20-min turns');
   });
 
+  it('shows a live turn game as waiting, not over, before its first turnState (#429)', () => {
+    // The settings can arrive before the socket's turnState, or while the socket is down.
+    const s = withTurnSettings(withClock(initialState, clock(1, 'paused')), {
+      dial: 'rigid',
+      persona: 'dry',
+      mode: 'turns',
+      turnMinutes: 20,
+    });
+    const view = clockView(s, 0);
+    expect(view).toMatchObject({
+      rate: '',
+      status: 'paused',
+      label: 'Waiting for the turn',
+      turnLength: '20-min turns',
+    });
+    expect(view.label).not.toBe('Game over');
+  });
+
   it('leaves a real-time game as it was when its settings arrive', () => {
     const s = withClock(initialState, clock(4, 'running'));
     expect(withTurnSettings(s, { dial: 'standard', persona: 'dry' })).toBe(s);
     expect(withTurnSettings(s, undefined)).toBe(s);
+  });
+
+  it('drops turn mode left from an earlier turn game when a real-time game is opened', () => {
+    const turns = withTurnSettings(withClock(initialState, clock(4, 'running')), {
+      dial: 'rigid',
+      persona: 'dry',
+      mode: 'turns',
+      turnMinutes: 20,
+    });
+    const s = withTurnSettings(turns, { dial: 'standard', persona: 'dry' });
+    expect(s.turnMode).toBeUndefined();
+    expect(s.turnMinutes).toBeUndefined();
+    expect(clockView(s, 0)).toMatchObject({ rate: '4:1', label: 'Running' });
   });
 });
