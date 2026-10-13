@@ -25,7 +25,7 @@ import type {
   SideView,
   StaffExchange,
 } from '@kriegsspiel/protocol';
-import { staffOfficerFor } from '../umpire/staff.js';
+import { conferenceOfficers } from '../umpire/staff.js';
 
 /** A side's deputy as the actor keeps it: its settings and what it has done. */
 export interface DeputyState {
@@ -33,15 +33,13 @@ export interface DeputyState {
   account: readonly DeputyAccount[];
 }
 
-const CONFERENCE_ROLES = ['chiefOfStaff', 'intelligence', 'quartermaster', 'engineer'] as const;
-
-/** The conference officers of `side`, fixed by the game seed, so the page shows the same ones before the first question and after a reload (#342). */
-function conferenceOfficers(seed: number, side: SideId): NonNullable<SideView['staffOfficers']> {
+/** The conference officers of `side` as the page lists them, from the one source the answers are signed from (#342, #418). */
+function officersOnWire(seed: number, side: SideId): NonNullable<SideView['staffOfficers']> {
   return Object.fromEntries(
-    CONFERENCE_ROLES.map((role) => {
-      const { name, traits } = staffOfficerFor(seed, side, role);
-      return [role, { name, traits }];
-    }),
+    Object.entries(conferenceOfficers(seed, side)).map(([role, { name, traits }]) => [
+      role,
+      { name, traits },
+    ]),
   ) as NonNullable<SideView['staffOfficers']>;
 }
 
@@ -180,7 +178,7 @@ export function toSideView(
 ): SideView {
   return {
     side: view.side,
-    ...(seed === undefined ? {} : { staffOfficers: conferenceOfficers(seed, view.side) }),
+    ...(seed === undefined ? {} : { staffOfficers: officersOnWire(seed, view.side) }),
     ...('role' in view ? { role: view.role } : {}),
     atGame: view.time,
     ...(view.hq ? { hq: view.hq } : {}),
