@@ -1440,6 +1440,8 @@ describe('SPA fallback for the Angular client', () => {
         '/map-benchmark?x=1',
         '/table-benchmark',
         '/table-benchmark?seconds=10',
+        '/spike/board',
+        '/spike/board?turn=3',
         '/style-guide',
       ]) {
         const res = await server.inject(url);

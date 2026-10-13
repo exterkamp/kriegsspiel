@@ -81,6 +81,52 @@ describe('board spike sim', () => {
     expect(track.some((p) => Math.abs(p.x - 1500) < 60 && Math.abs(p.y - 1000) < 80)).toBe(true);
   });
 
+  it('routes an attack on a target over the bridge', () => {
+    const b = new Battle(spikeScenario());
+    b.play({ b1: { verb: 'attack', target: 'r2', waypoints: [] } });
+    b.play();
+    b.play();
+    const track = b.turns.slice(1).flatMap((t) => t.tracks['b1']!);
+    const bank = (p: { x: number; y: number }) => Math.sign(p.y - b.scenario.riverY(p.x));
+    const crossings = track.filter((p, i) => i > 0 && bank(p) !== bank(track[i - 1]!));
+    expect(crossings.length).toBeGreaterThan(0);
+    for (const p of crossings) expect(Math.abs(p.x - 1500)).toBeLessThan(60);
+  });
+
+  it('falls back over the bridge when a unit breaks on the far bank', () => {
+    const s = spikeScenario();
+    // A weak battalion across the river and far east of the bridge, next to the enemy, with its home on the south bank.
+    const b1 = s.units.find((u) => u.id === 'b1')!;
+    Object.assign(b1, {
+      pos: { x: 2600, y: 450 },
+      home: { x: 2600, y: 1960 },
+      strength: 250,
+      morale: 45,
+    });
+    const b = new Battle(s);
+    b.play({ b1: { verb: 'attack', target: 'r3', waypoints: [] } });
+    for (let i = 0; i < 6; i++) b.play();
+    const broke = b.turns.findIndex((t) =>
+      t.events.some((e) => e.kind === 'broken' && e.unit === 'b1'),
+    );
+    expect(broke).toBeGreaterThan(0);
+    const track = b.turns.slice(broke).flatMap((t) => t.tracks['b1']!);
+    const bank = (p: { x: number; y: number }) => Math.sign(p.y - s.riverY(p.x));
+    const crossings = track.filter((p, i) => i > 0 && bank(p) !== bank(track[i - 1]!));
+    expect(crossings.length).toBeGreaterThan(0);
+    for (const p of crossings) expect(Math.abs(p.x - 1500)).toBeLessThan(60);
+  });
+
+  it('draws an enemy trail only from where it was seen this turn', () => {
+    const b = play(4);
+    // Nothing marches faster than broken cavalry, 220 m a minute and a third more; a longer step was never seen.
+    for (const t of b.turns.slice(1))
+      for (const track of Object.values(t.enemyTracks))
+        track
+          .slice(1)
+          .forEach((p, i) => expect(dist(p, track[i]!)).toBeLessThanOrEqual(220 * 1.3 + 1));
+  });
+
   it('bands strength estimates', () => {
     expect(sizeBand(600)).toEqual([450, 700]);
     expect(sizeBand(60)).toEqual([50, 100]);
@@ -110,6 +156,20 @@ describe('chief of staff report', () => {
     const text = r.paragraphs.map((p) => p.map((x) => x.text).join('')).join('\n');
     expect(text).toMatch(/1st Battalion came under fire .* and lost 1 man;/);
     expect(r.enemy.filter((l) => l[0]!.text === 'New: ')).toHaveLength(4);
+  });
+  it('still names a broken unit as broken on the turns after it broke', () => {
+    const b = play(5);
+    expect(unit(b.turns[4]!, 'b1').stage).toBe('broken');
+    const r = chiefOfStaffReport(b.scenario, b.turns[4]!, b.turns[5]!);
+    const text = r.paragraphs.map((p) => p.map((x) => x.text).join('')).join('\n');
+    expect(text).not.toMatch(/1st Battalion (holds|moved)/);
+    expect(text).toMatch(/1st Battalion is still broken, /);
+  });
+
+  it('does not report "lost 0 men"', () => {
+    const b = play(8);
+    for (const t of b.turns)
+      for (const e of t.events) if (e.kind === 'losses') expect(e.lost).toBeGreaterThan(0);
   });
 });
 

@@ -312,7 +312,8 @@ export class SpikeBoardComponent {
     const zoom = q.get('zoom');
     if (zoom) {
       const [x, y, w] = zoom.split(',').map(Number);
-      if ([x, y, w].every((n) => Number.isFinite(n))) this.view.set({ x: x!, y: y!, w: w! });
+      if ([x, y, w].every((n) => Number.isFinite(n)) && w! > 0)
+        this.view.set({ x: x!, y: y!, w: Math.max(600, Math.min(this.scenario.width * 1.2, w!)) });
     }
     if (q.get('report') === '0') this.reportOpen.set(false);
   }
@@ -553,7 +554,7 @@ export class SpikeBoardComponent {
         : { w: 180, h: 40 };
   }
 
-  /** The uncertainty ring of a last-known enemy: 12 m for every minute since it was seen, at most 300 m. */
+  /** The uncertainty ring of a last-known enemy: 30 m plus 8 m for every minute since it was seen, at most 200 m. */
   uncertainty(p: Piece): number {
     return Math.min(200, 30 + p.age * 8);
   }

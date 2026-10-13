@@ -443,7 +443,7 @@
             @for (v of verbs; track v) {
               <button
                 type="button"
-                [attr.aria-pressed]="shownOrder()?.verb === v && (draft() || pending()[u.id])"
+                [attr.aria-pressed]="shownOrder()?.verb === v && !!(draft() || pending()[u.id])"
                 [attr.data-verb]="v"
                 (click)="setVerb(v)"
               >

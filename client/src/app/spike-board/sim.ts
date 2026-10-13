@@ -238,7 +238,10 @@ export class Battle {
     const tracks: Record<string, Point[]> = {};
     const enemyTracks: Record<string, Point[]> = {};
     for (const u of this.units) tracks[u.id] = [{ ...u.pos }];
-    for (const c of this.known.values()) enemyTracks[c.id] = [{ ...c.pos }];
+    // Only an enemy seen now starts a track here; one seen again later starts at its new sighting, so the trail
+    // never draws movement nobody saw.
+    for (const c of this.known.values())
+      if (c.seenAt === this.minute) enemyTracks[c.id] = [{ ...c.pos }];
     const startStage = new Map(this.units.map((u) => [u.id, stageOf(u)]));
     for (let m = 0; m < TURN_MINUTES; m++) {
       this.minute++;
@@ -258,14 +261,10 @@ export class Battle {
         events.push({ kind: 'moved', minute: this.minute, unit: u.id, metres: Math.round(metres) });
       }
       const before = startStage.get(u.id);
-      if (u.side === 'blue' && u.strength < u.startStrength && before !== stageOf(u)) {
+      const lost = Math.round(tracksLoss(this.turns, u));
+      if (u.side === 'blue' && lost > 0 && before !== stageOf(u)) {
         // The losses of the turn, for the report, once per unit whose stage changed.
-        events.push({
-          kind: 'losses',
-          minute: this.minute,
-          unit: u.id,
-          lost: Math.round(tracksLoss(this.turns, u)),
-        });
+        events.push({ kind: 'losses', minute: this.minute, unit: u.id, lost });
       }
     }
     for (const [id, t] of Object.entries(enemyTracks)) {
@@ -280,7 +279,9 @@ export class Battle {
         });
     }
     const orders = Object.fromEntries(
-      this.units.filter((u) => u.side === 'blue').map((u) => [u.id, u.order]),
+      this.units
+        .filter((u) => u.side === 'blue')
+        .map((u) => [u.id, { ...u.order, waypoints: u.order.waypoints.map((p) => ({ ...p })) }]),
     );
     const turn = this.record(n, from, tracks, events, enemyTracks, orders);
     this.turns.push(turn);
@@ -328,7 +329,9 @@ export class Battle {
       if (o.verb === 'attack' && o.target) {
         const t = this.units.find((x) => x.id === o.target);
         if (t && t.stage !== 'broken' && t.strength > 0) {
-          if (o.waypoints.length === 0) goal = t.pos;
+          // Route to the target over the bridge, and take the first leg not yet reached.
+          if (o.waypoints.length === 0)
+            goal = this.routed(u.pos, [t.pos]).find((p) => dist(u.pos, p) >= 1) ?? t.pos;
           if (dist(u.pos, t.pos) <= Math.max(CONTACT_M, Math.min(RANGE[u.arm], 180)))
             goal = undefined;
         }

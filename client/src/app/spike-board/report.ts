@@ -4,8 +4,10 @@ import {
   type Scenario,
   type Turn,
   type Unit,
+  bearing,
   clock,
   dist,
+  inPolygon,
   stageOf,
 } from './sim';
 
@@ -42,7 +44,7 @@ const STAGE_WORDS: Record<string, string> = {
 /** A place name for a point: "at the bridge", "in Brandt wood", "800 m north of the bridge". */
 export function placeName(s: Scenario, p: Point): string {
   const wood = s.features.find((f) => f.kind === 'wood');
-  if (wood && inside(p, wood.points)) return `in ${wood.name}`;
+  if (wood && inPolygon(p, wood.points)) return `in ${wood.name}`;
   const bridge = s.features.find((f) => f.kind === 'bridge')!.points[0]!;
   const d = dist(p, bridge);
   if (d < 150) return 'at the bridge';
@@ -50,18 +52,8 @@ export function placeName(s: Scenario, p: Point): string {
   return `${Math.round(d / 100) * 100} m ${dir} of the bridge`;
 }
 
-function inside(p: Point, poly: Point[]): boolean {
-  let c = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[i]!;
-    const b = poly[j]!;
-    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) c = !c;
-  }
-  return c;
-}
-
 function compass(from: Point, to: Point): string {
-  const a = (Math.atan2(to.x - from.x, -(to.y - from.y)) * 180) / Math.PI;
+  const a = (bearing(from, to) * 180) / Math.PI;
   const names = [
     'north',
     'north-east',
@@ -134,6 +126,8 @@ export function chiefOfStaffReport(s: Scenario, prev: Turn, turn: Turn): Report 
           text: ` came under fire ${placeName(s, u.pos)} and lost ${men(lost)}; it ${STAGE_WORDS[stage]}.`,
         },
       ]);
+    } else if (stage === 'broken') {
+      fights.push([unitPiece(u), { text: ` is still broken, ${placeName(s, u.pos)}.` }]);
     } else {
       const metres = turn.events.find((e) => e.unit === u.id && e.kind === 'moved')?.metres;
       quiet.push(unitPiece(u), {

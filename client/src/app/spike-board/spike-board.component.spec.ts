@@ -36,6 +36,8 @@ describe('SpikeBoardComponent', () => {
     click(el.querySelector('[data-verb=hold]'));
     f.detectChanges();
     expect(el.textContent).toContain('{"verb":"hold"}');
+    expect(el.querySelector('[data-verb=hold]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(el.querySelector('[data-verb=move]')?.getAttribute('aria-pressed')).toBe('false');
     click(el.querySelector('[data-testid=give-order]'));
     f.detectChanges();
     expect(el.textContent).toContain('Held for next turn: Hold');
@@ -50,5 +52,15 @@ describe('SpikeBoardComponent', () => {
     expect(el.querySelectorAll('.counter').length).toBe(0);
     expect(el.querySelectorAll('.old-piece.ghost').length).toBeGreaterThan(0);
     expect(el.querySelectorAll('.trail').length).toBe(0);
+  });
+
+  it('ignores a zoom with no width', async () => {
+    const { f } = await open('/spike/board?zoom=0,0,0');
+    expect(f.componentInstance.view().w).toBe(f.componentInstance.scenario.width);
+  });
+
+  it('clamps a zoom from the URL as the zoom buttons do', async () => {
+    const { f } = await open('/spike/board?zoom=10,20,5');
+    expect(f.componentInstance.view()).toEqual({ x: 10, y: 20, w: 600 });
   });
 });
