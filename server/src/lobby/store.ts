@@ -18,6 +18,9 @@ export interface PauseSettings {
   rule: 'unanimous' | 'majority';
   voteTimeoutMs?: number;
   maxPauseMs?: number;
+  holdMs?: number;
+  holdsPerPlayer?: number;
+  holdsPerGame?: number;
 }
 
 /**
