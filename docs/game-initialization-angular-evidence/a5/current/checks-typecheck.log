@@ -1,0 +1,32 @@
+
+> typecheck
+> npm run typecheck --workspaces --if-present && npm run typecheck:local-map-catalog
+
+
+> @kriegsspiel/engine@0.0.0 typecheck
+> tsc --noEmit
+
+
+> @kriegsspiel/protocol@0.0.0 typecheck
+> tsc --noEmit
+
+
+> @kriegsspiel/maps@0.1.0 typecheck
+> tsc --noEmit
+
+
+> @kriegsspiel/server@0.0.0 typecheck
+> tsc --noEmit
+
+
+> @kriegsspiel/client@0.0.0 typecheck
+> tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json && tsc --noEmit -p tsconfig.worker.json
+
+
+> typecheck:local-map-catalog
+> npm run build -w packages/maps && tsc --noEmit -p tools/local-map-catalog/tsconfig.json
+
+
+> @kriegsspiel/maps@0.1.0 build
+> tsc -p tsconfig.build.json
+

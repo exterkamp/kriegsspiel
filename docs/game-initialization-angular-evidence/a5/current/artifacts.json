@@ -1,0 +1,209 @@
+{
+  "checkpoint": "3d787b66cffb475f543c09a72cbb682c2e231038",
+  "base": "36406f70c485e7f23befb9f9b9e27fdfbd4c32e0",
+  "status": "Qualified source and evidence checkpoint; native media gate and newer-main composition remain pending.",
+  "artifacts": [
+    {
+      "path": "checks.json",
+      "rawSource": "angular-a5-final-source-full-checks.json",
+      "rawSha256": "7e52a39bdd8f1318dfcab1fad2a6e0abfef0837221406349dbbb610db7ccb27c",
+      "sha256": "ac87a11454ab994f21129d7320f9140f75b5a9bd2287c74bcf6a506d07036429",
+      "bytes": 1063
+    },
+    {
+      "path": "ci-review.md",
+      "rawSource": "angular-a5-3d787-ci-review.md",
+      "rawSha256": "c75fa0eccb89fb689cc25e266fca36fcad0961a07d5d02e724c48129bd79d67e",
+      "sha256": "c75fa0eccb89fb689cc25e266fca36fcad0961a07d5d02e724c48129bd79d67e",
+      "bytes": 14843
+    },
+    {
+      "path": "integration-review.md",
+      "rawSource": "angular-a5-3d787-integration-evidence-review.md",
+      "rawSha256": "4f921c691902812e828fdfbcd5224317687936c6dc02ea4bfbed966b0ac6f362",
+      "sha256": "4f921c691902812e828fdfbcd5224317687936c6dc02ea4bfbed966b0ac6f362",
+      "bytes": 36212
+    },
+    {
+      "path": "source-carry.json",
+      "rawSource": "angular-a5-c387-to-final-carry.json",
+      "rawSha256": "bb59d423389f9cb71631b08838d93bec09c60828137526d1387c59cc5d26fc63",
+      "sha256": "bb59d423389f9cb71631b08838d93bec09c60828137526d1387c59cc5d26fc63",
+      "bytes": 35966
+    },
+    {
+      "path": "shipped-source-manifest.json",
+      "rawSource": "angular-a5-shipped-proof-graph.json",
+      "rawSha256": "82b69c2cf916a528b529fcb5f8b96dd2f904367ecf24e1f65439a758236b32c8",
+      "sha256": "82b69c2cf916a528b529fcb5f8b96dd2f904367ecf24e1f65439a758236b32c8",
+      "bytes": 103286
+    },
+    {
+      "path": "keyboard.json",
+      "rawSource": "angular-a5-shipped-keyboard-observations.json",
+      "rawSha256": "67368a852072071726ab047548b0b67014be261c5270ce46702ba20c1f4af143",
+      "sha256": "67368a852072071726ab047548b0b67014be261c5270ce46702ba20c1f4af143",
+      "bytes": 48369
+    },
+    {
+      "path": "retry-source-manifest.json",
+      "rawSource": "angular-a5-retry-proof-graph.json",
+      "rawSha256": "cd24f5199a52d5b570c17ced2e399db6dbe5f1893aa3e34078be0ddff052c274",
+      "sha256": "cd24f5199a52d5b570c17ced2e399db6dbe5f1893aa3e34078be0ddff052c274",
+      "bytes": 104860
+    },
+    {
+      "path": "retry-actions.json",
+      "rawSource": "angular-a5-retry-actions.json",
+      "rawSha256": "1e82cd7af2975de4aeefb664b807b420bda3c1267076c5dc194202ca7e7f45b8",
+      "sha256": "1e82cd7af2975de4aeefb664b807b420bda3c1267076c5dc194202ca7e7f45b8",
+      "bytes": 1537
+    },
+    {
+      "path": "retry-observations.json",
+      "rawSource": "angular-a5-retry-observations.json",
+      "rawSha256": "ef5c38cc966b05297f6a15ef3c9e55d6be7ca0ea9f0686619b4a3ec8441b9071",
+      "sha256": "2cb32d39f970f189bede67700c36e07ecdb25f3eaabf17d4267e37848f8e84e9",
+      "bytes": 111513
+    },
+    {
+      "path": "retry-retirement.json",
+      "rawSource": "angular-a5-retry-terminal.json",
+      "rawSha256": "16c91b245410ce658b558837708390964034837e520cfe53f4871c093e86db0c",
+      "sha256": "726d67b28c25ea65afa3a11b5bcd08db7df7600ffc1cfed1c844ee06051f917d",
+      "bytes": 16124
+    },
+    {
+      "path": "pending-startup-source-manifest.json",
+      "rawSource": "angular-a5-final-hmr-pending-proof-graph.json",
+      "rawSha256": "e106211043ebec08517d3fc3a80e026404c92e529ebdbe258b818a420aabd83e",
+      "sha256": "e106211043ebec08517d3fc3a80e026404c92e529ebdbe258b818a420aabd83e",
+      "bytes": 104859
+    },
+    {
+      "path": "setup-hmr-source-manifest.json",
+      "rawSource": "angular-a5-final-hmr-uncommitted-proof-graph.json",
+      "rawSha256": "f21f7c46651117de4833f555a6dec9cb233d7c6c71ebf068413e31e11d3b903a",
+      "sha256": "f21f7c46651117de4833f555a6dec9cb233d7c6c71ebf068413e31e11d3b903a",
+      "bytes": 104859
+    },
+    {
+      "path": "committed-hmr-source-manifest.json",
+      "rawSource": "angular-a5-final-hmr-committed-proof-graph.json",
+      "rawSha256": "c3521e6d2d5af5d4461ca23aa64a95011aed8c865b7399762eee130b61d176a3",
+      "sha256": "c3521e6d2d5af5d4461ca23aa64a95011aed8c865b7399762eee130b61d176a3",
+      "bytes": 104859
+    },
+    {
+      "path": "production-exclusion.json",
+      "rawSource": "angular-a5-final-production-http.json",
+      "rawSha256": "ddfb1e00e792de03db840fd533640d5f567d2a3bff5aaeb273f01ec8068fe4a4",
+      "sha256": "ddfb1e00e792de03db840fd533640d5f567d2a3bff5aaeb273f01ec8068fe4a4",
+      "bytes": 7437
+    },
+    {
+      "path": "production-browser.json",
+      "rawSource": "angular-a5-final-live-observations.json",
+      "rawSha256": "24ad75eead7c6e45753d962a986882b0c5e8c7b158557403a8bca5e7a274404f",
+      "sha256": "24ad75eead7c6e45753d962a986882b0c5e8c7b158557403a8bca5e7a274404f",
+      "bytes": 41632
+    },
+    {
+      "path": "lobby-seed.json",
+      "rawSource": "angular-a5-final-lobby-seed.json",
+      "rawSha256": "0bdbf57631cb7610fdb3d2d399b6a91d0b0a0c26c9d0438b221fed8d1f101efb",
+      "sha256": "0bdbf57631cb7610fdb3d2d399b6a91d0b0a0c26c9d0438b221fed8d1f101efb",
+      "bytes": 1026
+    },
+    {
+      "path": "live-mark-readback.json",
+      "rawSource": "angular-a5-final-live-marks-readback.json",
+      "rawSha256": "66ecb4f7496dbf0b20c45441b848a282ac11c4ee66ba016889adc1334cba3b23",
+      "sha256": "66ecb4f7496dbf0b20c45441b848a282ac11c4ee66ba016889adc1334cba3b23",
+      "bytes": 474
+    },
+    {
+      "path": "inspector-identity.txt",
+      "rawSource": "angular-a5-final-inspector-identity.txt",
+      "rawSha256": "329c2f9e982103dc98c68053b2a19da87f8c16f386f860050d41544f448cf91f",
+      "sha256": "329c2f9e982103dc98c68053b2a19da87f8c16f386f860050d41544f448cf91f",
+      "bytes": 84
+    },
+    {
+      "path": "setup-narrow.jpg",
+      "rawSource": "angular-a5-shipped-narrow-setup.jpg",
+      "rawSha256": "b3d835ee5167d07044c34c7a0f56821e01ec6587746ca45203319b39dc6e2ad5",
+      "sha256": "b3d835ee5167d07044c34c7a0f56821e01ec6587746ca45203319b39dc6e2ad5",
+      "bytes": 37567
+    },
+    {
+      "path": "inspector-oblique-narrow.jpg",
+      "rawSource": "angular-a5-final-inspector-oblique-narrow.jpg",
+      "rawSha256": "973eccd834aca1f56f68de640170d1fd9175e89c59e12ee4b3a4227168b0cb51",
+      "sha256": "973eccd834aca1f56f68de640170d1fd9175e89c59e12ee4b3a4227168b0cb51",
+      "bytes": 42742
+    },
+    {
+      "path": "live-orders.jpg",
+      "rawSource": "angular-a5-final-live-orders.jpg",
+      "rawSha256": "2273dce111a171b00dcc4b4929fa9d382ca206e358e9e6eafbee3d4da71e1ab8",
+      "sha256": "2273dce111a171b00dcc4b4929fa9d382ca206e358e9e6eafbee3d4da71e1ab8",
+      "bytes": 60158
+    },
+    {
+      "path": "game-over.jpg",
+      "rawSource": "angular-a5-final-game-over.jpg",
+      "rawSha256": "8fdc78b7a8e11f6a99bf5f52e7b954b8d00116b7840bd17a277ea28e0a070b94",
+      "sha256": "8fdc78b7a8e11f6a99bf5f52e7b954b8d00116b7840bd17a277ea28e0a070b94",
+      "bytes": 54065
+    },
+    {
+      "path": "checks-setup.log",
+      "rawSource": "angular-a5-final-source-setup.log",
+      "rawSha256": "b609658f6c14b093b1524e376c8be1a331a9449b93edec8d6709e5f430025afa",
+      "sha256": "b609658f6c14b093b1524e376c8be1a331a9449b93edec8d6709e5f430025afa",
+      "bytes": 668
+    },
+    {
+      "path": "checks-install.log",
+      "rawSource": "angular-a5-final-source-install.log",
+      "rawSha256": "956856800dcdd97445590080aeaa38f0f6a52ad6f0c321bb407aeaf04c082e48",
+      "sha256": "956856800dcdd97445590080aeaa38f0f6a52ad6f0c321bb407aeaf04c082e48",
+      "bytes": 281
+    },
+    {
+      "path": "checks-lint.log",
+      "rawSource": "angular-a5-final-source-lint.log",
+      "rawSha256": "27db8120787d818efa12af0c97d73f156b2ee2cc178a19e247a77222062a2fe9",
+      "sha256": "27db8120787d818efa12af0c97d73f156b2ee2cc178a19e247a77222062a2fe9",
+      "bytes": 108
+    },
+    {
+      "path": "checks-typecheck.log",
+      "rawSource": "angular-a5-final-source-typecheck.log",
+      "rawSha256": "bdd3e728d9e2b8f271bace2594306ec5b2457b85f6cc968844342e3bd1053cdf",
+      "sha256": "bdd3e728d9e2b8f271bace2594306ec5b2457b85f6cc968844342e3bd1053cdf",
+      "bytes": 658
+    },
+    {
+      "path": "checks-test.log",
+      "rawSource": "angular-a5-final-source-test.log",
+      "rawSha256": "b1e8c4631dde9b0ea121bdd3012c108d886389914cd53b9c63278248dae28521",
+      "sha256": "b1e8c4631dde9b0ea121bdd3012c108d886389914cd53b9c63278248dae28521",
+      "bytes": 33577
+    },
+    {
+      "path": "checks-build.log",
+      "rawSource": "angular-a5-final-source-build.log",
+      "rawSha256": "b7144acac85d668daf5134192ef0a32c269fcc6638aec2895ef3519e0e8aa254",
+      "sha256": "b7144acac85d668daf5134192ef0a32c269fcc6638aec2895ef3519e0e8aa254",
+      "bytes": 2959
+    },
+    {
+      "path": "hmr-overrides.json",
+      "bytes": 2140,
+      "sha256": "8aa642a1762483b998a15bc38e102ea6036e2c533702a06e9e1916e7eb4bd85f",
+      "source": "Derived exact template-only overrides; originals remain local."
+    }
+  ]
+}

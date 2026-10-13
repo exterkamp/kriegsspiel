@@ -65,3 +65,54 @@ describe('preview display lifecycle', () => {
     stop();
   });
 });
+
+describe('transactional display registrations', () => {
+  it('removes partial window and media registrations after add throws following registration', () => {
+    const display = new Display(),
+      redraw = vi.fn();
+    const add = display.addEventListener.bind(display);
+    vi.spyOn(display, 'addEventListener').mockImplementation((name, handler, options) => {
+      add(name, handler, options);
+      if (name === 'pageshow') throw new Error('register failure');
+    });
+    expect(() => observeDisplayLifecycle(display as unknown as Window, redraw, vi.fn())).toThrow(
+      'register failure',
+    );
+    display.dispatchEvent(new Event('resize'));
+    display.transition('pageshow', true);
+    display.queries[0]!.events.dispatchEvent(new Event('change'));
+    expect(redraw).not.toHaveBeenCalled();
+  });
+  it('releases later independent registrations when a removal throws and is idempotent', () => {
+    const display = new Display(),
+      redraw = vi.fn();
+    const stop = observeDisplayLifecycle(display as unknown as Window, redraw, vi.fn());
+    const remove = display.removeEventListener.bind(display);
+    const calls = vi
+      .spyOn(display, 'removeEventListener')
+      .mockImplementation((name, handler, options) => {
+        remove(name, handler, options);
+        if (name === 'pagehide') throw new Error('release failure');
+      });
+    expect(stop).not.toThrow();
+    stop();
+    expect(calls).toHaveBeenCalledTimes(3);
+    display.dispatchEvent(new Event('resize'));
+    display.transition('pageshow', true);
+    expect(redraw).not.toHaveBeenCalled();
+  });
+  it('holds one resolution listener and does not remove old query handles again at final release', () => {
+    const display = new Display();
+    const stop = observeDisplayLifecycle(display as unknown as Window, vi.fn(), vi.fn());
+    const removals: ReturnType<typeof vi.spyOn>[] = [];
+    for (let i = 0; i < 50; i++) {
+      const events = display.queries.at(-1)!.events;
+      removals.push(vi.spyOn(events, 'removeEventListener'));
+      display.devicePixelRatio = 1 + i / 10;
+      display.transition('pageshow', true);
+      expect(removals[i]).toHaveBeenCalledOnce();
+    }
+    stop();
+    for (const remove of removals) expect(remove).toHaveBeenCalledOnce();
+  });
+});

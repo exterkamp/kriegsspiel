@@ -1,0 +1,30 @@
+{
+  "head": "c38727836520003bfe5d5419917fa465d7abbae3",
+  "ref": {
+    "kind": "generated",
+    "id": "a84e4684-7181-47d0-9c5e-3c2d893a893d"
+  },
+  "source": "Actual visible Saved map selection following native Generate/Save; real sidecar GET and retained own generated file",
+  "bytes": 2350746,
+  "sha256": "ecce44a083ff6f5a616d9ffc6946b5ffa53023092396ba5230836f221c59f4ed",
+  "readbackEqualsStored": true,
+  "documentKeys": [
+    "bounds",
+    "coordinates",
+    "diagnostics",
+    "drainage",
+    "elevation",
+    "layers",
+    "name",
+    "overrides",
+    "precisionPolicy",
+    "provenance",
+    "schema",
+    "schemaVersion",
+    "settings"
+  ],
+  "limits": "Canonical worker export identity is separately corroborated by actual certified Start session binding; no old generated reference reused.",
+  "actualStartedSessionKey": "local-ef2e7dec-7b40-469d-8536-f347f3793fab",
+  "actualStartedBindingMatchesReadback": true,
+  "observationDocument": "32934b0b-4a20-4777-b31e-e8b0fd76dcc7"
+}

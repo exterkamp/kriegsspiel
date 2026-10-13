@@ -41,8 +41,9 @@ export class MapPreview {
   private issues: PreviewState['issues'] = [];
   private readonly context: CanvasRenderingContext2D;
   private readonly abort = new AbortController();
-  private readonly observer: ResizeObserver;
-  private readonly stopDisplayEvents: () => void;
+  private observer?: ResizeObserver;
+  private stopDisplayEvents?: () => void;
+  private disposed = false;
   private frame = 0;
   private drag?: { id: number; point: Point };
 
@@ -54,86 +55,91 @@ export class MapPreview {
     const context = canvas.getContext('2d');
     if (!context) throw new Error('This preview requires Canvas2D');
     this.context = context;
-    const signal = this.abort.signal;
-    const point = (event: MouseEvent): Point => {
-      const rect = canvas.getBoundingClientRect();
-      return [event.clientX - rect.left, event.clientY - rect.top];
-    };
-    canvas.addEventListener(
-      'pointerdown',
-      (event) => {
-        if (!event.isPrimary || event.button !== 0 || this.drag) return;
-        canvas.focus();
-        canvas.setPointerCapture(event.pointerId);
-        this.drag = { id: event.pointerId, point: point(event) };
-      },
-      { signal },
-    );
-    canvas.addEventListener(
-      'pointermove',
-      (event) => {
-        if (!this.view || !this.drag || event.pointerId !== this.drag.id) return;
-        const next = point(event);
-        this.view = panViewport(this.view, [
-          next[0] - this.drag.point[0],
-          next[1] - this.drag.point[1],
-        ]);
-        this.drag.point = next;
-        this.schedule();
-      },
-      { signal },
-    );
-    const end = (event: PointerEvent) => {
-      if (event.pointerId === this.drag?.id) this.drag = undefined;
-    };
-    canvas.addEventListener('pointerup', end, { signal });
-    canvas.addEventListener('pointercancel', end, { signal });
-    canvas.addEventListener('lostpointercapture', end, { signal });
-    canvas.addEventListener(
-      'wheel',
-      (event) => {
-        if (!this.view) return;
-        event.preventDefault();
-        const delta =
-          event.deltaY *
-          (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.view.height : 1);
-        this.zoom(Math.exp(-Math.max(-400, Math.min(400, delta)) * 0.002), point(event));
-      },
-      { signal, passive: false },
-    );
-    canvas.addEventListener(
-      'keydown',
-      (event) => {
-        if (!this.view) return;
-        const deltas: Record<string, Point> = {
-          ArrowLeft: [40, 0],
-          ArrowRight: [-40, 0],
-          ArrowUp: [0, 40],
-          ArrowDown: [0, -40],
-        };
-        if (deltas[event.key]) this.view = panViewport(this.view, deltas[event.key]!);
-        else if (event.key === '+' || event.key === '=') this.zoom(1.4);
-        else if (event.key === '-') this.zoom(1 / 1.4);
-        else if (event.key.toLowerCase() === 'f') this.fit();
-        else return;
-        event.preventDefault();
-        this.schedule();
-      },
-      { signal },
-    );
-    this.observer = new ResizeObserver(() => {
-      if (this.view) {
-        const size = this.size();
-        this.view = resizeViewport(this.view, size[0], size[1]);
-        this.schedule();
-      }
-    });
-    this.observer.observe(canvas);
-    this.stopDisplayEvents = observeDisplayLifecycle(
-      window,
-      () => this.refresh(),
-      () => this.dispose(),
-    );
+    try {
+      const signal = this.abort.signal;
+      const point = (event: MouseEvent): Point => {
+        const rect = canvas.getBoundingClientRect();
+        return [event.clientX - rect.left, event.clientY - rect.top];
+      };
+      canvas.addEventListener(
+        'pointerdown',
+        (event) => {
+          if (!event.isPrimary || event.button !== 0 || this.drag) return;
+          canvas.focus();
+          canvas.setPointerCapture(event.pointerId);
+          this.drag = { id: event.pointerId, point: point(event) };
+        },
+        { signal },
+      );
+      canvas.addEventListener(
+        'pointermove',
+        (event) => {
+          if (!this.view || !this.drag || event.pointerId !== this.drag.id) return;
+          const next = point(event);
+          this.view = panViewport(this.view, [
+            next[0] - this.drag.point[0],
+            next[1] - this.drag.point[1],
+          ]);
+          this.drag.point = next;
+          this.schedule();
+        },
+        { signal },
+      );
+      const end = (event: PointerEvent) => {
+        if (event.pointerId === this.drag?.id) this.drag = undefined;
+      };
+      canvas.addEventListener('pointerup', end, { signal });
+      canvas.addEventListener('pointercancel', end, { signal });
+      canvas.addEventListener('lostpointercapture', end, { signal });
+      canvas.addEventListener(
+        'wheel',
+        (event) => {
+          if (!this.view) return;
+          event.preventDefault();
+          const delta =
+            event.deltaY *
+            (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.view.height : 1);
+          this.zoom(Math.exp(-Math.max(-400, Math.min(400, delta)) * 0.002), point(event));
+        },
+        { signal, passive: false },
+      );
+      canvas.addEventListener(
+        'keydown',
+        (event) => {
+          if (!this.view) return;
+          const deltas: Record<string, Point> = {
+            ArrowLeft: [40, 0],
+            ArrowRight: [-40, 0],
+            ArrowUp: [0, 40],
+            ArrowDown: [0, -40],
+          };
+          if (deltas[event.key]) this.view = panViewport(this.view, deltas[event.key]!);
+          else if (event.key === '+' || event.key === '=') this.zoom(1.4);
+          else if (event.key === '-') this.zoom(1 / 1.4);
+          else if (event.key.toLowerCase() === 'f') this.fit();
+          else return;
+          event.preventDefault();
+          this.schedule();
+        },
+        { signal },
+      );
+      this.observer = new ResizeObserver(() => {
+        if (!this.disposed && this.view) {
+          const size = this.size();
+          this.view = resizeViewport(this.view, size[0], size[1]);
+          this.schedule();
+        }
+      });
+      this.observer.observe(canvas);
+      this.stopDisplayEvents = observeDisplayLifecycle(
+        window,
+        () => this.refresh(),
+        () => this.dispose(),
+      );
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
   }
 
   /** Invalid candidates report issues while the last valid snapshot remains visible. */
@@ -186,6 +192,7 @@ export class MapPreview {
     return [Math.max(1, this.canvas.clientWidth), Math.max(1, this.canvas.clientHeight)];
   }
   private refresh(): void {
+    if (this.disposed) return;
     // A frozen page may carry a suspended RAF; replace it when restoring.
     cancelAnimationFrame(this.frame);
     this.frame = 0;
@@ -196,6 +203,7 @@ export class MapPreview {
     }
   }
   private publish(): void {
+    if (this.disposed) return;
     this.changed({
       asset: this.renderer?.asset,
       source: this.source,
@@ -204,11 +212,11 @@ export class MapPreview {
     });
   }
   private schedule(): void {
-    if (this.frame) return;
+    if (this.disposed || this.frame) return;
     const requested = this.onFrame ? performance.now() : 0;
     this.frame = requestAnimationFrame((rafTimestampMs) => {
       this.frame = 0;
-      if (!this.view || !this.renderer) return;
+      if (this.disposed || !this.view || !this.renderer) return;
       const started = this.onFrame ? performance.now() : 0;
       const view = this.view;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -244,10 +252,32 @@ export class MapPreview {
       : undefined;
   }
   dispose(): void {
-    this.stopDisplayEvents();
-    this.abort.abort();
-    this.observer.disconnect();
-    cancelAnimationFrame(this.frame);
+    if (this.disposed) return;
+    this.disposed = true;
+    const observer = this.observer,
+      stop = this.stopDisplayEvents,
+      frame = this.frame;
+    const drag = this.drag;
+    this.observer = undefined;
+    this.stopDisplayEvents = undefined;
+    this.drag = undefined;
     this.frame = 0;
+    // Each leaf is attempted independently, including during partial construction.
+    for (const release of [
+      () => stop?.(),
+      () => this.abort.abort(),
+      () => observer?.disconnect(),
+      () => cancelAnimationFrame(frame),
+      () => {
+        if (drag && this.canvas.hasPointerCapture?.(drag.id))
+          this.canvas.releasePointerCapture(drag.id);
+      },
+    ]) {
+      try {
+        release();
+      } catch {
+        /* A faulty leaf cannot strand the other resources. */
+      }
+    }
   }
 }

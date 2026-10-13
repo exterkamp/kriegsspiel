@@ -167,3 +167,136 @@ describe('stable site detail selection', () => {
     expect(now).not.toHaveBeenCalled();
   });
 });
+
+describe('transactional preview construction and retirement', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+  function canvas() {
+    const canvas = document.createElement('canvas');
+    vi.spyOn(canvas, 'getContext').mockReturnValue({} as CanvasRenderingContext2D);
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 7),
+    );
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    vi.stubGlobal('matchMedia', () => ({ addEventListener() {}, removeEventListener() {} }));
+    return canvas;
+  }
+  it('aborts all installed canvas listener signals when observer construction throws', () => {
+    const c = canvas(),
+      signals: AbortSignal[] = [];
+    const add = c.addEventListener.bind(c);
+    vi.spyOn(c, 'addEventListener').mockImplementation((name, listener, options) => {
+      if (options && typeof options === 'object' && options.signal) signals.push(options.signal);
+      add(name, listener, options);
+    });
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor() {
+          throw new Error('observer construction');
+        }
+      },
+    );
+    expect(() => new MapPreview(c)).toThrow('observer construction');
+    expect(signals.length).toBeGreaterThan(0);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+  });
+  it('disconnects an acquired observer if observe throws and preserves the construction error', () => {
+    const c = canvas(),
+      disconnect = vi.fn();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {
+          throw new Error('observe failure');
+        }
+        disconnect = disconnect;
+      },
+    );
+    expect(() => new MapPreview(c)).toThrow('observe failure');
+    expect(disconnect).toHaveBeenCalledOnce();
+  });
+  it('retires observer and canvas signals after partial display registration failure', () => {
+    const c = canvas(),
+      disconnect = vi.fn(),
+      add = window.addEventListener.bind(window),
+      remove = vi.spyOn(window, 'removeEventListener');
+    const signal: AbortSignal[] = [];
+    vi.spyOn(c, 'addEventListener').mockImplementation((_name, _listener, options) => {
+      if (options && typeof options === 'object' && options.signal) signal.push(options.signal);
+    });
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect = disconnect;
+      },
+    );
+    vi.spyOn(window, 'addEventListener').mockImplementation((name, listener, options) => {
+      add(name, listener, options);
+      if (name === 'pageshow') throw new Error('partial display registration');
+    });
+    expect(() => new MapPreview(c)).toThrow('partial display registration');
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(signal.every((value) => value.aborted)).toBe(true);
+    expect(remove.mock.calls.map(([name]) => name)).toContain('resize');
+    expect(remove.mock.calls.map(([name]) => name)).toContain('pageshow');
+  });
+  it('attempts independent leaves once even when display release and observer cleanup throw', () => {
+    const c = canvas(),
+      disconnect = vi.fn(() => {
+        throw new Error('disconnect');
+      });
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect = disconnect;
+      },
+    );
+    const preview = new MapPreview(c);
+    const remove = window.removeEventListener.bind(window);
+    vi.spyOn(window, 'removeEventListener').mockImplementation((name, listener, options) => {
+      remove(name, listener, options);
+      if (name === 'pagehide') throw new Error('remove failure');
+    });
+    expect(() => preview.dispose()).not.toThrow();
+    preview.dispose();
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(cancelAnimationFrame).toHaveBeenCalledOnce();
+    c.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }));
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+  });
+  it('does not resurrect retired frames through an already queued observer or RAF callback', () => {
+    const c = canvas();
+    let resize!: ResizeObserverCallback, frame!: FrameRequestCallback;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          resize = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        frame = callback;
+        return 7;
+      }),
+    );
+    const changed = vi.fn(),
+      preview = new MapPreview(c, changed);
+    expect(preview.loadAsset(createReferenceAsset()).ok).toBe(true);
+    preview.dispose();
+    resize([], {} as ResizeObserver);
+    frame(100);
+    expect(requestAnimationFrame).toHaveBeenCalledOnce();
+    expect(changed).not.toHaveBeenCalled();
+  });
+});

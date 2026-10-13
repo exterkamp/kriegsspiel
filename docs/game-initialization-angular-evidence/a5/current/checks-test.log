@@ -1,0 +1,637 @@
+
+> test
+> npm run verify:map-source && npm run test --workspaces --if-present && npm run test:repository && npm run test:local-map-catalog
+
+
+> verify:map-source
+> node scripts/verify-map-source.mjs
+
+{"revision":"e08ec2e09f9a15f9110a3048123a31a58d08c341","files":163,"bytes":3842340}
+
+> @kriegsspiel/engine@0.0.0 test
+> vitest run
+
+
+ RUN  v4.1.11 /private/tmp/kriegsspiel-angular-a5-source-final/packages/engine
+
+
+ Test Files  19 passed (19)
+      Tests  408 passed (408)
+   Start at  16:19:36
+   Duration  2.00s (transform 1.67s, setup 0ms, import 3.88s, tests 2.92s, environment 1ms)
+
+
+> @kriegsspiel/protocol@0.0.0 test
+> vitest run
+
+
+ RUN  v4.1.11 /private/tmp/kriegsspiel-angular-a5-source-final/packages/protocol
+
+
+ Test Files  1 passed (1)
+      Tests  64 passed (64)
+   Start at  16:19:38
+   Duration  238ms (transform 70ms, setup 0ms, import 128ms, tests 35ms, environment 0ms)
+
+
+> @kriegsspiel/maps@0.1.0 test
+> npm run build && vitest run
+
+
+> @kriegsspiel/maps@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+ RUN  v4.1.11 /private/tmp/kriegsspiel-angular-a5-source-final/packages/maps
+
+
+ Test Files  28 passed (28)
+      Tests  262 passed (262)
+   Start at  16:19:40
+   Duration  24.38s (transform 1.99s, setup 0ms, import 6.69s, tests 74.06s, environment 2ms)
+
+
+> @kriegsspiel/server@0.0.0 test
+> vitest run
+
+
+ RUN  v4.1.11 /private/tmp/kriegsspiel-angular-a5-source-final/server
+
+(node:15917) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15914) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15916) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15913) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15912) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15923) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15924) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15925) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15927) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15929) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15932) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15934) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15935) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15938) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15939) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15940) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15945) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15946) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15947) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15950) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15951) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15956) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15960) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15961) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15963) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15967) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15969) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15972) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15976) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  57 passed (57)
+      Tests  885 passed | 3 skipped (888)
+   Start at  16:20:05
+   Duration  14.76s (transform 3.85s, setup 0ms, import 15.58s, tests 47.06s, environment 3ms)
+
+
+> @kriegsspiel/client@0.0.0 test
+> node ../scripts/prepare-local-map-default.mjs && ng test --watch=false && vitest run
+
+Option "splitting" is deprecated: No longer needed with Vitest 5.
+❯ Building...
+✔ Building...
+Application bundle generation complete. [7.886 seconds] - 2026-10-12T23:20:28.810Z
+
+
+ RUN  v4.1.11 /private/tmp/kriegsspiel-angular-a5-source-final/client
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  39 passed (39)
+      Tests  563 passed (563)
+   Start at  16:20:29
+   Duration  18.23s (transform 15.67s, setup 17.87s, import 23.04s, tests 42.75s, environment 28.22s)
+
+
+ RUN  v4.1.11 /private/tmp/kriegsspiel-angular-a5-source-final/client
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  50 passed (50)
+      Tests  826 passed (826)
+   Start at  16:20:48
+   Duration  9.01s (transform 8.41s, setup 0ms, import 17.08s, tests 17.70s, environment 17.86s)
+
+
+> test:repository
+> node --test "test/*.test.js" "scripts/maps-assessment/*.test.mjs"
+
+TAP version 13
+# Subtest: asymmetric metre coordinates rotate clockwise in y-down and round-trip
+ok 1 - asymmetric metre coordinates rotate clockwise in y-down and round-trip
+  ---
+  duration_ms: 1.486041
+  type: 'test'
+  ...
+# Subtest: known plane is queried in world metres after inverse local transform
+ok 2 - known plane is queried in world metres after inverse local transform
+  ---
+  duration_ms: 0.733375
+  type: 'test'
+  ...
+# Subtest: segment diagnostic handles interior nearest points and zero-length paths
+ok 3 - segment diagnostic handles interior nearest points and zero-length paths
+  ---
+  duration_ms: 0.088084
+  type: 'test'
+  ...
+# Subtest: overlap areas preserve holes
+ok 4 - overlap areas preserve holes
+  ---
+  duration_ms: 0.095625
+  type: 'test'
+  ...
+# Subtest: corridor covers complete segment width and conservative round caps
+ok 5 - corridor covers complete segment width and conservative round caps
+  ---
+  duration_ms: 1.219
+  type: 'test'
+  ...
+# Subtest: CI test groups cover every workspace exactly once and retain repository/catalog tests
+ok 6 - CI test groups cover every workspace exactly once and retain repository/catalog tests
+  ---
+  duration_ms: 1.709625
+  type: 'test'
+  ...
+# Subtest: required check rejects failed, cancelled, skipped and unknown dependency results
+ok 7 - required check rejects failed, cancelled, skipped and unknown dependency results
+  ---
+  duration_ms: 199.743459
+  type: 'test'
+  ...
+# Subtest: cancelled workflow explicitly fails while the result evaluator still runs
+ok 8 - cancelled workflow explicitly fails while the result evaluator still runs
+  ---
+  duration_ms: 4.838667
+  type: 'test'
+  ...
+# Subtest: all validation groups finish independently; only superseded PR runs cancel
+ok 9 - all validation groups finish independently; only superseded PR runs cancel
+  ---
+  duration_ms: 0.501334
+  type: 'test'
+  ...
+# Subtest: source selection retains distinct PR and merge-queue head/base provenance
+ok 10 - source selection retains distinct PR and merge-queue head/base provenance
+  ---
+  duration_ms: 0.270958
+  type: 'test'
+  ...
+# Subtest: accepts the exact recorded payload and rejects a source edit before compilation
+ok 11 - accepts the exact recorded payload and rejects a source edit before compilation
+  ---
+  duration_ms: 5.404125
+  type: 'test'
+  ...
+# Subtest: rejects an extra engine file that was never part of the pinned payload
+ok 12 - rejects an extra engine file that was never part of the pinned payload
+  ---
+  duration_ms: 1.343875
+  type: 'test'
+  ...
+# Subtest: rejects source manifest traversal paths
+ok 13 - rejects source manifest traversal paths
+  ---
+  duration_ms: 1.299875
+  type: 'test'
+  ...
+# Subtest: every map entry is complete and matches its file
+ok 14 - every map entry is complete and matches its file
+  ---
+  duration_ms: 3.229667
+  type: 'test'
+  ...
+# Subtest: every map scan has a sources entry
+ok 15 - every map scan has a sources entry
+  ---
+  duration_ms: 0.293167
+  type: 'test'
+  ...
+# Subtest: real Vitest value fault reaches only the expected assertion; restoration follows reaping
+ok 16 - real Vitest value fault reaches only the expected assertion; restoration follows reaping
+  ---
+  duration_ms: 1460.464125
+  type: 'test'
+  ...
+# Subtest: verified reporter captures actual mixed unhandled, collection and hook failures
+ok 17 - verified reporter captures actual mixed unhandled, collection and hook failures
+  ---
+  duration_ms: 1483.825667
+  type: 'test'
+  ...
+# Subtest: invalid syntax cannot be detected and original source is restored and rerun
+ok 18 - invalid syntax cannot be detected and original source is restored and rerun
+  ---
+  duration_ms: 1372.21425
+  type: 'test'
+  ...
+# Subtest: real skipped and foreign test identities cannot become a passing baseline
+ok 19 - real skipped and foreign test identities cannot become a passing baseline
+  ---
+  duration_ms: 715.510458
+  type: 'test'
+  ...
+# Subtest: timeout escalates to KILL for a TERM-resistant owned process
+ok 20 - timeout escalates to KILL for a TERM-resistant owned process
+  ---
+  duration_ms: 711.548042
+  type: 'test'
+  ...
+# Subtest: path, digest and replacement validation refuses unsafe, unmatched or ambiguous source before test execution
+ok 21 - path, digest and replacement validation refuses unsafe, unmatched or ambiguous source before test execution
+  ---
+  duration_ms: 5.620833
+  type: 'test'
+  ...
+# Subtest: real timeout and interruption reap parent and child before restoration and a successful rerun
+ok 22 - real timeout and interruption reap parent and child before restoration and a successful rerun
+  ---
+  duration_ms: 2632.24175
+  type: 'test'
+  ...
+# Subtest: restoration failures stop transaction; absent reaping proof never permits restoration
+ok 23 - restoration failures stop transaction; absent reaping proof never permits restoration
+  ---
+  duration_ms: 4579.53875
+  type: 'test'
+  ...
+# Subtest: baseline failure and zero/wrong selection prevent mutation; setup leaves bytes unchanged
+ok 24 - baseline failure and zero/wrong selection prevent mutation; setup leaves bytes unchanged
+  ---
+  duration_ms: 1444.015958
+  type: 'test'
+  ...
+# Subtest: CLI rejects mutable refs, internal output and existing evidence without overwriting it
+ok 25 - CLI rejects mutable refs, internal output and existing evidence without overwriting it
+  ---
+  duration_ms: 47.443917
+  type: 'test'
+  ...
+# Subtest: real repeated soft assertion A,A cannot satisfy expected A,B; exact multiplicities can
+ok 26 - real repeated soft assertion A,A cannot satisfy expected A,B; exact multiplicities can
+  ---
+  duration_ms: 1504.024875
+  type: 'test'
+  ...
+# Subtest: map bootstrap runs in scratch with retained integrity evidence and rejects changed inventory/artifacts/links
+ok 27 - map bootstrap runs in scratch with retained integrity evidence and rejects changed inventory/artifacts/links
+  ---
+  duration_ms: 916.587042
+  type: 'test'
+  ...
+# Subtest: absent map bootstrap is explicit only for legacy source without the required tarball
+ok 28 - absent map bootstrap is explicit only for legacy source without the required tarball
+  ---
+  duration_ms: 12.924625
+  type: 'test'
+  ...
+# Subtest: cancelled/timed out map bootstrap reaps its owned resistant child and blocks installation
+ok 29 - cancelled/timed out map bootstrap reaps its owned resistant child and blocks installation
+  ---
+  duration_ms: 1705.587416
+  type: 'test'
+  ...
+# Subtest: CLI thrown install call preserves scratch without complete persisted process proof
+ok 30 - CLI thrown install call preserves scratch without complete persisted process proof
+  ---
+  duration_ms: 5379.600792
+  type: 'test'
+  ...
+# Subtest: CLI thrown baseline call preserves scratch without complete persisted process proof
+ok 31 - CLI thrown baseline call preserves scratch without complete persisted process proof
+  ---
+  duration_ms: 5460.259959
+  type: 'test'
+  ...
+# Subtest: CLI bootstrap setup.json write failure remains conservative: group-unknown
+ok 32 - CLI bootstrap setup.json write failure remains conservative: group-unknown
+  ---
+  duration_ms: 1310.250667
+  type: 'test'
+  ...
+# Subtest: CLI bootstrap setup.json write failure remains conservative: record-missing
+ok 33 - CLI bootstrap setup.json write failure remains conservative: record-missing
+  ---
+  duration_ms: 1170.008083
+  type: 'test'
+  ...
+# Subtest: CLI bootstrap setup.json write failure remains conservative: complete
+ok 34 - CLI bootstrap setup.json write failure remains conservative: complete
+  ---
+  duration_ms: 1223.413416
+  type: 'test'
+  ...
+# Subtest: CLI bootstrap setup.json write failure remains conservative: normal-success
+ok 35 - CLI bootstrap setup.json write failure remains conservative: normal-success
+  ---
+  duration_ms: 2801.049333
+  type: 'test'
+  ...
+# Subtest: CLI interruption during final restored rerun: positive control
+ok 36 - CLI interruption during final restored rerun: positive control
+  ---
+  duration_ms: 2768.980708
+  type: 'test'
+  ...
+# Subtest: CLI interruption during final restored rerun: SIGINT
+ok 37 - CLI interruption during final restored rerun: SIGINT
+  ---
+  duration_ms: 3008.318542
+  type: 'test'
+  ...
+# Subtest: CLI interruption during final restored rerun: SIGTERM
+ok 38 - CLI interruption during final restored rerun: SIGTERM
+  ---
+  duration_ms: 2711.835709
+  type: 'test'
+  ...
+# Subtest: CLI cancellation of required map bootstrap reaps children, records setup, skips install and cleans scratch
+ok 39 - CLI cancellation of required map bootstrap reaps children, records setup, skips install and cleans scratch
+  ---
+  duration_ms: 1205.956042
+  type: 'test'
+  ...
+# Subtest: normal late worker completes naturally before restoration is allowed
+ok 40 - normal late worker completes naturally before restoration is allowed
+  ---
+  duration_ms: 165.886583
+  type: 'test'
+  ...
+# Subtest: persistent worker after parent exit stays an infrastructure failure
+ok 41 - persistent worker after parent exit stays an infrastructure failure
+  ---
+  duration_ms: 1152.909042
+  type: 'test'
+  ...
+# unknown format "uri" ignored in schema at path "\#/additionalProperties/properties/url"
+# unknown format "uri" ignored in schema at path "\#/additionalProperties/properties/url"
+# Subtest: sources.json validates
+ok 42 - sources.json validates
+  ---
+  duration_ms: 2.57825
+  type: 'test'
+  ...
+# Subtest: casualties.json validates and every citation resolves
+ok 43 - casualties.json validates and every citation resolves
+  ---
+  duration_ms: 0.660875
+  type: 'test'
+  ...
+# Subtest: fire.json validates and every citation resolves
+ok 44 - fire.json validates and every citation resolves
+  ---
+  duration_ms: 0.417042
+  type: 'test'
+  ...
+# Subtest: frontage.json validates and every citation resolves
+ok 45 - frontage.json validates and every citation resolves
+  ---
+  duration_ms: 0.2455
+  type: 'test'
+  ...
+# Subtest: march.json validates and every citation resolves
+ok 46 - march.json validates and every citation resolves
+  ---
+  duration_ms: 0.325666
+  type: 'test'
+  ...
+# Subtest: morale.json validates and every citation resolves
+ok 47 - morale.json validates and every citation resolves
+  ---
+  duration_ms: 0.168667
+  type: 'test'
+  ...
+# Subtest: scale.json validates and every citation resolves
+ok 48 - scale.json validates and every citation resolves
+  ---
+  duration_ms: 0.317208
+  type: 'test'
+  ...
+# Subtest: uncitedNumbers flags numbers without a citation (checks the check)
+ok 49 - uncitedNumbers flags numbers without a citation (checks the check)
+  ---
+  duration_ms: 1.26475
+  type: 'test'
+  ...
+# Subtest: every number in data has a citation on itself or an enclosing object
+ok 50 - every number in data has a citation on itself or an enclosing object
+  ---
+  duration_ms: 0.670125
+  type: 'test'
+  ...
+# Subtest: dice and fire rows are well formed
+ok 51 - dice and fire rows are well formed
+  ---
+  duration_ms: 0.401
+  type: 'test'
+  ...
+# Subtest: pinned values unchanged (regression pins; checked against the sources by hand)
+ok 52 - pinned values unchanged (regression pins; checked against the sources by hand)
+  ---
+  duration_ms: 0.192292
+  type: 'test'
+  ...
+1..52
+# tests 52
+# suites 0
+# pass 52
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 47082.606458
+
+> test:local-map-catalog
+> vitest run --config tools/local-map-catalog/vitest.config.ts
+
+
+ RUN  v4.1.11 /private/tmp/kriegsspiel-angular-a5-source-final
+
+
+ Test Files  2 passed (2)
+      Tests  21 passed (21)
+   Start at  16:21:45
+   Duration  8.78s (transform 527ms, setup 0ms, import 1.03s, tests 8.23s, environment 0ms)
+

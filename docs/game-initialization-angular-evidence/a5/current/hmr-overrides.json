@@ -1,0 +1,38 @@
+[
+  {
+    "head": "c38727836520003bfe5d5419917fa465d7abbae3",
+    "path": "client/src/app/local-board/local-board.component.html",
+    "originalSha256": "976a6a4047dfae6f150d5c0ab116128faba91aedf51bf4db390f383fedaefce8",
+    "temporarySha256": "1a7667fcece083f66e75855d91504bf09779a0a06f5a8472fc23eddd6e0148c8",
+    "change": "Only h1 text marker for actual Angular template HMR; no controller/test mutation.",
+    "case": "Setup",
+    "graphSha256": "f21f7c46651117de4833f555a6dec9cb233d7c6c71ebf068413e31e11d3b903a",
+    "reconstructFromSourceCommit": "c38727836520003bfe5d5419917fa465d7abbae3",
+    "replaceLiteral": "<h1>Local board</h1>",
+    "withLiteral": "<h1>Local board \u00b7 final HMR uncommitted</h1>"
+  },
+  {
+    "head": "c38727836520003bfe5d5419917fa465d7abbae3",
+    "path": "client/src/app/local-board/local-board.component.html",
+    "originalSha256": "976a6a4047dfae6f150d5c0ab116128faba91aedf51bf4db390f383fedaefce8",
+    "temporarySha256": "fa038bdb13cf48b2c4eac58f7045decabfd14032b7bb0368d38b93aa19cd2e00",
+    "change": "Only h1 text marker during explicit post-cleanup acknowledgment hold.",
+    "case": "committed Start",
+    "graphSha256": "c3521e6d2d5af5d4461ca23aa64a95011aed8c865b7399762eee130b61d176a3",
+    "reconstructFromSourceCommit": "c38727836520003bfe5d5419917fa465d7abbae3",
+    "replaceLiteral": "<h1>Local board</h1>",
+    "withLiteral": "<h1>Local board \u00b7 final HMR committed</h1>"
+  },
+  {
+    "head": "c38727836520003bfe5d5419917fa465d7abbae3",
+    "path": "client/src/app/local-board/local-board.component.html",
+    "originalSha256": "976a6a4047dfae6f150d5c0ab116128faba91aedf51bf4db390f383fedaefce8",
+    "temporarySha256": "02f842b57c3bd9bf6ec84be2f151f207291cd205f69a528ee0b68b0a661e505c",
+    "change": "Only h1 text during explicit real default result hold.",
+    "case": "pending startup",
+    "graphSha256": "e106211043ebec08517d3fc3a80e026404c92e529ebdbe258b818a420aabd83e",
+    "reconstructFromSourceCommit": "c38727836520003bfe5d5419917fa465d7abbae3",
+    "replaceLiteral": "<h1>Local board</h1>",
+    "withLiteral": "<h1>Local board \u00b7 final HMR pending startup</h1>"
+  }
+]
