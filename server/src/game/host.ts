@@ -16,7 +16,7 @@ import { GameActor, type GameActorOptions, type StaffAtWork, type Timers } from 
 import type { UmpireClient } from '../umpire/index.js';
 import type { TraceSink } from '../debug/trace.js';
 import { replayFrom } from './replay.js';
-import type { StaffExchange } from '@kriegsspiel/protocol';
+import type { Dissent, StaffExchange } from '@kriegsspiel/protocol';
 import type { GameStore } from './store.js';
 
 export interface GameHostOptions {
@@ -190,8 +190,10 @@ export class GameHost {
     });
     // The conference is not in a snapshot, so it comes from the whole log.
     const staffHistory = new Map<string, StaffExchange[]>();
+    const dissents = new Map<string, Dissent[]>();
     for (const e of await store.inputLog(id)) {
       const c = e.command;
+      if (c.kind === 'dissent') dissents.set(c.side, [...(dissents.get(c.side) ?? []), c.dissent]);
       if (c.kind !== 'staffAnswer' || !c.exchange) continue;
       staffHistory.set(c.side, [...(staffHistory.get(c.side) ?? []), c.exchange]);
     }
@@ -199,6 +201,7 @@ export class GameHost {
       ...this.actorOptions(id),
       state,
       staffHistory,
+      dissents,
       clock,
       agents: this.agentsFor(id, state.world),
       pause: this.options.pause?.(id, state.world),

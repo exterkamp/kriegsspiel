@@ -10,14 +10,15 @@
  *   GET  /games/:id                signed in: the game's settings, status, which sides are taken and ready, and which are yours
  *   POST /games/:id/join           signed in: take a free side, body `{ "side": string }` (the invite link is `/?game=<id>`);
  *                                  with a `role` (chiefOfStaff, intelligence, quartermaster, or subordinate with `units`) join
- *                                  the table of a side that already has its commander, while the game is in the lobby
- *   POST /games/:id/leave-role     signed in: give up the role you joined in the lobby
+ *                                  the table of a side that already has its commander, in the lobby or (D6e) after the start
+ *   POST /games/:id/leave-role     signed in: give up the role you joined; after the start the next holder is briefed from its journal
  *   POST /games/:id/leave          signed in: give up your seat (or role) in a game still in the lobby; the creator cannot
  *   POST /games/:id/kick           the creator: remove another player from a lobby game, body `{ side, role?, unit? }`
  *                                  (no `role`: the side's seat holder; a subordinate is named by one of their `unit`s)
  *   POST /games/:id/ready          signed in, seated or holding a role: body `{ "ready": boolean }`
  *   POST /games/:id/start          the creator: start a lobby game once every side is taken and every player is ready
  *   GET  /games/:id/window         seated, game over: the umpire's window timeline (403 `game_not_over` before the end)
+ *   GET  /games/:id/window/dissents seated, game over: dissents on signed orders, for the critique (D6e)
  *   GET  /games/:id/window/at?at=  seated, game over: true positions, beliefs, dice and rulings at a game time
  *   GET  /games/:id/ws             WebSocket for the side the signed-in user holds (`@kriegsspiel/protocol` messages);
  *                                  in hot-seat, `?side=` picks which of the creator's sides
@@ -63,6 +64,7 @@ import {
   type Forward,
   type LobbyGame,
   type LobbyStore,
+  type PastHolder,
   type RoleSeat,
   type SessionType,
 } from '../lobby/store.js';
@@ -76,6 +78,8 @@ import {
 } from '../notify/index.js';
 import { Hub, type Socket } from './hub.js';
 import { windowAt, windowTimeline } from './umpireWindow.js';
+import { dissentNotes } from '../critique.js';
+import { seatKey } from './sideView.js';
 
 /** Fastest clock a client may ask for: 1 game day per wall second. */
 export const MAX_RATE = 86_400;
@@ -330,6 +334,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
       },
     },
     trace ?? NOOP_TRACE,
+    (id, userId) => lobby.get(id)?.roles?.find((r) => r.userId === userId)?.succeeds,
   );
   const lobby = options.lobby ?? new MemoryLobbyStore();
   const limits: GameLimits = { ...DEFAULT_GAME_LIMITS, ...options.limits };
@@ -359,6 +364,16 @@ export async function buildApp(options: AppOptions): Promise<App> {
     lobby.put(legacy);
     return legacy;
   };
+  /** The players who vote on pauses and ratio changes: every seat and role holder. */
+  const votersOf = (rec: LobbyGame): string[] =>
+    rec.sessionType === 'hot_seat'
+      ? [rec.creator]
+      : [
+          ...authStore.seatsOf(rec.id).map((s) => s.userId),
+          ...(rec.roles ?? []).map((r) => r.userId),
+        ];
+  /** A role changed hands in a running game: its voters follow (D6e). */
+  const syncVoters = (rec: LobbyGame): void => host.get(rec.id)?.setVoters(votersOf(rec));
   const host: GameHost = new GameHost({
     store,
     parser: options.parser,
@@ -369,14 +384,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     pause: (id): PauseConfig | undefined => {
       const rec = recordOf(id);
       if (!rec?.pause) return undefined;
-      const voters =
-        rec.sessionType === 'hot_seat'
-          ? [rec.creator]
-          : [
-              ...authStore.seatsOf(id).map((s) => s.userId),
-              ...(rec.roles ?? []).map((r) => r.userId),
-            ];
-      return { voters, ...rec.pause };
+      return { voters: votersOf(rec), ...rec.pause };
     },
     // Only a co-op game has the built-in opponent; the other shapes leave every side to people.
     scriptedOpponents: (id) =>
@@ -737,8 +745,12 @@ export async function buildApp(options: AppOptions): Promise<App> {
     units: string[] | undefined,
     reply: FastifyReply,
   ) => {
-    if (rec.status !== 'lobby' || starting.has(rec.id))
-      return reply.code(409).send({ error: 'already_started' });
+    // After the start a role may still be taken, until the game is over (D6e).
+    const midGame = rec.status === 'started';
+    if (starting.has(rec.id)) return reply.code(409).send({ error: 'already_started' });
+    if (midGame && host.get(rec.id)?.state.world.outcome) {
+      return reply.code(409).send({ error: 'game_over' });
+    }
     if (!authStore.seatsOf(rec.id).some((s) => s.side === side)) {
       return reply.code(409).send({ error: 'no_commander' });
     }
@@ -765,9 +777,34 @@ export async function buildApp(options: AppOptions): Promise<App> {
         return reply.code(409).send({ error: 'role_taken' });
       }
     }
-    const seat: RoleSeat = { userId, side, role, ...(mine ? { units: mine } : {}) };
-    lobby.put({ ...rec, roles: [...roles, seat] });
-    return { id: rec.id, side, role, ...(mine ? { units: mine } : {}), ws: `/games/${rec.id}/ws` };
+    const key = seatKey({ role, ...(mine ? { units: mine } : {}) });
+    const succeeds = midGame
+      ? [
+          ...new Set(
+            (rec.past ?? [])
+              .filter((p) => p.side === side && seatKey(p) === key)
+              .map((p) => p.userId),
+          ),
+        ]
+      : undefined;
+    const seat: RoleSeat = {
+      userId,
+      side,
+      role,
+      ...(mine ? { units: mine } : {}),
+      ...(succeeds ? { succeeds } : {}),
+    };
+    const next = { ...rec, roles: [...roles, seat] };
+    lobby.put(next);
+    if (midGame) syncVoters(next);
+    return {
+      id: rec.id,
+      side,
+      role,
+      ...(mine ? { units: mine } : {}),
+      ...(midGame ? { midGame: true } : {}),
+      ws: `/games/${rec.id}/ws`,
+    };
   };
 
   server.post<{ Params: { id: string } }>('/games/:id/leave-role', async (req, reply) => {
@@ -776,14 +813,34 @@ export async function buildApp(options: AppOptions): Promise<App> {
     const rec = recordOf(req.params.id);
     if (!rec) return reply.code(404).send({ error: 'no_such_game' });
     return tracedHttp(req.params.id, req, reply, async () => {
-      if (rec.status !== 'lobby' || starting.has(rec.id))
-        return reply.code(409).send({ error: 'already_started' });
-      if (!roleOf(rec, user.id)) return reply.code(404).send({ error: 'no_role' });
-      lobby.put({
+      if (starting.has(rec.id)) return reply.code(409).send({ error: 'already_started' });
+      const held = roleOf(rec, user.id);
+      if (!held) return reply.code(404).send({ error: 'no_role' });
+      if (rec.status === 'started' && host.get(rec.id)?.state.world.outcome) {
+        return reply.code(409).send({ error: 'game_over' });
+      }
+      // After the start the seat's journal stays: the next holder is briefed from it (D6e).
+      const past: PastHolder[] =
+        rec.status === 'started'
+          ? [
+              ...(rec.past ?? []),
+              {
+                userId: user.id,
+                side: held.side,
+                role: held.role,
+                ...(held.units ? { units: held.units } : {}),
+                leftAtMs: Date.now(),
+              },
+            ]
+          : (rec.past ?? []);
+      const next: LobbyGame = {
         ...rec,
         roles: (rec.roles ?? []).filter((r) => r.userId !== user.id),
         ready: rec.ready.filter((u) => u !== user.id),
-      });
+        ...(past.length > 0 ? { past } : {}),
+      };
+      lobby.put(next);
+      if (rec.status === 'started') syncVoters(next);
       return { left: true };
     });
   });
@@ -974,6 +1031,18 @@ export async function buildApp(options: AppOptions): Promise<App> {
       const w = await windowFor(req.params.id, user.id, undefined);
       if ('error' in w) return reply.code(w.status).send({ error: w.error });
       return w.timeline;
+    });
+  });
+
+  // Dissent for the critique: each signed order a teammate dissented from. Same gate as the window.
+  server.get<{ Params: { id: string } }>('/games/:id/window/dissents', async (req, reply) => {
+    const user = auth.userOf(req);
+    if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+    if (!recordOf(req.params.id)) return reply.code(404).send({ error: 'no_such_game' });
+    return tracedHttp(req.params.id, req, reply, async () => {
+      const w = await windowFor(req.params.id, user.id, undefined);
+      if ('error' in w) return reply.code(w.status).send({ error: w.error });
+      return { notes: dissentNotes(w.input.entries) };
     });
   });
 

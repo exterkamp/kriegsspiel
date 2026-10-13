@@ -53,7 +53,7 @@ import {
   type UmpireRequest,
   type UmpireClient,
 } from '../umpire/index.js';
-import type { StaffExchange } from '@kriegsspiel/protocol';
+import type { Dissent, StaffExchange } from '@kriegsspiel/protocol';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
 /** Timer functions, injectable so tests can run on a fake clock. */
@@ -118,6 +118,8 @@ export interface GameActorOptions {
   onStaffAtWork?: (state: StaffAtWork) => void;
   /** The conference records of a reopened game, from its input log (D6b). */
   staffHistory?: ReadonlyMap<string, readonly StaffExchange[]>;
+  /** The dissents on record for a reopened game, from its input log (D6e). */
+  dissents?: ReadonlyMap<string, readonly Dissent[]>;
   /** Extra parse attempts after a failure or timeout, before the fallback. Default 2. */
   parseRetries?: number;
   /** Wall ms to wait for one parse attempt. Default 60,000. */
@@ -222,6 +224,7 @@ export class GameActor {
   private readonly overloaded = new Set<string>();
   /** Each side's questions to its staff officers and their answers (D6b), oldest first. */
   private readonly staffHistory = new Map<string, StaffExchange[]>();
+  private readonly dissents = new Map<string, Dissent[]>();
 
   /** The pause state machine; absent when the game has no voters configured. */
   private readonly pauseVoting: PauseVoting | undefined;
@@ -259,6 +262,7 @@ export class GameActor {
     this.seq = options.seq ?? 0;
     this.umpire = options.umpire;
     for (const [side, list] of options.staffHistory ?? []) this.staffHistory.set(side, [...list]);
+    for (const [side, list] of options.dissents ?? []) this.dissents.set(side, [...list]);
     // Reports from before this actor started (a reopened game) keep their template text.
     for (const side of this.engine.world.sides) this.narratedUntil.set(side.id, this.engine.time);
     this.restartInfo = options.restart;
@@ -294,6 +298,17 @@ export class GameActor {
   /** `side`'s conference with its staff officers, for `sideViewOf`. */
   staffHistoryFor(side: string): readonly StaffExchange[] {
     return this.staffHistory.get(side) ?? [];
+  }
+
+  /** The players who may vote changed (D6e). Without voting set up, nothing happens. */
+  setVoters(voters: readonly string[]): void {
+    this.pauseVoting?.setVoters(voters);
+    this.ratioVoting?.setVoters(voters);
+  }
+
+  /** The dissents `side` has put on record, oldest first. */
+  dissentsFor(side: string): readonly Dissent[] {
+    return this.dissents.get(side) ?? [];
   }
 
   /** Whether the game is waiting on the umpire. */
@@ -632,6 +647,35 @@ export class GameActor {
       this.notify();
     });
     return answer;
+  }
+
+  /**
+   * Puts a dissent on record: kept for the side and logged as a journal-only entry, so a restart
+   * and a replay have it. It never touches the engine. The caller has checked the order exists.
+   */
+  async recordDissent(
+    side: SideId,
+    dissent: Omit<Dissent, 'atGame'>,
+  ): Promise<Dissent | undefined> {
+    const filed: Dissent = { ...dissent, atGame: this.engine.time };
+    let duplicate = false;
+    await this.enqueueCompletion(async () => {
+      // Two filings with one id can both pass the caller's check before either lands.
+      duplicate = (this.dissents.get(side) ?? []).some((d) => d.id === filed.id);
+      if (duplicate) return;
+      this.dissents.set(side, [...(this.dissents.get(side) ?? []), filed]);
+      const entry: InputLogEntry = {
+        seq: ++this.seq,
+        wallMs: this.wallNow(),
+        gameMs: this.engine.time,
+        endGameMs: this.engine.time,
+        command: { kind: 'dissent', side, by: filed.seat, dissent: filed },
+      };
+      if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+      await this.commit(entry);
+      this.notify();
+    });
+    return duplicate ? undefined : filed;
   }
 
   /** Game time the soonest narration window closes, when the narrate stage is on. */
@@ -1055,6 +1099,8 @@ export class GameActor {
         throw new Error('narration is logged by the scheduler');
       case 'staffAnswer':
         throw new Error('staff answers are logged by answerStaff');
+      case 'dissent':
+        throw new Error('dissents are logged by recordDissent');
     }
   }
 
