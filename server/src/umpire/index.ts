@@ -64,6 +64,18 @@ export {
 } from './judgePlacement.js';
 export type { JudgePlacementOutput } from './judgePlacement.js';
 export {
+  JUDGE_SITUATION_PROMPT_VERSION,
+  JUDGE_SITUATION_SCHEMA,
+  JUDGE_SITUATION_SYSTEM,
+  judgeSituation,
+  judgeSituationInput,
+} from './judgeSituation.js';
+export type {
+  JudgeSituationOptions,
+  JudgeSituationOutput,
+  JudgeSituationResult,
+} from './judgeSituation.js';
+export {
   NARRATE_PROMPT_VERSION,
   NARRATE_SCHEMA,
   NARRATE_SYSTEM,

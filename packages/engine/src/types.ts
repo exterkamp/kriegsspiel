@@ -381,7 +381,7 @@ export interface GameState {
   /** Weather hook: multiplies every unit's sight range (1 when absent, 0.5 in fog). */
   sightFactor?: number;
   /** Every umpire placement ruling so far, in order. Master state only: never sent to a client. */
-  rulings: Array<Ruling | BattleRuling>;
+  rulings: Array<Ruling | BattleRuling | JudgmentRuling>;
   /** Men each unit started with, the yardstick for a broken force (D13). Absent: no unit counts as broken. */
   startStrength?: Record<string, number>;
   /** Set once, when the umpire has declared one side's force broken; the game closes soon after (D13). */
@@ -402,6 +402,34 @@ export interface BattleRuling {
   /** The umpire's reasoning, for the record and the post-game window. */
   rationale: string;
   /** What the table is told. */
+  narrative: string;
+}
+
+/**
+ * The umpire's bounded discretion over a situation no rule covers (3.6): "can the column cross
+ * the ford under fire?". The model proposes a `requested` modifier; the engine clamps it to the
+ * cap and applies `modifier`. Together the rulings of one game are its case law.
+ */
+export interface JudgmentRuling {
+  id: string;
+  time: GameTime;
+  kind: 'judgment';
+  /** Stable name of the situation, so a repeat is recognised: "ford-crossing-under-fire". */
+  key: string;
+  /** The question the engine put to the umpire, in words. */
+  situation: string;
+  unitId?: string;
+  /** What the model asked for, before the cap (0 when nothing usable came back). */
+  requested: number;
+  /** What stands: `requested` clamped to the cap. A fraction added to the rule's figure (+0.1 is 10% better). */
+  modifier: number;
+  /** True when `requested` was beyond the cap and was clamped. */
+  clamped: boolean;
+  /** True when no model answer could be used and the standard rule (modifier 0) stands. */
+  fallback: boolean;
+  /** True when an earlier ruling on the same key was followed, with no model call. */
+  precedent: boolean;
+  rationale: string;
   narrative: string;
 }
 

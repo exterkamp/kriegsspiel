@@ -85,6 +85,17 @@ export type {
   PlacementVerdict,
 } from './placement.js';
 export {
+  JUDGMENT_CAP,
+  JUDGMENT_EVENT,
+  caseLaw,
+  clampModifier,
+  issueJudgment,
+  judgmentModifier,
+  precedentFor,
+  registerJudgment,
+} from './judgment.js';
+export type { JudgmentProposal, JudgmentRequest } from './judgment.js';
+export {
   BREAK_MORALE,
   COMBAT_TICK_MS,
   coverFactor,
