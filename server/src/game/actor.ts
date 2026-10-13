@@ -1912,7 +1912,6 @@ export class GameActor {
       cause,
       orders: sentOrdersOf(t),
       sent: [...t.sent.keys()],
-      agents: () => this.turnAgents(t.n),
     };
     const state = this.engine;
     this.onStaffAtWork?.({ working: true, needAtMs: t.startMs });
@@ -1920,7 +1919,9 @@ export class GameActor {
     this.notify();
     const resolved = (async (): Promise<TurnResolution> => {
       try {
-        return await turns.resolver.resolve(state, input);
+        return await turns.resolver.resolve(state, input, {
+          agents: () => this.turnAgents(t.n),
+        });
       } catch (e) {
         // A resolver must always answer; one that throws leaves the units on their last orders.
         if (this.trace.enabled) this.trace.record(this.id, 'error', { source: 'turn', error: e });

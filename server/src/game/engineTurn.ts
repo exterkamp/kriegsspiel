@@ -37,7 +37,7 @@ import { hasConditionOrTime, testParse } from '../umpire/providers/testParse.js'
 import { parseContextOf } from './parseContext.js';
 import { advanceUntilOver } from './advance.js';
 import type { SentTurnOrder, TurnRecord } from './store.js';
-import type { TurnAgent, TurnInput, TurnResolution, TurnResolver } from './turns.js';
+import type { TurnAgent, TurnContext, TurnInput, TurnResolution, TurnResolver } from './turns.js';
 
 /** The name a resolver logs for a turn the engine resolved. */
 export const ENGINE_ADJUDICATOR = 'engine';
@@ -312,12 +312,13 @@ function runEngineTurn(
  */
 export function projectTurn(
   state: EngineState<GameState>,
-  input: Pick<TurnInput, 'n' | 'startMs' | 'endMs' | 'orders' | 'agents'>,
+  input: Pick<TurnInput, 'n' | 'startMs' | 'endMs' | 'orders'>,
   registry: EventRegistry<GameState>,
+  context: TurnContext = {},
 ): Projection {
   const parsed = input.orders.map((o) => rulesParseTurnOrder(state.world, o));
   const orders = engineOrdersOf(parsed, input.orders, input.startMs);
-  const run = runEngineTurn(state, orders, input, registry, input.agents?.());
+  const run = runEngineTurn(state, orders, input, registry, context.agents?.());
   return {
     state: run.state,
     emitted: run.emitted,
@@ -331,8 +332,12 @@ export function projectTurn(
 export class EngineTurnResolver implements TurnResolver {
   constructor(private readonly registry: EventRegistry<GameState>) {}
 
-  async resolve(state: EngineState<GameState>, input: TurnInput): Promise<TurnResolution> {
-    const p = projectTurn(state, input, this.registry);
+  async resolve(
+    state: EngineState<GameState>,
+    input: TurnInput,
+    context?: TurnContext,
+  ): Promise<TurnResolution> {
+    const p = projectTurn(state, input, this.registry, context);
     const output: EngineTurnOutput = {
       orders: p.orders,
       couriers: p.couriers,

@@ -34,10 +34,14 @@ export interface TurnInput {
   orders: readonly SentTurnOrder[];
   /** The sides that sent, in send order. */
   sent: readonly string[];
+}
+
+/** What a resolver may run beside the turn's data; not logged, and not plain data. */
+export interface TurnContext {
   /**
    * Fresh copies of the scripted sides, for a resolution that runs the turn under the engine: they
-   * think inside it at their interval as the live agents will (#430). Not logged: what the live
-   * agents order is logged as they order it.
+   * think inside it at their interval as the live agents will (#430). What the live agents order
+   * is logged as they order it.
    */
   agents?: () => TurnAgent[];
 }
@@ -73,7 +77,11 @@ export interface TurnResolution {
  * engine's own resolution on any failure (D39, "Fallback").
  */
 export interface TurnResolver {
-  resolve(state: EngineState<GameState>, input: TurnInput): Promise<TurnResolution>;
+  resolve(
+    state: EngineState<GameState>,
+    input: TurnInput,
+    context?: TurnContext,
+  ): Promise<TurnResolution>;
 }
 
 /**

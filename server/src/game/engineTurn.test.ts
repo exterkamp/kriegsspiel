@@ -12,7 +12,7 @@ import {
 import { GameHost, MemoryGameStore, createRegistry, startingState } from './index.js';
 import { replayLog } from './replay.js';
 import { FakeTime } from './testing.js';
-import type { TurnInput, TurnResolver } from './turns.js';
+import type { TurnContext, TurnInput, TurnResolver } from './turns.js';
 
 const MINUTE = 60_000;
 
@@ -54,12 +54,12 @@ class Watching implements TurnResolver {
   constructor(private readonly registry = createRegistry()) {
     this.inner = new EngineTurnResolver(this.registry);
   }
-  async resolve(state: EngineState<GameState>, input: TurnInput) {
+  async resolve(state: EngineState<GameState>, input: TurnInput, context?: TurnContext) {
     const before = structuredClone(state);
-    this.projections.push(projectTurn(state, input, this.registry));
+    this.projections.push(projectTurn(state, input, this.registry, context));
     // The projection never touches the live world.
     expect(state).toEqual(before);
-    return this.inner.resolve(state, input);
+    return this.inner.resolve(state, input, context);
   }
 }
 

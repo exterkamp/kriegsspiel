@@ -32,4 +32,11 @@ export {
   rulesParseTurnOrder,
 } from './engineTurn.js';
 export type { EngineTurnOutput, Projection, ProjectionSummary, RulesOrder } from './engineTurn.js';
-export type { TurnAdjudicator, TurnInput, TurnResolution, TurnResolver } from './turns.js';
+export type {
+  TurnAdjudicator,
+  TurnAgent,
+  TurnContext,
+  TurnInput,
+  TurnResolution,
+  TurnResolver,
+} from './turns.js';
