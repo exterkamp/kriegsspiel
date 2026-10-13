@@ -222,14 +222,12 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
         error: 'refused',
         message: result.kind === 'rejection' ? result.reason : result.question,
       });
-    // A step the LLM barrier held short: say so, or the bar would look like it did nothing.
-    const barrier = actor.gameClock.barrier;
-    const stalled =
-      command.kind === 'step' && barrier !== undefined && actor.gameClock.now() >= barrier;
+    // A step the LLM barrier held short: say so, or the bar would look like it did nothing. Only
+    // when the step itself fell short, not when a narration holds the clock at a reached target.
     return {
       clock: actor.gameClock.snapshot(),
       control: controlOf(actor),
-      ...(stalled ? { stalledAt: barrier } : {}),
+      ...(result.stalledAt === undefined ? {} : { stalledAt: result.stalledAt }),
     };
   });
 

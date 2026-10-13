@@ -354,6 +354,9 @@ describe('GameClock.skipTo (admin step, #128)', () => {
     clock.setBarrier(1500);
     clock.skipTo(9000);
     expect(clock.now()).toBe(1500);
+    // The anchor and the audit entry are capped too, not just the reading.
+    expect(clock.snapshot().gameMsAtAnchor).toBe(1500);
+    expect(clock.history().at(-1)).toMatchObject({ kind: 'advance', gameMs: 1500 });
     clock.skipTo(10);
     expect(clock.now()).toBe(1500);
     clock.stop();

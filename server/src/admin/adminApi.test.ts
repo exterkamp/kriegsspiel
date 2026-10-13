@@ -577,6 +577,18 @@ describe('clock controls (#128)', () => {
     expect(replayed.state.time).toBe(actor.state.time);
   });
 
+  it('does not call a step stalled when it reaches its target at the barrier', async () => {
+    const { id } = await start({ enabled: true }, () => 1_000_000);
+    const actor = app!.host.get(id)!;
+    await post(id, { action: 'pause' });
+    const t0 = actor.gameClock.now();
+    actor.gameClock.setBarrier(t0 + 60_000);
+    const res = await post(id, { action: 'step', ms: 60_000 });
+    expect(res.statusCode).toBe(200);
+    expect(actor.gameClock.now()).toBe(t0 + 60_000);
+    expect(res.json()).not.toHaveProperty('stalledAt');
+  });
+
   it('steps to the next queued event and no further', async () => {
     const { id } = await start({ enabled: true }, () => 1_000_000);
     const actor = app!.host.get(id)!;

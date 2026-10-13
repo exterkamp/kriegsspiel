@@ -102,7 +102,8 @@ export const DEFAULT_NARRATE_TIMEOUT_MS = 150_000;
 export const DEFAULT_PARSE_RETRY_DELAY_MS = 1_000;
 
 export type CommandResult =
-  | { ok: true; orderId?: string }
+  /** `stalledAt`: an admin step the LLM barrier held short of its target, and where it stopped. */
+  | { ok: true; orderId?: string; stalledAt?: number }
   | { ok: false; kind: 'clarification'; question: string; options?: string[] }
   | { ok: false; kind: 'rejection'; reason: string };
 
@@ -1377,7 +1378,8 @@ export class GameActor {
           gameMs: target,
         };
         this.clock.skipTo(target);
-        return { ok: true };
+        const reached = this.clock.now();
+        return reached < target ? { ok: true, stalledAt: reached } : { ok: true };
       }
       case 'order':
         throw new Error('orders go through submitOrder');
