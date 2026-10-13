@@ -128,17 +128,23 @@ describe('OrdersPanel', () => {
   }
 
   it('lists attempts and shows the detail of one as text', async () => {
+    const MARKUP = 'Hold the <img src=x onerror=alert(1)> bridge';
     const fetchFn = vi.fn((url: string) => {
-      if (url.startsWith('/admin/api/games/g1/orders/log-3')) return json(detail);
+      if (url.startsWith('/admin/api/games/g1/orders/log-3'))
+        return json({ ...detail, text: MARKUP });
       if (url.startsWith('/admin/api/games/g1/orders-context'))
         return json({ side: 'blue', units: [] });
       return json({
-        attempts: [attempt(), attempt({ key: 'log-1', text: 'Advance', fallbacks: [] })],
+        attempts: [
+          attempt({ text: MARKUP }),
+          attempt({ key: 'log-1', text: 'Advance', fallbacks: [] }),
+        ],
       });
     });
     const { root, panel } = mount(fetchFn);
     await panel.setGame('g1');
     expect(fetchFn).toHaveBeenCalledWith('/admin/api/games/g1/orders?token=tok');
+    expect(root.querySelector('tbody')!.textContent).toContain(MARKUP);
     const rows = [...root.querySelectorAll<HTMLElement>('tbody tr')];
     expect(rows.map((r) => r.dataset.key)).toEqual(['log-3', 'log-1']);
     expect(rows[0]!.classList.contains('bad')).toBe(true);
@@ -153,6 +159,8 @@ describe('OrdersPanel', () => {
     expect(text).toContain('is not one of');
     expect(text).toContain('SYSTEM <b>not html</b>');
     expect(root.querySelector('.or-detail b')).toBeNull();
+    expect(root.querySelector('.or-detail h2')!.textContent).toBe(`“${MARKUP}”`);
+    expect(root.querySelector('.or-detail img, tbody img')).toBeNull();
     expect(text).toContain('raw reply');
     expect(text).toContain('handed to the engine');
   });
@@ -214,5 +222,65 @@ describe('OrdersPanel', () => {
     await panel.setGame('g1');
     await panel.run(form());
     expect(root.querySelector('.or-results')!.textContent).toContain('rate_limited');
+  });
+
+  it('loads the context of the attempt\'s side on "Try in playground"', async () => {
+    const red = { ...detail, side: 'red', text: 'Hold the ford' };
+    const contexts: string[] = [];
+    const fetchFn = vi.fn((url: string) => {
+      if (url.startsWith('/admin/api/games/g1/orders/log-3')) return json(red);
+      if (url.startsWith('/admin/api/games/g1/orders-context')) {
+        const side = new URL(url, 'http://x').searchParams.get('side')!;
+        contexts.push(side);
+        return json({ side, units: [], hidden: [`${side}-hidden`] });
+      }
+      if (url.startsWith('/admin/api/orders/playground'))
+        return json({ prompts: {}, providers: [] });
+      return json({ attempts: [attempt({ side: 'red', text: 'Hold the ford' })] });
+    });
+    const { root, panel } = mount(fetchFn);
+    await panel.setGame('g1');
+    root.querySelector<HTMLElement>('tr[data-key="log-3"]')!.click();
+    await vi.waitFor(() => expect(root.querySelector('.or-detail h2')).not.toBeNull());
+    const tryIt = [...root.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Try in playground',
+    )!;
+    tryIt.click();
+    const field = (n: string) => root.querySelector<HTMLInputElement>(`[name="${n}"]`)!;
+    await vi.waitFor(() => expect(field('context').value).toContain('red-hidden'));
+    expect(contexts).toContain('red');
+    expect(field('side').value).toBe('red');
+    expect(field('text').value).toBe('Hold the ford');
+  });
+
+  it('sends one dry run at a time', async () => {
+    let release: () => void = () => undefined;
+    const posts: unknown[] = [];
+    const fetchFn = vi.fn((_url: string, init?: RequestInit) => {
+      if (init?.method !== 'POST') return json({ attempts: [] });
+      posts.push(init.body);
+      return new Promise((resolve) => {
+        release = () =>
+          resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              canned: { result: { kind: 'intents' }, problems: [], calls: [] },
+              usage: { runs: 1, calls: 0, inputTokens: 0, outputTokens: 0, usd: 0 },
+            }),
+          });
+      }) as never;
+    });
+    const { root, panel } = mount(fetchFn);
+    await panel.setGame('g1');
+    const first = panel.run(form());
+    const submit = root.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    expect(submit.disabled).toBe(true);
+    await panel.run(form());
+    expect(posts).toHaveLength(1);
+    release();
+    await first;
+    expect(submit.disabled).toBe(false);
+    await vi.waitFor(() => expect(root.querySelector('.or-results h2')).not.toBeNull());
   });
 });

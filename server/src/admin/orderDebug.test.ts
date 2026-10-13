@@ -268,6 +268,31 @@ describe('orderAttempts', () => {
     });
     expect(byText.scripted).toMatchObject({ answeredBy: 'agent', llmCalls: 0 });
   });
+  it('does not let a short order claim the calls of a longer one that contains it', () => {
+    const log = [
+      entry(1, 'Hold', { parse: { kind: 'rejection', text: 'Hold', reason: 'no' } }),
+      entry(2, 'Hold the bridge at all costs', {
+        parse: { kind: 'rejection', text: 'Hold the bridge at all costs', reason: 'no' },
+      }),
+    ];
+    const trace = [
+      t(1, 'command', 'tick', { seq: 1, command: log[0]!.command }),
+      t(2, 'command', 'tick', { seq: 2, command: log[1]!.command }),
+      t(3, 'llm', 'tick', { stage: 'parse', mode: 'live', ok: true, input: { order: 'Hold' } }),
+      t(4, 'llm', 'tick', {
+        stage: 'parse',
+        mode: 'test',
+        ok: true,
+        input: { order: 'Hold the bridge at all costs' },
+      }),
+    ];
+    const byText = Object.fromEntries(orderAttempts(log, trace).map((a) => [a.text, a]));
+    expect(byText.Hold).toMatchObject({ answeredBy: 'model', llmCalls: 1 });
+    expect(byText['Hold the bridge at all costs']).toMatchObject({
+      answeredBy: 'canned',
+      llmCalls: 1,
+    });
+  });
 });
 
 describe('playground (#395)', () => {
@@ -346,6 +371,23 @@ describe('playground (#395)', () => {
     now = 61_000;
     expect((await run()).statusCode).toBe(200);
     expect((await run({ unknown: 1 })).statusCode).toBe(400);
+  });
+
+  it('refuses dry runs once they have spent the server-wide budget', async () => {
+    const config = umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' });
+    const playground = new OrderPlayground({
+      config: { ...config, budget: { maxTotalTokens: 15 } },
+      makeClient: () => new FakeModel(),
+    });
+    const { id } = await start({ playground });
+    const run = () =>
+      post(`/admin/api/games/${id}/orders/dry-run`, { side: 'blue', text: GOOD, interpret: false });
+    // FakeModel reports 10 + 5 tokens a call: the first run reaches the cap, the second is refused.
+    expect((await run()).statusCode).toBe(200);
+    const refused = await run();
+    expect(refused.statusCode).toBe(429);
+    expect(refused.json()).toMatchObject({ error: 'budget_spent' });
+    expect(playground.usage()).toMatchObject({ runs: 1, inputTokens: 10, outputTokens: 5 });
   });
 
   it('describes the prompts, providers and route for the form', async () => {

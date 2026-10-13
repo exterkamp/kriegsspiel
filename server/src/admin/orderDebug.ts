@@ -15,7 +15,7 @@
  *
  * Dry runs never reach the game: they read the context once, then use their own umpire client (no game
  * budget, no fallback provider, no recorder), never touch the actor, the input log or the trace, and are
- * rate limited and counted on their own.
+ * rate limited and counted on their own, refused once that count reaches the server-wide budget.
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -105,6 +105,9 @@ function answeredBy(
   notes: TraceEntry[],
 ): AnsweredBy {
   if (logFallback) return 'none';
+  // `canned` means the canned client was consulted and its call succeeded: if its answer then failed the
+  // checks, the rules parser behind it answered, but the trace does not say which (rare with the test
+  // provider).
   const parseNote = notes.find((n) => rec(n.data).step === 'parse');
   const canned = calls.some((c) => {
     const d = rec(c.data);
@@ -154,15 +157,22 @@ export function orderAttempts(
   const linkedTo = (command: TraceEntry | undefined, text: string, agent: boolean) => {
     const id = command && command.correlationId !== 'none' ? command.correlationId : undefined;
     const chain = id ? (byCorrelation.get(id) ?? []) : [];
-    const mine = (e: TraceEntry, field: 'input' | 'text') => {
+    // An input with the text as a top-level field is the order's own call; a substring match is the
+    // fallback for prompts that embed the text, used only when no call matched exactly, so "Hold" does
+    // not claim the calls of "Hold the bridge" in the same tick.
+    const exact = (e: TraceEntry, field: 'input' | 'text') => {
       const v = rec(e.data)[field];
-      if (field === 'text') return v === text;
+      return v === text || (field === 'input' && Object.values(rec(v)).includes(text));
+    };
+    const contains = (e: TraceEntry) => {
+      const v = rec(e.data).input;
       const s = typeof v === 'string' ? v : JSON.stringify(v ?? null);
       return s.includes(text) || s.includes(JSON.stringify(text).slice(1, -1));
     };
     const pick = (kind: 'llm' | 'order', field: 'input' | 'text') => {
       const all = chain.filter((e) => e.kind === kind);
-      const matched = all.filter((e) => mine(e, field));
+      let matched = all.filter((e) => exact(e, field));
+      if (!matched.length && field === 'input') matched = all.filter(contains);
       return matched.length || agent || (id && ordersIn.get(id)! > 1) ? matched : all;
     };
     return { correlationId: id, chain, calls: pick('llm', 'input'), notes: pick('order', 'text') };
@@ -324,13 +334,13 @@ export interface DryRunResult {
   model?: DryRunSide;
   /** The canned parser (the test provider, then the rules), as the game falls back to it. */
   canned: DryRunSide;
-  /** Dry runs since the server started, counted apart from every game's budget. */
+  /** Dry runs since the server started, counted apart from every game's budget; capped by the server's. */
   usage: DryRunUsage;
 }
 
 export class PlaygroundError extends Error {
   constructor(
-    readonly code: 'rate_limited' | 'unknown_provider',
+    readonly code: 'rate_limited' | 'budget_spent' | 'unknown_provider',
     message: string,
     readonly retryAfterMs?: number,
   ) {
@@ -413,8 +423,9 @@ export interface OrderPlaygroundOptions {
 
 /**
  * Runs orders through the pipeline outside any game. Its client is its own: built per run from the
- * config with the edited route, with no budget, no game limits and no fallback provider, so a dry run
- * neither spends a game's budget nor hides a model failure behind the canned answer.
+ * config with the edited route, with no game limits and no fallback provider, so a dry run neither spends
+ * a game's budget nor hides a model failure behind the canned answer. The server-wide budget applies to
+ * the playground's own lifetime count (`take`).
  */
 export class OrderPlayground {
   private readonly now: () => number;
@@ -468,6 +479,17 @@ export class OrderPlayground {
   }
 
   private take(): void {
+    // The operator's server-wide cap (UMPIRE_BUDGET_*) bounds dry runs too, counted on their own: each run
+    // builds a fresh client, so the client's own budget would reset every time.
+    const cap = this.o.config?.budget;
+    const s = this.spent;
+    if (
+      cap &&
+      ((cap.maxCostUsd !== undefined && s.usd >= cap.maxCostUsd) ||
+        (cap.maxTotalTokens !== undefined && s.inputTokens + s.outputTokens >= cap.maxTotalTokens))
+    ) {
+      throw new PlaygroundError('budget_spent', 'the dry-run budget (UMPIRE_BUDGET_*) is spent');
+    }
     const t = this.now();
     while (this.recent.length && this.recent[0]! <= t - 60_000) this.recent.shift();
     if (this.recent.length >= this.perMinute) {
@@ -712,6 +734,9 @@ export function orderDebugRoutes(server: FastifyInstance, prefix: string, o: Ord
             return reply
               .code(429)
               .send({ error: e.code, message: e.message, retryAfterMs: e.retryAfterMs });
+          }
+          if (e.code === 'budget_spent') {
+            return reply.code(429).send({ error: e.code, message: e.message });
           }
           return reply.code(400).send({ error: e.code, message: e.message });
         }

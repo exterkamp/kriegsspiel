@@ -295,6 +295,7 @@ export class OrdersPanel {
   private info: PlaygroundInfo | undefined;
   private defaults: Record<string, string> = {};
   private recorded: OrderAttemptDetail | undefined;
+  private running = false;
 
   private readonly status = el('p', 'No game selected.', 'empty');
   private readonly body = el('tbody');
@@ -623,8 +624,13 @@ export class OrdersPanel {
   }
 
   private prefill(d: OrderAttemptDetail): void {
-    this.field<HTMLSelectElement>('side').value = d.side;
+    // Setting `.value` fires no `change`, so reload the context here; a hand-edited context is kept
+    // when the side is the same.
+    const side = this.field<HTMLSelectElement>('side');
+    const changed = side.value !== d.side;
+    side.value = d.side;
     this.field<HTMLTextAreaElement>('text').value = d.text;
+    if (changed) void this.loadContext();
     this.pg.open = true;
     this.pg.scrollIntoView?.({ block: 'start' });
   }
@@ -632,19 +638,23 @@ export class OrdersPanel {
   private showUsage(u: Usage): void {
     this.pg.querySelector('.or-usage')!.textContent =
       `dry runs: ${u.runs} · ${u.calls} calls · ${u.inputTokens} in / ${u.outputTokens} out tokens · ` +
-      `$${u.usd.toFixed(4)} (not counted in any game's budget; at most ${this.info?.perMinute ?? '?'} a minute)`;
+      `$${u.usd.toFixed(4)} (not counted in any game's budget; stopped at the server's; at most ${this.info?.perMinute ?? '?'} a minute)`;
   }
 
   /** Send a dry run and show the model's answer beside the canned one and the recorded one. */
   async run(form: PlaygroundForm): Promise<void> {
     const id = this.gameId;
-    if (!id) return;
+    // One dry run at a time: a double submit would spend two runs and could show the older answer.
+    if (!id || this.running) return;
     const built = buildDryRun(form);
     if ('error' in built) {
       this.out.replaceChildren(el('p', built.error, 'bad'));
       return;
     }
     this.out.replaceChildren(el('p', 'Running…', 'empty'));
+    this.running = true;
+    const submit = this.pg.querySelector<HTMLButtonElement>('button[type="submit"]');
+    if (submit) submit.disabled = true;
     try {
       const res = await this.fetchFn(this.url(`games/${encodeURIComponent(id)}/orders/dry-run`), {
         method: 'POST',
@@ -690,6 +700,9 @@ export class OrdersPanel {
       this.out.replaceChildren(wrap);
     } catch {
       this.out.replaceChildren(el('p', 'The dry run failed.', 'bad'));
+    } finally {
+      this.running = false;
+      if (submit) submit.disabled = false;
     }
   }
 }
