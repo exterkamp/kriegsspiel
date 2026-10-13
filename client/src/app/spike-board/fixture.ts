@@ -51,7 +51,12 @@ export function spikeScenario(): Scenario {
     riverY,
     features: [
       { id: 'river', kind: 'river', name: 'the Aa', points: river },
-      { id: 'road', kind: 'road', name: 'the post road', points: [to(1500, 0), to(1500, 700), BRIDGE, to(1450, 1400), to(1400, H)] },
+      {
+        id: 'road',
+        kind: 'road',
+        name: 'the post road',
+        points: [to(1500, 0), to(1500, 700), BRIDGE, to(1450, 1400), to(1400, H)],
+      },
       {
         id: 'wood',
         kind: 'wood',

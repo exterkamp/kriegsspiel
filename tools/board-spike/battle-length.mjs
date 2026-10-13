@@ -27,7 +27,12 @@ const VARIANTS = [
   { name: 'current' },
   { name: 'cap 8', shockCap: 8 },
   { name: 'cap 6, long range 0.5', shockCap: 6, longRange: 0.5 },
-  { name: 'PROPOSAL: cap 6, long range 0.5, under fire 1', shockCap: 6, longRange: 0.5, underFire: 1 },
+  {
+    name: 'PROPOSAL: cap 6, long range 0.5, under fire 1',
+    shockCap: 6,
+    longRange: 0.5,
+    underFire: 1,
+  },
   { name: 'cap 6, long range 0.5, under fire 2', shockCap: 6, longRange: 0.5, underFire: 2 },
   { name: 'cap 5, long range 0.5, under fire 2', shockCap: 5, longRange: 0.5, underFire: 2 },
 ];
@@ -77,11 +82,34 @@ function duel(e, seed, { gap, attack, morale }) {
       { id: 'red', name: 'Red', controller: 'human', hq: { x: 1000, y: 10 } },
     ],
     units: [
-      { id: 'b', name: 'b', side: 'blue', kind: 'infantry', strength: 600, morale, facingDeg: 0, at: { x: 1000, y: 1000 + gap / 2 } },
-      { id: 'r', name: 'r', side: 'red', kind: 'infantry', strength: 600, morale, facingDeg: 180, at: { x: 1000, y: 1000 - gap / 2 } },
+      {
+        id: 'b',
+        name: 'b',
+        side: 'blue',
+        kind: 'infantry',
+        strength: 600,
+        morale,
+        facingDeg: 0,
+        at: { x: 1000, y: 1000 + gap / 2 },
+      },
+      {
+        id: 'r',
+        name: 'r',
+        side: 'red',
+        kind: 'infantry',
+        strength: 600,
+        morale,
+        facingDeg: 180,
+        at: { x: 1000, y: 1000 - gap / 2 },
+      },
     ],
     victory: {
-      objective: [[70, 70], [130, 70], [130, 130], [70, 130]],
+      objective: [
+        [70, 70],
+        [130, 70],
+        [130, 130],
+        [70, 130],
+      ],
       defender: 'blue',
       attacker: 'red',
       holdMinutes: 600,
@@ -100,7 +128,11 @@ function bridge(e, seed) {
   const victory = { ...e.holdTheBridge.victory, holdMinutes: 600, takeMinutes: 600 };
   const g = e.loadScenario({ ...e.holdTheBridge, victory, seed });
   let s = e.startGame(e.createState(seed, g, 0));
-  for (const [r, b] of [['red-1', 'blue-1'], ['red-2', 'blue-2'], ['red-3', 'blue-3']]) {
+  for (const [r, b] of [
+    ['red-1', 'blue-1'],
+    ['red-2', 'blue-2'],
+    ['red-3', 'blue-3'],
+  ]) {
     s = e.issueAttack(s, r, b);
   }
   return s;
@@ -127,10 +159,12 @@ function stages(e, s) {
       if (p.melee) melee++;
       for (const id of [p.attacker, p.target]) if (!first.has(id)) first.set(id, ev.time);
       const u0 = start.get(p.target);
-      if (p.targetStrength < u0.strength * 0.95 && !at.losses.has(p.target)) at.losses.set(p.target, ev.time);
+      if (p.targetStrength < u0.strength * 0.95 && !at.losses.has(p.target))
+        at.losses.set(p.target, ev.time);
       if (p.targetMorale < 45 && !at.wavering.has(p.target)) at.wavering.set(p.target, ev.time);
     }
-    if (ev.type === 'unit.broken' && !at.broken.has(ev.payload.unitId)) at.broken.set(ev.payload.unitId, ev.time);
+    if (ev.type === 'unit.broken' && !at.broken.has(ev.payload.unitId))
+      at.broken.set(ev.payload.unitId, ev.time);
   }
   const mins = (m) => [...m].map(([id, t]) => (t - (first.get(id) ?? t)) / e.MS_PER_MINUTE);
   return {
@@ -149,16 +183,23 @@ const pct = (xs, p) => {
 const band = (xs) => `${pct(xs, 10)}/${pct(xs, 50)}/${pct(xs, 90)}`.padEnd(12);
 
 const CASES = [
-  ['firefight 150 m, morale 80', (e, seed) => duel(e, seed, { gap: 150, attack: false, morale: 80 })],
+  [
+    'firefight 150 m, morale 80',
+    (e, seed) => duel(e, seed, { gap: 150, attack: false, morale: 80 }),
+  ],
   ['red attacks from 400 m', (e, seed) => duel(e, seed, { gap: 400, attack: true, morale: 80 })],
   ['Hold the Bridge, all attack', bridge],
 ];
 
-console.log(`${SEEDS} seeds; minutes from a unit's first exchange, p10/p50/p90; a '-' is never within 3 h`);
+console.log(
+  `${SEEDS} seeds; minutes from a unit's first exchange, p10/p50/p90; a '-' is never within 3 h`,
+);
 for (const v of VARIANTS) {
   const { e, cleanup } = await engineFor(v);
   console.log(`\n${v.name}`);
-  console.log(`  ${'case'.padEnd(30)}${'losses'.padEnd(13)}${'wavering'.padEnd(13)}${'broken'.padEnd(13)}breaks  melee`);
+  console.log(
+    `  ${'case'.padEnd(30)}${'losses'.padEnd(13)}${'wavering'.padEnd(13)}${'broken'.padEnd(13)}breaks  melee`,
+  );
   for (const [label, make] of CASES) {
     // A run the engine throws on is counted, not fatal: see the follow-up issue on zero-casualty shots.
     let crashed = 0;
@@ -173,7 +214,12 @@ for (const v of VARIANTS) {
     const all = (k) => runs.flatMap((r) => r[k]);
     const breaks = all('broken').length;
     console.log(
-      `  ${label.padEnd(30)}${band(all('losses'))} ${band(all('wavering'))} ${band(all('broken'))} ${String(breaks).padEnd(7)} ${Math.round(pct(runs.map((r) => r.melee), 50) * 100)}%${crashed ? `  (${crashed} runs threw)` : ''}`,
+      `  ${label.padEnd(30)}${band(all('losses'))} ${band(all('wavering'))} ${band(all('broken'))} ${String(breaks).padEnd(7)} ${Math.round(
+        pct(
+          runs.map((r) => r.melee),
+          50,
+        ) * 100,
+      )}%${crashed ? `  (${crashed} runs threw)` : ''}`,
     );
   }
   cleanup();

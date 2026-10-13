@@ -143,7 +143,9 @@ export class SpikeBoardComponent {
    * Counter width in metres, so counters keep one size on the screen whatever the zoom: 3% of the view, and never under
    * 26 pixels, so a counter can still be read and tapped on a phone.
    */
-  readonly cw = computed(() => Math.max(this.view().w * 0.03, (this.view().w / this.boardPx()) * 26));
+  readonly cw = computed(() =>
+    Math.max(this.view().w * 0.03, (this.view().w / this.boardPx()) * 26),
+  );
   readonly ch = computed(() => this.cw() * 0.66);
 
   readonly report = computed<Report | null>(() =>
@@ -267,7 +269,8 @@ export class SpikeBoardComponent {
     for (let i = this.turn().n; i > 0; i--) {
       const t = this.turns()[i]!;
       const e = [...t.events].reverse().find((x) => x.unit === u.id);
-      if (e) return `${clock(e.minute)}: ${eventLine(e.kind, e.other ? this.nameOf(t, e.other) : '', e.metres, e.lost)}`;
+      if (e)
+        return `${clock(e.minute)}: ${eventLine(e.kind, e.other ? this.nameOf(t, e.other) : '', e.metres, e.lost)}`;
     }
     return null;
   });
@@ -282,7 +285,9 @@ export class SpikeBoardComponent {
     afterNextRender(() => {
       const el = this.svg()?.nativeElement;
       if (!el || typeof ResizeObserver === 'undefined') return;
-      const ro = new ResizeObserver(() => this.boardPx.set(el.getBoundingClientRect().width || 1000));
+      const ro = new ResizeObserver(() =>
+        this.boardPx.set(el.getBoundingClientRect().width || 1000),
+      );
       ro.observe(el);
       destroy.onDestroy(() => ro.disconnect());
     });
@@ -323,7 +328,11 @@ export class SpikeBoardComponent {
   setVariant<K extends keyof Variants>(k: K, v: Variants[K]): void {
     this.variants.update((s) => ({ ...s, [k]: v }));
     if (k === 'contact') this.rebuild();
-    void this.router.navigate([], { queryParams: { [k]: v }, queryParamsHandling: 'merge', replaceUrl: true });
+    void this.router.navigate([], {
+      queryParams: { [k]: v },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   select(id: string | null): void {
@@ -362,12 +371,21 @@ export class SpikeBoardComponent {
     if (o.verb === 'hold') return;
     const at = this.toMap(ev);
     const waypoints = ev.shiftKey ? [...o.waypoints, at] : [at];
-    this.draft.set({ ...o, waypoints, target: o.verb === 'attack' && ev.shiftKey ? o.target : undefined });
+    this.draft.set({
+      ...o,
+      waypoints,
+      target: o.verb === 'attack' && ev.shiftKey ? o.target : undefined,
+    });
   }
 
   setVerb(v: Verb): void {
     const o = this.draft() ?? this.pending()[this.selected() ?? ''] ?? null;
-    this.draft.set({ verb: v, waypoints: v === 'hold' ? [] : (o?.waypoints ?? []), target: v === 'attack' ? o?.target : undefined, note: o?.note });
+    this.draft.set({
+      verb: v,
+      waypoints: v === 'hold' ? [] : (o?.waypoints ?? []),
+      target: v === 'attack' ? o?.target : undefined,
+      note: o?.note,
+    });
   }
 
   setNote(note: string): void {
@@ -399,8 +417,13 @@ export class SpikeBoardComponent {
   }
 
   orderLine(o: Order): string {
-    const where = o.waypoints.length ? placeName(this.scenario, o.waypoints[o.waypoints.length - 1]!) : '';
-    const via = o.waypoints.length > 1 ? ` via ${o.waypoints.length - 1} waypoint${o.waypoints.length > 2 ? 's' : ''}` : '';
+    const where = o.waypoints.length
+      ? placeName(this.scenario, o.waypoints[o.waypoints.length - 1]!)
+      : '';
+    const via =
+      o.waypoints.length > 1
+        ? ` via ${o.waypoints.length - 1} waypoint${o.waypoints.length > 2 ? 's' : ''}`
+        : '';
     if (o.verb !== 'hold' && o.verb !== 'attack' && o.waypoints.length === 0) {
       return `${o.verb[0]!.toUpperCase()}${o.verb.slice(1)}: done, halted`;
     }
@@ -408,7 +431,9 @@ export class SpikeBoardComponent {
       case 'hold':
         return 'Hold';
       case 'attack':
-        return o.target ? `Attack ${this.nameOf(this.turn(), o.target)}` : `Attack, take ground ${where}${via}`;
+        return o.target
+          ? `Attack ${this.nameOf(this.turn(), o.target)}`
+          : `Attack, take ground ${where}${via}`;
       default:
         return `${o.verb[0]!.toUpperCase()}${o.verb.slice(1)} to ${where}${via}`;
     }
@@ -448,7 +473,10 @@ export class SpikeBoardComponent {
   zoom(factor: number, around?: Point): void {
     const v = this.view();
     const w = Math.max(600, Math.min(this.scenario.width * 1.2, v.w * factor));
-    const c = around ?? { x: v.x + v.w / 2, y: v.y + (v.w * this.scenario.height) / this.scenario.width / 2 };
+    const c = around ?? {
+      x: v.x + v.w / 2,
+      y: v.y + (v.w * this.scenario.height) / this.scenario.width / 2,
+    };
     const k = w / v.w;
     this.view.set({ x: c.x - (c.x - v.x) * k, y: c.y - (c.y - v.y) * k, w });
   }
@@ -498,9 +526,18 @@ export class SpikeBoardComponent {
   }
 
   // Geometry for the template.
-  readonly riverPoints = this.scenario.features.find((f) => f.kind === 'river')!.points.map((p) => `${p.x},${round(p.y)}`).join(' ');
-  readonly roadPoints = this.scenario.features.find((f) => f.kind === 'road')!.points.map((p) => `${p.x},${round(p.y)}`).join(' ');
-  readonly woodPoints = this.scenario.features.find((f) => f.kind === 'wood')!.points.map((p) => `${p.x},${p.y}`).join(' ');
+  readonly riverPoints = this.scenario.features
+    .find((f) => f.kind === 'river')!
+    .points.map((p) => `${p.x},${round(p.y)}`)
+    .join(' ');
+  readonly roadPoints = this.scenario.features
+    .find((f) => f.kind === 'road')!
+    .points.map((p) => `${p.x},${round(p.y)}`)
+    .join(' ');
+  readonly woodPoints = this.scenario.features
+    .find((f) => f.kind === 'wood')!
+    .points.map((p) => `${p.x},${p.y}`)
+    .join(' ');
   readonly bridge = this.scenario.features.find((f) => f.kind === 'bridge')!.points[0]!;
 
   deg(rad: number): number {
@@ -509,7 +546,11 @@ export class SpikeBoardComponent {
 
   /** The old look: the unit's footprint, a battalion line about 180 m by 40 m. */
   footprint(p: Piece): { w: number; h: number } {
-    return p.arm === 'artillery' ? { w: 120, h: 40 } : p.arm === 'cavalry' ? { w: 140, h: 50 } : { w: 180, h: 40 };
+    return p.arm === 'artillery'
+      ? { w: 120, h: 40 }
+      : p.arm === 'cavalry'
+        ? { w: 140, h: 50 }
+        : { w: 180, h: 40 };
   }
 
   /** The uncertainty ring of a last-known enemy: 12 m for every minute since it was seen, at most 300 m. */

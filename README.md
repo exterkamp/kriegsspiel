@@ -18,6 +18,7 @@ A deterministic engine owns the world: terrain, movement, line of sight, combat,
 - [docs/hq-getting-started.md](docs/hq-getting-started.md): current HQ features, user instructions and hands-on validation checklist
 - [docs/architecture.md](docs/architecture.md): server/engine/umpire design, tech choices, testing
 - [docs/roadmap.md](docs/roadmap.md): milestones and what is done
+- [docs/board-spike.md](docs/board-spike.md): the board readability and unit control spike (#443): findings and recommended changes
 
 ## Current state
 
@@ -82,3 +83,14 @@ devrun url web
 devrun logs web -n 50
 devrun stop web
 ```
+
+### Board spike
+
+`/spike/board` (also under Developer tools) is a prototype of the board's look and unit control, run from a fixture and a local simulation with no server (#443). The web server alone is enough:
+
+```bash
+devrun up --name web --port-env PORT -- npm run dev -w client
+echo "$(devrun url web)/spike/board?turn=3"
+```
+
+Query parameters pick each variant (`pieces`, `trails`, `contact`, `enemy`, `turn`, `select`, `zoom`); see [docs/board-spike.md](docs/board-spike.md). The battle-length measurement runs the real engine: `npm run build -w packages/engine && node tools/board-spike/battle-length.mjs`.

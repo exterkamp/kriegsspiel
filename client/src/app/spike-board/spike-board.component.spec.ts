@@ -12,7 +12,8 @@ async function open(url: string) {
   return { f, el: f.nativeElement as HTMLElement };
 }
 
-const click = (el: Element | null) => (el as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+const click = (el: Element | null) =>
+  (el as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
 describe('SpikeBoardComponent', () => {
   it('plays the turns asked for in the URL and shows trails, contact and enemies', async () => {
@@ -22,7 +23,9 @@ describe('SpikeBoardComponent', () => {
     expect(el.querySelectorAll('g.contact').length).toBe(1);
     expect(el.querySelectorAll('.counter.enemy.seen').length).toBeGreaterThan(0);
     expect(el.querySelectorAll('.counter.enemy.stale').length).toBeGreaterThan(0);
-    expect(el.querySelector('[data-testid=report]')?.textContent).toContain('1st Battalion is in action.');
+    expect(el.querySelector('[data-testid=report]')?.textContent).toContain(
+      '1st Battalion is in action.',
+    );
   });
 
   it('opens a unit by clicking it on the table and holds an order for the next turn', async () => {

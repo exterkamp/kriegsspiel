@@ -1,4 +1,13 @@
-import { type Contact, type Point, type Scenario, type Turn, type Unit, clock, dist, stageOf } from './sim';
+import {
+  type Contact,
+  type Point,
+  type Scenario,
+  type Turn,
+  type Unit,
+  clock,
+  dist,
+  stageOf,
+} from './sim';
 
 /**
  * The chief of staff's summary of a turn (#443 point 4), from a template: what our units did, which fights they are in
@@ -53,12 +62,25 @@ function inside(p: Point, poly: Point[]): boolean {
 
 function compass(from: Point, to: Point): string {
   const a = (Math.atan2(to.x - from.x, -(to.y - from.y)) * 180) / Math.PI;
-  const names = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+  const names = [
+    'north',
+    'north-east',
+    'east',
+    'south-east',
+    'south',
+    'south-west',
+    'west',
+    'north-west',
+  ];
   return names[(Math.round(((a + 360) % 360) / 45) % 8) as number]!;
 }
 
 const sizeWords = (c: Contact) => `${c.size[0]}–${c.size[1]}`;
-const ARM_WORD: Record<string, string> = { infantry: 'infantry', cavalry: 'horse', artillery: 'guns' };
+const ARM_WORD: Record<string, string> = {
+  infantry: 'infantry',
+  cavalry: 'horse',
+  artillery: 'guns',
+};
 
 export function enemyLabel(c: Contact): string {
   return `enemy ${ARM_WORD[c.arm]} ${c.letter} (${sizeWords(c)})`;
@@ -88,7 +110,9 @@ export function chiefOfStaffReport(s: Scenario, prev: Turn, turn: Turn): Report 
     if (stage === 'broken' && was.stage !== 'broken') {
       fights.push([
         unitPiece(u),
-        { text: ` broke at ${clock(turn.events.find((e) => e.kind === 'broken' && e.unit === u.id)?.minute ?? turn.to)}` },
+        {
+          text: ` broke at ${clock(turn.events.find((e) => e.kind === 'broken' && e.unit === u.id)?.minute ?? turn.to)}`,
+        },
         { text: lost > 0 ? ` after losing ${men(lost)} this turn` : '' },
         { text: ` and is falling back ${placeName(s, u.pos)}.` },
       ]);
@@ -99,17 +123,23 @@ export function chiefOfStaffReport(s: Scenario, prev: Turn, turn: Turn): Report 
         { text: contact ? ` met ` : ` is fighting ` },
         enemyPiece(foe),
         { text: ` ${placeName(s, u.pos)}` },
-        { text: `${contact ? ` at ${clock(contact.minute)}` : ''}; ${lost > 0 ? `lost ${men(lost)}, ` : ''}it ${STAGE_WORDS[stage]}.` },
+        {
+          text: `${contact ? ` at ${clock(contact.minute)}` : ''}; ${lost > 0 ? `lost ${men(lost)}, ` : ''}it ${STAGE_WORDS[stage]}.`,
+        },
       ]);
     } else if (lost > 0) {
       fights.push([
         unitPiece(u),
-        { text: ` came under fire ${placeName(s, u.pos)} and lost ${men(lost)}; it ${STAGE_WORDS[stage]}.` },
+        {
+          text: ` came under fire ${placeName(s, u.pos)} and lost ${men(lost)}; it ${STAGE_WORDS[stage]}.`,
+        },
       ]);
     } else {
       const metres = turn.events.find((e) => e.unit === u.id && e.kind === 'moved')?.metres;
       quiet.push(unitPiece(u), {
-        text: metres ? ` moved ${Math.round(metres / 50) * 50} m to ${placeName(s, u.pos)}; ` : ` holds ${placeName(s, u.pos)}; `,
+        text: metres
+          ? ` moved ${Math.round(metres / 50) * 50} m to ${placeName(s, u.pos)}; `
+          : ` holds ${placeName(s, u.pos)}; `,
       });
     }
   }
@@ -150,7 +180,12 @@ export function chiefOfStaffReport(s: Scenario, prev: Turn, turn: Turn): Report 
 
   const paragraphs: Piece[][] = [...fights];
   if (quiet.length) paragraphs.push(trimTail(quiet));
-  return { heading: `Turn ${turn.n}, ${clock(turn.from)} to ${clock(turn.to)}`, gist, paragraphs, enemy };
+  return {
+    heading: `Turn ${turn.n}, ${clock(turn.from)} to ${clock(turn.to)}`,
+    gist,
+    paragraphs,
+    enemy,
+  };
 }
 
 /** End a run of "…; " pieces with a full stop. */

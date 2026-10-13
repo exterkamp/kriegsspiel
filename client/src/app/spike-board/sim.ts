@@ -271,9 +271,17 @@ export class Battle {
     for (const [id, t] of Object.entries(enemyTracks)) {
       if (t.length < 2) continue;
       const metres = dist(t[0]!, t[t.length - 1]!);
-      if (metres > 50) events.push({ kind: 'enemy-moved', minute: this.minute, unit: id, metres: Math.round(metres) });
+      if (metres > 50)
+        events.push({
+          kind: 'enemy-moved',
+          minute: this.minute,
+          unit: id,
+          metres: Math.round(metres),
+        });
     }
-    const orders = Object.fromEntries(this.units.filter((u) => u.side === 'blue').map((u) => [u.id, u.order]));
+    const orders = Object.fromEntries(
+      this.units.filter((u) => u.side === 'blue').map((u) => [u.id, u.order]),
+    );
     const turn = this.record(n, from, tracks, events, enemyTracks, orders);
     this.turns.push(turn);
     return turn;
@@ -321,7 +329,8 @@ export class Battle {
         const t = this.units.find((x) => x.id === o.target);
         if (t && t.stage !== 'broken' && t.strength > 0) {
           if (o.waypoints.length === 0) goal = t.pos;
-          if (dist(u.pos, t.pos) <= Math.max(CONTACT_M, Math.min(RANGE[u.arm], 180))) goal = undefined;
+          if (dist(u.pos, t.pos) <= Math.max(CONTACT_M, Math.min(RANGE[u.arm], 180)))
+            goal = undefined;
         }
       }
       if (o.verb === 'hold') goal = undefined;
@@ -350,7 +359,8 @@ export class Battle {
           const d = dist(u.pos, blocker.pos);
           if (d > CONTACT_M) this.moveTowards(u, blocker.pos, d - CONTACT_M);
           u.facing = bearing(u.pos, blocker.pos);
-          if (u.contact !== blocker.id) events.push({ kind: 'halted', minute: this.minute, unit: u.id, other: blocker.id });
+          if (u.contact !== blocker.id)
+            events.push({ kind: 'halted', minute: this.minute, unit: u.id, other: blocker.id });
           continue;
         }
       }
@@ -363,7 +373,10 @@ export class Battle {
   private ahead(from: Point, to: Point, metres: number): Point {
     const d = dist(from, to);
     if (d <= metres) return { ...to };
-    return { x: from.x + ((to.x - from.x) * metres) / d, y: from.y + ((to.y - from.y) * metres) / d };
+    return {
+      x: from.x + ((to.x - from.x) * metres) / d,
+      y: from.y + ((to.y - from.y) * metres) / d,
+    };
   }
 
   /** Move up to `metres` towards `to`; true when there. */
@@ -401,9 +414,14 @@ export class Battle {
       const reach = u.contact === t.id ? 0.8 : 1 - (1 - LONG_RANGE) * Math.min(1, d / RANGE[u.arm]);
       const die = 1 + Math.floor(this.random() * 6);
       const aspect = Math.abs(angleDiff(t.facing, bearing(t.pos, u.pos))) > Math.PI / 3 ? 1.5 : 1;
-      const cas = u.strength * FIRE_RATE[u.arm] * (die / 3.5) * (0.5 + u.morale / 200) * reach * aspect;
+      const cas =
+        u.strength * FIRE_RATE[u.arm] * (die / 3.5) * (0.5 + u.morale / 200) * reach * aspect;
       lost.set(t.id, (lost.get(t.id) ?? 0) + cas);
-      shock.set(t.id, (shock.get(t.id) ?? 0) + (cas / t.strength) * 100 * MORALE_PER_LOSS_PERCENT * (aspect > 1 ? 1.25 : 1));
+      shock.set(
+        t.id,
+        (shock.get(t.id) ?? 0) +
+          (cas / t.strength) * 100 * MORALE_PER_LOSS_PERCENT * (aspect > 1 ? 1.25 : 1),
+      );
     }
     for (const u of this.units) {
       const cas = lost.get(u.id);
@@ -426,7 +444,8 @@ export class Battle {
       }
       const after = stageOf(u);
       u.stage = after;
-      if (after === 'wavering' && before !== 'wavering') events.push({ kind: 'wavering', minute: this.minute, unit: u.id });
+      if (after === 'wavering' && before !== 'wavering')
+        events.push({ kind: 'wavering', minute: this.minute, unit: u.id });
     }
     for (const u of this.units) if (u.stage !== 'broken') u.stage = stageOf(u);
   }
@@ -442,11 +461,15 @@ export class Battle {
       if (r.side !== 'red' || r.strength <= 0) continue;
       const hidden = woods.some((w) => inPolygon(r.pos, w.points));
       const seen = this.units.some(
-        (b) => b.side === 'blue' && b.strength > 0 && dist(b.pos, r.pos) <= (hidden ? WOOD_SIGHT_M : SIGHT[b.arm]),
+        (b) =>
+          b.side === 'blue' &&
+          b.strength > 0 &&
+          dist(b.pos, r.pos) <= (hidden ? WOOD_SIGHT_M : SIGHT[b.arm]),
       );
       const was = this.known.get(r.id);
       if (seen) {
-        if (!was || was.seenAt < this.minute - 1) events.push({ kind: 'spotted', minute: this.minute, unit: r.id });
+        if (!was || was.seenAt < this.minute - 1)
+          events.push({ kind: 'spotted', minute: this.minute, unit: r.id });
         this.known.set(r.id, {
           id: r.id,
           letter: was?.letter ?? String.fromCharCode(65 + this.known.size),

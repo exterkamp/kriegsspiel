@@ -7,7 +7,14 @@
 
   <section class="board-wrap" aria-label="Board">
     <div class="turnbar" role="group" aria-label="Turn">
-      <button type="button" (click)="step(-1)" [disabled]="turn().n === 0" aria-label="Previous turn">◀</button>
+      <button
+        type="button"
+        (click)="step(-1)"
+        [disabled]="turn().n === 0"
+        aria-label="Previous turn"
+      >
+        ◀
+      </button>
       <span class="turn-label" data-testid="turn-label">
         @if (turn().n === 0) {
           Start, {{ clock(turn().to) }}
@@ -18,7 +25,9 @@
           <span class="ks-muted">(looking back)</span>
         }
       </span>
-      <button type="button" (click)="step(1)" [disabled]="atLatest()" aria-label="Next turn">▶</button>
+      <button type="button" (click)="step(1)" [disabled]="atLatest()" aria-label="Next turn">
+        ▶
+      </button>
       <span class="spacer"></span>
       <button type="button" (click)="zoom(1 / 1.4)" aria-label="Zoom in">+</button>
       <button type="button" (click)="zoom(1.4)" aria-label="Zoom out">−</button>
@@ -44,23 +53,54 @@
       (pointerup)="up()"
     >
       <!-- Ground -->
-      <rect class="ground" x="-2000" y="-2000" [attr.width]="scenario.width + 4000" [attr.height]="scenario.height + 4000" />
-      <rect class="edge" x="0" y="0" [attr.width]="scenario.width" [attr.height]="scenario.height" />
+      <rect
+        class="ground"
+        x="-2000"
+        y="-2000"
+        [attr.width]="scenario.width + 4000"
+        [attr.height]="scenario.height + 4000"
+      />
+      <rect
+        class="edge"
+        x="0"
+        y="0"
+        [attr.width]="scenario.width"
+        [attr.height]="scenario.height"
+      />
       <polygon class="wood" [attr.points]="woodPoints" />
       <polyline class="river" [attr.points]="riverPoints" />
       <polyline class="road" [attr.points]="roadPoints" />
-      <rect class="bridge" [attr.x]="bridge.x - 22" [attr.y]="bridge.y - 50" width="44" height="100" />
-      <text class="place" [attr.x]="2200" [attr.y]="640" [attr.font-size]="cw() * 0.45">Brandt wood</text>
-      <text class="place water" [attr.x]="300" [attr.y]="1020" [attr.font-size]="cw() * 0.45">the Aa</text>
+      <rect
+        class="bridge"
+        [attr.x]="bridge.x - 22"
+        [attr.y]="bridge.y - 50"
+        width="44"
+        height="100"
+      />
+      <text class="place" [attr.x]="2200" [attr.y]="640" [attr.font-size]="cw() * 0.45">
+        Brandt wood
+      </text>
+      <text class="place water" [attr.x]="300" [attr.y]="1020" [attr.font-size]="cw() * 0.45">
+        the Aa
+      </text>
 
       <!-- Trails since last turn: own solid, enemy dashed -->
       @for (t of trails(); track t.id) {
-        <g class="trail" [class.own]="t.own" [class.enemy]="!t.own" [class.dim]="selected() && selected() !== t.id">
+        <g
+          class="trail"
+          [class.own]="t.own"
+          [class.enemy]="!t.own"
+          [class.dim]="selected() && selected() !== t.id"
+        >
           <polyline class="casing" [attr.points]="t.points" vector-effect="non-scaling-stroke" />
           <polyline class="line" [attr.points]="t.points" vector-effect="non-scaling-stroke" />
           <polygon
-            [attr.transform]="'translate(' + t.head.x + ' ' + t.head.y + ') rotate(' + t.angle + ')'"
-            [attr.points]="'0,0 ' + -cw() * 0.42 + ',' + -cw() * 0.2 + ' ' + -cw() * 0.42 + ',' + cw() * 0.2"
+            [attr.transform]="
+              'translate(' + t.head.x + ' ' + t.head.y + ') rotate(' + t.angle + ')'
+            "
+            [attr.points]="
+              '0,0 ' + -cw() * 0.42 + ',' + -cw() * 0.2 + ' ' + -cw() * 0.42 + ',' + cw() * 0.2
+            "
           />
         </g>
       }
@@ -79,16 +119,39 @@
       @if (variants().enemy === 'strong') {
         @for (p of pieces(); track p.id) {
           @if (!p.own && !p.seen) {
-            <circle class="uncertain" [attr.cx]="p.true.x" [attr.cy]="p.true.y" [attr.r]="uncertainty(p)" vector-effect="non-scaling-stroke" />
+            <circle
+              class="uncertain"
+              [attr.cx]="p.true.x"
+              [attr.cy]="p.true.y"
+              [attr.r]="uncertainty(p)"
+              vector-effect="non-scaling-stroke"
+            />
           }
         }
       }
 
       <!-- Contact lines -->
       @for (c of contacts(); track c.key) {
-        <g class="contact" [attr.transform]="'translate(' + c.mid.x + ' ' + c.mid.y + ') rotate(' + c.angle + ')'">
-          <line class="casing" [attr.x1]="0" [attr.y1]="-cw() * 0.75" [attr.x2]="0" [attr.y2]="cw() * 0.75" vector-effect="non-scaling-stroke" />
-          <line class="front" [attr.x1]="0" [attr.y1]="-cw() * 0.75" [attr.x2]="0" [attr.y2]="cw() * 0.75" vector-effect="non-scaling-stroke" />
+        <g
+          class="contact"
+          [attr.transform]="'translate(' + c.mid.x + ' ' + c.mid.y + ') rotate(' + c.angle + ')'"
+        >
+          <line
+            class="casing"
+            [attr.x1]="0"
+            [attr.y1]="-cw() * 0.75"
+            [attr.x2]="0"
+            [attr.y2]="cw() * 0.75"
+            vector-effect="non-scaling-stroke"
+          />
+          <line
+            class="front"
+            [attr.x1]="0"
+            [attr.y1]="-cw() * 0.75"
+            [attr.x2]="0"
+            [attr.y2]="cw() * 0.75"
+            vector-effect="non-scaling-stroke"
+          />
         </g>
       }
 
@@ -110,7 +173,9 @@
             (keydown.enter)="clickPiece($any($event), p)"
           >
             <rect
-              [attr.transform]="'translate(' + p.at.x + ' ' + p.at.y + ') rotate(' + deg(p.facing) + ')'"
+              [attr.transform]="
+                'translate(' + p.at.x + ' ' + p.at.y + ') rotate(' + deg(p.facing) + ')'
+              "
               [attr.x]="-footprint(p).w / 2"
               [attr.y]="-footprint(p).h / 2"
               [attr.width]="footprint(p).w"
@@ -118,7 +183,14 @@
               vector-effect="non-scaling-stroke"
             />
             @if (variants().pieces === 'labels') {
-              <rect class="tag" [attr.x]="p.at.x - 105" [attr.y]="p.at.y + 45" width="210" height="52" vector-effect="non-scaling-stroke" />
+              <rect
+                class="tag"
+                [attr.x]="p.at.x - 105"
+                [attr.y]="p.at.y + 45"
+                width="210"
+                height="52"
+                vector-effect="non-scaling-stroke"
+              />
               <text class="tag-text" [attr.x]="p.at.x" [attr.y]="p.at.y + 80" font-size="28">
                 {{ p.own ? p.name : p.age === 0 ? 'just now' : p.age + 'm old' }}
               </text>
@@ -136,7 +208,12 @@
             [attr.transform]="'translate(' + p.at.x + ' ' + p.at.y + ')'"
             role="button"
             tabindex="0"
-            [attr.aria-label]="(p.own ? '' : p.seen ? 'Seen: ' : 'Last seen ' + p.age + ' minutes ago: ') + p.name + ', ' + stageName[p.stage]"
+            [attr.aria-label]="
+              (p.own ? '' : p.seen ? 'Seen: ' : 'Last seen ' + p.age + ' minutes ago: ') +
+              p.name +
+              ', ' +
+              stageName[p.stage]
+            "
             [attr.data-unit]="p.id"
             (click)="clickPiece($event, p)"
             (keydown.enter)="clickPiece($any($event), p)"
@@ -144,23 +221,60 @@
             (mouseleave)="hovered.set(null)"
           >
             @if (p.at.x !== p.true.x || p.at.y !== p.true.y) {
-              <line class="leader" x1="0" y1="0" [attr.x2]="p.true.x - p.at.x" [attr.y2]="p.true.y - p.at.y" vector-effect="non-scaling-stroke" />
-              <circle class="leader-dot" [attr.cx]="p.true.x - p.at.x" [attr.cy]="p.true.y - p.at.y" [attr.r]="cw() * 0.06" />
+              <line
+                class="leader"
+                x1="0"
+                y1="0"
+                [attr.x2]="p.true.x - p.at.x"
+                [attr.y2]="p.true.y - p.at.y"
+                vector-effect="non-scaling-stroke"
+              />
+              <circle
+                class="leader-dot"
+                [attr.cx]="p.true.x - p.at.x"
+                [attr.cy]="p.true.y - p.at.y"
+                [attr.r]="cw() * 0.06"
+              />
             }
             <!-- Facing: a small wedge outside the counter on the side the unit faces -->
             <polygon
               class="facing"
               [attr.transform]="'rotate(' + deg(p.facing) + ')'"
               [attr.points]="
-                -cw() * 0.14 + ',' + -ch() * 0.62 + ' ' + cw() * 0.14 + ',' + -ch() * 0.62 + ' 0,' + -ch() * 0.95
+                -cw() * 0.14 +
+                ',' +
+                -ch() * 0.62 +
+                ' ' +
+                cw() * 0.14 +
+                ',' +
+                -ch() * 0.62 +
+                ' 0,' +
+                -ch() * 0.95
               "
             />
             @if (p.own) {
-              <rect class="body" [attr.x]="-cw() / 2" [attr.y]="-ch() / 2" [attr.width]="cw()" [attr.height]="ch()" vector-effect="non-scaling-stroke" />
+              <rect
+                class="body"
+                [attr.x]="-cw() / 2"
+                [attr.y]="-ch() / 2"
+                [attr.width]="cw()"
+                [attr.height]="ch()"
+                vector-effect="non-scaling-stroke"
+              />
             } @else {
               <polygon
                 class="body"
-                [attr.points]="'0,' + -ch() * 0.8 + ' ' + cw() * 0.6 + ',0 0,' + ch() * 0.8 + ' ' + -cw() * 0.6 + ',0'"
+                [attr.points]="
+                  '0,' +
+                  -ch() * 0.8 +
+                  ' ' +
+                  cw() * 0.6 +
+                  ',0 0,' +
+                  ch() * 0.8 +
+                  ' ' +
+                  -cw() * 0.6 +
+                  ',0'
+                "
                 vector-effect="non-scaling-stroke"
               />
             }
@@ -172,8 +286,38 @@
                   vector-effect="non-scaling-stroke"
                   [attr.d]="
                     p.own
-                      ? 'M' + -cw() / 2 + ' ' + -ch() / 2 + 'L' + cw() / 2 + ' ' + ch() / 2 + 'M' + cw() / 2 + ' ' + -ch() / 2 + 'L' + -cw() / 2 + ' ' + ch() / 2
-                      : 'M' + -cw() * 0.3 + ' ' + -ch() * 0.4 + 'L' + cw() * 0.3 + ' ' + ch() * 0.4 + 'M' + cw() * 0.3 + ' ' + -ch() * 0.4 + 'L' + -cw() * 0.3 + ' ' + ch() * 0.4
+                      ? 'M' +
+                        -cw() / 2 +
+                        ' ' +
+                        -ch() / 2 +
+                        'L' +
+                        cw() / 2 +
+                        ' ' +
+                        ch() / 2 +
+                        'M' +
+                        cw() / 2 +
+                        ' ' +
+                        -ch() / 2 +
+                        'L' +
+                        -cw() / 2 +
+                        ' ' +
+                        ch() / 2
+                      : 'M' +
+                        -cw() * 0.3 +
+                        ' ' +
+                        -ch() * 0.4 +
+                        'L' +
+                        cw() * 0.3 +
+                        ' ' +
+                        ch() * 0.4 +
+                        'M' +
+                        cw() * 0.3 +
+                        ' ' +
+                        -ch() * 0.4 +
+                        'L' +
+                        -cw() * 0.3 +
+                        ' ' +
+                        ch() * 0.4
                   "
                 />
               }
@@ -181,7 +325,11 @@
                 <path
                   class="sym"
                   vector-effect="non-scaling-stroke"
-                  [attr.d]="p.own ? 'M' + -cw() / 2 + ' ' + ch() / 2 + 'L' + cw() / 2 + ' ' + -ch() / 2 : 'M' + -cw() * 0.3 + ' ' + ch() * 0.4 + 'L' + cw() * 0.3 + ' ' + -ch() * 0.4"
+                  [attr.d]="
+                    p.own
+                      ? 'M' + -cw() / 2 + ' ' + ch() / 2 + 'L' + cw() / 2 + ' ' + -ch() / 2
+                      : 'M' + -cw() * 0.3 + ' ' + ch() * 0.4 + 'L' + cw() * 0.3 + ' ' + -ch() * 0.4
+                  "
                 />
               }
               @case ('artillery') {
@@ -190,8 +338,20 @@
             }
             @if (p.own) {
               <!-- Strength: a bar under the counter, full at the unit's starting strength -->
-              <rect class="str-bg" [attr.x]="-cw() / 2" [attr.y]="ch() / 2 + ch() * 0.1" [attr.width]="cw()" [attr.height]="ch() * 0.16" />
-              <rect class="str" [attr.x]="-cw() / 2" [attr.y]="ch() / 2 + ch() * 0.1" [attr.width]="cw() * p.strength!" [attr.height]="ch() * 0.16" />
+              <rect
+                class="str-bg"
+                [attr.x]="-cw() / 2"
+                [attr.y]="ch() / 2 + ch() * 0.1"
+                [attr.width]="cw()"
+                [attr.height]="ch() * 0.16"
+              />
+              <rect
+                class="str"
+                [attr.x]="-cw() / 2"
+                [attr.y]="ch() / 2 + ch() * 0.1"
+                [attr.width]="cw() * p.strength!"
+                [attr.height]="ch() * 0.16"
+              />
             }
             @if (p.stage !== 'fresh') {
               <!-- Fight stage: a pip on the corner (engaged, losses, wavering, broken) -->
@@ -204,12 +364,28 @@
               />
             }
             @if (!p.own && !p.seen) {
-              <text class="age" [attr.x]="0" [attr.y]="-ch() * 0.95" [attr.font-size]="ch() * 0.55">{{ p.age }}′ ago</text>
+              <text class="age" [attr.x]="0" [attr.y]="-ch() * 0.95" [attr.font-size]="ch() * 0.55">
+                {{ p.age }}′ ago
+              </text>
             }
             @if (selected() === p.id || hovered() === p.id || (detail() === 'near' && p.own)) {
-              <text class="name" [attr.x]="labelAt(p).x" [attr.y]="labelAt(p).y" [attr.font-size]="ch() * 0.55">{{ p.name }}</text>
+              <text
+                class="name"
+                [attr.x]="labelAt(p).x"
+                [attr.y]="labelAt(p).y"
+                [attr.font-size]="ch() * 0.55"
+              >
+                {{ p.name }}
+              </text>
             } @else if (detail() !== 'far') {
-              <text class="short" [attr.x]="labelAt(p).x" [attr.y]="labelAt(p).y" [attr.font-size]="ch() * 0.55">{{ p.short }}</text>
+              <text
+                class="short"
+                [attr.x]="labelAt(p).x"
+                [attr.y]="labelAt(p).y"
+                [attr.font-size]="ch() * 0.55"
+              >
+                {{ p.short }}
+              </text>
             }
           </g>
         }
@@ -223,7 +399,12 @@
       <li><span class="key trail-own"></span> Our move this turn</li>
       <li><span class="key trail-enemy"></span> Enemy move seen</li>
       <li><span class="key contact"></span> Contact line</li>
-      <li><span class="key pip stage-engaged"></span> Engaged <span class="key pip stage-losses"></span> Losses <span class="key pip stage-wavering"></span> Wavering <span class="key pip stage-broken"></span> Broken</li>
+      <li>
+        <span class="key pip stage-engaged"></span> Engaged
+        <span class="key pip stage-losses"></span> Losses
+        <span class="key pip stage-wavering"></span> Wavering
+        <span class="key pip stage-broken"></span> Broken
+      </li>
     </ul>
   </section>
 
@@ -234,12 +415,16 @@
 
     @if (selectedOwn(); as u) {
       <section class="panel" aria-labelledby="unit-h" data-testid="unit-panel">
-        <h2 id="unit-h">{{ u.name }} <span class="ks-muted">{{ u.short }}</span></h2>
+        <h2 id="unit-h">
+          {{ u.name }} <span class="ks-muted">{{ u.short }}</span>
+        </h2>
         <dl class="facts">
           <dt>Arm</dt>
           <dd>{{ armName[u.arm] }}</dd>
           <dt>State</dt>
-          <dd><span [class]="'pip-inline stage-' + stageOf(u)"></span> {{ stageName[stageOf(u)] }}</dd>
+          <dd>
+            <span [class]="'pip-inline stage-' + stageOf(u)"></span> {{ stageName[stageOf(u)] }}
+          </dd>
           <dt>Strength</dt>
           <dd>{{ u.strength | number: '1.0-0' }} of {{ u.startStrength }}</dd>
           <dt>Morale</dt>
@@ -256,7 +441,12 @@
           <h3>Order for next turn</h3>
           <div class="verbs" role="group" aria-label="Order">
             @for (v of verbs; track v) {
-              <button type="button" [attr.aria-pressed]="shownOrder()?.verb === v && (draft() || pending()[u.id])" [attr.data-verb]="v" (click)="setVerb(v)">
+              <button
+                type="button"
+                [attr.aria-pressed]="shownOrder()?.verb === v && (draft() || pending()[u.id])"
+                [attr.data-verb]="v"
+                (click)="setVerb(v)"
+              >
                 {{ v }}
               </button>
             }
@@ -264,17 +454,35 @@
           <p class="ks-muted help">{{ verbHelp[shownOrder()?.verb ?? 'move'] }}</p>
           <label class="note">
             Note to the umpire (optional)
-            <textarea rows="2" [value]="shownOrder()?.note ?? ''" (change)="setNote($any($event.target).value)"></textarea>
+            <textarea
+              rows="2"
+              [value]="shownOrder()?.note ?? ''"
+              (change)="setNote($any($event.target).value)"
+            ></textarea>
           </label>
           @if (draft(); as d) {
-            <p class="intent"><strong>{{ orderLine(d) }}</strong></p>
-            <p class="intent ks-muted"><code>{{ intent(d) }}</code></p>
+            <p class="intent">
+              <strong>{{ orderLine(d) }}</strong>
+            </p>
+            <p class="intent ks-muted">
+              <code>{{ intent(d) }}</code>
+            </p>
             <p class="row">
-              <button type="button" class="ks-primary" data-testid="give-order" (click)="giveOrder()" [disabled]="d.verb !== 'hold' && !d.waypoints.length && !d.target">Give order</button>
+              <button
+                type="button"
+                class="ks-primary"
+                data-testid="give-order"
+                (click)="giveOrder()"
+                [disabled]="d.verb !== 'hold' && !d.waypoints.length && !d.target"
+              >
+                Give order
+              </button>
               <button type="button" class="ks-quiet" (click)="cancelDraft()">Cancel</button>
             </p>
           } @else if (pending()[u.id]; as o) {
-            <p class="intent">Held for next turn: <strong>{{ orderLine(o) }}</strong></p>
+            <p class="intent">
+              Held for next turn: <strong>{{ orderLine(o) }}</strong>
+            </p>
           }
         }
       </section>
@@ -285,7 +493,13 @@
           <dt>Size</dt>
           <dd>{{ c.size[0] }}–{{ c.size[1] }} (estimate)</dd>
           <dt>Seen</dt>
-          <dd>{{ c.seenAt === turn().to ? 'Now' : clock(c.seenAt) + ', ' + (turn().to - c.seenAt) + ' min ago' }}</dd>
+          <dd>
+            {{
+              c.seenAt === turn().to
+                ? 'Now'
+                : clock(c.seenAt) + ', ' + (turn().to - c.seenAt) + ' min ago'
+            }}
+          </dd>
           <dt>Where</dt>
           <dd>{{ placeName(scenario, c.pos) }}</dd>
           <dt>State</dt>
@@ -298,7 +512,12 @@
 
     <section class="panel report" aria-labelledby="cos-h" data-testid="report">
       <h2 id="cos-h">
-        <button type="button" class="ks-quiet" [attr.aria-expanded]="reportOpen()" (click)="reportOpen.set(!reportOpen())">
+        <button
+          type="button"
+          class="ks-quiet"
+          [attr.aria-expanded]="reportOpen()"
+          (click)="reportOpen.set(!reportOpen())"
+        >
           Chief of staff {{ reportOpen() ? '▾' : '▸' }}
         </button>
       </h2>
@@ -307,13 +526,33 @@
           <p class="ks-muted">{{ r.heading }}</p>
           <p class="gist">{{ r.gist }}</p>
           @for (para of r.paragraphs; track $index) {
-            <p>@for (piece of para; track $index) {@if (piece.unit) {<button type="button" class="unit-link" (click)="find(piece.unit)">{{ piece.text }}</button>} @else {<span>{{ piece.text }}</span>}}</p>
+            <p>
+              @for (piece of para; track $index) {
+                @if (piece.unit) {
+                  <button type="button" class="unit-link" (click)="find(piece.unit)">
+                    {{ piece.text }}
+                  </button>
+                } @else {
+                  <span>{{ piece.text }}</span>
+                }
+              }
+            </p>
           }
           @if (r.enemy.length) {
             <h3>Enemy</h3>
             <ul class="enemy-list">
               @for (line of r.enemy; track $index) {
-                <li>@for (piece of line; track $index) {@if (piece.unit) {<button type="button" class="unit-link" (click)="find(piece.unit)">{{ piece.text }}</button>} @else {<span>{{ piece.text }}</span>}}</li>
+                <li>
+                  @for (piece of line; track $index) {
+                    @if (piece.unit) {
+                      <button type="button" class="unit-link" (click)="find(piece.unit)">
+                        {{ piece.text }}
+                      </button>
+                    } @else {
+                      <span>{{ piece.text }}</span>
+                    }
+                  }
+                </li>
               }
             </ul>
           }
@@ -327,23 +566,87 @@
       <h2 id="var-h">Variants</h2>
       <fieldset>
         <legend>Pieces</legend>
-        <label><input type="radio" name="pieces" [checked]="variants().pieces === 'counters'" (change)="setVariant('pieces', 'counters')" /> Counters</label>
-        <label><input type="radio" name="pieces" [checked]="variants().pieces === 'labels'" (change)="setVariant('pieces', 'labels')" /> Labels (now)</label>
+        <label
+          ><input
+            type="radio"
+            name="pieces"
+            [checked]="variants().pieces === 'counters'"
+            (change)="setVariant('pieces', 'counters')"
+          />
+          Counters</label
+        >
+        <label
+          ><input
+            type="radio"
+            name="pieces"
+            [checked]="variants().pieces === 'labels'"
+            (change)="setVariant('pieces', 'labels')"
+          />
+          Labels (now)</label
+        >
       </fieldset>
       <fieldset>
         <legend>Trails</legend>
-        <label><input type="radio" name="trails" [checked]="variants().trails === 'on'" (change)="setVariant('trails', 'on')" /> On</label>
-        <label><input type="radio" name="trails" [checked]="variants().trails === 'off'" (change)="setVariant('trails', 'off')" /> Off (now)</label>
+        <label
+          ><input
+            type="radio"
+            name="trails"
+            [checked]="variants().trails === 'on'"
+            (change)="setVariant('trails', 'on')"
+          />
+          On</label
+        >
+        <label
+          ><input
+            type="radio"
+            name="trails"
+            [checked]="variants().trails === 'off'"
+            (change)="setVariant('trails', 'off')"
+          />
+          Off (now)</label
+        >
       </fieldset>
       <fieldset>
         <legend>Contact</legend>
-        <label><input type="radio" name="contact" [checked]="variants().contact === 'line'" (change)="setVariant('contact', 'line')" /> Stop at {{ contactM }} m</label>
-        <label><input type="radio" name="contact" [checked]="variants().contact === 'overlap'" (change)="setVariant('contact', 'overlap')" /> March through (now)</label>
+        <label
+          ><input
+            type="radio"
+            name="contact"
+            [checked]="variants().contact === 'line'"
+            (change)="setVariant('contact', 'line')"
+          />
+          Stop at {{ contactM }} m</label
+        >
+        <label
+          ><input
+            type="radio"
+            name="contact"
+            [checked]="variants().contact === 'overlap'"
+            (change)="setVariant('contact', 'overlap')"
+          />
+          March through (now)</label
+        >
       </fieldset>
       <fieldset>
         <legend>Enemy</legend>
-        <label><input type="radio" name="enemy" [checked]="variants().enemy === 'strong'" (change)="setVariant('enemy', 'strong')" /> Seen / last known</label>
-        <label><input type="radio" name="enemy" [checked]="variants().enemy === 'ghost'" (change)="setVariant('enemy', 'ghost')" /> Grey ghost (now)</label>
+        <label
+          ><input
+            type="radio"
+            name="enemy"
+            [checked]="variants().enemy === 'strong'"
+            (change)="setVariant('enemy', 'strong')"
+          />
+          Seen / last known</label
+        >
+        <label
+          ><input
+            type="radio"
+            name="enemy"
+            [checked]="variants().enemy === 'ghost'"
+            (change)="setVariant('enemy', 'ghost')"
+          />
+          Grey ghost (now)</label
+        >
       </fieldset>
     </section>
   </aside>

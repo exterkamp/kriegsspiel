@@ -40,8 +40,12 @@ describe('board spike sim', () => {
     const stages = b.turns.map((t) => stageOf(unit(t, 'b1')));
     expect(stages).toContain('losses');
     expect(stages).toContain('wavering');
-    const broke = b.turns.flatMap((t) => t.events).find((e) => e.kind === 'broken' && e.unit === 'b1');
-    const met = b.turns.flatMap((t) => t.events).find((e) => e.kind === 'contact' && e.unit === 'b1');
+    const broke = b.turns
+      .flatMap((t) => t.events)
+      .find((e) => e.kind === 'broken' && e.unit === 'b1');
+    const met = b.turns
+      .flatMap((t) => t.events)
+      .find((e) => e.kind === 'contact' && e.unit === 'b1');
     expect(met).toBeDefined();
     expect(broke).toBeDefined();
     // The owner's target: a fight should last roughly 20 to 40 minutes before a unit breaks.
@@ -90,7 +94,9 @@ describe('chief of staff report', () => {
     expect(r.heading).toBe('Turn 3, 10:20 to 10:30');
     expect(r.gist).toMatch(/1st Battalion is wavering/);
     const text = r.paragraphs.map((p) => p.map((x) => x.text).join('')).join('\n');
-    expect(text).toMatch(/1st Battalion is fighting enemy infantry [A-Z] \(\d+–\d+\) [^;]*; lost \d+ men, it is wavering\./);
+    expect(text).toMatch(
+      /1st Battalion is fighting enemy infantry [A-Z] \(\d+–\d+\) [^;]*; lost \d+ men, it is wavering\./,
+    );
     const linked = r.paragraphs.flat().filter((x) => x.unit);
     expect(linked.map((x) => x.unit)).toEqual(expect.arrayContaining(['b1', 'r1']));
     // Never the enemy's own name or strength.
