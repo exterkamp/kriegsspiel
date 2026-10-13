@@ -9,9 +9,9 @@
  * names, the same pure function replay calls on the logged output, so a live turn and its replay
  * cannot differ. Only after that does the actor advance the clock to the turn's end.
  *
- * 11.4 (#400) registers the engine adjudicator and 11.6 (#402) the umpire's. Until then the
- * default resolver is `none`: the sent orders are logged but not carried out, and units go on with
- * their last orders through the turn.
+ * The engine adjudicator (`engine`, 11.4, `engineTurn.ts`) resolves a turn by the rigid rules
+ * with no model; `GameHost` uses its resolver unless told otherwise. 11.6 (#402) adds the umpire's.
+ * `none` logs the sent orders without carrying them out (units go on with their last orders).
  */
 import {
   type EngineState,
@@ -21,6 +21,7 @@ import {
 } from '@kriegsspiel/engine';
 import { MAX_TURN_ORDERS, type TurnCause, type TurnOrder } from '@kriegsspiel/protocol';
 import type { UmpireCallRecord } from '../umpire/umpireClient.js';
+import { ENGINE_ADJUDICATOR, engineAdjudicator } from './engineTurn.js';
 import type { InputLogEntry, SentTurnOrder, TurnRecord } from './store.js';
 
 /** What a resolver is given when a turn closes. */
@@ -64,10 +65,13 @@ export type TurnAdjudicator = (
   context: { gameId: string; registry: EventRegistry<GameState> },
 ) => EngineState<GameState>;
 
-/** The adjudicator of the default resolver: orders are logged, not carried out (until 11.4). */
+/** The adjudicator that changes nothing: orders are logged, not carried out. */
 export const NO_ADJUDICATOR = 'none';
 
-const adjudicators = new Map<string, TurnAdjudicator>([[NO_ADJUDICATOR, (state) => state]]);
+const adjudicators = new Map<string, TurnAdjudicator>([
+  [NO_ADJUDICATOR, (state) => state],
+  [ENGINE_ADJUDICATOR, engineAdjudicator],
+]);
 
 /** Make an adjudicator known to live play and replay by the name a resolver logs. */
 export function registerTurnAdjudicator(name: string, apply: TurnAdjudicator): void {
@@ -85,7 +89,7 @@ export function applyTurn(
   return apply(state, turn, context);
 }
 
-/** The default resolver until 11.4: no model, no change; units carry on with their last orders. */
+/** A resolver that changes nothing: no model, no change; units carry on with their last orders. */
 export const NO_ORDERS_RESOLVER: TurnResolver = {
   resolve: async () => ({ adjudicator: NO_ADJUDICATOR }),
 };

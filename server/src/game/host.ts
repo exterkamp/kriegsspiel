@@ -26,6 +26,7 @@ import type {
 } from '@kriegsspiel/protocol';
 import { turnSettingsOf } from '@kriegsspiel/protocol';
 import type { GameStore, InputLogEntry } from './store.js';
+import { EngineTurnResolver } from './engineTurn.js';
 import { openTurnFromLog, sentTurnIdsFromLog, type TurnResolver } from './turns.js';
 
 /** Each side's deputy settings (the last set) and the account of its turns, from a game's whole input log (D6f). */
@@ -88,7 +89,7 @@ export interface GameHostOptions {
   deputyAway?: (gameId: string, side: string, seat: Seat | undefined) => boolean;
   /** Pause voting for a game: who votes and the host's rules. Unset: players cannot vote to pause. Never used in turn mode. */
   pause?: (id: string, world: GameState) => PauseConfig | undefined;
-  /** Resolves a turn-mode game's turns (D39). Unset: `NO_ORDERS_RESOLVER` (until 11.4). */
+  /** Resolves a turn-mode game's turns (D39). Unset, or undefined for a game: the engine (`EngineTurnResolver`). */
   turnResolver?: (gameId: string, settings: UmpireSettings) => TurnResolver | undefined;
 }
 
@@ -140,11 +141,12 @@ export class GameHost {
   private turnsFor(id: string, settings: UmpireSettings | undefined) {
     const turn = turnSettingsOf(settings);
     if (!turn || !settings) return undefined;
-    const resolver = this.options.turnResolver?.(id, settings);
+    const resolver =
+      this.options.turnResolver?.(id, settings) ?? new EngineTurnResolver(this.options.registry);
     return {
       turnMs: turn.turnMinutes * 60_000,
       ...(turn.turnDeadlineHours === undefined ? {} : { deadlineHours: turn.turnDeadlineHours }),
-      ...(resolver ? { resolver } : {}),
+      resolver,
     };
   }
 
