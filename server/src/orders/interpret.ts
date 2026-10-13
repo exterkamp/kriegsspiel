@@ -1,6 +1,6 @@
 /**
  * The `interpret` task of the parse stage: how a subordinate's character colours an order
- * (docs/design.md, Subordinate personalities; D14c). It runs after `parseOrders` has said what the
+ * (docs/design.md, Subordinate personalities; D36). It runs after `parseOrders` has said what the
  * order means, and only for a unit whose commander has traits.
  *
  * The model proposes; this file and the engine decide. Its answer is one of four actions:

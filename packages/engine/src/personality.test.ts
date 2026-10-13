@@ -115,7 +115,12 @@ function run(personality: Trait[], interpretation?: Interpretation, seed = 1) {
   });
   const r = advanceTo(s, 6 * 60 * 60_000, registry());
   const unit = r.state.world.units.find((x) => x.id === 'blue-1')!;
-  return { y: unit.center.y, events: r.emitted.map((e) => e.type), world: r.state.world };
+  return {
+    y: unit.center.y,
+    events: r.emitted.map((e) => e.type),
+    world: r.state.world,
+    rng: r.state.rng,
+  };
 }
 
 describe('the same order, different commanders', () => {
@@ -138,8 +143,8 @@ describe('the same order, different commanders', () => {
   });
 
   it('draws one die whatever the traits, so later rolls do not depend on them', () => {
-    const a = run(['literal'], exceed(300)).world.rng;
-    const b = run(['aggressive'], exceed(300)).world.rng;
+    const a = run(['literal'], exceed(300)).rng;
+    const b = run(['aggressive'], exceed(300)).rng;
     expect(a).toEqual(b);
   });
 

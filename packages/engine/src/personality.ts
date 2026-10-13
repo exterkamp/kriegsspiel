@@ -2,7 +2,7 @@ import type { OrderIntent } from './orders.js';
 import type { Point, Unit } from './types.js';
 
 /**
- * Subordinate personalities (D14c, docs/design.md). A commander's traits are master state: they
+ * Subordinate personalities (D36, docs/design.md). A commander's traits are master state: they
  * are never sent to a player, who learns them from behaviour and reputation. The umpire's
  * `interpret` task proposes how a unit reads an order; `shapeIntents` is the only place that
  * proposal can touch the game, and it holds it to the limits below.
