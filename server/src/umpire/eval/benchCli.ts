@@ -8,12 +8,14 @@
  *   --import <dir> --model <label>        score a Claude Code pane's answers in <dir>
  *   --blind <dir> --key <file>            write the blind grading packet (letters, not names)
  *   --report [--grades <file> --key <file>]  join checks, grades and models.json into a table
+ *                                         (default grades <out>/grading/grades.json)
  *   --rescore                             re-apply the current checks to every saved raw output
  *
  * Common: --out <dir> (default bench/umpire), --cases a,b (a subset), --num-ctx <n> (Ollama).
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { request } from 'node:http';
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import { join } from 'node:path';
 import { AnthropicProvider } from '../providers/anthropic.js';
 import { OllamaProvider } from '../providers/ollama.js';
@@ -63,9 +65,11 @@ const line = (r: CaseRun) => {
  * A fetch over `node:http` with no header timeout. Node's fetch (undici) gives up after 300 s
  * without response headers, and a non-streamed Ollama answer sends none until it is done, which
  * a 7B model on this CPU host takes longer than. The call's own `AbortSignal` still applies.
+ * `https:` URLs (an Ollama behind a TLS proxy) go over `node:https`.
  */
 const patientFetch: FetchFn = (input, init) =>
   new Promise((resolve, reject) => {
+    const request = new URL(String(input)).protocol === 'https:' ? httpsRequest : httpRequest;
     const req = request(
       String(input),
       {
@@ -131,9 +135,12 @@ if (has('export')) {
   }
 } else if (has('report')) {
   const metaFile = join(out, 'models.json');
+  const gradesFile = arg('grades') ?? join(out, 'grading', 'grades.json');
+  if (!existsSync(gradesFile))
+    console.warn(`no grades at ${gradesFile}: the rubric columns will be empty`);
   const rows = summarise(
     loadRuns(out),
-    readJson<Grades>(arg('grades') ?? join(out, 'grades.json'), {}),
+    readJson<Grades>(gradesFile, {}),
     readJson<Record<string, string>>(arg('key') ?? join(out, 'blind-key.json'), {}),
     readJson<Record<string, ModelMeta>>(metaFile, {}),
   );

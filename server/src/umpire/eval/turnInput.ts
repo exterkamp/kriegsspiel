@@ -1,10 +1,13 @@
 /**
  * Builds a benchmark case's world, its engine projection and the umpire's input (#398).
  *
- * The projection stands in for 11.4's (#400), which does not exist yet: the case's rules-parsed
- * orders are given to their units at their courier-pass arrival minute (no courier rolls: the
- * case fixes the courier results, as D39's courier pass does), and the world advances from `T0`
- * to `T1` under the ordinary handlers on the scenario seed. Pure and deterministic.
+ * The projection was written before 11.4's (`engineTurn.projectTurn`, #400) landed: the case's
+ * rules-parsed orders are given to their units at their courier-pass arrival minute (no courier
+ * rolls: the case fixes the courier results, as D39's courier pass does), and the world advances
+ * from `T0` to `T1` under the ordinary handlers on the scenario seed. Pure and deterministic. It
+ * differs from 11.4's: `advanceTo`, not `advanceUntilOver` (it does not stop at an outcome); its
+ * own `benchRegistry`, not the server's (no placement, turn or judgment handlers); no scripted
+ * sides thinking (#430); and no rules parse or courier pass. Moving onto 11.4's is #440.
  */
 import {
   EventRegistry,

@@ -4,10 +4,11 @@
  *
  * - `schema`: D39's `TurnProposal` zod schema (if it fails, nothing else is checked).
  * - `ids`: the turn matches; every unit id is known and appears once; every unit not destroyed
- *   at `T0` appears; each order id was sent to that unit; `not-arrived` exactly for an order still
- *   on the road.
+ *   at `T0` appears; each order id was sent to that unit and every order sent to it has a result;
+ *   `not-arrived` exactly for an order still on the road.
  * - `limits`: the hard limits of D39 "Validation and clamps": the march (`validatePlacement` from
- *   the `T0` position over the turn), `0 <= strength <= T0 strength` with 0 meaning destroyed,
+ *   the `T0` position over the whole turn, whatever minute the unit's orders arrived: deliberately
+ *   coarse, as D39 words it), `0 <= strength <= T0 strength` with 0 meaning destroyed,
  *   morale, fatigue and ammunition in 0..100, and no loss for a unit no enemy could reach in the turn.
  * - `ammo`: D39's ceiling, ammunition no higher than the projection's. Kept apart from `limits`
  *   because it also fails an umpire that has a unit fire less than the engine did (see the docs).
@@ -133,11 +134,15 @@ export function checkProposal(c: TurnCase, raw: unknown): CheckResult {
   // ids and orders
   if (p.turn !== c.turn) problems.ids.push(`turn is ${p.turn}, not ${c.turn}`);
   const seen = new Set<string>();
+  const dupes = new Set<string>();
   for (const o of p.units) {
     if (!byId.has(o.unitId)) problems.ids.push(`unknown unit "${o.unitId}"`);
     else if (byId.get(o.unitId)!.status === 'destroyed')
       problems.ids.push(`${o.unitId} was destroyed`);
-    if (seen.has(o.unitId)) problems.ids.push(`${o.unitId} appears twice`);
+    if (seen.has(o.unitId)) {
+      problems.ids.push(`${o.unitId} appears twice`);
+      dupes.add(o.unitId);
+    }
     seen.add(o.unitId);
     for (const r of o.orders) {
       const order = c.orders.find((x) => x.orderId === r.orderId);
@@ -152,12 +157,14 @@ export function checkProposal(c: TurnCase, raw: unknown): CheckResult {
         );
       }
     }
+    for (const order of c.orders.filter((x) => x.to === o.unitId)) {
+      if (!o.orders.some((r) => r.orderId === order.orderId))
+        problems.ids.push(`${o.unitId}: order ${order.orderId} has no result`);
+    }
   }
   for (const u of alive) if (!seen.has(u.id)) problems.ids.push(`${u.id} is missing`);
 
-  const outcomes = p.units.filter(
-    (o) => byId.has(o.unitId) && !problems.ids.includes(`${o.unitId} appears twice`),
-  );
+  const outcomes = p.units.filter((o) => byId.has(o.unitId) && !dupes.has(o.unitId));
   const end = new Map<string, Unit>(
     outcomes.map((o) => [o.unitId, placedAt(byId.get(o.unitId)!, o)]),
   );

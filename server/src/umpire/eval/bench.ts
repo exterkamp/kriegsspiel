@@ -6,7 +6,7 @@
  * The CLI is `benchCli.ts`; docs/umpire-benchmark.md has the procedure.
  */
 import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import type { LlmProvider } from '../provider.js';
 import { CHECKS, checkProposal, type CheckName, type CheckResult } from './turnChecks.js';
 import { TURN_CASES, type TurnCase } from './turnCases.js';
@@ -231,6 +231,8 @@ function shuffled<T>(xs: T[], seed: string): T[] {
  * which must be outside `dir`.
  */
 export function blindPacket(dir: string, keyFile: string, runs: Map<string, CaseRun[]>): void {
+  if (resolve(keyFile).startsWith(resolve(dir) + sep))
+    throw new Error(`the key ${keyFile} must be outside the packet directory ${dir}`);
   mkdirSync(dir, { recursive: true });
   const models = shuffled([...runs.keys()].sort(), 'umpire-bench-v0');
   const letters = new Map(models.map((m, i) => [m, String.fromCharCode(65 + i)]));
@@ -321,7 +323,7 @@ export function summarise(
       }),
     );
     const means = Object.values(rubric).filter((n): n is number => n !== null);
-    const lat = rs.map((r) => r.latencyMs).filter((n): n is number => n !== null && n > 0);
+    const lat = rs.map((r) => r.latencyMs).filter((n): n is number => n !== null);
     const s = (ms: number | null) => (ms === null ? null : Math.round(ms / 100) / 10);
     return {
       model,
