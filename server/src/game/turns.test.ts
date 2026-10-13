@@ -100,8 +100,12 @@ describe('turn mode: the turn clock (D39, 11.3)', () => {
     expect(game.gameClock.now()).toBe(0);
     expect(game.turnStateFor('blue')).toMatchObject({ turn: 1, startsAt: 0, endsAt: 20 * MINUTE });
 
-    expect(await game.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order('b1', 'blue-1') })).toMatchObject({ ok: true });
-    expect(await game.submit({ kind: 'sendTurn', side: 'blue', turn: 0, orders: [] })).toEqual({ ok: true });
+    expect(
+      await game.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order('b1', 'blue-1') }),
+    ).toMatchObject({ ok: true });
+    expect(await game.submit({ kind: 'sendTurn', side: 'blue', turn: 0, orders: [] })).toEqual({
+      ok: true,
+    });
     await time.advance(HOUR);
     expect(game.gameClock.now()).toBe(0);
     expect(game.state.time).toBe(0);
@@ -170,26 +174,55 @@ describe('turn mode: the turn clock (D39, 11.3)', () => {
 
   it('shows held orders to their own side only, and they can be replaced or withdrawn until sending', async () => {
     const { game, store } = await create();
-    await game.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order('b1', 'blue-1', 'hold the wood') });
+    await game.submit({
+      kind: 'turnOrder',
+      side: 'blue',
+      turn: 0,
+      order: order('b1', 'blue-1', 'hold the wood'),
+    });
     await game.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order('b2', 'blue-2') });
-    await game.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order('b1', 'blue-1', 'take the bridge') });
+    await game.submit({
+      kind: 'turnOrder',
+      side: 'blue',
+      turn: 0,
+      order: order('b1', 'blue-1', 'take the bridge'),
+    });
     expect(game.turnStateFor('blue')!.held).toEqual([
       order('b1', 'blue-1', 'take the bridge'),
       order('b2', 'blue-2'),
     ]);
     expect(game.turnStateFor('red')!.held).toEqual([]);
-    expect(await game.submit({ kind: 'withdrawTurnOrder', side: 'blue', turn: 0, orderId: 'b2' })).toEqual({ ok: true });
+    expect(
+      await game.submit({ kind: 'withdrawTurnOrder', side: 'blue', turn: 0, orderId: 'b2' }),
+    ).toEqual({ ok: true });
     expect(game.turnStateFor('blue')!.held).toEqual([order('b1', 'blue-1', 'take the bridge')]);
 
     // An order to another side's unit is refused.
-    const foreign = await game.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order('b3', 'red-1') });
+    const foreign = await game.submit({
+      kind: 'turnOrder',
+      side: 'blue',
+      turn: 0,
+      order: order('b3', 'red-1'),
+    });
     expect(foreign).toMatchObject({ ok: false, kind: 'rejection' });
 
     await game.submit({ kind: 'sendTurn', side: 'blue', turn: 0, orders: [] });
-    const late = await game.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order('b4', 'blue-3') });
-    expect(late).toMatchObject({ ok: false, reason: 'your side has sent its orders for this turn' });
-    expect(await game.submit({ kind: 'withdrawTurnOrder', side: 'blue', turn: 0, orderId: 'b1' })).toMatchObject({ ok: false });
-    expect(await game.submit({ kind: 'sendTurn', side: 'blue', turn: 0, orders: [] })).toMatchObject({ ok: false });
+    const late = await game.submit({
+      kind: 'turnOrder',
+      side: 'blue',
+      turn: 0,
+      order: order('b4', 'blue-3'),
+    });
+    expect(late).toMatchObject({
+      ok: false,
+      reason: 'your side has sent its orders for this turn',
+    });
+    expect(
+      await game.submit({ kind: 'withdrawTurnOrder', side: 'blue', turn: 0, orderId: 'b1' }),
+    ).toMatchObject({ ok: false });
+    expect(
+      await game.submit({ kind: 'sendTurn', side: 'blue', turn: 0, orders: [] }),
+    ).toMatchObject({ ok: false });
 
     // The log has the turn number filled in and the orders as sent.
     const log = await store.inputLog('g1');
@@ -234,8 +267,12 @@ describe('turn mode: the turn clock (D39, 11.3)', () => {
         reason: TURN_MODE_REFUSAL,
       });
     }
-    expect(await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' })).toMatchObject({ ok: false });
-    expect(await game.submit({ kind: 'resolveTurn', turn: 1, cause: 'all-sent' })).toMatchObject({ ok: false });
+    expect(await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' })).toMatchObject({
+      ok: false,
+    });
+    expect(await game.submit({ kind: 'resolveTurn', turn: 1, cause: 'all-sent' })).toMatchObject({
+      ok: false,
+    });
     expect(game.gameClock.now()).toBe(0);
     expect(game.pauseState).toBeUndefined();
   });
@@ -260,8 +297,18 @@ describe('turn mode: the turn clock (D39, 11.3)', () => {
   it('replays a turn-mode log to the same state with no resolver call', async () => {
     const { game, time, store, resolver, settings } = await create();
     for (let i = 0; i < 2; i++) {
-      await game.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order(`b${i}`, 'blue-1') });
-      await game.submit({ kind: 'turnOrder', side: 'red', turn: 0, order: order(`r${i}`, 'red-2') });
+      await game.submit({
+        kind: 'turnOrder',
+        side: 'blue',
+        turn: 0,
+        order: order(`b${i}`, 'blue-1'),
+      });
+      await game.submit({
+        kind: 'turnOrder',
+        side: 'red',
+        turn: 0,
+        order: order(`r${i}`, 'red-2'),
+      });
       await game.submit({ kind: 'sendTurn', side: 'red', turn: 0, orders: [] });
       await game.submit({ kind: 'sendTurn', side: 'blue', turn: 0, orders: [] });
       await time.flush();
@@ -381,7 +428,13 @@ describe('turn bookkeeping', () => {
       e(1, { kind: 'openTurn', turn: 1, startMs: 0, endMs: 20 * MINUTE }),
       e(2, { kind: 'sendTurn', side: 'blue', turn: 1, orders: [] }),
       e(3, { kind: 'resolveTurn', turn: 1, cause: 'all-sent' }),
-      e(4, { kind: 'openTurn', turn: 2, startMs: 20 * MINUTE, endMs: 40 * MINUTE, deadlineWallMs: 9 }),
+      e(4, {
+        kind: 'openTurn',
+        turn: 2,
+        startMs: 20 * MINUTE,
+        endMs: 40 * MINUTE,
+        deadlineWallMs: 9,
+      }),
       e(5, { kind: 'turnOrder', side: 'red', turn: 2, order: order('r1', 'red-1') }),
       e(6, { kind: 'turnOrder', side: 'red', turn: 2, order: order('r2', 'red-2') }, 'refused'),
       e(7, { kind: 'turnOrder', side: 'blue', turn: 2, order: order('b1', 'blue-1') }),

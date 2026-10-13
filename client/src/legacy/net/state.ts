@@ -85,6 +85,9 @@ export interface PauseVote {
   proposal?: PauseProposal & { closesAtWall: number };
 }
 
+/** Turn mode (D39): the open turn as the server last reported it to this side. */
+export type TurnInfo = Omit<Extract<ServerMessage, { kind: 'turnState' }>, 'v' | 'kind'>;
+
 /** The umpire's answer to a staff question. */
 export interface StaffServerAnswer {
   text?: string;
@@ -106,6 +109,8 @@ export interface ClientState {
   staffAtWork: boolean;
   /** Absent until the server reports it; a game without voters never does. */
   pause?: PauseVote;
+  /** Turn mode only: the open turn, its sides that have sent and this side's held orders. Absent in a real-time game. */
+  turn?: TurnInfo;
   pending: PendingOrder[];
   /** Orders the staff could not carry out, by order id; the order itself leaves `pending`. */
   outcomes: Record<string, OrderOutcome>;
@@ -256,6 +261,10 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
             : {}),
         },
       };
+    case 'turnState': {
+      const { v: _v, kind: _kind, ...turn } = m;
+      return { ...s, turn };
+    }
     case 'pauseResult': {
       const message = pauseResultText(m);
       const notices = [...s.notices, { code: 'pause_result', message }].slice(-MAX_NOTICES);

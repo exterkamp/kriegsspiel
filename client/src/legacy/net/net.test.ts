@@ -125,6 +125,57 @@ describe('applyServerMessage', () => {
     expect(applyServerMessage(s, { v, kind: 'sentOrders', orders: [] }, 0)).toBe(s);
   });
 
+  it('keeps the open turn of a turn-mode game, replacing it on every turnState (D39)', () => {
+    expect(initialState.turn).toBeUndefined();
+    const held = [{ orderId: 'o1', to: 'blue-1', text: 'Hold the wood' }];
+    let s = applyServerMessage(
+      initialState,
+      {
+        v,
+        kind: 'turnState',
+        turn: 1,
+        startsAt: 0,
+        endsAt: 1_200_000,
+        sent: [],
+        resolving: false,
+        held,
+      },
+      0,
+    );
+    expect(s.turn).toEqual({
+      turn: 1,
+      startsAt: 0,
+      endsAt: 1_200_000,
+      sent: [],
+      resolving: false,
+      held,
+    });
+    s = applyServerMessage(
+      s,
+      {
+        v,
+        kind: 'turnState',
+        turn: 2,
+        startsAt: 1_200_000,
+        endsAt: 2_400_000,
+        sent: ['red'],
+        deadline: 99,
+        resolving: false,
+        held: [],
+      },
+      0,
+    );
+    expect(s.turn).toEqual({
+      turn: 2,
+      startsAt: 1_200_000,
+      endsAt: 2_400_000,
+      sent: ['red'],
+      deadline: 99,
+      resolving: false,
+      held: [],
+    });
+  });
+
   it('stores the view, merges its dispatches and anchors the clock', () => {
     const view = { ...fixtureView, dispatches: [disp('d1')] };
     const s = applyServerMessage(initialState, { v, kind: 'viewUpdate', view }, 1000);
