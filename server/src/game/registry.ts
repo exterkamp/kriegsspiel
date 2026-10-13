@@ -3,6 +3,7 @@ import {
   holdTheBridge,
   loadScenario,
   registerCombat,
+  registerJudgment,
   registerMovement,
   registerOrders,
   registerPlacement,
@@ -20,6 +21,7 @@ export function createRegistry(): EventRegistry<GameState> {
   registerCombat(r);
   registerOrders(r);
   registerPlacement(r);
+  registerJudgment(r);
   registerVisibility(r);
   return r;
 }

@@ -20,7 +20,7 @@ function stageOf(schema: Json): 'parse' | 'narrate' | 'staff' | 'judge' | 'comma
   if (keys.includes('result')) return 'parse';
   if (keys.includes('dispatches')) return 'narrate';
   if (keys.includes('messages')) return 'staff';
-  if (keys.includes('placements')) return 'judge';
+  if (keys.includes('placements') || keys.includes('modifier')) return 'judge';
   if (keys.includes('orders')) return 'command';
   return undefined;
 }
@@ -178,6 +178,15 @@ function command(input: Json) {
   };
 }
 
+/** The standard rule stands: modifier 0, worded from the situation alone. Same situation, same ruling. */
+function judgeSituation() {
+  return {
+    modifier: 0,
+    rationale: 'The test umpire finds no cause to depart from the standard rule.',
+    narrative: 'The umpire sees no cause to depart from the usual rule.',
+  };
+}
+
 export function testReply(schema: Json, input: Json): unknown {
   switch (stageOf(schema)) {
     case 'parse':
@@ -189,7 +198,7 @@ export function testReply(schema: Json, input: Json): unknown {
     case 'command':
       return command(input);
     case 'judge':
-      return { placements: [] };
+      return 'modifier' in (schema.properties as Json) ? judgeSituation() : { placements: [] };
     default:
       throw new Error('test provider: unknown output schema');
   }
