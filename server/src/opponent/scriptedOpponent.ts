@@ -44,6 +44,8 @@ export interface SideAgent {
    * quiet; one that is not settled is asked again at its next interval. Default: settled.
    */
   settled?(): boolean;
+  /** True while the agent should not decide at all (a deputy whose player is back at the table). */
+  dormant?(): boolean;
 }
 
 /** Game ms between decisions: five game minutes. */
