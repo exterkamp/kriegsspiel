@@ -97,7 +97,10 @@ afterEach(async () => {
   host = undefined;
 });
 
-async function newGame(umpire?: UmpireClient, extra: { narrateTimeoutMs?: number } = {}) {
+async function newGame(
+  umpire?: UmpireClient,
+  extra: { narrateTimeoutMs?: number; scriptedOpponents?: boolean } = {},
+) {
   const time = new FakeTime();
   const store = new MemoryGameStore();
   host = new GameHost({
@@ -222,6 +225,22 @@ describe('narrate stage in the actor', () => {
       await time.advance(NARRATE_WINDOW_BASE_MS);
     }
     expect(game.overloadedFor(side)).toBeUndefined();
+  });
+
+  it('never narrates a side a scripted agent plays (#419)', async () => {
+    const umpire = new StubUmpire();
+    const { time, game } = await newGame(umpire, { scriptedOpponents: true });
+    await runUntilReport(time, game);
+    for (let i = 0; i < 12; i++) await time.advance(NARRATE_WINDOW_BASE_MS);
+
+    const sides = umpire.requests
+      .filter((r) => r.stage === 'narrate')
+      .map((r) => (r.input as { side: string }).side);
+    expect(sides).toContain('blue');
+    expect(sides).not.toContain('red');
+    // Red had reports to narrate: nobody reads them, so no model was asked.
+    expect(viewFor(game.state.world, 'red', game.state.time).reports.length).toBeGreaterThan(0);
+    expect(game.narrationFor('red')).toBeUndefined();
   });
 
   it('keeps template text when no umpire is set', async () => {

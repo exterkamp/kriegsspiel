@@ -298,6 +298,8 @@ export class GameActor {
   private readonly narratedUntil = new Map<string, number>();
   private readonly narrations = new Map<string, SideNarration>();
   private readonly narrating = new Set<string>();
+  /** Sides a server-side agent plays (`options.agents`): nobody reads their dispatches, so they are never narrated (#419). */
+  private readonly scriptedSides: ReadonlySet<string>;
   /** Sides whose latest narration was refused by the game's budget or rate limit. */
   private readonly overloaded = new Set<string>();
   /** Each side's questions to its staff officers and their answers (D6b), oldest first. */
@@ -362,6 +364,7 @@ export class GameActor {
     }
     // Decisions fall on multiples of the interval; a resumed game picks up at the next one.
     const t = this.engine.time;
+    this.scriptedSides = new Set((options.agents ?? []).map((a) => a.side));
     this.agents = (options.agents ?? []).map((agent) => ({
       agent,
       nextAt: t === 0 ? 0 : (Math.floor(t / agent.intervalMs) + 1) * agent.intervalMs,
@@ -596,7 +599,7 @@ export class GameActor {
     if (!umpire || this.turns || this.closed || this.engine.world.outcome) return;
     const now = this.engine.time;
     for (const side of this.engine.world.sides) {
-      if (this.narrating.has(side.id)) continue;
+      if (this.narrating.has(side.id) || this.scriptedSides.has(side.id)) continue;
       const since = this.narratedUntil.get(side.id) ?? now;
       if (now < since + narrateWindowMs(this.clock.rate)) continue;
       // The window is closed: reports delivered later belong to the next one, whether or not any are due.
@@ -910,7 +913,7 @@ export class GameActor {
     if (!this.umpire || this.turns || this.engine.world.outcome) return undefined;
     let next: number | undefined;
     for (const side of this.engine.world.sides) {
-      if (this.narrating.has(side.id)) continue;
+      if (this.narrating.has(side.id) || this.scriptedSides.has(side.id)) continue;
       const at =
         (this.narratedUntil.get(side.id) ?? this.engine.time) + narrateWindowMs(this.clock.rate);
       if (next === undefined || at < next) next = at;
