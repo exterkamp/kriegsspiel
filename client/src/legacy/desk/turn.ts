@@ -67,12 +67,15 @@ export function heldLine(o: TurnOrder, names: ReadonlyMap<string, string>): stri
   return `To ${to}, by ${o.courier === 'fast' ? 'fast rider' : 'steady courier'}`;
 }
 
-/** A diary heading for a turn as it opens. Stable id, so it is recorded once. */
+/**
+ * A diary line for a turn as it opens, which also closes the turn before it: the diary reads newest
+ * first, so what stands below the line happened in the earlier turn. Stable id, so it is recorded once.
+ */
 export const turnEntry = (t: Pick<TurnInfo, 'turn' | 'startsAt' | 'endsAt'>): JournalEntry => ({
   id: `turn:${t.turn}`,
   kind: 'turn',
   at: t.startsAt,
-  text: `${turnLine(t)} opens.`,
+  text: `${t.turn > 1 ? `Turn ${t.turn - 1} decided. ` : ''}${turnLine(t)} opens.`,
 });
 
 /** What the desk says while the turn is being decided. */

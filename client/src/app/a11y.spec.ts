@@ -68,6 +68,31 @@ for (const high of [false, true]) {
       });
     }
 
+    // Turn mode (D39, 11.10): the turn panel in the dock and the held orders on the orders desk.
+    const turn = {
+      turn: 2,
+      startsAt: 1_200_000,
+      endsAt: 2_400_000,
+      sent: ['red'],
+      held: [{ orderId: 't-1', to: fixtureView.ownUnits[0]!.id, text: 'Hold the bridge.' }],
+    };
+    for (const [name, resolving, view] of [
+      ['writing, orders desk', false, 'orders'],
+      ['writing, table', false, 'table'],
+      ['resolving', true, 'table'],
+    ] as const) {
+      it(`the turn-mode desk (${name}) has no violations`, async () => {
+        setHighContrast(high);
+        const { f, el, desk } = await mount(DeskComponent, {
+          turnMode: true,
+          turn: { ...turn, resolving, ...(resolving ? { sent: ['red', 'blue'] } : {}) },
+        });
+        desk.activeView.set(view);
+        await f.whenStable();
+        await audit(`turn mode ${name}`, el);
+      });
+    }
+
     it('the game-over dialog has no violations', async () => {
       setHighContrast(high);
       const { el } = await mount(DeskComponent, { gameOver: over });

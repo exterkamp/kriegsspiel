@@ -55,8 +55,11 @@ describe('turn lines', () => {
       id: 'turn:2',
       kind: 'turn',
       at: 20 * MIN,
-      text: 'Turn 2: 00:20 to 00:40 opens.',
+      text: 'Turn 1 decided. Turn 2: 00:20 to 00:40 opens.',
     });
+    expect(turnEntry({ turn: 1, startsAt: 0, endsAt: 20 * MIN }).text).toBe(
+      'Turn 1: 00:00 to 00:20 opens.',
+    );
   });
 
   it('counts the papers a decided turn brought', () => {

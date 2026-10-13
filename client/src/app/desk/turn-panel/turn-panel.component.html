@@ -10,7 +10,7 @@
       <p class="decided" role="status" data-testid="turn-decided">
         <b>{{ d }}</b>
         <span class="buttons">
-          <button type="button" class="ks-primary" (click)="readReports()">Read the reports</button>
+          <button type="button" (click)="readReports()">Read the reports</button>
           <button type="button" (click)="dismiss()" aria-label="Dismiss">Dismiss</button>
         </span>
       </p>
@@ -30,7 +30,12 @@
       </p>
       @if (p === 'writing') {
         <p class="buttons">
-          <button type="button" class="ks-primary" id="turn-open-orders" (click)="openOrders()">
+          <button
+            type="button"
+            id="turn-open-orders"
+            [class.ks-primary]="heldCount() > 0"
+            (click)="openOrders()"
+          >
             {{ heldCount() === 0 ? 'Write orders' : 'Send orders (' + heldCount() + ' held)' }}
           </button>
           @if (deadline(); as d) {
