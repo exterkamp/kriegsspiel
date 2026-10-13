@@ -31,6 +31,7 @@ import {
 import { GameService } from '../game/game.service';
 import { ORDER_SENDER } from '../game/ports';
 import { DeskStore } from './desk.store';
+import { DraftsPanelComponent } from './drafts-panel.component';
 
 /** The longest order text the server accepts, once the addressee and annex are added. */
 const MAX_ORDER_CHARS = 2000;
@@ -40,6 +41,7 @@ type Field = 'to' | 'text' | 'send';
 /** The orders desk (port of `desk/OrdersDesk.svelte`): addressee, wording, annex, courier and signing. */
 @Component({
   selector: 'ks-orders-desk',
+  imports: [DraftsPanelComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './orders-desk.component.html',
   styleUrl: './orders-desk.component.css',

@@ -67,6 +67,8 @@ describe('Command', () => {
     { v, kind: 'proposeResume' },
     { v, kind: 'vote', proposal: 'p1', yes: false },
     { v, kind: 'draftEdit', draft: 'd1', baseRev: 0, op: [3, 'x', -1] },
+    { v, kind: 'draftPresence', draft: 'd1' },
+    { v, kind: 'draftPresence', draft: null },
   ];
   it.each(good)('round-trips $kind', (c) => {
     const r = parseCommand(serializeCommand(c));
@@ -105,6 +107,12 @@ describe('Command', () => {
 
 describe('ServerMessage', () => {
   const good: ServerMessage[] = [
+    {
+      v,
+      kind: 'draftPresence',
+      you: 'u1',
+      people: [{ id: 'u1', label: 'Commander', drafts: ['d1'] }],
+    },
     { v, kind: 'viewUpdate', view },
     {
       v,

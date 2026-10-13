@@ -1,7 +1,9 @@
 import { withMark } from '../table/marks.js';
+import { applyDraftEntry } from '../desk/drafts.js';
 import type {
   ClockState,
   Dispatch,
+  DraftSnapshot,
   Mark,
   PausePhase,
   PauseProposal,
@@ -60,6 +62,13 @@ export interface CatchUp {
 
 export type LinkStatus = 'connecting' | 'open' | 'closed' | 'failed' | 'offline';
 
+/** Who is on the side's drafting desk, as the server last said. */
+export interface DraftPresence {
+  /** The id this player's own edits and receipts go under. */
+  you: string;
+  people: { id: string; label: string; drafts: readonly string[] }[];
+}
+
 /** Where game time was at a local wall time; the clock display runs forward from here. */
 export interface ClockAnchor {
   gameMs: number;
@@ -108,6 +117,13 @@ export interface ClientState {
   gameOver?: GameOver;
   /** The side's marks on the table, as the server last sent them plus this client's own edits. */
   marks: Mark[];
+  /** The side's shared order drafts in creation order, kept in step with the server's entries (D6c). */
+  drafts: DraftSnapshot[];
+  /** Set when an entry did not follow the draft it was for: the client should ask for the snapshot again. */
+  draftsStale: boolean;
+  draftPresence?: DraftPresence;
+  /** Every label the server has given a player id, kept so an author who has gone offline is still named. */
+  draftLabels: Record<string, string>;
   /** Set when the server reports a return after an absence. */
   catchUp?: CatchUp;
   /** Newest last; the HUD shows the latest few. */
@@ -124,6 +140,9 @@ export const initialState: ClientState = {
   staffCharges: {},
   staffAnswers: {},
   marks: [],
+  drafts: [],
+  draftsStale: false,
+  draftLabels: {},
   notices: [],
 };
 
@@ -282,11 +301,35 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
           };
     }
     case 'drafts':
-    case 'draftState':
-    case 'draftEntry':
-    case 'draftReceipt':
-      // The drafting desk is not built yet (a follow-up story); the server sends these to the side.
-      return s;
+      return { ...s, drafts: m.drafts, draftsStale: false };
+    case 'draftState': {
+      const i = s.drafts.findIndex((d) => d.id === m.draft.id);
+      const drafts =
+        i < 0 ? [...s.drafts, m.draft] : s.drafts.map((d, j) => (j === i ? m.draft : d));
+      return { ...s, drafts };
+    }
+    case 'draftEntry': {
+      const d = s.drafts.find((x) => x.id === m.draft);
+      const next = d && applyDraftEntry(d, m.entry);
+      // An entry for a draft we do not hold, or one that skips a rev, means we missed something.
+      if (!next) return s.draftsStale ? s : { ...s, draftsStale: true };
+      return next === d ? s : { ...s, drafts: s.drafts.map((x) => (x === d ? next : x)) };
+    }
+    case 'draftReceipt': {
+      const d = s.drafts.find((x) => x.id === m.draft);
+      if (!d || (d.receipts[m.reader] ?? 0) >= m.rev) return s;
+      const next = { ...d, receipts: { ...d.receipts, [m.reader]: m.rev } };
+      return { ...s, drafts: s.drafts.map((x) => (x === d ? next : x)) };
+    }
+    case 'draftPresence':
+      return {
+        ...s,
+        draftPresence: { you: m.you, people: m.people },
+        draftLabels: {
+          ...s.draftLabels,
+          ...Object.fromEntries(m.people.map((p) => [p.id, p.label])),
+        },
+      };
     case 'staffAtWork':
       return { ...s, staffAtWork: m.working };
     case 'serverRestarted': {

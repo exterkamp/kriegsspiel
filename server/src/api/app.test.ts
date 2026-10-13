@@ -941,10 +941,41 @@ describe('shared order drafts', () => {
     expect(d!.history.map((e) => e.rev)).toEqual([1, 2, 3]);
     expect(d!.comments).toHaveLength(1);
     expect(Object.values(d!.receipts)).toEqual([3]);
-    expect(red.messages.filter((m) => m.kind.startsWith('draft') && m.kind !== 'drafts')).toEqual(
-      [],
-    );
+    expect(
+      red.messages.filter(
+        (m) => m.kind.startsWith('draft') && m.kind !== 'drafts' && m.kind !== 'draftPresence',
+      ),
+    ).toEqual([]);
     expect((await red.waitFor('drafts')).drafts).toEqual([]);
+  });
+
+  it('tells a side who has which draft open, and drops it when that tab closes', async () => {
+    const { base, ws } = await start();
+    const game = (await createGame(base)).json;
+    // Two tabs of one player count as one person.
+    const a = await join(ws, game, 'blue');
+    const b = await join(ws, game, 'blue');
+    const red = await join(ws, game, 'red');
+    const first = await b.waitFor('draftPresence');
+    expect(first.people).toEqual([{ id: first.you, label: 'HQ', drafts: [] }]);
+    a.send(cmd({ kind: 'draftPresence', draft: 'd1' }));
+    const open = await b.waitFor('draftPresence', (m) => m.people[0]!.drafts[0] === 'd1');
+    expect(open.people).toHaveLength(1);
+    a.send(cmd({ kind: 'draftPresence', draft: null }));
+    await b.waitFor(
+      'draftPresence',
+      (m) => m.people[0]!.drafts.length === 0 && m.people.length === 1,
+    );
+    a.send(cmd({ kind: 'draftPresence', draft: 'd2' }));
+    await b.waitFor('draftPresence', (m) => m.people[0]!.drafts[0] === 'd2');
+    a.socket.close();
+    await b.waitFor('draftPresence', (m) => m.people[0]!.drafts.length === 0);
+    // The other side never hears about blue's desk.
+    expect(
+      red.messages
+        .filter((m) => m.kind === 'draftPresence')
+        .every((m) => m.people.every((p) => p.drafts.length === 0)),
+    ).toBe(true);
   });
 
   it('applies a resent opId once after a reconnect, and syncDrafts resends the snapshot', async () => {

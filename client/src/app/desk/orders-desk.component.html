@@ -1,5 +1,8 @@
 <div class="form" [class.stamping]="stamping()">
   <h2>Orders</h2>
+  @if (!over()) {
+    <ks-drafts-panel (useDraft)="patch({ text: $event })" />
+  }
   @if (over()) {
     <p class="hint" id="orders-closed">The game is over; no more orders can be sent.</p>
   } @else {
