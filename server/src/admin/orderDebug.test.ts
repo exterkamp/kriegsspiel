@@ -268,6 +268,39 @@ describe('orderAttempts', () => {
     });
     expect(byText.scripted).toMatchObject({ answeredBy: 'agent', llmCalls: 0 });
   });
+  it('matches calls whose prompt embeds the order text inside a larger structure', () => {
+    const log = [
+      entry(1, 'Hold the ford', {
+        parse: { kind: 'rejection', text: 'Hold the ford', reason: 'no' },
+      }),
+      entry(2, 'Advance on the mill', {
+        parse: { kind: 'rejection', text: 'Advance on the mill', reason: 'no' },
+      }),
+    ];
+    const asMessages = (text: string) => ({
+      messages: [{ role: 'user', content: `Read this order: "${text}" and place it.` }],
+    });
+    const trace = [
+      t(1, 'command', 'tick', { seq: 1, command: log[0]!.command }),
+      t(2, 'command', 'tick', { seq: 2, command: log[1]!.command }),
+      t(3, 'llm', 'tick', {
+        stage: 'parse',
+        mode: 'live',
+        ok: true,
+        input: asMessages('Hold the ford'),
+      }),
+      t(4, 'llm', 'tick', {
+        stage: 'parse',
+        mode: 'test',
+        ok: true,
+        input: asMessages('Advance on the mill'),
+      }),
+    ];
+    const byText = Object.fromEntries(orderAttempts(log, trace).map((a) => [a.text, a]));
+    expect(byText['Hold the ford']).toMatchObject({ answeredBy: 'model', llmCalls: 1 });
+    expect(byText['Advance on the mill']).toMatchObject({ answeredBy: 'canned', llmCalls: 1 });
+  });
+
   it('does not let a short order claim the calls of a longer one that contains it', () => {
     const log = [
       entry(1, 'Hold', { parse: { kind: 'rejection', text: 'Hold', reason: 'no' } }),
