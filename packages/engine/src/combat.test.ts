@@ -1028,6 +1028,37 @@ describe('a decided battle against the time limit (#417)', () => {
     });
   });
 
+  it('the ruling stands when the winner then has nobody left on the field', () => {
+    const s = brokenDefenceAt(HOLD - 20);
+    const declared = advanceTo(s, s.time + 1, registry()).state;
+    expect(declared.world.battle).toMatchObject({ winner: 'red', reason: 'defence-broken' });
+    // Red's only battalion breaks in the pursuit and leaves the field: before #417 Blue won by it.
+    const gone = {
+      ...declared.world,
+      units: declared.world.units.map((u) =>
+        u.side === 'red' ? { ...u, status: 'withdrawn' as const } : u,
+      ),
+    };
+    expect(evaluateVictory(gone, declared.time)).toEqual({
+      winner: 'red',
+      reason: 'defence-broken',
+      time: declared.time,
+    });
+    // The loser leaving ends it at once too, and says so.
+    const fled = {
+      ...declared.world,
+      units: declared.world.units.map((u) =>
+        u.side === 'blue' ? { ...u, status: 'withdrawn' as const } : u,
+      ),
+    };
+    expect(evaluateVictory(fled, declared.time)).toEqual({
+      winner: 'red',
+      reason: 'defence-broken',
+      time: declared.time,
+      loserOut: 'withdrawn',
+    });
+  });
+
   it('an umpire turn ending at the time limit closes a declared battle with its ruling', () => {
     const s = brokenDefenceAt(HOLD - 10);
     const declared = advanceTo(s, s.time + 1, registry()).state;

@@ -209,6 +209,19 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
     const o = sideOut(world, s.id);
     if (o) out.set(s.id, o);
   }
+  // A declared battle decides the game (D13, #417): it closes after the pursuit, or at once when
+  // a side has nobody left, and a side leaving the field after the ruling does not overturn it.
+  if (battle) {
+    const loser = world.sides.find((s) => s.id !== battle.winner)!.id;
+    const loserOut = out.get(loser);
+    if (out.size === 0 && time < battle.declaredAt + BATTLE_CLOSE_MS) return null;
+    return {
+      winner: battle.winner,
+      reason: battle.reason,
+      time,
+      ...(loserOut ? { loserOut } : {}),
+    };
+  }
   if (out.size === world.sides.length) {
     const reason = [...out.values()].every((r) => r === 'eliminated') ? 'eliminated' : 'withdrawn';
     return { winner: null, reason, time };
@@ -218,13 +231,6 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
     if (reason) {
       return { winner: world.sides.find((o) => o.id !== s.id)!.id, reason, time };
     }
-  }
-  // A side with nobody left ends the game at once; one whose force broke closes after the pursuit.
-  if (battle) {
-    // A declared battle plays out its pursuit, then closes.
-    return time >= battle.declaredAt + BATTLE_CLOSE_MS
-      ? { winner: battle.winner, reason: battle.reason, time }
-      : null;
   }
   const since = world.heldSince ?? null;
   if (

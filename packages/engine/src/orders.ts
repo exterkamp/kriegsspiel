@@ -175,8 +175,18 @@ export const COURIER_OVERDUE_MS = 15 * MS_PER_MINUTE;
 function reportOverdue(world: GameState, c: Courier, time: number): GameState {
   const unit = world.units.find((u) => u.id === c.order.to && u.side === c.side);
   if (!unit || unit.strength <= 0) return world;
-  const due = Math.max(time, arrivalOf(c, c.order.issuedAt) + COURIER_OVERDUE_MS);
-  return fileReport(world, 'courierLost', unit, due, 0);
+  const orderDueAt = arrivalOf(c, c.order.issuedAt);
+  const due = Math.max(time, orderDueAt + COURIER_OVERDUE_MS);
+  const w = fileReport(world, 'courierLost', unit, due, 0);
+  const reports = w.intel[c.side].reports;
+  const filed = { ...reports.at(-1)!, orderDueAt };
+  return {
+    ...w,
+    intel: {
+      ...w.intel,
+      [c.side]: { ...w.intel[c.side], reports: [...reports.slice(0, -1), filed] },
+    },
+  };
 }
 const arrivalOf = (c: Courier, issuedAt: number) => c.legs.at(-1)?.arriveAt ?? issuedAt;
 
