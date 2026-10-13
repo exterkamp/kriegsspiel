@@ -105,6 +105,47 @@ describe('cannedAnswer (#418)', () => {
     expect(terse).toMatch(/1 enemy unit is in sight/);
   });
 
+  it('is terse: the bare facts, no caveat or sign-off, and shorter than a plain officer', () => {
+    const terse = cannedAnswer(officer(['cautious', 'meticulous', 'terse']), 'intelligence', view);
+    const plain = cannedAnswer(officer(['cautious', 'meticulous', 'bold']), 'intelligence', view);
+    expect(terse).not.toMatch(/Old sightings|I would not wait/);
+    expect(plain).toMatch(/Old sightings/);
+    expect(terse.split(/(?<=\.)\s+/).length).toBeLessThanOrEqual(2);
+    expect(terse.length).toBeLessThan(plain.length);
+  });
+
+  it('gives only a contact report as the enemy’s position, not a newer report of our own', () => {
+    const report = (
+      id: string,
+      kind: 'contact' | 'lowAmmo',
+      deliveredAt: number,
+      place: string,
+    ) => ({
+      id,
+      kind,
+      observedAt: deliveredAt,
+      deliveredAt,
+      ageMs: 0,
+      from: '2nd Brigade',
+      location: { x: 0, y: 0 },
+      place,
+      uncertaintyRadius: 100,
+      confidence: 'high' as const,
+      text: '',
+      ...(kind === 'contact' ? { sizeEstimate: 'a battalion' } : {}),
+    });
+    const withReports = {
+      ...viewForRole(w, 'blue', { role: 'chiefOfStaff' }, w.time),
+      reports: [
+        report('r1', 'contact', 60_000, 'at the ford'),
+        report('r2', 'lowAmmo', 120_000, 'near the mill'),
+      ],
+    };
+    const text = cannedAnswer(officer(['bold']), 'intelligence', withReports);
+    expect(text).toMatch(/puts a battalion at the ford/);
+    expect(text).not.toMatch(/near the mill/);
+  });
+
   it('says only what the seat can see', () => {
     const qm = viewForRole(w, 'blue', { role: 'quartermaster' }, w.time);
     const text = cannedAnswer(officer(['long-winded']), 'quartermaster', qm);

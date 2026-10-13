@@ -953,8 +953,9 @@ export class Hub {
 
   /**
    * Send the asker the officer's answer once it is written, at its due time (#418). The words are
-   * stored with the game, so a later view shows the same ones. Nothing is sent if the game closes or
-   * ends first; a reopened game answers from its log.
+   * stored with the game, so a later view shows the same ones. Nothing is sent if the game closes
+   * first; a reopened game answers from its log. If the game ends first the answer is still sent, but
+   * the side view withholds it, since the stopped clock never reaches its due time.
    */
   private async answerStaff(
     game: GameActor,
@@ -1367,7 +1368,7 @@ export class Hub {
         this.send(conn, error('game_over', `${command.questionId}: the game has ended`));
         return;
       }
-      if (game.staffHistoryFor(conn.side).some((x) => x.questionId === command.questionId)) {
+      if (game.staffQuestionUsed(conn.side, command.questionId)) {
         this.send(
           conn,
           error('bad_question', `${command.questionId}: that question id is already used`),

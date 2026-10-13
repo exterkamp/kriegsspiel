@@ -376,26 +376,84 @@ describe('staff answers in the actor', () => {
     };
     const arrives = await first(dry.game, dry.time);
     await host!.close('g1');
+    const due = arrives - 60_000;
+    // A second dry run stopped at `due` gives where blue-1 stood then, while it marches.
+    const still = await newGame();
+    await still.game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' });
+    await runTo(still.time, still.game, due);
+    const blue1At = (g: Game) =>
+      viewFor(g.state.world, 'blue', g.state.time).ownUnits.find((u) => u.id === 'blue-1')!
+        .position;
+    const atDue = blue1At(still.game);
+    await host!.close('g1');
 
     const umpire = new StubUmpire();
     const { time, game } = await newGame(umpire);
     await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' });
-    const due = arrives - 60_000;
     expect(due).toBeGreaterThan(0);
     const { answer: pending } = await ask(game, 'chiefOfStaff', 'What news?', {
       questionId: 'q1',
       askedAtGame: 0,
       answerAtGame: due,
     });
-    // One long jump past both the due time and the report: the answer is still written as of `due`.
-    await runTo(time, game, arrives + 30 * 60_000);
+    // One long jump past both the due time and the report, with no timer to wake the actor between
+    // (manual mode): the engine stops at `due` itself, and the answer is written as of then.
+    await game.submit({ kind: 'setMode', mode: 'manual' });
+    await game.submit({ kind: 'advanceTo', gameMs: arrives + 30 * 60_000 });
+    await time.advance(0);
     await pending;
     expect(viewFor(game.state.world, 'blue', game.state.time).reports.length).toBeGreaterThan(0);
     const call = umpire.requests.find((r) => r.stage === 'staff')!;
-    const input = call.input as { now: number; view: { reports: { deliveredAt: number }[] } };
+    const input = call.input as {
+      now: number;
+      view: {
+        reports: { deliveredAt: number }[];
+        ownUnits: { id: string; position: { x: number; y: number } }[];
+      };
+    };
     expect(input.now).toBe(Math.round(due / 60_000));
     expect(input.view.reports.filter((r) => r.deliveredAt > due)).toEqual([]);
+    // Not only the reports: the officer sees the world as it stood at `due`, not as it is now.
+    expect(input.view.ownUnits.find((u) => u.id === 'blue-1')?.position).toEqual(atDue);
+    expect(blue1At(game)).not.toEqual(atDue);
     expect(game.staffHistoryFor('blue')[0]?.basedOnGame).toBeLessThanOrEqual(due);
+  });
+
+  it.each([
+    ['no umpire', () => undefined],
+    ['a narrator', () => new StubUmpire()],
+  ])(
+    'wakes by itself at the due time, with %s and nothing else to wake it (#418)',
+    async (_, make) => {
+      const { time, game } = await newGame(make());
+      const { answer } = await ask(game, 'chiefOfStaff', 'Status?', {
+        questionId: 'q1',
+        askedAtGame: 0,
+        answerAtGame: 7 * 60_000,
+      });
+      let written: Awaited<typeof answer>;
+      void answer.then((x) => (written = x));
+      // Wall time only, before the first narration window: no command brings the world up to date.
+      await time.advance(7 * 60_000 + 1_000);
+      expect(written?.text).toBeDefined();
+      expect(written?.basedOnGame).toBeLessThanOrEqual(7 * 60_000);
+      expect(game.staffHistoryFor('blue')[0]?.text).toBe(written?.text);
+    },
+  );
+
+  it('refuses a question id used before at once, even before the first is logged, per side only', async () => {
+    const { time, game } = await newGame();
+    const at = asked('q1');
+    const first = game.answerStaff('blue', 'chiefOfStaff', 'Status?', at);
+    expect(game.staffQuestionUsed('blue', 'q1')).toBe(true);
+    expect(game.staffQuestionUsed('red', 'q1')).toBe(false);
+    expect(await game.answerStaff('blue', 'intelligence', 'Where?', at)).toBeUndefined();
+    // The same id on the other side is its own question.
+    const red = game.answerStaff('red', 'chiefOfStaff', 'Status?', at);
+    await runTo(time, game, 11 * 60_000);
+    expect((await first)?.role).toBe('chiefOfStaff');
+    expect((await red)?.text).toBeDefined();
+    expect(game.staffHistoryFor('blue')).toHaveLength(1);
   });
 
   it('answers in the officer’s own voice and logs why when the stage gives nothing usable', async () => {

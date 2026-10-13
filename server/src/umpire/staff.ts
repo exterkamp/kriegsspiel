@@ -8,7 +8,7 @@
  * (`mayDraft`); an officer never signs, so nothing they write is an order. A human can claim a
  * seat at any time, and the officer then goes quiet, even for a reply still in flight.
  */
-import { MS_PER_MINUTE, ROLES, mayDraft, viewForRole } from '@kriegsspiel/engine';
+import { LOW_AMMO, MS_PER_MINUTE, ROLES, mayDraft, viewForRole } from '@kriegsspiel/engine';
 import type { EngineRoleView, GameState, Role, Seat, SideId } from '@kriegsspiel/engine';
 import type { JsonSchema, UmpireCallRecord, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
@@ -130,6 +130,8 @@ export function conferenceOfficers(
   const out = {} as Record<ConferenceRole, StaffOfficer>;
   for (const role of CONFERENCE_ROLES) {
     const officer = staffOfficer(seed, side, SEAT_FOR[role], role === 'engineer' ? 1 : 0);
+    // Defensive: no seed seen so far draws two of these four alike, but a clash would sign one
+    // role's answer with another's name, so the next free name is taken.
     let i = NAMES.indexOf(officer.name);
     while (used.has(NAMES[i]!)) i = (i + 1) % NAMES.length;
     used.add(NAMES[i]!);
@@ -573,7 +575,10 @@ function cannedFacts(conferenceRole: string, view: EngineRoleView): [string[], s
           ? `${plural(seen.length, 'enemy unit')} ${seen.length === 1 ? 'is' : 'are'} in sight as I write, ${list(seen.map((e) => e.sizeEstimate))}.`
           : 'No enemy is in sight as I write.',
       );
-      const newest = [...view.reports].sort((a, b) => b.deliveredAt - a.deliveredAt)[0];
+      // Only a sighting says where the enemy is: own-side reports (low ammunition, an order delivered) do not.
+      const newest = view.reports
+        .filter((r) => r.kind === 'contact')
+        .sort((a, b) => b.deliveredAt - a.deliveredAt)[0];
       if (newest)
         lines.push(
           `The latest word, received ${clockTime(newest.deliveredAt)} from ${newest.from}, puts ${newest.sizeEstimate ?? 'them'} ${newest.place}.`,
@@ -588,7 +593,7 @@ function cannedFacts(conferenceRole: string, view: EngineRoleView): [string[], s
     }
     case 'quartermaster': {
       const full = own.filter((u): u is Extract<typeof u, { ammo: number }> => 'ammo' in u);
-      const low = full.filter((u) => u.ammo < 40);
+      const low = full.filter((u) => u.ammo <= LOW_AMMO);
       lines.push(
         low.length
           ? `${list(low.map((u) => u.name))} ${low.length === 1 ? 'is' : 'are'} running short of ammunition.`
@@ -640,8 +645,7 @@ export function cannedAnswer(
   const [lines, caveat] = cannedFacts(conferenceRole, view);
   const t = officer.traits;
   if (t.includes('terse')) return lines.slice(0, 2).join(' ');
-  const tone =
-    t.includes('cautious') || t.includes('sceptical') ? caveat : 'I would not wait on it.';
+  const tone = t.includes('cautious') ? caveat : 'I would not wait on it.';
   if (t.includes('long-winded'))
     return [
       `I have been through every paper on my table as of ${clockTime(view.time)}, and this is how matters stand.`,

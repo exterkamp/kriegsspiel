@@ -249,6 +249,9 @@ function narrationFallbackReason(result: Awaited<ReturnType<typeof narrateReport
 /** Narrated text by report id for one side; `null` marks a report folded into another's dispatch. */
 type SideNarration = Map<string, string | null>;
 
+/** Question ids are unique per side only. */
+const staffKey = (side: string, questionId: string): string => `${side}\u0000${questionId}`;
+
 /** A question put to a staff officer, waiting for its due time; `settle` hands the written exchange to the asker. */
 interface PendingStaff {
   side: string;
@@ -308,8 +311,10 @@ export class GameActor {
   private readonly overloaded = new Set<string>();
   /** Each side's questions to its staff officers and their answers (D6b), oldest first. */
   private readonly staffHistory = new Map<string, StaffExchange[]>();
-  /** Questions not yet due, by question id: each is answered once, from the view at its due time (#418). */
+  /** Questions not yet due, by `staffKey`: each is answered once, from the view at its due time (#418). */
   private readonly pendingStaff = new Map<string, PendingStaff>();
+  /** Every question id used, by `staffKey`, taken the moment a question is asked so a resend is refused. */
+  private readonly staffAsked = new Set<string>();
   private readonly dissents = new Map<string, Dissent[]>();
 
   /** The pause state machine; absent when the game has no voters configured. */
@@ -362,8 +367,13 @@ export class GameActor {
       this.staffHistory.set(side, [...list]);
       // Asked before a stop and not yet answered: answered when due, as if the game had not stopped.
       for (const exchange of list) {
+        this.staffAsked.add(staffKey(side, exchange.questionId));
         if (exchange.text !== undefined || exchange.textless) continue;
-        this.pendingStaff.set(exchange.questionId, { side, exchange, settle: () => undefined });
+        this.pendingStaff.set(staffKey(side, exchange.questionId), {
+          side,
+          exchange,
+          settle: () => undefined,
+        });
       }
     }
     for (const [side, list] of options.dissents ?? []) this.dissents.set(side, [...list]);
@@ -452,6 +462,11 @@ export class GameActor {
   /** `side`'s conference with its staff officers, for `sideViewOf`. */
   staffHistoryFor(side: string): readonly StaffExchange[] {
     return this.staffHistory.get(side) ?? [];
+  }
+
+  /** True when this side has used `questionId` before, including for a question not yet logged. */
+  staffQuestionUsed(side: string, questionId: string): boolean {
+    return this.staffAsked.has(staffKey(side, questionId));
   }
 
   /** The players who may vote changed (D6e). Without voting set up, nothing happens. */
@@ -808,6 +823,9 @@ export class GameActor {
     asked: { questionId: string; askedAtGame: number; answerAtGame: number; askedBy?: string },
   ): Promise<StaffExchange | undefined> {
     if (this.closed || this.engine.world.outcome) return undefined;
+    const key = staffKey(side, asked.questionId);
+    if (this.staffAsked.has(key)) return undefined;
+    this.staffAsked.add(key);
     const officer = staffOfficerFor(this.engine.world.seed, side, role);
     const exchange: StaffExchange = {
       ...asked,
@@ -819,13 +837,21 @@ export class GameActor {
     const written = new Promise<StaffExchange | undefined>((r) => (settle = r));
     await this.enqueueCompletion(async () => {
       if (this.closed) return settle(undefined);
-      this.staffHistory.set(side, [...(this.staffHistory.get(side) ?? []), exchange]);
       await this.logStaff(side, exchange, []);
-      this.pendingStaff.set(asked.questionId, { side, exchange, settle });
+      this.staffHistory.set(side, [...(this.staffHistory.get(side) ?? []), exchange]);
+      this.pendingStaff.set(key, { side, exchange, settle });
       this.takeDueStaff();
+      // Wake at its due time, so the answer is written then even on a quiet field.
+      this.reschedule();
       this.notify();
     });
     return written;
+  }
+
+  /** When the actor must wake to write a staff answer, if any (none once the game is over). */
+  private nextStaffWake(): number | undefined {
+    const at = this.nextStaffDue();
+    return this.engine.world.outcome || !Number.isFinite(at) ? undefined : at;
   }
 
   /** The earliest due time of a question still waiting, or Infinity. */
@@ -835,26 +861,36 @@ export class GameActor {
     return at;
   }
 
-  /** Write the answer of every question now due (all of them once the game is over), from the world as it is now. */
+  /**
+   * Write the answer of every question now due, from the world as it is now. Once the game is over all
+   * of them are written; one not yet due then is never shown (the clock stops before it), so it is
+   * answered in the canned voice without calling the model.
+   */
   private takeDueStaff(): void {
     const now = this.engine.time;
     const over = Boolean(this.engine.world.outcome);
-    for (const p of [...this.pendingStaff.values()]) {
+    for (const [key, p] of [...this.pendingStaff]) {
       if (!over && p.exchange.answerAtGame > now) continue;
-      this.pendingStaff.delete(p.exchange.questionId);
+      this.pendingStaff.delete(key);
       const at = Math.min(p.exchange.answerAtGame, now);
-      void this.writeStaff(p, this.engine.world, at).catch((e) => {
+      const umpire = p.exchange.answerAtGame > now ? undefined : this.umpire;
+      void this.writeStaff(p, this.engine.world, at, umpire).catch((e) => {
         p.settle(undefined);
         this.onError?.(e);
       });
     }
   }
 
-  /** Write one answer from `world` as seen at `at`, then store and log it. Not on the clock's critical path. */
-  private async writeStaff(p: PendingStaff, world: GameState, at: number): Promise<void> {
+  /** Write one answer from `world` as seen at `at`, then log and store it. Not on the clock's critical path. */
+  private async writeStaff(
+    p: PendingStaff,
+    world: GameState,
+    at: number,
+    umpire: UmpireClient | undefined,
+  ): Promise<void> {
     const { side, exchange } = p;
     const answer = await writeStaffAnswer(
-      this.umpire,
+      umpire,
       world,
       side as SideId,
       exchange.role,
@@ -870,13 +906,14 @@ export class GameActor {
     };
     await this.enqueueCompletion(async () => {
       if (this.closed) return p.settle(undefined);
+      // Logged first: if the commit fails, nothing shows words that a restart would write again.
+      await this.logStaff(side, done, answer.records, answer.failure);
       this.staffHistory.set(
         side,
         (this.staffHistory.get(side) ?? []).map((x) =>
           x.questionId === done.questionId ? done : x,
         ),
       );
-      await this.logStaff(side, done, answer.records, answer.failure);
       this.notify();
       p.settle(done);
     });
@@ -1308,7 +1345,7 @@ export class GameActor {
     if (this.closed) return;
     const nextEvent = this.engine.queue[0];
     const nextThink = this.engine.world.outcome ? undefined : this.nextAgent()?.nextAt;
-    const woken = [nextEvent?.time, nextThink, this.nextNarrationAt()].filter(
+    const woken = [nextEvent?.time, nextThink, this.nextNarrationAt(), this.nextStaffWake()].filter(
       (t) => t !== undefined,
     );
     const nextTime = woken.length > 0 ? Math.min(...woken) : undefined;
@@ -1368,10 +1405,10 @@ export class GameActor {
       // Nothing is waited for: jump to the next event, one instant per tick.
       const nextEvent = this.engine.queue[0];
       const nextThink = this.engine.world.outcome ? undefined : this.nextAgent()?.nextAt;
-      const next =
-        nextEvent && nextThink !== undefined
-          ? Math.min(nextEvent.time, nextThink)
-          : (nextEvent?.time ?? nextThink);
+      const woken = [nextEvent?.time, nextThink, this.nextStaffWake()].filter(
+        (t) => t !== undefined,
+      );
+      const next = woken.length > 0 ? Math.min(...woken) : undefined;
       if (next !== undefined && next <= (this.clock.barrier ?? Infinity)) {
         this.clock.advanceTo(Math.max(next, this.clock.now()));
         this.sync();
