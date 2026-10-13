@@ -22,7 +22,8 @@ import type { GameActor, GameStore } from '../game/index.js';
 import { NOOP_TRACE, traceRequest, type TraceSink } from '../debug/trace.js';
 import type { PauseTransition } from '../pause.js';
 import { DraftBook, DraftError } from '../drafts/book.js';
-import { StaffDesk } from './conference.js';
+import { DRAFT_CHECK_COST_MS, StaffDesk } from './conference.js';
+import { STAFF_CHECK_CAVEAT } from '../orders/staffCheck.js';
 import { seatKey, sideViewOf } from './sideView.js';
 import { staffOfficerFor } from '../umpire/index.js';
 import { mayForward, viewForRole, type Seat, type SideId } from '@kriegsspiel/engine';
@@ -653,6 +654,84 @@ export class Hub {
     });
   }
 
+  /**
+   * The staff check (D6d): the chief of staff reads a shared draft. The hub takes the draft's text
+   * from its own book (a client cannot have a different text read), charges the chief of staff's
+   * game time (the same busy state as a conference question), tells the side the check is queued
+   * and, when the stage has written the reading, sends it to every connection of the side. The
+   * client shows it once game time reaches `answerAtGame`. With no umpire or no usable reply the
+   * message says `unavailable`, and nothing else is changed.
+   */
+  private async handleCheckDraft(
+    gameId: string,
+    game: GameActor,
+    conn: Connection,
+    command: Extract<Command, { kind: 'checkDraft' }>,
+  ): Promise<void> {
+    const fail = (code: string, message: string) =>
+      this.send(conn, error(code, `${command.checkId}: ${message}`));
+    if (game.state.world.outcome) return fail('game_over', 'the game has ended');
+    const side = conn.side;
+    const draft = (await this.draftsOf(gameId, side)).get(command.draft);
+    if (!draft) return fail('draft_unknown', `no draft ${command.draft}`);
+    if (!draft.text.trim())
+      return fail('bad_draft', 'the draft is empty; there is nothing to read');
+    const charge = this.staffDesk.ask(
+      gameId,
+      side,
+      'chiefOfStaff',
+      game.gameClock.now(),
+      DRAFT_CHECK_COST_MS,
+    );
+    if (!charge.ok)
+      return fail('staff_busy', 'the chief of staff is still at work on your last request');
+    const { rev, text } = draft;
+    this.broadcastSide(gameId, side, {
+      v: PROTOCOL_VERSION,
+      kind: 'draftCheckQueued',
+      checkId: command.checkId,
+      draft: command.draft,
+      rev,
+      askedAtGame: charge.askedAtGame,
+      answerAtGame: charge.answerAtGame,
+      costMs: charge.costMs,
+    });
+    const officer = staffOfficerFor(game.state.world.seed, side, 'chiefOfStaff');
+    let report;
+    try {
+      const earlier = (await this.sentOrdersOf(gameId, conn)).map((o) => ({
+        id: o.id,
+        text: o.text,
+        sentAtGame: o.sentAtGame,
+      }));
+      report = await game.checkDraft(
+        side,
+        { checkId: command.checkId, draft: command.draft, rev, text },
+        earlier,
+      );
+    } catch (e) {
+      this.onError(gameId, e);
+    }
+    const who = report?.officer ?? officer;
+    this.broadcastSide(gameId, side, {
+      v: PROTOCOL_VERSION,
+      kind: 'draftCheck',
+      checkId: command.checkId,
+      draft: command.draft,
+      rev,
+      basedOnGame: report?.basedOnGame ?? game.state.time,
+      officer: { name: who.name, traits: who.traits },
+      ...(report
+        ? {
+            reading: report.reading,
+            ...(report.unitId === undefined ? {} : { unitId: report.unitId }),
+          }
+        : { unavailable: true as const }),
+      findings: report?.findings ?? [],
+      caveat: STAFF_CHECK_CAVEAT,
+    });
+  }
+
   /** HQ passes a paper in its own view on to the subordinate commanding `unit`. */
   private handleForward(
     gameId: string,
@@ -830,6 +909,11 @@ export class Hub {
     }
     if (command.kind === 'forwardDispatch') {
       this.handleForward(gameId, game, conn, command);
+      return;
+    }
+    if (command.kind === 'checkDraft') {
+      // Not awaited: the model call must not hold up this connection's other commands.
+      void this.handleCheckDraft(gameId, game, conn, command).catch((e) => this.onError(gameId, e));
       return;
     }
     if (command.kind === 'askStaff') {
