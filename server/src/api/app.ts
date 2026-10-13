@@ -24,7 +24,7 @@
  *                                  in hot-seat, `?side=` picks which of the creator's sides
  *   /notifications/*               signed in: notification preferences and web push subscriptions (see ../notify)
  *   GET  /healthz                  liveness, `{ ok: true }`
- *   /admin/api/*                   read-only debug API, only when `admin.enabled` (see ../admin)
+ *   /admin/api/*                   debug API (reads, plus clock controls), only when `admin.enabled` (see ../admin)
  *   GET  /*                        the built client, when `staticDir` is set
  *
  * A seat (one user on one side of one game) is the only way into a game; the session cookie is checked

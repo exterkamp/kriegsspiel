@@ -51,10 +51,12 @@ export type GameCommand =
   /** Manual and fast-forward modes: move game time to this point. */
   | { kind: 'advanceTo'; gameMs: number }
   /**
-   * Admin step (#128): move game time to this point whatever the mode, then leave the mode and
-   * pause state as they were. Replays exactly like `advanceTo`.
+   * Admin step (#128): move game time forward whatever the mode and pause state, which stay as they
+   * were. By `ms`, or to the next queued event when `ms` is absent. The target is resolved when the
+   * command runs and recorded in `gameMs` on the logged command. It stalls at the LLM barrier, so
+   * replay settles to the entry's `endGameMs` (where the step really ended), not to `gameMs`.
    */
-  | { kind: 'step'; gameMs: number }
+  | { kind: 'step'; ms?: number; gameMs?: number }
   /** Pause voting (docs/architecture.md). `by` is a voter's player id. */
   | { kind: 'proposePause'; by: string; reason?: string }
   | { kind: 'proposeResume'; by: string }

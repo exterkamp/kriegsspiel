@@ -1,5 +1,5 @@
 /**
- * Read-only admin API for the debug view (Epic #119, story 8.2). See docs/architecture.md (Admin API).
+ * Admin API for the debug view: reads, plus the clock controls (#128) (Epic #119, story 8.2). See docs/architecture.md (Admin API).
  *
  *   GET /admin/api/games                       open games with clock and trace counts
  *   GET /admin/api/games/:id/state             master state snapshot (unfiltered; never sent to clients)
@@ -205,16 +205,16 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
         command = { kind: 'setRate', rate: b.rate };
         break;
       case 'step':
-        command = { kind: 'step', gameMs: actor.gameClock.now() + b.ms };
+        // The actor resolves the target when the command runs, so a wait in its queue never
+        // leaves the target behind the clock.
+        command = { kind: 'step', ms: b.ms };
         break;
-      case 'stepToNext': {
-        const next = actor.nextEventAt;
-        if (next === undefined) {
+      case 'stepToNext':
+        if (actor.nextEventAt === undefined) {
           return reply.code(409).send({ error: 'no_next_event', message: 'no event is queued' });
         }
-        command = { kind: 'step', gameMs: Math.max(next, actor.gameClock.now()) };
+        command = { kind: 'step' };
         break;
-      }
     }
     const result = await actor.submit(command, { admin: true });
     if (!result.ok)
@@ -222,7 +222,15 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
         error: 'refused',
         message: result.kind === 'rejection' ? result.reason : result.question,
       });
-    return { clock: actor.gameClock.snapshot(), control: controlOf(actor) };
+    // A step the LLM barrier held short: say so, or the bar would look like it did nothing.
+    const barrier = actor.gameClock.barrier;
+    const stalled =
+      command.kind === 'step' && barrier !== undefined && actor.gameClock.now() >= barrier;
+    return {
+      clock: actor.gameClock.snapshot(),
+      control: controlOf(actor),
+      ...(stalled ? { stalledAt: barrier } : {}),
+    };
   });
 
   server.get<{ Params: { id: string }; Querystring: Record<string, string> }>(

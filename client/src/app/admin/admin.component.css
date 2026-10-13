@@ -74,11 +74,8 @@ ks-admin {
   small {
     color: var(--dim);
   }
+  /* Layout from the shared .ks-cluster (ui.css); only the bar's frame here. */
   .controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--ks-space-2);
     padding: var(--ks-space-1) var(--ks-space-2);
     border-bottom: 1px solid var(--ks-rule);
   }

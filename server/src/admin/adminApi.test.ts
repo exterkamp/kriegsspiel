@@ -6,7 +6,8 @@ import { hashToken } from '../auth/store.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { adminFromEnv, isLoopback } from './adminApi.js';
 import { TraceStore, traceUmpire } from '../debug/index.js';
-import { MemoryGameStore } from '../game/index.js';
+import { MemoryGameStore, createRegistry, replayFrom } from '../game/index.js';
+import { restoreEngine } from '../game/actor.js';
 import { MockUmpireClient } from '../umpire/index.js';
 
 const RATE = 3600;
@@ -21,13 +22,17 @@ afterEach(async () => {
 let store: MemoryGameStore;
 let trace: TraceStore;
 
-async function start(admin?: { enabled: boolean; token?: string; open?: boolean }) {
+async function start(
+  admin?: { enabled: boolean; token?: string; open?: boolean },
+  wallNow?: () => number,
+) {
   store = new MemoryGameStore();
   trace = new TraceStore();
   app = await buildApp({
     parser: new StubOrderParser(),
     store,
     admin: admin && { ...admin, trace },
+    wallNow,
   });
   const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
   const user = app.authStore.upsertUser('admin-test@example.test', Date.now());
@@ -506,17 +511,83 @@ describe('clock controls (#128)', () => {
     expect(actor.state.time).toBe(t0 + 60_000);
   });
 
-  it('steps to the next queued event', async () => {
-    const { id } = await start({ enabled: true });
+  it.each([1, 4, 12])(
+    'steps a running realtime game at rate %i by exactly the asked time',
+    async (rate) => {
+      let wall = 1_000_000;
+      const { id } = await start({ enabled: true }, () => wall);
+      const actor = app!.host.get(id)!;
+      expect((await post(id, { action: 'rate', rate })).statusCode).toBe(200);
+      const t0 = actor.gameClock.now();
+      expect((await post(id, { action: 'step', ms: 60_000 })).statusCode).toBe(200);
+      expect(actor.gameClock.now()).toBe(t0 + 60_000);
+      expect(actor.gameClock.status).toBe('running');
+      expect(actor.gameClock.mode).toBe('realtime');
+      wall += 1000;
+      expect(actor.gameClock.now()).toBe(t0 + 60_000 + 1000 * rate);
+    },
+  );
+
+  it.each(['manual', 'fast-forward'] as const)(
+    'steps a %s game and keeps the mode',
+    async (mode) => {
+      const { id } = await start({ enabled: true }, () => 1_000_000);
+      const actor = app!.host.get(id)!;
+      expect((await actor.submit({ kind: 'setMode', mode })).ok).toBe(true);
+      const t0 = actor.state.time;
+      expect((await post(id, { action: 'step', ms: 300_000 })).statusCode).toBe(200);
+      expect(actor.gameClock.mode).toBe(mode);
+      expect(actor.state.time).toBe(t0 + 300_000);
+    },
+  );
+
+  it('records one clock change per step and the resolved target on the log', async () => {
+    const { id } = await start({ enabled: true }, () => 1_000_000);
     const actor = app!.host.get(id)!;
     await post(id, { action: 'pause' });
-    const next = actor.nextEventAt;
+    const before = actor.gameClock.history().length;
+    const t0 = actor.gameClock.now();
+    await post(id, { action: 'step', ms: 60_000 });
+    expect(
+      actor.gameClock
+        .history()
+        .slice(before)
+        .map((c) => c.kind),
+    ).toEqual(['advance']);
+    const log = await store.inputLog(id);
+    expect(log.at(-1)!.command).toEqual({ kind: 'step', ms: 60_000, gameMs: t0 + 60_000 });
+  });
+
+  it('stalls a step at the LLM barrier, says so, and replays to where it stopped', async () => {
+    const { id } = await start({ enabled: true }, () => 1_000_000);
+    const actor = app!.host.get(id)!;
+    await post(id, { action: 'pause' });
+    const held = actor.gameClock.holdAtNow();
+    // Recovery replays the inputs after the snapshot (taken before the step here); it must end
+    // where the live game did.
+    const snap = (await store.loadSnapshot(id))!;
+    const res = await post(id, { action: 'step', ms: 300_000 });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ stalledAt: held });
+    expect(actor.gameClock.now()).toBe(held);
+    expect(actor.state.time).toBe(held);
+    const tail = await store.inputLog(id, snap.seq);
+    expect(tail.some((e) => e.command.kind === 'step')).toBe(true);
+    const replayed = replayFrom(restoreEngine(snap.engine), id, tail, createRegistry());
+    expect(replayed.state.time).toBe(actor.state.time);
+  });
+
+  it('steps to the next queued event and no further', async () => {
+    const { id } = await start({ enabled: true }, () => 1_000_000);
+    const actor = app!.host.get(id)!;
+    await post(id, { action: 'pause' });
+    const next = actor.nextEventAt!;
+    expect(next).toBeGreaterThan(actor.gameClock.now());
     const res = await post(id, { action: 'stepToNext' });
-    if (next === undefined) expect(res.statusCode).toBe(409);
-    else {
-      expect(res.statusCode).toBe(200);
-      expect(actor.gameClock.now()).toBe(Math.max(next, actor.gameClock.now()));
-    }
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).not.toHaveProperty('stalledAt');
+    expect(actor.gameClock.now()).toBe(next);
+    expect(actor.gameClock.status).toBe('paused');
   });
 
   it('rejects bad bodies and unknown games', async () => {

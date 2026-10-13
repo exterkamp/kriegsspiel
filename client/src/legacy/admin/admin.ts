@@ -316,11 +316,10 @@ export class AdminPage {
     try {
       const res = await this.fetchFn(apiUrl(`games/${encodeURIComponent(id)}/state`, this.token));
       if (!current()) return;
-      if (res.status === 404)
-        return (
-          this.controls.setState(undefined),
-          this.statePanel.showMessage('This game is not open; no live state.')
-        );
+      if (res.status === 404) {
+        this.controls.setState(undefined);
+        return this.statePanel.showMessage('This game is not open; no live state.');
+      }
       if (!res.ok) throw new Error(String(res.status));
       const body = (await res.json()) as AdminState;
       if (current()) {

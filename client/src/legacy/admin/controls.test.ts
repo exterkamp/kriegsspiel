@@ -69,6 +69,27 @@ describe('ControlBar', () => {
     await vi.waitFor(() => expect(root.textContent).toContain('Refused: no event is queued'));
   });
 
+  it('says when the umpire held a step short', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ stalledAt: 61_000 }) });
+    const { root, click } = make(fetchFn as unknown as typeof fetch);
+    click('Step 5 min');
+    await vi.waitFor(() => expect(root.textContent).toContain('Held for the umpire at 1:01.'));
+  });
+
+  it('drops the answer for a game that is no longer selected', async () => {
+    let answer!: (r: unknown) => void;
+    const fetchFn = vi.fn(() => new Promise((r) => (answer = r)));
+    const { root, bar, click } = make(fetchFn as unknown as typeof fetch);
+    click('Pause');
+    bar.setGame('other');
+    answer({ ok: false, status: 409, json: async () => ({ message: 'nope' }) });
+    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(root.textContent).not.toContain('Refused');
+  });
+
   it('disables the controls for a finished game', () => {
     const { root, bar } = make(vi.fn() as unknown as typeof fetch);
     bar.setState(state({ clock: { status: 'stopped' } }));

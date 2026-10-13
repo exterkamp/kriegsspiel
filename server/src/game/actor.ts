@@ -1365,18 +1365,18 @@ export class GameActor {
         this.clock.advanceTo(command.gameMs);
         return { ok: true };
       case 'step': {
-        // Step whatever the mode and pause state, then put both back. Each change re-anchors at the
-        // current game time, so only the advance moves it (and it stalls at the LLM barrier).
-        const { mode, status } = this.clock;
-        if (status === 'stopped') throw new Error('clock is stopped');
-        this.clock.setMode('manual');
-        this.clock.resume();
-        try {
-          this.clock.advanceTo(command.gameMs);
-        } finally {
-          if (status === 'paused') this.clock.pause();
-          this.clock.setMode(mode);
-        }
+        // Resolve the target here, under the queue, so it is never behind the clock however long
+        // the command waited. Log it so the audit trail shows where the step was aimed.
+        const from = this.clock.now();
+        const next = this.nextEventAt;
+        if (command.ms === undefined && next === undefined) throw new Error('no event is queued');
+        const target = command.ms === undefined ? Math.max(next!, from) : from + command.ms;
+        entry.command = {
+          kind: 'step',
+          ...(command.ms === undefined ? {} : { ms: command.ms }),
+          gameMs: target,
+        };
+        this.clock.skipTo(target);
         return { ok: true };
       }
       case 'order':

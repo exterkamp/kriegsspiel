@@ -47,7 +47,7 @@ export class ControlBar {
     private readonly fetchFn: typeof fetch = (...a) => fetch(...a),
     private readonly after: () => void = () => undefined,
   ) {
-    root.className = 'controls';
+    root.className = 'controls ks-cluster';
     root.setAttribute('role', 'group');
     root.setAttribute('aria-label', 'Clock controls');
     this.summary = document.createElement('span');
@@ -126,14 +126,19 @@ export class ControlBar {
           body: JSON.stringify(action),
         },
       );
+      // The admin switched games while this was in flight: its answer is not about this game.
+      if (this.gameId !== id) return;
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
         this.message.textContent = `Refused: ${body.message ?? body.error ?? res.status}`;
       } else {
+        const body = (await res.json().catch(() => ({}))) as { stalledAt?: number };
+        if (body.stalledAt !== undefined)
+          this.message.textContent = `Held for the umpire at ${formatGameMs(body.stalledAt)}.`;
         this.after();
       }
     } catch {
-      this.message.textContent = 'Could not reach the server.';
+      if (this.gameId === id) this.message.textContent = 'Could not reach the server.';
     } finally {
       this.busy = false;
       this.sync();
