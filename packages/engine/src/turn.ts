@@ -7,7 +7,7 @@
  * The proposal is the `TurnProposal` zod schema in `@kriegsspiel/protocol`; the engine depends on
  * no package, so it mirrors that shape here (metres and compass degrees, absolute values).
  */
-import { COMBAT_CHECK_EVENT, RALLY_EVENT, distanceMm } from './contact.js';
+import { RALLY_EVENT, distanceMm } from './contact.js';
 import { RALLY_RULES } from './combatRules.js';
 import { turnVictory } from './combat.js';
 import type { EngineState, EventRegistry, Json, NewEvent } from './events.js';
@@ -226,7 +226,8 @@ function fromUnit(u: Unit, at: Point, orders: TurnUnitOutcome['orders'] = []): W
 function marchReachMm(u: Unit, turnMs: number): number {
   const fastest = Math.max(...Object.values(FORMATION_RULES).map((r) => r.moveFactor));
   const road = Math.min(...Object.values(ROAD_CLASS_COST));
-  const metresPerMinute = (unitTypeOf(u).marchMetresPerMinute * fastest * FORCED_PACE_FACTOR) / road;
+  const metresPerMinute =
+    (unitTypeOf(u).marchMetresPerMinute * fastest * FORCED_PACE_FACTOR) / road;
   return mm((metresPerMinute * turnMs) / 60_000);
 }
 
@@ -253,7 +254,16 @@ export function validateProposal(
     reason: string,
     isClamp = true,
   ) => {
-    corrections.push({ kind: 'turn', turn: n, unitId, field, proposed, applied, reason, clamp: isClamp });
+    corrections.push({
+      kind: 'turn',
+      turn: n,
+      unitId,
+      field,
+      proposed,
+      applied,
+      reason,
+      clamp: isClamp,
+    });
     if (isClamp) problems.push(`${unitId}: ${reason}`);
   };
   const empty = (fatal: string): TurnValidation => ({
@@ -310,8 +320,7 @@ export function validateProposal(
       const far = distanceMm(w.center, p.center) > mm(DEPARTURE_TOLERANCE_M);
       const losses =
         Math.abs(w.strength - p.strength) > DEPARTURE_LOSS_SHARE * Math.max(1, u.strength);
-      const status =
-        (w.status === 'captured' ? 'destroyed' : w.status) !== projStatus;
+      const status = (w.status === 'captured' ? 'destroyed' : w.status) !== projStatus;
       if (far || losses || status) {
         wants.set(u.id, { ...fromUnit(p, p.center, w.orders) });
         note(
@@ -372,7 +381,13 @@ export function validateProposal(
       placed.set(u.id, startArrangement(u));
       atStart.add(u.id);
       const s = startAt.get(u.id)!;
-      note(u.id, 'position', proposed, { x: m(s.x), y: m(s.y) }, `refused: ${verdict.reasons.join('; ')}`);
+      note(
+        u.id,
+        'position',
+        proposed,
+        { x: m(s.x), y: m(s.y) },
+        `refused: ${verdict.reasons.join('; ')}`,
+      );
       continue;
     }
     const p = verdict.placement;
@@ -391,7 +406,7 @@ export function validateProposal(
   }
   // A unit put back where it started may now stand in a friend's end position: put that one back
   // too, in unit-id order, until nothing overlaps.
-  for (let changed = true; changed; ) {
+  for (let changed = true; changed;) {
     changed = false;
     for (const id of [...atStart].sort()) {
       const back = placed.get(id)!;
@@ -447,11 +462,21 @@ export function validateProposal(
     if (!inReach) {
       const floor = p ? Math.min(u.strength, p.strength) : u.strength;
       if (strength < floor) {
-        note(u.id, 'strength', strength, floor, 'no enemy could reach it this turn: no combat loss');
+        note(
+          u.id,
+          'strength',
+          strength,
+          floor,
+          'no enemy could reach it this turn: no combat loss',
+        );
         strength = floor;
       }
       if (status === 'destroyed' || status === 'captured') {
-        const back = p ? fromUnit(p, p.center).status : u.status === 'withdrawn' ? 'broken' : 'active';
+        const back = p
+          ? fromUnit(p, p.center).status
+          : u.status === 'withdrawn'
+            ? 'broken'
+            : 'active';
         if (back !== 'destroyed') {
           note(u.id, 'status', status, back, 'no enemy could reach it this turn');
           status = back;
@@ -532,9 +557,11 @@ export function validateProposal(
       }
     }
 
-    const gone = engineStatus === 'destroyed';
-    const center = gone ? startAt.get(u.id)! : where.center;
-    const intent: Intent = gone
+    const dead = engineStatus === 'destroyed';
+    // The engine keeps no men on a destroyed unit; the captured are lost to their side too.
+    if (dead) strength = 0;
+    const center = dead ? startAt.get(u.id)! : where.center;
+    const intent: Intent = dead
       ? { kind: 'idle' }
       : w.continuing.kind === 'hold'
         ? { kind: 'hold', at: { ...center } }
@@ -544,10 +571,10 @@ export function validateProposal(
     outcomes.push({
       unitId: u.id,
       center: { ...center },
-      facing: gone ? u.facing : where.facing,
-      formation: gone ? u.formation : where.formation,
-      footprint: gone ? u.footprint : where.footprint,
-      ...(!gone && where.shape ? { shape: where.shape } : {}),
+      facing: dead ? u.facing : where.facing,
+      formation: dead ? u.formation : where.formation,
+      footprint: dead ? u.footprint : where.footprint,
+      ...(!dead && where.shape ? { shape: where.shape } : {}),
       strength,
       morale,
       fatigue,
@@ -727,7 +754,9 @@ export function registerTurn(registry: EventRegistry<GameState>): void {
     for (const s of world.sides) {
       const inSight = [
         ...new Set(
-          check.observations.filter((o) => o.side === s.id && o.when === 'end').map((o) => o.unitId),
+          check.observations
+            .filter((o) => o.side === s.id && o.when === 'end')
+            .map((o) => o.unitId),
         ),
       ].sort();
       intel[s.id] = { ...intel[s.id], inSight };
@@ -735,17 +764,23 @@ export function registerTurn(registry: EventRegistry<GameState>): void {
     world = { ...world, intel };
 
     const rulings: TurnRuling[] = check.corrections.map((c, i) => {
-      const { clamp: _clamp, ...rest } = c;
       return {
-        ...rest,
+        kind: 'turn',
+        turn: c.turn,
+        unitId: c.unitId,
+        field: c.field,
+        proposed: c.proposed,
+        applied: c.applied,
+        reason: c.reason,
         id: `ruling-${world.rulings.length + i + 1}`,
         time: endMs,
         rationale: c.reason,
         narrative: `The umpire's turn ${n} was corrected for ${c.unitId} (${c.field}): ${c.reason}.`,
       };
     });
+    // The turn flag stays until the next turn begins, so the scan and the other handlers at
+    // this same instant leave the applied outcome as it is.
     world = { ...world, rulings: [...world.rulings, ...rulings], combatActive: false };
-    delete world.turn;
 
     const next: NewEvent[] = [];
     for (const o of check.outcomes) {
@@ -766,7 +801,7 @@ export function registerTurn(registry: EventRegistry<GameState>): void {
     const victory = turnVictory(world, endMs);
     return {
       world: victory.world,
-      schedule: [...next, ...(victory.schedule ?? []), { time: endMs, type: COMBAT_CHECK_EVENT }],
+      schedule: [...next, ...(victory.schedule ?? [])],
       emit: [...emit, ...(victory.emit ?? [])],
     };
   });

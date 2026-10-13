@@ -391,9 +391,10 @@ export interface GameState {
   /** Set once, when the umpire has declared one side's force broken; the game closes soon after (D13). */
   battle?: { winner: SideId; reason: 'attack-broken' | 'defence-broken'; declaredAt: GameTime };
   /**
-   * Set while a turn of a turn-mode game is being resolved (D39). Under the umpire
-   * (`adjudicator: 'umpire'`) the turn is held: units stay where they stood at `startMs`
-   * while the couriers ride, and `umpire.turn` sets the outcome at `endMs`. Absent in real time.
+   * The turn of a turn-mode game being resolved, or the last one, until the next begins (D39).
+   * Under the umpire (`adjudicator: 'umpire'`) the turn is held: units stay where they stood at
+   * `startMs` while the couriers ride, `umpire.turn` sets the outcome at `endMs`, and nothing else
+   * moves the world up to `endMs`. Absent in real time.
    */
   turn?: TurnFlag;
 }

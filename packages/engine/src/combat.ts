@@ -571,7 +571,10 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     const { unitId } = ev.payload as unknown as { unitId: string };
     // A held turn rolls no rally: the try waits for the next one (the give-up still counts).
     if (heldTurn(world, ev.time)) {
-      return { world, schedule: [{ time: ev.time + RALLY_RULES.retryMs, type: RALLY_EVENT, payload: { unitId } }] };
+      return {
+        world,
+        schedule: [{ time: ev.time + RALLY_RULES.retryMs, type: RALLY_EVENT, payload: { unitId } }],
+      };
     }
     const u = world.units.find((x) => x.id === unitId);
     if (!u || u.status !== 'withdrawn' || u.brokenAt === undefined) return { world };
