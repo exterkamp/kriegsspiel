@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, OnInit, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  input,
+  output,
+  signal,
+} from '@angular/core';
+import type { AdminMode } from '@legacy/auth';
 import type { ContinueRow } from '@legacy/shell/continueList';
 import { isHighContrast, setHighContrast } from '../ui/contrast';
 import { PageFrameComponent } from '../ui/page-frame.component';
@@ -24,7 +33,6 @@ const DEV_TOOLS = [
     name: 'Style guide',
     about: 'Tokens and every shared control in each state.',
   },
-  { href: '/admin/', name: 'Admin view', about: 'Operator console; asks for the admin token.' },
 ];
 
 /** The main menu: new game, the continue list, the account, and a word about the game. */
@@ -103,6 +111,12 @@ const DEV_TOOLS = [
                 </a>
               </li>
             }
+            <li>
+              <a href="/admin/" class="ks-row ks-link">
+                <b>{{ admin() === 'open' ? 'Admin view (open)' : 'Admin view' }}</b>
+                <span class="ks-muted">{{ adminAbout() }}</span>
+              </a>
+            </li>
           </ul>
         </section>
       }
@@ -140,6 +154,15 @@ export class MenuComponent implements OnInit {
   readonly guest = input(false);
   /** Show the Developer tools section (server `DEV_TOOLS`). */
   readonly devTools = input(false);
+  /** How the server gates the admin view; unset when it is off, which the link then says. */
+  readonly admin = input<AdminMode | undefined>(undefined);
+  protected readonly adminAbout = computed(() =>
+    this.admin() === 'open'
+      ? 'Operator console; open to anyone who can reach this server.'
+      : this.admin() === 'token'
+        ? 'Operator console; asks for the admin token.'
+        : 'Operator console; off on this server.',
+  );
   readonly newGame = output();
   readonly continueGame = output<string>();
   readonly signOut = output();

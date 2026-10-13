@@ -55,6 +55,22 @@ export async function devToolsEnabled(fetchFn: typeof fetch = fetch): Promise<bo
   }
 }
 
+/** How the server's admin view is gated: `open` (anyone), `token`, or undefined when it is off or cannot be asked. */
+export type AdminMode = 'open' | 'token';
+export async function adminMode(fetchFn: typeof fetch = fetch): Promise<AdminMode | undefined> {
+  try {
+    const res = await fetchFn('/scenarios');
+    if (!res.ok) return undefined;
+    const a = ((await res.json()) as { admin?: unknown }).admin;
+    return a === 'open' || a === 'token' ? a : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Where the admin page opens with `id` already selected. */
+export const debugGameUrl = (id: string): string => `/admin/?game=${encodeURIComponent(id)}`;
+
 /** Starts a guest session. Resolves to an error message, or undefined on success. */
 export async function startGuest(fetchFn: typeof fetch = fetch): Promise<string | undefined> {
   const res = await fetchFn('/auth/guest', { method: 'POST', credentials: 'same-origin' });

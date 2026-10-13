@@ -17,7 +17,7 @@ afterEach(async () => {
   app = undefined;
 });
 
-async function start(admin?: { enabled: boolean; token?: string }) {
+async function start(admin?: { enabled: boolean; token?: string; open?: boolean }) {
   app = await buildApp({ parser: new StubOrderParser(), admin });
   const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
   const user = app.authStore.upsertUser('admin-test@example.test', Date.now());
@@ -112,12 +112,117 @@ describe('gating', () => {
   });
 
   it('reads the flag from the environment', () => {
-    expect(adminFromEnv({})).toEqual({ enabled: false, token: undefined });
+    expect(adminFromEnv({})).toEqual({ enabled: false, token: undefined, open: false });
     expect(adminFromEnv({ ADMIN_ENABLED: 'true', ADMIN_TOKEN: ' t ' })).toEqual({
       enabled: true,
       token: 't',
+      open: false,
     });
     expect(adminFromEnv({ ADMIN_ENABLED: '0' }).enabled).toBe(false);
+  });
+});
+
+describe('open mode (#387)', () => {
+  const REMOTE = '203.0.113.9';
+
+  it('lets any caller read every route with no token, loopback or session', async () => {
+    const { id } = await start({ enabled: true, open: true });
+    for (const url of ['games', `games/${id}/state`, `games/${id}/entries`, `games/${id}/replay`]) {
+      expect((await get(`/admin/api/${url}`, REMOTE)).statusCode).toBe(200);
+    }
+    // Even behind a proxy, with a wrong token.
+    expect(
+      (
+        await get('/admin/api/games', '127.0.0.1', {
+          'x-forwarded-for': REMOTE,
+          authorization: 'Bearer nope',
+        })
+      ).statusCode,
+    ).toBe(200);
+  });
+
+  it('covers open, token, loopback and denied', async () => {
+    const cases: [{ enabled: boolean; token?: string; open?: boolean }, string, number][] = [
+      [{ enabled: true, open: true }, REMOTE, 200], // open
+      [{ enabled: true, token: TOKEN }, '127.0.0.1', 200], // loopback
+      [{ enabled: true, token: TOKEN }, REMOTE, 401], // denied
+      [{ enabled: true }, REMOTE, 401], // denied
+    ];
+    for (const [admin, from, status] of cases) {
+      await app?.server.close();
+      await start(admin);
+      expect((await get('/admin/api/games', from)).statusCode).toBe(status);
+    }
+    await app?.server.close();
+    await start({ enabled: true, token: TOKEN });
+    expect(
+      (await get('/admin/api/games', REMOTE, { authorization: `Bearer ${TOKEN}` })).statusCode,
+    ).toBe(200); // token
+  });
+
+  it('is only on with ADMIN_ENABLED, and the env flag reads', () => {
+    expect(adminFromEnv({ ADMIN_OPEN: '1' }).open).toBe(false);
+    expect(adminFromEnv({ ADMIN_ENABLED: '1', ADMIN_OPEN: 'on' }).open).toBe(true);
+    expect(adminFromEnv({ ADMIN_ENABLED: '1' }).open).toBe(false);
+  });
+
+  it('refuses to start under NODE_ENV=production unless forced', () => {
+    const env = { ADMIN_ENABLED: '1', ADMIN_OPEN: '1', NODE_ENV: 'production' };
+    expect(() => adminFromEnv(env)).toThrow(/ADMIN_OPEN/);
+    expect(adminFromEnv({ ...env, ADMIN_OPEN_FORCE: '1' }).open).toBe(true);
+    // Production without open mode is unaffected.
+    expect(adminFromEnv({ ADMIN_ENABLED: '1', NODE_ENV: 'production' }).open).toBe(false);
+  });
+
+  it('reports the mode in /scenarios, and nothing when admin is off', async () => {
+    await start({ enabled: true, open: true });
+    expect((await get('/scenarios')).json()).toMatchObject({ admin: 'open' });
+    await app?.server.close();
+    await start({ enabled: true });
+    expect((await get('/scenarios')).json()).toMatchObject({ admin: 'token' });
+    await app?.server.close();
+    await start();
+    expect((await get('/scenarios')).json()).not.toHaveProperty('admin');
+  });
+
+  it('shows no login token, session cookie or user email, even when open', async () => {
+    const KEY = 'sk-ant-api03-OPENMODEKEY1234567890';
+    const trace = new TraceStore({ secrets: [KEY] });
+    app = await buildApp({
+      parser: new StubOrderParser(),
+      admin: { enabled: true, open: true, trace },
+    });
+    const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
+    const email = 'someone-private@example.test';
+    const user = app.authStore.upsertUser(email, Date.now());
+    app.authStore.putSession(hashToken('open-session-secret'), user.id, Date.now() + 3_600_000);
+    const made = await fetch(`${base}/games`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'ks_session=open-session-secret' },
+      body: JSON.stringify({ rate: RATE }),
+    });
+    const { id } = (await made.json()) as { id: string };
+    const umpire = traceUmpire(new MockUmpireClient([{ stage: 'judge', output: { v: KEY } }]), {
+      trace,
+      gameId: id,
+      mode: 'live',
+    });
+    await umpire.call({
+      stage: 'judge',
+      promptVersion: 'j1',
+      system: `key=${KEY}`,
+      input: {},
+      schema: { type: 'object' },
+    });
+    for (const url of ['games', `games/${id}/state`, `games/${id}/entries`, `games/${id}/replay`]) {
+      const res = await get(`/admin/api/${url}`, REMOTE, {
+        cookie: 'ks_session=open-session-secret',
+      });
+      expect(res.statusCode).toBe(200);
+      for (const secret of [email, 'open-session-secret', KEY, hashToken('open-session-secret')]) {
+        expect(res.body).not.toContain(secret);
+      }
+    }
   });
 });
 

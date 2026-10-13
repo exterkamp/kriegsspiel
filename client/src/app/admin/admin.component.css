@@ -14,6 +14,9 @@ ks-admin {
   background: var(--ks-page-bg);
   color: var(--fg);
 
+  .open-banner {
+    margin: 0 var(--ks-space-3) var(--ks-space-2);
+  }
   .admin-bar {
     margin: 0;
     padding: var(--ks-space-1) var(--ks-space-3);
