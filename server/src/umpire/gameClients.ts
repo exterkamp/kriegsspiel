@@ -38,7 +38,10 @@ export interface ParserWiringOptions {
   /** The LLM parses orders; false keeps the rule-based parser. */
   llm: boolean;
   clientFor: (gameId: string) => UmpireClient;
-  /** Retried before the stub when the model cannot place an order (set with a local model on `parse`). */
+  /**
+   * Set with a local model (keyless Ollama mode): retried before the stub when the model cannot place
+   * an order, and the check a model's intents must agree with (unit and places) before they stand (#389).
+   */
   cannedParser?: OrderParser;
   onFallback?: (gameId: string, reason: string) => void;
 }
@@ -53,6 +56,7 @@ export function orderParserFor(
     return new InterpretingParser(
       new LlmOrderParser(client, {
         fallbackParser: o.cannedParser ?? new StubOrderParser(),
+        ...(o.cannedParser ? { groundingParser: o.cannedParser } : {}),
         onFallback: (f) => o.onFallback?.(gameId, f.reason),
       }),
       client,

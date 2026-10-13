@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MockUmpireClient } from '../umpire/mockUmpireClient.js';
+import { createUmpireClient } from '../umpire/createUmpireClient.js';
+import { umpireConfigFromEnv } from '../umpire/config.js';
 import { PlaybackUmpireClient } from '../umpire/playbackUmpireClient.js';
 import type { UmpireCallRecord, UmpireFixture } from '../umpire/index.js';
 import { UmpireError } from '../umpire/umpireClient.js';
@@ -197,5 +199,75 @@ describe('failed calls', () => {
     await parser.parse('a', CORPUS_CONTEXT);
     await parser.parse('b', CORPUS_CONTEXT);
     expect(parser.usage()).toEqual({ inputTokens: 200, outputTokens: 20, usd: 0.03 });
+  });
+});
+
+describe('grounding a small model in the names of the order (#389)', () => {
+  const canned = new LlmOrderParser(
+    createUmpireClient({ config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }), env: {} }),
+  );
+  const grounded = (output: unknown) => {
+    const fallbacks: ParserFallback[] = [];
+    const parser = new LlmOrderParser(new MockUmpireClient([reply(output)]), {
+      groundingParser: canned,
+      onFallback: (f) => fallbacks.push(f),
+    });
+    return { parser, fallbacks };
+  };
+  const bridge = { x: 250_000, y: 250_000 };
+
+  it('keeps model intents that name the same unit and places as the order', async () => {
+    const { parser, fallbacks } = grounded({
+      result: 'intents',
+      unitId: 'blue-1',
+      intents: [{ kind: 'move', place: 'bridge' }],
+    });
+    const r = await parser.parse('1st Battalion march to the bridge', CORPUS_CONTEXT);
+    expect(r).toMatchObject({
+      kind: 'intents',
+      unitId: 'blue-1',
+      intents: [{ kind: 'move', to: bridge }],
+    });
+    expect(fallbacks).toEqual([]);
+  });
+
+  it('never lets a model pick a unit the order does not name', async () => {
+    const { parser, fallbacks } = grounded({
+      result: 'intents',
+      unitId: 'blue-3',
+      intents: [{ kind: 'move', place: 'bridge' }],
+    });
+    const r = await parser.parse('Second Battalion: take the bridge and hold it.', CORPUS_CONTEXT);
+    expect(r).toMatchObject({ kind: 'intents', unitId: 'blue-2' });
+    expect(fallbacks[0]?.reason).toMatch(/not grounded.*names blue-2, not blue-3/);
+  });
+
+  it('asks instead of guessing a unit when the order names none', async () => {
+    const { parser } = grounded({
+      result: 'intents',
+      unitId: 'blue-1',
+      intents: [{ kind: 'hold', place: 'bridge' }],
+    });
+    const r = await parser.parse('Hold the bridge at all costs.', CORPUS_CONTEXT);
+    expect(r.kind).toBe('clarification');
+  });
+
+  it('replaces wrong places, and refuses with the rules what the model would carry out', async () => {
+    const wrongPlace = grounded({
+      result: 'intents',
+      unitId: 'blue-1',
+      intents: [{ kind: 'move', place: 'wood-a' }],
+    });
+    expect(
+      await wrongPlace.parser.parse('1st Battalion march to the bridge', CORPUS_CONTEXT),
+    ).toMatchObject({ kind: 'intents', intents: [{ kind: 'move', to: bridge }] });
+    const moon = grounded({
+      result: 'intents',
+      unitId: 'blue-1',
+      intents: [{ kind: 'move', place: 'wood-a' }],
+    });
+    expect((await moon.parser.parse('1st Battalion march to the moon', CORPUS_CONTEXT)).kind).toBe(
+      'rejection',
+    );
   });
 });

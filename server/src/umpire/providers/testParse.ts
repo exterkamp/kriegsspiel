@@ -5,7 +5,8 @@
  *
  * Rules, all deterministic:
  * - A unit is found by id, full name, or an alias (`the cavalry`, `the guns`, `the 1st`). Several
- *   fits and no exact name: ask which. No unit named: the unit nearest the first place is meant.
+ *   fits and no exact name: ask which. No unit named: ask which (the nearest to the first place
+ *   first). Words before the verb that fit none of our units (`3rd Battalion`): refuse.
  *   Words before the verb that fit no unit: refuse.
  * - The order is split into clauses at `and`, `then` and commas. Each clause has a verb (move,
  *   hold/defend/screen, withdraw/fall back, attack) and a place. `it`, `there` or no place in a
@@ -19,7 +20,10 @@
  *   an answer carries one unit.
  * - A place is found by its name, or by its kind (`the wood`) narrowed by words in its name
  *   (`the northern wood`). Several fits: ask which. None: refuse.
- * - Conditions and times ("if pressed", "at noon") are ignored; the intents are the plain order.
+ * - A condition or a time ("if pressed", "at noon"), a negation ("but do not move"), steps that undo
+ *   each other (hold, then advance; fall back from a place and fight for it) and an order to all
+ *   units: ask. Text that is not an order mixed into one (claims of umpire authority, "reveal",
+ *   dice): ask for the order alone. A vague place (`somewhere`, `forward`): ask where.
  */
 import type { ParseOrdersOutput } from '../../orders/llmParser.js';
 
@@ -54,7 +58,10 @@ const VERBS: [RegExp, Kind][] = [
     /\b(?:hold(?:s|ing)?|defend(?:s|ing)?|screen(?:s|ing)?|picket|garrison|occupy|guard|stand)\b/,
     'hold',
   ],
-  [/\b(?:move|march(?:es|ing)?|advance|proceed|go|push|cross|redeploy|shift)\b/, 'move'],
+  [
+    /\b(?:move|march(?:es|ing)?|advance|proceed|go|push|cross|redeploy|shift|take|seize|send)\b/,
+    'move',
+  ],
 ];
 
 /** Words a player uses for a kind of ground; the kind itself always counts too. */
@@ -87,16 +94,7 @@ const UNIT_ALIASES: Record<string, string[]> = {
     'cuirassier',
     'cuirassiers',
   ],
-  infantry: [
-    'infantry',
-    'battalion',
-    'line',
-    'vanguard',
-    'regiment',
-    'grenadier',
-    'grenadiers',
-    'jaegers',
-  ],
+  infantry: ['infantry', 'battalion', 'line', 'regiment', 'grenadier', 'grenadiers', 'jaegers'],
   battalion: ['battalion'],
   squadron: ['squadron'],
   artillery: ['artillery', 'battery', 'guns', 'gun'],
@@ -250,13 +248,100 @@ function leftmostVerb(clause: string): { kind: Kind; index: number; end: number 
   return found;
 }
 
+/** Words that leave the place open: the player must say where. */
+const VAGUE = new Set([
+  'somewhere',
+  'anywhere',
+  'forward',
+  'ahead',
+  'useful',
+  'someone',
+  'somebody',
+]);
+
+/** Words that may stand around a unit's name before the verb ("the 1st Battalion is to defend"). */
+const SUBJECT_FILLER = new Set([
+  ...FILLER,
+  'will',
+  'shall',
+  'is',
+  'are',
+  'must',
+  'should',
+  'now',
+  'you',
+  'your',
+  'sir',
+  'general',
+]);
+
+/** A condition or a time, which the intents cannot carry: the unit acts as soon as the order arrives. */
+const CONDITION =
+  /\b(?:if|unless|once|when|whenever|until|till|after|before|as soon as|at (?:dawn|dusk|noon|midnight|nightfall|daybreak|first light|sunrise|sunset|\d+)|in (?:\d+|an?|one|two|three|four|five|six|ten|half an) (?:minutes?|hours?)|by (?:noon|nightfall|dawn|dusk)|tomorrow|tonight)\b/;
+
+/** Text that is not an order for a unit: claims of authority, requests for hidden things, rule changes. */
+const NOT_AN_ORDER =
+  /\b(?:system|debug|reveal|umpire|declare|victory|tell (?:red|the enemy)|dice|roll|strength|teleport|prompt|instructions?|rules?|validation|game state|disregard|forget)\b/;
+
+const NEGATION = /\b(?:do not|don t|dont|never|not)\b/;
+
 const INJECTION =
   /\b(?:ignore (?:all |the |your )?(?:previous|prior|above)|system prompt|you are now|reveal your|new instructions)\b/;
 
 const distance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.hypot(a.x - b.x, a.y - b.y);
 
+/**
+ * The canned parse. On top of the plain parse (`parseOrder`): text that is not an order, mixed into a
+ * real one, makes it ask for a restatement; a condition or a time, a negation, or steps that undo each
+ * other make it ask; an order with no unit named asks which unit.
+ */
 export function testParse(input: ParseInput): ParseOrdersOutput {
+  const text = normalize(input.order);
+  const plain = parseOrder(input);
+  if (plain.result === 'rejection') return plain;
+  if (NOT_AN_ORDER.test(text)) {
+    if (plain.result !== 'intents') {
+      return { result: 'rejection', reason: 'That is no order for a unit of ours, sir.' };
+    }
+    return {
+      result: 'clarification',
+      question:
+        'Your order has words in it that are no order for a unit of ours, sir. Please restate the order alone.',
+    };
+  }
+  if (plain.result !== 'intents') return plain;
+  if (CONDITION.test(text.replace(/\bat once\b/g, ''))) {
+    return {
+      result: 'clarification',
+      question:
+        'I can carry no condition or hour in an order, sir: the unit acts as soon as it arrives. Please send it without them, or when the moment comes.',
+    };
+  }
+  if (NEGATION.test(text)) {
+    return {
+      result: 'clarification',
+      question: 'Your order says both what to do and what not to do, sir. Which is it?',
+    };
+  }
+  const steps = plain.intents ?? [];
+  const holdThenGo = steps.some(
+    (s, i) =>
+      s.kind === 'hold' && steps.slice(i + 1).some((t) => t.kind === 'move' || t.kind === 'attack'),
+  );
+  const withdrawAndMore = steps.some(
+    (s) => s.kind === 'withdraw' && steps.some((t) => t.place === s.place && t.kind !== 'withdraw'),
+  );
+  if (holdThenGo || withdrawAndMore) {
+    return {
+      result: 'clarification',
+      question: `Your order ${holdThenGo ? 'has the unit hold and then go on' : 'has the unit fall back from where it is also to fight'}, sir. Which do you mean?`,
+    };
+  }
+  return plain;
+}
+
+function parseOrder(input: ParseInput): ParseOrdersOutput {
   const text = normalize(input.order);
   const ask = (question: string, options?: string[]): ParseOrdersOutput => ({
     result: 'clarification',
@@ -270,8 +355,33 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
   if (!leftmostVerb(text))
     return refuse('I cannot find an order in that, sir: march, hold, withdraw or attack?');
 
+  if (
+    /\b(?:all|every|both)\b(?: \w+)? units?\b|\ball (?:the )?(?:battalions|squadrons|troops|men)\b/.test(
+      text,
+    )
+  ) {
+    return ask(
+      'I can carry an order to one unit at a time, sir. Which first?',
+      input.units.map((u) => u.name),
+    );
+  }
+
   // The unit, wherever it is named; then its words come out so they cannot be taken for a place.
   const match = findUnit(text, input.units);
+  // Words before the verb that belong to no unit of ours ("3rd Battalion", "Vanguard Battalion"):
+  // a unit we do not have, not one to guess at. The words are not quoted back: they may name an
+  // enemy unit, which a reply must not echo.
+  const lead = words(text.slice(0, leftmostVerb(text)?.index ?? 0)).filter(
+    (w) => !SUBJECT_FILLER.has(w),
+  );
+  const noSuchUnit = (units: Unit[]) => {
+    const known = new Set([
+      ...units.flatMap((u) => [...words(normalize(u.name)), u.id.toLowerCase()]),
+      ...Object.keys(UNIT_ALIASES),
+    ]);
+    return lead.some((w) => !known.has(w));
+  };
+  if (match.kind === 'many' && noSuchUnit(match.units)) return refuse('We have no such unit, sir.');
   if (match.kind === 'many') {
     return ask(
       `"${match.phrase}" could mean more than one unit, sir. Which one?`,
@@ -296,6 +406,7 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
         [match.unit, ...others.values()].map((u) => u.name),
       );
     }
+    if (noSuchUnit([match.unit])) return refuse('We have no such unit, sir.');
   }
 
   if (match.kind === 'none') {
@@ -335,7 +446,21 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
     const phrase = words(object).filter((w) => !FILLER.has(w));
     const refersBack =
       phrase.length === 0 ||
-      phrase.every((w) => ['it', 'there', 'them', 'here', 'position', 'ground'].includes(w));
+      phrase.every((w) =>
+        [
+          'it',
+          'there',
+          'them',
+          'here',
+          'position',
+          'ground',
+          'your',
+          'our',
+          'current',
+          'fast',
+          'firm',
+        ].includes(w),
+      );
     if (!found && refersBack) continue;
     let place: Place | undefined;
     if (refersBack) {
@@ -351,6 +476,9 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
           input.places.map(placeLabel),
         );
     } else {
+      if (phrase.some((w) => VAGUE.has(w))) {
+        return ask('Where exactly, sir?', input.places.map(placeLabel));
+      }
       const hit = findPlace(object, input.places);
       if (hit.kind === 'none' && intents.length > 0) {
         // The one option is the first part as a whole order, for the desk to send as it stands.
@@ -377,19 +505,18 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
   }
   if (intents.length === 0) return refuse('I cannot find an order in that, sir.');
 
-  let unit: Unit | undefined = match.kind === 'one' ? match.unit : undefined;
-  if (!unit) {
-    // No unit named: the nearest to the first place, which is the one that can act soonest.
+  // No unit named: ask rather than guess. The unit nearest the first place comes first.
+  if (match.kind !== 'one') {
     const anchor = nearestTo;
-    if (!anchor)
-      return ask(
-        'Which unit is this order for, sir?',
-        input.units.map((u) => u.name),
-      );
-    unit = [...input.units].sort(
-      (a, b) => distance(a, anchor) - distance(b, anchor) || (a.id < b.id ? -1 : 1),
-    )[0];
+    const units = anchor
+      ? [...input.units].sort(
+          (a, b) => distance(a, anchor) - distance(b, anchor) || (a.id < b.id ? -1 : 1),
+        )
+      : input.units;
+    return ask(
+      'Which unit is this order for, sir?',
+      units.map((u) => u.name),
+    );
   }
-  if (!unit) return refuse('There is no unit to carry out that order, sir.');
-  return { result: 'intents', unitId: unit.id, intents };
+  return { result: 'intents', unitId: match.unit.id, intents };
 }

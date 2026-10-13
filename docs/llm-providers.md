@@ -48,7 +48,7 @@ Select it with `UMPIRE_PROVIDER=test` (every stage), `UMPIRE_PROVIDER_<STAGE>=te
 
 | Stage | What it does |
 | --- | --- |
-| `parse` | Finds the unit (id, name, or `the cavalry`, `the 1st`), then one or more clauses split at `and`, `then` and commas, each a verb (move, hold/screen/defend, withdraw/fall back, attack) and a place (by name, or by kind narrowed by name words, such as `the northern wood`). `it` or `there` means the place before. No unit named: the unit nearest the first place. Several fits: a clarification with options. An unknown place or unit, no verb, or injected instructions: a rejection with a reason. Conditions and times are ignored. |
+| `parse` | Finds the unit (id, name, or `the cavalry`, `the 1st`), then one or more clauses split at `and`, `then` and commas, each a verb (move, hold/screen/defend, withdraw/fall back, attack) and a place (by name, or by kind narrowed by name words, such as `the northern wood`). `it` or `there` means the place before. Several fits: a clarification with options. It never guesses (#389): no unit named, a condition or an hour (`if pressed`, `at noon`), a negation, steps that undo each other (hold, then advance; fall back from a place and fight for it), an order to all units, a vague place (`somewhere`, `forward`), or other text mixed into a real order (claims of umpire authority, `reveal`, dice): a clarification. An unknown place or unit (words before the verb that fit none of ours, such as `3rd Battalion`, refused without quoting them back), no verb, or text that is no order: a rejection with a reason. It is the keyless demo's order parser; `testProvider.test.ts` holds it to the golden corpus (95%, no injection or ambiguity carried out). |
 | `narrate` | One dispatch per report, built only from the report's own officer, place, size and numbers, so it passes `checkNarration`. |
 | `staff` | One short piece of advice, chosen by the topic keywords of an optional `question` (enemy, supply, fatigue, ground, orders) or else by the officer's role, from counts in the officer's view. |
 | `judge` | No placements. |
@@ -74,6 +74,22 @@ Its output is deterministic and validated like any model's, and recorded through
 | `llama3.2:1b` | 1.3 GB | 2.4 GB | 24/50, 16.6 s / 48.6 s | 1/6, 11.8 s / 72.9 s | 8/8, 19.5 s / 51.0 s |
 
 Narrate "pass" means the first reply passed `checkNarration` (no repair, no template); staff "pass" means a non-silent turn with no rejected reply. Parse "pass" counts the corpus's expected result per order. **No model parses a clear order**: all three score 0/10 in the `clear` category (they leave out `unitId`, or give names where place ids are required) and their 24 passes are clarifications and rejections that the corpus also accepts, with 5/15 on the injection orders. So `parse` is not on the model by default; set `OLLAMA_STAGES=parse,narrate,staff` to try it (an unusable parse falls back to the canned parser, after waiting for the model). `qwen2.5:0.5b` is the default because it is the smallest model that passes narration and almost all staff turns, and it is faster than the 1B model.
+
+**Order parsing on a small model (#389).** Parse stays on the canned rules: no prompt, schema or split of the task that we tried makes a model this size beat them. Runner: `node server/dist/orders/eval/parseExperiments.js <variant> [--model <tag>] [--url <ollama>]` (`server/src/orders/eval/parseExperiments.ts`, after `npm run build -w server`). It scores the golden corpus (50), the issue's 10 sample orders and 14 held-out orders written after the rules were changed, through the production `LlmOrderParser` checks. Same 4-CPU host, temperature 0.2:
+
+| Variant | Model | Corpus (model's own answer) | Clear | Samples | Held-out | Median per call |
+| --- | --- | --- | --- | --- | --- | --- |
+| production prompt and schema | `qwen2.5:0.5b` | 22/50 (2; the rest are the "restate" fallback) | 0/10 | 4/10 | | 4.7 s |
+| + six worked examples | `qwen2.5:0.5b` | 2/50 | 2/10 | 1/10 | | 5.8 s |
+| short ids, no coordinates, rotated lists, strict `enum` schema | `qwen2.5:0.5b` | 7/50 | 7/10 | 1/10 | | 4.9 s |
+| two calls: classify, then fill | `qwen2.5:0.5b` | 11/50 | 6/10 | 3/10 | | 13.8 s |
+| rules pick unit, places, ask/refuse; model gives verbs only | `qwen2.5:0.5b` | 45/50 | 5/10 | 8/10 | 8/14 | 1.7 s |
+| production prompt and schema | `qwen2.5:1.5b` | 17/50 (5) | 5/10 | 6/10 | 4/14 | 6.3 s |
+| short ids, strict schema | `qwen2.5:1.5b` | 15/50 | 9/10 | 5/10 | 6/14 | 5.8 s |
+| canned rules, `main` before #389 | none | 29/50 | 9/10 | 8/10 | 10/14 | 0 |
+| canned rules, after #389 | none | 50/50 | 10/10 | 10/10 | 14/14 (13/14 before `stand fast` was added) | 0 |
+
+The models fail the decision, not only the ids: they answer `intents` to almost every vague, contradictory, impossible, conditional, timed or injected order (often while writing a sensible question next to it), and worked examples make that worse by making wrong answers pass the id checks. With the decision taken in code the 0.5B model still gets half the verb sequences wrong (it copies an example's `move, hold`). The larger runs (`qwen2.5:3b`, `llama3.2:1b/3b`, `gemma3:1b`) were stopped when the owner moved the umpire work to turn-based play (Epic 11, #393). So `OLLAMA_STAGES` keeps its default (`narrate,staff`) and the model takes no part in parsing. If `parse` is put on the model anyway, its `intents` stand only when the canned rules, run on the same order, name the same unit and the same places (`groundingParser` in `LlmOrderParser`, wired in `orderParserFor`); otherwise the rules' answer is used and the disagreement is logged as a parser fallback. Every parse result, model or rules, is in the input log as before, so replay needs no model.
 
 ## Structured output
 

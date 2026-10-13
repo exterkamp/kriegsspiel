@@ -63,8 +63,9 @@ export interface UmpireConfig {
 
 /**
  * The stages `UMPIRE_KEYLESS_PROVIDER=ollama` hands to the local model (`OLLAMA_STAGES` overrides); the rest stay on `test`.
- * Parse is left out by default: on the order corpus the models that fit this host parse no clear order into the
- * expected intents (see docs/llm-providers.md), while narration and staff advice pass their checks.
+ * Parse is left out by default: on the order corpus the models that fit this host answer `intents` to nearly every
+ * order they should ask about or refuse, and the canned rules beat them in every category (#389, docs/llm-providers.md),
+ * while narration and staff advice pass their checks.
  */
 export const OLLAMA_DEFAULT_STAGES: readonly UmpireStage[] = ['narrate', 'staff'];
 const OLLAMA_ELIGIBLE: readonly UmpireStage[] = ['parse', 'narrate', 'staff'];

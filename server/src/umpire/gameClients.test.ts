@@ -98,4 +98,37 @@ describe('orderParserFor', () => {
     expect(calls).toEqual(['Advance']);
     expect(r).toMatchObject({ kind: 'intents', unitId: 'blue-1' });
   });
+
+  it('with a canned parser, keeps a model answer only if it names what the order names (#389)', async () => {
+    const model = new MockUmpireClient([
+      {
+        stage: 'parse',
+        output: {
+          result: 'intents',
+          unitId: 'blue-3',
+          intents: [{ kind: 'move', place: 'bridge' }],
+        },
+      },
+    ]);
+    const canned = {
+      async parse(text: string) {
+        return {
+          kind: 'intents' as const,
+          text,
+          unitId: 'blue-1',
+          intents: [{ kind: 'move' as const, to: { x: 250_000, y: 250_000 } }],
+        };
+      },
+    };
+    const seen: string[] = [];
+    const make = orderParserFor({
+      llm: true,
+      clientFor: () => model,
+      cannedParser: canned,
+      onFallback: (_id, reason) => seen.push(reason),
+    }) as (id: string) => OrderParser;
+    const r = await make('g').parse('1st Battalion march to the bridge', CORPUS_CONTEXT);
+    expect(r).toMatchObject({ kind: 'intents', unitId: 'blue-1' });
+    expect(seen.some((x) => /not grounded/.test(x))).toBe(true);
+  });
 });
