@@ -177,7 +177,7 @@ export interface AppOptions {
    * Debug/admin view (Epic #119). Off unless `enabled`: then no `/admin` route exists and the
    * trace is a no-op. When on, requests must be loopback or carry `token`.
    */
-  admin?: { enabled: boolean; token?: string; trace?: TraceStore };
+  admin?: { enabled: boolean; token?: string; open?: boolean; trace?: TraceStore };
   /**
    * Accounts. Defaults to an in-memory store and a mailer that logs the login link, which suits
    * tests and local development; `main.ts` supplies the SQLite store and a real mailer.
@@ -418,7 +418,14 @@ export async function buildApp(options: AppOptions): Promise<App> {
   // Liveness for the container health check. Does not touch a game or the store.
   server.get('/healthz', async () => ({ ok: true }));
 
-  if (trace) await adminApi(server, { host, trace, store, token: options.admin?.token });
+  if (trace)
+    await adminApi(server, {
+      host,
+      trace,
+      store,
+      token: options.admin?.token,
+      open: options.admin?.open === true,
+    });
 
   if (options.staticDir) {
     await server.register(fastifyStatic, { root: resolve(options.staticDir), redirect: true });
@@ -526,6 +533,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
       : {}),
     // Present when the umpire answers with canned responses, so the game can say so.
     ...(options.testUmpire ? { umpire: 'test' } : {}),
+    // Whether the admin view is mounted, and whether it is open to anyone, so the menu can link to it.
+    ...(trace ? { admin: options.admin?.open === true ? 'open' : 'token' } : {}),
   }));
 
   server.post('/games', async (req, reply) => {
