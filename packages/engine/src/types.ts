@@ -301,6 +301,10 @@ export interface Report {
   text?: string;
   /** For `courierLost`: when the lost order should have reached the unit. */
   orderDueAt?: GameTime;
+  /** A unit's own report written while it was broken and falling back: it does not claim to hold. */
+  routed?: true;
+  /** The unit's first report of the fight since it rallied from a break: it says so. */
+  rallied?: true;
 }
 
 /**

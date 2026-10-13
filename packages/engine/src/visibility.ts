@@ -1,4 +1,4 @@
-import { heldTurn } from './held.js';
+import { heldTurn, reachesHqAt } from './held.js';
 import type { EventRegistry, NewEvent } from './events.js';
 import { schedule } from './queue.js';
 import type { EngineState } from './events.js';
@@ -578,7 +578,7 @@ function scan(world: GameState, time: GameTime): GameState {
         id: `${side}-r${reports.length + 1}`,
         kind: 'contact',
         observedAt: time,
-        deliverAt: time + COURIER_DELAY_MS,
+        deliverAt: reachesHqAt(w, time, COURIER_DELAY_MS),
         from: observer.name,
         location: { ...u.center },
         place: describePlace(w.map, u.center),
@@ -607,7 +607,7 @@ function scan(world: GameState, time: GameTime): GameState {
               id: `${side}-r${reports.length + 1}`,
               kind: 'destroyed',
               observedAt: time,
-              deliverAt: time + COURIER_DELAY_MS,
+              deliverAt: reachesHqAt(w, time, COURIER_DELAY_MS),
               from: observer.name,
               location: { ...u.center },
               place: describePlace(w.map, u.center),
@@ -640,13 +640,13 @@ export function fileReport(
   unit: Unit,
   time: GameTime,
   delayMs: number = COURIER_DELAY_MS,
-  extra: Pick<Report, 'orderDueAt'> = {},
+  extra: Pick<Report, 'orderDueAt' | 'routed' | 'rallied'> = {},
 ): GameState {
   const report: Report = {
     id: reportId(world, unit.side),
     kind,
     observedAt: time,
-    deliverAt: time + delayMs,
+    deliverAt: reachesHqAt(world, time, delayMs),
     from: unit.name,
     location: { ...unit.center },
     place: describePlace(world.map, unit.center),

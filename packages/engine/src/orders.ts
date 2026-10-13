@@ -17,7 +17,7 @@ import type { Pace } from './fatigue.js';
 import { findPath, legCost } from './navigation.js';
 import { describePlace } from './place.js';
 import { schedule } from './queue.js';
-import { heldTurn } from './held.js';
+import { heldTurn, reachesHqAt } from './held.js';
 import { applyIntents, fireOnReceipt, registerStanding } from './standing.js';
 import { COURIER_DELAY_MS, REPORT_EVENT, fileReport } from './visibility.js';
 import {
@@ -330,7 +330,7 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       id: `${captor.side}-d${world.intel[captor.side].documents.length + 1}`,
       kind: 'capturedDispatch' as const,
       capturedAt: ev.time,
-      deliverAt: ev.time + COURIER_DELAY_MS,
+      deliverAt: reachesHqAt(world, ev.time, COURIER_DELAY_MS),
       issuedAt: c.order.issuedAt,
       fromSide: c.side,
       addressedTo: world.units.find((u) => u.id === c.order.to)?.name ?? c.order.to,

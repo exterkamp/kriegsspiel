@@ -148,3 +148,27 @@ describe('the order acknowledgement (#419)', () => {
     }
   });
 });
+
+describe('a broken unit in its notes (#438)', () => {
+  const HOLDS = /\bwe (hold|stand)\b|will not give ground|hold our ground|the men stand well/i;
+  const traits = ['bold and impatient', 'cautious', 'steady veteran', undefined];
+
+  it('never says it holds while it is falling back', () => {
+    for (const kind of ['engaged', 'heavyLosses'] as const) {
+      for (const trait of traits) {
+        for (const id of ids) {
+          const text = fieldNote({ ...report(kind, id), routed: true }, 0, false, { trait }, 7);
+          expect(text).not.toMatch(HOLDS);
+          expect(text).toMatch(/fall(ing)? back|streaming back|go back/);
+        }
+      }
+    }
+  });
+
+  it('says it has rallied in its first report after the rally', () => {
+    for (const id of ids.slice(0, 20)) {
+      const text = fieldNote({ ...report('engaged', id), rallied: true }, 0, false, {}, 7);
+      expect(text).toMatch(/^Sir, we have rallied\. [A-Z]/);
+    }
+  });
+});
