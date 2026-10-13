@@ -94,7 +94,7 @@ Real life happens. The game can be **paused by a vote of all human players** acr
 - Any player can propose a pause, with an optional reason. A single "no" or a timeout cancels the proposal. The host can instead allow a majority.
 - While paused, game time stops. Players can still read, draft and sign orders, but a signed order's courier only leaves when the clock resumes, so nothing can be gained from a pause.
 - Resuming needs everyone to mark themselves ready, or a host-set maximum pause length.
-- An **emergency hold** lets any one player stop the clock for a few minutes, a limited number of times per game, unless a vote ratifies it.
+- An **emergency hold** lets any one player stop the clock at once for five minutes by default, twice per player and six times per game by default (the host can change these), unless the other players ratify it with a vote, which makes it an ordinary pause (D5).
 - If the server was ever down, the game comes back paused and asks everyone to confirm. We never skip game time silently.
 - Pauses are recorded in the journal.
 
@@ -131,7 +131,7 @@ A wing commander's scout report reaches HQ only if they send it, and it takes ti
 
 Both supported, set in the lobby:
 - **Shared HQ.** Everyone on the side sees the same desk and map. Simpler, and good for friends planning together.
-- **Chain of command.** Each human has their own desk and sector. Messages between players take in-game time. Human subordinates can misread or improvise.
+- **Chain of command.** Each human has their own desk and sector. Messages between players take in-game time. Human subordinates can misread or improvise. A subordinate's reports reach HQ only when the subordinate forwards them, and they ride there (distance at courier pace); in shared HQ forwarding takes no time (#79).
 
 ### Session shapes
 

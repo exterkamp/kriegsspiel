@@ -45,6 +45,8 @@ export type GameCommand =
   /** Pause voting (docs/architecture.md). `by` is a voter's player id. */
   | { kind: 'proposePause'; by: string; reason?: string }
   | { kind: 'proposeResume'; by: string }
+  /** Emergency hold (D5): stops the clock now; lapses unless the voters ratify it in time. */
+  | { kind: 'proposeHold'; by: string; reason?: string }
   | { kind: 'vote'; by: string; proposal: string; yes: boolean }
   /** A vote or the maximum pause length ran out. Issued by the actor's own timer. */
   | { kind: 'pauseExpire' }

@@ -25,7 +25,16 @@ import { DraftBook, DraftError } from '../drafts/book.js';
 import { StaffDesk } from './conference.js';
 import { seatKey, sideViewOf } from './sideView.js';
 import { staffOfficerFor } from '../umpire/index.js';
-import { mayForward, viewForRole, type Seat, type SideId } from '@kriegsspiel/engine';
+import {
+  arrivedForwards,
+  mayForward,
+  sendForward,
+  viewForRole,
+  type ChainOfCommand,
+  type Hierarchy,
+  type Seat,
+  type SideId,
+} from '@kriegsspiel/engine';
 import type { Forward } from '../lobby/store.js';
 
 /** The slice of a `ws` socket the hub uses. */
@@ -123,6 +132,10 @@ export class Hub {
       undefined,
     /** Papers HQ has forwarded in a game (kept by the lobby record, so they survive a restart). */
     private readonly forwards: {
+      /** How the game's humans are organised; chain of command makes forwarding take game time. */
+      hierarchy?(gameId: string): Hierarchy;
+      /** The unit ids human subordinates command on a side. */
+      subordinateUnits?(gameId: string, side: SideId): readonly string[];
       list(gameId: string): readonly Forward[];
       add(gameId: string, forward: Forward): void;
     } = { list: () => [], add: () => undefined },
@@ -171,12 +184,38 @@ export class Hub {
     return list;
   }
 
-  /** The ids of papers HQ forwarded to the seat's formations. */
-  private forwardedTo(gameId: string, conn: Connection): string[] {
+  /** The ids of papers HQ forwarded to the seat's formations that have reached them by `now`. */
+  private forwardedTo(gameId: string, conn: Connection, now: number): string[] {
     const units = conn.seat?.role === 'subordinate' ? (conn.seat.units ?? []) : [];
-    return this.forwardsOf(gameId)
-      .filter((f) => f.side === conn.side && units.includes(f.unit))
-      .map((f) => f.dispatchId);
+    return arrivedForwards(this.timedForwards(gameId), conn.side, 'down', now, units);
+  }
+
+  /** Forwards with their times; a record made before forwarding took time arrived when sent. */
+  private timedForwards(gameId: string) {
+    return this.forwardsOf(gameId).map((f) => ({
+      side: f.side as SideId,
+      dispatchId: f.dispatchId,
+      unit: f.unit,
+      direction: f.direction ?? ('down' as const),
+      sentAt: f.sentAt ?? 0,
+      deliverAt: f.deliverAt ?? 0,
+    }));
+  }
+
+  private hierarchyOf(gameId: string): Hierarchy {
+    return this.forwards.hierarchy?.(gameId) ?? 'shared';
+  }
+
+  /**
+   * In a chain of command, the human subordinates' formations and the reports forwarded up to HQ
+   * that have arrived. Undefined in shared HQ, where HQ sees every report of the side at once.
+   */
+  private chainOf(gameId: string, side: SideId, now: number): ChainOfCommand | undefined {
+    if (this.hierarchyOf(gameId) !== 'chain') return undefined;
+    return {
+      subordinateUnits: this.forwards.subordinateUnits?.(gameId, side) ?? [],
+      deliveredUp: arrivedForwards(this.timedForwards(gameId), side, 'up', now),
+    };
   }
 
   private viewOf(gameId: string, game: GameActor, conn: Connection) {
@@ -185,10 +224,11 @@ export class Hub {
       conn.side,
       game.gameClock.snapshot(),
       conn.seat,
-      conn.seat ? this.forwardedTo(gameId, conn) : [],
+      conn.seat ? this.forwardedTo(gameId, conn, game.state.time) : [],
       game.narrationFor(conn.side),
       game.staffHistoryFor(conn.side),
       game.overloadedFor(conn.side),
+      this.chainOf(gameId, conn.side, game.state.time),
     );
   }
 
@@ -654,6 +694,7 @@ export class Hub {
         kind: state.phase === 'resume_proposed' ? 'resume' : 'pause',
         ...(bySide === undefined ? {} : { bySide }),
         byYou: conn.userId !== undefined && open.by === conn.userId,
+        ...(open.hold ? { hold: true } : {}),
         ...(open.reason === undefined ? {} : { reason: open.reason }),
         yes: votes.filter((v) => v).length,
         no: votes.filter((v) => !v).length,
@@ -663,7 +704,8 @@ export class Hub {
       };
     }
     // The countdown changes every push, so only the rest decides whether anything is new.
-    const key = JSON.stringify([state.phase, proposal && { ...proposal, msLeft: 0 }]);
+    const holdsLeft = conn.userId === undefined ? undefined : game.holdsLeftFor(conn.userId);
+    const key = JSON.stringify([state.phase, proposal && { ...proposal, msLeft: 0 }, holdsLeft]);
     if (key === conn.lastPause) return;
     conn.lastPause = key;
     this.send(conn, {
@@ -671,6 +713,7 @@ export class Hub {
       kind: 'pauseState',
       phase: state.phase,
       ...(proposal ? { proposal } : {}),
+      ...(holdsLeft === undefined ? {} : { holdsLeft }),
     });
   }
 
@@ -724,7 +767,14 @@ export class Hub {
       return;
     }
     // Only a paper the forwarder can see themselves can be passed on.
-    const mine = viewForRole(world, conn.side, conn.seat, game.state.time);
+    const mine = viewForRole(
+      world,
+      conn.side,
+      conn.seat,
+      game.state.time,
+      [],
+      this.chainOf(gameId, conn.side, game.state.time),
+    );
     const known = [...mine.reports, ...mine.documents].some((p) => p.id === command.dispatchId);
     if (!known) {
       this.send(conn, error('no_such_dispatch', 'you hold no such paper'));
@@ -734,17 +784,61 @@ export class Hub {
       (f) => f.side === conn.side && f.unit === command.unit && f.dispatchId === command.dispatchId,
     );
     if (!already) {
-      const forward = { side: conn.side, dispatchId: command.dispatchId, unit: command.unit };
-      this.forwards.add(gameId, forward);
-      this.forwardsOf(gameId).push(forward);
-      this.notify(gameId);
+      this.record(gameId, game, conn.side, command.dispatchId, command.unit, 'down');
     }
+  }
+
+  /** File a forward, timed by the hierarchy and the distance, and tell the table. */
+  private record(
+    gameId: string,
+    game: GameActor,
+    side: SideId,
+    dispatchId: string,
+    unit: string,
+    direction: 'down' | 'up',
+  ): void {
+    const { sentAt, deliverAt } = sendForward(
+      game.state.world,
+      side,
+      this.hierarchyOf(gameId),
+      { dispatchId, unit, direction },
+      game.state.time,
+    );
+    const forward: Forward = { side, dispatchId, unit, direction, sentAt, deliverAt };
+    this.forwards.add(gameId, forward);
+    this.forwardsOf(gameId).push(forward);
+    this.notify(gameId);
+  }
+
+  /** A subordinate sends a report one of their own formations filed up to HQ. */
+  private handleForwardReport(
+    gameId: string,
+    game: GameActor,
+    conn: Connection,
+    command: Extract<Command, { kind: 'forwardReport' }>,
+  ): void {
+    if (conn.seat?.role !== 'subordinate') {
+      this.send(conn, error('not_permitted', 'only a subordinate sends their reports up'));
+      return;
+    }
+    const world = game.state.world;
+    const mine = viewForRole(world, conn.side, conn.seat, game.state.time);
+    const report = mine.reports.find((r) => r.id === command.reportId);
+    const unit = report && world.units.find((u) => u.name === report.from && u.side === conn.side);
+    if (!report || !unit || !(conn.seat.units ?? []).includes(unit.id)) {
+      this.send(conn, error('no_such_dispatch', 'none of your formations filed that report'));
+      return;
+    }
+    const already = this.forwardsOf(gameId).some(
+      (f) => f.side === conn.side && f.direction === 'up' && f.dispatchId === command.reportId,
+    );
+    if (!already) this.record(gameId, game, conn.side, command.reportId, unit.id, 'up');
   }
 
   private async handlePauseCommand(
     game: GameActor,
     conn: Connection,
-    command: Extract<Command, { kind: 'proposePause' | 'proposeResume' | 'vote' }>,
+    command: Extract<Command, { kind: 'proposePause' | 'proposeHold' | 'proposeResume' | 'vote' }>,
   ): Promise<void> {
     if (!game.pauseState) {
       this.send(conn, error('pause_unavailable', 'this game has no pause voting'));
@@ -766,6 +860,9 @@ export class Hub {
         });
       } else if (command.kind === 'proposeResume') {
         result = await game.submit({ kind: 'proposeResume', by });
+      } else if (command.kind === 'proposeHold') {
+        const reason = command.reason?.trim();
+        result = await game.submit({ kind: 'proposeHold', by, ...(reason ? { reason } : {}) });
       } else {
         const reason = command.reason?.trim();
         result = await game.submit({ kind: 'proposePause', by, ...(reason ? { reason } : {}) });
@@ -779,6 +876,9 @@ export class Hub {
     const text = result.kind === 'rejection' ? result.reason : '';
     if (/not a voter/.test(text)) {
       this.send(conn, error('not_a_voter', 'you do not vote in this game'));
+    } else if (/hold limit/.test(text)) {
+      // Fixed wording: it says no hold is left, not whose holds were used.
+      this.send(conn, error('hold_refused', 'no emergency hold is left to you in this game'));
     } else if (/already voted/.test(text)) {
       this.send(conn, error('pause_refused', 'you have already voted on that'));
     } else {
@@ -876,6 +976,7 @@ export class Hub {
     }
     if (
       command.kind === 'proposePause' ||
+      command.kind === 'proposeHold' ||
       command.kind === 'proposeResume' ||
       command.kind === 'vote'
     ) {
@@ -884,6 +985,10 @@ export class Hub {
     }
     if (command.kind === 'forwardDispatch') {
       this.handleForward(gameId, game, conn, command);
+      return;
+    }
+    if (command.kind === 'forwardReport') {
+      this.handleForwardReport(gameId, game, conn, command);
       return;
     }
     if (command.kind === 'askStaff') {

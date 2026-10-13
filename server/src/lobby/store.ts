@@ -18,6 +18,9 @@ export interface PauseSettings {
   rule: 'unanimous' | 'majority';
   voteTimeoutMs?: number;
   maxPauseMs?: number;
+  holdMs?: number;
+  holdsPerPlayer?: number;
+  holdsPerGame?: number;
 }
 
 /**
@@ -37,6 +40,11 @@ export interface Forward {
   side: string;
   dispatchId: string;
   unit: string;
+  /** `down` (the default, for records made before reports could go up) or `up` to HQ. */
+  direction?: 'down' | 'up';
+  /** Game time it was sent and when it arrives; absent on older records, which arrived at once. */
+  sentAt?: number;
+  deliverAt?: number;
 }
 
 export interface LobbyGame {
@@ -55,8 +63,10 @@ export interface LobbyGame {
   removed?: string[];
   /** Players holding a staff or subordinate role beside the side's commander. None: shared HQ. */
   roles?: RoleSeat[];
-  /** Papers HQ forwarded to subordinates. */
+  /** Papers passed along the chain (HQ to a subordinate, or a subordinate's report up to HQ). */
   forwards?: Forward[];
+  /** How the humans of a side are organised. Unset: shared HQ, so forwarding takes no time. */
+  hierarchy?: 'shared' | 'chain';
   createdAtMs: number;
 }
 

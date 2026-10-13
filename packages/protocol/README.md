@@ -13,6 +13,7 @@ Helpers: `parseCommand` / `parseServerMessage` (JSON string to `{ ok, value | er
 | `issueOrder`   | `orderId`, `draft` or `text` | signs a draft, or sends the order wording directly (until drafts exist); exactly one of the two |
 | `setReady`     | `ready`                     | resume-from-pause readiness     |
 | `proposePause` | `reason?`                   | starts a pause vote             |
+| `proposeHold`  | `reason?`                   | emergency hold (D5): stops the clock now, lapses unless ratified by `vote` |
 | `vote`         | `proposal`, `yes`           | vote on a proposal              |
 | `draftEdit`    | `draft`, `ops: unknown[]`   | stub; op shape not yet designed |
 

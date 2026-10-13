@@ -101,14 +101,20 @@ interface Table {
 }
 
 /** A lobby game with blue's commander, red's player, and three more blue players, not yet started. */
-async function lobbyTable(): Promise<Table> {
+async function lobbyTable(hierarchy?: 'shared' | 'chain'): Promise<Table> {
   const { base, ws } = await start();
   const [lead, red, cos, intel, sub] = await Promise.all(
     ['lead', 'red', 'cos', 'intel', 'sub'].map((n) => signIn(base, `${n}@example.test`)),
   );
   const created = await fetch(
     `${base}/games`,
-    post(lead!, { lobby: true, rate: RATE, sessionType: 'team_vs_team', side: 'blue' }),
+    post(lead!, {
+      lobby: true,
+      rate: RATE,
+      sessionType: 'team_vs_team',
+      side: 'blue',
+      ...(hierarchy ? { hierarchy } : {}),
+    }),
   );
   const { id } = (await created.json()) as { id: string };
   expect((await fetch(`${base}/games/${id}/join`, post(red!, { side: 'red' }))).status).toBe(200);
@@ -368,6 +374,63 @@ describe('forwarding from HQ', () => {
     expect(sub.lastView()!.dispatches.map((d) => d.id)).toContain(id);
     // It reached the subordinate and nobody else new: the staff view of blue-1's unit is unchanged.
     expect(sub.lastView()!.ownUnits.map((u) => u.id)).toEqual(['blue-2']);
+    app!.hub.closeAll();
+  });
+});
+
+describe('forwarding up the chain of command', () => {
+  async function seated(hierarchy: 'shared' | 'chain') {
+    const t = await lobbyTable(hierarchy);
+    await startTable(t);
+    const url = `${t.ws}/games/${t.id}/ws`;
+    const lead = await Tap.open(url, t.lead);
+    const cos = await Tap.open(url, t.cos);
+    const sub = await Tap.open(url, t.sub);
+    await Promise.all(
+      [lead, cos, sub].map((c) => c.until((m) => m.find((x) => x.kind === 'viewUpdate'))),
+    );
+    // The subordinate's formation receives an order and files a report.
+    lead.send({ kind: 'issueOrder', orderId: 'u1', text: 'blue-2 march to the bridge' });
+    const filed = await sub.until((m) =>
+      m.find((x) => x.kind === 'dispatch' && x.dispatch.text.includes('received its orders')),
+    );
+    return { lead, cos, sub, id: (filed as { dispatch: { id: string } }).dispatch.id };
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 300));
+
+  it('keeps a subordinate report off HQ desks until the subordinate forwards it', async () => {
+    const { lead, cos, sub, id } = await seated('chain');
+    await settle();
+    for (const hq of [lead, cos]) {
+      expect(hq.lastView()!.dispatches.map((d) => d.id)).not.toContain(id);
+      expect(hq.messages.some((x) => x.kind === 'dispatch' && x.dispatch.id === id)).toBe(false);
+    }
+
+    // Only a subordinate sends reports up, and only their own formation's.
+    lead.send({ kind: 'forwardReport', reportId: id });
+    expect(await lead.until((m) => m.find((x) => x.kind === 'error'))).toMatchObject({
+      code: 'not_permitted',
+    });
+    sub.send({ kind: 'forwardReport', reportId: 'nope' });
+    expect(await sub.until((m) => m.find((x) => x.kind === 'error'))).toMatchObject({
+      code: 'no_such_dispatch',
+    });
+
+    sub.send({ kind: 'forwardReport', reportId: id });
+    // It takes game time to ride to HQ, then arrives.
+    const arrived = await lead.until((m) =>
+      m.find((x) => x.kind === 'dispatch' && x.dispatch.id === id),
+    );
+    expect(arrived).toBeDefined();
+    expect(lead.lastView()!.dispatches.map((d) => d.id)).toContain(id);
+    app!.hub.closeAll();
+  });
+
+  it('shows HQ the same report at once in shared HQ', async () => {
+    const { lead, id } = await seated('shared');
+    expect(
+      await lead.until((m) => m.find((x) => x.kind === 'dispatch' && x.dispatch.id === id)),
+    ).toBeDefined();
     app!.hub.closeAll();
   });
 });

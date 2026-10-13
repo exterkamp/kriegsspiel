@@ -89,6 +89,10 @@ const PauseSettings = z
   .object({
     rule: z.enum(['unanimous', 'majority']),
     voteTimeoutMs: z.number().int().min(1000).max(3_600_000).optional(),
+    // Emergency hold (D5): how long it stops the clock, and how many a player and the game may call.
+    holdMs: z.number().int().min(1000).max(3_600_000).optional(),
+    holdsPerPlayer: z.number().int().min(0).max(20).optional(),
+    holdsPerGame: z.number().int().min(0).max(100).optional(),
     maxPauseMs: z
       .number()
       .int()
@@ -105,6 +109,7 @@ const CreateGame = z
     side: SideName.optional(),
     sessionType: z.enum(SESSION_TYPES as [SessionType, ...SessionType[]]).optional(),
     pause: PauseSettings.optional(),
+    hierarchy: z.enum(['shared', 'chain']).optional(),
     lobby: z.boolean().optional(),
   })
   .strict();
@@ -323,6 +328,11 @@ export async function buildApp(options: AppOptions): Promise<App> {
       );
     },
     {
+      hierarchy: (id) => lobby.get(id)?.hierarchy ?? 'shared',
+      subordinateUnits: (id, side) =>
+        (lobby.get(id)?.roles ?? [])
+          .filter((r) => r.side === side && r.role === 'subordinate')
+          .flatMap((r) => r.units ?? []),
       list: (id) => lobby.get(id)?.forwards ?? [],
       add: (id, f: Forward) => {
         const rec = lobby.get(id);
@@ -577,6 +587,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
       rate: body.data.rate ?? 1,
       sessionType,
       ...(body.data.pause ? { pause: body.data.pause } : {}),
+      ...(body.data.hierarchy ? { hierarchy: body.data.hierarchy } : {}),
       creator: user.id,
       status: 'lobby',
       ready: [],
