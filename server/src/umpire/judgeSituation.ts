@@ -8,14 +8,20 @@
  * once and then replaced by the standard rule (modifier 0, `fallback`), so a tiny or absent
  * model never blocks a game or changes an outcome unpredictably.
  */
-import { JUDGMENT_CAP, caseLaw, precedentFor } from '@kriegsspiel/engine';
+import { JUDGMENT_CAP, caseLaw, judgmentCap, precedentFor } from '@kriegsspiel/engine';
 import type { GameState, JudgmentProposal, JudgmentRequest } from '@kriegsspiel/engine';
+import type { UmpirePersona } from '@kriegsspiel/protocol';
+import { withPersona } from './persona.js';
 import { checkProseAgainst, proseFactsOf } from './narrate.js';
 import type { JsonSchema, UmpireClient } from './umpireClient.js';
 
 export const JUDGE_SITUATION_PROMPT_VERSION = 'judge-situation-v1';
 
-export const JUDGE_SITUATION_SYSTEM = `You are the umpire of a Napoleonic wargame in the tradition of Kriegsspiel. The rules do not cover the situation you are given, so you rule on it. Return "modifier": a number from -${JUDGMENT_CAP} to ${JUDGMENT_CAP}, the fraction by which the rule's usual figure is better (positive) or worse (negative) for the unit in this situation; 0 means the usual rule stands. The engine clamps anything beyond the range, so do not try to exceed it. "caseLaw" lists your earlier rulings in this game: rule the same way on a like situation, and say so. Give "rationale" (your reasoning, for the record) and "narrative" (one plain sentence for the players, using only names and numbers from the situation). Reply with the JSON object only.`;
+/** The system prompt for a game whose judgment cap is `cap` (the rigid-to-free dial, 3.11). */
+export const judgeSituationSystem = (cap: number) =>
+  `You are the umpire of a Napoleonic wargame in the tradition of Kriegsspiel. The rules do not cover the situation you are given, so you rule on it. Return "modifier": a number from -${cap} to ${cap}, the fraction by which the rule's usual figure is better (positive) or worse (negative) for the unit in this situation; 0 means the usual rule stands. The engine clamps anything beyond the range, so do not try to exceed it. "caseLaw" lists your earlier rulings in this game: rule the same way on a like situation, and say so. Give "rationale" (your reasoning, for the record) and "narrative" (one plain sentence for the players, using only names and numbers from the situation). Reply with the JSON object only.`;
+
+export const JUDGE_SITUATION_SYSTEM = judgeSituationSystem(JUDGMENT_CAP);
 
 export const JUDGE_SITUATION_SCHEMA: JsonSchema = {
   type: 'object',
@@ -39,7 +45,7 @@ export function judgeSituationInput(world: GameState, request: JudgmentRequest) 
   return {
     key: request.key,
     situation: request.situation,
-    cap: JUDGMENT_CAP,
+    cap: judgmentCap(world),
     gameMinutes: Math.round(world.time / 600) / 100,
     caseLaw: caseLaw(world).map((r) => ({
       key: r.key,
@@ -55,6 +61,8 @@ export interface JudgeSituationOptions {
   maxCalls?: number;
   /** Names that must not appear in the narrative (the other side's hidden terms). */
   hidden?: readonly string[];
+  /** The umpire's voice (3.11); tone only. Default the dry staff officer. */
+  persona?: UmpirePersona;
 }
 
 export interface JudgeSituationResult {
@@ -127,6 +135,15 @@ export async function judgeSituation(
       },
     };
   }
+  const cap = judgmentCap(world);
+  if (cap === 0) {
+    // Rigid dial: the tables decide, so there is nothing for the judge to rule and no call to make.
+    return {
+      calls: 0,
+      reason: 'rigid dial',
+      proposal: { request, modifier: 0, ...STANDARD_RULE, fallback: true },
+    };
+  }
   const input = judgeSituationInput(world, request);
   const facts = proseFactsOf(input);
   const maxCalls = Math.max(1, opts.maxCalls ?? 2);
@@ -138,7 +155,7 @@ export async function judgeSituation(
       const { output } = await client.call<JudgeSituationOutput>({
         stage: 'judge',
         promptVersion: JUDGE_SITUATION_PROMPT_VERSION,
-        system: JUDGE_SITUATION_SYSTEM,
+        system: withPersona(judgeSituationSystem(cap), opts.persona),
         input,
         schema: JUDGE_SITUATION_SCHEMA,
       });

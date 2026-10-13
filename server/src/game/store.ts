@@ -8,7 +8,7 @@
 import { appendFile, mkdir, readFile, truncate, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Seat } from '@kriegsspiel/engine';
-import type { DraftSnapshot, Mark, StaffExchange } from '@kriegsspiel/protocol';
+import type { DraftSnapshot, Mark, StaffExchange, UmpireSettings } from '@kriegsspiel/protocol';
 import type { UmpireCallRecord } from '../umpire/umpireClient.js';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
@@ -82,6 +82,8 @@ export interface InputLogHeader {
   scenarioId: string;
   /** Seed of the game's RNG. */
   seed: number;
+  /** Umpire settings chosen at creation (3.11). Absent on older games: the defaults. Replay applies the dial. */
+  settings?: UmpireSettings;
 }
 
 export interface InputLogEntry {

@@ -37,6 +37,12 @@ import websocket from '@fastify/websocket';
 import { holdTheBridge, loadScenario, type Seat, type SideId } from '@kriegsspiel/engine';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { spaFallback } from './spaFallback.js';
+import {
+  DEFAULT_UMPIRE_DIAL,
+  DEFAULT_UMPIRE_PERSONA,
+  DIALS,
+  PERSONAS,
+} from '@kriegsspiel/protocol';
 import { z } from 'zod';
 import type { WallClock } from '../clock.js';
 import {
@@ -105,6 +111,9 @@ const CreateGame = z
     side: SideName.optional(),
     sessionType: z.enum(SESSION_TYPES as [SessionType, ...SessionType[]]).optional(),
     pause: PauseSettings.optional(),
+    /** The rigid-to-free dial and the umpire's persona (3.11); both optional, defaulting to standard and dry. */
+    dial: z.enum(DIALS).optional(),
+    persona: z.enum(PERSONAS).optional(),
     lobby: z.boolean().optional(),
   })
   .strict();
@@ -507,6 +516,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     status: rec.status,
     sessionType: rec.sessionType,
     rate: rec.rate,
+    ...(rec.umpire ? { umpire: rec.umpire } : {}),
     side: sideFor(rec, userId) ?? null,
     creator: rec.creator === userId,
     createdAtMs: rec.createdAtMs,
@@ -562,6 +572,10 @@ export async function buildApp(options: AppOptions): Promise<App> {
       rate: body.data.rate ?? 1,
       sessionType,
       ...(body.data.pause ? { pause: body.data.pause } : {}),
+      umpire: {
+        dial: body.data.dial ?? DEFAULT_UMPIRE_DIAL,
+        persona: body.data.persona ?? DEFAULT_UMPIRE_PERSONA,
+      },
       creator: user.id,
       status: 'lobby',
       ready: [],
@@ -586,6 +600,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
         scenario,
         rate: rec.rate,
         sessionType,
+        umpire: rec.umpire,
         side: sessionType === 'hot_seat' ? playable[0]! : side,
         ws: `/games/${rec.id}/ws`,
       };
@@ -602,7 +617,10 @@ export async function buildApp(options: AppOptions): Promise<App> {
   /** Create the game's actor and mark the record started. Returns an error code on failure. */
   const startGame = async (rec: LobbyGame): Promise<string | undefined> => {
     try {
-      await host.create(rec.id, loadScenarioById(rec.scenario), { rate: rec.rate });
+      await host.create(rec.id, loadScenarioById(rec.scenario), {
+        rate: rec.rate,
+        settings: rec.umpire,
+      });
     } catch (e) {
       server.log.error({ err: e, gameId: rec.id }, 'could not start game');
       return 'start_failed';

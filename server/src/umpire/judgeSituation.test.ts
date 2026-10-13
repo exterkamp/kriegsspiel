@@ -189,3 +189,52 @@ describe('judge situation: hidden names and injection', () => {
     for (const s of secrets) expect(text).not.toContain(s.value);
   });
 });
+
+describe('judge situation: the rigid-to-free dial and personas (3.11)', () => {
+  const withDial = (dial: 'rigid' | 'standard' | 'free') => ({
+    ...loadScenario(holdTheBridge),
+    dial,
+  });
+
+  it('free allows a wider swing than standard; the engine clamps at the dial’s cap', async () => {
+    const standard = await ruleOn(
+      new MockUmpireClient([answer({ modifier: 9 })]),
+      withDial('standard'),
+    );
+    const free = await ruleOn(new MockUmpireClient([answer({ modifier: 9 })]), withDial('free'));
+    expect(standard.world.rulings[0]).toMatchObject({ modifier: 0.25, clamped: true });
+    expect(free.world.rulings[0]).toMatchObject({ modifier: 0.4, clamped: true });
+  });
+
+  it('rigid makes no model call and applies no modifier, and leaves no case law', async () => {
+    const client = new MockUmpireClient([answer({ modifier: 0.2 })]);
+    const { result, world } = await ruleOn(client, withDial('rigid'));
+    expect(client.calls).toHaveLength(0);
+    expect(result.proposal).toMatchObject({ modifier: 0, fallback: true });
+    expect(world.rulings[0]).toMatchObject({ modifier: 0 });
+    expect(world.rulings.filter((r) => r.kind === 'judgment' && !r.fallback)).toHaveLength(0);
+  });
+
+  it('tells the model the dial’s cap, and a persona changes only the prompt text', async () => {
+    const seen: UmpireRequest[] = [];
+    const spy = (persona?: 'dry' | 'pedantic' | 'dramatic') => ({
+      call: async (req: UmpireRequest) => {
+        seen.push(req);
+        return { output: testReply(req.schema, req.input as never), record: {} as never };
+      },
+    });
+    const w = withDial('free');
+    const runs = [];
+    for (const persona of [undefined, 'pedantic', 'dramatic'] as const) {
+      const r = await judgeSituation(spy(persona) as unknown as MockUmpireClient, w, request, {
+        persona,
+      });
+      runs.push(r.proposal);
+    }
+    expect(seen[0]!.system).toContain('-0.4 to 0.4');
+    expect(new Set(seen.map((s) => s.system)).size).toBe(3);
+    expect(new Set(seen.map((s) => JSON.stringify(s.schema))).size).toBe(1);
+    expect(new Set(seen.map((s) => JSON.stringify(s.input))).size).toBe(1);
+    expect(new Set(runs.map((p) => p.modifier)).size).toBe(1);
+  });
+});

@@ -53,7 +53,7 @@ import {
   type UmpireRequest,
   type UmpireClient,
 } from '../umpire/index.js';
-import type { StaffExchange } from '@kriegsspiel/protocol';
+import type { StaffExchange, UmpirePersona } from '@kriegsspiel/protocol';
 import type { GameCommand, GameStore, InputLogEntry } from './store.js';
 
 /** Timer functions, injectable so tests can run on a fake clock. */
@@ -136,6 +136,8 @@ export interface GameActorOptions {
    * in its view. Unset: players see the template text.
    */
   umpire?: UmpireClient;
+  /** The umpire's voice for narration (3.11); tone only. Default the dry staff officer. */
+  persona?: UmpirePersona;
   /** Server-side agents that play scripted sides (see `opponent/`). */
   agents?: SideAgent[];
   /** Pause voting: who votes and the host's rules. Unset: the vote commands are refused. */
@@ -214,6 +216,7 @@ export class GameActor {
   private readonly dependencies = new Map<number, Dependency>();
   private nextDependency = 1;
   private readonly umpire: UmpireClient | undefined;
+  private readonly persona: UmpirePersona | undefined;
   /** Game time up to which each side's reports have been handed to the narrate stage. */
   private readonly narratedUntil = new Map<string, number>();
   private readonly narrations = new Map<string, SideNarration>();
@@ -258,6 +261,7 @@ export class GameActor {
     this.parseRetryDelayMs = options.parseRetryDelayMs ?? DEFAULT_PARSE_RETRY_DELAY_MS;
     this.seq = options.seq ?? 0;
     this.umpire = options.umpire;
+    this.persona = options.persona;
     for (const [side, list] of options.staffHistory ?? []) this.staffHistory.set(side, [...list]);
     // Reports from before this actor started (a reopened game) keep their template text.
     for (const side of this.engine.world.sides) this.narratedUntil.set(side.id, this.engine.time);
@@ -452,6 +456,7 @@ export class GameActor {
       const work = narrateReports(client, side.id as SideId, due, {
         hidden: hiddenTerms(this.engine.world, side.id as SideId),
         signal: abort.signal,
+        persona: this.persona,
       }).then(
         (result) => {
           this.clearParseTimer(deadline);

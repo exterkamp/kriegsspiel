@@ -11,7 +11,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { DraftSnapshot, Mark } from '@kriegsspiel/protocol';
+import type { DraftSnapshot, Mark, UmpireSettings } from '@kriegsspiel/protocol';
 import type { ClockChange } from '../clock.js';
 import type {
   GameSnapshot,
@@ -85,6 +85,8 @@ export const MIGRATIONS: readonly string[] = [
    ALTER TABLE games ADD COLUMN finished INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE games ADD COLUMN winner TEXT;
    ALTER TABLE games ADD COLUMN summarized INTEGER NOT NULL DEFAULT 0;`,
+  // Umpire settings chosen at creation (3.11), as JSON; null for a game made before they existed.
+  `ALTER TABLE games ADD COLUMN settings TEXT;`,
 ];
 
 /** Older snapshots kept besides the newest (not yet used as a fallback: recovery reads the newest). */
@@ -145,15 +147,29 @@ export class SqliteGameStore implements GameStore {
   async saveLogHeader(header: InputLogHeader): Promise<void> {
     // Plain INSERT: never overwrite the record of an existing game.
     this.db
-      .prepare('INSERT INTO games (game_id, scenario_id, seed, summarized) VALUES (?, ?, ?, 1)')
-      .run(header.gameId, header.scenarioId, header.seed);
+      .prepare(
+        'INSERT INTO games (game_id, scenario_id, seed, summarized, settings) VALUES (?, ?, ?, 1, ?)',
+      )
+      .run(
+        header.gameId,
+        header.scenarioId,
+        header.seed,
+        header.settings ? JSON.stringify(header.settings) : null,
+      );
   }
 
   async logHeader(gameId: string): Promise<InputLogHeader | undefined> {
     const r = this.db
-      .prepare('SELECT scenario_id, seed FROM games WHERE game_id = ?')
-      .get(gameId) as { scenario_id: string; seed: number } | undefined;
-    return r && { gameId, scenarioId: r.scenario_id, seed: r.seed };
+      .prepare('SELECT scenario_id, seed, settings FROM games WHERE game_id = ?')
+      .get(gameId) as { scenario_id: string; seed: number; settings: string | null } | undefined;
+    return (
+      r && {
+        gameId,
+        scenarioId: r.scenario_id,
+        seed: r.seed,
+        ...(r.settings ? { settings: JSON.parse(r.settings) as UmpireSettings } : {}),
+      }
+    );
   }
 
   async appendInput(gameId: string, entry: InputLogEntry): Promise<void> {
