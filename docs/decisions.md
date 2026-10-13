@@ -191,6 +191,7 @@ Retry, backoff, the per-attempt timeout and schema validation stay in `ProviderU
 - **Replay** is unchanged apart from reading the dial from the header into the starting world; the persona has no effect on a replay, which makes no model calls. A game with no settings in its header replays as `standard`.
 - The dial does not yet touch placement bounds (D15) or the turn length; only the judgment cap. The judge situation task is not yet called by the actor, so the dial's effect is in the engine clamp and the stage function until it is wired.
 
+**Update (#389, 2026-10-12): order parsing stays on rules in the keyless demo.** Measured on the golden corpus, 10 sample and 14 held-out orders: `qwen2.5:0.5b` and `qwen2.5:1.5b` parse at most 9/10 clear orders and answer `intents` to nearly every order they should ask about or refuse, whatever the prompt, schema or split (numbers in llm-providers.md). The canned rules were extended instead (ask when no unit is named, about conditions, times, negations, contradictions, all-units orders and vague places; refuse units we do not have; ask for the order alone when other text is mixed in) and score 50/50, 10/10 and 14/14 (29/50 before). `OLLAMA_STAGES` keeps `narrate,staff`; with `parse` on a local model, its intents stand only if the rules find the same unit and places in the order. Free-text interpretation by a capable umpire is taken up by the turn-based mode (Epic 11, #393).
 **See.** [llm-providers.md](llm-providers.md), [architecture.md](architecture.md)
 
 ## Debug trace store (story 8.1, #120)
