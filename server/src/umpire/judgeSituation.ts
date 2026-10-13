@@ -15,7 +15,7 @@ import { withPersona } from './persona.js';
 import { checkProseAgainst, proseFactsOf } from './narrate.js';
 import type { JsonSchema, UmpireClient } from './umpireClient.js';
 
-export const JUDGE_SITUATION_PROMPT_VERSION = 'judge-situation-v1';
+export const JUDGE_SITUATION_PROMPT_VERSION = 'judge-situation-v2';
 
 /** The system prompt for a game whose judgment cap is `cap` (the rigid-to-free dial, 3.11). */
 export const judgeSituationSystem = (cap: number) =>

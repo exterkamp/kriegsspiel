@@ -16,7 +16,7 @@ import type { JsonSchema, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
 import { hiddenIn } from './leakGuard.js';
 
-export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v2';
+export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v3';
 
 export const NARRATE_SYSTEM = `You are the scribe at a Napoleonic army headquarters, turning staff reports into the period dispatches that reach the general's desk. You write in the voice of the officer who sent each report: a cautious subordinate hedges, a veteran scout is terse.
 
