@@ -78,7 +78,9 @@ const SAMPLES: GoldenOrder[] = [
   sample('s4', 'Hold the bridge at all costs.', { kinds: ['clarification'] }),
   sample('s5', 'Advance to the wood.', { kinds: ['clarification'] }),
   sample('s6', 'Attack the moon.', { kinds: ['rejection'] }),
-  sample('s7', 'Cavalry fall back to the ford if pressed.', { kinds: ['clarification', 'rejection'] }),
+  sample('s7', 'Cavalry fall back to the ford if pressed.', {
+    kinds: ['clarification', 'rejection'],
+  }),
   sample('s8', 'All units hold the bridge.', { kinds: ['clarification', 'rejection'] }),
   sample('s9', '1st Battalion march to the bridge and hold it.', {
     kinds: ['intents'],
@@ -144,29 +146,6 @@ type In = {
 const unitEnum = (i: In) => i.units.map((u) => u.id);
 const placeEnum = (i: In) => ['here', ...i.places.map((p) => p.id)];
 
-const production: Json = {
-  type: 'object',
-  properties: {
-    result: { type: 'string', enum: ['intents', 'clarification', 'rejection'] },
-    unitId: { type: 'string' },
-    intents: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          kind: { type: 'string', enum: KINDS },
-          place: { type: 'string' },
-        },
-        required: ['kind', 'place'],
-      },
-    },
-    question: { type: 'string' },
-    options: { type: 'array', items: { type: 'string' } },
-    reason: { type: 'string' },
-  },
-  required: ['result'],
-};
-
 /** Every field required, ids restricted to the real ones. Unused fields are empty. */
 const strict = (i: In): Json => ({
   type: 'object',
@@ -203,11 +182,14 @@ Order "Guard Battalion hold the ford if the enemy comes." -> {"result":"clarific
 
 /** Short input a model can copy from: ids and names only, no coordinates, lists shuffled. */
 function shortInput(i: In, seed: number): In {
-  const rot = <T>(xs: T[]) => (xs.length ? [...xs.slice(seed % xs.length), ...xs.slice(0, seed % xs.length)] : xs);
+  const rot = <T>(xs: T[]) =>
+    xs.length ? [...xs.slice(seed % xs.length), ...xs.slice(0, seed % xs.length)] : xs;
   return {
     order: i.order,
     units: rot(i.units.map((u) => ({ id: u.id, name: u.name }))),
-    places: rot(i.places.map((p) => ({ id: p.id, kind: p.kind, ...(p.name ? { name: p.name } : {}) }))),
+    places: rot(
+      i.places.map((p) => ({ id: p.id, kind: p.kind, ...(p.name ? { name: p.name } : {}) })),
+    ),
   };
 }
 
@@ -235,13 +217,13 @@ const variants: Record<string, Fn> = {
   /** Production schema, worked examples appended to the prompt. */
   fewshot: (_i, req) => ask(req.system + FEWSHOT, req.input, req.schema as Json),
   /** Examples, short copyable input (no coordinates, rotated lists), strict enum schema. */
-  short: async (i, req) => {
+  short: async (i) => {
     const seed = i.order.length;
     const s = shortInput(i, seed);
-    return toOut(await ask(req.system + FEWSHOT, legend(s), strict(i)));
+    return toOut(await ask(PARSE_ORDERS_SYSTEM + FEWSHOT, legend(s), strict(i)));
   },
   /** Two calls: classify, then fill only the branch chosen. */
-  twocall: async (i, req) => {
+  twocall: async (i) => {
     const s = shortInput(i, i.order.length);
     const head = await ask(
       `${PARSE_ORDERS_SYSTEM}\n\nFirst decide only the "result": intents (one clear unit, one clear place), clarification (no unit named, several units or places fit, conditional, timed, contradictory) or rejection (unknown unit or place, impossible, not an order).`,
@@ -280,7 +262,7 @@ const variants: Record<string, Fn> = {
    * Code decides the unit, the places and whether to ask or refuse (the canned rules); the model is
    * asked only for the verb of each step, with the places already chosen. Its verbs replace the canned ones.
    */
-  resolver: async (i, req) => {
+  resolver: async (i) => {
     const skeleton = testParse(i as never);
     if (skeleton.result !== 'intents' || !skeleton.intents) return skeleton;
     const places = skeleton.intents.map((x) => x.place);
@@ -353,21 +335,26 @@ const client: UmpireClient = {
 };
 
 const q = (xs: number[], p: number) =>
-  xs.length ? [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.ceil(p * xs.length) - 1)]! : 0;
+  xs.length
+    ? [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.ceil(p * xs.length) - 1)]!
+    : 0;
 const sec = (ms: number) => (ms / 1000).toFixed(1);
 
 async function score(name: string, orders: readonly GoldenOrder[], ctx: ParseContext) {
   lat.length = 0;
   raw.length = 0;
-  let fallbacks = 0;
-  const parser = new LlmOrderParser(client, { onFallback: () => void fallbacks++ });
+  const fellBack = new Set<string>();
+  const parser = new LlmOrderParser(client, { onFallback: (f) => void fellBack.add(f.orderText) });
   const rep = await runEval(name, parser, orders, ctx);
+  const own = rep.orders.filter(
+    (o) => o.pass && !fellBack.has(orders.find((g) => g.id === o.id)!.text),
+  ).length;
   const cats = Object.entries(rep.categories)
     .filter(([, s]) => s.total > 0)
     .map(([c, s]) => `${c} ${s.passed}/${s.total}`)
     .join(', ');
   console.log(
-    `${variant} | ${model} | ${name}: ${rep.passed}/${rep.total} pass, unsafe ${rep.unsafe}, rejected by checks ${fallbacks} | ${cats} | latency median ${sec(q(lat, 0.5))}s p95 ${sec(q(lat, 0.95))}s | tokens in ${rep.usage.inputTokens} out ${rep.usage.outputTokens}`,
+    `${variant} | ${model} | ${name}: ${rep.passed}/${rep.total} pass, unsafe ${rep.unsafe}, model's own answer passed ${own}, refused by the checks ${fellBack.size} | ${cats} | latency median ${sec(q(lat, 0.5))}s p95 ${sec(q(lat, 0.95))}s | tokens in ${rep.usage.inputTokens} out ${rep.usage.outputTokens}`,
   );
   for (const o of rep.orders.filter((x) => !x.pass).slice(0, 60)) {
     const r = raw.find((x) => orders.find((g) => g.id === o.id)?.text === x.order);

@@ -96,6 +96,13 @@ export interface LlmOrderParserOptions {
    * Its answer is used only if it understood the order; otherwise the player is asked to restate.
    */
   fallbackParser?: OrderParser;
+  /**
+   * Set for a small local model (#389): its `intents` stand only if this deterministic parser, run on
+   * the same order, names the same unit and the same places. Otherwise this parser's answer is used
+   * and the disagreement is reported through `onFallback`. A model answer that asks or refuses issues
+   * nothing, so it stands.
+   */
+  groundingParser?: OrderParser;
 }
 
 export type ParserUsage = { inputTokens: number; outputTokens: number; usd: number };
@@ -136,7 +143,44 @@ export class LlmOrderParser implements OrderParser {
       return this.fallback(orderText, ctx, err instanceof Error ? err.message : String(err));
     }
     const result = this.check(orderText, output, ctx);
-    return typeof result === 'string' ? this.fallback(orderText, ctx, result) : result;
+    if (typeof result === 'string') return this.fallback(orderText, ctx, result);
+    return result.kind === 'intents' && this.opts.groundingParser
+      ? this.ground(orderText, ctx, result)
+      : result;
+  }
+
+  private async ground(
+    orderText: string,
+    ctx: ParseContext,
+    model: Extract<ParseResult, { kind: 'intents' }>,
+  ): Promise<ParseResult> {
+    let rules: ParseResult;
+    try {
+      rules = await (this.opts.groundingParser as OrderParser).parse(orderText, ctx);
+    } catch (err) {
+      return this.fallback(orderText, ctx, `grounding failed: ${String(err)}`);
+    }
+    const places = (r: Extract<ParseResult, { kind: 'intents' }>) =>
+      [...new Set(r.intents.map((i) => JSON.stringify(intentPoint(i))))].sort().join();
+    if (
+      rules.kind === 'intents' &&
+      rules.unitId === model.unitId &&
+      places(rules) === places(model)
+    ) {
+      return model;
+    }
+    const why =
+      rules.kind !== 'intents'
+        ? `the rules ${rules.kind === 'rejection' ? 'refuse' : 'ask about'} this order`
+        : rules.unitId !== model.unitId
+          ? `the order names ${rules.unitId}, not ${model.unitId}`
+          : 'the order names other places';
+    try {
+      this.opts.onFallback?.({ orderText, reason: `model answer not grounded: ${why}` });
+    } catch {
+      // a failing logger must not change the answer
+    }
+    return rules;
   }
 
   private add(usage: TokenUsage | undefined, usd: number | null | undefined): void {
@@ -222,6 +266,16 @@ export class LlmOrderParser implements OrderParser {
     }
     return { kind: 'intents', text, unitId: unit.id, intents };
   }
+}
+
+function intentPoint(i: OrderIntent): Coord {
+  return i.kind === 'move'
+    ? i.to
+    : i.kind === 'hold'
+      ? i.at
+      : i.kind === 'attack'
+        ? i.target
+        : i.toward;
 }
 
 function placeAnchor(ctx: ParseContext, id: string): Coord | undefined {
