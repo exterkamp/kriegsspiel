@@ -6,6 +6,7 @@ import {
   type Mark,
   type StaffRole,
   type ServerMessage,
+  type TextOp,
 } from '@kriegsspiel/protocol';
 
 /** The slice of a browser WebSocket the connection uses, so tests can fake it. */
@@ -117,6 +118,43 @@ export class GameConnection {
 
   syncDrafts(): boolean {
     return this.send({ v: PROTOCOL_VERSION, kind: 'syncDrafts' });
+  }
+
+  createDraft(draft: string, input: { text?: string; title?: string } = {}): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'createDraft', draft, ...input });
+  }
+
+  draftEdit(draft: string, e: { baseRev: number; op: TextOp; opId: string }): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'draftEdit', draft, ...e });
+  }
+
+  draftComment(
+    draft: string,
+    baseRev: number,
+    comment: { id: string; from: number; to: number; body: string; replyTo?: string },
+  ): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'draftComment', draft, baseRev, comment });
+  }
+
+  resolveComment(draft: string, commentId: string, resolved: boolean): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'resolveComment', draft, commentId, resolved });
+  }
+
+  readDraft(draft: string, rev: number): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'readDraft', draft, rev });
+  }
+
+  forkDraft(draft: string, newDraft: string): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'forkDraft', draft, newDraft });
+  }
+
+  mergeDraft(draft: string): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'mergeDraft', draft });
+  }
+
+  /** Tell the side which draft this player has open, or none. */
+  draftPresence(draft: string | null): boolean {
+    return this.send({ v: PROTOCOL_VERSION, kind: 'draftPresence', draft });
   }
 
   proposePause(reason?: string): boolean {

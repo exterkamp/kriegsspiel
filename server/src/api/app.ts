@@ -20,6 +20,7 @@
  *   GET  /games/:id/window         seated, game over: the umpire's window timeline (403 `game_not_over` before the end)
  *   GET  /games/:id/window/dissents seated, game over: dissents on signed orders, for the critique (D6e)
  *   GET  /games/:id/window/at?at=  seated, game over: true positions, beliefs, dice and rulings at a game time
+ *   GET  /games/:id/critique       seated, game over: the umpire's critique, each point citing logged events (403 `game_not_over` before the end)
  *   GET  /games/:id/ws             WebSocket for the side the signed-in user holds (`@kriegsspiel/protocol` messages);
  *                                  in hot-seat, `?side=` picks which of the creator's sides
  *   /notifications/*               signed in: notification preferences and web push subscriptions (see ../notify)
@@ -83,6 +84,7 @@ import {
   type PushSender,
 } from '../notify/index.js';
 import { Hub, type Socket } from './hub.js';
+import { CritiqueService } from './critiqueService.js';
 import { windowAt, windowTimeline } from './umpireWindow.js';
 import { dissentNotes } from '../critique.js';
 import { seatKey } from './sideView.js';
@@ -183,6 +185,8 @@ export interface AppOptions {
   testUmpire?: boolean;
   /** Narrates each side's dispatches per window. See `GameHostOptions.narrator`. */
   narrator?: GameHostOptions['narrator'];
+  /** The umpire that writes the post-game critique, per game. Unset: the critique is the log's own wording. */
+  critic?: GameHostOptions['narrator'];
   /** Directory of the built client to serve at `/`. Unset: API only (dev uses the Vite server). */
   staticDir?: string;
   /**
@@ -410,6 +414,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
       options.scriptedOpponents === true && recordOf(id)?.sessionType === 'co_op_vs_ai',
     aiAgents: options.aiAgents,
     narrator: options.narrator,
+    deputyAway: (id, side, seat) => hub.isAway(id, side as SideId, seat),
     trace,
     onUpdate: (id) => {
       hub.notify(id);
@@ -1078,6 +1083,13 @@ export async function buildApp(options: AppOptions): Promise<App> {
     });
   });
 
+  const critiques = new CritiqueService({
+    store,
+    client: options.critic,
+    wallNow,
+    onNote: (gameId, note) => server.log.warn({ gameId, note }, 'critique'),
+  });
+
   // Dissent for the critique: each signed order a teammate dissented from. Same gate as the window.
   server.get<{ Params: { id: string } }>('/games/:id/window/dissents', async (req, reply) => {
     const user = auth.userOf(req);
@@ -1087,6 +1099,17 @@ export async function buildApp(options: AppOptions): Promise<App> {
       const w = await windowFor(req.params.id, user.id, undefined);
       if ('error' in w) return reply.code(w.status).send({ error: w.error });
       return { notes: dissentNotes(w.input.entries) };
+    });
+  });
+
+  server.get<{ Params: { id: string } }>('/games/:id/critique', async (req, reply) => {
+    const user = auth.userOf(req);
+    if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+    if (!recordOf(req.params.id)) return reply.code(404).send({ error: 'no_such_game' });
+    return tracedHttp(req.params.id, req, reply, async () => {
+      const w = await windowFor(req.params.id, user.id, undefined);
+      if ('error' in w) return reply.code(w.status).send({ error: w.error });
+      return critiques.get(req.params.id, w.input, w.timeline.endMs);
     });
   });
 

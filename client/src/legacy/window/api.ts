@@ -1,4 +1,4 @@
-import { WindowAt, WindowTimeline } from '@kriegsspiel/protocol';
+import { Critique, WindowAt, WindowTimeline } from '@kriegsspiel/protocol';
 
 async function getJson<T>(
   url: string,
@@ -27,3 +27,7 @@ export const fetchWindowAt = (
     (v) => WindowAt.parse(v),
     fetchFn,
   );
+
+/** The umpire's critique of a finished game. The first request may wait while the umpire writes it. */
+export const fetchCritique = (game: string, fetchFn: typeof fetch = fetch) =>
+  getJson(`/games/${encodeURIComponent(game)}/critique`, (v) => Critique.parse(v), fetchFn);

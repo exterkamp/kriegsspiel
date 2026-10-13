@@ -16,8 +16,22 @@ import {
   type ViewDocument,
   type ViewReport,
 } from '@kriegsspiel/engine';
-import type { ClockState, Dispatch, OwnUnit, SideView, StaffExchange } from '@kriegsspiel/protocol';
+import type {
+  ClockState,
+  DeputyAccount,
+  DeputySettings,
+  Dispatch,
+  OwnUnit,
+  SideView,
+  StaffExchange,
+} from '@kriegsspiel/protocol';
 import { staffOfficerFor } from '../umpire/staff.js';
+
+/** A side's deputy as the actor keeps it: its settings and what it has done. */
+export interface DeputyState {
+  settings: DeputySettings;
+  account: readonly DeputyAccount[];
+}
 
 const CONFERENCE_ROLES = ['chiefOfStaff', 'intelligence', 'quartermaster', 'engineer'] as const;
 
@@ -109,6 +123,26 @@ function staffDispatch(x: StaffExchange, now: number): Dispatch[] {
   ];
 }
 
+/** The deputy's turn as one paper for the in-tray: what it signed in the player's name, what it was refused, and its report. */
+export function deputyDispatch(a: DeputyAccount): Dispatch {
+  const lines = [
+    ...a.issued.map((o) => `Ordered ${o.unit}, in your name: "${o.text}"`),
+    ...a.refused.map(
+      (r) =>
+        `Refused (beyond my ${a.discretion} discretion or your authority): "${r.text}" (${r.reasons.join('; ')})`,
+    ),
+    ...(a.report ? [a.report] : []),
+  ];
+  return {
+    id: a.id,
+    from: 'Your deputy',
+    writtenAtGame: a.atGame,
+    receivedAtGame: a.atGame,
+    category: 'staff',
+    text: lines.length > 0 ? lines.join(' ') : 'I found nothing to do.',
+  };
+}
+
 /** The answer's words are withheld until the officer's time has passed. */
 function staffExchangeAt(x: StaffExchange, now: number): StaffExchange {
   const early = { ...x };
@@ -142,6 +176,7 @@ export function toSideView(
   staff: readonly StaffExchange[] = [],
   seed?: number,
   overloaded?: string,
+  deputy?: DeputyState,
 ): SideView {
   return {
     side: view.side,
@@ -207,11 +242,13 @@ export function toSideView(
       }),
       ...view.documents.map(documentToDispatch),
       ...staff.flatMap((x) => staffDispatch(x, view.time)),
+      ...(deputy?.account ?? []).map(deputyDispatch),
     ],
     ...(staff.length === 0
       ? {}
       : { staffHistory: staff.map((x) => staffExchangeAt(x, view.time)) }),
     ...(overloaded ? { staffOverloaded: overloaded } : {}),
+    ...(deputy ? { deputy: { settings: deputy.settings, account: [...deputy.account] } } : {}),
     clock,
   };
 }
@@ -230,8 +267,14 @@ export function sideViewOf(
   narration?: Narration,
   staff: readonly StaffExchange[] = [],
   overloaded?: string,
+  deputy?: DeputyState,
   chain?: ChainOfCommand,
 ): SideView {
+  // The deputy writes to the player who runs HQ: the commander, the chief of staff, or the whole side in shared-HQ play.
+  const hqDeputy =
+    deputy && (!seat || seat.role === 'commander' || seat.role === 'chiefOfStaff')
+      ? deputy
+      : undefined;
   // `world.time` only moves when an event fires; the engine's own time is the real "now".
   if (seat) {
     return toSideView(
@@ -241,6 +284,7 @@ export function sideViewOf(
       staffFor(seat, staff),
       state.world.seed,
       overloaded,
+      hqDeputy,
     );
   }
   return toSideView(
@@ -250,5 +294,6 @@ export function sideViewOf(
     staff,
     state.world.seed,
     overloaded,
+    hqDeputy,
   );
 }

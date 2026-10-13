@@ -70,6 +70,8 @@ A report on an objective changing hands is not yet produced.
 
 The umpire's window reveals true positions, dice and rulings. The umpire then writes a critique: what each side knew and when, decisions that mattered, and misreadings. This is built properly, not left as an afterthought.
 
+The critique is a section of the window (`GET /games/:id/critique`, D38). The umpire writes it from the log: every point is dated and cites the logged events it rests on (orders and their delivery times, reports as they reached headquarters, rulings, losses, pauses and votes), and the server refuses any point that cites an event that does not exist. If no umpire is available the same facts are quoted plainly. It is written once and kept in the input log.
+
 The window is the same map table with a scrubber over the whole game. It shows every unit's true position at the scrubbed time, can overlay what either side believed (live sightings and aged ghosts), and shows the dice, modifiers and umpire rulings for a unit under the pointer. It is rebuilt from the input log with no model call, and the server refuses it (`403 game_not_over`) until the game has ended (`GET /games/:id/window`, `/window/at`).
 
 ## Pace: the clock ratio
@@ -93,7 +95,7 @@ The default is decided after the first scenario is written and its pacing is mea
 - **Standing orders keep working.** Units follow their orders and contingencies. If none apply, they hold and wait. Subordinates never invent a plan for you.
 - **Notifications.** You choose what reaches you: all dispatches, urgent only, or contact only.
 - **Subordinate players** can act for a formation when you are away.
-- **Deputy mode** (optional): an LLM staff officer acts within your standing orders and stated intent, writes orders under your authority, and reports what it did. You set how much discretion it has.
+- **Deputy mode** (optional): an LLM staff officer acts within your standing orders and stated intent, writes orders under your authority, and reports what it did. You set how much discretion it has: **hold** (stand fast or fall back toward HQ), **adjust** (reposition a unit up to about a mile and a half at the ordinary pace) or **act** (anything you could sign yourself). The engine checks every order against the setting; one beyond it is never sent, and appears in the account as an act the deputy tried and was refused. It acts only while you have nothing open at the table, never signs for a formation you could not sign for, and on your return the in-tray holds one paper for each of its turns: what it ordered in your name, what it was refused, and its own report.
 - **Contact alerts.** When a fight begins, you can be alerted at once.
 
 ### Pausing
@@ -130,7 +132,7 @@ In the lobby the commander's table fills as players join the side with a role; a
 - Each order is a **shared draft**. Anyone with access can propose text, comment, or suggest a change. Edits are tracked.
 - Only the holder of command authority for that formation can **sign and stamp** an order to send it. This is the stamp moment from the Papers Please-style desk. Staff and other players can propose on the draft but a stamp from them is refused; a subordinate stamps only for their own formations. A stamped draft is closed to edits (fork it for another plan).
 - An **LLM staff check** reads a draft before it goes and reports how a subordinate will likely read it: "the bridge is not mentioned", "this contradicts the timing in Order 3". It costs a little in-game time (staff work: the chief of staff is busy for ten game minutes, the same at every clock rate), so it is a tool and not a free preview. It sees only what your side knows (your own units, the named places, the orders you have sent), and it is advice, not a promise: the order is read afresh when it is signed (D6d).
-- Drafts can be **forked**, so the staff can write alternative plans and the commander chooses.
+- Drafts can be **forked**, so the staff can write alternative plans and the commander chooses. A fork is also how a staff officer makes a suggestion: they write it in a fork, and merging it brings their edits into the draft under their name (D6g).
 
 ### Dissent
 

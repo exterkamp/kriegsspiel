@@ -25,6 +25,86 @@ const disp = (id: string, extra: Partial<Dispatch> = {}): Dispatch => ({
   ...extra,
 });
 
+describe('shared drafts in the client state', () => {
+  const draft = (over = {}) => ({
+    id: 'd1',
+    title: '',
+    createdBy: 'a',
+    rev: 0,
+    text: 'abc',
+    authors: [{ author: 'a', len: 3 }],
+    comments: [],
+    receipts: {},
+    history: [],
+    ...over,
+  });
+
+  it('keeps the drafts the server sends and follows its entries in rev order', () => {
+    let s = applyServerMessage(initialState, { v, kind: 'drafts', drafts: [draft()] }, 0);
+    s = applyServerMessage(
+      s,
+      {
+        v,
+        kind: 'draftEntry',
+        draft: 'd1',
+        entry: { kind: 'edit', rev: 1, author: 'b', at: 1, op: [3, 'd'] },
+      },
+      0,
+    );
+    expect(s.drafts[0]).toMatchObject({ rev: 1, text: 'abcd' });
+    // The same entry again (a snapshot raced it) changes nothing.
+    const again = applyServerMessage(
+      s,
+      {
+        v,
+        kind: 'draftEntry',
+        draft: 'd1',
+        entry: { kind: 'edit', rev: 1, author: 'b', at: 1, op: [3, 'd'] },
+      },
+      0,
+    );
+    expect(again).toBe(s);
+  });
+
+  it('marks the drafts stale when an entry skips a rev, and a snapshot clears it', () => {
+    let s = applyServerMessage(initialState, { v, kind: 'drafts', drafts: [draft()] }, 0);
+    s = applyServerMessage(
+      s,
+      {
+        v,
+        kind: 'draftEntry',
+        draft: 'd1',
+        entry: { kind: 'edit', rev: 3, author: 'b', at: 1, op: [3, 'd'] },
+      },
+      0,
+    );
+    expect(s.draftsStale).toBe(true);
+    expect(s.drafts[0]!.rev).toBe(0);
+    s = applyServerMessage(s, { v, kind: 'drafts', drafts: [draft({ rev: 3, text: 'abcd' })] }, 0);
+    expect(s.draftsStale).toBe(false);
+  });
+
+  it('adds or replaces a draft from draftState, and records receipts and presence', () => {
+    let s = applyServerMessage(initialState, { v, kind: 'draftState', draft: draft() }, 0);
+    s = applyServerMessage(s, { v, kind: 'draftState', draft: draft({ title: 'Plan' }) }, 0);
+    expect(s.drafts.map((d) => d.title)).toEqual(['Plan']);
+    s = applyServerMessage(s, { v, kind: 'draftReceipt', draft: 'd1', reader: 'b', rev: 2 }, 0);
+    expect(s.drafts[0]!.receipts).toEqual({ b: 2 });
+    s = applyServerMessage(
+      s,
+      {
+        v,
+        kind: 'draftPresence',
+        you: 'a',
+        people: [{ id: 'b', label: 'Chief of staff', drafts: ['d1'] }],
+      },
+      0,
+    );
+    expect(s.draftPresence?.you).toBe('a');
+    expect(s.draftLabels).toEqual({ b: 'Chief of staff' });
+  });
+});
+
 describe('applyServerMessage', () => {
   it('rebuilds the sent orders from the server after a reload, without doubling a local one (#343)', () => {
     let s = withPendingOrder(initialState, { orderId: 'o1', text: 'hold', sentAtGame: 5 });

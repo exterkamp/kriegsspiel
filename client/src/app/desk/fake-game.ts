@@ -17,6 +17,14 @@ export function fakeGame(state: Partial<ClientState> = {}, gameId?: string) {
     disconnect: vi.fn(),
     putMark: vi.fn<(mark: Mark) => boolean>(() => true),
     deleteMark: vi.fn<(id: string) => void>(),
+    createDraft: vi.fn(() => true),
+    draftEdit: vi.fn(() => true),
+    draftComment: vi.fn(() => true),
+    resolveComment: vi.fn(() => true),
+    readDraft: vi.fn(() => true),
+    forkDraft: vi.fn(() => true),
+    mergeDraft: vi.fn(() => true),
+    draftPresence: vi.fn(() => true),
     set: (p: Partial<ClientState>) => s.update((x) => ({ ...x, ...p })),
   };
   return { provide: GameService, useValue: fake, fake };

@@ -7,8 +7,11 @@
  */
 import { appendFile, mkdir, readFile, truncate, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Seat } from '@kriegsspiel/engine';
+import type { Discretion, Seat } from '@kriegsspiel/engine';
 import type {
+  Critique,
+  DeputyAccount,
+  DeputySettings,
   Dissent,
   DraftSnapshot,
   Mark,
@@ -89,6 +92,13 @@ export type GameCommand =
       exchange?: StaffExchange;
     }
   /**
+   * A player set (or switched off) what their deputy may do (D6f). Journal only: the settings are
+   * the player's input, not engine state. `seat` is the player's own, absent in shared-HQ play.
+   */
+  | { kind: 'deputySet'; side: string; settings: DeputySettings; seat?: Seat }
+  /** The deputy's turn as the player reads it on return. Journal only; the orders it signed are logged on their own. */
+  | { kind: 'deputyTurn'; side: string; account: DeputyAccount }
+  /**
    * The chief of staff read a shared draft (the staff check, D6d). Journal only: the reading is
    * advice and never changes the engine. `text` is the draft as read and `earlier` the side's own
    * earlier orders shown to the model; the model calls are on the entry (`calls`), so replay needs
@@ -102,7 +112,13 @@ export type GameCommand =
       rev: number;
       text: string;
       earlier: Array<{ id: string; text: string; sentAtGame: number }>;
-    };
+    }
+  /**
+   * The umpire wrote the post-game critique (docs/gameplay.md, After the game) once the game was
+   * over. Journal only: it never changes the engine, and is kept so a restart serves the same text
+   * with no new model call; the model calls are on the entry (`calls`).
+   */
+  | { kind: 'critique'; critique: Critique };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {
@@ -130,6 +146,8 @@ export interface InputLogEntry {
   fallback?: { attempts: number; error: string };
   /** Issued by a scripted side's agent, not a player. Replay applies it at `gameMs` before any command at the same instant. */
   agent?: boolean;
+  /** Written by a player's deputy, within this discretion (D6f). Always set with `agent`. */
+  deputy?: { discretion: Discretion };
   /** Pause-voting steps this command caused, for the journal. */
   pause?: PauseTransition[];
   /** Ratio-vote steps this command caused. A `passed` step carries the new ratio. */

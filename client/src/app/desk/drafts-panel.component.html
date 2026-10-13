@@ -1,0 +1,277 @@
+<section class="drafts" aria-labelledby="drafts-h">
+  <h3 id="drafts-h">Drafts</h3>
+  <p class="hint" id="drafts-intro">
+    Draft the order together with your staff. Everyone on your side sees the same wording as it
+    changes.
+  </p>
+  <div class="ks-sr-only" role="status" aria-live="polite" data-testid="drafts-announcer">
+    {{ announcement() }}
+  </div>
+
+  <div class="bar">
+    <button type="button" (click)="newDraft()" [disabled]="!online()">New draft</button>
+    @if (!online()) {
+      <span class="hint" role="status"
+        >Drafts can be edited when the link to the server is up.</span
+      >
+    }
+  </div>
+
+  @if (rows().length === 0) {
+    <p class="hint">No drafts yet. Start one and your staff can write in it with you.</p>
+  } @else {
+    <ul class="list" aria-label="Drafts and forks">
+      @for (r of rows(); track r.draft.id) {
+        <li [style.margin-left.em]="r.depth * 1.25">
+          <button
+            type="button"
+            class="row"
+            [attr.aria-current]="selected()?.id === r.draft.id ? 'true' : null"
+            (click)="choose(r.draft.id)"
+          >
+            <span class="title">
+              @if (r.depth > 0) {
+                <span class="ks-sr-only">Fork: </span>
+              }
+              {{ title(r.draft) }}
+            </span>
+            @if (r.draft.mergedInto) {
+              <span class="tag">merged</span>
+            }
+            @if (unread(r.draft) > 0) {
+              <span class="tag new">{{ unread(r.draft) }} new</span>
+            }
+            @if (viewers(r.draft).length > 0) {
+              <span class="tag">{{ viewers(r.draft).join(', ') }} here</span>
+            }
+          </button>
+        </li>
+      }
+    </ul>
+  }
+
+  @if (serverProblem() || problem()) {
+    <p class="err ks-error" role="alert">
+      {{ problem() || serverProblem() }}
+      <button type="button" class="link" (click)="dismiss()">Dismiss</button>
+    </p>
+  }
+
+  @if (selected(); as d) {
+    <div class="editor-block">
+      <div class="presence" role="status">
+        @if (presence().here.length > 0) {
+          <span>Also looking at this draft: {{ presence().here.join(', ') }}.</span>
+        } @else {
+          <span>No one else is looking at this draft.</span>
+        }
+        @if (presence().elsewhere.length > 0) {
+          <span>Elsewhere on the desk: {{ presence().elsewhere.join(', ') }}.</span>
+        }
+      </div>
+
+      @if (d.forkOf) {
+        <p class="hint">
+          A fork of {{ parentTitle() ?? 'a draft' }}, taken at its step {{ d.forkOf.rev }}.
+          @if (d.mergedInto) {
+            Merged back; it takes no more changes.
+          }
+        </p>
+      }
+
+      <div class="modes" role="group" aria-label="View">
+        <button type="button" [attr.aria-pressed]="mode() === 'edit'" (click)="mode.set('edit')">
+          Edit
+        </button>
+        <button
+          type="button"
+          [attr.aria-pressed]="mode() === 'tracked'"
+          (click)="mode.set('tracked')"
+        >
+          Who wrote what
+        </button>
+      </div>
+
+      @if (mode() === 'edit') {
+        <label for="draft-text">Draft wording</label>
+        <textarea
+          #editor
+          id="draft-text"
+          rows="6"
+          maxlength="2000"
+          placeholder="Write the order…"
+          [value]="text()"
+          [readOnly]="readOnly()"
+          aria-describedby="draft-status"
+          (input)="onInput($any($event.target).value)"
+          (blur)="pump()"
+        ></textarea>
+        <p class="hint" id="draft-status">
+          {{ length() }} of 2000 characters.
+          @if (d.mergedInto) {
+            This fork was merged and is read-only.
+          } @else if (saved()) {
+            Saved for your staff.
+          } @else {
+            Sending your changes…
+          }
+        </p>
+      } @else {
+        <div class="authored" role="group" aria-label="The draft by author" tabindex="0">
+          @if (d.text === '') {
+            <span class="hint">The draft is empty.</span>
+          }
+          @for (s of spans(); track $index) {
+            <span [class]="'by ' + styleOf(s.author)">
+              <span class="ks-sr-only">{{ s.author ? name(s.author) : 'Unknown' }} wrote: </span
+              >{{ s.text }}
+            </span>
+          }
+        </div>
+        @if (legend().length > 0) {
+          <ul class="legend" aria-label="Authors">
+            @for (l of legend(); track l.id) {
+              <li><span [class]="'swatch ' + l.style" aria-hidden="true">Aa</span> {{ l.name }}</li>
+            }
+          </ul>
+        }
+        <h4>Changes</h4>
+        @if (history().length === 0) {
+          <p class="hint">No changes yet.</p>
+        } @else {
+          <ol class="history" reversed aria-label="Changes, newest first">
+            @for (h of history(); track h.rev) {
+              <li>
+                <span class="when">{{ time(h.at) }}</span>
+                <b>{{ h.who }}</b> {{ h.text }}
+                @if (h.viaFork) {
+                  (from a fork)
+                }
+              </li>
+            }
+          </ol>
+        }
+      }
+
+      <div class="actions">
+        <button type="button" (click)="use()">Use in order</button>
+        <button type="button" (click)="fork()" [disabled]="!online() || !!d.mergedInto">
+          Fork this draft
+        </button>
+        @if (d.forkOf && !d.mergedInto) {
+          <button type="button" (click)="merge()" [disabled]="!online()">
+            {{
+              confirmMerge()
+                ? 'Confirm: merge into ' + (parentTitle() ?? 'the draft')
+                : 'Merge into ' + (parentTitle() ?? 'the draft')
+            }}
+          </button>
+          @if (confirmMerge()) {
+            <button type="button" (click)="confirmMerge.set(false)">Cancel</button>
+          }
+        }
+      </div>
+
+      <h4>Read by</h4>
+      @if (readers().length === 0) {
+        <p class="hint">No one else is on this side yet.</p>
+      } @else {
+        <ul class="readers">
+          @for (r of readers(); track r.id) {
+            <li>{{ r.name }} {{ r.status }}.</li>
+          }
+        </ul>
+      }
+
+      <h4>Comments</h4>
+      @if (threads().length === 0) {
+        <p class="hint">No comments. Select words in the draft to comment on them.</p>
+      }
+      @for (t of threads(); track t.root.id) {
+        <article
+          class="thread"
+          [class.resolved]="t.root.resolved"
+          [attr.aria-label]="'Comment by ' + name(t.root.author)"
+        >
+          <p class="quote">
+            On {{ excerpt(t.root.from, t.root.to) }}
+            <button type="button" class="link" (click)="showInText(t.root.from, t.root.to)">
+              Show in text
+            </button>
+          </p>
+          <p class="body">
+            <b>{{ name(t.root.author) }}</b> {{ time(t.root.at) }}: {{ t.root.body }}
+          </p>
+          @for (r of t.replies; track r.id) {
+            <p class="body reply">
+              <b>{{ name(r.author) }}</b> {{ time(r.at) }}: {{ r.body }}
+            </p>
+          }
+          @if (!d.mergedInto) {
+            <div class="row-actions">
+              <button
+                type="button"
+                class="link"
+                (click)="replyTo.set(replyTo() === t.root.id ? undefined : t.root.id)"
+                [attr.aria-expanded]="replyTo() === t.root.id"
+              >
+                Reply
+              </button>
+              <button type="button" class="link" (click)="resolve(t.root.id, !t.root.resolved)">
+                {{ t.root.resolved ? 'Reopen' : 'Resolve' }}
+              </button>
+              @if (t.root.resolved) {
+                <span class="tag">resolved</span>
+              }
+            </div>
+            @if (replyTo() === t.root.id) {
+              <label [for]="'reply-' + t.root.id" class="ks-sr-only">Reply</label>
+              <textarea
+                [id]="'reply-' + t.root.id"
+                rows="2"
+                maxlength="1000"
+                [value]="replyBody()"
+                (input)="replyBody.set($any($event.target).value)"
+              ></textarea>
+              <button
+                type="button"
+                (click)="sendReply(t.root.id)"
+                [disabled]="replyBody().trim() === ''"
+              >
+                Send reply
+              </button>
+            }
+          }
+        </article>
+      }
+      @if (!d.mergedInto) {
+        <label for="draft-comment">New comment on the selected words</label>
+        <textarea
+          id="draft-comment"
+          rows="2"
+          maxlength="1000"
+          [value]="commentBody()"
+          [disabled]="mode() !== 'edit' || !online()"
+          aria-describedby="draft-comment-hint"
+          (input)="commentBody.set($any($event.target).value)"
+        ></textarea>
+        <p class="hint" id="draft-comment-hint">
+          @if (mode() !== 'edit') {
+            Go back to Edit to select the words you mean.
+          } @else if (!saved()) {
+            Your changes are still being sent; you can comment once they are saved.
+          } @else {
+            Select words in the draft first, or leave nothing selected to comment at the caret.
+          }
+        </p>
+        <button
+          type="button"
+          (click)="addComment()"
+          [disabled]="mode() !== 'edit' || !saved() || commentBody().trim() === '' || !online()"
+        >
+          Add comment
+        </button>
+      }
+    </div>
+  }
+</section>

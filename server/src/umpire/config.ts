@@ -10,6 +10,7 @@ export const UMPIRE_STAGES: readonly UmpireStage[] = [
   'narrate',
   'staff',
   'command',
+  'critique',
 ];
 
 /** One configured model server. `type` names a factory in the `ProviderRegistry`. */
@@ -94,6 +95,7 @@ export const DEFAULT_UMPIRE_CONFIG: UmpireConfig = {
     narrate: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
     staff: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
     command: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
+    critique: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
   },
   timeoutMs: 60_000,
   maxAttempts: 3,

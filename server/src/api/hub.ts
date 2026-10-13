@@ -57,6 +57,8 @@ const OPEN = 1;
 
 interface Connection {
   side: SideId;
+  /** The draft this connection has open on the drafting desk, for presence. */
+  viewing: string | null;
   userId: string | undefined;
   /** The role this player holds. Unset in shared-HQ play, where the connection sees the whole side view. */
   seat: Seat | undefined;
@@ -98,6 +100,15 @@ export function pauseResultOf(step: PauseTransition): Omit<PauseResult, 'v' | 'k
   }
   return undefined;
 }
+
+/** How a staff role reads on the drafting desk's presence list. */
+const ROLE_LABELS: Record<string, string> = {
+  commander: 'Commander',
+  chiefOfStaff: 'Chief of staff',
+  intelligence: 'Intelligence officer',
+  quartermaster: 'Quartermaster',
+  subordinate: 'Subordinate commander',
+};
 
 const error = (code: string, message: string): ServerMessage => ({
   v: PROTOCOL_VERSION,
@@ -241,6 +252,7 @@ export class Hub {
       game.narrationFor(conn.side),
       game.staffHistoryFor(conn.side),
       game.overloadedFor(conn.side),
+      game.deputyFor(conn.side),
       this.chainOf(gameId, conn.side, game.state.time),
     );
   }
@@ -301,6 +313,34 @@ export class Hub {
   /** Tell every connection of a side something about its drafts. */
   private broadcastSide(gameId: string, side: SideId, message: ServerMessage): void {
     for (const c of this.conns.get(gameId) ?? []) if (c.side === side) this.send(c, message);
+  }
+
+  /** The staff role a connection is shown under on the drafting desk. A label only: never a name or an email. */
+  private presenceLabel(conn: Connection): string {
+    return conn.seat ? (ROLE_LABELS[conn.seat.role] ?? 'Staff') : 'HQ';
+  }
+
+  /**
+   * Tell each connection of a side who is on the drafting desk and which drafts they have open. One entry per
+   * player (a player with two tabs open is one person). Ephemeral: nothing here is stored or logged.
+   */
+  private broadcastPresence(gameId: string, side: SideId): void {
+    const mine = [...(this.conns.get(gameId) ?? [])].filter((c) => c.side === side);
+    const idOf = (c: Connection) => c.userId ?? c.side;
+    const people = new Map<string, { id: string; label: string; drafts: string[] }>();
+    for (const c of mine) {
+      const p = people.get(idOf(c)) ?? { id: idOf(c), label: this.presenceLabel(c), drafts: [] };
+      if (c.viewing !== null && !p.drafts.includes(c.viewing) && p.drafts.length < 8)
+        p.drafts.push(c.viewing);
+      people.set(p.id, p);
+    }
+    for (const c of mine)
+      this.send(c, {
+        v: PROTOCOL_VERSION,
+        kind: 'draftPresence',
+        you: idOf(c),
+        people: [...people.values()],
+      });
   }
 
   /** Run one draft command against the side's book, tell the side what changed, and keep the book. */
@@ -480,6 +520,7 @@ export class Hub {
   attach(gameId: string, side: SideId, socket: Socket, userId?: string, seat?: Seat): void {
     const conn: Connection = {
       side,
+      viewing: null,
       userId,
       seat,
       socket,
@@ -502,11 +543,14 @@ export class Hub {
     this.conns.set(gameId, set);
     const detach = () => {
       if (!set.delete(conn)) return;
+      if (conn.viewing !== null) this.broadcastPresence(gameId, side);
       const at = this.seen.get(seenKey);
       if (at !== undefined && ![...set].some((c) => c.side === side)) {
         void this.store?.saveSeen(gameId, side, at).catch((e) => this.onError(gameId, e));
       }
       if (set.size === 0 && this.conns.get(gameId) === set) this.conns.delete(gameId);
+      // A player who has just left may have a deputy waiting to act.
+      this.lookup(gameId)?.noteDeputyPresence();
     };
     socket.on('close', detach);
     socket.on('error', () => {
@@ -525,6 +569,7 @@ export class Hub {
         ? Promise.resolve(seenInMemory)
         : (this.store?.loadSeen(gameId, side) ?? Promise.resolve(undefined));
     this.push(gameId, conn);
+    this.broadcastPresence(gameId, side);
     void sinceP
       .then((since) => this.sendCatchUp(gameId, conn, since))
       .catch((e) => this.onError(gameId, e));
@@ -832,6 +877,36 @@ export class Hub {
   }
 
   /**
+   * The commander sets what their deputy may do while they are away (D6f). Only the seat that runs
+   * HQ may, or anyone on a shared-HQ side; the deputy then acts for that seat and no further.
+   */
+  private async handleSetDeputy(
+    game: GameActor,
+    conn: Connection,
+    command: Extract<Command, { kind: 'setDeputy' }>,
+  ): Promise<void> {
+    if (conn.seat && conn.seat.role !== 'commander') {
+      this.send(conn, error('not_permitted', 'only the commander appoints a deputy'));
+      return;
+    }
+    const res = await game.setDeputy(conn.side, conn.seat, command.settings);
+    if (!res.ok) this.send(conn, error('deputy_unavailable', res.reason));
+  }
+
+  /**
+   * Whether nobody is at the table for `side`'s deputy's player: no open connection for that seat
+   * (or, in shared-HQ play, none for the side). The deputy acts only while this holds.
+   */
+  isAway(gameId: string, side: SideId, seat: Seat | undefined): boolean {
+    const key = seat ? seatKey(seat) : undefined;
+    for (const c of this.conns.get(gameId) ?? []) {
+      if (c.side !== side || c.socket.readyState !== OPEN) continue;
+      if (key === undefined || (c.seat && seatKey(c.seat) === key)) return false;
+    }
+    return true;
+  }
+
+  /**
    * The staff check (D6d): the chief of staff reads a shared draft. The hub takes the draft's text
    * from its own book (a client cannot have a different text read), charges the chief of staff's
    * game time (the same busy state as a conference question), tells the side the check is queued
@@ -1121,6 +1196,13 @@ export class Hub {
       this.broadcastMarks(gameId, conn.side, list);
       return;
     }
+    if (command.kind === 'draftPresence') {
+      if (conn.viewing !== command.draft) {
+        conn.viewing = command.draft;
+        this.broadcastPresence(gameId, conn.side);
+      }
+      return;
+    }
     if (
       command.kind === 'createDraft' ||
       command.kind === 'draftEdit' ||
@@ -1149,6 +1231,10 @@ export class Hub {
     }
     if (command.kind === 'forwardDispatch') {
       this.handleForward(gameId, game, conn, command);
+      return;
+    }
+    if (command.kind === 'setDeputy') {
+      await this.handleSetDeputy(game, conn, command);
       return;
     }
     if (command.kind === 'checkDraft') {

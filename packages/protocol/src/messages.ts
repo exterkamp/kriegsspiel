@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { PROTOCOL_VERSION, ClockState, GameMs, Side } from './common.js';
 import { Briefing, Dissent, MAX_DISSENT } from './dissent.js';
 import { DraftEntry, DraftSnapshot, MAX_COMMENT, MAX_DRAFT_TEXT, TextOp } from './drafts.js';
+import { DeputySettings } from './deputy.js';
 import { Mark } from './marks.js';
 import { Dispatch, SideView, StaffRole } from './view.js';
 
@@ -172,6 +173,9 @@ export const Command = z.discriminatedUnion('kind', [
       rev: z.number().int().nonnegative(),
     })
     .strict(),
+  // "I am looking at this draft" (or at none, `null`): presence. Replaces the sender's earlier one and
+  // is dropped when the connection closes. Ephemeral: not stored, not logged.
+  z.object({ ...Envelope, kind: z.literal('draftPresence'), draft: Id.nullable() }).strict(),
   // Ask for the side's drafts again (the `drafts` snapshot), for a client that fell out of step.
   z.object({ ...Envelope, kind: z.literal('syncDrafts') }).strict(),
   // Copy a draft into a new one, to write an alternative plan.
@@ -191,6 +195,8 @@ export const Command = z.discriminatedUnion('kind', [
     .strict(),
   // HQ (commander, chief of staff) passes a paper in its own view on to the subordinate commanding `unit`.
   z.object({ ...Envelope, kind: z.literal('forwardDispatch'), dispatchId: Id, unit: Id }).strict(),
+  // Set what the LLM deputy may do while the sender is away (D6f). Commander only, or anyone on a shared-HQ side.
+  z.object({ ...Envelope, kind: z.literal('setDeputy'), settings: DeputySettings }).strict(),
   // A subordinate sends a report their own formation filed up to HQ. In a chain of command HQ sees it only once it has ridden there.
   z.object({ ...Envelope, kind: z.literal('forwardReport'), reportId: Id }).strict(),
 ]);
@@ -247,6 +253,19 @@ export const ServerMessage = z.discriminatedUnion('kind', [
   // A `drafts` snapshot sent on connect can already contain an entry that follows it, so a client
   // ignores any entry with `rev` at or below the rev of the draft it holds.
   z.object({ ...Envelope, kind: z.literal('draftEntry'), draft: Id, entry: DraftEntry }).strict(),
+  // Who of the side is on the drafting desk and which drafts each has open. Sent to every connection of
+  // the side whenever someone arrives, leaves or turns to another draft. `you` is the receiving
+  // player's own id (the id that signs their edits); `label` is their staff role, never a name or email.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('draftPresence'),
+      you: Id,
+      people: z.array(
+        z.object({ id: Id, label: z.string().max(40), drafts: z.array(Id).max(8) }).strict(),
+      ),
+    })
+    .strict(),
   z
     .object({
       ...Envelope,
