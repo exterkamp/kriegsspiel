@@ -59,13 +59,11 @@ describe('ControlBar', () => {
   });
 
   it('shows the server refusal', async () => {
-    const fetchFn = vi
-      .fn()
-      .mockResolvedValue({
-        ok: false,
-        status: 409,
-        json: async () => ({ message: 'no event is queued' }),
-      });
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: async () => ({ message: 'no event is queued' }),
+    });
     const { root, click } = make(fetchFn as unknown as typeof fetch);
     click('Step to next event');
     await vi.waitFor(() => expect(root.textContent).toContain('Refused: no event is queued'));

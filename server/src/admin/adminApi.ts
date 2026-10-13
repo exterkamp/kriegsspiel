@@ -218,12 +218,10 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
     }
     const result = await actor.submit(command, { admin: true });
     if (!result.ok)
-      return reply
-        .code(409)
-        .send({
-          error: 'refused',
-          message: result.kind === 'rejection' ? result.reason : result.question,
-        });
+      return reply.code(409).send({
+        error: 'refused',
+        message: result.kind === 'rejection' ? result.reason : result.question,
+      });
     return { clock: actor.gameClock.snapshot(), control: controlOf(actor) };
   });
 
