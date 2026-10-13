@@ -1072,6 +1072,7 @@ export class GameActor {
         })),
       },
       units: units.map((u) => ({ id: u.id, side: u.side, name: u.name, center: u.center })),
+      hidden: hiddenTerms(this.engine.world, side as SideId),
     };
   }
 

@@ -133,6 +133,7 @@ export class ProviderUmpireClient implements UmpireClient {
           usage,
           costUsd: cost,
           attempts: attempt,
+          ...(res.canned ? { canned: true } : {}),
         };
         this.recorder?.record(record);
         return { output: parsed as T, record };

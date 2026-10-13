@@ -52,6 +52,8 @@ class StubUmpire implements UmpireClient {
   staffText: string | undefined = 'The bridge holds, sir; 1st Battalion is forward.';
   /** Refuse every narrate call the way a capped `GameUmpireClient` does. */
   refuse: 'budget' | 'rate-limit' | undefined;
+  /** Replaces the text of every dispatch the narrate stage writes. */
+  narrateText: ((from: string) => string) | undefined;
   async call<T>(request: UmpireRequest): Promise<UmpireResponse<T>> {
     this.requests.push(request);
     if (this.refuse && request.stage === 'narrate') {
@@ -66,7 +68,10 @@ class StubUmpire implements UmpireClient {
     } else {
       const { reports } = request.input as { reports: { id: string; from: string }[] };
       output = {
-        dispatches: reports.map((r) => ({ reportIds: [r.id], text: `Sir, ${r.from} writes.` })),
+        dispatches: reports.map((r) => ({
+          reportIds: [r.id],
+          text: this.narrateText?.(r.from) ?? `Sir, ${r.from} writes.`,
+        })),
       };
     }
     return {
@@ -375,6 +380,27 @@ describe('staff answers in the actor', () => {
       game.narrationFor('blue'),
     );
     expect(view.dispatches.some((d) => d.text.startsWith('Sir, '))).toBe(true);
+  });
+
+  it('refuses a dispatch that names an enemy unit, in any case, and keeps the template text (#366)', async () => {
+    const enemy = loadScenario(holdTheBridge).units.find((u) => u.side === 'red')!.name;
+    const umpire = new StubUmpire();
+    // Lower case, so only the hidden-term list (not the proper-noun check) can stop it.
+    umpire.narrateText = (from) => `Sir, ${from} saw ${enemy.toLowerCase()} by the bridge.`;
+    const { time, game } = await newGame(umpire);
+    const side = await runUntilReport(time, game);
+    await time.advance(NARRATE_WINDOW_BASE_MS);
+    expect(umpire.requests.some((r) => r.stage === 'narrate')).toBe(true);
+    const view = sideViewOf(
+      game.state,
+      side as 'blue',
+      game.gameClock.snapshot(),
+      undefined,
+      [],
+      game.narrationFor(side),
+    );
+    expect(view.dispatches.length).toBeGreaterThan(0);
+    expect(JSON.stringify(view.dispatches).toLowerCase()).not.toContain(enemy.toLowerCase());
   });
 
   it('gives up after the narrate timeout and keeps the template text, logging why', async () => {

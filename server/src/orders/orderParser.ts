@@ -36,6 +36,8 @@ export interface ParseContext {
   map: { features: readonly ParseFeature[] };
   /** `center` is the middle of the unit's footprint, as in the engine's `Unit`. */
   units: readonly { id: string; side: string; name: string; center: Coord }[];
+  /** Names the issuing side must not read in a reply (`hiddenTerms`), such as the enemy's commanders. */
+  hidden?: readonly string[];
 }
 
 interface ParseResultBase {

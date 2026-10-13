@@ -3,7 +3,7 @@ import { MS_PER_MINUTE, holdTheBridge, loadScenario, mm } from '@kriegsspiel/eng
 import type { GameState, ViewReport } from '@kriegsspiel/engine';
 import { llmOrderParserEnabled, usesTestUmpire } from '../config.js';
 import { CORPUS_CONTEXT } from '../orders/eval/corpus.js';
-import { LlmOrderParser } from '../orders/llmParser.js';
+import { LlmOrderParser, PARSE_ORDERS_SCHEMA } from '../orders/llmParser.js';
 import type { ParseContext } from '../orders/orderParser.js';
 import { umpireConfigFromEnv } from './config.js';
 import { createUmpireClient } from './createUmpireClient.js';
@@ -188,6 +188,45 @@ describe('test provider: parse', () => {
     });
   });
 
+  it('reads "from X to Y" as Y', async () => {
+    const r = await parse('Cavalry withdraw from the bridge to the ford.');
+    expect(r).toMatchObject({
+      kind: 'intents',
+      unitId: 'blue-3',
+      intents: [{ kind: 'withdraw', toward: at(400, 250) }],
+    });
+    const m = await parse('Cavalry move from the northern wood toward the bridge');
+    expect(m).toMatchObject({ intents: [{ kind: 'move', to: at(250, 250) }] });
+  });
+
+  it('gives a later clause with a place and no verb the verb before it', async () => {
+    const r = await parse('Cavalry hold the bridge and the ford.');
+    expect(r).toMatchObject({
+      kind: 'intents',
+      intents: [
+        { kind: 'hold', at: at(250, 250) },
+        { kind: 'hold', at: at(400, 250) },
+      ],
+    });
+  });
+
+  it('asks about a later clause with neither verb nor place, instead of dropping it', async () => {
+    const r = await parse('Cavalry hold the bridge and the moon.');
+    expect(r).toMatchObject({
+      kind: 'clarification',
+      question: expect.stringContaining('moon'),
+    });
+  });
+
+  it('asks which unit first when the order names several', async () => {
+    const r = await parse('1st and 2nd battalions hold the bridge.');
+    expect(r).toMatchObject({
+      kind: 'clarification',
+      question: expect.stringContaining('more than one unit'),
+    });
+    expect((r as { options?: string[] }).options).toEqual(['1st Battalion', '2nd Battalion']);
+  });
+
   it('refuses a place that is not on the map, with a reason', async () => {
     const r = await parse('Attack the moon');
     expect(r.kind).toBe('rejection');
@@ -272,6 +311,9 @@ describe('test provider: narrate', () => {
     });
     expect(checkNarration(res.output, input)).toEqual([]);
     expect(res.output.dispatches).toHaveLength(4);
+    for (const d of res.output.dispatches) {
+      expect(d.text).toContain('near the mill, east of the Albrecht road');
+    }
   });
 
   it('is used by narrateReports without falling back to the template', async () => {
@@ -279,6 +321,8 @@ describe('test provider: narrate', () => {
     expect(out).toMatchObject({ fellBack: false, calls: reports().length });
     expect(out.dispatches[0]!.text).toContain('2nd Hussars sighted about 400 men');
     expect(out.dispatches[0]!.text).not.toBe('template');
+    // The place the report carries is in the text.
+    expect(out.dispatches[0]!.text).toContain('near the mill, east of the Albrecht road');
   });
 });
 
@@ -449,6 +493,38 @@ describe('test provider: admin trace', () => {
       costUsd: 0,
       ok: true,
     });
+    await trace.close();
+  });
+
+  it('labels by the record the provider set, not by the model name', async () => {
+    const trace = new TraceStore();
+    const inner = client();
+    const wrap = (canned: boolean | undefined, model: string) =>
+      traceUmpire(
+        {
+          call: async (req) => {
+            const res = await inner.call(req);
+            const rest = { ...res.record };
+            delete rest.canned;
+            return { ...res, record: { ...rest, model, ...(canned ? { canned } : {}) } } as never;
+          },
+        },
+        { trace, gameId: 'g2', mode: 'live' },
+      );
+    const input = { order: 'Hold the bridge', units: [], places: [] };
+    const req = {
+      stage: 'parse',
+      promptVersion: 'x',
+      system: 'x',
+      input,
+      schema: PARSE_ORDERS_SCHEMA,
+    } as const;
+    await wrap(true, 'renamed').call(req);
+    await wrap(undefined, 'test').call(req);
+    const modes = trace
+      .entries('g2', { kind: 'llm' })
+      .map((e) => (e.data as { mode: string }).mode);
+    expect(modes).toEqual(['test', 'live']);
     await trace.close();
   });
 });

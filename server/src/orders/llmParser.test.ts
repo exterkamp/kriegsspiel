@@ -139,6 +139,19 @@ describe('validation of model output', () => {
   });
 });
 
+describe('hidden terms in the reply (#354)', () => {
+  const ctx = { ...CORPUS_CONTEXT, hidden: ['Gen. Skellwick'] };
+  it('refuses an enemy commander written in lower case, and falls back', async () => {
+    const q = parserFor({ result: 'rejection', reason: 'gen. skellwick is leading them.' });
+    expect(await q.parser.parse('o', ctx)).toMatchObject({ kind: 'clarification' });
+    expect(q.fallbacks).toHaveLength(1);
+  });
+  it('lets the same reply through when no hidden terms are given', async () => {
+    const q = parserFor({ result: 'rejection', reason: 'gen. skellwick is leading them.' });
+    expect(await q.parser.parse('o', CORPUS_CONTEXT)).toMatchObject({ kind: 'rejection' });
+  });
+});
+
 describe('failed calls', () => {
   it.each(['transport', 'timeout', 'schema', 'refusal'] as const)(
     'fall back on a %s failure and log it',

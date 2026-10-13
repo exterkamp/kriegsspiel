@@ -48,6 +48,8 @@ export interface UmpireCallRecord {
   /** Summed over all attempts, including failed ones. `null` when the model has no known price. */
   costUsd: number | null;
   attempts: number;
+  /** Set when the answer came from the test provider's canned rules rather than a model. */
+  canned?: boolean;
   /** Set when the configured model could not answer and the fallback provider did (see `FallbackUmpireClient`). */
   fallbackFor?: { reason: string; kind: string; provider?: string; model?: string };
 }

@@ -1,7 +1,6 @@
 import type { TraceSink } from './trace.js';
 import type { UmpireClient, UmpireRequest, UmpireResponse } from '../umpire/umpireClient.js';
 import { UmpireError } from '../umpire/umpireClient.js';
-import { TEST_MODEL } from '../umpire/providers/test.js';
 
 export interface TracedUmpireOptions {
   inner: UmpireClient;
@@ -42,7 +41,7 @@ export class TracedUmpireClient implements UmpireClient {
       const r = res.record;
       this.o.trace.record(this.o.gameId, 'llm', {
         ...base,
-        mode: r.fallbackFor ? 'fallback' : r.model === TEST_MODEL ? 'test' : base.mode,
+        mode: r.fallbackFor ? 'fallback' : r.canned ? 'test' : base.mode,
         ...(r.fallbackFor ? { fallbackFor: r.fallbackFor } : {}),
         provider: r.provider ?? this.o.provider ?? 'unknown',
         model: r.model,
