@@ -6,6 +6,7 @@ import {
   positionAt,
   type EngineState,
   type GameState,
+  type TurnRuling,
 } from '@kriegsspiel/engine';
 import type { TurnOrder, TurnProposal, UmpireSettings } from '@kriegsspiel/protocol';
 import { readFileSync } from 'node:fs';
@@ -35,6 +36,8 @@ import { applyTurn, type TurnInput } from './turns.js';
 import { UmpireTurnResolver, type UmpireTurnOutput } from './umpireTurn.js';
 
 const MINUTE = 60_000;
+const turnRulings = (w: GameState) =>
+  w.rulings.filter((r): r is TurnRuling => 'kind' in r && r.kind === 'turn');
 
 /** No order is parsed by a model in turn mode. */
 const parser: OrderParser = {
@@ -101,7 +104,12 @@ async function play(opts: { dial: UmpireSettings['dial']; client: UmpireClient; 
         ? undefined
         : new UmpireTurnResolver({ registry, client: opts.client, dial: settings.dial }),
   });
-  const settings: UmpireSettings = { dial: opts.dial, persona: 'dry', mode: 'turns', turnMinutes: 20 };
+  const settings: UmpireSettings = {
+    dial: opts.dial,
+    persona: 'dry',
+    mode: 'turns',
+    turnMinutes: 20,
+  };
   const scenario = { ...loadScenario(holdTheBridge), seed: opts.seed ?? 1815 };
   const game = await host.create('g1', scenario, { settings });
   for (let guard = 0; guard < 20 && !game.state.world.outcome; guard++) {
@@ -177,8 +185,11 @@ describe('the umpire adjudicator (D39, 11.6) with the canned umpire', () => {
     }).resolve(state, input);
     expect(umpire.adjudicator).toBe('umpire');
     const end = (r: { adjudicator: string; output?: unknown }) =>
-      advanceTo(applyTurn(state, record(input, r), { gameId: 'g', registry }), input.endMs, registry)
-        .state.world;
+      advanceTo(
+        applyTurn(state, record(input, r), { gameId: 'g', registry }),
+        input.endMs,
+        registry,
+      ).state.world;
     const a = end(engine);
     const b = end(umpire);
     for (const u of a.units) {
@@ -191,7 +202,7 @@ describe('the umpire adjudicator (D39, 11.6) with the canned umpire', () => {
       expect(v.status).toBe(u.status);
     }
     // The canned proposal needs no clamp.
-    expect(b.rulings.filter((r) => r.kind === 'turn')).toEqual([]);
+    expect(turnRulings(b)).toEqual([]);
     // The orders that arrived are carried out; each side saw what the engine's rules saw.
     const out = umpire.output as UmpireTurnOutput;
     const b1 = out.proposal.units.find((u) => u.unitId === 'blue-1')!;
@@ -257,9 +268,12 @@ describe('the adjudicate pipeline: checks, one resend, clamp or fall back', () =
     expect(r.fallback).toBeUndefined();
     expect(r.calls).toHaveLength(2);
     expect((r.output as UmpireTurnOutput).resent).toEqual(resend.rejected.problems);
-    const end = advanceTo(applyTurn(state, record(input, r), { gameId: 'g', registry }), input.endMs, registry)
-      .state.world;
-    const ruling = end.rulings.find((x) => x.kind === 'turn' && x.unitId === 'blue-3');
+    const end = advanceTo(
+      applyTurn(state, record(input, r), { gameId: 'g', registry }),
+      input.endMs,
+      registry,
+    ).state.world;
+    const ruling = turnRulings(end).find((x) => x.unitId === 'blue-3');
     expect(ruling).toMatchObject({ field: 'position' });
   });
 
@@ -267,7 +281,10 @@ describe('the adjudicate pipeline: checks, one resend, clamp or fall back', () =
     const { state, input } = firstTurn();
     const model = editing((p, call) =>
       call === 1
-        ? { ...p, units: p.units.map((u) => (u.unitId === 'red-1' ? { ...u, strength: 99_999 } : u)) }
+        ? {
+            ...p,
+            units: p.units.map((u) => (u.unitId === 'red-1' ? { ...u, strength: 99_999 } : u)),
+          }
         : p,
     );
     const r = await resolver(model).resolve(state, input);
@@ -275,9 +292,12 @@ describe('the adjudicate pipeline: checks, one resend, clamp or fall back', () =
     expect(r.adjudicator).toBe('umpire');
     const out = r.output as UmpireTurnOutput;
     expect(out.resent!.some((p) => p.includes('red-1'))).toBe(true);
-    const end = advanceTo(applyTurn(state, record(input, r), { gameId: 'g', registry }), input.endMs, registry)
-      .state.world;
-    expect(end.rulings.filter((x) => x.kind === 'turn')).toEqual([]);
+    const end = advanceTo(
+      applyTurn(state, record(input, r), { gameId: 'g', registry }),
+      input.endMs,
+      registry,
+    ).state.world;
+    expect(turnRulings(end)).toEqual([]);
   });
 
   it('falls back to the engine when the call fails twice, and says why', async () => {
@@ -376,11 +396,15 @@ describe('the adjudicate pipeline: checks, one resend, clamp or fall back', () =
     const strengthAfter = async (dial: 'standard' | 'free') => {
       const r = await resolver(editing(lose), dial).resolve(state, input);
       expect(r.adjudicator).toBe('umpire');
-      const end = advanceTo(applyTurn(state, record(input, r), { gameId: 'g', registry }), input.endMs, registry)
-        .state.world;
+      const end = advanceTo(
+        applyTurn(state, record(input, r), { gameId: 'g', registry }),
+        input.endMs,
+        registry,
+      ).state.world;
       return end.units.find((u) => u.id === 'blue-2')!.strength;
     };
-    const canned = (await resolver(cannedClient()).resolve(state, input)).output as UmpireTurnOutput;
+    const canned = (await resolver(cannedClient()).resolve(state, input))
+      .output as UmpireTurnOutput;
     const projected = canned.proposal.units.find((u) => u.unitId === 'blue-2')!.strength;
     expect(Math.round(await strengthAfter('standard'))).toBe(projected);
     expect(Math.round(await strengthAfter('free'))).toBe(projected - 100);
@@ -411,13 +435,16 @@ describe('replay of a recorded umpire turn', () => {
     const model = editing((p) => ({
       ...p,
       units: p.units.map((u) =>
-        u.unitId === 'blue-1' ? { ...u, x: u.x - 50, account: 'We halted short of the bridge.' } : u,
+        u.unitId === 'blue-1'
+          ? { ...u, x: u.x - 50, account: 'We halted short of the bridge.' }
+          : u,
       ),
     }));
-    const live = await new UmpireTurnResolver({ registry, client: model, dial: 'standard' }).resolve(
-      state,
-      input,
-    );
+    const live = await new UmpireTurnResolver({
+      registry,
+      client: model,
+      dial: 'standard',
+    }).resolve(state, input);
     expect(live.adjudicator).toBe('umpire');
     const played = await new UmpireTurnResolver({
       registry,
@@ -427,13 +454,15 @@ describe('replay of a recorded umpire turn', () => {
     expect(played).toEqual(live);
     const end = (r: { adjudicator: string; output?: unknown }) =>
       JSON.stringify(
-        advanceTo(applyTurn(state, record(input, r), { gameId: 'g', registry }), input.endMs, registry)
-          .state,
+        advanceTo(
+          applyTurn(state, record(input, r), { gameId: 'g', registry }),
+          input.endMs,
+          registry,
+        ).state,
       );
     expect(end(played)).toBe(end(live));
   });
 });
-
 
 describe('a recorded real-model turn (the benchmark’s Opus answers, #398)', () => {
   const dir = new URL('../../bench/umpire/claude-code-opus/', import.meta.url);
@@ -494,8 +523,11 @@ describe('a recorded real-model turn (the benchmark’s Opus answers, #398)', ()
       expect(played).toEqual(live);
       const end = (r: { adjudicator: string; output?: unknown }) =>
         JSON.stringify(
-          advanceTo(applyTurn(state, record(input, r), { gameId: 'g', registry }), input.endMs, registry)
-            .state,
+          advanceTo(
+            applyTurn(state, record(input, r), { gameId: 'g', registry }),
+            input.endMs,
+            registry,
+          ).state,
         );
       expect(end(played)).toBe(end(live));
       // Opus's answers pass the gate (some after clamps): each is an umpire turn, not a fallback.

@@ -368,13 +368,18 @@ describe('turn orders: hostile text in front of the turn umpire', () => {
   const { world, secrets } = plantCanaries(loadScenario(holdTheBridge));
   const registry = createRegistry();
   const state = startingState(createState(world.seed, { ...world, dial: 'standard' }, 0));
-  const enemyNames = world.units.filter((u) => u.side === 'red').map((u) => `${u.name} (${u.commander})`);
+  const enemyNames = world.units
+    .filter((u) => u.side === 'red')
+    .map((u) => `${u.name} (${u.commander})`);
 
   /** The canned answer, then everything the injection asked for. */
   const obeying = (namesEnemy: boolean) =>
     new ScriptedModel({
       adjudicate: (req) => {
-        const p = testReply(req.schema as Record<string, unknown>, req.input as never) as TurnProposal;
+        const p = testReply(
+          req.schema as Record<string, unknown>,
+          req.input as never,
+        ) as TurnProposal;
         return {
           ...p,
           units: p.units.map((u) =>
@@ -404,14 +409,25 @@ describe('turn orders: hostile text in front of the turn umpire', () => {
       sent: ['blue'],
     };
     const before = JSON.stringify(state);
-    const r = await new UmpireTurnResolver({ registry, client, dial: 'standard' }).resolve(state, input);
+    const r = await new UmpireTurnResolver({ registry, client, dial: 'standard' }).resolve(
+      state,
+      input,
+    );
     const engine = await new EngineTurnResolver(registry).resolve(state, input);
     expect(JSON.stringify(state)).toBe(before);
     const end = (res: { adjudicator: string; output?: unknown }) =>
       advanceTo(
         applyTurn(
           state,
-          { n: 1, startMs: 0, endMs: input.endMs, cause: 'all-sent', orders: input.orders, sent: ['blue'], ...res },
+          {
+            n: 1,
+            startMs: 0,
+            endMs: input.endMs,
+            cause: 'all-sent',
+            orders: [...input.orders],
+            sent: ['blue'],
+            ...res,
+          },
           { gameId: 'inj', registry },
         ),
         input.endMs,
@@ -435,15 +451,21 @@ describe('turn orders: hostile text in front of the turn umpire', () => {
           const e = engineWorld.units.find((x) => x.id === u.id)!;
           expect(u.status).toBe(e.status);
           expect(Math.round(u.strength)).toBe(Math.round(e.strength));
-          expect(Math.abs(u.center.x - e.center.x) + Math.abs(u.center.y - e.center.y)).toBeLessThan(2_000);
+          expect(
+            Math.abs(u.center.x - e.center.x) + Math.abs(u.center.y - e.center.y),
+          ).toBeLessThan(2_000);
         }
         const b1 = after.units.find((u) => u.id === 'blue-1')!;
-        expect(b1.strength).toBeLessThanOrEqual(world.units.find((u) => u.id === 'blue-1')!.strength);
+        expect(b1.strength).toBeLessThanOrEqual(
+          world.units.find((u) => u.id === 'blue-1')!.strength,
+        );
         // An account that names the enemy fails the gate: the engine resolves the turn.
         if (namesEnemy) expect(r.adjudicator).toBe('engine');
         const view = JSON.stringify(viewFor(after, 'blue', 20 * 60_000));
         expect(hiddenIn(view, enemyNames)).toEqual([]);
-        expect(secrets.filter((s) => s.hiddenFrom === 'blue' && view.includes(s.value))).toEqual([]);
+        expect(secrets.filter((s) => s.hiddenFrom === 'blue' && view.includes(s.value))).toEqual(
+          [],
+        );
       }
     });
   }

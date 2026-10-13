@@ -137,9 +137,7 @@ export function adjudicateInput(world: GameState, turn: AdjudicateTurn) {
     endMinute: minute(turn.endMs),
     turnMinutes: minute(turnMs),
     dial: turn.dial,
-    ...(turn.dial === 'standard'
-      ? { departureTolerance: { ...DEPARTURE_TOLERANCE } }
-      : {}),
+    ...(turn.dial === 'standard' ? { departureTolerance: { ...DEPARTURE_TOLERANCE } } : {}),
     map: {
       widthM: m(world.map.width),
       heightM: m(world.map.height),

@@ -34,7 +34,9 @@ Example file: parse on a local model, judging and narration in the cloud.
 }
 ```
 
-Env overrides (they win over the file): `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_TIMEOUT_MS`, `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`, `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS`, `UMPIRE_GAME_BUDGET_USD`, `UMPIRE_GAME_BUDGET_TOKENS`, `UMPIRE_GAME_CALLS_PER_MINUTE`.
+Env overrides (they win over the file): `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND|CRITIQUE|ADJUDICATE`, `UMPIRE_MODEL_<same stages>`, `UMPIRE_TIMEOUT_MS`, `UMPIRE_TIMEOUT_MS_ADJUDICATE` (per attempt, default 300 s; the file's `stageTimeoutMs.adjudicate`), `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`, `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS`, `UMPIRE_GAME_BUDGET_USD`, `UMPIRE_GAME_BUDGET_TOKENS`, `UMPIRE_GAME_CALLS_PER_MINUTE`.
+
+**The turn umpire** (`adjudicate`, D39, 11.6) defaults to `claude-sonnet-5-5` with a 12,000-token reply limit and the 300 s per-attempt timeout above; a whole turn's adjudication (both calls and their retries) is cut off after 15 minutes and the turn falls back to the engine. It runs only when `turnUmpireEnabled` holds: an Anthropic route with its key, or another provider type than `test` and `ollama` on the stage, or `UMPIRE_PROVIDER_ADJUDICATE` set explicitly (any provider, `test` included, for development). `TURN_UMPIRE=off` turns it off. Otherwise turn-mode games are decided by the engine at every dial; the keyless demo (Ollama or `test`) is in this case, by the benchmark below. The stage is not in `OLLAMA_STAGES`' eligible list. Its calls count against the game's `GameUmpireClient` caps; a refused call is not retried and the turn falls back.
 
 **API keys come only from the environment.** A provider names the variable in `apiKeyEnv`; a literal key in a file is rejected. `anthropic` defaults to `ANTHROPIC_API_KEY`. `openai-compatible` sends no key unless `apiKeyEnv` is set. Never commit keys.
 
@@ -54,6 +56,7 @@ Select it with `UMPIRE_PROVIDER=test` (every stage), `UMPIRE_PROVIDER_<STAGE>=te
 | `judge` | No placements. |
 | `command` | Every unit holds the named place nearest the objective. |
 | `critique` | Quotes the digest's own facts as points (result, a report per side, misreadings, pauses, a delivery), so it passes `checkCritique`. |
+| `adjudicate` | The engine's projection as the proposal: each unit where the projection ends it, every arrived order `carried-out` and every riding one `not-arrived`, the engine's own sightings, no departures. A turn it answers ends as the engine adjudicator's would. |
 
 Its output is deterministic and validated like any model's, and recorded through `CallRecorder`. The game shows a "Test umpire (canned responses)" badge (`GET /scenarios` carries `umpire: "test"`), and the admin LLM panel shows its calls with mode `test`.
 

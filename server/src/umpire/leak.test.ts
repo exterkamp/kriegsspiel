@@ -39,7 +39,7 @@ import { StaffRoster, answerStaffQuestion, runStaff } from './staff.js';
 import type { UmpireClient } from './umpireClient.js';
 import { createRegistry, startingState } from '../game/registry.js';
 import { applyTurn, type TurnInput } from '../game/turns.js';
-import { UmpireTurnResolver, type UmpireTurnOutput } from '../game/umpireTurn.js';
+import { UmpireTurnResolver } from '../game/umpireTurn.js';
 import { testReply } from './providers/test.js';
 
 const SIDES: SideId[] = ['blue', 'red'];
@@ -381,7 +381,9 @@ describe('the turn umpire delivers a side nothing but its own view (adjudicate, 
     ],
     sent: ['blue', 'red'],
   };
-  const everyName = planted.world.units.map((u) => `${u.name} under ${u.commander}, ${u.strength} men`);
+  const everyName = planted.world.units.map(
+    (u) => `${u.name} under ${u.commander}, ${u.strength} men`,
+  );
   /** The canned answer, with every canary of both sides in the summary and, if asked, the accounts. */
   const leaking = (accounts: boolean) =>
     new ScriptedModel({
@@ -394,13 +396,20 @@ describe('the turn umpire delivers a side nothing but its own view (adjudicate, 
         return {
           ...p,
           summary: everyName.join('; ').slice(0, 2000),
-          units: p.units.map((u) => (accounts ? { ...u, account: everyName.join('; ').slice(0, 600) } : u)),
+          units: p.units.map((u) =>
+            accounts ? { ...u, account: everyName.join('; ').slice(0, 600) } : u,
+          ),
           // Every unit claims to have seen every enemy at both ends.
           observations: planted.world.units.flatMap((by) =>
             planted.world.units
               .filter((t) => t.side !== by.side)
               .flatMap((t) =>
-                (['start', 'end'] as const).map((when) => ({ side: by.side, by: by.id, unitId: t.id, when })),
+                (['start', 'end'] as const).map((when) => ({
+                  side: by.side,
+                  by: by.id,
+                  unitId: t.id,
+                  when,
+                })),
               ),
           ),
         };
@@ -408,29 +417,45 @@ describe('the turn umpire delivers a side nothing but its own view (adjudicate, 
     });
 
   const after = async (client: UmpireClient) => {
-    const r = await new UmpireTurnResolver({ registry, client, dial: 'standard' }).resolve(state, input);
+    const r = await new UmpireTurnResolver({ registry, client, dial: 'standard' }).resolve(
+      state,
+      input,
+    );
     const turn = {
       n: 1,
       startMs: 0,
       endMs: input.endMs,
       cause: input.cause,
-      orders: input.orders,
-      sent: input.sent,
+      orders: [...input.orders],
+      sent: [...input.sent],
       adjudicator: r.adjudicator,
       output: r.output,
     };
-    const end = advanceTo(applyTurn(state, turn, { gameId: 'leak', registry }), input.endMs, registry);
+    const end = advanceTo(
+      applyTurn(state, turn, { gameId: 'leak', registry }),
+      input.endMs,
+      registry,
+    );
     return { r, world: end.state.world };
   };
 
   it.each([
-    ['the canned umpire', () => createUmpireClient({ config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }), env: {} })],
+    [
+      'the canned umpire',
+      () =>
+        createUmpireClient({ config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }), env: {} }),
+    ],
     ['an umpire whose summary names every unit', () => leaking(false)],
     ['an umpire whose accounts name every unit', () => leaking(true)],
   ] as const)('%s: no canary of the other side in either view', async (_label, client) => {
     const { r, world } = await after(client());
     for (const side of SIDES) {
-      const leaks = scan(JSON.stringify(viewFor(world, side, input.endMs)), planted.secrets, side, `${side} view`);
+      const leaks = scan(
+        JSON.stringify(viewFor(world, side, input.endMs)),
+        planted.secrets,
+        side,
+        `${side} view`,
+      );
       expect(describeLeaks(leaks)).toBe('');
     }
     // The commanders' accounts are in their own voice: naming the enemy fails the gate, and the
@@ -446,7 +471,9 @@ describe('the turn umpire delivers a side nothing but its own view (adjudicate, 
     expect(claimed.r.adjudicator).toBe('umpire');
     // Every impossible sighting is dropped (and recorded as a ruling); what each side learns is
     // what the engine's own sight test gave the canned umpire.
-    const dropped = claimed.world.rulings.filter((x) => x.kind === 'turn' && x.field === 'observation');
+    const dropped = claimed.world.rulings.filter(
+      (x) => 'kind' in x && x.kind === 'turn' && 'field' in x && x.field === 'observation',
+    );
     expect(dropped.length).toBeGreaterThan(0);
     for (const side of SIDES) {
       expect(claimed.world.intel[side]).toEqual(canned.world.intel[side]);

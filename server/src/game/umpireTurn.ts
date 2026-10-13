@@ -144,7 +144,8 @@ function projectedUnits(p: Projection, live: ReadonlySet<string>, endMs: number)
         morale: Math.round(u.morale),
         fatigue: Math.round(u.fatigue),
         ammo: Math.round(u.ammo),
-        status: u.status === 'destroyed' ? 'destroyed' : u.status === 'withdrawn' ? 'broken' : 'active',
+        status:
+          u.status === 'destroyed' ? 'destroyed' : u.status === 'withdrawn' ? 'broken' : 'active',
         continuing: to
           ? { kind: 'move', x: m(to.x), y: m(to.y) }
           : intent.kind === 'hold'
@@ -211,7 +212,9 @@ export class UmpireTurnResolver implements TurnResolver {
     // for the umpire to decide, and the engine's turn is exactly what it projected.
     if (state.world.outcome) return { adjudicator: ENGINE_ADJUDICATOR, output: engine };
 
-    const live = new Set(state.world.units.filter((u) => u.status !== 'destroyed').map((u) => u.id));
+    const live = new Set(
+      state.world.units.filter((u) => u.status !== 'destroyed').map((u) => u.id),
+    );
     const orders = shownOrders(state, input, p.couriers);
     const turn: AdjudicateTurn = {
       n: input.n,
