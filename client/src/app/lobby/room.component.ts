@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import type { GameInfo, KickTarget } from '@legacy/lobby/api';
-import { SESSION_LABELS, inviteLink, rateLabel, startBlocker } from '@legacy/lobby/model';
+import { SESSION_LABELS, inviteLink, paceLabel, startBlocker } from '@legacy/lobby/model';
 import { SHELL_API, SHELL_WINDOW } from '../shell/shell-api';
 import { ModalComponent } from '../ui/modal.component';
 import { PageFrameComponent } from '../ui/page-frame.component';
@@ -114,7 +114,7 @@ export class RoomComponent implements OnInit {
   protected readonly info = signal<GameInfo>(undefined as unknown as GameInfo);
   protected readonly error = signal<string | undefined>(undefined);
   protected readonly hot = () => this.info().sessionType === 'hot_seat';
-  protected readonly rate = () => rateLabel(this.info().rate);
+  protected readonly rate = () => paceLabel(this.info());
   protected readonly invite = () => inviteLink(this.win.location.origin, this.info().id);
   protected readonly blocker = () => startBlocker(this.info());
   /** The status line: an error, else what stops the host starting, else the guest's wait. Empty shows no bar. */

@@ -5,12 +5,14 @@ import {
   ElementRef,
   OnDestroy,
   afterNextRender,
+  computed,
   effect,
   inject,
   viewChild,
 } from '@angular/core';
 import * as THREE from 'three';
 import { buildSceneState } from '@legacy/table/sceneState';
+import { GLIDE_MS } from '@legacy/table/glide';
 import { fixtureMap } from '@legacy/table/fixture';
 import { buildWindowScene } from '@legacy/window/model';
 import { DeskStore } from '../desk/desk.store';
@@ -59,6 +61,8 @@ export class TableHostComponent implements OnDestroy {
   protected readonly tableService = inject(TableService);
   private readonly makeScene = inject(TABLE_SCENE_FACTORY);
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('table');
+  /** A turn-mode game (D39) moves by whole turns, so its pieces glide to their new places. */
+  private readonly turnMode = computed(() => this.game.state().turnMode === true);
 
   constructor() {
     afterNextRender(() => {
@@ -79,6 +83,8 @@ export class TableHostComponent implements OnDestroy {
       const frame = this.desk.windowFrame();
       const view = this.game.view();
       if (!scene) return;
+      const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      scene.setGlide(!frame && this.turnMode() && !still ? GLIDE_MS : 0);
       if (frame) scene.apply(buildWindowScene(frame, this.desk.windowBelief(), fixtureMap));
       else if (view) scene.apply(buildSceneState(view, fixtureMap));
     });
