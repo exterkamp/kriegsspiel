@@ -21,6 +21,7 @@ import type {
   UmpireSettings,
 } from '@kriegsspiel/protocol';
 import type { UmpireCallRecord } from '../umpire/umpireClient.js';
+import type { NarrateBreakerState } from '../umpire/narrateBreaker.js';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
 import type { PauseTransition } from '../pause.js';
@@ -214,6 +215,11 @@ export interface InputLogEntry {
   ratio?: RatioTransition[];
   /** For `narrate` commands: every model call the stage made, so the narration replays with no network. */
   calls?: UmpireCallRecord[];
+  /**
+   * For `narrate` commands: the game's narration circuit breaker after this window (#419). A window it
+   * skipped has no calls. A reopened game starts from the last one, so the decision needs no model.
+   */
+  narrateBreaker?: NarrateBreakerState;
   /** For `resolveTurn` commands: the turn as resolved, so replay needs no resolver call (D39). */
   turn?: TurnRecord;
   /** The command was refused or failed; the reason. */

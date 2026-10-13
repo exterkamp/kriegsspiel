@@ -270,6 +270,10 @@ export class GameHost {
       staffHistory.set(c.side, [...(staffHistory.get(c.side) ?? []), c.exchange]);
     }
     const deputies = deputiesFromLog(log);
+    // The narration breaker as the last window left it (#419).
+    const narrateBreaker = [...log]
+      .reverse()
+      .find((e) => e.command.kind === 'narrate' && e.narrateBreaker)?.narrateBreaker;
     const open = turnOptions ? openTurnFromLog(log) : undefined;
     const turns = turnOptions && {
       ...turnOptions,
@@ -288,6 +292,7 @@ export class GameHost {
       ...(turns ? { turns } : { pause: this.options.pause?.(id, state.world) }),
       restart: { downMs },
       persona: settings?.persona,
+      ...(narrateBreaker ? { narrateBreaker } : {}),
       // The log is in insertion order, which is not always seq order (see D14b).
       seq: tail.reduce((max, e) => Math.max(max, e.seq), snap.seq),
     });

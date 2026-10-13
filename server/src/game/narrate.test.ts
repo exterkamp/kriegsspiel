@@ -243,6 +243,71 @@ describe('narrate stage in the actor', () => {
     expect(game.narrationFor('red')).toBeUndefined();
   });
 
+  it('stops calling a failing model for a cooling-off in game time, logs why, and tries again after (#419)', async () => {
+    const umpire = new StubUmpire();
+    // An officer the reports never name: every reply fails the checks.
+    umpire.narrateText = () => 'Sir, Colonel Zorn writes.';
+    const { time, store, game } = await newGame(umpire);
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' });
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march on' });
+    const narrateCalls = () => umpire.requests.filter((r) => r.stage === 'narrate').length;
+    for (let i = 0; i < 60 && game.narrationBreaker.pausedUntil === undefined; i++) {
+      await time.advance(NARRATE_WINDOW_BASE_MS);
+    }
+    const pausedUntil = game.narrationBreaker.pausedUntil!;
+    expect(pausedUntil).toBeDefined();
+    expect(game.narrationBreaker.failed).toBeGreaterThanOrEqual(3);
+
+    // Cooling off: windows close with reports due, but the model is not asked.
+    const before = narrateCalls();
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 hold' });
+    while (game.state.time + NARRATE_WINDOW_BASE_MS < pausedUntil) {
+      await time.advance(NARRATE_WINDOW_BASE_MS);
+    }
+    expect(narrateCalls()).toBe(before);
+    const log = (await store.inputLog('g1')).filter((e) => e.command.kind === 'narrate');
+    const skipped = log.filter((e) => e.calls?.length === 0);
+    expect(skipped.length).toBeGreaterThan(0);
+    expect(skipped[0]!.error).toMatch(/model narration paused: \d+ of \d+ failed/);
+    expect(skipped[0]!.narrateBreaker?.pausedUntil).toBe(pausedUntil);
+
+    // After it the model is asked again, and its good text is shown.
+    umpire.narrateText = undefined;
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' });
+    for (let i = 0; i < 20 && narrateCalls() === before; i++) {
+      await time.advance(NARRATE_WINDOW_BASE_MS);
+    }
+    expect(narrateCalls()).toBeGreaterThan(before);
+    expect(game.state.time).toBeGreaterThanOrEqual(pausedUntil);
+    expect([...(game.narrationFor('blue')?.values() ?? [])]).toContain(
+      'Sir, 1st Battalion writes.',
+    );
+    expect(game.narrationBreaker.pausedUntil).toBeUndefined();
+  });
+
+  it('restores the breaker from the input log when a game is reopened (#419)', async () => {
+    const umpire = new StubUmpire();
+    umpire.narrateText = () => 'Sir, Colonel Zorn writes.';
+    const { time, store, game } = await newGame(umpire);
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' });
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march on' });
+    for (let i = 0; i < 60 && game.narrationBreaker.pausedUntil === undefined; i++) {
+      await time.advance(NARRATE_WINDOW_BASE_MS);
+    }
+    const state = structuredClone(game.narrationBreaker);
+    expect(state.pausedUntil).toBeDefined();
+    await host!.close('g1');
+    host = new GameHost({
+      store,
+      parser,
+      registry: registry(),
+      wallNow: time.now,
+      timers: time,
+      narrator: () => umpire,
+    });
+    expect((await host.open('g1')).narrationBreaker).toEqual(state);
+  });
+
   it('keeps template text when no umpire is set', async () => {
     const { time, game } = await newGame();
     const side = await runUntilReport(time, game);

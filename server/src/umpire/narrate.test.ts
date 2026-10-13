@@ -405,6 +405,58 @@ describe('narrateReports', () => {
   });
 });
 
+describe('narrateReports with a circuit breaker (#419)', () => {
+  it('tells the breaker each outcome and stops calling once it opens', async () => {
+    const outcomes: boolean[] = [];
+    let open = false;
+    const breaker = {
+      allows: () => !open,
+      reason: () => 'model narration paused: 3 of 3 failed',
+      record: (ok: boolean) => {
+        outcomes.push(ok);
+        open = outcomes.filter((o) => !o).length >= 3;
+      },
+    };
+    const bad = { dispatches: [{ reportIds: ['blue-r1'], text: 'Red-9 attacks.' }] };
+    const client = new MockUmpireClient([fixture(bad)]);
+    const three = [...reports, report({ id: 'blue-r3', from: '1st Jaegers' })];
+    const r = await narrateReports(client, 'blue', three, { breaker });
+    // Two rejected replies for the first report, one for the second, then nothing more.
+    expect(client.calls).toHaveLength(3);
+    expect(outcomes).toEqual([false, false, false]);
+    expect(r.dispatches.map((d) => d.text)).toEqual(three.map((x) => x.text));
+    expect(r.fallbacks.map((f) => f.reason).slice(1)).toEqual([
+      'model narration paused: 3 of 3 failed',
+      'model narration paused: 3 of 3 failed',
+    ]);
+  });
+
+  it('counts a failed call as a failure and a passing reply as a success', async () => {
+    const outcomes: boolean[] = [];
+    const breaker = {
+      allows: () => true,
+      reason: () => '',
+      record: (ok: boolean) => outcomes.push(ok),
+    };
+    await narrateReports(
+      fakeModel([
+        one('blue-r1', good.dispatches[0]!.text),
+        one('blue-r2', good.dispatches[1]!.text),
+      ]) as never,
+      'blue',
+      reports,
+      { breaker },
+    );
+    await narrateReports(
+      new MockUmpireClient([{ stage: 'narrate', failure: { kind: 'transport' } }]),
+      'blue',
+      reports,
+      { breaker },
+    );
+    expect(outcomes).toEqual([true, true, false]);
+  });
+});
+
 describe('narration windows', () => {
   it('scales the window with the clock rate', () => {
     expect(narrateWindowMs(1)).toBe(NARRATE_WINDOW_BASE_MS);

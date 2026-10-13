@@ -526,6 +526,11 @@ export interface NarrateOptions {
   persona?: UmpirePersona;
   /** The side's own units (`viewFor(...).ownUnits`): each sender's commander, manner and condition (#390). */
   ownUnits?: readonly ViewUnit[];
+  /**
+   * The game's circuit breaker (#419): asked before every model call, and told whether each passed. Once it
+   * stops allowing calls, the reports not yet narrated keep their template text with `reason` as the reason.
+   */
+  breaker?: { allows(): boolean; record(ok: boolean): void; reason(): string };
 }
 
 const TIMED_OUT = 'timed out';
@@ -610,6 +615,10 @@ export async function narrateReports(
     let narrated: NarratedDispatch | undefined;
     let calls = 0;
     while (calls < maxCalls && !narrated && stopped === undefined) {
+      if (opts.breaker && !opts.breaker.allows()) {
+        stopped = opts.breaker.reason();
+        break;
+      }
       calls++;
       result.calls++;
       // Tell a retry what was wrong, so it does not repeat the invention.
@@ -628,6 +637,7 @@ export async function narrateReports(
         ));
       } catch (e) {
         if (e === ABORTED) {
+          opts.breaker?.record(false);
           stopped = TIMED_OUT;
           break;
         }
@@ -639,11 +649,13 @@ export async function narrateReports(
           result.overloaded = STAFF_OVERLOADED_NOTICE;
           stopped = 'umpire budget or rate limit';
         } else {
+          opts.breaker?.record(false);
           stopped = `the model call failed (${e.kind})`;
         }
         break;
       }
       const problems = checkNarration(output, input, opts.hidden);
+      opts.breaker?.record(problems.length === 0);
       if (problems.length === 0) {
         narrated = {
           reportIds: [r.id],
