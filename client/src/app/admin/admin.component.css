@@ -23,7 +23,7 @@ ks-admin {
   }
   #app {
     display: grid;
-    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto minmax(0, 1fr);
     grid-template-columns: minmax(0, 1fr);
     min-height: 0;
     margin: 0 var(--ks-space-3) var(--ks-space-3);
@@ -73,6 +73,18 @@ ks-admin {
   }
   small {
     color: var(--dim);
+  }
+  /* Layout from the shared .ks-cluster (ui.css); only the bar's frame here. */
+  .controls {
+    padding: var(--ks-space-1) var(--ks-space-2);
+    border-bottom: 1px solid var(--ks-rule);
+  }
+  .controls-state {
+    font-weight: bold;
+    margin-right: var(--ks-space-2);
+  }
+  .controls input {
+    width: 5ch;
   }
   nav {
     display: flex;
