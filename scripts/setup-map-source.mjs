@@ -27,18 +27,12 @@ if (
 )
   throw new Error('Missing or invalid consumed engine artifact integrity');
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-// Node refuses to spawn .cmd files without a shell (CVE-2024-27980).
-const shell = process.platform === 'win32';
 execFileSync(
   npm,
   ['ci', '--workspaces=false', '--ignore-scripts', '--cache', join(root, '.cache/maps-npm')],
-  { cwd: source, stdio: 'inherit', shell },
+  { cwd: source, stdio: 'inherit' },
 );
-execFileSync(npm, ['run', 'build', '--workspaces=false'], {
-  cwd: source,
-  stdio: 'inherit',
-  shell,
-});
+execFileSync(npm, ['run', 'build', '--workspaces=false'], { cwd: source, stdio: 'inherit' });
 
 // Install the exact measured runtime tarball, never an ignored source checkout
 // or a floating workspace link. Only engine source/object code enters this pack.
@@ -56,7 +50,6 @@ try {
     execFileSync(npm, ['pack', '--ignore-scripts', '--json'], {
       cwd: temporary,
       encoding: 'utf8',
-      shell,
     }),
   );
   const tarball = join(temporary, packed.filename);
