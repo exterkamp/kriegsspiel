@@ -1,0 +1,13 @@
+{
+  "pid": 27161,
+  "url": "http://a5-c8.localhost:41772/",
+  "verified": {
+    "ORDER_PARSER": true,
+    "AI_COMMANDER": true,
+    "UMPIRE_PROVIDER": true,
+    "DB_PATH": true,
+    "MAIL_WEBHOOK_URL": true,
+    "MAIL_WEBHOOK_TOKEN": true
+  },
+  "scope": "Approved Angular landing plan lines256-257 requires fresh real-server scenario creation/live preservation smoke. Test-only game in own isolated local database; no engine implementation expansion, external model/mail calls, deployment or production data."
+}

@@ -1,4 +1,5 @@
 import type { Routes } from '@angular/router';
+import { developmentRoutes } from './development.routes';
 
 /**
  * One Angular workspace with lazy tool pages. Admin, map authoring and the benchmarks are lazy so the game bundle stays small.
@@ -50,5 +51,6 @@ export const routes: Routes = [
   { path: 'map-authoring.html', redirectTo: 'map-authoring' },
   { path: 'map-benchmark.html', redirectTo: 'map-benchmark' },
   { path: 'table-benchmark.html', redirectTo: 'table-benchmark' },
+  ...developmentRoutes,
   { path: '**', redirectTo: '' },
 ];

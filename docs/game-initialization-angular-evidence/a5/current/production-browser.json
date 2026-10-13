@@ -1,0 +1,450 @@
+[
+  {
+    "label": "Signed-in creator opens explicitly API-seeded invite lobby",
+    "at": "2026-10-12T23:31:00.513Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- status: Loading…",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Signed-in creator lobby settled",
+    "at": "2026-10-12T23:31:07.157Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- main:\n  - paragraph:\n    - button \"← Main menu\"\n  - 'heading \"Lobby: Team vs team, 12:1\" [level=1]'\n  - list:\n    - listitem: \"blue: ready (you)\"\n    - listitem: \"red: open\"\n  - paragraph:\n    - text: \"Invite link:\"\n    - textbox \"Invite link:\": http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f\n  - button \"Start game\" [disabled]\n  - status: Waiting for a player on red.",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Invite guest authentication submitted",
+    "at": "2026-10-12T23:31:17.049Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895219",
+    "url": "http://127.0.0.1:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Guest invitation lobby settled",
+    "at": "2026-10-12T23:31:23.946Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895219",
+    "url": "http://127.0.0.1:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- main:\n  - paragraph:\n    - button \"← Main menu\"\n  - 'heading \"Lobby: Team vs team, 12:1\" [level=1]'\n  - list:\n    - listitem: \"blue: ready\"\n    - listitem: \"red: seated (you)\"\n  - paragraph:\n    - text: \"Invite link:\"\n    - textbox \"Invite link:\": http://127.0.0.1:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f\n  - button \"Ready\"\n  - button \"Leave seat\"\n  - status: Waiting for the host to start.",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Guest Ready submitted",
+    "at": "2026-10-12T23:31:40.200Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895219",
+    "url": "http://127.0.0.1:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- main:\n  - paragraph:\n    - button \"← Main menu\"\n  - 'heading \"Lobby: Team vs team, 12:1\" [level=1]'\n  - list:\n    - listitem: \"blue: ready\"\n    - listitem: \"red: ready (you)\"\n  - paragraph:\n    - text: \"Invite link:\"\n    - textbox \"Invite link:\": http://127.0.0.1:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f\n  - button \"Not ready\" [active]\n  - button \"Leave seat\"\n  - status: Waiting for the host to start.",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Current upstream Leave confirmation",
+    "at": "2026-10-12T23:31:40.407Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895219",
+    "url": "http://127.0.0.1:41912/",
+    "dom": "- status: Loading…",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Leave completes return to ordinary guest menu",
+    "at": "2026-10-12T23:31:49.764Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895219",
+    "url": "http://127.0.0.1:41912/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph: An umpired war game, played in real time or slower.\n  - navigation \"Main menu\":\n    - button \"New game\"\n  - region \"Account\":\n    - heading \"Account\" [level=2]\n    - paragraph: Playing as a guest. Your games stay in this browser.\n    - button \"Sign in to keep your games on other devices\"\n    - button \"High contrast\"\n  - region \"Developer tools\":\n    - heading \"Developer tools\" [level=2]\n    - paragraph: For development; not part of the game.\n    - list:\n      - link \"Map editor Generate, preview and export a battlefield.\":\n        - /url: /map-authoring\n        - generic: Map editor\n        - generic: Generate, preview and export a battlefield.\n      - link \"Map benchmark Time map generation and rendering on this device.\":\n        - /url: /map-benchmark\n        - generic: Map benchmark\n        - generic: Time map generation and rendering on this device.\n      - link \"Table benchmark Time the 3D table scene on this device.\":\n        - /url: /table-benchmark\n        - generic: Table benchmark\n        - generic: Time the 3D table scene on this device.\n      - link \"Style guide Tokens and every shared control in each state.\":\n        - /url: /style-guide\n        - generic: Style guide\n        - generic: Tokens and every shared control in each state.\n      - link \"Admin view Operator console; asks for the admin token.\":\n        - /url: /admin/\n        - generic: Admin view\n        - generic: Operator console; asks for the admin token.\n  - region \"About\":\n    - heading \"About\" [level=2]\n    - paragraph:\n      - text: You command one side of a battle from a desk. Orders are written in plain words and carried by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game keeps running on the server while you are away.\n      - link \"Read how it plays\":\n        - /url: https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md\n      - text: .",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Host poll observes freed Red seat after guest Leave",
+    "at": "2026-10-12T23:31:49.816Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- main:\n  - paragraph:\n    - button \"← Main menu\"\n  - 'heading \"Lobby: Team vs team, 12:1\" [level=1]'\n  - list:\n    - listitem: \"blue: ready (you)\"\n    - listitem: \"red: open\"\n  - paragraph:\n    - text: \"Invite link:\"\n    - textbox \"Invite link:\": http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f\n  - button \"Start game\" [disabled]\n  - status: Waiting for a player on red.",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Guest reopens invitation after voluntarily leaving",
+    "at": "2026-10-12T23:31:59.917Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895219",
+    "url": "http://127.0.0.1:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- status: Opening the game…",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Rejoined guest Red seat is not ready",
+    "at": "2026-10-12T23:32:46.968Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895219",
+    "url": "http://127.0.0.1:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- main:\n  - paragraph:\n    - button \"← Main menu\"\n  - 'heading \"Lobby: Team vs team, 12:1\" [level=1]'\n  - list:\n    - listitem: \"blue: ready\"\n    - listitem: \"red: seated (you)\"\n  - paragraph:\n    - text: \"Invite link:\"\n    - textbox \"Invite link:\": http://127.0.0.1:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f\n  - button \"Ready\"\n  - button \"Leave seat\"\n  - status: Waiting for the host to start.",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Host observes both seats ready after guest rejoin",
+    "at": "2026-10-12T23:32:47.356Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- main:\n  - paragraph:\n    - button \"← Main menu\"\n  - 'heading \"Lobby: Team vs team, 12:1\" [level=1]'\n  - list:\n    - listitem: \"blue: ready (you)\"\n    - text: \"red: seated\"\n    - button \"Remove red player\"\n  - paragraph:\n    - text: \"Invite link:\"\n    - textbox \"Invite link:\": http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f\n  - button \"Start game\" [disabled]\n  - status: Waiting for red to be ready.",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Upstream Remove confirmation opened without submitting removal",
+    "at": "2026-10-12T23:33:01.833Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- main:\n  - paragraph:\n    - button \"← Main menu\"\n  - 'heading \"Lobby: Team vs team, 12:1\" [level=1]'\n  - list:\n    - listitem: \"blue: ready (you)\"\n    - text: \"red: ready\"\n    - button \"Remove red player\"\n  - paragraph:\n    - text: \"Invite link:\"\n    - textbox \"Invite link:\": http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f\n  - button \"Start game\"\n  - status\n  - dialog \"Remove player?\":\n    - heading \"Remove player?\" [level=2]\n    - paragraph: Remove the commander on red from this game? They are told and cannot rejoin.\n    - button \"Remove player\" [active]\n    - button \"Cancel\"",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Inherited lobby Remove confirmation remains open after Escape",
+    "at": "2026-10-12T23:33:13.236Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- main:\n  - paragraph:\n    - button \"← Main menu\"\n  - 'heading \"Lobby: Team vs team, 12:1\" [level=1]'\n  - list:\n    - listitem: \"blue: ready (you)\"\n    - text: \"red: ready\"\n    - button \"Remove red player\"\n  - paragraph:\n    - text: \"Invite link:\"\n    - textbox \"Invite link:\": http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f\n  - button \"Start game\"\n  - status\n  - dialog \"Remove player?\":\n    - heading \"Remove player?\" [level=2]\n    - paragraph: Remove the commander on red from this game? They are told and cannot rejoin.\n    - button \"Remove player\"\n    - button \"Cancel\" [active]",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Explicit Cancel retains ready Red participant",
+    "at": "2026-10-12T23:33:13.522Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- main:\n  - paragraph:\n    - button \"← Main menu\"\n  - 'heading \"Lobby: Team vs team, 12:1\" [level=1]'\n  - list:\n    - listitem: \"blue: ready (you)\"\n    - text: \"red: ready\"\n    - button \"Remove red player\"\n  - paragraph:\n    - text: \"Invite link:\"\n    - textbox \"Invite link:\": http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f\n  - button \"Start game\"\n  - status",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Actual host Start submitted with both ready seats",
+    "at": "2026-10-12T23:33:13.820Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- region \"Map marks\":\n  - button \"Tools\" [expanded]\n  - toolbar:\n    - button \"Look\" [pressed]\n    - button \"Move\"\n    - button \"Pin\"\n    - button \"Pencil\"\n    - button \"Arrow\"\n    - button \"Range ring\"\n  - textbox \"Note for the next mark\"\n  - button \"Delete mark\" [disabled]\n  - button \"Plot report\" [disabled]\n  - checkbox \"Order arrows\" [checked]\n  - text: Order arrows\n  - checkbox \"Planned routes\" [checked]\n  - text: Planned routes\n  - checkbox \"Last known\" [checked]\n  - text: Last known\n- region \"Clock\":\n  - generic: Day 1 00:00\n  - generic: 12:1\n  - generic: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\" [pressed]:\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 1 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"1 unread\": \"1\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- button \"Menu (Esc)\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Guest invitation transitions to real running Red HQ",
+    "at": "2026-10-12T23:34:01.031Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895219",
+    "url": "http://127.0.0.1:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- region \"Map marks\":\n  - button \"Tools\" [expanded]\n  - toolbar:\n    - button \"Look\" [pressed]\n    - button \"Move\"\n    - button \"Pin\"\n    - button \"Pencil\"\n    - button \"Arrow\"\n    - button \"Range ring\"\n  - textbox \"Note for the next mark\"\n  - button \"Delete mark\" [disabled]\n  - button \"Plot report\" [disabled]\n  - checkbox \"Order arrows\" [checked]\n  - text: Order arrows\n  - checkbox \"Planned routes\" [checked]\n  - text: Planned routes\n  - checkbox \"Last known\" [checked]\n  - text: Last known\n- region \"Clock\":\n  - generic: Day 1 00:09\n  - generic: 12:1\n  - generic: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\" [pressed]:\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 1 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"1 unread\": \"1\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- button \"Menu (Esc)\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Live Blue Pin submitted through actual canvas tool",
+    "at": "2026-10-12T23:34:05.409Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- region \"Map marks\":\n  - button \"Tools\" [expanded]\n  - toolbar:\n    - button \"Look\"\n    - button \"Move\"\n    - button \"Pin\" [pressed]\n    - button \"Pencil\"\n    - button \"Arrow\"\n    - button \"Range ring\"\n  - textbox \"Note for the next mark\"\n  - button \"Delete mark\" [disabled]\n  - button \"Plot report\" [disabled]\n  - checkbox \"Order arrows\" [checked]\n  - text: Order arrows\n  - checkbox \"Planned routes\" [checked]\n  - text: Planned routes\n  - checkbox \"Last known\" [checked]\n  - text: Last known\n- region \"Clock\":\n  - generic: Day 1 00:10\n  - generic: 12:1\n  - generic: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\" [pressed]:\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 1 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"1 unread\": \"1\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- button \"Menu (Esc)\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Actual current Orders desk",
+    "at": "2026-10-12T23:34:05.731Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- region \"Clock\":\n  - generic: Day 1 00:10\n  - generic: 12:1\n  - generic: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\":\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 1 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"1 unread\": \"1\"\n  - button \"Orders desk O\" [active] [pressed]:\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- region \"Orders desk\":\n  - heading \"Orders\" [level=2]\n  - generic: To\n  - combobox \"To\":\n    - option \"(choose a commander)\" [selected]\n    - option \"1st Battalion\"\n    - option \"2nd Battalion\"\n    - option \"Cavalry Squadron\"\n  - alert\n  - generic: Order\n  - textbox \"Order\":\n    - /placeholder: Write the order…\n  - alert\n  - paragraph: The staff understand orders such as \"1st Battalion march to the bridge\" or \"Hold the wood\".\n  - group \"Marked-map annex\":\n    - generic: Marked-map annex\n    - paragraph: Draw arrows on the map table to attach them to the order.\n  - group \"Courier\":\n    - generic: Courier\n    - radio \"Fast rider choose a commander for an estimate Rides hard and arrives sooner, but is more likely to be lost, taken or to garble the order.\"\n    - generic: Fast rider\n    - generic: choose a commander for an estimate\n    - generic: Rides hard and arrives sooner, but is more likely to be lost, taken or to garble the order.\n    - radio \"Steady courier choose a commander for an estimate Keeps to the quiet way. Arrives later, but is less likely to be lost, taken or to garble the order.\" [checked]\n    - generic: Steady courier\n    - generic: choose a commander for an estimate\n    - generic: Keeps to the quiet way. Arrives later, but is less likely to be lost, taken or to garble the order.\n    - paragraph: The staff reckon the ride on the straight line; a road shortens it and rough ground lengthens it.\n  - button \"Sign and send\"\n  - alert\n- button \"Menu (Esc)\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Live Blue order Sign and send submitted",
+    "at": "2026-10-12T23:34:26.612Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- region \"Clock\":\n  - generic: Day 1 00:14\n  - generic: 12:1\n  - generic: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\":\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 1 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"1 unread\": \"1\"\n  - button \"Orders desk O\" [pressed]:\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- region \"Orders desk\":\n  - heading \"Orders\" [level=2]\n  - generic: To\n  - combobox \"To\":\n    - option \"(choose a commander)\"\n    - option \"1st Battalion\" [selected]\n    - option \"2nd Battalion\"\n    - option \"Cavalry Squadron\"\n  - alert\n  - generic: Order\n  - textbox \"Order\":\n    - /placeholder: Write the order…\n  - alert\n  - paragraph: The staff understand orders such as \"1st Battalion march to the bridge\" or \"Hold the wood\".\n  - group \"Marked-map annex\":\n    - generic: Marked-map annex\n    - paragraph: Draw arrows on the map table to attach them to the order.\n  - group \"Courier\":\n    - generic: Courier\n    - radio \"Fast rider about 2 min Rides hard and arrives sooner, but is more likely to be lost, taken or to garble the order.\"\n    - generic: Fast rider\n    - generic: about 2 min\n    - generic: Rides hard and arrives sooner, but is more likely to be lost, taken or to garble the order.\n    - radio \"Steady courier about 4 min Keeps to the quiet way. Arrives later, but is less likely to be lost, taken or to garble the order.\" [checked]\n    - generic: Steady courier\n    - generic: about 4 min\n    - generic: Keeps to the quiet way. Arrives later, but is less likely to be lost, taken or to garble the order.\n    - paragraph: The staff reckon the ride on the straight line; a road shortens it and rough ground lengthens it.\n  - generic: Signed, the Commander\n  - button \"Sign and send\" [active]\n  - alert\n  - status: Sent to 1st Battalion by steady courier; expected to arrive Day 1 00:18\n  - generic: SENT\n  - generic: Order signed and sent.\n- button \"Menu (Esc)\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Actual current built inspector rectangle certification submitted",
+    "at": "2026-10-12T23:48:56.211Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895222",
+    "url": "http://a5-final.localhost:41912/map-table",
+    "dom": "- main:\n  - heading \"Saved map table\" [level=1]\n  - link \"Open map authoring\":\n    - /url: /map-authoring.html\n  - navigation \"Map inspection controls\":\n    - text: Load saved JSON\n    - button \"Load saved JSON\" [active]\n    - button \"Cancel load\"\n    - button \"Fit map\" [disabled]\n    - button \"Top-down\" [disabled]\n    - button \"Oblique\" [disabled]\n  - region \"Displayed map\":\n    - strong: No map displayed\n  - status: Independently certifying saved geometry…\n  - progressbar \"Map load in progress\"\n  - generic \"Flat map table; focus the map and use plain arrow keys to pan; use mouse to zoom and orbit\"\n  - paragraph: Start in map authoring, generate and export JSON, then load the saved file here.\n  - paragraph: \"Drag to orbit · right-drag to pan · scroll to zoom. Focus the map, then use plain arrow keys to pan. Touch: one finger orbits, two fingers pan and zoom. The flat paper uses metres. Whole-map raster detail is limited by the device texture cap.\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Current rectangle certification settled",
+    "at": "2026-10-12T23:49:09.445Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895222",
+    "url": "http://a5-final.localhost:41912/map-table",
+    "dom": "- main:\n  - heading \"Saved map table\" [level=1]\n  - link \"Open map authoring\":\n    - /url: /map-authoring.html\n  - navigation \"Map inspection controls\":\n    - text: Load saved JSON\n    - button \"Load saved JSON\" [active]\n    - button \"Cancel load\" [disabled]\n    - button \"Fit map\"\n    - button \"Top-down\"\n    - button \"Oblique\"\n  - region \"Displayed map\":\n    - strong: Battlefield 17\n    - generic: 5,000 × 3,000 m · countryside-rectangle.json\n    - generic \"Full asset identity\"\n  - status: Map loaded. Drag to orbit; right-drag to pan; scroll to zoom.\n  - generic \"Flat map table; focus the map and use plain arrow keys to pan; use mouse to zoom and orbit\"\n  - paragraph: \"Drag to orbit · right-drag to pan · scroll to zoom. Focus the map, then use plain arrow keys to pan. Touch: one finger orbits, two fingers pan and zoom. The flat paper uses metres. Whole-map raster detail is limited by the device texture cap.\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Current game outcome after live order and delayed inspector operation",
+    "at": "2026-10-12T23:49:09.720Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- status \"Game over\": \"Victory: the objective was held. Game time elapsed Day 1 00:50.\"\n- region \"Clock\":\n  - generic: Day 1 00:50\n  - generic: 12:1\n  - generic: ⏹Stopped\n- navigation \"Desk\":\n  - button \"Map table T\" [pressed]:\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 2 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"2 unread\": \"2\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n  - button \"Umpire's window\"\n- dialog \"Victory\":\n  - heading \"Victory\" [level=2]\n  - paragraph: Blue held the objective at Day 1 00:50.\n  - list:\n    - listitem: \"Game time elapsed: Day 1 00:50\"\n    - listitem: \"Your losses: 0\"\n    - listitem: \"Enemy losses: 0\"\n  - button \"View the umpire's window\" [active]\n  - button \"Read the journal\"\n  - button \"Play again\"\n  - button \"New game\"\n  - button \"Main menu\"\n- button \"Menu (Esc)\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Current inspector unsupported-version replacement submitted",
+    "at": "2026-10-12T23:50:01.438Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895222",
+    "url": "http://a5-final.localhost:41912/map-table",
+    "dom": "- main:\n  - heading \"Saved map table\" [level=1]\n  - link \"Open map authoring\":\n    - /url: /map-authoring.html\n  - navigation \"Map inspection controls\":\n    - text: Load saved JSON\n    - button \"Load saved JSON\" [active]\n    - button \"Cancel load\" [disabled]\n    - button \"Fit map\"\n    - button \"Top-down\"\n    - button \"Oblique\"\n  - region \"Displayed map\":\n    - strong: Battlefield 17\n    - generic: 5,000 × 3,000 m · countryside-rectangle.json\n    - generic \"Full asset identity\"\n  - status: \"$.schemaVersion: Unsupported version; expected 1 [UNSUPPORTED_VERSION]\"\n  - paragraph: The previously displayed map remains on the table.\n  - generic \"Flat map table; focus the map and use plain arrow keys to pan; use mouse to zoom and orbit\"\n  - paragraph: \"Drag to orbit · right-drag to pan · scroll to zoom. Focus the map, then use plain arrow keys to pan. Touch: one finger orbits, two fingers pan and zoom. The flat paper uses metres. Whole-map raster detail is limited by the device texture cap.\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Actual Cancel load preserves prior rectangular display",
+    "at": "2026-10-12T23:50:14.416Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895222",
+    "url": "http://a5-final.localhost:41912/map-table",
+    "dom": "- main:\n  - heading \"Saved map table\" [level=1]\n  - link \"Open map authoring\":\n    - /url: /map-authoring.html\n  - navigation \"Map inspection controls\":\n    - text: Load saved JSON\n    - button \"Load saved JSON\"\n    - button \"Cancel load\" [disabled]\n    - button \"Fit map\"\n    - button \"Top-down\"\n    - button \"Oblique\"\n  - region \"Displayed map\":\n    - strong: Battlefield 17\n    - generic: 5,000 × 3,000 m · countryside-rectangle.json\n    - generic \"Full asset identity\"\n  - status: Load cancelled.\n  - paragraph: The previously displayed map remains on the table.\n  - generic \"Flat map table; focus the map and use plain arrow keys to pan; use mouse to zoom and orbit\"\n  - paragraph: \"Drag to orbit · right-drag to pan · scroll to zoom. Focus the map, then use plain arrow keys to pan. Touch: one finger orbits, two fingers pan and zoom. The flat paper uses metres. Whole-map raster detail is limited by the device texture cap.\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Current square-map certification submitted separately after Cancel",
+    "at": "2026-10-12T23:50:26.385Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895222",
+    "url": "http://a5-final.localhost:41912/map-table",
+    "dom": "- main:\n  - heading \"Saved map table\" [level=1]\n  - link \"Open map authoring\":\n    - /url: /map-authoring.html\n  - navigation \"Map inspection controls\":\n    - text: Load saved JSON\n    - button \"Load saved JSON\" [active]\n    - button \"Cancel load\"\n    - button \"Fit map\"\n    - button \"Top-down\"\n    - button \"Oblique\"\n  - region \"Displayed map\":\n    - strong: Battlefield 17\n    - generic: 5,000 × 3,000 m · countryside-rectangle.json\n    - generic \"Full asset identity\"\n  - status: Independently certifying saved geometry…\n  - progressbar \"Map load in progress\"\n  - paragraph: The previously displayed map remains on the table.\n  - generic \"Flat map table; focus the map and use plain arrow keys to pan; use mouse to zoom and orbit\"\n  - paragraph: \"Drag to orbit · right-drag to pan · scroll to zoom. Focus the map, then use plain arrow keys to pan. Touch: one finger orbits, two fingers pan and zoom. The flat paper uses metres. Whole-map raster detail is limited by the device texture cap.\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Current square-map certification settled",
+    "at": "2026-10-12T23:52:06.516Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895222",
+    "url": "http://a5-final.localhost:41912/map-table",
+    "dom": "- main:\n  - heading \"Saved map table\" [level=1]\n  - link \"Open map authoring\":\n    - /url: /map-authoring.html\n  - navigation \"Map inspection controls\":\n    - text: Load saved JSON\n    - button \"Load saved JSON\" [active]\n    - button \"Cancel load\" [disabled]\n    - button \"Fit map\"\n    - button \"Top-down\"\n    - button \"Oblique\"\n  - region \"Displayed map\":\n    - strong: Battlefield 31\n    - generic: 5,000 × 5,000 m · wooded-hills.json\n    - generic \"Full asset identity\"\n  - status: Map loaded. Drag to orbit; right-drag to pan; scroll to zoom.\n  - generic \"Flat map table; focus the map and use plain arrow keys to pan; use mouse to zoom and orbit\"\n  - paragraph: \"Drag to orbit · right-drag to pan · scroll to zoom. Focus the map, then use plain arrow keys to pan. Touch: one finger orbits, two fingers pan and zoom. The flat paper uses metres. Whole-map raster detail is limited by the device texture cap.\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Current square inspector actual390x844 Oblique and Fit",
+    "at": "2026-10-12T23:52:07.204Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895222",
+    "url": "http://a5-final.localhost:41912/map-table",
+    "dom": "- main:\n  - heading \"Saved map table\" [level=1]\n  - link \"Open map authoring\":\n    - /url: /map-authoring.html\n  - navigation \"Map inspection controls\":\n    - text: Load saved JSON\n    - button \"Load saved JSON\"\n    - button \"Cancel load\" [disabled]\n    - button \"Fit map\" [active]\n    - button \"Top-down\"\n    - button \"Oblique\"\n  - region \"Displayed map\":\n    - strong: Battlefield 31\n    - generic: 5,000 × 5,000 m · wooded-hills.json\n    - generic \"Full asset identity\"\n  - status: Map loaded. Drag to orbit; right-drag to pan; scroll to zoom.\n  - generic \"Flat map table; focus the map and use plain arrow keys to pan; use mouse to zoom and orbit\"\n  - paragraph: \"Drag to orbit · right-drag to pan · scroll to zoom. Focus the map, then use plain arrow keys to pan. Touch: one finger orbits, two fingers pan and zoom. The flat paper uses metres. Whole-map raster detail is limited by the device texture cap.\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 844,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "label": "Current finished signed-in game returns settled main menu",
+    "at": "2026-10-12T23:52:07.304Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895211",
+    "url": "http://a5-final.localhost:41912/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph: An umpired war game, played in real time or slower.\n  - navigation \"Main menu\":\n    - button \"New game\"\n  - region \"Account\":\n    - heading \"Account\" [level=2]\n    - paragraph: Signed in as a5-final-host@example.invalid\n    - button \"Sign out\"\n    - button \"High contrast\"\n  - region \"Developer tools\":\n    - heading \"Developer tools\" [level=2]\n    - paragraph: For development; not part of the game.\n    - list:\n      - link \"Map editor Generate, preview and export a battlefield.\":\n        - /url: /map-authoring\n        - generic: Map editor\n        - generic: Generate, preview and export a battlefield.\n      - link \"Map benchmark Time map generation and rendering on this device.\":\n        - /url: /map-benchmark\n        - generic: Map benchmark\n        - generic: Time map generation and rendering on this device.\n      - link \"Table benchmark Time the 3D table scene on this device.\":\n        - /url: /table-benchmark\n        - generic: Table benchmark\n        - generic: Time the 3D table scene on this device.\n      - link \"Style guide Tokens and every shared control in each state.\":\n        - /url: /style-guide\n        - generic: Style guide\n        - generic: Tokens and every shared control in each state.\n      - link \"Admin view Operator console; asks for the admin token.\":\n        - /url: /admin/\n        - generic: Admin view\n        - generic: Operator console; asks for the admin token.\n  - region \"About\":\n    - heading \"About\" [level=2]\n    - paragraph:\n      - text: You command one side of a battle from a desk. Orders are written in plain words and carried by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game keeps running on the server while you are away.\n      - link \"Read how it plays\":\n        - /url: https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md\n      - text: .",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Current finished guest game outcome",
+    "at": "2026-10-12T23:52:07.482Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895219",
+    "url": "http://127.0.0.1:41912/?game=d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- status \"Game over\": \"Defeat: blue wins: the objective was held. Game time elapsed Day 1 00:50.\"\n- region \"Clock\":\n  - generic: Day 1 00:50\n  - generic: 12:1\n  - generic: ⏹Stopped\n- navigation \"Desk\":\n  - button \"Map table T\" [pressed]:\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 1 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"1 unread\": \"1\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n  - button \"Umpire's window\"\n- dialog \"Defeat\":\n  - heading \"Defeat\" [level=2]\n  - paragraph: Blue held the objective at Day 1 00:50.\n  - list:\n    - listitem: \"Game time elapsed: Day 1 00:50\"\n    - listitem: \"Your losses: 0\"\n    - listitem: \"Enemy losses: 0\"\n  - button \"View the umpire's window\" [active]\n  - button \"Read the journal\"\n  - button \"Play again\"\n  - button \"New game\"\n  - button \"Main menu\"\n- button \"Menu (Esc)\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Actual390x844 inspector Oblique selected after separate Fit check",
+    "at": "2026-10-12T23:52:34.157Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895222",
+    "url": "http://a5-final.localhost:41912/map-table",
+    "dom": "- main:\n  - heading \"Saved map table\" [level=1]\n  - link \"Open map authoring\":\n    - /url: /map-authoring.html\n  - navigation \"Map inspection controls\":\n    - text: Load saved JSON\n    - button \"Load saved JSON\"\n    - button \"Cancel load\" [disabled]\n    - button \"Fit map\"\n    - button \"Top-down\"\n    - button \"Oblique\" [active]\n  - region \"Displayed map\":\n    - strong: Battlefield 31\n    - generic: 5,000 × 5,000 m · wooded-hills.json\n    - generic \"Full asset identity\"\n  - status: Map loaded. Drag to orbit; right-drag to pan; scroll to zoom.\n  - generic \"Flat map table; focus the map and use plain arrow keys to pan; use mouse to zoom and orbit\"\n  - paragraph: \"Drag to orbit · right-drag to pan · scroll to zoom. Focus the map, then use plain arrow keys to pan. Touch: one finger orbits, two fingers pan and zoom. The flat paper uses metres. Whole-map raster detail is limited by the device texture cap.\"",
+    "viewport": {
+      "canvas": 1,
+      "height": 844,
+      "scrollWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "label": "Finished guest Main menu action submitted",
+    "at": "2026-10-12T23:52:34.783Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895219",
+    "url": "http://127.0.0.1:41912/",
+    "dom": "",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  },
+  {
+    "label": "Finished guest main menu settles with zero local or live canvases",
+    "at": "2026-10-12T23:53:14.825Z",
+    "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+    "tab": "698895219",
+    "url": "http://127.0.0.1:41912/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph: An umpired war game, played in real time or slower.\n  - navigation \"Main menu\":\n    - button \"New game\"\n  - region \"Account\":\n    - heading \"Account\" [level=2]\n    - paragraph: Playing as a guest. Your games stay in this browser.\n    - button \"Sign in to keep your games on other devices\"\n    - button \"High contrast\"\n  - region \"Developer tools\":\n    - heading \"Developer tools\" [level=2]\n    - paragraph: For development; not part of the game.\n    - list:\n      - link \"Map editor Generate, preview and export a battlefield.\":\n        - /url: /map-authoring\n        - generic: Map editor\n        - generic: Generate, preview and export a battlefield.\n      - link \"Map benchmark Time map generation and rendering on this device.\":\n        - /url: /map-benchmark\n        - generic: Map benchmark\n        - generic: Time map generation and rendering on this device.\n      - link \"Table benchmark Time the 3D table scene on this device.\":\n        - /url: /table-benchmark\n        - generic: Table benchmark\n        - generic: Time the 3D table scene on this device.\n      - link \"Style guide Tokens and every shared control in each state.\":\n        - /url: /style-guide\n        - generic: Style guide\n        - generic: Tokens and every shared control in each state.\n      - link \"Admin view Operator console; asks for the admin token.\":\n        - /url: /admin/\n        - generic: Admin view\n        - generic: Operator console; asks for the admin token.\n  - region \"About\":\n    - heading \"About\" [level=2]\n    - paragraph:\n      - text: You command one side of a battle from a desk. Orders are written in plain words and carried by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game keeps running on the server while you are away.\n      - link \"Read how it plays\":\n        - /url: https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md\n      - text: .",
+    "viewport": {
+      "canvas": 0,
+      "height": 846,
+      "scrollWidth": 1456,
+      "width": 1456
+    }
+  }
+]

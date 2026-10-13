@@ -1,0 +1,219 @@
+{
+  "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+  "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+  "responses": [
+    {
+      "path": "/",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:41029/",
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 2862,
+      "sha256": "4c49fccd10d86a162089bb0259fc8f229b1db3dba791cff42d421062ddf5f99e"
+    },
+    {
+      "path": "/?mode=fixture",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:41029/?mode=fixture",
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 2862,
+      "sha256": "4c49fccd10d86a162089bb0259fc8f229b1db3dba791cff42d421062ddf5f99e"
+    },
+    {
+      "path": "/dev/local-board",
+      "status": 404,
+      "finalUrl": "http://127.0.0.1:41029/dev/local-board",
+      "contentType": "application/json; charset=utf-8",
+      "bytes": 87,
+      "sha256": "efc7d1435fcbc1bbed59306fbf038fbed87fcf943feffc525ed99fca33d9cda5"
+    },
+    {
+      "path": "/dev/local-board?x=1",
+      "status": 404,
+      "finalUrl": "http://127.0.0.1:41029/dev/local-board?x=1",
+      "contentType": "application/json; charset=utf-8",
+      "bytes": 87,
+      "sha256": "efc7d1435fcbc1bbed59306fbf038fbed87fcf943feffc525ed99fca33d9cda5"
+    },
+    {
+      "path": "/__local-default/",
+      "status": 404,
+      "finalUrl": "http://127.0.0.1:41029/__local-default/",
+      "contentType": "application/json; charset=utf-8",
+      "bytes": 88,
+      "sha256": "c9988d5026ba3e02abf0d8fdf2c8142bed1adc00696087d624cc5993be35c26f"
+    },
+    {
+      "path": "/__map-catalog",
+      "status": 404,
+      "finalUrl": "http://127.0.0.1:41029/__map-catalog",
+      "contentType": "application/json; charset=utf-8",
+      "bytes": 85,
+      "sha256": "ffe91a8f9386ae0228866ceb48fdc03fa65c76c9e41af04e66894e31b02be4c0"
+    },
+    {
+      "path": "/map-table.html",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:41029/map-table",
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 2862,
+      "sha256": "4c49fccd10d86a162089bb0259fc8f229b1db3dba791cff42d421062ddf5f99e"
+    },
+    {
+      "path": "/map-table",
+      "status": 200,
+      "finalUrl": "http://127.0.0.1:41029/map-table",
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 2862,
+      "sha256": "4c49fccd10d86a162089bb0259fc8f229b1db3dba791cff42d421062ddf5f99e"
+    },
+    {
+      "path": "/__map-catalog",
+      "method": "POST",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "bytes": 86,
+      "sha256": "a2165d208171797d34e8e8418e89517bd91849b3742f540e26119125e829edb2"
+    }
+  ],
+  "builtFiles": [
+    {
+      "path": "client/dist/browser/chunk-2qJxE1rC.js",
+      "bytes": 233488,
+      "sha256": "e5c9861bc9e0c621504edac64c26fe4038373238ee98efe62c057075e940b855",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-BCS0YiPz.js",
+      "bytes": 826,
+      "sha256": "b06630a8a68ade25ac0646e3457c8db92f8d8aebe00336ae48acd9dd09f4f8c5",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-BESi1TXj.js",
+      "bytes": 9482,
+      "sha256": "5d5599d70a23209154132cc5318c57e7bcfc8dc2a4a89b6c8e09228775e8b950",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-BG7AHnSG.js",
+      "bytes": 855,
+      "sha256": "79e96e250bfe869d001a5e1b2503f34ead3cd7fb65dd4aba92fa3206322bb933",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-BHtR6i8F.js",
+      "bytes": 29709,
+      "sha256": "284764fe8fd1b737fca562e8d7d6e9c130e999fd73381c9c6d30963188365b10",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-BjrkL9Ny.js",
+      "bytes": 16441,
+      "sha256": "aed2057591192873c4b2bc1ac64c5e9a8a7e9b1cdd0fcda9bc2523331b7617cf",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-BpGW4lru.js",
+      "bytes": 10804,
+      "sha256": "fa930da242ce070ffb2fbbc854966fb15db68e737762daa3589d79ee9d55d844",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-BuXhGGMg.js",
+      "bytes": 24656,
+      "sha256": "da871403a246d66ddf1d55a5ff39c9b938110fe31c94666b26c16750984fab89",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-C7Rj1mW_.js",
+      "bytes": 57491,
+      "sha256": "94fec18d2a48fb689f175249de0bcfb223c33c6a3d68230c7b76bcce36afc02a",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-CiB9Kxlp.js",
+      "bytes": 1812,
+      "sha256": "856573d587f73dcbeafba3dfe35fb899dc8cd56745b534749df11a2d662f8ebb",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-Ckgeo2lD.js",
+      "bytes": 5282,
+      "sha256": "6d215e43b128555c76f73a9959879c074ad7d3a15bac0549ec429a0a29353976",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-CzRy-Uri.js",
+      "bytes": 33254,
+      "sha256": "285a42567d82eb184f9b589407287cb8dfc06ae1e7860fbe0f24e0a2118ab06f",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-DHapI0db.js",
+      "bytes": 2995,
+      "sha256": "128a4ca20374c2b4d7c4fe13e15ac27d4161c928fe0ddf071602d1299f2b0e72",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-DUsVy_PX.js",
+      "bytes": 426965,
+      "sha256": "753bebe3dbe70c7848f4f874c02152b3a4794e6f5f2be818aa8ac64f48ecc872",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-DyXki1zu.js",
+      "bytes": 521029,
+      "sha256": "656a889a4d89ef196847d98fc46c3378789e9fa7f1cbae464243d0a42fdb4977",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-TyLiDWRW.js",
+      "bytes": 2782,
+      "sha256": "bb4275c761e81afbafd6cb43cda9d8724954b2166d930cc9d11bab222b956e48",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/chunk-w5tBJJfB.js",
+      "bytes": 2155481,
+      "sha256": "b084f798450dba13acc9ca00b07b15910cb2a787f7ad46ae2ca6f774f44b0256",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/hq-preview.svg",
+      "bytes": 1417,
+      "sha256": "6deca4f086c35698519c912030086524880fc21cfb40861ee43fd8dec33abc07",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/index.html",
+      "bytes": 2862,
+      "sha256": "4c49fccd10d86a162089bb0259fc8f229b1db3dba791cff42d421062ddf5f99e",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/main-P35PVY7I.js",
+      "bytes": 234456,
+      "sha256": "4f818bf641d1d148e67d8d7d150035c315fa90b9e3a785aaf23d3f806d6939f2",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/styles-46OU2WZO.css",
+      "bytes": 11135,
+      "sha256": "729927c0b2617329b149e5293755103e4d3d8b4029a4d8e63bc5ff89032731f6",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/worker-TXN6MSST.js",
+      "bytes": 2644783,
+      "sha256": "0e9333c96ff7fc97012ffece92a13ddcb5642803b6abeca625a4a8a188467e27",
+      "hits": []
+    },
+    {
+      "path": "client/dist/browser/worker-VUG6IS2I.js",
+      "bytes": 2766343,
+      "sha256": "e4657237a53383c2ed2418e81ab8f41e573c16666f24d8a9cd32a2a9b207c126",
+      "hits": []
+    }
+  ],
+  "limits": "Actual isolated built server responses and bounded literal output scan; not native inspector file-picker proof"
+}

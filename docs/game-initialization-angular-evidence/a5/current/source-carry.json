@@ -1,0 +1,800 @@
+{
+  "sourceCheckpoint": "c38727836520003bfe5d5419917fa465d7abbae3",
+  "candidateHead": "3d787b66cffb475f543c09a72cbb682c2e231038",
+  "base": "36406f70c485e7f23befb9f9b9e27fdfbd4c32e0",
+  "rows": [
+    {
+      "path": "client/src/app/local-board/board-binding.ts",
+      "c387Sha256": "b275da29e15b710b8cce5be3fcc1cda6cf200c3f4e2128545c1de2639cd431bc",
+      "currentSha256": "b275da29e15b710b8cce5be3fcc1cda6cf200c3f4e2128545c1de2639cd431bc",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/board-host.component.css",
+      "c387Sha256": "e4f91b9bc610cd5a53469e0b6b47b482859e1f27e51bc8401793fe1881d9ff6e",
+      "currentSha256": "e4f91b9bc610cd5a53469e0b6b47b482859e1f27e51bc8401793fe1881d9ff6e",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/board-host.component.html",
+      "c387Sha256": "5740b778438cd50787ab3b9d9fa5e511db7a52f4b7fa1e58662a1986d6042702",
+      "currentSha256": "5740b778438cd50787ab3b9d9fa5e511db7a52f4b7fa1e58662a1986d6042702",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/board-host.component.ts",
+      "c387Sha256": "f91b931fc4ea2a928cba407245d2f9209846d5f8835e8a87edd807a5d80e3c10",
+      "currentSha256": "f91b931fc4ea2a928cba407245d2f9209846d5f8835e8a87edd807a5d80e3c10",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/board-surface.ts",
+      "c387Sha256": "3f829426e8ca503f21d4de9689c2577cebb495c9d7c70e2cd980eb416953b96f",
+      "currentSha256": "3f829426e8ca503f21d4de9689c2577cebb495c9d7c70e2cd980eb416953b96f",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/contracts.ts",
+      "c387Sha256": "3315306eac78d7124529b26286cb8d3413be8c22d1ea0c40dd08d86463a9db95",
+      "currentSha256": "3315306eac78d7124529b26286cb8d3413be8c22d1ea0c40dd08d86463a9db95",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/default-board.ts",
+      "c387Sha256": "8e9f63b5af281addf463fcaf7dca28814e898d23d9014c23a05d87a2ab52952e",
+      "currentSha256": "8e9f63b5af281addf463fcaf7dca28814e898d23d9014c23a05d87a2ab52952e",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/local-board.component.css",
+      "c387Sha256": "afda701899ca1aa8ebf368f1a6ed58bd19670906b5f0f851531514f90bdc1d77",
+      "currentSha256": "afda701899ca1aa8ebf368f1a6ed58bd19670906b5f0f851531514f90bdc1d77",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/local-board.component.html",
+      "c387Sha256": "976a6a4047dfae6f150d5c0ab116128faba91aedf51bf4db390f383fedaefce8",
+      "currentSha256": "976a6a4047dfae6f150d5c0ab116128faba91aedf51bf4db390f383fedaefce8",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/local-board.component.ts",
+      "c387Sha256": "8a86140aa39b922578b73dfe05800deaf8c3ad8f85f14d7b457d66646aad3748",
+      "currentSha256": "8a86140aa39b922578b73dfe05800deaf8c3ad8f85f14d7b457d66646aad3748",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/local-session-host.directive.ts",
+      "c387Sha256": "151e8046193f93031198b245b5158617cd26df3077ce03d7f0976668618836e6",
+      "currentSha256": "151e8046193f93031198b245b5158617cd26df3077ce03d7f0976668618836e6",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/local-setup-host.directive.ts",
+      "c387Sha256": "5da3c997efde221d471dfe7a06d5aec7d4d4c1abd28744e803bb28966bdc0fdf",
+      "currentSha256": "5da3c997efde221d471dfe7a06d5aec7d4d4c1abd28744e803bb28966bdc0fdf",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/notebook.component.css",
+      "c387Sha256": "26696d165c085a5e984139591436f8938fdcd8e8e1f967c3d7888551feb139ec",
+      "currentSha256": "26696d165c085a5e984139591436f8938fdcd8e8e1f967c3d7888551feb139ec",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/notebook.component.html",
+      "c387Sha256": "1cdc0e3daedb76c03efb524ab8c80b7bc62fe90861a854b601f54b375936e8cc",
+      "currentSha256": "1cdc0e3daedb76c03efb524ab8c80b7bc62fe90861a854b601f54b375936e8cc",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/notebook.component.ts",
+      "c387Sha256": "6ec5a94dec8a60e6b969857969f6337a68f6f73a9d85ff382aab5c927a768cf8",
+      "currentSha256": "6ec5a94dec8a60e6b969857969f6337a68f6f73a9d85ff382aab5c927a768cf8",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/personal-repository.ts",
+      "c387Sha256": "5491017851cb8305781094fd935ac1d774c0d74725aca7e9cbe8625782b526d3",
+      "currentSha256": "5491017851cb8305781094fd935ac1d774c0d74725aca7e9cbe8625782b526d3",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/personal-store.ts",
+      "c387Sha256": "8dc596d6c5e07dc091f45c9ab5d14885084d3d0f726ce145d39afa1c936dea30",
+      "currentSha256": "8dc596d6c5e07dc091f45c9ab5d14885084d3d0f726ce145d39afa1c936dea30",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/personal-tools.component.css",
+      "c387Sha256": "4b3111a7d66cc54985cd98dcffe436418ecd1b3b6ac7c82544d1ebe5a83ce597",
+      "currentSha256": "4b3111a7d66cc54985cd98dcffe436418ecd1b3b6ac7c82544d1ebe5a83ce597",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/personal-tools.component.html",
+      "c387Sha256": "8780e1fd8c399ffe0ea74910e4e8de69d8c8d495f029445528b43a28e3c7f552",
+      "currentSha256": "8780e1fd8c399ffe0ea74910e4e8de69d8c8d495f029445528b43a28e3c7f552",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/personal-tools.component.ts",
+      "c387Sha256": "14c68a3922518d72eef569c95c531e8d47a07fc2a5b987967ccbcb5eaf07ba5a",
+      "currentSha256": "14c68a3922518d72eef569c95c531e8d47a07fc2a5b987967ccbcb5eaf07ba5a",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/session-owner.ts",
+      "c387Sha256": "eff2894916cb7e2c87f78a73b0e38727147de02552c4aa8b996cba10b2ba3f60",
+      "currentSha256": "eff2894916cb7e2c87f78a73b0e38727147de02552c4aa8b996cba10b2ba3f60",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/session-surface.ts",
+      "c387Sha256": "2bfd4512a58a6afc916f7db071b98b9c96103296f7af85df69133719b8570002",
+      "currentSha256": "2bfd4512a58a6afc916f7db071b98b9c96103296f7af85df69133719b8570002",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/setup/setup-state.ts",
+      "c387Sha256": "eb0e32051fecae026985559c908aa9c8692069520b241afe923d7f3b2d761d43",
+      "currentSha256": "eb0e32051fecae026985559c908aa9c8692069520b241afe923d7f3b2d761d43",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/setup/setup.component.css",
+      "c387Sha256": "f317589b7923af8fb492756edd6f7d7f3a448c973ba7c0f8214917d79580c6d7",
+      "currentSha256": "f317589b7923af8fb492756edd6f7d7f3a448c973ba7c0f8214917d79580c6d7",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/setup/setup.component.html",
+      "c387Sha256": "07e32f72b99b97c920bacc749f85baf7f94fdf02001ad8e77e6c89c3b88465c0",
+      "currentSha256": "07e32f72b99b97c920bacc749f85baf7f94fdf02001ad8e77e6c89c3b88465c0",
+      "same": true
+    },
+    {
+      "path": "client/src/app/local-board/setup/setup.component.ts",
+      "c387Sha256": "9242d6a2957879ebfedb925d2a10832b3be4c55b8a80f0b06331d6f9c77e850f",
+      "currentSha256": "9242d6a2957879ebfedb925d2a10832b3be4c55b8a80f0b06331d6f9c77e850f",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/asset.ts",
+      "c387Sha256": "3546f451f5c3dc6817e443a8df6b55eee3d2c7cf7240a151f8440f625fdcf2a3",
+      "currentSha256": "3546f451f5c3dc6817e443a8df6b55eee3d2c7cf7240a151f8440f625fdcf2a3",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/display-lifecycle.ts",
+      "c387Sha256": "5889b41528ebd8048d72b4a097e7d176b9527a376ac8dd6a39aa24fe0db620b0",
+      "currentSha256": "5889b41528ebd8048d72b4a097e7d176b9527a376ac8dd6a39aa24fe0db620b0",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/generate.worker.ts",
+      "c387Sha256": "7c83457b564bee4219e66eead03fec03785bbfecaf09135e77dd613dddb99d8e",
+      "currentSha256": "7c83457b564bee4219e66eead03fec03785bbfecaf09135e77dd613dddb99d8e",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/generation/controller.ts",
+      "c387Sha256": "9aadbacec1dc90600adad55853af39e68f2ac041da8cb83294677abaac5aa228",
+      "currentSha256": "9aadbacec1dc90600adad55853af39e68f2ac041da8cb83294677abaac5aa228",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/generation/index.ts",
+      "c387Sha256": "df545c68cb4baed73d5e4b40abf563663737b617b064d07175a6fe824464750e",
+      "currentSha256": "df545c68cb4baed73d5e4b40abf563663737b617b064d07175a6fe824464750e",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/generation/protocol.ts",
+      "c387Sha256": "a3a74acfdbe133d21ef488c37b32ecf200119d81fb494c831c80529c1d282941",
+      "currentSha256": "a3a74acfdbe133d21ef488c37b32ecf200119d81fb494c831c80529c1d282941",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/generation/worker-runner.ts",
+      "c387Sha256": "aedce8cdaf4c45de077df11f588f2b897271e1fdc50b2badd8e23147eb4a6d12",
+      "currentSha256": "aedce8cdaf4c45de077df11f588f2b897271e1fdc50b2badd8e23147eb4a6d12",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/geometry.ts",
+      "c387Sha256": "90be509d76c4c54c11e3517e039966f670ec78c592f0c2a73363110e2f8f7cfe",
+      "currentSha256": "90be509d76c4c54c11e3517e039966f670ec78c592f0c2a73363110e2f8f7cfe",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/preview.ts",
+      "c387Sha256": "6df176e199eab4285e3d93dc180a4130963af04b23a3958a4dcc20072d8df1dc",
+      "currentSha256": "6df176e199eab4285e3d93dc180a4130963af04b23a3958a4dcc20072d8df1dc",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/renderer.ts",
+      "c387Sha256": "b6e482f93b8853c8c3a8c668a21e6251be148b16b63cb21390ef166da2ce904c",
+      "currentSha256": "b6e482f93b8853c8c3a8c668a21e6251be148b16b63cb21390ef166da2ce904c",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/runtime/adapter.ts",
+      "c387Sha256": "e2ca17898d69d098734833ca3c0e04de99aca192f1fb2677087b31d2072963d1",
+      "currentSha256": "e2ca17898d69d098734833ca3c0e04de99aca192f1fb2677087b31d2072963d1",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/runtime/index.ts",
+      "c387Sha256": "43d8301f285c68f41e88b72baa332b446733086443f3774dd9905d6ae9b375f5",
+      "currentSha256": "43d8301f285c68f41e88b72baa332b446733086443f3774dd9905d6ae9b375f5",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/runtime/protocol.ts",
+      "c387Sha256": "0644514f5b8608f4b13ca2e7e9928c4f3b9fe9e5c80dca8f241e881378c58275",
+      "currentSha256": "0644514f5b8608f4b13ca2e7e9928c4f3b9fe9e5c80dca8f241e881378c58275",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/runtime/validation-runner.ts",
+      "c387Sha256": "944611325a7580adc96dcb55c2276e3249e1bdb8270aa02109000178e8374a6f",
+      "currentSha256": "944611325a7580adc96dcb55c2276e3249e1bdb8270aa02109000178e8374a6f",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/validate.worker.ts",
+      "c387Sha256": "dea30bd1ac110f03efe19c9ab249ff5516aeeb2ae204f23aff8b98c3aacf9d08",
+      "currentSha256": "dea30bd1ac110f03efe19c9ab249ff5516aeeb2ae204f23aff8b98c3aacf9d08",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/map-authoring/viewport.ts",
+      "c387Sha256": "35a0f491cd5275310c738937f2111b11460190766c0fc5602d78c3833e45829a",
+      "currentSha256": "35a0f491cd5275310c738937f2111b11460190766c0fc5602d78c3833e45829a",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/table/FixtureTableScene.ts",
+      "c387Sha256": "6bf8a009b29512d56c49111fbff33b6e93e2d5058bb3573308be280e399e556b",
+      "currentSha256": "6bf8a009b29512d56c49111fbff33b6e93e2d5058bb3573308be280e399e556b",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/table/dressing.ts",
+      "c387Sha256": "4922f1be6f94d47c08556e9aa8601763e4d7c82ed41b4d1be825c454629d509b",
+      "currentSha256": "4922f1be6f94d47c08556e9aa8601763e4d7c82ed41b4d1be825c454629d509b",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/table/fixtureMarks.ts",
+      "c387Sha256": "27f8432bcf327adc489aa6c5cc11073960d891ae71fc1f988ac7c55866fdecfd",
+      "currentSha256": "27f8432bcf327adc489aa6c5cc11073960d891ae71fc1f988ac7c55866fdecfd",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/table/framing.ts",
+      "c387Sha256": "cb6ac7b18d00e084051c5b117126f09db6b87ae455601db601a63ba173e49697",
+      "currentSha256": "cb6ac7b18d00e084051c5b117126f09db6b87ae455601db601a63ba173e49697",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/table/gameTime.ts",
+      "c387Sha256": "d77034896743a94f72de8222e467ab420ed58bad35c595ad3697a0a89bda9524",
+      "currentSha256": "d77034896743a94f72de8222e467ab420ed58bad35c595ad3697a0a89bda9524",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/table/mapTexture.ts",
+      "c387Sha256": "0a8dc27a3c05677225d1c260dd27dfd05bf40aa85fdeac2665fbdf730e20ecb4",
+      "currentSha256": "0a8dc27a3c05677225d1c260dd27dfd05bf40aa85fdeac2665fbdf730e20ecb4",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/table/picking.ts",
+      "c387Sha256": "4ffbe669a34292aa62f4ab49b493c552e57ef3c6c0cabf52f451ed5195614dfb",
+      "currentSha256": "4ffbe669a34292aa62f4ab49b493c552e57ef3c6c0cabf52f451ed5195614dfb",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/table/tagText.ts",
+      "c387Sha256": "7d658640542cf99bbb4114b551374ae72518317d5114d1c52bbdb462c12d633b",
+      "currentSha256": "7d658640542cf99bbb4114b551374ae72518317d5114d1c52bbdb462c12d633b",
+      "same": true
+    },
+    {
+      "path": "client/src/legacy/table/types.ts",
+      "c387Sha256": "8366fe4115ed5a4f9ed5cee9028141723e747934bd4aee9a90280d39dcb42453",
+      "currentSha256": "8366fe4115ed5a4f9ed5cee9028141723e747934bd4aee9a90280d39dcb42453",
+      "same": true
+    },
+    {
+      "path": "client/src/shared/game-setup/catalog.ts",
+      "c387Sha256": "2d6700a10f641cbf62ae5060aa01ae23a39aea8bf23636c0cd4fdccc608d854d",
+      "currentSha256": "2d6700a10f641cbf62ae5060aa01ae23a39aea8bf23636c0cd4fdccc608d854d",
+      "same": true
+    },
+    {
+      "path": "client/src/shared/game-setup/contracts.ts",
+      "c387Sha256": "a208d6a8754b061bb20c7b9ba85c093331a2976158b3c57f3229cefec6a6935e",
+      "currentSha256": "a208d6a8754b061bb20c7b9ba85c093331a2976158b3c57f3229cefec6a6935e",
+      "same": true
+    },
+    {
+      "path": "client/src/shared/game-setup/preparation.ts",
+      "c387Sha256": "fdbd55ae4fa099f0ff23adcf1714a7ab2bb22b4447eb89f5fdbe3943968f3d50",
+      "currentSha256": "fdbd55ae4fa099f0ff23adcf1714a7ab2bb22b4447eb89f5fdbe3943968f3d50",
+      "same": true
+    },
+    {
+      "path": "client/src/shared/map-table/raster.ts",
+      "c387Sha256": "a3f0075574d679ca5c3a5bdb1b1a3c6bf4eddf01c0a02478355c0e454723c2b7",
+      "currentSha256": "a3f0075574d679ca5c3a5bdb1b1a3c6bf4eddf01c0a02478355c0e454723c2b7",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/canonical.ts",
+      "c387Sha256": "898095f72310195ce05a584ebcb5a4ed140306e228a62a9c5d8fca0523406157",
+      "currentSha256": "898095f72310195ce05a584ebcb5a4ed140306e228a62a9c5d8fca0523406157",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/assemble.ts",
+      "c387Sha256": "e12b2429ed0219d4b5150978a283c2ae2b881f8e06de58dd17c0256aee708d35",
+      "currentSha256": "e12b2429ed0219d4b5150978a283c2ae2b881f8e06de58dd17c0256aee708d35",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/budget.ts",
+      "c387Sha256": "901a7d47b937e961f232c30df9d057b0159e68da591e2cedda0ea34a83299cdb",
+      "currentSha256": "901a7d47b937e961f232c30df9d057b0159e68da591e2cedda0ea34a83299cdb",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/compact.ts",
+      "c387Sha256": "44846f35c4fec1809fba6711af3020a71acbf5de25426605d44f38d2216424aa",
+      "currentSha256": "44846f35c4fec1809fba6711af3020a71acbf5de25426605d44f38d2216424aa",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/export.ts",
+      "c387Sha256": "2243903e1a89dc5395b573e9f8c67924e7e419c1ca433a7c7907152c52596903",
+      "currentSha256": "2243903e1a89dc5395b573e9f8c67924e7e419c1ca433a7c7907152c52596903",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/frame.ts",
+      "c387Sha256": "9ad52c01ea28485262a62e118d78b38d5095193c2a4a750d4bcb9260ae52921c",
+      "currentSha256": "9ad52c01ea28485262a62e118d78b38d5095193c2a4a750d4bcb9260ae52921c",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/generate.ts",
+      "c387Sha256": "a230eb920ee5d470f39da2e1fa5b1314bb56ca68a5c17fe0c529b9098cc73c31",
+      "currentSha256": "a230eb920ee5d470f39da2e1fa5b1314bb56ca68a5c17fe0c529b9098cc73c31",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/identity.ts",
+      "c387Sha256": "3f90118b5d82950fad119c9991327022df2ddd9fc5b20a744bb555f8b406a7af",
+      "currentSha256": "3f90118b5d82950fad119c9991327022df2ddd9fc5b20a744bb555f8b406a7af",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/index.ts",
+      "c387Sha256": "761c09f71c383b117ded71e114210e91d1059b7dfaa03c9ca35afc66f9842d27",
+      "currentSha256": "761c09f71c383b117ded71e114210e91d1059b7dfaa03c9ca35afc66f9842d27",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/settlements.ts",
+      "c387Sha256": "0766dbed9a9ba6700bb37ad17b7b3469c42bac13cbcb7837c216feefffd30e2f",
+      "currentSha256": "0766dbed9a9ba6700bb37ad17b7b3469c42bac13cbcb7837c216feefffd30e2f",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/source.ts",
+      "c387Sha256": "3fbfa00459033b4327f15441708c7d4554ec52b2ee9972877a7c81961e7909dd",
+      "currentSha256": "3fbfa00459033b4327f15441708c7d4554ec52b2ee9972877a7c81961e7909dd",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/types.ts",
+      "c387Sha256": "ec55a34dff370fc469863662d3e74673e519c4fde69d5e278a058b1d7e670b80",
+      "currentSha256": "ec55a34dff370fc469863662d3e74673e519c4fde69d5e278a058b1d7e670b80",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/validate.ts",
+      "c387Sha256": "cd46d73b1a04407cf9a726c09f68d52dd48267e3ea5e92251b771e73600439ec",
+      "currentSha256": "cd46d73b1a04407cf9a726c09f68d52dd48267e3ea5e92251b771e73600439ec",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/composition/windows.ts",
+      "c387Sha256": "640ff663ceda5ee56a29839c4174567e59168c46fb11fa9f8cf7f704627ead25",
+      "currentSha256": "640ff663ceda5ee56a29839c4174567e59168c46fb11fa9f8cf7f704627ead25",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/contract.ts",
+      "c387Sha256": "cdf39de39b6081e704d2de5703d4383e08c0aff134031ea501a92d0d50feb87a",
+      "currentSha256": "cdf39de39b6081e704d2de5703d4383e08c0aff134031ea501a92d0d50feb87a",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/errors.ts",
+      "c387Sha256": "e81cd298670d4a7d1c4b80152ec61ec90ee9953f326afd06224965d00000eb4c",
+      "currentSha256": "e81cd298670d4a7d1c4b80152ec61ec90ee9953f326afd06224965d00000eb4c",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/fixtures/reference.ts",
+      "c387Sha256": "3dad330d42e5a839dc8fff6ab842403b069462c5eac2d9ecb4a2c541a884bf80",
+      "currentSha256": "3dad330d42e5a839dc8fff6ab842403b069462c5eac2d9ecb4a2c541a884bf80",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/budget.ts",
+      "c387Sha256": "b691ed53280ea09f5851d2d8069412ea5e1d3d9b9377c482fa3e72e03a1eacdb",
+      "currentSha256": "b691ed53280ea09f5851d2d8069412ea5e1d3d9b9377c482fa3e72e03a1eacdb",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/cover/budget.ts",
+      "c387Sha256": "8e9150b8fe22392d7934f8ce5b755039327851afefafec3706fb3439c22088ba",
+      "currentSha256": "8e9150b8fe22392d7934f8ce5b755039327851afefafec3706fb3439c22088ba",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/cover/index.ts",
+      "c387Sha256": "f858805c12147e80113521a800fd0957fb3f4ca1133da0c67dc5cc33492ae381",
+      "currentSha256": "f858805c12147e80113521a800fd0957fb3f4ca1133da0c67dc5cc33492ae381",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/cover/input.ts",
+      "c387Sha256": "2c12bd26975bc3f006b625dd7692811bae6cb8d02148b58cf1513222396c43d1",
+      "currentSha256": "2c12bd26975bc3f006b625dd7692811bae6cb8d02148b58cf1513222396c43d1",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/cover/mask.ts",
+      "c387Sha256": "b6cd491cddb9e39b20c418b8354f4099459155f710386109288016ca587a0211",
+      "currentSha256": "b6cd491cddb9e39b20c418b8354f4099459155f710386109288016ca587a0211",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/cover/noise.ts",
+      "c387Sha256": "94004ece4ee388e70b933662b8f1e0f42022ba604a3b19692961c713cd611f1f",
+      "currentSha256": "94004ece4ee388e70b933662b8f1e0f42022ba604a3b19692961c713cd611f1f",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/cover/order.ts",
+      "c387Sha256": "114ff47f0015030afd1a913b3f321df9087ad8ec71dcd8532733d3ab530b96af",
+      "currentSha256": "114ff47f0015030afd1a913b3f321df9087ad8ec71dcd8532733d3ab530b96af",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/cover/polygonize.ts",
+      "c387Sha256": "b6044e148c5d14dbe07becbfe25d4e2c3ab15452b6ed2490e520100b7563e113",
+      "currentSha256": "b6044e148c5d14dbe07becbfe25d4e2c3ab15452b6ed2490e520100b7563e113",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/crossings.ts",
+      "c387Sha256": "3f5bc65351eaac841f3c6dd7496a1ee2631f681dd54850c956baa9c6e7e2cc7e",
+      "currentSha256": "3f5bc65351eaac841f3c6dd7496a1ee2631f681dd54850c956baa9c6e7e2cc7e",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/drainage.ts",
+      "c387Sha256": "22b7743145ba9e538c6d0b58d69552dbcc06be8aa6cf398be04d0b3106f39b15",
+      "currentSha256": "22b7743145ba9e538c6d0b58d69552dbcc06be8aa6cf398be04d0b3106f39b15",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/generate.ts",
+      "c387Sha256": "2b9b83f2ac5e1e7217f6f5b334e533657a1132bb8cc8c498eb94ac6ee19048dd",
+      "currentSha256": "2b9b83f2ac5e1e7217f6f5b334e533657a1132bb8cc8c498eb94ac6ee19048dd",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/hydrology.ts",
+      "c387Sha256": "6149acc23f521a12b02f97330cae913327ad1a53c5c1749c31fb8476c330aa46",
+      "currentSha256": "6149acc23f521a12b02f97330cae913327ad1a53c5c1749c31fb8476c330aa46",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/index.ts",
+      "c387Sha256": "1e638726d507a554955447ec56838f42e5fa1b1c734a6e5226e8c7d97d6156ef",
+      "currentSha256": "1e638726d507a554955447ec56838f42e5fa1b1c734a6e5226e8c7d97d6156ef",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/physics.ts",
+      "c387Sha256": "bd0a43d7e454d9c68ff8af0bce9c7c4d1d4a4fd6f86629f51dfe175654c3e8a8",
+      "currentSha256": "bd0a43d7e454d9c68ff8af0bce9c7c4d1d4a4fd6f86629f51dfe175654c3e8a8",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/presets.ts",
+      "c387Sha256": "4630d043bd29654542f06246f4c67edfc2841d46328cc57d206d1656d344a45d",
+      "currentSha256": "4630d043bd29654542f06246f4c67edfc2841d46328cc57d206d1656d344a45d",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/queries.ts",
+      "c387Sha256": "e77c73ee3bf64ced8239bc39d71c973de8f6060705134cf4f466a7e6c89dd6cc",
+      "currentSha256": "e77c73ee3bf64ced8239bc39d71c973de8f6060705134cf4f466a7e6c89dd6cc",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/regions.ts",
+      "c387Sha256": "9ff43cc607e3b07962cd275ca0bf88f3e39d9cdc7a41e596c3d9e2d4e8a0385d",
+      "currentSha256": "9ff43cc607e3b07962cd275ca0bf88f3e39d9cdc7a41e596c3d9e2d4e8a0385d",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/shoulders.ts",
+      "c387Sha256": "fb50a1daf777b98c43b5d97dbb0dfc2415d122adbbb1f78b034d48e714ccb020",
+      "currentSha256": "fb50a1daf777b98c43b5d97dbb0dfc2415d122adbbb1f78b034d48e714ccb020",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/types.ts",
+      "c387Sha256": "5c84984f68b803cd8469683cba7add1226d7af0322a28be4bef7ec3e81a062dd",
+      "currentSha256": "5c84984f68b803cd8469683cba7add1226d7af0322a28be4bef7ec3e81a062dd",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geography/water.ts",
+      "c387Sha256": "1baf464d3f3cfd27bdd717f324897ec6950ee44c545f117826867cf1eabb0d56",
+      "currentSha256": "1baf464d3f3cfd27bdd717f324897ec6950ee44c545f117826867cf1eabb0d56",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/geometry.ts",
+      "c387Sha256": "f7474497c8503951a2fe11c52ae008ba3a1c29655561ee85ce82a90f977ec994",
+      "currentSha256": "f7474497c8503951a2fe11c52ae008ba3a1c29655561ee85ce82a90f977ec994",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/import.ts",
+      "c387Sha256": "2c3e09803ef9873a6554b8bd06301870ff7dfc67715bf74ce425c2691206688a",
+      "currentSha256": "2c3e09803ef9873a6554b8bd06301870ff7dfc67715bf74ce425c2691206688a",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/index.ts",
+      "c387Sha256": "64ede39eba89227777b49b737881366c758fa672df32880171e2ed4b33eff779",
+      "currentSha256": "64ede39eba89227777b49b737881366c758fa672df32880171e2ed4b33eff779",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/overrides.ts",
+      "c387Sha256": "e05a68ad121176e3fae203043d8c7fc74df5937766be2b42f0656e55f2b90b44",
+      "currentSha256": "e05a68ad121176e3fae203043d8c7fc74df5937766be2b42f0656e55f2b90b44",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/path-index.ts",
+      "c387Sha256": "d254e7405af6f7fe4890f4cf924d9c8f997d145f2f90f2914f9cd9c6c66a662b",
+      "currentSha256": "d254e7405af6f7fe4890f4cf924d9c8f997d145f2f90f2914f9cd9c6c66a662b",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/planning/bridges.ts",
+      "c387Sha256": "7e97ea9abdc4665f0047411b793a1f48d4bfc8dec865579b391b7b46d51b7944",
+      "currentSha256": "7e97ea9abdc4665f0047411b793a1f48d4bfc8dec865579b391b7b46d51b7944",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/planning/budget.ts",
+      "c387Sha256": "aaa915a544ef23bab5dbf7849f5b0de1196de42a644f3ea72cbf67f8bd831b95",
+      "currentSha256": "aaa915a544ef23bab5dbf7849f5b0de1196de42a644f3ea72cbf67f8bd831b95",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/planning/certificates.ts",
+      "c387Sha256": "386d548409304b0770244e77ee2361cb1837cf6b87a9dcb803ba45dd621c1d1d",
+      "currentSha256": "386d548409304b0770244e77ee2361cb1837cf6b87a9dcb803ba45dd621c1d1d",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/planning/context.ts",
+      "c387Sha256": "a2bfbb559c36bd50226e6f8b572bdaf57c302922637083219a7c0bd418c221dd",
+      "currentSha256": "a2bfbb559c36bd50226e6f8b572bdaf57c302922637083219a7c0bd418c221dd",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/planning/index.ts",
+      "c387Sha256": "15dfb5d9306017ce02fc10195fe0abd62b9b2ee3004571989346dab3a140c172",
+      "currentSha256": "15dfb5d9306017ce02fc10195fe0abd62b9b2ee3004571989346dab3a140c172",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/planning/network.ts",
+      "c387Sha256": "d3c1c2e8dc255f5309d6a223cbac25e7d67c45c5c77cbbdeb96180925b6dbf80",
+      "currentSha256": "d3c1c2e8dc255f5309d6a223cbac25e7d67c45c5c77cbbdeb96180925b6dbf80",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/planning/reconcile.ts",
+      "c387Sha256": "67220f4993c4bd2a66f58de70592b7e7a035c4902b65aad92d82f4d89d462dab",
+      "currentSha256": "67220f4993c4bd2a66f58de70592b7e7a035c4902b65aad92d82f4d89d462dab",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/planning/router.ts",
+      "c387Sha256": "726304ff717bbdbb254601d07513a9707a7d61ee8ca5c4212b50c2b6d5e92593",
+      "currentSha256": "726304ff717bbdbb254601d07513a9707a7d61ee8ca5c4212b50c2b6d5e92593",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/planning/session.ts",
+      "c387Sha256": "6e8a4f801d0f58ecfdf2737e3d5170e7b31b2444e08ad4a116ddc60b606990b6",
+      "currentSha256": "6e8a4f801d0f58ecfdf2737e3d5170e7b31b2444e08ad4a116ddc60b606990b6",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/planning/sites.ts",
+      "c387Sha256": "a96e0bbbba54a440542b65dcaa17dbca0b593e49cd35064b51bc69f4ebb9d09f",
+      "currentSha256": "a96e0bbbba54a440542b65dcaa17dbca0b593e49cd35064b51bc69f4ebb9d09f",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/planning/types.ts",
+      "c387Sha256": "ee3bb00ec5532d8a80d77a7ef82309dca84d3511d108926ffda61273a08197f8",
+      "currentSha256": "ee3bb00ec5532d8a80d77a7ef82309dca84d3511d108926ffda61273a08197f8",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/planning/validation.ts",
+      "c387Sha256": "bb1face0efb274a0c14ebe6ff5db3673a10acb4ce638b6732e23cb612a8aca4e",
+      "currentSha256": "bb1face0efb274a0c14ebe6ff5db3673a10acb4ce638b6732e23cb612a8aca4e",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/queries.ts",
+      "c387Sha256": "711f1df40bdb7c85cd68be98cd512c6d61239d55b9094fbfa2440216b5bba100",
+      "currentSha256": "711f1df40bdb7c85cd68be98cd512c6d61239d55b9094fbfa2440216b5bba100",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/resources.ts",
+      "c387Sha256": "7869220ca72d724124db49e8eb54258503b91c02b189dc2c505def732aad77bb",
+      "currentSha256": "7869220ca72d724124db49e8eb54258503b91c02b189dc2c505def732aad77bb",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/terrain/budgets.ts",
+      "c387Sha256": "ec05688d9d53f0e60e1b3cbb388694a0811e17741c099f3d9ec05d103f03ccc9",
+      "currentSha256": "ec05688d9d53f0e60e1b3cbb388694a0811e17741c099f3d9ec05d103f03ccc9",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/terrain/contours.ts",
+      "c387Sha256": "92f3fe9c927b40649b9e8c978c21f4f712c7edd3478071798d1de4ab700e3c81",
+      "currentSha256": "92f3fe9c927b40649b9e8c978c21f4f712c7edd3478071798d1de4ab700e3c81",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/terrain/elevation.ts",
+      "c387Sha256": "e2bbf190006dc6b976fb41871dc9664450e6fb7c6c0a9dd21acc29029b4f5627",
+      "currentSha256": "e2bbf190006dc6b976fb41871dc9664450e6fb7c6c0a9dd21acc29029b4f5627",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/terrain/index.ts",
+      "c387Sha256": "83470375f803710bbf49b2e9e5c638eb186d96cc0f4dbdf70d38305343934ad4",
+      "currentSha256": "83470375f803710bbf49b2e9e5c638eb186d96cc0f4dbdf70d38305343934ad4",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/terrain/input.ts",
+      "c387Sha256": "5040dbc40cb4cd6b46374a83b78cc2224c63f786f011624b9e3649b58ac9d867",
+      "currentSha256": "5040dbc40cb4cd6b46374a83b78cc2224c63f786f011624b9e3649b58ac9d867",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/terrain/precision.ts",
+      "c387Sha256": "4cdcd4fa0e57bb80bfe90038b07e5f8b29d4c5bf1c1faa5dd1c7f40993043719",
+      "currentSha256": "4cdcd4fa0e57bb80bfe90038b07e5f8b29d4c5bf1c1faa5dd1c7f40993043719",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/terrain/validation.ts",
+      "c387Sha256": "d17f96047bbe31efa2a896846e0a3d9d74ccc5f6ee2a9a6f1928e8e7d4559be6",
+      "currentSha256": "d17f96047bbe31efa2a896846e0a3d9d74ccc5f6ee2a9a6f1928e8e7d4559be6",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/validation-roads.ts",
+      "c387Sha256": "3ffaee86e31947c1eada33eaf5a505fae7b794aaa4d593be1e36923d72ece531",
+      "currentSha256": "3ffaee86e31947c1eada33eaf5a505fae7b794aaa4d593be1e36923d72ece531",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/validation-water.ts",
+      "c387Sha256": "35b697812e9642d8c5e978c4adea30b53a57a0c8c5ca0b9a2126c0e1611013bf",
+      "currentSha256": "35b697812e9642d8c5e978c4adea30b53a57a0c8c5ca0b9a2126c0e1611013bf",
+      "same": true
+    },
+    {
+      "path": "packages/maps/src/validation.ts",
+      "c387Sha256": "2075128807f3ccf7d358a07276e21c34f7eeccfca5480505a3c3f6ce54e9152e",
+      "currentSha256": "2075128807f3ccf7d358a07276e21c34f7eeccfca5480505a3c3f6ce54e9152e",
+      "same": true
+    },
+    {
+      "path": "packages/protocol/src/common.ts",
+      "c387Sha256": "3c42c3c7ee041038e56d1e207a9571adaea976c9d92f213b8b3e2690c7c54e2b",
+      "currentSha256": "3c42c3c7ee041038e56d1e207a9571adaea976c9d92f213b8b3e2690c7c54e2b",
+      "same": true
+    },
+    {
+      "path": "packages/protocol/src/drafts.ts",
+      "c387Sha256": "66cfd7f7305289c11a32e0135bd6a6877248dcc9c81fc232f2e7630db7505391",
+      "currentSha256": "66cfd7f7305289c11a32e0135bd6a6877248dcc9c81fc232f2e7630db7505391",
+      "same": true
+    },
+    {
+      "path": "packages/protocol/src/index.ts",
+      "c387Sha256": "53c869522e9eee81026a6513442f16bd50035927c75258800a91fb606cd5c85f",
+      "currentSha256": "53c869522e9eee81026a6513442f16bd50035927c75258800a91fb606cd5c85f",
+      "same": true
+    },
+    {
+      "path": "packages/protocol/src/marks.ts",
+      "c387Sha256": "9a9c608d731e225b3c19668aab446906ac55cf66663fa1104df5c0265e6eeb64",
+      "currentSha256": "9a9c608d731e225b3c19668aab446906ac55cf66663fa1104df5c0265e6eeb64",
+      "same": true
+    },
+    {
+      "path": "packages/protocol/src/messages.ts",
+      "c387Sha256": "88a8824bdd55606e78fcbb241d021479d7e89f2b9a97df991012ef8e10ab0c61",
+      "currentSha256": "88a8824bdd55606e78fcbb241d021479d7e89f2b9a97df991012ef8e10ab0c61",
+      "same": true
+    },
+    {
+      "path": "packages/protocol/src/view.ts",
+      "c387Sha256": "e6a4a7d7da74a25c3da0078e91ca9e11f9cf7f963bbf831b926365fd1186bcb4",
+      "currentSha256": "e6a4a7d7da74a25c3da0078e91ca9e11f9cf7f963bbf831b926365fd1186bcb4",
+      "same": true
+    },
+    {
+      "path": "packages/protocol/src/window.ts",
+      "c387Sha256": "51de6215298e139ea2db374df38c502ec647a663073e80826dbd891f4dd75d90",
+      "currentSha256": "51de6215298e139ea2db374df38c502ec647a663073e80826dbd891f4dd75d90",
+      "same": true
+    },
+    {
+      "path": "client/angular.json",
+      "c387Sha256": "17a629070c8d70083271206b42cd2c9e2615aeaa0b3aae12dfac65324fd7bcb1",
+      "currentSha256": "17a629070c8d70083271206b42cd2c9e2615aeaa0b3aae12dfac65324fd7bcb1",
+      "same": true
+    },
+    {
+      "path": "client/src/styles.css",
+      "c387Sha256": "28643da64dd91f75f7db14fb5ae9f26b47a17615d80c46308999024f193d2ce0",
+      "currentSha256": "28643da64dd91f75f7db14fb5ae9f26b47a17615d80c46308999024f193d2ce0",
+      "same": true
+    },
+    {
+      "path": "client/src/styles/tokens.css",
+      "c387Sha256": "18b361a943a227a175f1b8075aae48a65987e88cf47feac3f29e3be9301d5dc0",
+      "currentSha256": "18b361a943a227a175f1b8075aae48a65987e88cf47feac3f29e3be9301d5dc0",
+      "same": true
+    },
+    {
+      "path": "client/src/styles/ui.css",
+      "c387Sha256": "f1e088d8ad541999cffb8a0898b0d7e1fb771218d77e4cb4dc2512c8a99b380e",
+      "currentSha256": "f1e088d8ad541999cffb8a0898b0d7e1fb771218d77e4cb4dc2512c8a99b380e",
+      "same": true
+    }
+  ],
+  "limits": "128 declared local source graph inputs and four style/config entries byte-identical. This is not equality of every c387 emitted binding: incoming live lobby/room sources changed and require current smoke."
+}

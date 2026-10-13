@@ -1,0 +1,70 @@
+{
+  "head": "c38727836520003bfe5d5419917fa465d7abbae3",
+  "builtFiles": 22,
+  "tokens": [
+    "dev/local-board",
+    "__local-default",
+    "local-general",
+    "Local board ready",
+    "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84"
+  ],
+  "tokenHits": [],
+  "rows": [
+    {
+      "path": "/dev/local-board",
+      "method": "GET",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41522/dev/local-board",
+      "bodySha256": "efc7d1435fcbc1bbed59306fbf038fbed87fcf943feffc525ed99fca33d9cda5"
+    },
+    {
+      "path": "/dev/local-board?mode=fixture",
+      "method": "GET",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41522/dev/local-board?mode=fixture",
+      "bodySha256": "efc7d1435fcbc1bbed59306fbf038fbed87fcf943feffc525ed99fca33d9cda5"
+    },
+    {
+      "path": "/__local-default/countryside-rectangle.json",
+      "method": "GET",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41522/__local-default/countryside-rectangle.json",
+      "bodySha256": "f922c0cc9324324953cce78ad401d89367c22effe19419ab6235c1d73d17ba9f"
+    },
+    {
+      "path": "/__local/maps",
+      "method": "GET",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41522/__local/maps",
+      "bodySha256": "ba1cdbb4553bdebb45888e5e5250ebba8eff3465a30e3770f96b4ff12a4a1c9e"
+    },
+    {
+      "path": "/__local/maps",
+      "method": "POST",
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41522/__local/maps",
+      "bodySha256": "07d4323cc1afa43b34f11c80ab17757db7f6f14ad6e1c113dae0fc97638a5cba"
+    },
+    {
+      "path": "/?mode=fixture",
+      "method": "GET",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41522/?mode=fixture",
+      "bodySha256": "512d419302d6a55b18e209187d7ee27f98fd9ea7139df62b8b9711e63b434430"
+    },
+    {
+      "path": "/map-table.html?inspection=1",
+      "method": "GET",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "finalUrl": "http://127.0.0.1:41522/map-table?inspection=1",
+      "bodySha256": "512d419302d6a55b18e209187d7ee27f98fd9ea7139df62b8b9711e63b434430"
+    }
+  ]
+}

@@ -1,0 +1,334 @@
+[
+  {
+    "at": "2026-10-13T15:55:16.947Z",
+    "label": "Native DevTools forced-colors active and reduced-motion reduce selected",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [pressed]\n    - button \"Notebook\"\n    - button \"Settings\"\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\"\n      - button \"Oblique\"\n    - generic \"Local map in metres; drag to orbit, right-drag to pan, scroll to zoom, or focus and use arrow keys\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\"\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [pressed]\n        - button \"New Symbol\"\n        - button \"New Ring\"\n        - button \"New Line\"\n        - button \"New Arrow\"\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\"\n      - text: X east (metres)\n      - textbox \"X east (metres)\"\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\"\n      - button \"Add mark\"\n      - button \"Place on map\"\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.",
+    "rendered": {
+      "active": "BODY",
+      "background": "rgba(255, 255, 255, 0)",
+      "canvases": 1,
+      "documentWidth": 471,
+      "height": 892,
+      "textColor": "rgb(0, 0, 0)",
+      "width": 471
+    }
+  },
+  {
+    "at": "2026-10-13T15:57:42.866Z",
+    "label": "Actual both media active, Settings controls visible",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [disabled] [pressed]\n    - button \"Notebook\" [disabled]\n    - button \"Settings\" [disabled]\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\" [disabled]\n      - button \"Oblique\" [disabled]\n    - generic \"Local map in metres; click to place a manual mark\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes · Interaction paused\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\" [disabled]\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [disabled] [pressed]\n        - button \"New Symbol\" [disabled]\n        - button \"New Ring\" [disabled]\n        - button \"New Line\" [disabled]\n        - button \"New Arrow\" [disabled]\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\" [disabled]\n      - text: X east (metres)\n      - textbox \"X east (metres)\" [disabled]\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\" [disabled]\n      - button \"Add mark\" [disabled]\n      - button \"Place on map\" [disabled]\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.\n  - dialog \"Settings\":\n    - heading \"Settings\" [level=2]\n    - button \"New game\" [active]\n    - button \"Close\"",
+    "rendered": {
+      "activeInDialog": true,
+      "activeTag": "BUTTON",
+      "activeText": "New game",
+      "canvases": 1,
+      "dialogs": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(0, 0, 0)",
+          "textColor": "rgb(0, 0, 0)",
+          "width": 208.4921875
+        }
+      ],
+      "documentWidth": 441,
+      "forcedColors": true,
+      "height": 846,
+      "reducedMotion": true,
+      "transitions": ["0s", "0s", "0s"],
+      "width": 441
+    }
+  },
+  {
+    "at": "2026-10-13T15:58:25.133Z",
+    "label": "Actual saved rectangle ready with both media active at 441px",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [disabled] [pressed]\n    - button \"Notebook\" [disabled]\n    - button \"Settings\" [disabled]\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\" [disabled]\n      - button \"Oblique\" [disabled]\n    - generic \"Local map in metres; click to place a manual mark\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes · Interaction paused\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\" [disabled]\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [disabled] [pressed]\n        - button \"New Symbol\" [disabled]\n        - button \"New Ring\" [disabled]\n        - button \"New Line\" [disabled]\n        - button \"New Arrow\" [disabled]\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\" [disabled]\n      - text: X east (metres)\n      - textbox \"X east (metres)\" [disabled]\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\" [disabled]\n      - button \"Add mark\" [disabled]\n      - button \"Place on map\" [disabled]\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.\n  - dialog \"New game setup\" [active]:\n    - region \"New game setup\":\n      - heading \"New game\" [level=2]\n      - paragraph: Choose the map for a fresh local board.\n      - text: Saved map\n      - combobox \"Saved map\":\n        - option \"Choose a map…\"\n        - option \"Countryside — 5 × 3 km (premade)\" [selected]\n        - option \"Wooded hills — 5 × 5 km (premade)\"\n        - option \"River valley — 5 × 5 km (premade)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n      - heading \"Generate a map\" [level=3]\n      - text: Preset\n      - combobox \"Preset\":\n        - option \"Custom / recorded settings\" [selected]\n        - option \"flat countryside\"\n        - option \"wooded hills\"\n        - option \"river valley\"\n      - text: Seed\n      - textbox \"Seed\": \"17\"\n      - text: Map size\n      - combobox \"Map size\":\n        - option \"Custom / recorded size\" [selected]\n        - option \"5 km × 5 km\"\n        - option \"10 km × 10 km\"\n        - option \"15 km × 15 km\"\n      - button \"Generate\"\n      - button \"Save map\" [disabled]\n      - status: Saved map ready.\n      - paragraph: Battlefield 17 · 5 × 3 km · Saved\n      - generic \"Map preview. Drag to pan, scroll to zoom, F to fit.\"\n      - paragraph: Drag to pan · scroll to zoom · F to fit\n      - button \"Cancel\"\n      - button \"Start game\"",
+    "rendered": {
+      "activeInDialog": true,
+      "activeTag": "DIALOG",
+      "activeText": "New gameChoose the map for a fresh local board.Saved map Choose a map… Countryside — 5 × 3 km (prema",
+      "canvases": 2,
+      "dialogs": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(0, 0, 0)",
+          "textColor": "rgb(0, 0, 0)",
+          "width": 441
+        }
+      ],
+      "documentWidth": 441,
+      "forcedColors": true,
+      "height": 846,
+      "reducedMotion": true,
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
+      "width": 441
+    }
+  },
+  {
+    "at": "2026-10-13T15:58:25.300Z",
+    "label": "Native Tab from initial Setup focus",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [disabled] [pressed]\n    - button \"Notebook\" [disabled]\n    - button \"Settings\" [disabled]\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\" [disabled]\n      - button \"Oblique\" [disabled]\n    - generic \"Local map in metres; click to place a manual mark\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes · Interaction paused\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\" [disabled]\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [disabled] [pressed]\n        - button \"New Symbol\" [disabled]\n        - button \"New Ring\" [disabled]\n        - button \"New Line\" [disabled]\n        - button \"New Arrow\" [disabled]\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\" [disabled]\n      - text: X east (metres)\n      - textbox \"X east (metres)\" [disabled]\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\" [disabled]\n      - button \"Add mark\" [disabled]\n      - button \"Place on map\" [disabled]\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.\n  - dialog \"New game setup\" [active]:\n    - region \"New game setup\":\n      - heading \"New game\" [level=2]\n      - paragraph: Choose the map for a fresh local board.\n      - text: Saved map\n      - combobox \"Saved map\":\n        - option \"Choose a map…\"\n        - option \"Countryside — 5 × 3 km (premade)\" [selected]\n        - option \"Wooded hills — 5 × 5 km (premade)\"\n        - option \"River valley — 5 × 5 km (premade)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n      - heading \"Generate a map\" [level=3]\n      - text: Preset\n      - combobox \"Preset\":\n        - option \"Custom / recorded settings\" [selected]\n        - option \"flat countryside\"\n        - option \"wooded hills\"\n        - option \"river valley\"\n      - text: Seed\n      - textbox \"Seed\": \"17\"\n      - text: Map size\n      - combobox \"Map size\":\n        - option \"Custom / recorded size\" [selected]\n        - option \"5 km × 5 km\"\n        - option \"10 km × 10 km\"\n        - option \"15 km × 15 km\"\n      - button \"Generate\"\n      - button \"Save map\" [disabled]\n      - status: Saved map ready.\n      - paragraph: Battlefield 17 · 5 × 3 km · Saved\n      - generic \"Map preview. Drag to pan, scroll to zoom, F to fit.\"\n      - paragraph: Drag to pan · scroll to zoom · F to fit\n      - button \"Cancel\"\n      - button \"Start game\"",
+    "rendered": {
+      "activeInDialog": true,
+      "activeTag": "DIALOG",
+      "activeText": "New gameChoose the map for a fresh local board.Saved map Choose a map… Countryside — 5 × 3 km (prema",
+      "canvases": 2,
+      "dialogs": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(0, 0, 0)",
+          "textColor": "rgb(0, 0, 0)",
+          "width": 441
+        }
+      ],
+      "documentWidth": 441,
+      "forcedColors": true,
+      "height": 846,
+      "reducedMotion": true,
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
+      "width": 441
+    }
+  },
+  {
+    "at": "2026-10-13T15:58:46.943Z",
+    "label": "Native Tab within Setup after actual page focus",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [disabled] [pressed]\n    - button \"Notebook\" [disabled]\n    - button \"Settings\" [disabled]\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\" [disabled]\n      - button \"Oblique\" [disabled]\n    - generic \"Local map in metres; click to place a manual mark\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes · Interaction paused\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\" [disabled]\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [disabled] [pressed]\n        - button \"New Symbol\" [disabled]\n        - button \"New Ring\" [disabled]\n        - button \"New Line\" [disabled]\n        - button \"New Arrow\" [disabled]\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\" [disabled]\n      - text: X east (metres)\n      - textbox \"X east (metres)\" [disabled]\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\" [disabled]\n      - button \"Add mark\" [disabled]\n      - button \"Place on map\" [disabled]\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.\n  - dialog \"New game setup\":\n    - region \"New game setup\":\n      - heading \"New game\" [level=2]\n      - paragraph: Choose the map for a fresh local board.\n      - text: Saved map\n      - combobox \"Saved map\":\n        - option \"Choose a map…\"\n        - option \"Countryside — 5 × 3 km (premade)\" [selected]\n        - option \"Wooded hills — 5 × 5 km (premade)\"\n        - option \"River valley — 5 × 5 km (premade)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n      - heading \"Generate a map\" [level=3]\n      - text: Preset\n      - combobox \"Preset\":\n        - option \"Custom / recorded settings\" [selected]\n        - option \"flat countryside\"\n        - option \"wooded hills\"\n        - option \"river valley\"\n      - text: Seed\n      - textbox \"Seed\": \"17\"\n      - text: Map size\n      - combobox \"Map size\" [active]:\n        - option \"Custom / recorded size\" [selected]\n        - option \"5 km × 5 km\"\n        - option \"10 km × 10 km\"\n        - option \"15 km × 15 km\"\n      - button \"Generate\"\n      - button \"Save map\" [disabled]\n      - status: Saved map ready.\n      - paragraph: Battlefield 17 · 5 × 3 km · Saved\n      - generic \"Map preview. Drag to pan, scroll to zoom, F to fit.\"\n      - paragraph: Drag to pan · scroll to zoom · F to fit\n      - button \"Cancel\"\n      - button \"Start game\"",
+    "rendered": {
+      "activeInDialog": true,
+      "activeTag": "SELECT",
+      "activeText": "Custom / recorded size5 km × 5 km10 km × 10 km15 km × 15 km",
+      "canvases": 2,
+      "dialogs": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(0, 0, 0)",
+          "textColor": "rgb(0, 0, 0)",
+          "width": 441
+        }
+      ],
+      "documentWidth": 441,
+      "forcedColors": true,
+      "height": 846,
+      "reducedMotion": true,
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
+      "width": 441
+    }
+  },
+  {
+    "at": "2026-10-13T15:58:57.729Z",
+    "label": "Native forward Setup Tab 1",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [disabled] [pressed]\n    - button \"Notebook\" [disabled]\n    - button \"Settings\" [disabled]\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\" [disabled]\n      - button \"Oblique\" [disabled]\n    - generic \"Local map in metres; click to place a manual mark\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes · Interaction paused\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\" [disabled]\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [disabled] [pressed]\n        - button \"New Symbol\" [disabled]\n        - button \"New Ring\" [disabled]\n        - button \"New Line\" [disabled]\n        - button \"New Arrow\" [disabled]\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\" [disabled]\n      - text: X east (metres)\n      - textbox \"X east (metres)\" [disabled]\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\" [disabled]\n      - button \"Add mark\" [disabled]\n      - button \"Place on map\" [disabled]\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.\n  - dialog \"New game setup\":\n    - region \"New game setup\":\n      - heading \"New game\" [level=2]\n      - paragraph: Choose the map for a fresh local board.\n      - text: Saved map\n      - combobox \"Saved map\":\n        - option \"Choose a map…\"\n        - option \"Countryside — 5 × 3 km (premade)\" [selected]\n        - option \"Wooded hills — 5 × 5 km (premade)\"\n        - option \"River valley — 5 × 5 km (premade)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n      - heading \"Generate a map\" [level=3]\n      - text: Preset\n      - combobox \"Preset\":\n        - option \"Custom / recorded settings\" [selected]\n        - option \"flat countryside\"\n        - option \"wooded hills\"\n        - option \"river valley\"\n      - text: Seed\n      - textbox \"Seed\": \"17\"\n      - text: Map size\n      - combobox \"Map size\":\n        - option \"Custom / recorded size\" [selected]\n        - option \"5 km × 5 km\"\n        - option \"10 km × 10 km\"\n        - option \"15 km × 15 km\"\n      - button \"Generate\" [active]\n      - button \"Save map\" [disabled]\n      - status: Saved map ready.\n      - paragraph: Battlefield 17 · 5 × 3 km · Saved\n      - generic \"Map preview. Drag to pan, scroll to zoom, F to fit.\"\n      - paragraph: Drag to pan · scroll to zoom · F to fit\n      - button \"Cancel\"\n      - button \"Start game\"",
+    "rendered": {
+      "activeInDialog": true,
+      "activeTag": "BUTTON",
+      "activeText": "Generate",
+      "canvases": 2,
+      "dialogs": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(0, 0, 0)",
+          "textColor": "rgb(0, 0, 0)",
+          "width": 441
+        }
+      ],
+      "documentWidth": 441,
+      "forcedColors": true,
+      "height": 846,
+      "reducedMotion": true,
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
+      "width": 441
+    }
+  },
+  {
+    "at": "2026-10-13T15:58:59.454Z",
+    "label": "Native forward Setup Tab 2",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [disabled] [pressed]\n    - button \"Notebook\" [disabled]\n    - button \"Settings\" [disabled]\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\" [disabled]\n      - button \"Oblique\" [disabled]\n    - generic \"Local map in metres; click to place a manual mark\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes · Interaction paused\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\" [disabled]\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [disabled] [pressed]\n        - button \"New Symbol\" [disabled]\n        - button \"New Ring\" [disabled]\n        - button \"New Line\" [disabled]\n        - button \"New Arrow\" [disabled]\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\" [disabled]\n      - text: X east (metres)\n      - textbox \"X east (metres)\" [disabled]\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\" [disabled]\n      - button \"Add mark\" [disabled]\n      - button \"Place on map\" [disabled]\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.\n  - dialog \"New game setup\":\n    - region \"New game setup\":\n      - heading \"New game\" [level=2]\n      - paragraph: Choose the map for a fresh local board.\n      - text: Saved map\n      - combobox \"Saved map\":\n        - option \"Choose a map…\"\n        - option \"Countryside — 5 × 3 km (premade)\" [selected]\n        - option \"Wooded hills — 5 × 5 km (premade)\"\n        - option \"River valley — 5 × 5 km (premade)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n      - heading \"Generate a map\" [level=3]\n      - text: Preset\n      - combobox \"Preset\":\n        - option \"Custom / recorded settings\" [selected]\n        - option \"flat countryside\"\n        - option \"wooded hills\"\n        - option \"river valley\"\n      - text: Seed\n      - textbox \"Seed\": \"17\"\n      - text: Map size\n      - combobox \"Map size\":\n        - option \"Custom / recorded size\" [selected]\n        - option \"5 km × 5 km\"\n        - option \"10 km × 10 km\"\n        - option \"15 km × 15 km\"\n      - button \"Generate\"\n      - button \"Save map\" [disabled]\n      - status: Saved map ready.\n      - paragraph: Battlefield 17 · 5 × 3 km · Saved\n      - generic \"Map preview. Drag to pan, scroll to zoom, F to fit.\" [active]\n      - paragraph: Drag to pan · scroll to zoom · F to fit\n      - button \"Cancel\"\n      - button \"Start game\"",
+    "rendered": {
+      "activeInDialog": true,
+      "activeTag": "CANVAS",
+      "activeText": "",
+      "canvases": 2,
+      "dialogs": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(0, 0, 0)",
+          "textColor": "rgb(0, 0, 0)",
+          "width": 441
+        }
+      ],
+      "documentWidth": 441,
+      "forcedColors": true,
+      "height": 846,
+      "reducedMotion": true,
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
+      "width": 441
+    }
+  },
+  {
+    "at": "2026-10-13T15:58:59.495Z",
+    "label": "Native forward Setup Tab 3",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [disabled] [pressed]\n    - button \"Notebook\" [disabled]\n    - button \"Settings\" [disabled]\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\" [disabled]\n      - button \"Oblique\" [disabled]\n    - generic \"Local map in metres; click to place a manual mark\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes · Interaction paused\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\" [disabled]\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [disabled] [pressed]\n        - button \"New Symbol\" [disabled]\n        - button \"New Ring\" [disabled]\n        - button \"New Line\" [disabled]\n        - button \"New Arrow\" [disabled]\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\" [disabled]\n      - text: X east (metres)\n      - textbox \"X east (metres)\" [disabled]\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\" [disabled]\n      - button \"Add mark\" [disabled]\n      - button \"Place on map\" [disabled]\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.\n  - dialog \"New game setup\":\n    - region \"New game setup\":\n      - heading \"New game\" [level=2]\n      - paragraph: Choose the map for a fresh local board.\n      - text: Saved map\n      - combobox \"Saved map\":\n        - option \"Choose a map…\"\n        - option \"Countryside — 5 × 3 km (premade)\" [selected]\n        - option \"Wooded hills — 5 × 5 km (premade)\"\n        - option \"River valley — 5 × 5 km (premade)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n      - heading \"Generate a map\" [level=3]\n      - text: Preset\n      - combobox \"Preset\":\n        - option \"Custom / recorded settings\" [selected]\n        - option \"flat countryside\"\n        - option \"wooded hills\"\n        - option \"river valley\"\n      - text: Seed\n      - textbox \"Seed\": \"17\"\n      - text: Map size\n      - combobox \"Map size\":\n        - option \"Custom / recorded size\" [selected]\n        - option \"5 km × 5 km\"\n        - option \"10 km × 10 km\"\n        - option \"15 km × 15 km\"\n      - button \"Generate\"\n      - button \"Save map\" [disabled]\n      - status: Saved map ready.\n      - paragraph: Battlefield 17 · 5 × 3 km · Saved\n      - generic \"Map preview. Drag to pan, scroll to zoom, F to fit.\"\n      - paragraph: Drag to pan · scroll to zoom · F to fit\n      - button \"Cancel\" [active]\n      - button \"Start game\"",
+    "rendered": {
+      "activeInDialog": true,
+      "activeTag": "BUTTON",
+      "activeText": "Cancel",
+      "canvases": 2,
+      "dialogs": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(0, 0, 0)",
+          "textColor": "rgb(0, 0, 0)",
+          "width": 441
+        }
+      ],
+      "documentWidth": 441,
+      "forcedColors": true,
+      "height": 846,
+      "reducedMotion": true,
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
+      "width": 441
+    }
+  },
+  {
+    "at": "2026-10-13T15:58:59.537Z",
+    "label": "Native forward Setup Tab 4",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [disabled] [pressed]\n    - button \"Notebook\" [disabled]\n    - button \"Settings\" [disabled]\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\" [disabled]\n      - button \"Oblique\" [disabled]\n    - generic \"Local map in metres; click to place a manual mark\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes · Interaction paused\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\" [disabled]\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [disabled] [pressed]\n        - button \"New Symbol\" [disabled]\n        - button \"New Ring\" [disabled]\n        - button \"New Line\" [disabled]\n        - button \"New Arrow\" [disabled]\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\" [disabled]\n      - text: X east (metres)\n      - textbox \"X east (metres)\" [disabled]\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\" [disabled]\n      - button \"Add mark\" [disabled]\n      - button \"Place on map\" [disabled]\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.\n  - dialog \"New game setup\":\n    - region \"New game setup\":\n      - heading \"New game\" [level=2]\n      - paragraph: Choose the map for a fresh local board.\n      - text: Saved map\n      - combobox \"Saved map\":\n        - option \"Choose a map…\"\n        - option \"Countryside — 5 × 3 km (premade)\" [selected]\n        - option \"Wooded hills — 5 × 5 km (premade)\"\n        - option \"River valley — 5 × 5 km (premade)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n      - heading \"Generate a map\" [level=3]\n      - text: Preset\n      - combobox \"Preset\":\n        - option \"Custom / recorded settings\" [selected]\n        - option \"flat countryside\"\n        - option \"wooded hills\"\n        - option \"river valley\"\n      - text: Seed\n      - textbox \"Seed\": \"17\"\n      - text: Map size\n      - combobox \"Map size\":\n        - option \"Custom / recorded size\" [selected]\n        - option \"5 km × 5 km\"\n        - option \"10 km × 10 km\"\n        - option \"15 km × 15 km\"\n      - button \"Generate\"\n      - button \"Save map\" [disabled]\n      - status: Saved map ready.\n      - paragraph: Battlefield 17 · 5 × 3 km · Saved\n      - generic \"Map preview. Drag to pan, scroll to zoom, F to fit.\"\n      - paragraph: Drag to pan · scroll to zoom · F to fit\n      - button \"Cancel\"\n      - button \"Start game\" [active]",
+    "rendered": {
+      "activeInDialog": true,
+      "activeTag": "BUTTON",
+      "activeText": "Start game",
+      "canvases": 2,
+      "dialogs": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(0, 0, 0)",
+          "textColor": "rgb(0, 0, 0)",
+          "width": 441
+        }
+      ],
+      "documentWidth": 441,
+      "forcedColors": true,
+      "height": 846,
+      "reducedMotion": true,
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
+      "width": 441
+    }
+  },
+  {
+    "at": "2026-10-13T15:58:59.571Z",
+    "label": "Native forward Setup Tab 5",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [disabled] [pressed]\n    - button \"Notebook\" [disabled]\n    - button \"Settings\" [disabled]\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\" [disabled]\n      - button \"Oblique\" [disabled]\n    - generic \"Local map in metres; click to place a manual mark\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes · Interaction paused\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\" [disabled]\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [disabled] [pressed]\n        - button \"New Symbol\" [disabled]\n        - button \"New Ring\" [disabled]\n        - button \"New Line\" [disabled]\n        - button \"New Arrow\" [disabled]\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\" [disabled]\n      - text: X east (metres)\n      - textbox \"X east (metres)\" [disabled]\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\" [disabled]\n      - button \"Add mark\" [disabled]\n      - button \"Place on map\" [disabled]\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.\n  - dialog \"New game setup\":\n    - region \"New game setup\":\n      - heading \"New game\" [level=2]\n      - paragraph: Choose the map for a fresh local board.\n      - text: Saved map\n      - combobox \"Saved map\":\n        - option \"Choose a map…\"\n        - option \"Countryside — 5 × 3 km (premade)\" [selected]\n        - option \"Wooded hills — 5 × 5 km (premade)\"\n        - option \"River valley — 5 × 5 km (premade)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n      - heading \"Generate a map\" [level=3]\n      - text: Preset\n      - combobox \"Preset\":\n        - option \"Custom / recorded settings\" [selected]\n        - option \"flat countryside\"\n        - option \"wooded hills\"\n        - option \"river valley\"\n      - text: Seed\n      - textbox \"Seed\": \"17\"\n      - text: Map size\n      - combobox \"Map size\":\n        - option \"Custom / recorded size\" [selected]\n        - option \"5 km × 5 km\"\n        - option \"10 km × 10 km\"\n        - option \"15 km × 15 km\"\n      - button \"Generate\"\n      - button \"Save map\" [disabled]\n      - status: Saved map ready.\n      - paragraph: Battlefield 17 · 5 × 3 km · Saved\n      - generic \"Map preview. Drag to pan, scroll to zoom, F to fit.\"\n      - paragraph: Drag to pan · scroll to zoom · F to fit\n      - button \"Cancel\"\n      - button \"Start game\"",
+    "rendered": {
+      "activeInDialog": false,
+      "activeTag": "BODY",
+      "activeText": "Local boardTime stopped at 0 · No simulation Table  Notebook  Settings Back to menu Top-down  Obliqu",
+      "canvases": 2,
+      "dialogs": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(0, 0, 0)",
+          "textColor": "rgb(0, 0, 0)",
+          "width": 441
+        }
+      ],
+      "documentWidth": 441,
+      "forcedColors": true,
+      "height": 846,
+      "reducedMotion": true,
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
+      "width": 441
+    }
+  },
+  {
+    "at": "2026-10-13T15:58:59.661Z",
+    "label": "Native forward Setup Tab 6",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [disabled] [pressed]\n    - button \"Notebook\" [disabled]\n    - button \"Settings\" [disabled]\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\" [disabled]\n      - button \"Oblique\" [disabled]\n    - generic \"Local map in metres; click to place a manual mark\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes · Interaction paused\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\" [disabled]\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [disabled] [pressed]\n        - button \"New Symbol\" [disabled]\n        - button \"New Ring\" [disabled]\n        - button \"New Line\" [disabled]\n        - button \"New Arrow\" [disabled]\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\" [disabled]\n      - text: X east (metres)\n      - textbox \"X east (metres)\" [disabled]\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\" [disabled]\n      - button \"Add mark\" [disabled]\n      - button \"Place on map\" [disabled]\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.\n  - dialog \"New game setup\":\n    - region \"New game setup\":\n      - heading \"New game\" [level=2]\n      - paragraph: Choose the map for a fresh local board.\n      - text: Saved map\n      - combobox \"Saved map\":\n        - option \"Choose a map…\"\n        - option \"Countryside — 5 × 3 km (premade)\" [selected]\n        - option \"Wooded hills — 5 × 5 km (premade)\"\n        - option \"River valley — 5 × 5 km (premade)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n        - option \"Battlefield 31 (generated)\"\n      - heading \"Generate a map\" [level=3]\n      - text: Preset\n      - combobox \"Preset\":\n        - option \"Custom / recorded settings\" [selected]\n        - option \"flat countryside\"\n        - option \"wooded hills\"\n        - option \"river valley\"\n      - text: Seed\n      - textbox \"Seed\": \"17\"\n      - text: Map size\n      - combobox \"Map size\":\n        - option \"Custom / recorded size\" [selected]\n        - option \"5 km × 5 km\"\n        - option \"10 km × 10 km\"\n        - option \"15 km × 15 km\"\n      - button \"Generate\"\n      - button \"Save map\" [disabled]\n      - status: Saved map ready.\n      - paragraph: Battlefield 17 · 5 × 3 km · Saved\n      - generic \"Map preview. Drag to pan, scroll to zoom, F to fit.\"\n      - paragraph: Drag to pan · scroll to zoom · F to fit\n      - button \"Cancel\"\n      - button \"Start game\"",
+    "rendered": {
+      "activeInDialog": false,
+      "activeTag": "BODY",
+      "activeText": "Local boardTime stopped at 0 · No simulation Table  Notebook  Settings Back to menu Top-down  Obliqu",
+      "canvases": 2,
+      "dialogs": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(0, 0, 0)",
+          "textColor": "rgb(0, 0, 0)",
+          "width": 441
+        }
+      ],
+      "documentWidth": 441,
+      "forcedColors": true,
+      "height": 846,
+      "reducedMotion": true,
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
+      "width": 441
+    }
+  },
+  {
+    "at": "2026-10-13T16:00:29.719Z",
+    "label": "Native Escape cancels Setup with both media modes active",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [pressed]\n    - button \"Notebook\"\n    - button \"Settings\" [active]\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\"\n      - button \"Oblique\"\n    - generic \"Local map in metres; drag to orbit, right-drag to pan, scroll to zoom, or focus and use arrow keys\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\"\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [pressed]\n        - button \"New Symbol\"\n        - button \"New Ring\"\n        - button \"New Line\"\n        - button \"New Arrow\"\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\"\n      - text: X east (metres)\n      - textbox \"X east (metres)\"\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\"\n      - button \"Add mark\"\n      - button \"Place on map\"\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.",
+    "rendered": {
+      "activeInDialog": false,
+      "activeTag": "BUTTON",
+      "activeText": "Settings",
+      "canvases": 1,
+      "dialogs": [],
+      "documentWidth": 441,
+      "forcedColors": true,
+      "height": 846,
+      "reducedMotion": true,
+      "transitions": [],
+      "width": 441
+    }
+  },
+  {
+    "at": "2026-10-13T16:01:18.103Z",
+    "label": "Native settings restored to No emulation; actual media queries false",
+    "url": "http://127.0.0.1:41930/dev/local-board",
+    "dom": "- main:\n  - heading \"Local board\" [level=1]\n  - status: Time stopped at 0 · No simulation\n  - navigation \"Local board navigation\":\n    - button \"Table\" [pressed]\n    - button \"Notebook\"\n    - button \"Settings\" [active]\n    - link \"Back to menu\":\n      - /url: /\n  - region \"Local map board\":\n    - navigation \"Board camera\":\n      - button \"Top-down\"\n      - button \"Oblique\"\n    - generic \"Local map in metres; drag to orbit, right-drag to pan, scroll to zoom, or focus and use arrow keys\"\n    - status: Local board ready · time stopped at 0\n  - region \"Personal marks\":\n    - heading \"Personal marks\" [level=2]\n    - paragraph: Manual annotations · game time 0 · metres east / south from the north-west corner.\n    - status: No unsaved mark changes\n    - button \"Save marks\" [disabled]\n    - button \"Reload marks\"\n    - paragraph: Reload replaces the draft with stored marks after a successful load.\n    - group \"Create a mark\":\n      - generic: Create a mark\n      - generic \"New mark tools\":\n        - button \"New Pin\" [pressed]\n        - button \"New Symbol\"\n        - button \"New Ring\"\n        - button \"New Line\"\n        - button \"New Arrow\"\n      - paragraph: \"Selected tool: pin\"\n      - text: Mark label\n      - textbox \"Mark label\"\n      - text: X east (metres)\n      - textbox \"X east (metres)\"\n      - text: Y south (metres)\n      - textbox \"Y south (metres)\"\n      - button \"Add mark\"\n      - button \"Place on map\"\n      - button \"Stop placement\" [disabled]\n      - status: Map placement is stopped. Numeric entry is available above.\n    - heading \"Marks (0 / 200)\" [level=3]\n    - list \"Existing marks\":\n      - listitem: No personal marks yet.",
+    "rendered": {
+      "activeInDialog": false,
+      "activeTag": "BUTTON",
+      "activeText": "Settings",
+      "canvases": 1,
+      "dialogs": [],
+      "documentWidth": 441,
+      "forcedColors": false,
+      "height": 846,
+      "reducedMotion": false,
+      "transitions": [],
+      "width": 441
+    }
+  },
+  {
+    "at": "2026-10-13T16:02:26.687Z",
+    "label": "Route departure settled ordinary menu and zero canvases, media restored",
+    "url": "http://127.0.0.1:41930/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph: An umpired war game, played in real time or slower.\n  - navigation \"Main menu\":\n    - button \"New game\"\n  - region \"Account\":\n    - heading \"Account\" [level=2]\n    - paragraph: Playing as a guest. Your games stay in this browser.\n    - button \"Sign in to keep your games on other devices\"\n    - button \"High contrast\"\n  - region \"About\":\n    - heading \"About\" [level=2]\n    - paragraph:\n      - text: You command one side of a battle from a desk. Orders are written in plain words and carried by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game keeps running on the server while you are away.\n      - link \"Read how it plays\":\n        - /url: https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md\n      - text: .",
+    "rendered": {
+      "activeInDialog": false,
+      "activeTag": "BODY",
+      "activeText": "KriegsspielAn umpired war game, played in real time or slower.New gameAccountPlaying as a guest. You",
+      "canvases": 0,
+      "dialogs": [],
+      "documentWidth": 1456,
+      "forcedColors": false,
+      "height": 846,
+      "reducedMotion": false,
+      "transitions": [],
+      "width": 1456
+    }
+  }
+]

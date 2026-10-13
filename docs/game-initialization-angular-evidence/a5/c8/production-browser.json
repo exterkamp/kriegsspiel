@@ -1,0 +1,128 @@
+[
+  {
+    "head": "04453f4a126f072d7731fa84749cf4a9a4ec8c9b",
+    "base": "c8e3ec61efe56846f462f105414a615401ef3e4a",
+    "label": "Current production signed-out menu",
+    "at": "2026-10-13T00:09:56.840Z",
+    "url": "http://a5-c8.localhost:41772/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph:\n    - button \"Play as guest\"\n  - paragraph: No email needed. Sign in later to keep your games on other devices.\n  - form \"Sign in\":\n    - heading \"Sign in\" [level=2]\n    - text: Email\n    - textbox \"Email\"\n    - button \"Send me a login link\"",
+    "rendered": {
+      "canvas": 0,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "04453f4a126f072d7731fa84749cf4a9a4ec8c9b",
+    "base": "c8e3ec61efe56846f462f105414a615401ef3e4a",
+    "label": "Current production settled guest menu",
+    "at": "2026-10-13T00:10:22.084Z",
+    "url": "http://a5-c8.localhost:41772/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph: An umpired war game, played in real time or slower.\n  - navigation \"Main menu\":\n    - button \"New game\"\n  - region \"Account\":\n    - heading \"Account\" [level=2]\n    - paragraph: Playing as a guest. Your games stay in this browser.\n    - button \"Sign in to keep your games on other devices\"\n    - button \"High contrast\"\n  - region \"Developer tools\":\n    - heading \"Developer tools\" [level=2]\n    - paragraph: For development; not part of the game.\n    - list:\n      - link \"Map editor Generate, preview and export a battlefield.\":\n        - /url: /map-authoring\n        - generic: Map editor\n        - generic: Generate, preview and export a battlefield.\n      - link \"Map benchmark Time map generation and rendering on this device.\":\n        - /url: /map-benchmark\n        - generic: Map benchmark\n        - generic: Time map generation and rendering on this device.\n      - link \"Table benchmark Time the 3D table scene on this device.\":\n        - /url: /table-benchmark\n        - generic: Table benchmark\n        - generic: Time the 3D table scene on this device.\n      - link \"Style guide Tokens and every shared control in each state.\":\n        - /url: /style-guide\n        - generic: Style guide\n        - generic: Tokens and every shared control in each state.\n      - link \"Admin view Operator console; asks for the admin token.\":\n        - /url: /admin/\n        - generic: Admin view\n        - generic: Operator console; asks for the admin token.\n  - region \"About\":\n    - heading \"About\" [level=2]\n    - paragraph:\n      - text: You command one side of a battle from a desk. Orders are written in plain words and carried by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game keeps running on the server while you are away.\n      - link \"Read how it plays\":\n        - /url: https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md\n      - text: .",
+    "rendered": {
+      "canvas": 0,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "04453f4a126f072d7731fa84749cf4a9a4ec8c9b",
+    "base": "c8e3ec61efe56846f462f105414a615401ef3e4a",
+    "label": "Native Start current own guest scenario; actual settled state below",
+    "at": "2026-10-13T00:11:19.579Z",
+    "url": "http://a5-c8.localhost:41772/?game=0e7de79f-a8cf-4c33-b81d-d87195cbb373",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- region \"Map marks\":\n  - button \"Tools\" [expanded]\n  - toolbar:\n    - button \"Look\" [pressed]\n    - button \"Move\"\n    - button \"Pin\"\n    - button \"Pencil\"\n    - button \"Arrow\"\n    - button \"Range ring\"\n  - textbox \"Note for the next mark\"\n  - button \"Delete mark\" [disabled]\n  - button \"Plot report\" [disabled]\n  - checkbox \"Order arrows\" [checked]\n  - text: Order arrows\n  - checkbox \"Planned routes\" [checked]\n  - text: Planned routes\n  - checkbox \"Last known\" [checked]\n  - text: Last known\n- region \"Clock\":\n  - generic: Day 1 00:01\n  - generic: 12:1\n  - generic: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\" [pressed]:\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 1 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"1 unread\": \"1\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- button \"Menu (Esc)\"",
+    "rendered": {
+      "canvas": 1,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "04453f4a126f072d7731fa84749cf4a9a4ec8c9b",
+    "base": "c8e3ec61efe56846f462f105414a615401ef3e4a",
+    "label": "Current real roster includes own names and trait titles",
+    "at": "2026-10-13T00:11:36.229Z",
+    "url": "http://a5-c8.localhost:41772/?game=0e7de79f-a8cf-4c33-b81d-d87195cbb373",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- region \"Clock\":\n  - generic: Day 1 00:05\n  - generic: 12:1\n  - generic: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\":\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 1 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"1 unread\": \"1\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\" [active] [pressed]:\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- region \"Order of battle\":\n  - heading \"Order of battle\" [level=2]\n  - table:\n    - rowgroup:\n      - row \"Formation Strength Supply Morale Reported\":\n        - columnheader \"Formation\"\n        - columnheader \"Strength\"\n        - columnheader \"Supply\"\n        - columnheader \"Morale\"\n        - columnheader \"Reported\"\n    - rowgroup:\n      - row \"Show 1st Battalion on the table Col. Aubry 600 100% 80% Day 1 00:05 just now\":\n        - rowheader \"Show 1st Battalion on the table Col. Aubry\":\n          - button \"Show 1st Battalion on the table\": 1st Battalion\n          - generic \"steady and methodical; holds a line under fire\": Col. Aubry\n        - cell \"600\"\n        - cell \"100%\"\n        - cell \"80%\"\n        - cell \"Day 1 00:05 just now\":\n          - text: Day 1 00:05\n          - generic: just now\n      - row \"Show 2nd Battalion on the table Col. Delacroix 550 100% 75% Day 1 00:05 just now\":\n        - rowheader \"Show 2nd Battalion on the table Col. Delacroix\":\n          - button \"Show 2nd Battalion on the table\": 2nd Battalion\n          - generic \"cautious; slow to commit his reserve\": Col. Delacroix\n        - cell \"550\"\n        - cell \"100%\"\n        - cell \"75%\"\n        - cell \"Day 1 00:05 just now\":\n          - text: Day 1 00:05\n          - generic: just now\n      - row \"Show Cavalry Squadron on the table Maj. Verneuil 200 100% 85% Day 1 00:05 just now\":\n        - rowheader \"Show Cavalry Squadron on the table Maj. Verneuil\":\n          - button \"Show Cavalry Squadron on the table\": Cavalry Squadron\n          - generic \"bold and impatient; apt to charge early\": Maj. Verneuil\n        - cell \"200\"\n        - cell \"100%\"\n        - cell \"85%\"\n        - cell \"Day 1 00:05 just now\":\n          - text: Day 1 00:05\n          - generic: just now\n- button \"Menu (Esc)\"",
+    "rendered": {
+      "canvas": 1,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "04453f4a126f072d7731fa84749cf4a9a4ec8c9b",
+    "base": "c8e3ec61efe56846f462f105414a615401ef3e4a",
+    "label": "Current live menu with guest and leave behavior",
+    "at": "2026-10-13T00:11:44.060Z",
+    "url": "http://a5-c8.localhost:41772/?game=0e7de79f-a8cf-4c33-b81d-d87195cbb373",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- region \"Clock\":\n  - generic: Day 1 00:06\n  - generic: 12:1\n  - generic: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\":\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 1 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"1 unread\": \"1\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\" [pressed]:\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- region \"Order of battle\":\n  - heading \"Order of battle\" [level=2]\n  - table:\n    - rowgroup:\n      - row \"Formation Strength Supply Morale Reported\":\n        - columnheader \"Formation\"\n        - columnheader \"Strength\"\n        - columnheader \"Supply\"\n        - columnheader \"Morale\"\n        - columnheader \"Reported\"\n    - rowgroup:\n      - row \"Show 1st Battalion on the table Col. Aubry 600 100% 80% Day 1 00:06 just now\":\n        - rowheader \"Show 1st Battalion on the table Col. Aubry\":\n          - button \"Show 1st Battalion on the table\": 1st Battalion\n          - generic \"steady and methodical; holds a line under fire\": Col. Aubry\n        - cell \"600\"\n        - cell \"100%\"\n        - cell \"80%\"\n        - cell \"Day 1 00:06 just now\":\n          - text: Day 1 00:06\n          - generic: just now\n      - row \"Show 2nd Battalion on the table Col. Delacroix 550 100% 75% Day 1 00:06 just now\":\n        - rowheader \"Show 2nd Battalion on the table Col. Delacroix\":\n          - button \"Show 2nd Battalion on the table\": 2nd Battalion\n          - generic \"cautious; slow to commit his reserve\": Col. Delacroix\n        - cell \"550\"\n        - cell \"100%\"\n        - cell \"75%\"\n        - cell \"Day 1 00:06 just now\":\n          - text: Day 1 00:06\n          - generic: just now\n      - row \"Show Cavalry Squadron on the table Maj. Verneuil 200 100% 85% Day 1 00:06 just now\":\n        - rowheader \"Show Cavalry Squadron on the table Maj. Verneuil\":\n          - button \"Show Cavalry Squadron on the table\": Cavalry Squadron\n          - generic \"bold and impatient; apt to charge early\": Maj. Verneuil\n        - cell \"200\"\n        - cell \"100%\"\n        - cell \"85%\"\n        - cell \"Day 1 00:06 just now\":\n          - text: Day 1 00:06\n          - generic: just now\n- button \"Menu (Esc)\"\n- dialog \"Menu\":\n  - heading \"Menu\" [level=2]\n  - button \"Resume\" [active]\n  - button \"Leave to main menu\"\n  - button \"Sign out\"\n  - generic: Guest\n  - link \"Games\":\n    - /url: /?lobby=1\n  - button \"Delete account\"\n  - paragraph: Leaving does not end the game. It keeps running on the server.",
+    "rendered": {
+      "canvas": 1,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "04453f4a126f072d7731fa84749cf4a9a4ec8c9b",
+    "base": "c8e3ec61efe56846f462f105414a615401ef3e4a",
+    "label": "Current guest game retained on menu",
+    "at": "2026-10-13T00:12:12.452Z",
+    "url": "http://a5-c8.localhost:41772/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph: An umpired war game, played in real time or slower.\n  - navigation \"Main menu\":\n    - button \"New game\"\n  - region \"Continue\":\n    - heading \"Continue\" [level=2]\n    - list:\n      - 'button \"Continue: Hold the Bridge, playing blue, game time Day 1 00:06, last played just now\"':\n        - generic: Hold the Bridge\n        - generic: blue\n        - generic: Day 1 00:06\n        - generic: played just now\n  - region \"Account\":\n    - heading \"Account\" [level=2]\n    - paragraph: Playing as a guest. Your games stay in this browser.\n    - button \"Sign in to keep your games on other devices\"\n    - button \"High contrast\"\n  - region \"Developer tools\":\n    - heading \"Developer tools\" [level=2]\n    - paragraph: For development; not part of the game.\n    - list:\n      - link \"Map editor Generate, preview and export a battlefield.\":\n        - /url: /map-authoring\n        - generic: Map editor\n        - generic: Generate, preview and export a battlefield.\n      - link \"Map benchmark Time map generation and rendering on this device.\":\n        - /url: /map-benchmark\n        - generic: Map benchmark\n        - generic: Time map generation and rendering on this device.\n      - link \"Table benchmark Time the 3D table scene on this device.\":\n        - /url: /table-benchmark\n        - generic: Table benchmark\n        - generic: Time the 3D table scene on this device.\n      - link \"Style guide Tokens and every shared control in each state.\":\n        - /url: /style-guide\n        - generic: Style guide\n        - generic: Tokens and every shared control in each state.\n      - link \"Admin view Operator console; asks for the admin token.\":\n        - /url: /admin/\n        - generic: Admin view\n        - generic: Operator console; asks for the admin token.\n  - region \"About\":\n    - heading \"About\" [level=2]\n    - paragraph:\n      - text: You command one side of a battle from a desk. Orders are written in plain words and carried by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game keeps running on the server while you are away.\n      - link \"Read how it plays\":\n        - /url: https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md\n      - text: .",
+    "rendered": {
+      "canvas": 0,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "04453f4a126f072d7731fa84749cf4a9a4ec8c9b",
+    "base": "c8e3ec61efe56846f462f105414a615401ef3e4a",
+    "label": "Current menu after unsubmitted sign-in reset",
+    "at": "2026-10-13T00:13:59.432Z",
+    "url": "http://a5-c8.localhost:41772/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph: An umpired war game, played in real time or slower.\n  - navigation \"Main menu\":\n    - button \"New game\"\n  - region \"Continue\":\n    - heading \"Continue\" [level=2]\n    - list:\n      - 'button \"Continue: Hold the Bridge, playing blue, game time Day 1 00:26, last played just now\"':\n        - generic: Hold the Bridge\n        - generic: blue\n        - generic: Day 1 00:26\n        - generic: played just now\n  - region \"Account\":\n    - heading \"Account\" [level=2]\n    - paragraph: Playing as a guest. Your games stay in this browser.\n    - button \"Sign in to keep your games on other devices\"\n    - button \"High contrast\"\n  - region \"Developer tools\":\n    - heading \"Developer tools\" [level=2]\n    - paragraph: For development; not part of the game.\n    - list:\n      - link \"Map editor Generate, preview and export a battlefield.\":\n        - /url: /map-authoring\n        - generic: Map editor\n        - generic: Generate, preview and export a battlefield.\n      - link \"Map benchmark Time map generation and rendering on this device.\":\n        - /url: /map-benchmark\n        - generic: Map benchmark\n        - generic: Time map generation and rendering on this device.\n      - link \"Table benchmark Time the 3D table scene on this device.\":\n        - /url: /table-benchmark\n        - generic: Table benchmark\n        - generic: Time the 3D table scene on this device.\n      - link \"Style guide Tokens and every shared control in each state.\":\n        - /url: /style-guide\n        - generic: Style guide\n        - generic: Tokens and every shared control in each state.\n      - link \"Admin view Operator console; asks for the admin token.\":\n        - /url: /admin/\n        - generic: Admin view\n        - generic: Operator console; asks for the admin token.\n  - region \"About\":\n    - heading \"About\" [level=2]\n    - paragraph:\n      - text: You command one side of a battle from a desk. Orders are written in plain words and carried by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game keeps running on the server while you are away.\n      - link \"Read how it plays\":\n        - /url: https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md\n      - text: .",
+    "rendered": {
+      "canvas": 0,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "04453f4a126f072d7731fa84749cf4a9a4ec8c9b",
+    "base": "c8e3ec61efe56846f462f105414a615401ef3e4a",
+    "label": "Current own synthetic game outcome",
+    "at": "2026-10-13T00:15:55.999Z",
+    "url": "http://a5-c8.localhost:41772/?game=0e7de79f-a8cf-4c33-b81d-d87195cbb373",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- status \"Game over\": \"Victory: the objective was held. Game time elapsed Day 1 00:50.\"\n- region \"Clock\":\n  - generic: Day 1 00:50\n  - generic: 12:1\n  - generic: ⏹Stopped\n- navigation \"Desk\":\n  - button \"Map table T\" [pressed]:\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 10 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"10 unread\": \"10\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n  - button \"Umpire's window\"\n- dialog \"Victory\":\n  - heading \"Victory\" [level=2]\n  - paragraph: Blue held the objective at Day 1 00:50.\n  - list:\n    - listitem: \"Game time elapsed: Day 1 00:50\"\n    - listitem: \"Your losses: 153\"\n    - listitem: \"Enemy losses: 762\"\n  - button \"View the umpire's window\" [active]\n  - button \"Read the journal\"\n  - button \"Play again\"\n  - button \"New game\"\n  - button \"Main menu\"\n- button \"Menu (Esc)\"",
+    "rendered": {
+      "canvas": 1,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "04453f4a126f072d7731fa84749cf4a9a4ec8c9b",
+    "base": "c8e3ec61efe56846f462f105414a615401ef3e4a",
+    "label": "Current native game-over Main menu settled, zero canvases",
+    "at": "2026-10-13T00:16:27.187Z",
+    "url": "http://a5-c8.localhost:41772/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph: An umpired war game, played in real time or slower.\n  - navigation \"Main menu\":\n    - button \"New game\"\n  - region \"Account\":\n    - heading \"Account\" [level=2]\n    - paragraph: Playing as a guest. Your games stay in this browser.\n    - button \"Sign in to keep your games on other devices\"\n    - button \"High contrast\"\n  - region \"Developer tools\":\n    - heading \"Developer tools\" [level=2]\n    - paragraph: For development; not part of the game.\n    - list:\n      - link \"Map editor Generate, preview and export a battlefield.\":\n        - /url: /map-authoring\n        - generic: Map editor\n        - generic: Generate, preview and export a battlefield.\n      - link \"Map benchmark Time map generation and rendering on this device.\":\n        - /url: /map-benchmark\n        - generic: Map benchmark\n        - generic: Time map generation and rendering on this device.\n      - link \"Table benchmark Time the 3D table scene on this device.\":\n        - /url: /table-benchmark\n        - generic: Table benchmark\n        - generic: Time the 3D table scene on this device.\n      - link \"Style guide Tokens and every shared control in each state.\":\n        - /url: /style-guide\n        - generic: Style guide\n        - generic: Tokens and every shared control in each state.\n      - link \"Admin view Operator console; asks for the admin token.\":\n        - /url: /admin/\n        - generic: Admin view\n        - generic: Operator console; asks for the admin token.\n  - region \"About\":\n    - heading \"About\" [level=2]\n    - paragraph:\n      - text: You command one side of a battle from a desk. Orders are written in plain words and carried by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game keeps running on the server while you are away.\n      - link \"Read how it plays\":\n        - /url: https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md\n      - text: .",
+    "rendered": {
+      "canvas": 0,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  }
+]

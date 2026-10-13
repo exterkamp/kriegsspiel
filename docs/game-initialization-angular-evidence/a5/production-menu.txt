@@ -1,0 +1,41 @@
+- main:
+  - heading "Kriegsspiel" [level=1]
+  - paragraph: An umpired war game, played in real time or slower.
+  - navigation "Main menu":
+    - button "New game"
+  - region "Account":
+    - heading "Account" [level=2]
+    - paragraph: Playing as a guest. Your games stay in this browser.
+    - button "Sign in to keep your games on other devices"
+    - button "High contrast" [pressed]
+  - region "Developer tools":
+    - heading "Developer tools" [level=2]
+    - paragraph: For development; not part of the game.
+    - list:
+      - link "Map editor Generate, preview and export a battlefield.":
+        - /url: /map-authoring
+        - generic: Map editor
+        - generic: Generate, preview and export a battlefield.
+      - link "Map benchmark Time map generation and rendering on this device.":
+        - /url: /map-benchmark
+        - generic: Map benchmark
+        - generic: Time map generation and rendering on this device.
+      - link "Table benchmark Time the 3D table scene on this device.":
+        - /url: /table-benchmark
+        - generic: Table benchmark
+        - generic: Time the 3D table scene on this device.
+      - link "Style guide Tokens and every shared control in each state.":
+        - /url: /style-guide
+        - generic: Style guide
+        - generic: Tokens and every shared control in each state.
+      - link "Admin view Operator console; asks for the admin token.":
+        - /url: /admin/
+        - generic: Admin view
+        - generic: Operator console; asks for the admin token.
+  - region "About":
+    - heading "About" [level=2]
+    - paragraph:
+      - text: You command one side of a battle from a desk. Orders are written in plain words and carried by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game keeps running on the server while you are away.
+      - link "Read how it plays":
+        - /url: https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md
+      - text: .
