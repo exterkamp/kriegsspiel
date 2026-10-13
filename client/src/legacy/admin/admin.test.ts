@@ -69,11 +69,11 @@ describe('model', () => {
 const frame = () => ({ data: JSON.stringify({ seq: 1, ts: 1, kind: 'engine', data: {} }) });
 
 describe('AdminPage', () => {
-  function mount(fetchFn: typeof fetch) {
+  function mount(fetchFn: typeof fetch, search = '') {
     vi.stubGlobal('EventSource', FakeES);
     vi.useFakeTimers();
     document.body.innerHTML = '<div id="app"></div>';
-    return new AdminPage(document.getElementById('app')!, '', fetchFn);
+    return new AdminPage(document.getElementById('app')!, search, fetchFn);
   }
 
   it('renders five empty panels and shows one at a time', () => {
@@ -104,6 +104,30 @@ describe('AdminPage', () => {
     expect(document.querySelector<HTMLElement>('#live')!.dataset.status).toBe('live');
     FakeES.last!.onerror!();
     expect(page.linkStatus).toBe('reconnecting');
+    page.stop();
+  });
+
+  it('opens on the ?game= game when it is not the first (#387)', async () => {
+    const page = mount(
+      vi.fn(() => ok({ games })),
+      '?game=bbbbbbbb-2',
+    );
+    page.start();
+    await flush();
+    expect(document.querySelector<HTMLSelectElement>('#game')!.value).toBe('bbbbbbbb-2');
+    expect(FakeES.last!.url).toBe('/admin/api/games/bbbbbbbb-2/stream');
+    page.stop();
+  });
+
+  it('falls back to the first game when ?game= is unknown (#387)', async () => {
+    const page = mount(
+      vi.fn(() => ok({ games })),
+      '?game=gone',
+    );
+    page.start();
+    await flush();
+    expect(document.querySelector<HTMLSelectElement>('#game')!.value).toBe('aaaaaaaa-1');
+    expect(FakeES.last!.url).toBe('/admin/api/games/aaaaaaaa-1/stream');
     page.stop();
   });
 
