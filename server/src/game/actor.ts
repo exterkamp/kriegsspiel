@@ -1353,6 +1353,8 @@ export class GameActor {
         throw new Error('narration is logged by the scheduler');
       case 'staffAnswer':
         throw new Error('staff answers are logged by answerStaff');
+      case 'critique':
+        throw new Error('the critique is logged by the critique route');
       case 'deputySet':
       case 'deputyTurn':
         throw new Error('deputy entries are logged by setDeputy and the deputy itself');

@@ -59,6 +59,41 @@ ul {
   margin: 0.25rem 0;
 }
 
+.critique {
+  margin-bottom: 0.75rem;
+}
+.critique h3 {
+  margin: 0.25rem 0;
+}
+.critique ol {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.critique li {
+  margin-bottom: 0.5em;
+}
+.critique .kind {
+  font-weight: bold;
+}
+.critique .side {
+  text-transform: capitalize;
+  opacity: 0.85;
+}
+.critique .cites {
+  display: block;
+  opacity: 0.85;
+  font-size: 0.85em;
+}
+.critique .jump,
+.critique .cite {
+  padding: 0 4px;
+  font-size: 0.85em;
+}
+.critique .why {
+  opacity: 0.85;
+  font-size: 0.85em;
+}
+
 /* The HUD wraps to two rows on a phone, so the window starts lower than on a desktop. */
 @media (max-width: 600px) {
   .window {

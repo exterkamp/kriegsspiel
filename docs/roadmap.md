@@ -105,7 +105,7 @@ Historical annotation remains #85/#88. Detailed erosion, elaborate cities, a ful
 
 ## M4b: Standing orders and critique
 - [ ] Conditional and timed orders in the intent schema
-- [ ] Post-game critique generation
+- [x] Post-game critique generation (#82, D38)
 
 ## M5: Remote async play and collaboration
 - [x] Accounts (magic-link login, sessions, seats; D17)

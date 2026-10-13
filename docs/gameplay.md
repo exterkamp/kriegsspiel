@@ -70,6 +70,8 @@ A report on an objective changing hands is not yet produced.
 
 The umpire's window reveals true positions, dice and rulings. The umpire then writes a critique: what each side knew and when, decisions that mattered, and misreadings. This is built properly, not left as an afterthought.
 
+The critique is a section of the window (`GET /games/:id/critique`, D38). The umpire writes it from the log: every point is dated and cites the logged events it rests on (orders and their delivery times, reports as they reached headquarters, rulings, losses, pauses and votes), and the server refuses any point that cites an event that does not exist. If no umpire is available the same facts are quoted plainly. It is written once and kept in the input log.
+
 The window is the same map table with a scrubber over the whole game. It shows every unit's true position at the scrubbed time, can overlay what either side believed (live sightings and aged ghosts), and shows the dice, modifiers and umpire rulings for a unit under the pointer. It is rebuilt from the input log with no model call, and the server refuses it (`403 game_not_over`) until the game has ended (`GET /games/:id/window`, `/window/at`).
 
 ## Pace: the clock ratio

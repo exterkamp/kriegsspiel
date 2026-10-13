@@ -18,7 +18,16 @@ const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v)
 /** Which stage asked, from the output schema it wants. The request carries no stage name. */
 function stageOf(
   schema: Json,
-): 'parse' | 'interpret' | 'narrate' | 'staff' | 'staffCheck' | 'judge' | 'command' | undefined {
+):
+  | 'parse'
+  | 'interpret'
+  | 'narrate'
+  | 'staff'
+  | 'staffCheck'
+  | 'judge'
+  | 'command'
+  | 'critique'
+  | undefined {
   const keys = Object.keys((schema.properties as Json | undefined) ?? {});
   if (keys.includes('result')) return 'parse';
   if (keys.includes('action')) return 'interpret';
@@ -27,6 +36,7 @@ function stageOf(
   if (keys.includes('findings')) return 'staffCheck';
   if (keys.includes('placements') || keys.includes('modifier')) return 'judge';
   if (keys.includes('orders')) return 'command';
+  if (keys.includes('points')) return 'critique';
   return undefined;
 }
 
@@ -211,6 +221,45 @@ function judgeSituation() {
   };
 }
 
+const CRITIQUE_KIND: Record<string, string> = {
+  outcome: 'outcome',
+  report: 'knowledge',
+  misreading: 'misreading',
+  pause: 'pause',
+  order: 'decision',
+  delivery: 'decision',
+  courier: 'decision',
+  ruling: 'decision',
+  loss: 'decision',
+  contact: 'decision',
+};
+
+/** The critique's own facts, quoted: outcome, a report for each side, misreadings, pauses and a delivery. */
+function critique(input: Json) {
+  const facts = arr(input.facts);
+  const picked: Json[] = [];
+  const seen = new Map<string, number>();
+  for (const f of facts) {
+    const kind = str(f.kind);
+    const key = kind === 'report' ? `report:${str(f.side)}` : kind;
+    const limit =
+      { outcome: 1, report: 1, misreading: 2, pause: 2, delivery: 1 }[kind.split(':')[0]!] ?? 0;
+    if ((seen.get(key) ?? 0) >= limit) continue;
+    seen.set(key, (seen.get(key) ?? 0) + 1);
+    picked.push(f);
+  }
+  return {
+    summary: str(input.result),
+    points: picked.map((f) => ({
+      kind: CRITIQUE_KIND[str(f.kind)] ?? 'decision',
+      side: str(f.side) || 'both',
+      minute: num(f.minute),
+      text: str(f.text),
+      cites: [str(f.id)],
+    })),
+  };
+}
+
 export function testReply(schema: Json, input: Json): unknown {
   switch (stageOf(schema)) {
     case 'parse':
@@ -225,6 +274,8 @@ export function testReply(schema: Json, input: Json): unknown {
       return testStaffCheck(input as never);
     case 'command':
       return command(input);
+    case 'critique':
+      return critique(input);
     case 'judge':
       return 'modifier' in (schema.properties as Json) ? judgeSituation() : { placements: [] };
     default:

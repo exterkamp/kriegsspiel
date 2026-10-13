@@ -9,6 +9,7 @@ import { appendFile, mkdir, readFile, truncate, writeFile } from 'node:fs/promis
 import { join } from 'node:path';
 import type { Discretion, Seat } from '@kriegsspiel/engine';
 import type {
+  Critique,
   DeputyAccount,
   DeputySettings,
   Dissent,
@@ -111,7 +112,13 @@ export type GameCommand =
       rev: number;
       text: string;
       earlier: Array<{ id: string; text: string; sentAtGame: number }>;
-    };
+    }
+  /**
+   * The umpire wrote the post-game critique (docs/gameplay.md, After the game) once the game was
+   * over. Journal only: it never changes the engine, and is kept so a restart serves the same text
+   * with no new model call; the model calls are on the entry (`calls`).
+   */
+  | { kind: 'critique'; critique: Critique };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {
