@@ -7,6 +7,7 @@ import {
 import { COMBAT_CHECK_EVENT } from './contact.js';
 import type { EngineState, EventRegistry, Json } from './events.js';
 import { schedule } from './queue.js';
+import { heldTurn } from './held.js';
 import { findPath } from './navigation.js';
 import { unitTypeOf } from './unitTypes.js';
 import { legDuration, pathDuration, positionAlong, positionAt, updateUnit } from './movement.js';
@@ -91,8 +92,18 @@ function shrunk(u: Unit): Unit {
   };
 }
 
+/**
+ * How `validatePlacement` is used for a turn (D39): a unit that is not `active` (a broken one
+ * running) may be placed, and only overlap with its own side counts, since opposing units
+ * placed in contact may overlap as in melee.
+ */
+export interface PlacementOptions {
+  allowWithdrawn?: boolean;
+  overlapWith?: 'all' | 'friendly';
+}
+
 /** Everything wrong with `unit` standing as it is, against the map and the other units. */
-function problems(world: GameState, unit: Unit): string[] {
+function problems(world: GameState, unit: Unit, opts: PlacementOptions = {}): string[] {
   const out: string[] = [];
   if (!footprintCorners(unit).every((c) => inMap(world.map, c))) {
     out.push('footprint extends off the map');
@@ -106,6 +117,7 @@ function problems(world: GameState, unit: Unit): string[] {
   if (!unit.shape) {
     for (const other of world.units) {
       if (other.id === unit.id || other.status === 'destroyed' || other.shape) continue;
+      if (opts.overlapWith === 'friendly' && other.side !== unit.side) continue;
       if (footprintsOverlap(shrunk(unit), shrunk(other))) {
         out.push(`overlaps unit "${other.id}"`);
       }
@@ -144,27 +156,21 @@ function shapeFootprint(shape: Point[]): Footprint {
 }
 
 /**
- * Check a placement the umpire proposes for a unit: inside the map, not on impassable ground,
- * footprints not overlapping beyond `OVERLAP_TOLERANCE_MM`, and no further from where the
- * engine has the unit than it could march in `elapsedMs` over the ground between. Nothing
- * snaps to a grid. Too far is clamped to the point along the cheapest route reached when time
- * runs out; anything else wrong is rejected. Pure: it changes no state.
+ * `unit` standing as `proposal` asks, before any check against the map, the other units or the
+ * march; or why the proposal cannot even be drawn up (a bad shape, formation or number).
  */
-export function validatePlacement(world: GameState, proposal: PlacementProposal): PlacementVerdict {
-  const unit = world.units.find((u) => u.id === proposal.unitId);
-  if (!unit) return { verdict: 'reject', reasons: ['unknown unit'] };
-  if (unit.status !== 'active') return { verdict: 'reject', reasons: ['unit not active'] };
-  if (!Number.isFinite(proposal.elapsedMs) || proposal.elapsedMs < 0) {
-    return { verdict: 'reject', reasons: ['elapsedMs must be zero or more'] };
-  }
+export function proposedArrangement(
+  unit: Unit,
+  proposal: Pick<PlacementProposal, 'center' | 'facing' | 'formation' | 'shape'>,
+): { wanted: Unit } | { reasons: string[] } {
   const facing = proposal.facing ?? unit.facing;
   const formation = proposal.formation ?? unit.formation;
   const shapeProblem = badShape(proposal.shape);
-  if (shapeProblem) return { verdict: 'reject', reasons: [shapeProblem] };
-  if (!FORMATIONS.includes(formation)) return { verdict: 'reject', reasons: ['unknown formation'] };
-  if (!Number.isFinite(facing)) return { verdict: 'reject', reasons: ['facing must be a number'] };
+  if (shapeProblem) return { reasons: [shapeProblem] };
+  if (!FORMATIONS.includes(formation)) return { reasons: ['unknown formation'] };
+  if (!Number.isFinite(facing)) return { reasons: ['facing must be a number'] };
   if (!Number.isFinite(proposal.center.x) || !Number.isFinite(proposal.center.y)) {
-    return { verdict: 'reject', reasons: ['centre must be a point'] };
+    return { reasons: ['centre must be a point'] };
   }
   const shape =
     proposal.shape && proposal.shape.length > 0 ? roundedShape(proposal.shape) : undefined;
@@ -173,8 +179,42 @@ export function validatePlacement(world: GameState, proposal: PlacementProposal)
     : formation === unit.formation && !unit.shape
       ? unit.footprint
       : defaultFootprint(unitTypeOf(unit), formation, unit.strength);
-  const wanted = arranged(unit, { center: proposal.center, facing, formation, footprint, shape });
-  const wrong = problems(world, wanted);
+  return {
+    wanted: arranged(unit, { center: proposal.center, facing, formation, footprint, shape }),
+  };
+}
+
+/** True when two compact units overlap by more than `OVERLAP_TOLERANCE_MM` (loose shapes may nest). */
+export function overlapsBeyondTolerance(a: Unit, b: Unit): boolean {
+  if (a.shape || b.shape) return false;
+  return footprintsOverlap(shrunk(a), shrunk(b));
+}
+
+/**
+ * Check a placement the umpire proposes for a unit: inside the map, not on impassable ground,
+ * footprints not overlapping beyond `OVERLAP_TOLERANCE_MM`, and no further from where the
+ * engine has the unit than it could march in `elapsedMs` over the ground between. Nothing
+ * snaps to a grid. Too far is clamped to the point along the cheapest route reached when time
+ * runs out; anything else wrong is rejected. Pure: it changes no state.
+ */
+export function validatePlacement(
+  world: GameState,
+  proposal: PlacementProposal,
+  opts: PlacementOptions = {},
+): PlacementVerdict {
+  const unit = world.units.find((u) => u.id === proposal.unitId);
+  if (!unit) return { verdict: 'reject', reasons: ['unknown unit'] };
+  const placeable =
+    unit.status === 'active' || (opts.allowWithdrawn === true && unit.status === 'withdrawn');
+  if (!placeable) return { verdict: 'reject', reasons: ['unit not active'] };
+  if (!Number.isFinite(proposal.elapsedMs) || proposal.elapsedMs < 0) {
+    return { verdict: 'reject', reasons: ['elapsedMs must be zero or more'] };
+  }
+  const want = proposedArrangement(unit, proposal);
+  if ('reasons' in want) return { verdict: 'reject', reasons: want.reasons };
+  const { wanted } = want;
+  const { facing, formation, footprint, shape } = wanted;
+  const wrong = problems(world, wanted, opts);
   if (wrong.length > 0) return { verdict: 'reject', reasons: wrong };
 
   const from = positionAt(world.map, unit, world.time);
@@ -212,7 +252,7 @@ export function validatePlacement(world: GameState, proposal: PlacementProposal)
     center = b;
   }
   const reached = arranged(unit, { center, facing, formation, footprint, shape });
-  const stuck = problems(world, reached);
+  const stuck = problems(world, reached, opts);
   const reasons = [
     `too far: ${Math.round(needed / 1000)} s of marching needed, ${Math.round(proposal.elapsedMs / 1000)} s allowed (${Math.round(metres(path.cost))} m of weighted ground)`,
   ];
@@ -253,6 +293,8 @@ export function issuePlacement(
  */
 export function registerPlacement(registry: EventRegistry<GameState>): void {
   registry.register(PLACEMENT_EVENT, (w, ev) => {
+    // In an umpire turn only `umpire.turn` places units (D39).
+    if (heldTurn(w, ev.time)) return { world: w };
     const { proposal, rationale, narrative } = ev.payload as unknown as PlacementRuling;
     const world: GameState = { ...w, time: ev.time };
     const verdict = validatePlacement(world, proposal);

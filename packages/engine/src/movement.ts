@@ -1,3 +1,4 @@
+import { heldTurn } from './held.js';
 import { ATTACK_INTENT_EVENT, COMBAT_CHECK_EVENT, canReach, pursuable } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
 import { distance } from './geometry.js';
@@ -314,6 +315,7 @@ export function startMarch(
 export function registerMovement(registry: EventRegistry<GameState>): void {
   registry.register(MOVE_INTENT_EVENT, (world, ev) => {
     if (world.outcome) return { world }; // the game is over: nothing moves
+    if (heldTurn(world, ev.time)) return { world }; // an umpire turn: units are held
     const { unitId, to, pace } = ev.payload as unknown as MovePayload;
     const unit = world.units.find((u) => u.id === unitId);
     if (!unit) return rejectUnknown(world, unitId);
@@ -323,6 +325,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
 
   registry.register(HALT_INTENT_EVENT, (world, ev) => {
     if (world.outcome) return { world }; // the game is over: nothing moves
+    if (heldTurn(world, ev.time)) return { world }; // an umpire turn: units are held
     const { unitId } = ev.payload as unknown as { unitId: string };
     if (!world.units.some((u) => u.id === unitId)) return rejectUnknown(world, unitId);
     const unit = world.units.find((u) => u.id === unitId)!;
@@ -339,6 +342,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
 
   registry.register(FORMATION_INTENT_EVENT, (world, ev) => {
     if (world.outcome) return { world }; // the game is over: nothing moves
+    if (heldTurn(world, ev.time)) return { world }; // an umpire turn: units are held
     const { unitId, formation } = ev.payload as unknown as {
       unitId: string;
       formation: Formation;
@@ -372,6 +376,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
 
   registry.register(FORMATION_DONE_EVENT, (world, ev) => {
     if (world.outcome) return { world }; // the game is over: nothing moves
+    if (heldTurn(world, ev.time)) return { world }; // an umpire turn: units are held
     const p = ev.payload as unknown as { unitId: string; formation: Formation; startedAt: number };
     const unit = world.units.find((u) => u.id === p.unitId);
     const i = unit?.intent;
@@ -390,6 +395,7 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
 
   registry.register(MOVE_STEP_EVENT, (world, ev) => {
     if (world.outcome) return { world }; // the game is over: nothing moves
+    if (heldTurn(world, ev.time)) return { world }; // an umpire turn: units are held
     const p = ev.payload as unknown as StepPayload;
     const unit = world.units.find((u) => u.id === p.unitId);
     const i = unit?.intent;

@@ -1,3 +1,4 @@
+import { heldTurn } from './held.js';
 import type { EventRegistry, NewEvent } from './events.js';
 import { schedule } from './queue.js';
 import type { EngineState } from './events.js';
@@ -116,7 +117,7 @@ export function sightRangeMm(
 }
 
 /** Round a bearing to the nearest eighth of a turn, in [0, 2 pi): all a watcher can judge. */
-const coarseFacing = (f: number): number => {
+export const coarseFacing = (f: number): number => {
   const step = Math.PI / 4;
   const n = ((Math.round(f / step) % 8) + 8) % 8;
   return n * step;
@@ -177,7 +178,7 @@ function visibleTo(world: GameState, side: SideId): Unit[] {
 }
 
 /** A coarse description. Never the real number. */
-function sizeEstimate(strength: number): string {
+export function sizeEstimate(strength: number): string {
   if (strength < 300) return 'a small detachment';
   if (strength < 800) return 'about a battalion';
   if (strength < 2000) return 'about a brigade';
@@ -662,6 +663,10 @@ export function fileReport(
  */
 export function registerVisibility(registry: EventRegistry<GameState>): void {
   registry.register(SCAN_EVENT, (world, ev) => {
+    // An umpire turn records no sightings: the umpire's observations stand for the turn.
+    if (heldTurn(world, ev.time)) {
+      return { world, schedule: [{ time: ev.time + SCAN_INTERVAL_MS, type: SCAN_EVENT }] };
+    }
     // Standing orders are judged right after the scan, from each unit's own sight.
     const res = evaluateStanding(scan(world, ev.time), ev.time);
     return {
