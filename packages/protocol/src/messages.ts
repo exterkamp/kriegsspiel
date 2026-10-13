@@ -173,6 +173,9 @@ export const Command = z.discriminatedUnion('kind', [
       rev: z.number().int().nonnegative(),
     })
     .strict(),
+  // "I am looking at this draft" (or at none, `null`): presence. Replaces the sender's earlier one and
+  // is dropped when the connection closes. Ephemeral: not stored, not logged.
+  z.object({ ...Envelope, kind: z.literal('draftPresence'), draft: Id.nullable() }).strict(),
   // Ask for the side's drafts again (the `drafts` snapshot), for a client that fell out of step.
   z.object({ ...Envelope, kind: z.literal('syncDrafts') }).strict(),
   // Copy a draft into a new one, to write an alternative plan.
@@ -250,6 +253,19 @@ export const ServerMessage = z.discriminatedUnion('kind', [
   // A `drafts` snapshot sent on connect can already contain an entry that follows it, so a client
   // ignores any entry with `rev` at or below the rev of the draft it holds.
   z.object({ ...Envelope, kind: z.literal('draftEntry'), draft: Id, entry: DraftEntry }).strict(),
+  // Who of the side is on the drafting desk and which drafts each has open. Sent to every connection of
+  // the side whenever someone arrives, leaves or turns to another draft. `you` is the receiving
+  // player's own id (the id that signs their edits); `label` is their staff role, never a name or email.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('draftPresence'),
+      you: Id,
+      people: z.array(
+        z.object({ id: Id, label: z.string().max(40), drafts: z.array(Id).max(8) }).strict(),
+      ),
+    })
+    .strict(),
   z
     .object({
       ...Envelope,

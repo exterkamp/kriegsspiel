@@ -132,7 +132,7 @@ In the lobby the commander's table fills as players join the side with a role; a
 - Each order is a **shared draft**. Anyone with access can propose text, comment, or suggest a change. Edits are tracked.
 - Only the holder of command authority for that formation can **sign and stamp** an order to send it. This is the stamp moment from the Papers Please-style desk. Staff and other players can propose on the draft but a stamp from them is refused; a subordinate stamps only for their own formations. A stamped draft is closed to edits (fork it for another plan).
 - An **LLM staff check** reads a draft before it goes and reports how a subordinate will likely read it: "the bridge is not mentioned", "this contradicts the timing in Order 3". It costs a little in-game time (staff work: the chief of staff is busy for ten game minutes, the same at every clock rate), so it is a tool and not a free preview. It sees only what your side knows (your own units, the named places, the orders you have sent), and it is advice, not a promise: the order is read afresh when it is signed (D6d).
-- Drafts can be **forked**, so the staff can write alternative plans and the commander chooses.
+- Drafts can be **forked**, so the staff can write alternative plans and the commander chooses. A fork is also how a staff officer makes a suggestion: they write it in a fork, and merging it brings their edits into the draft under their name (D6g).
 
 ### Dissent
 

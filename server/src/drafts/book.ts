@@ -15,7 +15,6 @@ import {
   MAX_DRAFTS,
   MAX_DRAFT_REVS,
   MAX_DRAFT_TEXT,
-  type AuthorRun,
   type DraftComment,
   type DraftEntry,
   type DraftSnapshot,
@@ -25,6 +24,7 @@ import {
   baseLength,
   fits,
   normalize,
+  reattribute,
   targetLength,
   transformRange,
   transformThrough,
@@ -55,36 +55,6 @@ export class DraftError extends Error {
 type EditEntry = Extract<DraftEntry, { kind: 'edit' }>;
 
 const isEdit = (e: DraftEntry): e is EditEntry => e.kind === 'edit';
-
-/** Move author runs across an op: kept text keeps its author, inserted text is `author`'s, deleted text goes. */
-function reattribute(runs: readonly AuthorRun[], op: TextOp, author: string): AuthorRun[] {
-  const out: AuthorRun[] = [];
-  const add = (a: string, len: number) => {
-    if (len <= 0) return;
-    const last = out[out.length - 1];
-    if (last && last.author === a) last.len += len;
-    else out.push({ author: a, len });
-  };
-  const queue = runs.map((r) => ({ ...r }));
-  let q = 0;
-  for (const c of op) {
-    if (typeof c === 'string') {
-      add(author, c.length);
-      continue;
-    }
-    let left = Math.abs(c);
-    while (left > 0) {
-      const run = queue[q];
-      if (!run) throw new Error('author runs do not cover the text');
-      const n = Math.min(left, run.len);
-      if (c > 0) add(run.author, n);
-      run.len -= n;
-      left -= n;
-      if (run.len === 0) q++;
-    }
-  }
-  return out;
-}
 
 export class DraftBook {
   private readonly drafts = new Map<string, DraftSnapshot>();

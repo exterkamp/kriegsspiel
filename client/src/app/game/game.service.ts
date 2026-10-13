@@ -47,7 +47,13 @@ export class GameService {
     this.conn = new GameConnection({
       url: wsUrl(loc, params.game, params.side),
       onStatus: (s) => this._state.update((st) => withLink(st, s)),
-      onMessage: (m) => this._state.update((st) => applyServerMessage(st, m, Date.now())),
+      onMessage: (m) => {
+        const before = this._state();
+        const after = applyServerMessage(before, m, Date.now());
+        this._state.set(after);
+        // An entry that skipped a rev: start over from the server's snapshot.
+        if (after.draftsStale && !before.draftsStale) this.conn?.syncDrafts();
+      },
     });
     this.conn.start();
     this.listenForPageCache();
@@ -117,6 +123,30 @@ export class GameService {
     this.conn?.deleteMark(id);
   }
 
+  createDraft(...args: Parameters<GameConnection['createDraft']>): boolean {
+    return this.conn?.createDraft(...args) ?? false;
+  }
+  draftEdit(...args: Parameters<GameConnection['draftEdit']>): boolean {
+    return this.conn?.draftEdit(...args) ?? false;
+  }
+  draftComment(...args: Parameters<GameConnection['draftComment']>): boolean {
+    return this.conn?.draftComment(...args) ?? false;
+  }
+  resolveComment(...args: Parameters<GameConnection['resolveComment']>): boolean {
+    return this.conn?.resolveComment(...args) ?? false;
+  }
+  readDraft(...args: Parameters<GameConnection['readDraft']>): boolean {
+    return this.conn?.readDraft(...args) ?? false;
+  }
+  forkDraft(...args: Parameters<GameConnection['forkDraft']>): boolean {
+    return this.conn?.forkDraft(...args) ?? false;
+  }
+  mergeDraft(...args: Parameters<GameConnection['mergeDraft']>): boolean {
+    return this.conn?.mergeDraft(...args) ?? false;
+  }
+  draftPresence(...args: Parameters<GameConnection['draftPresence']>): boolean {
+    return this.conn?.draftPresence(...args) ?? false;
+  }
   askStaff(...args: Parameters<GameConnection['askStaff']>): boolean {
     return this.conn?.askStaff(...args) ?? false;
   }

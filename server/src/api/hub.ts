@@ -57,6 +57,8 @@ const OPEN = 1;
 
 interface Connection {
   side: SideId;
+  /** The draft this connection has open on the drafting desk, for presence. */
+  viewing: string | null;
   userId: string | undefined;
   /** The role this player holds. Unset in shared-HQ play, where the connection sees the whole side view. */
   seat: Seat | undefined;
@@ -98,6 +100,15 @@ export function pauseResultOf(step: PauseTransition): Omit<PauseResult, 'v' | 'k
   }
   return undefined;
 }
+
+/** How a staff role reads on the drafting desk's presence list. */
+const ROLE_LABELS: Record<string, string> = {
+  commander: 'Commander',
+  chiefOfStaff: 'Chief of staff',
+  intelligence: 'Intelligence officer',
+  quartermaster: 'Quartermaster',
+  subordinate: 'Subordinate commander',
+};
 
 const error = (code: string, message: string): ServerMessage => ({
   v: PROTOCOL_VERSION,
@@ -304,6 +315,34 @@ export class Hub {
     for (const c of this.conns.get(gameId) ?? []) if (c.side === side) this.send(c, message);
   }
 
+  /** The staff role a connection is shown under on the drafting desk. A label only: never a name or an email. */
+  private presenceLabel(conn: Connection): string {
+    return conn.seat ? (ROLE_LABELS[conn.seat.role] ?? 'Staff') : 'HQ';
+  }
+
+  /**
+   * Tell each connection of a side who is on the drafting desk and which drafts they have open. One entry per
+   * player (a player with two tabs open is one person). Ephemeral: nothing here is stored or logged.
+   */
+  private broadcastPresence(gameId: string, side: SideId): void {
+    const mine = [...(this.conns.get(gameId) ?? [])].filter((c) => c.side === side);
+    const idOf = (c: Connection) => c.userId ?? c.side;
+    const people = new Map<string, { id: string; label: string; drafts: string[] }>();
+    for (const c of mine) {
+      const p = people.get(idOf(c)) ?? { id: idOf(c), label: this.presenceLabel(c), drafts: [] };
+      if (c.viewing !== null && !p.drafts.includes(c.viewing) && p.drafts.length < 8)
+        p.drafts.push(c.viewing);
+      people.set(p.id, p);
+    }
+    for (const c of mine)
+      this.send(c, {
+        v: PROTOCOL_VERSION,
+        kind: 'draftPresence',
+        you: idOf(c),
+        people: [...people.values()],
+      });
+  }
+
   /** Run one draft command against the side's book, tell the side what changed, and keep the book. */
   private async handleDraftCommand(
     gameId: string,
@@ -481,6 +520,7 @@ export class Hub {
   attach(gameId: string, side: SideId, socket: Socket, userId?: string, seat?: Seat): void {
     const conn: Connection = {
       side,
+      viewing: null,
       userId,
       seat,
       socket,
@@ -503,6 +543,7 @@ export class Hub {
     this.conns.set(gameId, set);
     const detach = () => {
       if (!set.delete(conn)) return;
+      if (conn.viewing !== null) this.broadcastPresence(gameId, side);
       const at = this.seen.get(seenKey);
       if (at !== undefined && ![...set].some((c) => c.side === side)) {
         void this.store?.saveSeen(gameId, side, at).catch((e) => this.onError(gameId, e));
@@ -528,6 +569,7 @@ export class Hub {
         ? Promise.resolve(seenInMemory)
         : (this.store?.loadSeen(gameId, side) ?? Promise.resolve(undefined));
     this.push(gameId, conn);
+    this.broadcastPresence(gameId, side);
     void sinceP
       .then((since) => this.sendCatchUp(gameId, conn, since))
       .catch((e) => this.onError(gameId, e));
@@ -1152,6 +1194,13 @@ export class Hub {
       }
       this.saveMarks(gameId, conn.side, list);
       this.broadcastMarks(gameId, conn.side, list);
+      return;
+    }
+    if (command.kind === 'draftPresence') {
+      if (conn.viewing !== command.draft) {
+        conn.viewing = command.draft;
+        this.broadcastPresence(gameId, conn.side);
+      }
       return;
     }
     if (
