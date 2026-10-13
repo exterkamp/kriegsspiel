@@ -1,0 +1,34 @@
+{
+  "caseId": "uncontested-march",
+  "model": "llama3.1:8b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 1310490,
+  "usage": {
+    "inputTokens": 2904,
+    "outputTokens": 956
+  },
+  "raw": "{\n  \"turn\": 1,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 1960,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 600,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [],\n      \"account\": \"Colonel Aubry held his line steady, awaiting further orders.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 2140,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 550,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [],\n      \"account\": \"Colonel Delacroix remained cautious, waiting for the enemy to make the first move.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 2050,\n      \"y\": 1850,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 200,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [],\n      \"account\": \"Major Verneuil held his cavalry in reserve, awaiting an opportunity to strike.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 2050,\n      \"y\": 1400,\n      \"facingDeg\": 180,\n      \"formation\": \"column\",\n      \"strength\": 650,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [{\"orderId\": \"r1-1\", \"result\": \"carried-out\"}],\n      \"account\": \"Colonel Brandt marched his battalion down the high road, halting 400 paces short of the river.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2050,\n      \"y\": 900,\n      \"facingDeg\": 180,\n      \"formation\": \"column\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [{\"orderId\": \"r2-1\", \"result\": \"carried-out\"}],\n      \"account\": \"Colonel Hartmann followed the Vanguard down the road, keeping a safe distance.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 1550,\n      \"y\": 400,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 220,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [],\n      \"account\": \"Major von Reiter held his cavalry in reserve, awaiting an opportunity to strike.\",\n      \"departure\": \"\"\n    }\n  ],\n  \"observations\": [\n    {\"side\": \"blue\", \"unitId\": \"blue-1\", \"by\": \"blue-1\", \"when\": \"end\"},\n    {\"side\": \"blue\", \"unitId\": \"blue-2\", \"by\": \"blue-2\", \"when\": \"end\"},\n    {\"side\": \"blue\", \"unitId\": \"blue-3\", \"by\": \"blue-3\", \"when\": \"end\"},\n    {\"side\": \"red\", \"unitId\": \"red-1\", \"by\": \"red-1\", \"when\": \"end\"},\n    {\"side\": \"red\", \"unitId\": \"red-2\", \"by\": \"red-2\", \"when\": \"end\"},\n    {\"side\": \"red\", \"unitId\": \"red-3\", \"by\": \"red-3\", \"when\": \"end\"}\n  ],\n  \"summary\": \"The Blue forces held their positions, awaiting further orders. The Red forces marched down the high road, with the Vanguard Battalion halting 400 paces short of the river. The Hussar Squadron remained in reserve, awaiting an opportunity to strike.\"\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [],
+      "limits": [],
+      "ammo": [],
+      "observations": [
+        "blue-1 saw blue-1: not blue's unit watching an enemy",
+        "blue-2 saw blue-2: not blue's unit watching an enemy",
+        "blue-3 saw blue-3: not blue's unit watching an enemy",
+        "red-1 saw red-1: not red's unit watching an enemy",
+        "red-2 saw red-2: not red's unit watching an enemy",
+        "red-3 saw red-3: not red's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [
+        "red-1: 300 m from the projection, no departure reason"
+      ],
+      "injection": []
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "caseId": "impossible-order",
+  "model": "llama3.1:8b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 1601871,
+  "usage": {
+    "inputTokens": 3841,
+    "outputTokens": 1025
+  },
+  "raw": "{\n  \"turn\": 2,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 1960,\n      \"y\": 1680,\n      \"facingDeg\": 103,\n      \"formation\": \"line\",\n      \"strength\": 589,\n      \"morale\": 76,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [{\"orderId\": \"b2-9\", \"result\": \"carried-out\"}],\n      \"account\": \"Col. Aubry held his line, as ordered, despite the enemy's attempts to break through.\",\n      \"departure\": \"None\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 2050,\n      \"y\": 60,\n      \"facingDeg\": 325,\n      \"formation\": \"line\",\n      \"strength\": 541,\n      \"morale\": 72,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [{\"orderId\": \"b2-9\", \"result\": \"carried-out\"}],\n      \"account\": \"Col. Delacroix waded the river, as ordered, but his men were slow to cross.\",\n      \"departure\": \"None\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 1650,\n      \"y\": 400,\n      \"facingDeg\": 270,\n      \"formation\": \"line\",\n      \"strength\": 200,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [{\"orderId\": \"b2-9\", \"result\": \"carried-out\"}],\n      \"account\": \"Maj. Verneuil held his position, as ordered, but his men were eager to charge.\",\n      \"departure\": \"None\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 1950,\n      \"y\": 300,\n      \"facingDeg\": 145,\n      \"formation\": \"line\",\n      \"strength\": 647,\n      \"morale\": 79,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [{\"orderId\": \"r3-9\", \"result\": \"misread\"}],\n      \"account\": \"Col. Brandt misread the order to capture the enemy army and instead held his position.\",\n      \"departure\": \"None\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2250,\n      \"y\": 150,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [{\"orderId\": \"r3-9\", \"result\": \"misread\"}],\n      \"account\": \"Col. Hartmann misread the order to capture the enemy army and instead held his position.\",\n      \"departure\": \"None\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 1550,\n      \"y\": 400,\n      \"facingDeg\": 283,\n      \"formation\": \"line\",\n      \"strength\": 0,\n      \"morale\": 0,\n      \"status\": \"destroyed\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [{\"orderId\": \"r3-9\", \"result\": \"misread\"}],\n      \"account\": \"Maj. von Reiter's unit was destroyed in the previous turn.\",\n      \"departure\": \"None\"\n    }\n  ],\n  \"observations\": [\n    {\"side\": \"blue\", \"unitId\": \"blue-1\", \"by\": \"blue-1\", \"when\": \"end\"},\n    {\"side\": \"blue\", \"unitId\": \"blue-2\", \"by\": \"blue-2\", \"when\": \"end\"},\n    {\"side\": \"blue\", \"unitId\": \"blue-3\", \"by\": \"blue-3\", \"when\": \"end\"},\n    {\"side\": \"red\", \"unitId\": \"red-1\", \"by\": \"red-1\", \"when\": \"end\"},\n    {\"side\": \"red\", \"unitId\": \"red-2\", \"by\": \"red-2\", \"when\": \"end\"},\n    {\"side\": \"red\", \"unitId\": \"red-3\", \"by\": \"red-3\", \"when\": \"end\"}\n  ],\n  \"summary\": \"The blue units held their positions, while the red units were slow to react to the orders. The red cavalry unit was destroyed in the previous turn.\"\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [
+        "turn is 2, not 1",
+        "blue-1: order \"b2-9\" was not sent to it",
+        "blue-3: order \"b2-9\" was not sent to it",
+        "red-1: order \"r3-9\" was not sent to it",
+        "red-2: order \"r3-9\" was not sent to it"
+      ],
+      "limits": [],
+      "ammo": [],
+      "observations": [
+        "blue-1 saw blue-1: not blue's unit watching an enemy",
+        "blue-2 saw blue-2: not blue's unit watching an enemy",
+        "blue-3 saw blue-3: not blue's unit watching an enemy",
+        "red-1 saw red-1: not red's unit watching an enemy",
+        "red-2 saw red-2: not red's unit watching an enemy",
+        "red-3 saw red-3: not red's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

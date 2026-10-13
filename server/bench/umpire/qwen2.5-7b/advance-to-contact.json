@@ -1,0 +1,36 @@
+{
+  "caseId": "advance-to-contact",
+  "model": "qwen2.5:7b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 1469619,
+  "usage": {
+    "inputTokens": 4370,
+    "outputTokens": 1217
+  },
+  "raw": "{\n  \"turn\": 2,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 1960,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 600,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b3-1\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Aubry holds his position, maintaining the line and watching the road. He is cautious about committing his reserves.\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 2140,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 550,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b3-1\",\n          \"result\": \"partly\"\n        }\n      ],\n      \"account\": \"Col. Delacroix is hesitant to move his battalion, preferring to wait for further orders.\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 2050,\n      \"y\": 1250,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 162,\n      \"morale\": 29,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b3-1\",\n          \"result\": \"misread\"\n        }\n      ],\n      \"account\": \"Maj. Verneuil, eager to act, misinterprets the order and moves his squadron to the bridge, where he is engaged in combat.\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 2050,\n      \"y\": 1350,\n      \"facingDeg\": 0,\n      \"formation\": \"column\",\n      \"strength\": 627,\n      \"morale\": 72,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [\n        {\n          \"orderId\": \"r1-2\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Brandt advances his battalion towards the bridge, engaging the blue picket.\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2050,\n      \"y\": 550,\n      \"facingDeg\": 180,\n      \"formation\": \"column\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"r1-2\",\n          \"result\": \"not-arrived\"\n        }\n      ],\n      \"account\": \"Col. Hartmann waits for further orders, maintaining his position.\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 1950,\n      \"y\": 1300,\n      \"facingDeg\": 160,\n      \"formation\": \"line\",\n      \"strength\": 220,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [\n        {\n          \"orderId\": \"r3-2\",\n          \"result\": \"partly\"\n        }\n      ],\n      \"account\": \"Maj. von Reiter rides to the left of the Vanguard, but does not engage the enemy as planned.\"\n    }\n  ],\n  \"observations\": [\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-1\",\n      \"by\": \"blue-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-2\",\n      \"by\": \"blue-2\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-3\",\n      \"by\": \"blue-3\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-1\",\n      \"by\": \"red-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-2\",\n      \"by\": \"red-2\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-3\",\n      \"by\": \"red-3\",\n      \"when\": \"end\"\n    }\n  ],\n  \"summary\": \"In turn 2, the red vanguard battalion advances towards the bridge, engaging the blue picket. The blue cavalry squadron, misinterpreting its orders, moves to the bridge and is engaged in combat. The red line battalion waits for further orders, while the red hussar squadron rides to the left of the vanguard but does not engage the enemy. The blue line battalions hold their positions, maintaining their formation and morale. Combat between the red vanguard and the blue picket is intense, with significant losses on both sides.\"\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [
+        "blue-1: order \"b3-1\" was not sent to it",
+        "blue-2: order \"b3-1\" was not sent to it",
+        "red-2: order \"r1-2\" was not sent to it"
+      ],
+      "limits": [],
+      "ammo": [],
+      "observations": [
+        "blue-1 saw blue-1: not blue's unit watching an enemy",
+        "blue-2 saw blue-2: not blue's unit watching an enemy",
+        "blue-3 saw blue-3: not blue's unit watching an enemy",
+        "red-1 saw red-1: not red's unit watching an enemy",
+        "red-2 saw red-2: not red's unit watching an enemy",
+        "red-3 saw red-3: not red's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

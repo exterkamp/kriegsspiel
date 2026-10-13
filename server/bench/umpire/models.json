@@ -1,0 +1,10 @@
+{
+  "qwen2.5:7b": {
+    "diskGb": 4.7,
+    "memGb": 5.7
+  },
+  "llama3.1:8b": {
+    "diskGb": 4.9,
+    "note": "resident memory not recorded: the Docker daemon crashed during its last case"
+  }
+}
