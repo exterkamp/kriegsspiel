@@ -34,7 +34,7 @@ import {
 import { parseOrdersInput, placeIntents } from '../orders/llmParser.js';
 import { hasConditionOrTime, testParse } from '../umpire/providers/testParse.js';
 import { parseContextOf } from './parseContext.js';
-import { advanceUntilOver } from './replay.js';
+import { advanceUntilOver } from './advance.js';
 import type { SentTurnOrder, TurnRecord } from './store.js';
 import type { TurnInput, TurnResolution, TurnResolver } from './turns.js';
 
@@ -126,7 +126,7 @@ export interface ProjectedUnit {
   /** Where it stood and stands: the nearest named place, and the point in metres. */
   from: { at: string; x: number; y: number };
   to: { at: string; x: number; y: number };
-  /** Where it was every 5 game minutes, when it moved (metres). */
+  /** Where it was every 5 game minutes, when it moved, halts left out (metres). */
   path?: [number, number][];
   /** Enemy units it came into contact with. */
   contacts?: string[];
@@ -209,8 +209,11 @@ function summarize(
     const u1 = end.world.units.find((u) => u.id === u0.id) ?? u0;
     const from = placeOf(start.world, u0, turn.startMs);
     const to = placeOf(end.world, u1, end.time);
-    const path = paths.get(u0.id) ?? [];
-    const moved = path.some(([x, y]) => x !== from.x || y !== from.y);
+    // Where it stood at each sample, with a halt (the same point again) left out.
+    const path = (paths.get(u0.id) ?? []).filter(
+      ([x, y], i, all) => i === 0 || x !== all[i - 1]![0] || y !== all[i - 1]![1],
+    );
+    const moved = path.length > 1;
     const lost = Math.round(u0.strength - u1.strength);
     const morale = Math.round(u1.morale - u0.morale);
     const met = [...(contacts.get(u0.id) ?? [])].sort();

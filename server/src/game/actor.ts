@@ -17,7 +17,6 @@
  */
 import {
   deserialize,
-  featureAnchor,
   mayDraft,
   maySign,
   serialize,

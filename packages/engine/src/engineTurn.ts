@@ -56,9 +56,18 @@ export interface CourierPass {
 
 type Bounds = Pick<TurnFlag, 'n' | 'startMs' | 'endMs'>;
 
+/** The turn flag for `turn` (only its bounds: callers may pass a whole turn record). */
+const flag = (turn: Bounds, adjudicator: TurnFlag['adjudicator']): TurnFlag => ({
+  n: turn.n,
+  startMs: turn.startMs,
+  endMs: turn.endMs,
+  adjudicator,
+});
+
 const withoutForced = (c: Courier): Courier => {
   if (!c.forced) return c;
-  const { forced: _, ...rest } = c;
+  const rest = { ...c };
+  delete rest.forced;
   return rest;
 };
 
@@ -74,7 +83,7 @@ export function courierPass(
   turn: Bounds,
   registry: EventRegistry<GameState>,
 ): CourierPass {
-  let s = beginTurn(state, { ...turn, adjudicator: 'umpire' });
+  let s = beginTurn(state, flag(turn, 'umpire'));
   s = { ...s, world: { ...s.world, couriers: s.world.couriers.map(withoutForced) } };
   const riding = s.world.couriers.filter((c) => c.lostAt === undefined).map((c) => c.order.id);
   for (const o of orders) s = issueOrder(s, o, turn.startMs);
@@ -155,7 +164,7 @@ export function engineTurnStart(
   pass: CourierPass,
   turn: Bounds,
 ): EngineState<GameState> {
-  let s = beginTurn(state, { ...turn, adjudicator: 'engine' });
+  let s = beginTurn(state, flag(turn, 'engine'));
   const couriers = s.world.couriers.map((c) => {
     const bare = withoutForced(c);
     const f = pass.forced[c.order.id];
