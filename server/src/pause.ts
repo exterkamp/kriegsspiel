@@ -95,7 +95,7 @@ export class PauseVoting {
   private proposal: Proposal | undefined;
   /** Wall time the current pause began, for the maximum pause length. */
   private pausedAtMs: number | undefined;
-  private readonly voters: readonly string[];
+  private voters: readonly string[];
   private readonly rule: VoteRule;
   private readonly voteTimeoutMs: number;
   private readonly maxPauseMs: number | undefined;
@@ -129,6 +129,18 @@ export class PauseVoting {
 
   get phase(): PausePhase {
     return this.current;
+  }
+
+  /**
+   * The players who vote changed (someone took a role or gave one up mid-game, D6e). A vote cast
+   * by one who is gone is dropped; an open vote is not re-counted, so it settles on the next vote
+   * or runs out its timer.
+   */
+  setVoters(voters: readonly string[]): void {
+    this.voters = [...new Set(voters)];
+    for (const player of [...(this.proposal?.votes.keys() ?? [])]) {
+      if (!this.voters.includes(player)) this.proposal?.votes.delete(player);
+    }
   }
 
   /** How many players vote. */

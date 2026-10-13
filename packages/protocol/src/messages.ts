@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PROTOCOL_VERSION, ClockState, GameMs, Side } from './common.js';
+import { Briefing, Dissent, MAX_DISSENT } from './dissent.js';
 import { DraftEntry, DraftSnapshot, MAX_COMMENT, MAX_DRAFT_TEXT, TextOp } from './drafts.js';
 import { Mark } from './marks.js';
 import { Dispatch, SideView, StaffRole } from './view.js';
@@ -177,6 +178,17 @@ export const Command = z.discriminatedUnion('kind', [
   z.object({ ...Envelope, kind: z.literal('forkDraft'), draft: Id, newDraft: Id.max(64) }).strict(),
   // Fold a fork's edits back into the draft it came from.
   z.object({ ...Envelope, kind: z.literal('mergeDraft'), draft: Id }).strict(),
+  // A seat holder puts a dissent on record against an order the side signed. It never changes the engine;
+  // it is journalled and shown to the critique. `dissentId` is chosen by the client.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('dissent'),
+      dissentId: Id.max(64),
+      orderId: Id.max(64),
+      body: z.string().trim().min(1).max(MAX_DISSENT),
+    })
+    .strict(),
   // HQ (commander, chief of staff) passes a paper in its own view on to the subordinate commanding `unit`.
   z.object({ ...Envelope, kind: z.literal('forwardDispatch'), dispatchId: Id, unit: Id }).strict(),
   // A subordinate sends a report their own formation filed up to HQ. In a chain of command HQ sees it only once it has ridden there.
@@ -222,6 +234,10 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       ),
     })
     .strict(),
+  // Every dissent the side has on record, oldest first, sent on connect and again after each new one.
+  z.object({ ...Envelope, kind: z.literal('dissents'), dissents: z.array(Dissent) }).strict(),
+  // Sent on connect to a player who took over a role mid-game: the journal of the seat they now hold.
+  z.object({ ...Envelope, kind: z.literal('briefing'), briefing: Briefing }).strict(),
   // Every draft the side has, sent on connect. A player back after a while catches up from this.
   z.object({ ...Envelope, kind: z.literal('drafts'), drafts: z.array(DraftSnapshot) }).strict(),
   // One draft in full: sent when it is created or forked, and when a merge closes a fork.

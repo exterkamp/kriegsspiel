@@ -132,6 +132,10 @@ In the lobby the commander's table fills as players join the side with a role; a
 - An **LLM staff check** reads a draft before it goes and reports how a subordinate will likely read it: "the bridge is not mentioned", "this contradicts the timing in Order 3". It costs a little in-game time (staff work: the chief of staff is busy for ten game minutes, the same at every clock rate), so it is a tool and not a free preview. It sees only what your side knows (your own units, the named places, the orders you have sent), and it is advice, not a promise: the order is read afresh when it is signed (D6d).
 - Drafts can be **forked**, so the staff can write alternative plans and the commander chooses.
 
+### Dissent
+
+A teammate who disagrees with a signed order says so on the record: the dissent is kept with the order, shown to the side and read in the post-game critique. It does not stop or change the order.
+
 ### Information sharing is gameplay
 
 A wing commander's scout report reaches HQ only if they send it, and it takes time to arrive. Withholding, delaying or mis-summarising information is possible and has consequences. Each player's desk shows only what reached them.
@@ -141,6 +145,10 @@ A wing commander's scout report reaches HQ only if they send it, and it takes ti
 Both supported, set in the lobby:
 - **Shared HQ.** Everyone on the side sees the same desk and map. Simpler, and good for friends planning together.
 - **Chain of command.** Each human has their own desk and sector. Messages between players take in-game time. Human subordinates can misread or improvise. A subordinate's reports reach HQ only when the subordinate forwards them, and they ride there (distance at courier pace); in shared HQ forwarding takes no time (#79).
+
+### Joining mid-game
+
+A player may take a role nobody holds, also after the game has begun (a teammate left, or a staff officer was being played by the LLM). They are briefed from the journal of the seat they take over, and vote on pauses from then on.
 
 ### Session shapes
 
@@ -157,6 +165,6 @@ Both supported, set in the lobby:
 
 ## Open questions
 
-- How are disputes between teammates settled? (Suggestion: the commander decides, and dissent is recorded in the journal and appears in the critique.)
+- ~~How are disputes between teammates settled?~~ Settled (D6e): the commander decides. A teammate files a **dissent** against a signed order; it is kept in the side's journal and handed to the critique, and changes nothing in the game.
 - Should players be able to refuse or modify an order from a superior? (Suggestion: yes, with consequences the umpire records.)
-- How does a new player join mid-game? (Suggestion: they take over a role and receive a briefing from the previous holder's journal.)
+- ~~How does a new player join mid-game?~~ Settled (D6e): they take over a free role and receive a briefing built from the journal of that seat (orders signed, dissents, drafts, staff questions). The commander seat is not yet handed over.

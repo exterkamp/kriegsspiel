@@ -5,4 +5,5 @@ export * from './messages.js';
 export * from './marks.js';
 export * from './drafts.js';
 export * from './window.js';
+export * from './dissent.js';
 export * from './umpireSettings.js';

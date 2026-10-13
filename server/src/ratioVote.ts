@@ -32,7 +32,7 @@ interface Proposal {
 
 export class RatioVoting {
   private proposal: Proposal | undefined;
-  private readonly voters: readonly string[];
+  private voters: readonly string[];
   private readonly rule: VoteRule;
   private readonly voteTimeoutMs: number;
 
@@ -40,6 +40,18 @@ export class RatioVoting {
     this.voters = [...new Set(config.voters)];
     this.rule = config.rule ?? 'unanimous';
     this.voteTimeoutMs = config.voteTimeoutMs ?? DEFAULT_VOTE_TIMEOUT_MS;
+  }
+
+  /**
+   * The players who vote changed (someone took a role or gave one up mid-game, D6e). A vote cast
+   * by one who is gone is dropped; an open vote is not re-counted, so it settles on the next vote
+   * or runs out its timer.
+   */
+  setVoters(voters: readonly string[]): void {
+    this.voters = [...new Set(voters)];
+    for (const player of [...(this.proposal?.votes.keys() ?? [])]) {
+      if (!this.voters.includes(player)) this.proposal?.votes.delete(player);
+    }
   }
 
   /** The open proposal, if any: who asked, the ratio, and the votes so far. */

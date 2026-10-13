@@ -37,6 +37,12 @@ import {
   type SideId,
 } from '@kriegsspiel/engine';
 import type { Forward } from '../lobby/store.js';
+import { buildBriefing } from '../briefing.js';
+import { signedOrders } from '../journal.js';
+
+/** Most dissents a side may keep on record, and most one seat may file against one order. */
+const MAX_DISSENTS_PER_SIDE = 200;
+const MAX_DISSENTS_PER_ORDER = 3;
 
 /** The slice of a `ws` socket the hub uses. */
 export interface Socket {
@@ -143,6 +149,12 @@ export class Hub {
     /** Debug trace (#198): each message is handled inside `traceRequest`, so the commands and
      * LLM calls it causes share its correlation id and the admin Requests panel has rows. */
     private readonly trace: TraceSink = NOOP_TRACE,
+    /**
+     * For a player who took over a role after the game started: the accounts that held the seat
+     * before (D6e). Undefined for everyone else, who are given no briefing.
+     */
+    private readonly predecessors: (gameId: string, userId: string) => string[] | undefined = () =>
+      undefined,
   ) {}
 
   /** Where a user's current seat is read from: the lobby record, so authority follows who holds the role now (#77). */
@@ -531,6 +543,75 @@ export class Hub {
     void this.sentOrdersOf(gameId, conn)
       .then((orders) => this.send(conn, { v: PROTOCOL_VERSION, kind: 'sentOrders', orders }))
       .catch((e) => this.onError(gameId, e));
+    const filed = this.lookup(gameId)?.dissentsFor(side) ?? [];
+    // Dissents quote orders, which intelligence does not see (as with sentOrders).
+    if (filed.length > 0 && conn.seat?.role !== 'intelligence') {
+      this.send(conn, { v: PROTOCOL_VERSION, kind: 'dissents', dissents: [...filed] });
+    }
+    void this.briefingFor(gameId, conn)
+      .then((briefing) => {
+        if (briefing) this.send(conn, { v: PROTOCOL_VERSION, kind: 'briefing', briefing });
+      })
+      .catch((e) => this.onError(gameId, e));
+  }
+
+  /** The journal of the seat a mid-game joiner took over, from the log and the side's drafts. */
+  private async briefingFor(gameId: string, conn: Connection) {
+    const game = this.lookup(gameId);
+    const before = conn.userId === undefined ? undefined : this.predecessors(gameId, conn.userId);
+    if (!game || !before || !conn.seat || !this.store) return undefined;
+    const book = await this.draftsOf(gameId, conn.side);
+    return buildBriefing({
+      seat: seatKey(conn.seat),
+      atGame: game.state.time,
+      orders: signedOrders(await this.store.inputLog(gameId), conn.side),
+      dissents: game.dissentsFor(conn.side),
+      staff: game.staffHistoryFor(conn.side),
+      drafts: book.toJSON(),
+      previousHolders: before,
+    });
+  }
+
+  /** A seat holder files a dissent against an order the side signed (D6e). Never changes the engine. */
+  private async handleDissent(
+    gameId: string,
+    game: GameActor,
+    conn: Connection,
+    command: Extract<Command, { kind: 'dissent' }>,
+  ): Promise<void> {
+    const fail = (code: string, message: string) =>
+      this.send(conn, error(code, `${command.dissentId}: ${message}`));
+    if (!conn.seat || conn.seat.role === 'intelligence') {
+      return fail('not_permitted', 'dissent needs a role that sees the orders');
+    }
+    if (game.state.world.outcome) return fail('game_over', 'the game has ended');
+    if (!this.store) return fail('unavailable', 'this game keeps no journal');
+    const order = signedOrders(await this.store.inputLog(gameId), conn.side).find(
+      (o) => o.orderId === command.orderId,
+    );
+    if (!order) return fail('no_such_order', 'the side signed no such order');
+    const seat = seatKey(conn.seat);
+    if (order.signer === seat) return fail('own_order', 'you signed that order yourself');
+    const filed = game.dissentsFor(conn.side);
+    if (filed.some((d) => d.id === command.dissentId)) {
+      return fail('bad_dissent', 'that dissent id is already used');
+    }
+    const mine = filed.filter((d) => d.orderId === command.orderId && d.seat === seat).length;
+    if (mine >= MAX_DISSENTS_PER_ORDER || filed.length >= MAX_DISSENTS_PER_SIDE) {
+      return fail('too_many_dissents', 'enough has been said on that order');
+    }
+    const recorded = await game.recordDissent(conn.side, {
+      id: command.dissentId,
+      orderId: command.orderId,
+      seat,
+      body: command.body,
+    });
+    if (!recorded) return fail('bad_dissent', 'that dissent id is already used');
+    const all = [...game.dissentsFor(conn.side)];
+    for (const c of this.conns.get(gameId) ?? []) {
+      if (c.side === conn.side && c.seat?.role !== 'intelligence')
+        this.send(c, { v: PROTOCOL_VERSION, kind: 'dissents', dissents: all });
+    }
   }
 
   /** The orders this side sent and the staff understood, from the game's input log (not the client's memory). */
@@ -1060,6 +1141,10 @@ export class Hub {
       command.kind === 'vote'
     ) {
       await this.handlePauseCommand(game, conn, command);
+      return;
+    }
+    if (command.kind === 'dissent') {
+      await this.handleDissent(gameId, game, conn, command);
       return;
     }
     if (command.kind === 'forwardDispatch') {

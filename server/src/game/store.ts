@@ -8,7 +8,13 @@
 import { appendFile, mkdir, readFile, truncate, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Seat } from '@kriegsspiel/engine';
-import type { DraftSnapshot, Mark, StaffExchange, UmpireSettings } from '@kriegsspiel/protocol';
+import type {
+  Dissent,
+  DraftSnapshot,
+  Mark,
+  StaffExchange,
+  UmpireSettings,
+} from '@kriegsspiel/protocol';
 import type { UmpireCallRecord } from '../umpire/umpireClient.js';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
@@ -69,6 +75,11 @@ export type GameCommand =
    * A staff officer answered a player's question on the `staff` stage. Journal only: the answer is
    * advice text and never changes the engine; the model calls are on the entry (`calls`).
    */
+  /**
+   * A seat holder put a dissent on record against an order the side signed. Journal only: it never
+   * changes the engine; it is shown to the side and handed to the post-game critique (D6e).
+   */
+  | { kind: 'dissent'; side: string; by: string; dissent: Dissent }
   | {
       kind: 'staffAnswer';
       side: string;

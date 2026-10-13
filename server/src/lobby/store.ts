@@ -34,6 +34,20 @@ export interface RoleSeat {
   role: Exclude<Role, 'commander'>;
   /** Subordinate only: the ids of the units they command. */
   units?: string[];
+  /**
+   * Set when the player took the role after the game started (D6e): the accounts that held the
+   * same seat before, whose journal is the briefing. Empty if no one did.
+   */
+  succeeds?: string[];
+}
+
+/** Someone who gave up a role after the game started. Their seat's journal briefs the next holder. */
+export interface PastHolder {
+  userId: string;
+  side: string;
+  role: RoleSeat['role'];
+  units?: string[];
+  leftAtMs: number;
 }
 
 /** A paper HQ passed on to the subordinate commanding `unit`: an id from HQ's own view. */
@@ -68,6 +82,8 @@ export interface LobbyGame {
   roles?: RoleSeat[];
   /** Papers passed along the chain (HQ to a subordinate, or a subordinate's report up to HQ). */
   forwards?: Forward[];
+  /** Players who gave up a role after the start, oldest first (D6e). */
+  past?: PastHolder[];
   /** How the humans of a side are organised. Unset: shared HQ, so forwarding takes no time. */
   hierarchy?: 'shared' | 'chain';
   createdAtMs: number;

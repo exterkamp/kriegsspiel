@@ -208,8 +208,11 @@ describe('roles in the lobby', () => {
     expect(await early.json()).toMatchObject({ error: 'not_ready', sides: ['blue'] });
     await fetch(`${t.base}/games/${t.id}/ready`, post(t.cos, { ready: true }));
     expect((await fetch(`${t.base}/games/${t.id}/start`, post(t.lead))).status).toBe(200);
-    // Roles are fixed once the game has started.
-    expect((await j(t.intel, { side: 'blue', role: 'intelligence' })).status).toBe(409);
+    // A free role can still be taken after the start (D6e), but only by one player.
+    const mid = await j(t.intel, { side: 'blue', role: 'intelligence' });
+    expect(mid.status).toBe(200);
+    expect(await mid.json()).toMatchObject({ midGame: true });
+    expect((await j(t.sub, { side: 'blue', role: 'intelligence' })).status).toBe(409);
     app!.hub.closeAll();
   });
 });
