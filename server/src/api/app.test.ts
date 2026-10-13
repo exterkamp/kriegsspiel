@@ -790,13 +790,13 @@ describe('orders', () => {
     expect(app!.host.get(game.id)!.state.queue.some((e) => e.type === 'order.issue')).toBe(false);
   });
 
-  it('says drafts and other commands are not supported yet', async () => {
+  it('refuses a draft that does not exist, and says other commands are not supported yet', async () => {
     const { base, ws } = await start();
     const game = (await createGame(base)).json;
     const blue = await join(ws, game, 'blue');
     blue.send(JSON.stringify({ v, kind: 'issueOrder', orderId: 'o', draft: 'd1' }));
     blue.send(JSON.stringify({ v, kind: 'setReady', ready: true }));
-    await blue.waitFor('error', (m) => m.code === 'not_implemented' && m.message.includes('draft'));
+    await blue.waitFor('error', (m) => m.code === 'draft_unknown' && m.message.includes('o:'));
     await blue.waitFor(
       'error',
       (m) => m.code === 'not_implemented' && m.message.includes('setReady'),
@@ -1485,6 +1485,34 @@ describe('pause voting over the WebSocket', () => {
     expect((await c.waitFor('error')).code).toBe('pause_unavailable');
     expect(c.messages.some((m) => m.kind === 'pauseState')).toBe(false);
   });
+
+  it('emergency hold: stops the clock, shows tallies only, and refuses with fixed wording when spent', async () => {
+    const { game, blue, red } = await votingGame({
+      rule: 'unanimous',
+      holdMs: 1000,
+      holdsPerPlayer: 1,
+    });
+    await blue.waitFor('pauseState', (m) => m.phase === 'running' && m.holdsLeft === 1);
+    blue.send(cmd({ kind: 'proposeHold', reason: 'phone' }));
+    const open = await red.waitFor('pauseState', (m) => m.phase === 'pause_proposed');
+    expect(open.proposal).toMatchObject({
+      hold: true,
+      kind: 'pause',
+      bySide: 'blue',
+      yes: 1,
+      no: 0,
+    });
+    expect(JSON.stringify(open)).not.toContain('vote-blue');
+    expect(app!.host.get(game.id)!.gameClock.status).toBe('paused');
+    // Nobody ratifies: it lapses and the clock runs again.
+    const r = await red.waitFor('pauseResult', () => true, 8000);
+    expect(r).toMatchObject({ outcome: 'cancelled', cause: 'timeout', proposalKind: 'pause' });
+    await blue.waitFor('pauseState', (m) => m.phase === 'running' && m.holdsLeft === 0);
+    expect(app!.host.get(game.id)!.gameClock.status).toBe('running');
+    blue.send(cmd({ kind: 'proposeHold' }));
+    const refused = await blue.waitFor('error', (m) => m.code === 'hold_refused');
+    expect(refused.message).toBe('no emergency hold is left to you in this game');
+  }, 20_000);
 
   it('refuses a vote on a proposal that is not open', async () => {
     const { blue } = await votingGame();
