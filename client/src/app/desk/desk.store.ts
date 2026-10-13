@@ -274,7 +274,10 @@ export class DeskStore {
           const startsAt = (n - 1) * ms;
           const endsAt = n === decided && s.gameOver ? s.gameOver.atGame : n * ms;
           // Only the turn just decided has the view at its end; an older one (a reload) is told from its papers.
-          const atEnd = view.atGame === endsAt || (n === decided && !!s.gameOver);
+          // At the game's end the outcome may come a moment before the last view: wait for the view.
+          const atEnd =
+            view.atGame === endsAt ||
+            (n === decided && !!s.gameOver && view.atGame >= s.gameOver.atGame);
           if (n === decided && !atEnd) continue;
           const before = atEnd ? next.starts[n] : undefined;
           fresh.push(

@@ -69,6 +69,32 @@ describe('GameService', () => {
     expect(svc.state()).toMatchObject({ turnMode: true, turnMinutes: 30 });
   });
 
+  it("reads the battle's length from the scenario list, so the desk can count the turns (#439)", async () => {
+    const svc = TestBed.inject(GameService);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => ({
+        ok: true,
+        status: 200,
+        json: async () =>
+          url === '/scenarios'
+            ? {
+                scenarios: [
+                  { id: 'other', lengthMinutes: 90 },
+                  { id: 'bridge', lengthMinutes: 50 },
+                ],
+              }
+            : {
+                scenario: 'bridge',
+                sides: [{ side: 'blue' }],
+                umpire: { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 20 },
+              },
+      })),
+    );
+    svc.connect(loc('?game=t2'));
+    await vi.waitFor(() => expect(svc.state().battleMinutes).toBe(50));
+  });
+
   it('leaves a real-time game in real-time dress when its settings arrive', async () => {
     const svc = TestBed.inject(GameService);
     vi.stubGlobal(

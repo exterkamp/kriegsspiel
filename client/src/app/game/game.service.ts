@@ -60,7 +60,10 @@ export class GameService {
         // The battle's length, so the turn desk can count its turns (#439).
         fetchScenarios().then(
           (list) => {
-            const minutes = list.find((x) => x.id === info.scenario)?.lengthMinutes;
+            // An odd answer only costs the count.
+            const minutes = Array.isArray(list)
+              ? list.find((x) => x.id === info.scenario)?.lengthMinutes
+              : undefined;
             if (this._gameId() !== game || minutes === undefined) return;
             this._state.update((s) => ({ ...s, battleMinutes: minutes }));
           },
