@@ -1,3 +1,4 @@
+import type { Json } from './events.js';
 import type { Pace } from './fatigue.js';
 import type { Order, OrderIntent } from './orders.js';
 import type { Trait } from './personality.js';
@@ -382,13 +383,50 @@ export interface GameState {
   /** Weather hook: multiplies every unit's sight range (1 when absent, 0.5 in fog). */
   sightFactor?: number;
   /** Every umpire placement ruling so far, in order. Master state only: never sent to a client. */
-  rulings: Array<Ruling | BattleRuling | JudgmentRuling>;
+  rulings: Array<Ruling | BattleRuling | JudgmentRuling | TurnRuling>;
   /** The rigid-to-free dial chosen for this game; absent counts as 'standard'. Sets the judgment cap only. */
   dial?: Dial;
   /** Men each unit started with, the yardstick for a broken force (D13). Absent: no unit counts as broken. */
   startStrength?: Record<string, number>;
   /** Set once, when the umpire has declared one side's force broken; the game closes soon after (D13). */
   battle?: { winner: SideId; reason: 'attack-broken' | 'defence-broken'; declaredAt: GameTime };
+  /**
+   * Set while a turn of a turn-mode game is being resolved (D39). Under the umpire
+   * (`adjudicator: 'umpire'`) the turn is held: units stay where they stood at `startMs`
+   * while the couriers ride, and `umpire.turn` sets the outcome at `endMs`. Absent in real time.
+   */
+  turn?: TurnFlag;
+}
+
+/** The turn being resolved: turn `n` covers game time `[startMs, endMs)`. */
+export interface TurnFlag {
+  n: number;
+  startMs: GameTime;
+  endMs: GameTime;
+  adjudicator: 'engine' | 'umpire';
+}
+
+/**
+ * One correction the engine made to an umpire's turn proposal (D39): a field of one unit's
+ * outcome, or an observation, that broke a hard limit. Master state only.
+ */
+export interface TurnRuling {
+  id: string;
+  /** The turn's end, when the outcome was applied. */
+  time: GameTime;
+  kind: 'turn';
+  turn: number;
+  unitId: string;
+  /** The outcome field corrected (`position`, `strength`, `status`, `observation`...). */
+  field: string;
+  proposed: Json;
+  applied: Json;
+  /** The limit it broke, in words. */
+  reason: string;
+  /** The same reason, for readers of every ruling kind (the window, the critique). */
+  rationale: string;
+  /** One plain sentence on what was corrected. */
+  narrative: string;
 }
 
 /**

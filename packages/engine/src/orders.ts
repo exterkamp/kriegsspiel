@@ -17,6 +17,7 @@ import type { Pace } from './fatigue.js';
 import { findPath, legCost } from './navigation.js';
 import { describePlace } from './place.js';
 import { schedule } from './queue.js';
+import { heldTurn } from './held.js';
 import { applyIntents, fireOnReceipt, registerStanding } from './standing.js';
 import { COURIER_DELAY_MS, REPORT_EVENT, fileReport } from './visibility.js';
 import {
@@ -320,6 +321,20 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       type: 'order_delivered',
       payload: { orderId: order.id, unitId: unit.id, issuedAt: order.issuedAt },
     };
+    // The unit's courier rides back: HQ hears of the delivery after the usual report delay.
+    const ack = {
+      time: ev.time,
+      type: REPORT_EVENT,
+      payload: { kind: 'orderDelivered', unitId: unit.id },
+    };
+    // In an umpire turn the order is delivered and acknowledged, but the umpire decides what
+    // the unit makes of it: no intent is adopted (D39).
+    if (heldTurn(world, ev.time)) {
+      const garbledHeld = c.garbled
+        ? [{ type: 'order_garbled', payload: { orderId: order.id, unitId: unit.id } }]
+        : [];
+      return { world, schedule: [ack], emit: [delivered, ...garbledHeld] };
+    }
     // Standing orders already carried may fire on this arrival; the new order's own may not.
     const had = unit.standing ?? [];
     // One draw whenever the umpire proposed a deviation, whatever the traits, so the RNG stream
@@ -334,12 +349,6 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     );
     const res = applyIntents(world, unit, shaped.intents, ev.time, order.id);
     const fired = fireOnReceipt(res.world, unit.id, had, order.from ?? 'hq', ev.time);
-    // The unit's courier rides back: HQ hears of the delivery after the usual report delay.
-    const ack = {
-      time: ev.time,
-      type: REPORT_EVENT,
-      payload: { kind: 'orderDelivered', unitId: unit.id },
-    };
     const interpreted = shaped.deviation
       ? [
           {

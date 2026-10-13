@@ -25,6 +25,7 @@ import { positionAt, rejectOrder, startMarch } from './movement.js';
 import { FATIGUE_PER_FIGHT_TICK } from './fatigue.js';
 import { FIRE_RULES, MORALE_RULES, RALLY_RULES } from './combatRules.js';
 import { schedule } from './queue.js';
+import { heldTurn } from './held.js';
 import {
   AMMO_PER_FIRE_TICK,
   OUT_OF_AMMO_FACTOR,
@@ -237,6 +238,29 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
 }
 
 /**
+ * The one victory check at the end of an umpire turn (D39): the objective (held since the turn
+ * end from which only the attacker held it), a broken force, and the time limit, which the turn
+ * that contains it ends at.
+ */
+export function turnVictory(world: GameState, time: number): HandlerResult<GameState> {
+  if (world.outcome) return { world };
+  const held = trackHold(world, time);
+  world = held.world;
+  const outcome =
+    evaluateVictory(world, time) ??
+    (time >= world.victory.holdMs
+      ? { winner: world.victory.defender, reason: 'objective-held' as const, time }
+      : null);
+  if (outcome) return conclude(world, outcome);
+  const declared = declareBattle(world, time);
+  return {
+    world: declared?.world ?? world,
+    schedule: [...held.schedule, ...(declared?.schedule ?? [])],
+    emit: declared?.emit ?? [],
+  };
+}
+
+/**
  * Declare the battle if one side's force is broken and the other's is not (D13): record the
  * umpire's ruling, file it as a report to both sides (no figures, so nothing hidden leaks) and
  * queue the check that closes the game once the pursuit has played out. Pure.
@@ -425,6 +449,7 @@ function chooseTarget(shooter: Unit, enemies: Unit[]): Unit | undefined {
 export function registerCombat(registry: EventRegistry<GameState>): void {
   registerSupply(registry);
   registry.register(ATTACK_INTENT_EVENT, (world, ev) => {
+    if (heldTurn(world, ev.time)) return { world };
     const { unitId, target: targetId } = ev.payload as unknown as {
       unitId: string;
       target: string;
@@ -489,7 +514,8 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
   });
 
   registry.register(COMBAT_CHECK_EVENT, (world, ev) => {
-    if (world.outcome) return { world };
+    // In an umpire turn the umpire decides the fighting, and `umpire.turn` checks victory.
+    if (world.outcome || heldTurn(world, ev.time)) return { world };
     const held = trackHold(world, ev.time);
     world = held.world;
     const outcome = evaluateVictory(world, ev.time);
@@ -530,7 +556,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
   });
 
   registry.register(VICTORY_DEADLINE_EVENT, (world, ev) => {
-    if (world.outcome) return { world };
+    if (world.outcome || heldTurn(world, ev.time)) return { world };
     const outcome = evaluateVictory(world, ev.time) ?? {
       winner: world.victory.defender,
       reason: 'objective-held' as const,
@@ -543,6 +569,10 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     // The result of a declared battle stands, so a rally after it changes nothing.
     if (world.outcome || world.battle) return { world };
     const { unitId } = ev.payload as unknown as { unitId: string };
+    // A held turn rolls no rally: the try waits for the next one (the give-up still counts).
+    if (heldTurn(world, ev.time)) {
+      return { world, schedule: [{ time: ev.time + RALLY_RULES.retryMs, type: RALLY_EVENT, payload: { unitId } }] };
+    }
     const u = world.units.find((x) => x.id === unitId);
     if (!u || u.status !== 'withdrawn' || u.brokenAt === undefined) return { world };
     if (ev.time - u.brokenAt > RALLY_RULES.giveUpMs) return { world };
@@ -597,6 +627,8 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
 
   registry.register(COMBAT_TICK_EVENT, (world, ev, rng) => {
     if (world.outcome) return { world };
+    // The chain ends in a held turn; the check `umpire.turn` queues starts it again.
+    if (heldTurn(world, ev.time)) return { world: { ...world, combatActive: false } };
     const active = activeUnits(world);
     const shots: Shot[] = [];
     for (const shooter of active) {

@@ -75,11 +75,14 @@ export {
   OVERLAP_TOLERANCE_MM,
   PLACEMENT_EVENT,
   issuePlacement,
+  overlapsBeyondTolerance,
+  proposedArrangement,
   registerPlacement,
   validatePlacement,
 } from './placement.js';
 export type {
   Placement,
+  PlacementOptions,
   PlacementProposal,
   PlacementRuling,
   PlacementVerdict,
@@ -222,3 +225,28 @@ export {
 export type { Deviation, Interpretation, Trait } from './personality.js';
 export { ADJUST_RANGE_M, DISCRETIONS, HOLD_RANGE_M, deputyProblems } from './deputy.js';
 export type { Discretion } from './deputy.js';
+export { heldTurn } from './held.js';
+export {
+  DEPARTURE_LOSS_SHARE,
+  DEPARTURE_TOLERANCE_M,
+  TURN_EVENT,
+  beginTurn,
+  issueTurn,
+  registerTurn,
+  validateProposal,
+} from './turn.js';
+export type {
+  AppliedOutcome,
+  TurnContext,
+  TurnCorrection,
+  TurnObservation,
+  TurnOrderResult,
+  TurnOrderStatus,
+  TurnPayload,
+  TurnProposal,
+  TurnRoll,
+  TurnRollRequest,
+  TurnUnitOutcome,
+  TurnValidation,
+} from './turn.js';
+export { turnVictory } from './combat.js';
