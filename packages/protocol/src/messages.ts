@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { PROTOCOL_VERSION, ClockState, GameMs, Side } from './common.js';
 import { DraftEntry, DraftSnapshot, MAX_COMMENT, MAX_DRAFT_TEXT, TextOp } from './drafts.js';
+import { DeputySettings } from './deputy.js';
 import { Mark } from './marks.js';
 import { Dispatch, SideView, StaffRole } from './view.js';
 
@@ -149,6 +150,8 @@ export const Command = z.discriminatedUnion('kind', [
   z.object({ ...Envelope, kind: z.literal('mergeDraft'), draft: Id }).strict(),
   // HQ (commander, chief of staff) passes a paper in its own view on to the subordinate commanding `unit`.
   z.object({ ...Envelope, kind: z.literal('forwardDispatch'), dispatchId: Id, unit: Id }).strict(),
+  // Set what the LLM deputy may do while the sender is away (D6d). Commander only, or anyone on a shared-HQ side.
+  z.object({ ...Envelope, kind: z.literal('setDeputy'), settings: DeputySettings }).strict(),
 ]);
 export type Command = z.infer<typeof Command>;
 

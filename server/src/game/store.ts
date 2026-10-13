@@ -7,8 +7,14 @@
  */
 import { appendFile, mkdir, readFile, truncate, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Seat } from '@kriegsspiel/engine';
-import type { DraftSnapshot, Mark, StaffExchange } from '@kriegsspiel/protocol';
+import type { Discretion, Seat } from '@kriegsspiel/engine';
+import type {
+  DeputyAccount,
+  DeputySettings,
+  DraftSnapshot,
+  Mark,
+  StaffExchange,
+} from '@kriegsspiel/protocol';
 import type { UmpireCallRecord } from '../umpire/umpireClient.js';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
@@ -74,7 +80,14 @@ export type GameCommand =
       question: string;
       /** The conference record, so a restart restores it (D6b). Absent in entries from before it was kept. */
       exchange?: StaffExchange;
-    };
+    }
+  /**
+   * A player set (or switched off) what their deputy may do (D6d). Journal only: the settings are
+   * the player's input, not engine state. `seat` is the player's own, absent in shared-HQ play.
+   */
+  | { kind: 'deputySet'; side: string; settings: DeputySettings; seat?: Seat }
+  /** The deputy's turn as the player reads it on return. Journal only; the orders it signed are logged on their own. */
+  | { kind: 'deputyTurn'; side: string; account: DeputyAccount };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {
@@ -100,6 +113,8 @@ export interface InputLogEntry {
   fallback?: { attempts: number; error: string };
   /** Issued by a scripted side's agent, not a player. Replay applies it at `gameMs` before any command at the same instant. */
   agent?: boolean;
+  /** Written by a player's deputy, within this discretion (D6d). Always set with `agent`. */
+  deputy?: { discretion: Discretion };
   /** Pause-voting steps this command caused, for the journal. */
   pause?: PauseTransition[];
   /** Ratio-vote steps this command caused. A `passed` step carries the new ratio. */

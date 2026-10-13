@@ -383,6 +383,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
       options.scriptedOpponents === true && recordOf(id)?.sessionType === 'co_op_vs_ai',
     aiAgents: options.aiAgents,
     narrator: options.narrator,
+    deputyAway: (id, side, seat) => hub.isAway(id, side as SideId, seat),
     trace,
     onUpdate: (id) => {
       hub.notify(id);

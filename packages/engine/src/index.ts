@@ -207,3 +207,5 @@ export {
   shapeIntents,
 } from './personality.js';
 export type { Deviation, Interpretation, Trait } from './personality.js';
+export { ADJUST_RANGE_M, DISCRETIONS, HOLD_RANGE_M, deputyProblems } from './deputy.js';
+export type { Discretion } from './deputy.js';

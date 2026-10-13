@@ -7,6 +7,7 @@ import {
   type EngineState,
   type EventRegistry,
   type GameState,
+  type Seat,
 } from '@kriegsspiel/engine';
 import { GameClock, type WallClock } from '../clock.js';
 import { scriptedAgents, type SideAgent } from '../opponent/index.js';
@@ -16,8 +17,33 @@ import { GameActor, type GameActorOptions, type StaffAtWork, type Timers } from 
 import type { UmpireClient } from '../umpire/index.js';
 import type { TraceSink } from '../debug/trace.js';
 import { replayFrom } from './replay.js';
-import type { StaffExchange } from '@kriegsspiel/protocol';
-import type { GameStore } from './store.js';
+import type { DeputyAccount, DeputySettings, StaffExchange } from '@kriegsspiel/protocol';
+import type { GameStore, InputLogEntry } from './store.js';
+
+/** Each side's deputy settings (the last set) and the account of its turns, from a game's whole input log (D6d). */
+export function deputiesFromLog(
+  log: readonly InputLogEntry[],
+): Map<string, { settings: DeputySettings; seat?: Seat; account: DeputyAccount[] }> {
+  const out = new Map<
+    string,
+    { settings: DeputySettings; seat?: Seat; account: DeputyAccount[] }
+  >();
+  for (const e of log) {
+    const c = e.command;
+    if (c.kind === 'deputySet') {
+      const had = out.get(c.side);
+      out.set(c.side, {
+        settings: c.settings,
+        ...(c.seat ? { seat: c.seat } : {}),
+        account: had?.account ?? [],
+      });
+    } else if (c.kind === 'deputyTurn') {
+      const had = out.get(c.side);
+      if (had) had.account.push(c.account);
+    }
+  }
+  return out;
+}
 
 export interface GameHostOptions {
   store: GameStore;
@@ -50,6 +76,8 @@ export interface GameHostOptions {
   aiAgents?: (gameId: string, world: GameState, scripted: SideAgent[]) => SideAgent[];
   /** The umpire client that narrates a game's dispatches (one per game, so caps are per game). Unset: players see the engine's template text. */
   narrator?: (gameId: string) => UmpireClient | undefined;
+  /** Whether the player who appointed a side's deputy is away from the table now (D6d). Unset: always. */
+  deputyAway?: (gameId: string, side: string, seat: Seat | undefined) => boolean;
   /** Pause voting for a game: who votes and the host's rules. Unset: players cannot vote to pause. */
   pause?: (id: string, world: GameState) => PauseConfig | undefined;
 }
@@ -90,6 +118,7 @@ export class GameHost {
       onEmitted: (events) => o.onEmitted?.(id, events),
       onStaffAtWork: (state) => o.onStaffAtWork?.(id, state),
       umpire: o.narrator?.(id),
+      deputyAway: o.deputyAway ? (side, seat) => o.deputyAway!(id, side, seat) : undefined,
       parseRetries: o.parseRetries,
       parseTimeoutMs: o.parseTimeoutMs,
       narrateTimeoutMs: o.narrateTimeoutMs,
@@ -189,16 +218,19 @@ export class GameHost {
       status: snap.clock.status === 'stopped' ? 'stopped' : 'paused',
     });
     // The conference is not in a snapshot, so it comes from the whole log.
+    const log = await store.inputLog(id);
     const staffHistory = new Map<string, StaffExchange[]>();
-    for (const e of await store.inputLog(id)) {
+    for (const e of log) {
       const c = e.command;
       if (c.kind !== 'staffAnswer' || !c.exchange) continue;
       staffHistory.set(c.side, [...(staffHistory.get(c.side) ?? []), c.exchange]);
     }
+    const deputies = deputiesFromLog(log);
     const actor = new GameActor({
       ...this.actorOptions(id),
       state,
       staffHistory,
+      deputies,
       clock,
       agents: this.agentsFor(id, state.world),
       pause: this.options.pause?.(id, state.world),

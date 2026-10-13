@@ -156,7 +156,7 @@ The hub remembers the game time of the last view pushed to each side and saves i
 - Per-game rate limits and a budget cap (`GameUmpireClient`, `gameBudget` in the umpire config), with a clear "staff overloaded" fallback. A capped game is refused before any call is sent, so stages use their conservative fallback at once and game time never waits on it. Narration then returns the engine's template text plus `STAFF_OVERLOADED_NOTICE`. Each call and refusal is logged as a metric, and `report()` gives the cost of the game.
 - Parsing defaults to the cheap model (`claude-haiku-5-5`); judgment keeps the strong one.
 - Cheaper model for parsing, stronger for judgment and narration.
-- Deputy mode (the LLM acting for an absent player) only runs when the player has enabled it, and only when a trigger in their standing orders fires.
+- Deputy mode (the LLM acting for an absent player, D6d) only runs when the player has enabled it, only while they have no connection open, and at most once per ten game minutes. It is a side agent on the `staff` stage, so it shares the staff budget share, and it holds game time while it thinks (the LLM barrier), like the LLM commander. (An earlier draft ran it only when a standing-order trigger fired; the interval is simpler, costs nothing while the field is quiet because an unchanged view asks no question, and lets it notice what no trigger covers.)
 
 ## Determinism and replay
 
