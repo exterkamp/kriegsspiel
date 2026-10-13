@@ -48,6 +48,11 @@ export type GameCommand =
   | { kind: 'setMode'; mode: ClockMode }
   /** Manual and fast-forward modes: move game time to this point. */
   | { kind: 'advanceTo'; gameMs: number }
+  /**
+   * Admin step (#128): move game time to this point whatever the mode, then leave the mode and
+   * pause state as they were. Replays exactly like `advanceTo`.
+   */
+  | { kind: 'step'; gameMs: number }
   /** Pause voting (docs/architecture.md). `by` is a voter's player id. */
   | { kind: 'proposePause'; by: string; reason?: string }
   | { kind: 'proposeResume'; by: string }
@@ -128,6 +133,8 @@ export interface InputLogEntry {
   parse?: ParseResult;
   /** The parser failed on every attempt and the conservative fallback was used instead. */
   fallback?: { attempts: number; error: string };
+  /** Issued from the admin view (#128), not by a player or the game's own scheduler. */
+  admin?: boolean;
   /** Issued by a scripted side's agent, not a player. Replay applies it at `gameMs` before any command at the same instant. */
   agent?: boolean;
   /** Pause-voting steps this command caused, for the journal. */

@@ -338,6 +338,11 @@ export class GameActor {
     return this.clock;
   }
 
+  /** Game time of the next queued event, for the admin "step to next event" control. */
+  get nextEventAt(): number | undefined {
+    return this.engine.queue[0]?.time;
+  }
+
   /** The pause vote: its phase and the open proposal, for the views. Undefined without voters. */
   get pauseState():
     | { phase: PauseVoting['phase']; proposal: PauseVoting['open']; voters: number; nowMs: number }
@@ -387,12 +392,13 @@ export class GameActor {
   }
 
   /** Queue a command. Resolves when it has been applied. */
-  submit(command: GameCommand): Promise<CommandResult> {
+  submit(command: GameCommand, options: { admin?: boolean } = {}): Promise<CommandResult> {
+    const admin = options.admin === true;
     // The id of the request being handled, or a fresh one for a caller outside any request.
     const id = this.trace.enabled ? (currentCorrelationId() ?? newCorrelationId()) : undefined;
     if (command.kind === 'order') return this.submitOrder(command, id);
-    if (id === undefined) return this.enqueue(() => this.apply(command));
-    return this.enqueue(() => withCorrelationId(id, () => this.apply(command)));
+    if (id === undefined) return this.enqueue(() => this.apply(command, admin));
+    return this.enqueue(() => withCorrelationId(id, () => this.apply(command, admin)));
   }
 
   /** Stop the scheduler, finish queued work, and refuse new commands. Safe to call twice. */
@@ -1018,11 +1024,22 @@ export class GameActor {
     }
   }
 
-  private async apply(command: GameCommand): Promise<CommandResult> {
-    const entry: InputLogEntry = { seq: ++this.seq, wallMs: this.wallNow(), gameMs: 0, command };
+  private async apply(command: GameCommand, admin = false): Promise<CommandResult> {
+    const entry: InputLogEntry = {
+      seq: ++this.seq,
+      wallMs: this.wallNow(),
+      gameMs: 0,
+      command,
+      ...(admin ? { admin } : {}),
+    };
     let result: CommandResult;
     const tracing = this.trace.enabled;
-    if (tracing) this.trace.record(this.id, 'command', { seq: entry.seq, command });
+    if (tracing)
+      this.trace.record(this.id, 'command', {
+        seq: entry.seq,
+        command,
+        ...(admin ? { admin } : {}),
+      });
     const before = tracing ? this.clockView() : undefined;
     try {
       this.sync();
@@ -1176,6 +1193,21 @@ export class GameActor {
       case 'advanceTo':
         this.clock.advanceTo(command.gameMs);
         return { ok: true };
+      case 'step': {
+        // Step whatever the mode and pause state, then put both back. Each change re-anchors at the
+        // current game time, so only the advance moves it (and it stalls at the LLM barrier).
+        const { mode, status } = this.clock;
+        if (status === 'stopped') throw new Error('clock is stopped');
+        this.clock.setMode('manual');
+        this.clock.resume();
+        try {
+          this.clock.advanceTo(command.gameMs);
+        } finally {
+          if (status === 'paused') this.clock.pause();
+          this.clock.setMode(mode);
+        }
+        return { ok: true };
+      }
       case 'order':
         throw new Error('orders go through submitOrder');
       case 'narrate':

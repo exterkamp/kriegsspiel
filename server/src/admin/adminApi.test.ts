@@ -6,6 +6,7 @@ import { hashToken } from '../auth/store.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { adminFromEnv, isLoopback } from './adminApi.js';
 import { TraceStore, traceUmpire } from '../debug/index.js';
+import { MemoryGameStore } from '../game/index.js';
 import { MockUmpireClient } from '../umpire/index.js';
 
 const RATE = 3600;
@@ -17,8 +18,17 @@ afterEach(async () => {
   app = undefined;
 });
 
+let store: MemoryGameStore;
+let trace: TraceStore;
+
 async function start(admin?: { enabled: boolean; token?: string; open?: boolean }) {
-  app = await buildApp({ parser: new StubOrderParser(), admin });
+  store = new MemoryGameStore();
+  trace = new TraceStore();
+  app = await buildApp({
+    parser: new StubOrderParser(),
+    store,
+    admin: admin && { ...admin, trace },
+  });
   const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
   const user = app.authStore.upsertUser('admin-test@example.test', Date.now());
   app.authStore.putSession(hashToken('test-session'), user.id, Date.now() + 3_600_000);
@@ -447,5 +457,74 @@ describe('LLM log through the admin API', () => {
       ok: true,
     });
     expect(entries[1]!.data).toMatchObject({ stage: 'parse', ok: false, errorKind: 'timeout' });
+  });
+});
+
+describe('clock controls (#128)', () => {
+  const post = (id: string, body: unknown, remoteAddress = '127.0.0.1') =>
+    app!.server.inject({
+      method: 'POST',
+      url: `/admin/api/games/${id}/clock`,
+      remoteAddress,
+      payload: body as object,
+    });
+
+  it('is a 404 when admin is off, and 401 for a remote caller without the token', async () => {
+    const off = await start();
+    expect((await post(off.id, { action: 'pause' })).statusCode).toBe(404);
+    const on = await start({ enabled: true, token: TOKEN });
+    expect((await post(on.id, { action: 'pause' }, '203.0.113.9')).statusCode).toBe(401);
+    expect(app!.host.get(on.id)!.gameClock.status).toBe('running');
+  });
+
+  it('pauses, resumes and changes the rate, logging each as an admin input', async () => {
+    const { id } = await start({ enabled: true });
+    const actor = app!.host.get(id)!;
+    expect((await post(id, { action: 'pause' })).statusCode).toBe(200);
+    expect(actor.gameClock.status).toBe('paused');
+    expect((await post(id, { action: 'rate', rate: 4 })).statusCode).toBe(200);
+    expect(actor.gameClock.rate).toBe(4);
+    expect((await post(id, { action: 'resume' })).statusCode).toBe(200);
+    expect(actor.gameClock.status).toBe('running');
+    const log = await store.inputLog(id);
+    const admin = log.filter((e) => e.admin);
+    expect(admin.map((e) => e.command.kind)).toEqual(['pause', 'setRate', 'resume']);
+    const traced = trace.entries(id).filter((e) => e.kind === 'command');
+    expect(traced.every((e) => (e.data as { admin?: boolean }).admin === true)).toBe(true);
+  });
+
+  it('steps a paused realtime game by exactly the asked time and leaves it paused', async () => {
+    const { id } = await start({ enabled: true });
+    const actor = app!.host.get(id)!;
+    await post(id, { action: 'pause' });
+    const t0 = actor.gameClock.now();
+    const res = await post(id, { action: 'step', ms: 60_000 });
+    expect(res.statusCode).toBe(200);
+    expect(actor.gameClock.now()).toBe(t0 + 60_000);
+    expect(actor.gameClock.status).toBe('paused');
+    expect(actor.gameClock.mode).toBe('realtime');
+    expect(actor.state.time).toBe(t0 + 60_000);
+  });
+
+  it('steps to the next queued event', async () => {
+    const { id } = await start({ enabled: true });
+    const actor = app!.host.get(id)!;
+    await post(id, { action: 'pause' });
+    const next = actor.nextEventAt;
+    const res = await post(id, { action: 'stepToNext' });
+    if (next === undefined) expect(res.statusCode).toBe(409);
+    else {
+      expect(res.statusCode).toBe(200);
+      expect(actor.gameClock.now()).toBe(Math.max(next, actor.gameClock.now()));
+    }
+  });
+
+  it('rejects bad bodies and unknown games', async () => {
+    const { id } = await start({ enabled: true });
+    expect((await post(id, { action: 'rate', rate: 0 })).statusCode).toBe(400);
+    expect((await post(id, { action: 'rate', rate: 1e9 })).statusCode).toBe(400);
+    expect((await post(id, { action: 'step', ms: -5 })).statusCode).toBe(400);
+    expect((await post(id, { action: 'nope' })).statusCode).toBe(400);
+    expect((await post('missing', { action: 'pause' })).statusCode).toBe(404);
   });
 });
