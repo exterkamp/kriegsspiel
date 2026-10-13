@@ -7,7 +7,7 @@
 import { DEFAULT_UMPIRE_PERSONA, type UmpirePersona } from '@kriegsspiel/protocol';
 
 export const PERSONA_PROMPT: Readonly<Record<UmpirePersona, string>> = {
-  dry: 'Voice: a dry, seasoned Prussian staff officer. Terse, matter-of-fact, no ornament.',
+  dry: 'Voice: a dry, seasoned Prussian staff officer. Plain and matter-of-fact, no ornament, but with a soldier’s judgement.',
   pedantic:
     'Voice: a pedantic umpire. Precise to a fault: name the rule or the figure behind a ruling, and read an order strictly as it is worded, not as it was probably meant.',
   dramatic:

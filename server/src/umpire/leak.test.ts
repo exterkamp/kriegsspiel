@@ -119,6 +119,7 @@ async function runStages(client: UmpireClient, side: SideId): Promise<Delivered[
   const view = viewFor(G.world, side, G.now);
   const narrated = await narrateReports(client, side, view.reports, {
     hidden: hiddenTerms(G.world, side),
+    ownUnits: view.ownUnits,
   });
   out.push(deliver('narrate dispatches', narrated.dispatches));
 

@@ -493,12 +493,8 @@ export class GameActor {
       if (now < since + narrateWindowMs(this.clock.rate)) continue;
       // The window is closed: reports delivered later belong to the next one, whether or not any are due.
       this.narratedUntil.set(side.id, now);
-      const due = reportsDueForNarration(
-        viewFor(this.engine.world, side.id, now).reports,
-        since,
-        now,
-        this.clock.rate,
-      );
+      const view = viewFor(this.engine.world, side.id, now);
+      const due = reportsDueForNarration(view.reports, since, now, this.clock.rate);
       if (due.length === 0) continue;
       this.narrating.add(side.id);
       const before = this.clock.barrier;
@@ -527,6 +523,7 @@ export class GameActor {
         hidden: hiddenTerms(this.engine.world, side.id as SideId),
         signal: abort.signal,
         persona: this.persona,
+        ownUnits: view.ownUnits,
       }).then(
         (result) => {
           this.clearParseTimer(deadline);

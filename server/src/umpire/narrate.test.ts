@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MS_PER_MINUTE } from '@kriegsspiel/engine';
-import type { ViewReport } from '@kriegsspiel/engine';
+import { LOW_AMMO, MS_PER_MINUTE } from '@kriegsspiel/engine';
+import type { ViewReport, ViewUnit } from '@kriegsspiel/engine';
 import { MockUmpireClient } from './mockUmpireClient.js';
 import type { UmpireFixture } from './mockUmpireClient.js';
 import {
@@ -13,6 +13,7 @@ import {
   narrateReports,
   narrateWindowMs,
   reportsDueForNarration,
+  unitCondition,
 } from './narrate.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- a fake model reads raw call inputs */
@@ -70,6 +71,108 @@ describe('narrate input', () => {
       radiusM: 120,
     });
     expect(JSON.stringify(input)).not.toMatch(/red-|location|"x"/);
+  });
+});
+
+describe('narrate input: the sender (#390)', () => {
+  const hussars = {
+    id: 'blue-2',
+    name: '2nd Hussars',
+    commander: 'Maj. von Reiter',
+    trait: 'bold and impatient; apt to charge early',
+    strength: 300,
+    morale: 35,
+    fatigue: 80,
+    ammo: 15,
+  } as ViewUnit;
+  const withSender = narrateInput('blue', reports, [hussars]);
+
+  it('gives the sending officer, his manner and his unit’s condition in words', () => {
+    expect(withSender.reports[0]).toMatchObject({
+      commander: 'Maj. von Reiter',
+      trait: 'bold and impatient; apt to charge early',
+      condition: 'wavering, spent, ammunition nearly gone',
+    });
+    expect(JSON.stringify(withSender.reports[0])).not.toMatch(/"(morale|fatigue|ammo|strength)"/);
+  });
+
+  it('adds nothing for a sender that is not one of the side’s units, or is destroyed', () => {
+    expect(withSender.reports[1]).toEqual(input.reports[1]);
+    const gone = narrateInput('blue', reports, [{ ...hussars, strength: 0 }]);
+    expect(gone.reports[0]).toEqual(input.reports[0]);
+  });
+
+  it('puts condition in coarse words', () => {
+    expect(unitCondition({ morale: 90, fatigue: 10, ammo: 100 })).toBe(
+      'steady, fresh, well supplied',
+    );
+    expect(unitCondition({ morale: 50, fatigue: 50, ammo: 40 })).toBe(
+      'shaken, tiring, ammunition running low',
+    );
+    // A unit that has just filed its lowAmmo report reads as nearly gone.
+    expect(unitCondition({ morale: 90, fatigue: 10, ammo: LOW_AMMO })).toBe(
+      'steady, fresh, ammunition nearly gone',
+    );
+    expect(unitCondition({ morale: 90, fatigue: 10, ammo: LOW_AMMO + 1 })).toBe(
+      'steady, fresh, ammunition running low',
+    );
+  });
+
+  it('lets the note name its commander and ask the general a question', () => {
+    expect(
+      checkProse(
+        'Sir, the 2nd Hussars have sighted perhaps 400 men near the mill. My men are spent. Shall we fall back? Should we hold? Maj. von Reiter',
+        withSender,
+      ),
+    ).toEqual([]);
+    expect(checkProse('Must we hold? May I pursue? Request orders.', input)).toEqual([]);
+    // A question is still no place to invent a name.
+    expect(checkProse('Shall we fall back on Hohenau?', withSender)).toEqual([
+      'unknown name "Hohenau"',
+    ]);
+  });
+
+  it('gives no sender for the kinds headquarters writes: a lost unit or a lost courier', () => {
+    const staff = narrateInput(
+      'blue',
+      [
+        report({ id: 'blue-r4', kind: 'courierLost', sizeEstimate: undefined }),
+        report({ id: 'blue-r5', kind: 'unitLost', sizeEstimate: undefined }),
+      ],
+      [hussars],
+    );
+    for (const r of staff.reports) {
+      expect(r).not.toHaveProperty('commander');
+      expect(r).not.toHaveProperty('trait');
+      expect(r).not.toHaveProperty('condition');
+    }
+  });
+
+  it('passes the field notes the prompt asks for, in the officer’s own words', () => {
+    const engaged = narrateInput(
+      'blue',
+      [report({ id: 'blue-r3', kind: 'engaged', place: 'at the bridge on the High road' })],
+      [hussars],
+    );
+    const notes = [
+      'Sir, we are engaged at the bridge. Spent as we are, I doubt we can hold. Shall we fall back?',
+      'Sir, we are engaged at the bridge. Pursue them or hold? Your orders, sir.',
+      'Ammunition is nearly gone. Hold or fall back?',
+      'Engaged at the bridge on the High road. Men are spent and wavering. Request relief.',
+      'The enemy presses us at the bridge. Wavering men will not stand long. Send help, I beg you.',
+      'We hold the bridge for now. Is the reserve coming? Advise, sir.',
+      'Sir, we hold the bridge for now. Unless relieved within the hour we must give way. Orders?',
+      'Sir, we hold. Nothing more can be asked of these men. Shall I withdraw? Yours, Maj. von Reiter',
+      'Sir, we are hotly engaged at the bridge. Our powder is nearly gone. Can we be relieved?',
+    ];
+    for (const note of notes) expect(checkProse(note, engaged), note).toEqual([]);
+    expect(checkProse('Advance on Hohenau?', engaged)).toEqual(['unknown name "Hohenau"']);
+  });
+
+  it('passes the side’s units through to each call', async () => {
+    const client = fakeModel([one('blue-r1', good.dispatches[0]!.text)]);
+    await narrateReports(client as never, 'blue', [reports[0]!], { ownUnits: [hussars] });
+    expect(client.calls[0]).toEqual(narrateInput('blue', [reports[0]!], [hussars]));
   });
 });
 
