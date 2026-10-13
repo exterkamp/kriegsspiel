@@ -26,12 +26,6 @@ afterEach(async () => {
   host = undefined;
 });
 
-/** Hold the Bridge against the scripted Red, with the time limit and the hold time given. */
-function scenario(victory: { holdMs?: number; takeMs?: number } = {}): Scenario {
-  const s = loadScenario(holdTheBridge);
-  return { ...s, seed: 1815, victory: { ...s.victory, ...victory } };
-}
-
 /**
  * Hold the Bridge with Blue's one battalion far from the river and the rest left out, so the
  * scripted Red marches onto the bridge unopposed: no fight can break its attack, and its hold
@@ -133,13 +127,13 @@ describe('turn mode: the game ends in the turn that decides it (#429)', () => {
     'opens no further turn when the objective falls at the end of a $turnMinutes-minute turn (deadline $deadlineHours h)',
     async ({ turnMinutes, deadlineHours }) => {
       const turnMs = turnMinutes * MINUTE;
-      // First check when Red's hold on the bridge starts (it starts part-way through a minute).
+      // First check that Red's hold on the bridge starts at HOLD_FROM (counted to the game minute).
       const probe = await play(unopposed({ holdMs: 4 * HOUR, takeMs: 3 * HOUR }), turnMinutes);
       const since = probe.heldSince.find((s) => typeof s === 'number')!;
       expect(since).toBe(HOLD_FROM);
-      // Then make the hold complete at the end of a turn: counted to the game minute, as the
-      // clock shows it, the take falls on the turn end and decides that turn.
-      const minute = Math.floor(since / MINUTE) * MINUTE;
+      // Then make the hold complete at the end of a turn: the take falls on the turn end and
+      // decides that turn.
+      const minute = since;
       let end = Math.ceil((minute + MINUTE) / turnMs) * turnMs;
       if (end - minute < 2 * MINUTE) end += turnMs;
       const { game, log } = await play(
@@ -162,9 +156,10 @@ describe('turn mode: the game ends in the turn that decides it (#429)', () => {
   it.each([10, 20, 30])(
     'ends at the time limit with the last %i-minute turn and opens no other',
     async (turnMinutes) => {
-      // Red cannot take the bridge in time: the defender wins at the time limit.
+      // Red holds the bridge from 00:15 but cannot take it in time, and no fight declares a
+      // battle: the defender wins at the time limit.
       const holdMs = 50 * MINUTE;
-      const { game, log } = await play(scenario({ holdMs, takeMs: 3 * HOUR }), turnMinutes);
+      const { game, log } = await play(unopposed({ holdMs, takeMs: 3 * HOUR }), turnMinutes);
       expect(game.state.world.outcome).toMatchObject({ reason: 'objective-held', time: holdMs });
       expectOver(game, holdMs);
       expect(opened(log).at(-1)).toMatchObject({ endMs: holdMs });
