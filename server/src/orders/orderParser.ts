@@ -6,6 +6,8 @@
  * `ParseResult`, and the engine validates and applies any intents.
  */
 
+import type { Interpretation } from '@kriegsspiel/engine';
+
 /** A point on the continuous map plane, as in the engine's master state: integer millimetres. */
 export type Coord = { x: number; y: number };
 
@@ -35,7 +37,14 @@ export interface ParseContext {
   side: string;
   map: { features: readonly ParseFeature[] };
   /** `center` is the middle of the unit's footprint, as in the engine's `Unit`. */
-  units: readonly { id: string; side: string; name: string; center: Coord }[];
+  units: readonly {
+    id: string;
+    side: string;
+    name: string;
+    center: Coord;
+    /** The commander's traits. Only the interpret task reads them; never shown to a player. */
+    personality?: readonly string[];
+  }[];
   /** Names the issuing side must not read in a reply (`hiddenTerms`), such as the enemy's commanders. */
   hidden?: readonly string[];
 }
@@ -47,7 +56,13 @@ interface ParseResultBase {
 
 export type ParseResult =
   /** The order was understood: `unitId` should carry out `intents` in sequence. */
-  | (ParseResultBase & { kind: 'intents'; unitId: string; intents: OrderIntent[] })
+  | (ParseResultBase & {
+      kind: 'intents';
+      unitId: string;
+      intents: OrderIntent[];
+      /** How the addressee's character coloured the order (the interpret task). Logged for replay. */
+      interpretation?: Interpretation;
+    })
   /** The order is plausible but underspecified; ask the player. */
   | (ParseResultBase & { kind: 'clarification'; question: string; options?: string[] })
   /** The order cannot be carried out or understood. */

@@ -4,6 +4,7 @@ import {
   defaultFootprint,
   subPositions,
 } from './formation.js';
+import { TRAITS } from './personality.js';
 import { mm, pointMm, polygonCentroid } from './geometry.js';
 import { KIND_DEFAULTS, ROAD_CLASS_COST, terrainAt } from './terrain.js';
 import { UNIT_TYPES, unitTypeOf } from './unitTypes.js';
@@ -267,6 +268,14 @@ function parseUnits(raw: unknown, map: TerrainMap, sides: Side[]): Unit[] {
       name,
       ...(o.commander === undefined ? {} : { commander: str(o.commander, `${p}.commander`) }),
       ...(o.trait === undefined ? {} : { trait: str(o.trait, `${p}.trait`) }),
+      ...(o.personality === undefined
+        ? {}
+        : {
+            personality: (Array.isArray(o.personality)
+              ? o.personality
+              : fail(`${p}.personality must be an array`)
+            ).map((t: unknown) => oneOf(t, TRAITS, `${p}.personality`)),
+          }),
       center,
       facing: (num(o.facingDeg, `${p}.facingDeg`) * Math.PI) / 180,
       formation,
