@@ -269,7 +269,15 @@ export class GameHost {
       const c = e.command;
       if (c.kind === 'dissent') dissents.set(c.side, [...(dissents.get(c.side) ?? []), c.dissent]);
       if (c.kind !== 'staffAnswer' || !c.exchange) continue;
-      staffHistory.set(c.side, [...(staffHistory.get(c.side) ?? []), c.exchange]);
+      // A question is logged when asked and again when answered (#418): the answer replaces it in place.
+      const x = c.exchange;
+      const list = staffHistory.get(c.side) ?? [];
+      staffHistory.set(
+        c.side,
+        list.some((y) => y.questionId === x.questionId)
+          ? list.map((y) => (y.questionId === x.questionId ? x : y))
+          : [...list, x],
+      );
     }
     const deputies = deputiesFromLog(log);
     // The narration breaker as the last window left it (#419).

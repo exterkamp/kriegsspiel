@@ -296,9 +296,9 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       costMs: GameMs,
     })
     .strict(),
-  // The umpire's answer to a staff question, written from the asking seat's view at `basedOnGame`. The
-  // client shows it once game time reaches the question's `answerAtGame`. No `text`: the staff stage is
-  // off or failed, and the client falls back to its own canned answer.
+  // An officer's answer to a staff question, written once when game time reaches the question's
+  // `answerAtGame`, from the officer's view then, and stored with the game (#418). The server always
+  // sends `text` (the model's, or the officer's canned answer); it is optional only for older servers.
   z
     .object({
       ...Envelope,
