@@ -349,4 +349,16 @@ describe('crash recovery', () => {
     expect(views!.seq).toBe(1);
     expect((await store.clockHistory('g1')).map((c) => c.kind)).toEqual(['pause']);
   });
+
+  it("keeps a finished game's winner in its stored summary across a reopen", async () => {
+    const path = tmpDb();
+    const store = open(path);
+    await hostFor(store, new FakeTime()).create('g1', loadScenario(holdTheBridge));
+    expect((await store.loadSummary('g1'))?.finished).toBe(false);
+    await store.saveOutcome('g1', 'blue');
+    store.close();
+    const summary = await open(path).loadSummary('g1');
+    expect(summary?.finished).toBe(true);
+    expect(summary?.winner).toBe('blue');
+  });
 });

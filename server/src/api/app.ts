@@ -613,15 +613,6 @@ export async function buildApp(options: AppOptions): Promise<App> {
     return undefined;
   };
 
-  /**
-   * Replay results for games that are not open, by game id. A replay only changes when the log
-   * grows, so `GET /games` replays a stored game once, not on every call (#262).
-   */
-  const replayed = new Map<
-    string,
-    { entries: number; outcome: ReturnType<typeof replayTimeline>['outcome']; endMs: number }
-  >();
-
   /** Where a started game stands: over or not, its game time and when it was last played (wall time). */
   const progressOf = async (
     rec: LobbyGame,
@@ -634,35 +625,44 @@ export async function buildApp(options: AppOptions): Promise<App> {
   }> => {
     const none = { finished: false, gameTimeMs: 0, lastPlayedMs: rec.createdAtMs };
     if (rec.status !== 'started') return none;
-    const input = await loadReplayInput(store, rec.id).catch(() => undefined);
-    const lastPlayedMs = input?.entries.reduce((m, e) => Math.max(m, e.wallMs), rec.createdAtMs);
-    const live = host.get(rec.id);
-    if (live) {
-      replayed.delete(rec.id);
-      return {
-        finished: Boolean(live.state.world.outcome),
-        ...(live.state.world.outcome ? { winner: live.state.world.outcome.winner } : {}),
-        gameTimeMs: live.state.time,
-        lastPlayedMs: lastPlayedMs ?? rec.createdAtMs,
-      };
-    }
-    if (!input) return none;
-    try {
-      let hit = replayed.get(rec.id);
-      if (hit?.entries !== input.entries.length) {
-        const tl = replayTimeline(input);
-        hit = { entries: input.entries.length, outcome: tl.outcome, endMs: tl.endMs };
-        replayed.set(rec.id, hit);
+    // The standing is kept with the game record as it is played (#262), so this reads, never replays.
+    let sum = await store.loadSummary(rec.id).catch(() => undefined);
+    if (!sum) return none;
+    if (!sum.known) {
+      // A game stored before the standing was kept: replay it once and keep the result.
+      try {
+        const input = await loadReplayInput(store, rec.id);
+        if (input) {
+          const tl = replayTimeline(input);
+          await store.backfillSummary(rec.id, {
+            lastPlayedMs: input.entries.reduce((m, e) => Math.max(m, e.wallMs), 0) || undefined,
+            ...(tl.outcome ? { outcome: { winner: tl.outcome.winner } } : {}),
+          });
+          sum = await store.loadSummary(rec.id);
+          if (sum && sum.gameMs < tl.endMs) sum = { ...sum, gameMs: tl.endMs };
+        }
+      } catch {
+        return none;
       }
-      return {
-        finished: Boolean(hit.outcome),
-        ...(hit.outcome ? { winner: hit.outcome.winner } : {}),
-        gameTimeMs: hit.endMs,
-        lastPlayedMs: lastPlayedMs ?? rec.createdAtMs,
-      };
-    } catch {
-      return { ...none, lastPlayedMs: lastPlayedMs ?? rec.createdAtMs };
+      if (!sum) return none;
     }
+    const lastPlayedMs = Math.max(sum.lastPlayedMs ?? 0, rec.createdAtMs);
+    const live = host.get(rec.id)?.state;
+    if (live) {
+      const outcome = live.world.outcome;
+      return {
+        finished: Boolean(outcome),
+        ...(outcome ? { winner: outcome.winner } : {}),
+        gameTimeMs: live.time,
+        lastPlayedMs,
+      };
+    }
+    return {
+      finished: sum.finished,
+      ...(sum.finished ? { winner: sum.winner ?? null } : {}),
+      gameTimeMs: sum.gameMs,
+      lastPlayedMs,
+    };
   };
 
   server.get('/games', async (req, reply) => {

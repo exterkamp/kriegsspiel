@@ -118,6 +118,21 @@ export interface SideViews {
   views: Record<string, unknown>;
 }
 
+/**
+ * A game's standing, kept with its record so listing games needs no replay (#262). `known` is
+ * false for a game stored before this was kept: the caller replays it once and calls `backfillSummary`.
+ */
+export interface GameSummary {
+  known: boolean;
+  /** How far game time has run. */
+  gameMs: number;
+  /** Wall time of the newest input, if any. */
+  lastPlayedMs?: number;
+  finished: boolean;
+  /** Set once the game is over: the winning side, or null when both were put out together. */
+  winner?: string | null;
+}
+
 export interface GameStore {
   /** Create or replace the snapshot. */
   saveSnapshot(gameId: string, snapshot: GameSnapshot): Promise<void>;
@@ -134,6 +149,15 @@ export interface GameStore {
    */
   saveProgress(gameId: string, gameMs: number): Promise<void>;
   loadProgress(gameId: string): Promise<number | undefined>;
+  /** Record that the game is over, with its winner (null: a draw). Called once the outcome exists. */
+  saveOutcome(gameId: string, winner: string | null): Promise<void>;
+  /** The game's standing without loading its log; undefined if the game is not stored. */
+  loadSummary(gameId: string): Promise<GameSummary | undefined>;
+  /** Fill in the standing of a game stored before it was kept, from a replay. */
+  backfillSummary(
+    gameId: string,
+    summary: { lastPlayedMs?: number; outcome?: { winner: string | null } },
+  ): Promise<void>;
   /** Remember the last wall time the server was seen alive for this game, so a restart can measure downtime. */
   saveHeartbeat(gameId: string, wallMs: number): Promise<void>;
   loadHeartbeat(gameId: string): Promise<number | undefined>;
@@ -198,6 +222,32 @@ export class MemoryGameStore implements GameStore {
 
   async loadProgress(gameId: string): Promise<number | undefined> {
     return this.progress.get(gameId);
+  }
+
+  private readonly outcomes = new Map<string, string | null>();
+
+  async saveOutcome(gameId: string, winner: string | null): Promise<void> {
+    this.outcomes.set(gameId, winner);
+  }
+
+  async loadSummary(gameId: string): Promise<GameSummary | undefined> {
+    if (!this.headers.has(gameId)) return undefined;
+    const log = this.logs.get(gameId) ?? [];
+    const finished = this.outcomes.has(gameId);
+    return {
+      known: true,
+      gameMs: this.progress.get(gameId) ?? 0,
+      ...(log.length > 0 ? { lastPlayedMs: log.reduce((m, e) => Math.max(m, e.wallMs), 0) } : {}),
+      finished,
+      ...(finished ? { winner: this.outcomes.get(gameId) ?? null } : {}),
+    };
+  }
+
+  async backfillSummary(
+    gameId: string,
+    summary: { outcome?: { winner: string | null } },
+  ): Promise<void> {
+    if (summary.outcome) this.outcomes.set(gameId, summary.outcome.winner);
   }
 
   private readonly heartbeats = new Map<string, number>();
