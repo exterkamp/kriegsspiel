@@ -8,14 +8,17 @@
  *   --import <dir> --model <label>        score a Claude Code pane's answers in <dir>
  *   --blind <dir> --key <file>            write the blind grading packet (letters, not names)
  *   --report [--grades <file> --key <file>]  join checks, grades and models.json into a table
+ *   --rescore                             re-apply the current checks to every saved raw output
  *
  * Common: --out <dir> (default bench/umpire), --cases a,b (a subset), --num-ctx <n> (Ollama).
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { request } from 'node:http';
 import { join } from 'node:path';
 import { AnthropicProvider } from '../providers/anthropic.js';
 import { OllamaProvider } from '../providers/ollama.js';
 import type { LlmProvider } from '../provider.js';
+import type { FetchFn } from '../providers/http.js';
 import { TURN_CASES } from './turnCases.js';
 import {
   blindPacket,
@@ -25,6 +28,7 @@ import {
   runCanned,
   runCase,
   saveRun,
+  scoreRaw,
   slug,
   summarise,
   tableMarkdown,
@@ -54,6 +58,33 @@ const line = (r: CaseRun) => {
   const s = r.latencyMs === null ? '-' : `${(r.latencyMs / 1000).toFixed(1)} s`;
   return `${r.caseId.padEnd(20)} ${r.checks.pass ? 'PASS' : 'FAIL'}  ${s.padStart(8)}  ${fails}`;
 };
+
+/**
+ * A fetch over `node:http` with no header timeout. Node's fetch (undici) gives up after 300 s
+ * without response headers, and a non-streamed Ollama answer sends none until it is done, which
+ * a 7B model on this CPU host takes longer than. The call's own `AbortSignal` still applies.
+ */
+const patientFetch: FetchFn = (input, init) =>
+  new Promise((resolve, reject) => {
+    const req = request(
+      String(input),
+      {
+        method: init?.method ?? 'GET',
+        headers: init?.headers as Record<string, string>,
+        ...(init?.signal ? { signal: init.signal } : {}),
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () =>
+          resolve(new Response(Buffer.concat(chunks), { status: res.statusCode ?? 500 })),
+        );
+        res.on('error', reject);
+      },
+    );
+    req.on('error', reject);
+    req.end(typeof init?.body === 'string' ? init.body : undefined);
+  });
 
 async function ollamaMeta(url: string, model: string): Promise<ModelMeta> {
   try {
@@ -88,6 +119,16 @@ if (has('export')) {
   if (!key) throw new Error('--blind needs --key <file> outside the packet directory');
   blindPacket(arg('blind')!, key, loadRuns(out));
   console.log(`wrote the grading packet to ${arg('blind')} and the key to ${key}`);
+} else if (has('rescore')) {
+  for (const runs of loadRuns(out).values()) {
+    for (const r of runs) {
+      const c = TURN_CASES.find((x) => x.id === r.caseId)!;
+      // A run with no output (a failed call) keeps its error; any other is scored afresh.
+      const next: CaseRun = r.raw ? { ...r, error: undefined, ...scoreRaw(c, r.raw) } : r;
+      saveRun(out, next);
+      console.log(`${r.model.padEnd(22)} ${line(next)}`);
+    }
+  }
 } else if (has('report')) {
   const metaFile = join(out, 'models.json');
   const rows = summarise(
@@ -104,7 +145,11 @@ if (has('export')) {
   const url = arg('url') ?? 'http://localhost:11434';
   let provider: LlmProvider | undefined;
   if (providerId === 'ollama') {
-    provider = new OllamaProvider({ baseUrl: url, numCtx: Number(arg('num-ctx') ?? 12288) });
+    provider = new OllamaProvider({
+      baseUrl: url,
+      numCtx: Number(arg('num-ctx') ?? 12288),
+      fetch: patientFetch,
+    });
   } else if (providerId === 'anthropic') {
     provider = new AnthropicProvider();
   } else if (providerId !== 'test') {

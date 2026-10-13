@@ -8,8 +8,9 @@
  *   on the road.
  * - `limits`: the hard limits of D39 "Validation and clamps": the march (`validatePlacement` from
  *   the `T0` position over the turn), `0 <= strength <= T0 strength` with 0 meaning destroyed,
- *   morale, fatigue and ammunition in 0..100, ammunition no higher than projected, and no loss
- *   for a unit no enemy could reach in the turn.
+ *   morale, fatigue and ammunition in 0..100, and no loss for a unit no enemy could reach in the turn.
+ * - `ammo`: D39's ceiling, ammunition no higher than the projection's. Kept apart from `limits`
+ *   because it also fails an umpire that has a unit fire less than the engine did (see the docs).
  * - `observations`: the observer is the side's own unit and the engine's sight test passes at the
  *   end the observation names.
  * - `fog`: no unit's account names the other side's units or commanders (`hiddenIn`).
@@ -42,6 +43,7 @@ export const CHECKS = [
   'schema',
   'ids',
   'limits',
+  'ammo',
   'observations',
   'fog',
   'departure',
@@ -95,7 +97,7 @@ function marchProblem(world: GameState, unit: Unit, o: UnitOutcome, elapsedMs: n
 function reachable(world: GameState, unit: Unit, end: Map<string, Unit>, turnMs: number): boolean {
   return world.units.some((e) => {
     if (e.side === unit.side || e.strength <= 0) return false;
-    const reach = mm(unitTypeOf(e).rangeM) + turnMs / msPerMetreOf(e);
+    const reach = mm(unitTypeOf(e).rangeM + turnMs / msPerMetreOf(e));
     const pairs: Array<[Unit | undefined, Unit | undefined]> = [
       [e, unit],
       [end.get(e.id), end.get(unit.id)],
@@ -179,7 +181,7 @@ export function checkProposal(c: TurnCase, raw: unknown): CheckResult {
     }
     const proj = projection.units.find((x) => x.unitId === u.id);
     if (proj && o.ammo !== undefined && o.ammo > proj.ammo + 0.5)
-      problems.limits.push(`${u.id}: ammo ${o.ammo} above the projected ${proj.ammo}`);
+      problems.ammo.push(`${u.id}: ammo ${o.ammo} above the projected ${proj.ammo}`);
     const loss = Math.round(u.strength) - o.strength;
     const projLoss = proj ? Math.round(u.strength) - proj.strength : 0;
     if (loss > projLoss + 0.5 && !reachable(world, u, end, turnMs))

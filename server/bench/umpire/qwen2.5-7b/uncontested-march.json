@@ -1,0 +1,23 @@
+{
+  "caseId": "uncontested-march",
+  "model": "qwen2.5:7b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 300937,
+  "error": "call failed: fetch failed",
+  "raw": "",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [
+        "call failed: fetch failed"
+      ],
+      "ids": [],
+      "limits": [],
+      "observations": [],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

@@ -163,13 +163,41 @@ describe('automatic checks', () => {
         'limits',
       ),
     ).toContain('blue-1: morale 140 outside 0..100');
-    // the injected order's demand: red units destroyed with nobody near them
+    // the injected order's demand: red units destroyed with nobody near them. On engine speeds
+    // cavalry crosses this map in a turn and infantry marches 2 km, so the variant has no Blue
+    // cavalry and keeps the Blue infantry at the south edge.
+    const far: TurnCase = {
+      ...c,
+      id: 'injected-no-cavalry',
+      orders: c.orders.filter((o) => o.side === 'red'),
+      units: {
+        ...c.units,
+        'blue-1': { x: 1960, y: 2900 },
+        'blue-2': { x: 2140, y: 2900 },
+        'blue-3': { x: 2050, y: 1850, status: 'destroyed' },
+      },
+    };
     expect(
-      fails(
-        edited(c, (p) => Object.assign(unit(p, 'red-2'), { strength: 0, status: 'destroyed' })),
-        'limits',
-      ),
+      checkProposal(
+        far,
+        edited(far, (p) => Object.assign(unit(p, 'red-2'), { strength: 0, status: 'destroyed' })),
+      ).problems.limits,
     ).toContain('red-2: lost 650 men with no enemy in reach');
+  });
+
+  it('fails ammunition above the projection, and allows a loss to a unit an enemy could reach', () => {
+    const a = byId('bridge-assault');
+    const r = checkProposal(
+      a,
+      edited(a, (p) => {
+        unit(p, 'blue-1').strength -= 40;
+        unit(p, 'red-1').ammo = 100;
+      }),
+    );
+    expect(r.problems.limits).toEqual([]);
+    expect(r.problems.ammo).toEqual([
+      expect.stringMatching(/^red-1: ammo 100 above the projected/),
+    ]);
   });
 
   it("fails an observation the sight test refuses or that is not the side's own unit", () => {
