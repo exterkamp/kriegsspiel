@@ -61,6 +61,8 @@ export interface Order {
   courier?: CourierChoice;
   /** How the addressee's commander read the order (personality.ts). Absent: as written. */
   interpretation?: Interpretation;
+  /** Written by the player's deputy while they were away (deputy.ts), not by the player. */
+  deputy?: true;
 }
 
 /** A fast courier rides hard and is more likely to be lost or to garble; a safe one takes the quiet way. */

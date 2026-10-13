@@ -241,6 +241,7 @@ export class Hub {
       game.narrationFor(conn.side),
       game.staffHistoryFor(conn.side),
       game.overloadedFor(conn.side),
+      game.deputyFor(conn.side),
       this.chainOf(gameId, conn.side, game.state.time),
     );
   }
@@ -507,6 +508,8 @@ export class Hub {
         void this.store?.saveSeen(gameId, side, at).catch((e) => this.onError(gameId, e));
       }
       if (set.size === 0 && this.conns.get(gameId) === set) this.conns.delete(gameId);
+      // A player who has just left may have a deputy waiting to act.
+      this.lookup(gameId)?.noteDeputyPresence();
     };
     socket.on('close', detach);
     socket.on('error', () => {
@@ -832,6 +835,36 @@ export class Hub {
   }
 
   /**
+   * The commander sets what their deputy may do while they are away (D6f). Only the seat that runs
+   * HQ may, or anyone on a shared-HQ side; the deputy then acts for that seat and no further.
+   */
+  private async handleSetDeputy(
+    game: GameActor,
+    conn: Connection,
+    command: Extract<Command, { kind: 'setDeputy' }>,
+  ): Promise<void> {
+    if (conn.seat && conn.seat.role !== 'commander') {
+      this.send(conn, error('not_permitted', 'only the commander appoints a deputy'));
+      return;
+    }
+    const res = await game.setDeputy(conn.side, conn.seat, command.settings);
+    if (!res.ok) this.send(conn, error('deputy_unavailable', res.reason));
+  }
+
+  /**
+   * Whether nobody is at the table for `side`'s deputy's player: no open connection for that seat
+   * (or, in shared-HQ play, none for the side). The deputy acts only while this holds.
+   */
+  isAway(gameId: string, side: SideId, seat: Seat | undefined): boolean {
+    const key = seat ? seatKey(seat) : undefined;
+    for (const c of this.conns.get(gameId) ?? []) {
+      if (c.side !== side || c.socket.readyState !== OPEN) continue;
+      if (key === undefined || (c.seat && seatKey(c.seat) === key)) return false;
+    }
+    return true;
+  }
+
+  /**
    * The staff check (D6d): the chief of staff reads a shared draft. The hub takes the draft's text
    * from its own book (a client cannot have a different text read), charges the chief of staff's
    * game time (the same busy state as a conference question), tells the side the check is queued
@@ -1149,6 +1182,10 @@ export class Hub {
     }
     if (command.kind === 'forwardDispatch') {
       this.handleForward(gameId, game, conn, command);
+      return;
+    }
+    if (command.kind === 'setDeputy') {
+      await this.handleSetDeputy(game, conn, command);
       return;
     }
     if (command.kind === 'checkDraft') {
