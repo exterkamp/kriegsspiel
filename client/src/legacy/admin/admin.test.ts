@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminPage } from './admin.js';
-import { adminToken, apiUrl, backoffMs, pickGame, panelForKey, stepPanel } from './model.js';
+import {
+  adminGame,
+  adminToken,
+  apiUrl,
+  backoffMs,
+  pickGame,
+  panelForKey,
+  stepPanel,
+} from './model.js';
 
 const games = [
   { id: 'aaaaaaaa-1', open: true, clock: { rate: 4 }, entries: 3 },
@@ -49,6 +57,8 @@ describe('model', () => {
   });
   it('builds admin URLs with the token, and backs off to a cap', () => {
     expect(adminToken('?token=abc')).toBe('abc');
+    expect(adminGame('?game=g%201&token=x')).toBe('g 1');
+    expect(adminGame('')).toBeUndefined();
     expect(apiUrl('games', 'abc')).toBe('/admin/api/games?token=abc');
     expect(apiUrl('games', undefined)).toBe('/admin/api/games');
     expect([0, 1, 2, 10].map(backoffMs)).toEqual([1000, 2000, 4000, 10_000]);

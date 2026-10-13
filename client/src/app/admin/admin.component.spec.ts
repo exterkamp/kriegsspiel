@@ -37,6 +37,43 @@ describe('admin route', () => {
     expect(TestBed.inject(Router).url).toBe('/admin');
   });
 
+  it('shows a persistent banner only when the server says admin is open', async () => {
+    const answer = (admin?: string) =>
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) =>
+          url === '/scenarios'
+            ? new Response(JSON.stringify({ scenarios: [], ...(admin ? { admin } : {}) }))
+            : new Response('{}', { status: 401 }),
+        ),
+      );
+    answer('open');
+    let harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/admin/');
+    const el = harness.fixture.nativeElement as HTMLElement;
+    await vi.waitFor(() => {
+      harness.fixture.detectChanges();
+      expect(el.querySelector('.open-banner')?.textContent).toContain(
+        'anyone who can reach this port can read all hidden game state and LLM prompts',
+      );
+    });
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter(routes),
+        { provide: UrlSerializer, useClass: TrailingSlashUrlSerializer },
+      ],
+    });
+    answer('token');
+    harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/admin/');
+    await harness.fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 20));
+    harness.fixture.detectChanges();
+    expect((harness.fixture.nativeElement as HTMLElement).querySelector('.open-banner')).toBeNull();
+  });
+
   it('stops the page when the route is left', async () => {
     const stop = vi.spyOn(AdminPage.prototype, 'stop');
     const harness = await RouterTestingHarness.create();

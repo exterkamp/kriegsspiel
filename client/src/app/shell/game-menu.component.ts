@@ -6,10 +6,12 @@ import {
   inject,
   Injector,
   DestroyRef,
+  input,
   output,
   signal,
   viewChild,
 } from '@angular/core';
+import { debugGameUrl } from '@legacy/auth';
 import { isTypingTarget } from '@legacy/desk/views';
 import { DeskStore } from '../desk/desk.store';
 import { ModalComponent } from '../ui/modal.component';
@@ -29,6 +31,11 @@ import { ModalComponent } from '../ui/modal.component';
           <button #resume type="button" (click)="setOpen(false)">Resume</button>
           <button type="button" (click)="leave.emit()">Leave to main menu</button>
           <button type="button" class="ks-danger" (click)="signOut.emit()">Sign out</button>
+          @if (debugGame(); as id) {
+            <a class="ks-row ks-link" [href]="debugUrl(id)" target="_blank" rel="noopener"
+              >Debug this game</a
+            >
+          }
           <ng-content />
           <p class="note ks-muted">
             Leaving does not end the game. It keeps running on the server.
@@ -61,6 +68,9 @@ import { ModalComponent } from '../ui/modal.component';
   `,
 })
 export class GameMenuComponent {
+  /** The game's id when the admin view is on, so the menu can link to its debug view. */
+  readonly debugGame = input<string | undefined>(undefined);
+  protected readonly debugUrl = debugGameUrl;
   readonly leave = output();
   readonly signOut = output();
   private readonly desk = inject(DeskStore);

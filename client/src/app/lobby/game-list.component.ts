@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { debugGameUrl } from '@legacy/auth';
 import type { GameSummary } from '@legacy/lobby/api';
 import type { PlayedGame } from '@legacy/shell/continueList';
 import { gameStatus } from '@legacy/shell/continueList';
@@ -26,6 +27,9 @@ interface Row {
         @for (g of rows(); track g.id) {
           <li class="ks-row">
             <a [href]="'/?game=' + enc(g.id)">{{ g.title }}</a> — {{ g.state }}
+            @if (admin()) {
+              — <a class="debug" [href]="debugUrl(g.id)">Debug this game</a>
+            }
           </li>
         } @empty {
           <li>No games yet.</li>
@@ -49,8 +53,14 @@ export class GameListComponent implements OnInit {
   protected readonly rows = signal<Row[] | undefined>(undefined);
   protected readonly error = signal<string | undefined>(undefined);
   protected readonly enc = encodeURIComponent;
+  protected readonly debugUrl = debugGameUrl;
+  protected readonly admin = signal(false);
 
   ngOnInit(): void {
+    this.api.adminMode().then(
+      (m) => this.admin.set(m !== undefined),
+      () => undefined,
+    );
     Promise.all([this.api.fetchGames(), this.api.fetchScenarios().catch(() => [])]).then(
       ([games, scenarios]) =>
         this.rows.set(
