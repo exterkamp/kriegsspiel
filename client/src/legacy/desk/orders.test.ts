@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import type { Mark } from '@kriegsspiel/protocol';
+import type { Dispatch, Mark } from '@kriegsspiel/protocol';
 import {
   annexLine,
+  deliveredBy,
   deliveryStatus,
   emptyDraft,
   estimateRideMs,
   formatEstimate,
   loadDraft,
+  lostBy,
   orderWithOption,
   refusalText,
   saveDraft,
@@ -143,5 +145,47 @@ describe('clarification options', () => {
     });
     expect(t).toContain('Which wood, sir?');
     expect(t).not.toContain('Southern');
+  });
+});
+
+describe('word of an order (#438)', () => {
+  const order = {
+    orderId: 't-1',
+    text: 'March to the bridge',
+    sentAtGame: 20 * 60_000,
+    toName: '1st Battalion',
+  };
+  const paper = (
+    id: string,
+    kind: Dispatch['kind'],
+    writtenMin: number,
+    from = '1st Battalion',
+  ): Dispatch => ({
+    id,
+    from,
+    kind,
+    writtenAtGame: writtenMin * 60_000,
+    receivedAtGame: (writtenMin + 3) * 60_000,
+    category: 'subordinates',
+    text: '',
+  });
+
+  it('takes only the addressee acknowledging its orders as proof that the order arrived', () => {
+    const engaged = paper('r1', 'engaged', 21);
+    const ack = paper('r2', 'orderDelivered', 22);
+    expect(deliveredBy(order, [engaged])).toBeUndefined();
+    expect(deliveredBy(order, [engaged, ack])).toBe(ack);
+    // An acknowledgement written before the order went out is for an earlier one.
+    expect(deliveredBy(order, [paper('r0', 'orderDelivered', 19)])).toBeUndefined();
+    expect(
+      deliveredBy(order, [paper('r3', 'orderDelivered', 22, '2nd Battalion')]),
+    ).toBeUndefined();
+  });
+
+  it('reads the staff giving its courier up as the order lost, unless it arrived first', () => {
+    const lost = paper('r4', 'courierLost', 37);
+    expect(lostBy(order, [paper('r1', 'engaged', 21), lost])).toBe(lost);
+    expect(lostBy(order, [paper('r2', 'orderDelivered', 22), lost])).toBeUndefined();
+    expect(lostBy(order, [paper('r5', 'courierLost', 15)])).toBeUndefined();
   });
 });

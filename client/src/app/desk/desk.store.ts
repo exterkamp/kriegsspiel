@@ -14,6 +14,7 @@ import type { BeliefChoice } from '@legacy/window/model';
 import { gameNowMs } from '@legacy/net/state';
 import {
   deliveredBy,
+  lostBy,
   emptyDraft,
   loadDraft,
   saveDraft,
@@ -22,6 +23,7 @@ import {
 import {
   addEntries,
   arrivedEntry,
+  lostEntry,
   clockEntry,
   dispatchEntry,
   loadJournal,
@@ -164,7 +166,8 @@ export class DeskStore {
           ),
           ...s.pending.flatMap((p) => {
             const d = deliveredBy(p, s.dispatches);
-            return d ? [arrivedEntry(p, d)] : [];
+            const lost = lostBy(p, s.dispatches);
+            return lost ? [lostEntry(p, lost)] : d ? [arrivedEntry(p, d)] : [];
           }),
         ];
         // A turn-mode game's clock never runs (D39): each turn's heading stands in for pauses and resumes.

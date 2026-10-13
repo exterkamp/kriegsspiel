@@ -214,19 +214,35 @@ export function noticeText(
   return o ? refusalText(o) : n.message.replace(/^o-[\w-]+:\s*/, '');
 }
 
+/** The first paper of `kind` about the order's addressee written after the order was sent. */
+function firstAbout(
+  p: PendingOrder,
+  dispatches: readonly Dispatch[],
+  kind: NonNullable<Dispatch['kind']>,
+): Dispatch | undefined {
+  if (!p.toName) return undefined;
+  return [...dispatches]
+    .sort((a, b) => a.writtenAtGame - b.writtenAtGame)
+    .find((d) => d.kind === kind && d.from === p.toName && d.writtenAtGame >= p.sentAtGame);
+}
+
 /**
- * Word that an order arrived: the first dispatch from its addressee written after it was sent (written, not received:
- * a report already riding when the order went out says nothing about the order).
- * The addressee answering is the only proof of delivery the client has.
+ * Word that an order arrived: the addressee's first acknowledgement written after it was sent (written, not received:
+ * one already riding when the order went out is for an earlier order). Any other report from the unit says nothing of
+ * the order: its courier may still be lost (#438).
  */
 export function deliveredBy(
   p: PendingOrder,
   dispatches: readonly Dispatch[],
 ): Dispatch | undefined {
-  if (!p.toName) return undefined;
-  return [...dispatches]
-    .sort((a, b) => a.writtenAtGame - b.writtenAtGame)
-    .find((d) => d.from === p.toName && d.writtenAtGame >= p.sentAtGame);
+  return firstAbout(p, dispatches, 'orderDelivered');
+}
+
+/** Word that an order was lost: the staff giving up its courier, when no acknowledgement came first. */
+export function lostBy(p: PendingOrder, dispatches: readonly Dispatch[]): Dispatch | undefined {
+  const lost = firstAbout(p, dispatches, 'courierLost');
+  const ack = deliveredBy(p, dispatches);
+  return lost && (!ack || ack.writtenAtGame > lost.writtenAtGame) ? lost : undefined;
 }
 
 /** What the desk says once an order is signed: to whom, by which courier and, if known, when it should arrive. */

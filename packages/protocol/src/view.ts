@@ -36,6 +36,26 @@ export const Dispatch = z
     writtenAtGame: GameMs,
     receivedAtGame: GameMs,
     category: z.enum(['urgent', 'scouts', 'subordinates', 'staff', 'intelligence', 'rumour']),
+    /**
+     * What the paper reports, for a unit's or the staff's report: `orderDelivered` is a unit's word
+     * that it has its orders, `courierLost` the staff giving a courier up (#438).
+     */
+    kind: z
+      .enum([
+        'situation',
+        'contact',
+        'unitLost',
+        'courierLost',
+        'orderDelivered',
+        'lowAmmo',
+        'exhausted',
+        'destroyed',
+        'engaged',
+        'heavyLosses',
+        'broke',
+        'battle',
+      ])
+      .optional(),
     location: Coord.optional(),
     unit: z.string().optional(),
     sizeEstimate: z.string().optional(),
