@@ -20,6 +20,7 @@ import {
 } from '@kriegsspiel/engine';
 import type { ParseResult } from '../orders/index.js';
 import type { InputLogEntry, InputLogHeader } from './store.js';
+import { applyTurn } from './turns.js';
 
 /** Maps a parsed intent to one the engine knows, or the reason it cannot. */
 function toEngineIntents(intents: ParseResult & { kind: 'intents' }): EngineIntent[] | string {
@@ -166,6 +167,10 @@ export function replayFrom(
           entry.deputy !== undefined,
         );
         if ('state' in res) state = res.state;
+      } else if (command.kind === 'resolveTurn' && entry.turn) {
+        // Turn mode (D39): the logged resolution, applied at the turn's start by the adjudicator that
+        // made it, with no model call; the settle below runs the world on to the turn's end.
+        state = applyTurn(state, entry.turn, { gameId, registry });
       }
     }
     settled = Math.max(settled, entry.endGameMs ?? state.time);

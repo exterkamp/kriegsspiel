@@ -85,6 +85,9 @@ export interface PauseVote {
   proposal?: PauseProposal & { closesAtWall: number };
 }
 
+/** Turn mode (D39): the open turn as the server last reported it to this side. */
+export type TurnInfo = Omit<Extract<ServerMessage, { kind: 'turnState' }>, 'v' | 'kind'>;
+
 /** The umpire's answer to a staff question. */
 export interface StaffServerAnswer {
   text?: string;
@@ -106,6 +109,8 @@ export interface ClientState {
   staffAtWork: boolean;
   /** Absent until the server reports it; a game without voters never does. */
   pause?: PauseVote;
+  /** Turn mode only: the open turn, its sides that have sent and this side's held orders. Absent in a real-time game. */
+  turn?: TurnInfo;
   pending: PendingOrder[];
   /** Orders the staff could not carry out, by order id; the order itself leaves `pending`. */
   outcomes: Record<string, OrderOutcome>;
@@ -256,6 +261,21 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
             : {}),
         },
       };
+    case 'turnState': {
+      const { turn, startsAt, endsAt, sent, deadline, resolving, held } = m;
+      return {
+        ...s,
+        turn: {
+          turn,
+          startsAt,
+          endsAt,
+          sent,
+          ...(deadline === undefined ? {} : { deadline }),
+          resolving,
+          held,
+        },
+      };
+    }
     case 'pauseResult': {
       const message = pauseResultText(m);
       const notices = [...s.notices, { code: 'pause_result', message }].slice(-MAX_NOTICES);
@@ -366,9 +386,12 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
         notices,
       };
     }
-    case 'gameOver':
+    case 'gameOver': {
+      // No turn opens after the game ends; drop the last one (often still resolving).
+      const rest = { ...s };
+      delete rest.turn;
       return {
-        ...s,
+        ...rest,
         gameOver: {
           winner: m.winner,
           reason: m.reason,
@@ -376,6 +399,7 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
           ...(m.loserOut ? { loserOut: m.loserOut } : {}),
         },
       };
+    }
     case 'notification': {
       // What would reach an away player by push or email, shown to one who has the game open.
       const notices = [
