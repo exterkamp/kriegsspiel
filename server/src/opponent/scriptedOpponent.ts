@@ -260,25 +260,29 @@ export class ScriptedOpponent implements SideAgent {
 
   private order(unitId: string, name: string, s: Standing): AgentOrder {
     const to = mmPoint(s.target);
-    const fmt = this.config.describe ?? rawPoint;
+    // A described place carries its own preposition ("at the bridge", "near the mill"), so the
+    // order does not add one (#438); a bare point needs it.
+    const described = this.config.describe?.(s.target);
+    const at = described ?? `at ${rawPoint(s.target)}`;
+    const toward = described ? `to a position ${described}` : `to ${rawPoint(s.target)}`;
     switch (s.kind) {
       case 'withdraw':
         return {
           unitId,
-          text: `${name} fall back to ${fmt(s.target)}`,
+          text: `${name} fall back ${toward}`,
           intent: { kind: 'withdraw', toward: to },
         };
       case 'attack':
         // The engine has no attack intent in orders yet; closing on the enemy brings it into range.
         return {
           unitId,
-          text: `${name} advance on the enemy at ${fmt(s.target)}`,
+          text: `${name} advance on the enemy ${at}`,
           intent: { kind: 'move', to },
         };
       case 'advance':
         return {
           unitId,
-          text: `${name} advance to ${fmt(s.target)}`,
+          text: `${name} advance ${toward}`,
           intent: { kind: 'move', to },
         };
     }
