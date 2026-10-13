@@ -1,4 +1,4 @@
-import { holdTheBridge, loadScenario, type Scenario } from '@kriegsspiel/engine';
+import { holdTheBridge, loadScenario } from '@kriegsspiel/engine';
 import type { UmpireSettings } from '@kriegsspiel/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser } from '../orders/index.js';
@@ -9,6 +9,8 @@ import { FakeTime } from './testing.js';
 
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
+
+type Scenario = ReturnType<typeof loadScenario>;
 
 const parser: OrderParser = {
   parse: async () => {
@@ -39,7 +41,7 @@ async function play(
   maxTurns = 40,
 ): Promise<{
   game: Awaited<ReturnType<GameHost['create']>>;
-  log: InputLogEntry[];
+  log: readonly InputLogEntry[];
   heldSince: (number | null | undefined)[];
 }> {
   await host?.shutdown();
@@ -78,9 +80,9 @@ async function play(
   return { game, log: await store.inputLog('g1'), heldSince };
 }
 
-const opened = (log: InputLogEntry[]) =>
+const opened = (log: readonly InputLogEntry[]) =>
   log.flatMap((e) => (e.command.kind === 'openTurn' && !e.error ? [e.command] : []));
-const resolved = (log: InputLogEntry[]) =>
+const resolved = (log: readonly InputLogEntry[]) =>
   log.flatMap((e) => (e.command.kind === 'resolveTurn' && !e.error ? [e] : []));
 
 /** The game is over everywhere a player looks: state, clock, view and the turn shown. */
@@ -91,7 +93,7 @@ function expectOver(game: Awaited<ReturnType<GameHost['create']>>, at: number): 
   expect(game.gameClock.now()).toBe(at);
   expect(game.turnStateFor('blue')).toBeUndefined();
   expect(game.turnStateFor('red')).toBeUndefined();
-  for (const side of ['blue', 'red']) {
+  for (const side of ['blue', 'red'] as const) {
     const view = sideViewOf(game.state, side, game.gameClock.snapshot());
     expect(view.atGame).toBe(at);
     expect(view.clock.status).toBe('stopped');

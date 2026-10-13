@@ -76,7 +76,10 @@ describe('GameService', () => {
       vi.fn(async () => ({
         ok: true,
         status: 200,
-        json: async () => ({ sides: [{ side: 'blue' }], umpire: { dial: 'standard', persona: 'dry' } }),
+        json: async () => ({
+          sides: [{ side: 'blue' }],
+          umpire: { dial: 'standard', persona: 'dry' },
+        }),
       })),
     );
     svc.connect(loc('?game=r1'));

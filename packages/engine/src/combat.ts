@@ -225,8 +225,7 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
   if (battle) {
     const loser = world.sides.find((s) => s.id !== battle.winner)!.id;
     const loserOut = out.get(loser);
-    if (out.size === 0 && time < timerFrom(world, battle.declaredAt) + BATTLE_CLOSE_MS)
-      return null;
+    if (out.size === 0 && time < timerFrom(world, battle.declaredAt) + BATTLE_CLOSE_MS) return null;
     return {
       winner: battle.winner,
       reason: battle.reason,

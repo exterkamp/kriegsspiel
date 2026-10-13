@@ -484,7 +484,10 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
  * What the game's settings (`GET /games/:id`) say about its mode: a turn-mode game is known as one from the
  * start and after it ends, when the server sends no `turnState` (D39, #429). A real-time game is unchanged.
  */
-export function withTurnSettings(s: ClientState, umpire: Partial<UmpireSettings> | undefined): ClientState {
+export function withTurnSettings(
+  s: ClientState,
+  umpire: Partial<UmpireSettings> | undefined,
+): ClientState {
   const t = turnSettingsOf(umpire);
   return t ? { ...s, turnMode: true, turnMinutes: t.turnMinutes } : s;
 }
