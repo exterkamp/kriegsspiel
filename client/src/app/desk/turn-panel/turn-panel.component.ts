@@ -11,6 +11,8 @@ import {
 import {
   RESOLVING_TEXT,
   deadlineText,
+  howTurnsWork,
+  lastTurnText,
   pursuitText,
   resolvedText,
   sidesSent,
@@ -51,6 +53,18 @@ export class TurnPanelComponent {
   protected readonly heldCount = computed(() => this.turn()?.held.length ?? 0);
   protected readonly deadline = computed(() => deadlineText(this.turn()?.deadline, this.now()));
   protected readonly resolvingText = RESOLVING_TEXT;
+  /** What a turn is, for a first-time player, and a word on the last turn when it is short (#439). */
+  protected readonly howItWorks = computed(() => {
+    const s = this.game.state();
+    const t = this.turn();
+    const minutes = s.turnMinutes ?? (t ? Math.round((t.endsAt - t.startsAt) / 60_000) : undefined);
+    return minutes ? howTurnsWork(minutes, s.battleMinutes) : undefined;
+  });
+  protected readonly lastTurn = computed(() => {
+    const t = this.turn();
+    const s = this.game.state();
+    return t && !t.pursuitUntil ? lastTurnText(t, s.turnMinutes, s.battleMinutes) : undefined;
+  });
   /** After the umpire's ruling: the turn is the pursuit, and while writing, it may go with no orders (#438). */
   protected readonly pursuit = computed(() => pursuitText(this.turn(), this.phase() === 'writing'));
 
@@ -59,9 +73,10 @@ export class TurnPanelComponent {
   protected readonly decidedText = computed(() => {
     const d = this.decided();
     if (!d) return undefined;
-    const fresh = this.game
-      .state()
-      .dispatches.filter((x) => x.receivedAtGame > d.from && x.receivedAtGame <= d.to).length;
+    // The staff's summary of the turn is one of its papers (#439).
+    const fresh = this.desk
+      .papers()
+      .filter((x) => x.receivedAtGame > d.from && x.receivedAtGame <= d.to).length;
     return resolvedText(d.turn, fresh);
   });
 

@@ -71,7 +71,7 @@ export class DeskComponent {
   /** A turn-mode game (D39) has no pause vote; the turn panel takes its place. */
   protected readonly turnMode = computed(() => this.game.state().turnMode === true);
   protected readonly unread = computed(() =>
-    unreadCount(this.game.state().dispatches, this.desk.trayMarks()),
+    unreadCount(this.desk.papers(), this.desk.trayMarks()),
   );
 
   /** Spoken to screen readers: a dispatch arrived, a staff officer answered. */
@@ -99,7 +99,7 @@ export class DeskComponent {
     const seenDispatches = new Set<string>();
     let first = true;
     effect(() => {
-      const list = this.game.state().dispatches;
+      const list = this.desk.papers();
       untracked(() => {
         const say = first ? '' : dispatchAnnouncement(seenDispatches, list);
         for (const d of list) seenDispatches.add(d.id);

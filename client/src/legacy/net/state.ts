@@ -117,6 +117,8 @@ export interface ClientState {
   turnMode?: true;
   /** Turn mode: game minutes per turn, from the game's settings (`GET /games/:id`); kept after the game ends. */
   turnMinutes?: number;
+  /** The scenario's time limit in game minutes, from `/scenarios`, so a turn game can say "Turn 2 of about 3" (#439). */
+  battleMinutes?: number;
   pending: PendingOrder[];
   /** Orders the staff could not carry out, by order id; the order itself leaves `pending`. */
   outcomes: Record<string, OrderOutcome>;

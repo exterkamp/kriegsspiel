@@ -104,3 +104,31 @@ dd {
   font-style: italic;
   list-style: none;
 }
+h3.turn {
+  margin: 8px 0 2px;
+  font-size: var(--ks-text-sm);
+  position: sticky;
+  top: 0;
+  background: var(--ks-paper);
+}
+h3.turn:first-child {
+  margin-top: 0;
+}
+.list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.row.summary b {
+  font-style: italic;
+}
+.also {
+  border-left: 2px solid var(--ks-rule);
+  padding-left: 8px;
+  margin-bottom: 8px;
+  font-size: var(--ks-text-sm);
+}
+.also ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}

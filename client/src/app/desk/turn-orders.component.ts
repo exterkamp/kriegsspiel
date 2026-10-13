@@ -10,7 +10,18 @@ import {
   untracked,
 } from '@angular/core';
 import type { TurnOrder } from '@kriegsspiel/protocol';
-import { deadlineText, heldLine, sidesSent, turnLine, turnPhase } from '@legacy/desk/turn';
+import {
+  deadlineText,
+  heldLine,
+  lastTurnText,
+  sidesSent,
+  timeOfDay,
+  turnLine,
+  turnPhase,
+  turnsInBattle,
+} from '@legacy/desk/turn';
+import { orderProgress } from '@legacy/desk/orders';
+import { unitStatuses } from '@legacy/desk/turnReport';
 import { GameService } from '../game/game.service';
 import { TURN_ACTIONS } from '../game/ports';
 import { DeskStore } from './desk.store';
@@ -38,7 +49,44 @@ export class TurnOrdersComponent {
   protected readonly phase = computed(() => turnPhase(this.game.state()));
   protected readonly heading = computed(() => {
     const t = this.turn();
-    return t ? turnLine(t) : '';
+    const s = this.game.state();
+    return t ? turnLine(t, turnsInBattle(s.battleMinutes, s.turnMinutes)) : '';
+  });
+  /** A short last turn says why it is short (#439). */
+  protected readonly lastTurn = computed(() => {
+    const t = this.turn();
+    const s = this.game.state();
+    return t && !t.pursuitUntil ? lastTurnText(t, s.turnMinutes, s.battleMinutes) : undefined;
+  });
+  /** Each own unit at a glance, from the side's own view (#439). */
+  protected readonly units = computed(() => {
+    const s = this.game.state();
+    if (!s.view) return [];
+    return unitStatuses({
+      view: s.view,
+      held: this.held(),
+      pending: s.pending,
+      dispatches: s.dispatches,
+      papers: this.desk.lastTurn()?.papers ?? [],
+      sent: this.phase() !== 'writing',
+    });
+  });
+  /**
+   * Orders sent in earlier turns, newest first, each with where it stands: with the courier, delivered at a time,
+   * acted on, or lost (#439).
+   */
+  protected readonly earlier = computed(() => {
+    const s = this.game.state();
+    const now = new Set(this.held().map((o) => o.orderId));
+    return s.pending
+      .filter((p) => !now.has(p.orderId))
+      .map((p) => ({
+        id: p.orderId,
+        line: `To ${p.toName ?? 'a unit'}, sent at ${timeOfDay(p.sentAtGame)}`,
+        words: p.words ?? p.text,
+        state: orderProgress(p, s.dispatches, timeOfDay)?.label ?? 'With the courier; no word yet',
+      }))
+      .reverse();
   });
   protected readonly held = computed(() => this.turn()?.held ?? []);
   private readonly names = computed(

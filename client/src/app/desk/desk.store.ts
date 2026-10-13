@@ -35,6 +35,17 @@ import {
 } from '@legacy/desk/journal';
 import { loadMarks, saveMarks, type TrayMarks } from '@legacy/desk/tray';
 import { turnEntry, turnPhase } from '@legacy/desk/turn';
+import {
+  loadTurnRecord,
+  papersOfTurn,
+  saveTurnRecord,
+  snapUnits,
+  summaryId,
+  turnFights,
+  turnOfPaper,
+  turnSummary,
+  type TurnRecord,
+} from '@legacy/desk/turnReport';
 import type { ViewId } from '@legacy/desk/views';
 import { fixtureClient, type ConferenceClient, type Exchange } from '@legacy/desk/conference';
 import { GameService } from '../game/game.service';
@@ -80,6 +91,40 @@ export class DeskStore {
 
   /** The war diary: orders sent, dispatches received, pauses and the player's notes. */
   readonly journal = signal<JournalEntry[]>([]);
+
+  /**
+   * Turn mode (#439): the side's units as each turn opened, and the staff's summary of each decided turn, kept
+   * for the game in localStorage so a reload keeps both.
+   */
+  readonly turnRecord = signal<TurnRecord>({ starts: {}, summaries: [] });
+  /** Turn mode: game ms per turn, from the game's settings or the open turn; undefined in real time. */
+  readonly turnMs = computed(() => {
+    const s = this.game.state();
+    if (!s.turnMode) return undefined;
+    if (s.turnMinutes) return s.turnMinutes * 60_000;
+    return s.turn ? s.turn.endsAt - s.turn.startsAt : undefined;
+  });
+  /** Every paper on the desk: the server's, and in a turn-mode game the staff's turn summaries (#439). */
+  readonly papers = computed<readonly Dispatch[]>(() => {
+    const own = this.game.state().dispatches;
+    const summaries = this.turnRecord().summaries;
+    return summaries.length === 0 ? own : [...summaries, ...own];
+  });
+  /** Turn mode: the latest decided turn and its papers, for the unit status and the table's fight markers. */
+  readonly lastTurn = computed(() => {
+    const ms = this.turnMs();
+    const s = this.game.state();
+    if (!ms) return undefined;
+    const n = s.gameOver ? turnOfPaper(s.gameOver.atGame, ms) : (s.turn?.turn ?? 1) - 1;
+    return n < 1 ? undefined : { turn: n, papers: papersOfTurn(s.dispatches, n, ms) };
+  });
+  /** Turn mode on the table (#439): the open turn's orders, and where the last turn's papers reported fighting. */
+  readonly turnTable = computed(() => {
+    const s = this.game.state();
+    if (!s.turnMode) return undefined;
+    const last = this.lastTurn();
+    return { held: s.turn?.held ?? [], fights: last ? turnFights(last.papers, last.turn) : [] };
+  });
 
   /** Which turn the side is writing, if any: a held order being rewritten belongs to that turn alone. */
   private readonly writingTurn = computed(() => {
@@ -197,6 +242,66 @@ export class DeskStore {
     });
     return () => {
       stopGame();
+      stopSave();
+    };
+  }
+
+  /**
+   * Turn mode (#439): note the side's units as each turn opens, and file the staff's summary of a turn once it is
+   * decided (the view stands at its end and the next turn has opened, or the game is over). Loads what was saved
+   * for this game and saves on every change.
+   */
+  persistTurns(key: string): () => void {
+    this.turnRecord.set(loadTurnRecord(key));
+    let first = true;
+    const stopRecord = this.run(() => {
+      const s = this.game.state();
+      const ms = this.turnMs();
+      untracked(() => {
+        const view = s.view;
+        if (!ms || !view) return;
+        const rec = this.turnRecord();
+        let next = rec;
+        const t = s.turn;
+        if (t && !t.resolving && view.atGame === t.startsAt && !rec.starts[t.turn]) {
+          next = { ...next, starts: { ...next.starts, [t.turn]: snapUnits(view) } };
+        }
+        const decided = this.lastTurn()?.turn ?? 0;
+        const have = new Set(next.summaries.map((d) => d.id));
+        const fresh: Dispatch[] = [];
+        for (let n = 1; n <= decided; n++) {
+          if (have.has(summaryId(n))) continue;
+          const startsAt = (n - 1) * ms;
+          const endsAt = n === decided && s.gameOver ? s.gameOver.atGame : n * ms;
+          // Only the turn just decided has the view at its end; an older one (a reload) is told from its papers.
+          const atEnd = view.atGame === endsAt || (n === decided && !!s.gameOver);
+          if (n === decided && !atEnd) continue;
+          const before = atEnd ? next.starts[n] : undefined;
+          fresh.push(
+            turnSummary({
+              turn: n,
+              startsAt,
+              endsAt,
+              view: atEnd ? view : { ownUnits: [] },
+              ...(before ? { before } : {}),
+              papers: papersOfTurn(s.dispatches, n, ms),
+            }),
+          );
+        }
+        if (fresh.length) next = { ...next, summaries: [...next.summaries, ...fresh] };
+        if (next !== rec) this.turnRecord.set(next);
+      });
+    });
+    const stopSave = this.run(() => {
+      const r = this.turnRecord();
+      if (first) {
+        first = false;
+        return;
+      }
+      untracked(() => saveTurnRecord(key, r));
+    });
+    return () => {
+      stopRecord();
       stopSave();
     };
   }

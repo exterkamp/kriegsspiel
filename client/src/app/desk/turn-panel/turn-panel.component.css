@@ -35,10 +35,6 @@ p:last-child {
   border-bottom: 1px solid var(--ks-brass);
   padding-bottom: 4px;
 }
-.pursuit {
-  font-style: italic;
-  color: var(--ks-brass-hi);
-}
 .deadline {
   font-size: var(--ks-text-xs);
   opacity: 0.85;
@@ -70,4 +66,21 @@ p:last-child {
   .quill {
     animation: none;
   }
+}
+.pursuit,
+.last {
+  font-style: italic;
+  color: var(--ks-brass-hi);
+}
+.how {
+  margin-top: 4px;
+  font-size: var(--ks-text-xs);
+  max-width: 34rem;
+}
+.how summary {
+  cursor: pointer;
+  opacity: 0.9;
+}
+.how p {
+  margin-top: 4px;
 }

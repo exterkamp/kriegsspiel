@@ -279,6 +279,45 @@ export function orderOutcomes(
   return out;
 }
 
+/** Where a sent order stands once word of it has come back (#439). */
+export interface OrderProgress {
+  state: 'delivered' | 'actedOn' | 'lost';
+  /** When its unit got it, or when the staff gave its courier up. */
+  atGame: number;
+  label: string;
+}
+
+/**
+ * What became of a sent order, from the papers: delivered at the time its unit had it (the acknowledgement's
+ * written time, not when the paper reached HQ), acted on once the unit has written since, or lost. Undefined
+ * while no word has come back. `clock` formats the time (`Day 1 00:04` by default).
+ */
+export function orderProgress(
+  p: PendingOrder,
+  dispatches: readonly Dispatch[],
+  clock: (ms: number) => string = formatGameTime,
+): OrderProgress | undefined {
+  const sorted = byWritten(dispatches);
+  const o = outcomeOf(p, sorted);
+  if (!o) return undefined;
+  if ('lost' in o) {
+    const at = o.lost.writtenAtGame;
+    return { state: 'lost', atGame: at, label: `Lost: the courier was given up at ${clock(at)}` };
+  }
+  const at = o.arrived.writtenAtGame;
+  const since = sorted.some(
+    (d) =>
+      !!p.toName &&
+      d.from === p.toName &&
+      d.writtenAtGame > at &&
+      d.kind !== 'orderDelivered' &&
+      d.kind !== 'courierLost',
+  );
+  return since
+    ? { state: 'actedOn', atGame: at, label: `Delivered at ${clock(at)}; acted on` }
+    : { state: 'delivered', atGame: at, label: `Delivered at ${clock(at)}` };
+}
+
 /** What the desk says once an order is signed: to whom, by which courier and, if known, when it should arrive. */
 export function sentLine(toName: string, courier: Courier, etaGame: number | undefined): string {
   const how = courier === 'fast' ? 'fast rider' : 'steady courier';

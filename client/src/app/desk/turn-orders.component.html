@@ -1,6 +1,37 @@
 @let p = phase();
 <section class="turn" aria-labelledby="turn-orders-h" data-testid="turn-orders">
   <h3 id="turn-orders-h">{{ heading() }}</h3>
+  @if (lastTurn(); as text) {
+    <p class="hint last" data-testid="turn-orders-last">{{ text }}</p>
+  }
+
+  @if (units().length > 0) {
+    <section class="units" aria-labelledby="turn-units-h" data-testid="turn-units">
+      <h4 id="turn-units-h">Your units</h4>
+      <ul>
+        @for (u of units(); track u.id) {
+          <li [attr.data-unit]="u.id">
+            <b>{{ u.name }}</b>
+            <dl>
+              <dt>Told</dt>
+              <dd>
+                {{ u.told }}
+                @if (u.orderState) {
+                  <small class="state">({{ u.orderState }})</small>
+                }
+              </dd>
+              <dt>Where</dt>
+              <dd>{{ u.where }}</dd>
+              <dt>Doing</dt>
+              <dd>{{ u.doing }}</dd>
+              <dt>Strength</dt>
+              <dd>{{ u.men }}, {{ u.morale }}</dd>
+            </dl>
+          </li>
+        }
+      </ul>
+    </section>
+  }
 
   <ul class="sides" aria-label="Who has sent orders">
     @for (s of sides(); track s.side) {
@@ -41,6 +72,9 @@
         <li [class.editing]="editing() === o.orderId">
           <small>{{ line(o) }}</small>
           <p class="words">{{ o.text }}</p>
+          @if (p !== 'writing') {
+            <small class="state">Sent; the couriers ride when the turn is decided.</small>
+          }
           @if (p === 'writing') {
             <div class="row">
               <button type="button" class="ks-quiet" (click)="edit.emit(o)">
@@ -83,6 +117,20 @@
         Send orders for this turn
       </button>
     }
+  }
+  @if (earlier().length > 0) {
+    <details class="earlier" data-testid="turn-earlier">
+      <summary>Sent in earlier turns ({{ earlier().length }})</summary>
+      <ol>
+        @for (o of earlier(); track o.id) {
+          <li>
+            <small>{{ o.line }}</small>
+            <p class="words">{{ o.words }}</p>
+            <small class="state">{{ o.state }}</small>
+          </li>
+        }
+      </ol>
+    </details>
   }
   @if (problem()) {
     <p class="ks-error" role="alert">{{ problem() }}</p>

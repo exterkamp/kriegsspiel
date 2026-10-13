@@ -1,5 +1,5 @@
 import { formatGameTime, formatRate, gameNowMs, type ClientState } from '../net/state.js';
-import { turnLine, turnPhase } from './turn.js';
+import { turnLine, turnPhase, turnsInBattle } from './turn.js';
 
 export interface ClockView {
   /** `Day 1 14:05`, or a placeholder before the server has sent a clock. */
@@ -59,14 +59,16 @@ function turnClockView(state: ClientState): ClockView {
   // Only the server's game over ends the game; no `turnState` yet means it has not arrived (#429).
   const waiting = !t && !state.gameOver;
   const end = state.gameOver?.atGame ?? state.clock?.gameMs ?? state.view?.atGame;
+  // "Turn 2 of about 3", once the battle's length is known (#439).
+  const line = t && turnLine(t, turnsInBattle(state.battleMinutes, state.turnMinutes));
   return {
-    time: t && !state.gameOver ? turnLine(t) : end === undefined ? '--' : formatGameTime(end),
+    time: line && !state.gameOver ? line : end === undefined ? '--' : formatGameTime(end),
     rate: '',
     status: phase === 'over' && !waiting ? 'stopped' : 'paused',
     // The status label says the turn is being decided; the desk shows the umpire at work.
     staffAtWork: false,
     label: waiting ? TURN_WAITING : TURN_LABEL[phase],
-    ...(t && !state.gameOver ? { turn: turnLine(t) } : {}),
+    ...(line && !state.gameOver ? { turn: line } : {}),
     ...(state.turnMinutes ? { turnLength: `${state.turnMinutes}-min turns` } : {}),
   };
 }
