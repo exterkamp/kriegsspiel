@@ -1067,6 +1067,27 @@ describe('a decided battle against the time limit (#417)', () => {
     expect(res.world.outcome).toMatchObject({ winner: 'red', reason: 'defence-broken' });
   });
 
+  it('files the outcome as the umpire’s paper to both sides in turn mode only (#429)', () => {
+    const s = brokenDefenceAt(HOLD - 10);
+    const declared = advanceTo(s, s.time + 1, registry()).state;
+    const end = HOLD * MS_PER_MINUTE;
+    const closing = (w: typeof declared.world) =>
+      w.sides.map((side) =>
+        w.intel[side.id].reports.filter((r) => r.text?.includes('The game is over')),
+      );
+    const turn = { n: 3, startMs: end - 20 * MS_PER_MINUTE, endMs: end, adjudicator: 'umpire' };
+    const inTurn = turnVictory({ ...declared.world, turn } as typeof declared.world, end).world;
+    for (const papers of closing(inTurn)) {
+      expect(papers).toHaveLength(1);
+      expect(papers[0]).toMatchObject({ kind: 'battle', observedAt: end, deliverAt: end });
+      expect(papers[0]!.text).toMatch(/defence has been broken .*The game is over: \w+ wins\./);
+    }
+    // A real-time game ends on the game-over screen alone, as before.
+    for (const papers of closing(turnVictory(declared.world, end).world)) {
+      expect(papers).toHaveLength(0);
+    }
+  });
+
   it("a defence broken by the combat tick on the time limit's own minute goes to the ruling", () => {
     // Two weak Blue battalions in contact with two strong Red ones from the start, no orders.
     const fight = (holdMinutes: number) =>

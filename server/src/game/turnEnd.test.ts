@@ -91,9 +91,15 @@ function expectOver(game: Awaited<ReturnType<GameHost['create']>>, at: number): 
   expect(game.gameClock.now()).toBe(at);
   expect(game.turnStateFor('blue')).toBeUndefined();
   expect(game.turnStateFor('red')).toBeUndefined();
-  const view = sideViewOf(game.state, 'blue', game.gameClock.snapshot());
-  expect(view.atGame).toBe(at);
-  expect(view.clock.status).toBe('stopped');
+  for (const side of ['blue', 'red']) {
+    const view = sideViewOf(game.state, side, game.gameClock.snapshot());
+    expect(view.atGame).toBe(at);
+    expect(view.clock.status).toBe('stopped');
+    // The decisive turn's last paper is the umpire's ruling on the outcome, in both in-trays.
+    const papers = view.dispatches.filter((d) => d.text.includes('The game is over'));
+    expect(papers).toHaveLength(1);
+    expect(papers[0]).toMatchObject({ from: "The umpire's ruling", receivedAtGame: at });
+  }
 }
 
 describe('turn mode: the game ends in the turn that decides it (#429)', () => {

@@ -412,8 +412,9 @@ function finish(world: GameState, outcome: Outcome): HandlerResult<GameState> {
       },
     ]),
   ) as GameState['intel'];
+  const papers = world.turn ? outcomePapers({ ...world, intel }, outcome) : intel;
   return {
-    world: { ...world, units, intel, time: outcome.time, combatActive: false, outcome },
+    world: { ...world, units, intel: papers, time: outcome.time, combatActive: false, outcome },
     emit: [
       {
         type: 'game.end',
@@ -421,6 +422,64 @@ function finish(world: GameState, outcome: Outcome): HandlerResult<GameState> {
       },
     ],
   };
+}
+
+/**
+ * The umpire's closing paper in a turn-mode game (#429): each side is told in its in-tray how the
+ * game was decided, at the minute it was, as the turn's last report. Public, like the outcome, so it
+ * names no unit and no figure. Real-time play has the game-over screen alone, as before.
+ */
+function outcomePapers(world: GameState, outcome: Outcome): GameState['intel'] {
+  const text = outcomeText(world, outcome);
+  const centre = polygonCentroid(world.victory.objective);
+  const place = describePlace(world.map, centre);
+  return Object.fromEntries(
+    Object.entries(world.intel).map(([side, i]) => {
+      const report: Report = {
+        id: `${side}-r${i.reports.length + 1}`,
+        kind: 'battle',
+        observedAt: outcome.time,
+        deliverAt: outcome.time,
+        from: "The umpire's ruling",
+        location: { ...centre },
+        place,
+        uncertainty: 0,
+        confidence: 'high',
+        text,
+      };
+      return [side, { ...i, reports: [...i.reports, report] }];
+    }),
+  ) as GameState['intel'];
+}
+
+/** How the game was decided, in the umpire's words. Exported for tests only. */
+export function outcomeText(world: GameState, outcome: Outcome): string {
+  const name = (id: SideId) => world.sides.find((s) => s.id === id)?.name ?? id;
+  const where = describePlace(world.map, polygonCentroid(world.victory.objective));
+  // `where` may carry a clause ("at the bridge, on the High road"), closed by a comma.
+  const closed = where.includes(',') ? `${where},` : where;
+  const winner = outcome.winner === null ? null : name(outcome.winner);
+  const loserId = world.sides.find((s) => s.id !== outcome.winner)?.id;
+  const loser = loserId === undefined ? '' : name(loserId);
+  switch (outcome.reason) {
+    case 'objective-taken':
+      return `${winner} has taken the objective ${closed} and held it. The game is over: ${winner} wins.`;
+    case 'objective-held':
+      return `The time limit is reached with ${winner} still holding the objective ${where}. The game is over: ${winner} wins.`;
+    case 'attack-broken':
+    case 'defence-broken': {
+      const what = outcome.reason === 'attack-broken' ? 'attack' : 'defence';
+      return `${loser}'s ${what} has been broken and ${winner} holds the field. The game is over: ${winner} wins.`;
+    }
+    case 'eliminated':
+      return winner === null
+        ? 'Both forces have been destroyed. The game is over: neither side wins.'
+        : `${loser} has no force left on the field. The game is over: ${winner} wins.`;
+    case 'withdrawn':
+      return winner === null
+        ? 'Both forces have left the field. The game is over: neither side wins.'
+        : `${loser}'s force has left the field. The game is over: ${winner} wins.`;
+  }
 }
 
 interface Shot {
