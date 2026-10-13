@@ -56,6 +56,8 @@ export interface ParserWiringOptions {
  */
 export interface OrderTraceNote {
   step: 'parse' | 'interpret';
+  /** The order as written, so a note is matched to its order when several share a correlation id. */
+  text: string;
   reason: string;
   answeredBy: 'fallback' | 'none' | 'as-written';
 }
@@ -75,14 +77,24 @@ export function orderParserFor(
       new LlmOrderParser(client, {
         fallbackParser: canned ?? new StubOrderParser(),
         onFallback: (f) => {
-          note(gameId, { step: 'parse', reason: f.reason, answeredBy: f.answeredBy });
+          note(gameId, {
+            step: 'parse',
+            text: f.orderText,
+            reason: f.reason,
+            answeredBy: f.answeredBy,
+          });
           o.onFallback?.(gameId, f.reason);
         },
       }),
       client,
       {
-        onFallback: (reason) => {
-          note(gameId, { step: 'interpret', reason, answeredBy: 'as-written' });
+        onFallback: (reason, text) => {
+          note(gameId, {
+            step: 'interpret',
+            text,
+            reason: reason.replace(/^interpret: /, ''),
+            answeredBy: 'as-written',
+          });
           o.onFallback?.(gameId, reason);
         },
       },

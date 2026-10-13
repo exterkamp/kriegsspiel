@@ -434,6 +434,10 @@ ks-admin {
   .badge.none {
     color: var(--ks-wax);
   }
+  .badge.agent,
+  .badge.unknown {
+    color: var(--dim);
+  }
   .or-playground {
     margin-top: 10px;
     border: 1px solid var(--line);

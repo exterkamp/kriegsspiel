@@ -43,10 +43,11 @@ import { UmpireError } from '../umpire/umpireClient.js';
 export type OrderOutcome = 'intents' | 'clarification' | 'rejection' | 'pending' | 'error';
 /**
  * Who gave the answer the engine got: the configured `model`, the `canned` test provider (configured, or as
- * the fallback), the rule-based `rules` parser, `none` (the player was asked to restate), or `unknown`
- * when the trace no longer holds the order (a restart, or the ring buffer moved on).
+ * the fallback), the rule-based `rules` parser, `none` (the player was asked to restate), the `agent` that
+ * wrote the order with its intents (a scripted side, the AI commander or a deputy; no parse ran), or
+ * `unknown` when the trace no longer holds the order (a restart, or the ring buffer moved on).
  */
-export type AnsweredBy = 'model' | 'canned' | 'rules' | 'none' | 'unknown';
+export type AnsweredBy = 'model' | 'canned' | 'rules' | 'none' | 'agent' | 'unknown';
 
 export interface OrderAttempt {
   /** `log-<seq>` for a logged order, `trace-<seq>` for one still being parsed. */
@@ -146,15 +147,25 @@ export function orderAttempts(
     if (!list) byCorrelation.set(e.correlationId, (list = []));
     list.push(e);
   }
-  const linkedTo = (command: TraceEntry | undefined) => {
+  const ordersIn = new Map<string, number>();
+  for (const c of commands) ordersIn.set(c.correlationId, (ordersIn.get(c.correlationId) ?? 0) + 1);
+  // A scheduler tick can carry several orders and unrelated calls (narration), so a call or note belongs
+  // to an order when it carries the order's text; only a request with one order and no match takes all.
+  const linkedTo = (command: TraceEntry | undefined, text: string, agent: boolean) => {
     const id = command && command.correlationId !== 'none' ? command.correlationId : undefined;
     const chain = id ? (byCorrelation.get(id) ?? []) : [];
-    return {
-      correlationId: id,
-      chain,
-      calls: chain.filter((e) => e.kind === 'llm'),
-      notes: chain.filter((e) => e.kind === 'order'),
+    const mine = (e: TraceEntry, field: 'input' | 'text') => {
+      const v = rec(e.data)[field];
+      if (field === 'text') return v === text;
+      const s = typeof v === 'string' ? v : JSON.stringify(v ?? null);
+      return s.includes(text) || s.includes(JSON.stringify(text).slice(1, -1));
     };
+    const pick = (kind: 'llm' | 'order', field: 'input' | 'text') => {
+      const all = chain.filter((e) => e.kind === kind);
+      const matched = all.filter((e) => mine(e, field));
+      return matched.length || agent || (id && ordersIn.get(id)! > 1) ? matched : all;
+    };
+    return { correlationId: id, chain, calls: pick('llm', 'input'), notes: pick('order', 'text') };
   };
   const out: OrderAttemptDetail[] = [];
   const logged = new Set<number>();
@@ -162,7 +173,7 @@ export function orderAttempts(
     if (entry.command.kind !== 'order') continue;
     logged.add(entry.seq);
     const command = bySeq.get(entry.seq);
-    const link = linkedTo(command);
+    const link = linkedTo(command, entry.command.text, !!entry.agent);
     const fallbacks = link.notes.map((n) => {
       const d = rec(n.data);
       return `${String(d.step ?? '?')}: ${String(d.reason ?? '')}`;
@@ -187,7 +198,9 @@ export function orderAttempts(
       text: entry.command.text,
       ...(entry.agent ? { agent: true } : {}),
       outcome,
-      answeredBy: answeredBy(command !== undefined, !!entry.fallback, link.calls, link.notes),
+      answeredBy: entry.agent
+        ? 'agent'
+        : answeredBy(command !== undefined, !!entry.fallback, link.calls, link.notes),
       fallbacks,
       ...(entry.error ? { error: entry.error } : {}),
       ...(link.correlationId ? { correlationId: link.correlationId } : {}),
@@ -203,7 +216,7 @@ export function orderAttempts(
     const seq = rec(c.data).seq;
     if (typeof seq === 'number' && logged.has(seq)) continue;
     const command = rec(rec(c.data).command);
-    const link = linkedTo(c);
+    const link = linkedTo(c, String(command.text ?? ''), false);
     out.push({
       key: `trace-${c.seq}`,
       ...(typeof seq === 'number' ? { seq } : {}),

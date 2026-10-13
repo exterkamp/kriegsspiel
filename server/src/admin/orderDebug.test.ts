@@ -235,6 +235,39 @@ describe('orderAttempts', () => {
     expect(byText.d).toMatchObject({ answeredBy: 'unknown', outcome: 'pending', llmCalls: 0 });
     expect(byText.e).toMatchObject({ key: 'trace-6', outcome: 'pending', side: 'red' });
   });
+
+  it('gives each order of a shared correlation id only its own calls and notes', () => {
+    const log = [
+      entry(1, 'first', { parse: { kind: 'rejection', text: 'first', reason: 'no' } }),
+      entry(2, 'second', { parse: { kind: 'rejection', text: 'second', reason: 'no' } }),
+      entry(3, 'scripted', {
+        agent: true,
+        parse: { kind: 'intents', text: 'scripted', unitId: 'r', intents: [] },
+      }),
+    ];
+    const trace = [
+      t(1, 'command', 'tick', { seq: 1, command: log[0]!.command }),
+      t(2, 'command', 'tick', { seq: 2, command: log[1]!.command }),
+      t(3, 'command', 'tick', { seq: 3, command: log[2]!.command }),
+      t(4, 'llm', 'tick', { stage: 'parse', mode: 'live', ok: true, input: { order: 'first' } }),
+      t(5, 'llm', 'tick', { stage: 'parse', mode: 'test', ok: true, input: { order: 'second' } }),
+      t(6, 'order', 'tick', {
+        step: 'parse',
+        text: 'second',
+        reason: 'bad',
+        answeredBy: 'fallback',
+      }),
+      t(7, 'llm', 'tick', { stage: 'narrate', mode: 'live', ok: true, input: { reports: [] } }),
+    ];
+    const byText = Object.fromEntries(orderAttempts(log, trace).map((a) => [a.text, a]));
+    expect(byText.first).toMatchObject({ answeredBy: 'model', llmCalls: 1, fallbacks: [] });
+    expect(byText.second).toMatchObject({
+      answeredBy: 'canned',
+      llmCalls: 1,
+      fallbacks: ['parse: bad'],
+    });
+    expect(byText.scripted).toMatchObject({ answeredBy: 'agent', llmCalls: 0 });
+  });
 });
 
 describe('playground (#395)', () => {

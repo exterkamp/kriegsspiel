@@ -10,7 +10,7 @@
 import { COLLAPSE_OVER, formatLatency, pretty } from './llm.js';
 import { apiUrl, formatGameMs } from './model.js';
 
-export type AnsweredBy = 'model' | 'canned' | 'rules' | 'none' | 'unknown';
+export type AnsweredBy = 'model' | 'canned' | 'rules' | 'none' | 'agent' | 'unknown';
 
 /** One row of `GET /admin/api/games/:id/orders`. */
 export interface OrderAttempt {
@@ -123,6 +123,7 @@ const ANSWERED: Record<AnsweredBy, string> = {
   canned: 'canned',
   rules: 'rules',
   none: 'nobody (restate)',
+  agent: 'agent (no parse)',
   unknown: 'not traced',
 };
 
