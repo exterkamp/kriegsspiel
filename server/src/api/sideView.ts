@@ -6,6 +6,7 @@ import {
   renderDocument,
   viewFor,
   viewForRole,
+  type ChainOfCommand,
   type EngineRoleView,
   type EngineSideView,
   type EngineState,
@@ -229,11 +230,12 @@ export function sideViewOf(
   narration?: Narration,
   staff: readonly StaffExchange[] = [],
   overloaded?: string,
+  chain?: ChainOfCommand,
 ): SideView {
   // `world.time` only moves when an event fires; the engine's own time is the real "now".
   if (seat) {
     return toSideView(
-      viewForRole(state.world, side, seat, state.time, forwarded),
+      viewForRole(state.world, side, seat, state.time, forwarded, chain),
       clock,
       narration,
       staffFor(seat, staff),

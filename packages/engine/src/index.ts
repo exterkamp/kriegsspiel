@@ -187,6 +187,15 @@ export {
   wagonsReach,
 } from './supply.js';
 export { ROLES, maySign, mayDraft, mayForward, viewForRole } from './roles.js';
+export type { ChainOfCommand } from './roles.js';
+export {
+  FORWARD_HANDLING_MS,
+  arrivedForwards,
+  forwardDelayMs,
+  sendForward,
+  type ForwardedPaper,
+  type Hierarchy,
+} from './forwarding.js';
 export type { EngineRoleView, Role, Seat, ViewUnitOutline } from './roles.js';
 export {
   COMBAT_DATA,
