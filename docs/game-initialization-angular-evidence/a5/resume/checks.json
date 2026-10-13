@@ -7,59 +7,37 @@
   "results": [
     {
       "name": "setup",
-      "command": [
-        "npm",
-        "run",
-        "setup:map-source"
-      ],
+      "command": ["npm", "run", "setup:map-source"],
       "code": 0,
       "seconds": 3.690140962600708
     },
     {
       "name": "install",
-      "command": [
-        "npm",
-        "ci"
-      ],
+      "command": ["npm", "ci"],
       "code": 0,
       "seconds": 3.699075222015381
     },
     {
       "name": "lint",
-      "command": [
-        "npm",
-        "run",
-        "lint"
-      ],
+      "command": ["npm", "run", "lint"],
       "code": 0,
       "seconds": 11.732409238815308
     },
     {
       "name": "typecheck",
-      "command": [
-        "npm",
-        "run",
-        "typecheck"
-      ],
+      "command": ["npm", "run", "typecheck"],
       "code": 0,
       "seconds": 16.177862882614136
     },
     {
       "name": "test",
-      "command": [
-        "npm",
-        "test"
-      ],
+      "command": ["npm", "test"],
       "code": 0,
       "seconds": 227.67719507217407
     },
     {
       "name": "build",
-      "command": [
-        "npm",
-        "run",
-        "build"
-      ],
+      "command": ["npm", "run", "build"],
       "code": 0,
       "seconds": 26.057767152786255
     }

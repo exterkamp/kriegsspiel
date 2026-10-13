@@ -36,11 +36,7 @@
       "forcedColors": true,
       "height": 846,
       "reducedMotion": true,
-      "transitions": [
-        "0s",
-        "0s",
-        "0s"
-      ],
+      "transitions": ["0s", "0s", "0s"],
       "width": 441
     }
   },
@@ -66,13 +62,7 @@
       "forcedColors": true,
       "height": 846,
       "reducedMotion": true,
-      "transitions": [
-        "0s",
-        "0s",
-        "0s",
-        "0s",
-        "0s"
-      ],
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
       "width": 441
     }
   },
@@ -98,13 +88,7 @@
       "forcedColors": true,
       "height": 846,
       "reducedMotion": true,
-      "transitions": [
-        "0s",
-        "0s",
-        "0s",
-        "0s",
-        "0s"
-      ],
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
       "width": 441
     }
   },
@@ -130,13 +114,7 @@
       "forcedColors": true,
       "height": 846,
       "reducedMotion": true,
-      "transitions": [
-        "0s",
-        "0s",
-        "0s",
-        "0s",
-        "0s"
-      ],
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
       "width": 441
     }
   },
@@ -162,13 +140,7 @@
       "forcedColors": true,
       "height": 846,
       "reducedMotion": true,
-      "transitions": [
-        "0s",
-        "0s",
-        "0s",
-        "0s",
-        "0s"
-      ],
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
       "width": 441
     }
   },
@@ -194,13 +166,7 @@
       "forcedColors": true,
       "height": 846,
       "reducedMotion": true,
-      "transitions": [
-        "0s",
-        "0s",
-        "0s",
-        "0s",
-        "0s"
-      ],
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
       "width": 441
     }
   },
@@ -226,13 +192,7 @@
       "forcedColors": true,
       "height": 846,
       "reducedMotion": true,
-      "transitions": [
-        "0s",
-        "0s",
-        "0s",
-        "0s",
-        "0s"
-      ],
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
       "width": 441
     }
   },
@@ -258,13 +218,7 @@
       "forcedColors": true,
       "height": 846,
       "reducedMotion": true,
-      "transitions": [
-        "0s",
-        "0s",
-        "0s",
-        "0s",
-        "0s"
-      ],
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
       "width": 441
     }
   },
@@ -290,13 +244,7 @@
       "forcedColors": true,
       "height": 846,
       "reducedMotion": true,
-      "transitions": [
-        "0s",
-        "0s",
-        "0s",
-        "0s",
-        "0s"
-      ],
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
       "width": 441
     }
   },
@@ -322,13 +270,7 @@
       "forcedColors": true,
       "height": 846,
       "reducedMotion": true,
-      "transitions": [
-        "0s",
-        "0s",
-        "0s",
-        "0s",
-        "0s"
-      ],
+      "transitions": ["0s", "0s", "0s", "0s", "0s"],
       "width": 441
     }
   },

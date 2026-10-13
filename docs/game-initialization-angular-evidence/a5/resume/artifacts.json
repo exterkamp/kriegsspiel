@@ -8,8 +8,8 @@
     },
     {
       "path": "checks.json",
-      "bytes": 1244,
-      "sha256": "dffcd339476928719bdd9e0b065f562dca16f652326989dd2bff91b833a3bc8f"
+      "bytes": 1068,
+      "sha256": "f96a503c7ccc3f27ff342cf0ccb91b577aa034a1c28ce525f50e1f6675abad06"
     },
     {
       "path": "media-setup.jpg",
@@ -18,8 +18,8 @@
     },
     {
       "path": "media.json",
-      "bytes": 51110,
-      "sha256": "4d0a16f1fb55da8bf586aa10c47b7c2d3164cb665f4cccfc0f52b9be7ebb00ae"
+      "bytes": 50647,
+      "sha256": "5c099c73891035d63f13c059fb928243065a76e5727846475cce4aab4c169a94"
     },
     {
       "path": "native-restoration.json",
@@ -33,8 +33,8 @@
     },
     {
       "path": "production-browser.json",
-      "bytes": 29898,
-      "sha256": "632ef32cce3857131faf334d23a831c65056e20cf010c00aed6411e2d505a756"
+      "bytes": 29899,
+      "sha256": "30824a8220b4ba01c051b839b5a242fc4d16cd48d941f4db7df9a12a684553b1"
     },
     {
       "path": "production-exclusion.json",
