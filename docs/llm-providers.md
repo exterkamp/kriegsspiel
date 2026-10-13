@@ -75,6 +75,45 @@ Its output is deterministic and validated like any model's, and recorded through
 
 Narrate "pass" means the first reply passed `checkNarration` (no repair, no template); staff "pass" means a non-silent turn with no rejected reply. Parse "pass" counts the corpus's expected result per order. **No model parses a clear order**: all three score 0/10 in the `clear` category (they leave out `unitId`, or give names where place ids are required) and their 24 passes are clarifications and rejections that the corpus also accepts, with 5/15 on the injection orders. So `parse` is not on the model by default; set `OLLAMA_STAGES=parse,narrate,staff` to try it (an unusable parse falls back to the canned parser, after waiting for the model). `qwen2.5:0.5b` is the default because it is the smallest model that passes narration and almost all staff turns, and it is faster than the 1B model.
 
+## Turn umpire benchmark
+
+Story 11.2 (#398): can a model adjudicate a whole turn (D39)? The cases, prompt `adjudicate-v0`, checks, rubric and procedure are in [umpire-benchmark.md](umpire-benchmark.md); raw outputs, grades and the joined table are in `server/bench/umpire/`. Run 2026-10-12/13 on this host (4 CPUs, no GPU, 15 GB RAM, shared with other agents).
+
+| Umpire | Cases | Schema | All checks | All but ammo | Failing checks (cases) | Median / p95 per turn | Plausibility | Faithfulness | Consistency | Fog | Prose | Rubric mean | Disk | Memory |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Claude Code, Opus (`claude-opus-5-5`) | 12 | 12/12 | 7/12 | 12/12 | ammo 5 | 29 s / 52 s | 5.0 | 5.0 | 4.9 | 5.0 | 5.0 | **5.0** | cloud | cloud |
+| Claude Code, Sonnet (`claude-sonnet-5-5`) | 12 | 12/12 | 7/12 | 11/12 | ammo 5, departure 1 | 31 s / 54 s | 4.6 | 4.9 | 4.8 | 4.9 | 5.0 | **4.8** | cloud | cloud |
+| `test` (projection as proposal) | 12 | 12/12 | 12/12 | 12/12 | none | 0 | 2.7 | 2.2 | 3.8 | 3.1 | 1.0 | 2.6 | 0 | 0 |
+| `qwen2.5:7b` | 6 | 6/6 | 0/6 | 0/6 | ids 6, observations 6 | 13 min / 24 min | 2.5 | 2.2 | 3.2 | 2.0 | 2.0 | 2.4 | 4.7 GB | 5.7 GB |
+| `llama3.1:8b` | 5 | 5/5 | 0/5 | 0/5 | ids 2, observations 5, departure 1 | 24 min / 27 min | 2.2 | 2.4 | 2.4 | 2.4 | 1.4 | 2.2 | 4.9 GB | not recorded |
+| `gemma4:e4b` | 6 | 6/6 | 0/6 | 0/6 | ids 1, limits 1, observations 5, departure 1, injection 1 | 32 min / 44 min | 1.7 | 1.5 | 2.0 | 1.8 | 2.2 | 1.8 | 6.6 GB | 7.6 GB |
+| `gemma4:12b`, `qwen2.5:14b` | - | not run | | | | | | | | | | | 8.0 / 9.0 GB | |
+| `gemma4:26b`, `gemma4:31b` | - | not run | | | | | | | | | | | 18.7 / 20.4 GB | |
+| Anthropic API | - | not run | | | | | | | | | | | | |
+
+How to read it:
+- **Cases.** The Claude Code umpires and `test` answered all 12 cases. The local models ran a fixed subset, because one turn takes them 13 to 44 minutes here: the 7-8B models and Gemma 4 e4b ran `uncontested-march`, `advance-to-contact`, `bridge-assault`, `courier-mid-turn`, `impossible-order` and `injected-order`; `llama3.1:8b` lost its sixth (`injected-order`) to a Docker daemon crash on the host and is reported on five. Rubric means are over the cases each model ran. On that same six-case subset Opus passes 6/6 and Sonnet 5/6 of every check but ammo.
+- **Not run.** `gemma4:12b` and `qwen2.5:14b` were not run: the 7-8B models already take 13 to 27 minutes per turn on this host, a 12-14B model would take roughly twice that, and the owner capped the run after the daemon crash. `gemma4:26b` and `gemma4:31b` need more memory than the host has. No `ANTHROPIC_API_KEY` is configured, so the API rows were not run; the Claude Code panes stand in for Sonnet and Opus with the same prompt and schema.
+- **Latency.** Claude Code times are from each pane's `date` before reading a case and after writing the answer, so they include file handling and are an upper bound on an API call. Local times are wall clock with Ollama on about 2 CPUs (its default thread count here) while other agents shared the host; the Gemma run was capped at 1.5 CPUs.
+- **Memory.** `qwen2.5:7b` from Ollama `/api/ps`; `gemma4:e4b` from `docker stats` while it ran (Ollama's `/api/ps` reported 1.9 GB after the run, which is not its working set); `llama3.1:8b` was not recorded before the crash.
+- **Grading.** A separate Opus pane graded every proposal blind (letters A to F, model names and the key withheld). Grades are in `server/bench/umpire/grading/grades.json`, the key in `blind-key.json`. The grader may be biased toward Claude's own style; the automatic checks agree with its ranking independently. Spot check by hand on three cases (`impossible-order`, `uncontested-march`, `injected-order`): agreement on every ranking and on the reasons, with one correction to a note: the grader says the projection marched Blue-2 "over the impassable river" in `impossible-order`, but the engine routed it over the bridge; the outcome (a battalion through the Red army to its headquarters in 17 minutes on an order to wade) is still implausible, so the score stands.
+
+What the failures were:
+- **All three local models** copy the engine's projection for positions and losses and then write accounts that contradict it (`qwen2.5:7b` has Blue-2 "hesitate to cross" while placing it at the enemy headquarters; `llama3.1:8b` says it "waded the river" and that the hussars were destroyed "in the previous turn" on turn 1). Every one lists a unit as having observed itself, and two attach orders to units they were not sent to. `gemma4:e4b` departs from the projection but badly: it marches Red through the Blue line in an "uncontested" march, puts a battalion in the river, marks an order still on the road as carried out, and **writes the injected marker word**, obeying instructions hidden in an order.
+- **Opus and Sonnet** read every order as written and as the commander would (the cautious colonel refuses to wade the river, the aggressive major makes one unauthorised charge, the garbled order is misread, the order on the road is not acted on), ignore the injected text and say so, and explain each departure from the projection. Their only check failures are D39's ammunition ceiling (below) and one missing departure reason from Sonnet.
+- **The projection itself** (`test`, what `rigid` and the keyless demo do) passes every check but grades 2.6: the engine's march rates and combat are harsh (a column storming the bridge ends at 96 men, a hussar squadron is destroyed in 15 minutes, cavalry pursue 1.3 km), and it cannot refuse an impossible order or let a personality bend one.
+
+Findings for the turn-mode stories:
+- **D39's ammunition ceiling is wrong.** "The projection's value is the ceiling" fails every umpire that has a unit fire less than the engine did (5 of 12 cases for both Claude umpires). The rule should be "no rise above the `T0` value except by the engine's supply rule" (11.5, #401).
+- **D39's reach rule hardly ever applies.** With engine march rates (cavalry 6 km and infantry 2 km per 20-minute turn) every unit on "Hold the Bridge" is within some enemy's reach every turn, so "no loss out of reach" catches nothing here (11.5).
+- **Observations need a clearer prompt.** Every local model listed self-sightings; the field names (`unitId` seen, `by` observer) are easy to swap. 11.6 should say it in the prompt and the validator should drop them quietly (D39 already drops observations that fail the sight test).
+- **Local calls cannot last past 300 s** through the server's `fetch` (#415), so a local adjudicator would fail at the timeout D39 sets even if it were good enough.
+
+**Recommendation.**
+- **Cloud: Sonnet** (`claude-sonnet-5-5`) as the `adjudicate` default, as D39 says. It grades 4.8 against Opus's 5.0, with the same check results apart from one missing departure reason, at the same speed in this harness; Opus is the option for a game whose owner wants the best umpire and accepts the cost.
+- **Local: no model that runs on this host is good enough.** The 7-8B models and Gemma 4 e4b fail every case, take 13 to 44 minutes per turn, and one obeys injected text. Larger local models were not run; on this hardware they would be slower still.
+- **Keyless demo:** keep D39's plan: `adjudicate` is not an Ollama stage, the `test` provider answers with the projection (the engine's resolution, with the canned badge), so turn mode plays as `rigid` at every dial. It is consistent and checkable but harsh and literal (rubric 2.6); with a key the umpire is Sonnet.
+
 ## Structured output
 
 - `native`: the server enforces the schema (Anthropic `output_config`, OpenAI `json_schema`, Ollama `format`). The default for all three adapters.

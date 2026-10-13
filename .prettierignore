@@ -12,3 +12,4 @@ server/baselines/*.recording.json
 
 # Preserve certified canonical map bytes.
 data/maps/*.json
+server/bench/

@@ -1,6 +1,6 @@
 # Umpire benchmark (turn mode)
 
-Story 11.2 (#398) of Epic #393. Before building the turn umpire (D39) we need to know which models can adjudicate a whole turn: read every side's orders against the true situation and return a plausible, consistent `TurnProposal`. This page is the procedure; the results and the recommendation are in [llm-providers.md](llm-providers.md#turn-umpire-benchmark).
+Story 11.2 (#398) of Epic #393. Before building the turn umpire (D39) we need to know which models can adjudicate a whole turn: read every side's orders against the true situation and return a plausible, consistent `TurnProposal`. This page is the procedure; the results, findings and the recommendation (Sonnet in the cloud, no usable local model on this host, the projection for the keyless demo) are in [llm-providers.md](llm-providers.md#turn-umpire-benchmark).
 
 ## What is in the repo
 
@@ -36,7 +36,8 @@ Each failure is tagged with the check that found it:
 
 - `schema`: the `TurnProposal` zod schema (string bounds included). A reply that is not JSON fails here.
 - `ids`: the turn number; every unit known, once, and every unit alive at `T0` present; each listed order was sent to that unit; `not-arrived` exactly for an order still on the road.
-- `limits`: D39's hard limits. The march (`validatePlacement` from the `T0` position over the turn, on a scratch world with only that unit, so it tests ground and distance; 11.5's friendly-overlap rule is not checked here), `0 <= strength <= T0 strength` with 0 meaning destroyed, morale, fatigue and ammunition in 0..100, ammunition no higher than projected, and no loss for a unit no enemy could reach in the turn (reach plus a turn's march, at `T0` and at `T1`).
+- `limits`: D39's hard limits. The march (`validatePlacement` from the `T0` position over the turn, on a scratch world with only that unit, so it tests ground and distance; 11.5's friendly-overlap rule is not checked here), `0 <= strength <= T0 strength` with 0 meaning destroyed, morale, fatigue and ammunition in 0..100, and no loss for a unit no enemy could reach in the turn (fire range plus a turn's march, at `T0` and at `T1`). At the engine's march rates every unit on this map is in some enemy's reach every turn, so the last rule only bites in a variant with no enemy nearby (the tests use one).
+- `ammo`: D39's ceiling, ammunition no higher than the projection's. It is reported apart from `limits`, and the report has an "all but ammo" column, because it also fails an umpire that has a unit fire less than the engine did.
 - `observations`: the observer is the side's own unit and the engine's sight test (`canSee`) passes at the end the observation names.
 - `fog`: no unit's `account` names the other side's units or commanders (`hiddenIn`, `hiddenTerms`). The accounts are in each commander's voice and 11.9 builds the reports from them.
 - `departure`: under `standard`, an outcome more than 100 m or 5% of strength from the projection, or with a different status, gives a reason.
@@ -61,7 +62,7 @@ All commands from `server/`. `npm run bench:umpire -- <args>` builds first; afte
    curl -s 127.0.0.1:11435/api/delete -X DELETE -d '{"model":"qwen2.5:7b"}'       # before the next pull
    docker compose -p ks-umpire-bench -f bench/umpire/docker-compose.yml down -v   # at the end
    ```
-   One model at a time; the runner records disk and resident memory in `models.json` from `/api/tags` and `/api/ps`. `--num-ctx` defaults to 12288 (the input is about 5k tokens). Temperature is 0.
+   One model at a time; the runner records disk and resident memory in `models.json` from `/api/tags` and `/api/ps`. `--num-ctx` defaults to 12288 (the input is about 5k tokens). Temperature is 0. On a shared host cap the container (`docker update --cpus 1.5 ks-umpire-bench-ollama-1`). A 7-8B model on this host takes 13 to 44 minutes per turn, so run a subset with `--cases` and one case per call when a crash would cost hours (each call saves its case; commit as you go). The runner calls Ollama through `node:http` (`patientFetch`), because Node's `fetch` gives up after 300 s without response headers (#415).
 3. **API models**: `ANTHROPIC_API_KEY=... npm run bench:umpire -- --provider anthropic --model claude-sonnet-5-5`.
 4. **Claude Code reference umpire** (no API key in the server):
    ```bash
@@ -73,5 +74,6 @@ All commands from `server/`. `npm run bench:umpire -- <args>` builds first; afte
    ```
    Repeat with `opus`.
 5. **Blind grading**: `node dist/umpire/eval/benchCli.js --blind bench/umpire/grading --key bench/umpire/blind-key.json` writes one file per case with the input and every model's proposal under a letter (one letter per model across the packet, in a fixed shuffled order) and `RUBRIC.md`. Start a second pane (Opus) in `bench/umpire/grading` only, and ask it to write `grades.json` there (`{ "<letter>": { "<case>": { "plausibility": n, ..., "note": "..." } } }`) without reading anything outside that directory. It is not told which model is which, nor that the reference is a Claude model.
-6. **Report**: `node dist/umpire/eval/benchCli.js --report --grades bench/umpire/grading/grades.json --key bench/umpire/blind-key.json` prints the table and writes `bench/umpire/results.md`.
+   Keep the key out of the repo (in a scratch directory) until the grader is done, then copy it to `bench/umpire/blind-key.json`. The grader scores a case a model did not run as 1; the report leaves those out and averages each model over the cases it ran.
+6. **Report**: `node dist/umpire/eval/benchCli.js --report --grades bench/umpire/grading/grades.json --key bench/umpire/blind-key.json` prints the table and writes `bench/umpire/results.md`. After a change to the checks, `--rescore` re-applies them to every saved raw output.
 7. Spot-check three cases by hand against the grader's notes and record the agreement in llm-providers.md.
