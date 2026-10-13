@@ -152,6 +152,8 @@ export function replayFrom(
       // An advance is logged at the game time it started from, and agents think (and log orders)
       // part way through it. So do not run to its target now: later entries catch the world up as
       // they come, and the settle at the end covers the rest.
+      // A step is not here: it may have stalled at the barrier short of its target, and the
+      // settle to `endGameMs` below already records where it really ended.
       if (command.kind === 'advanceTo') settled = Math.max(settled, command.gameMs);
       else if (command.kind === 'order' && entry.parse) {
         const res = applyLoggedOrder(

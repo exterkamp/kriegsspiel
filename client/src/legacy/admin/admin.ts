@@ -1,6 +1,6 @@
 /**
  * Admin page shell: game picker, live indicator and empty tabbed panels with a shared filter bar.
- * Read-only: it only issues GETs to `/admin/api` and shares nothing with the game client.
+ * Mostly read-only: GETs to `/admin/api`, plus the clock control bar's POSTs (#128). Shares nothing with the game client.
  */
 import { ReplayPanel } from './replay.js';
 import { LlmPanel } from './llm.js';
@@ -23,6 +23,7 @@ import {
   type LinkStatus,
   type PanelId,
 } from './model.js';
+import { ControlBar } from './controls.js';
 import { StatePanel, type AdminState } from './state.js';
 
 const POLL_MS = 3000;
@@ -56,6 +57,7 @@ export class AdminPage {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private streamCount = 0;
   private statePanel!: StatePanel;
+  private readonly controls: ControlBar;
   private stateReq = 0;
   private stateTimer: ReturnType<typeof setTimeout> | undefined;
   /** From `?token=`, else the one typed in this session (kept in sessionStorage), else none. */
@@ -92,6 +94,7 @@ export class AdminPage {
           <button type="submit">Connect</button>
         </form>
       </header>
+      <div id="controls"></div>
       <nav role="tablist" aria-label="Panels"></nav>
       <div id="filterbar">
         <input id="filter" type="search" placeholder="filter  ( / )" aria-label="Filter" />
@@ -138,6 +141,12 @@ export class AdminPage {
       if (id === 'Replay') this.replay = new ReplayPanel(sec, () => this.token, this.fetchFn);
       if (id === 'Orders') this.orders = new OrdersPanel(sec, () => this.token, this.fetchFn);
     }
+    this.controls = new ControlBar(
+      root.querySelector('#controls')!,
+      () => this.token,
+      this.fetchFn,
+      () => void this.refreshState(),
+    );
     this.statePanel = new StatePanel(this.panels.get('State')!);
     this.llm = new LlmPanel(this.panels.get('LLM')!);
     nav.addEventListener('keydown', (e) => {
@@ -245,6 +254,7 @@ export class AdminPage {
 
   private select(id: string | undefined): void {
     this.gameId = id;
+    this.controls.setGame(id);
     this.closeStream();
     this.streamCount = 0;
     this.llm.reset();
@@ -314,11 +324,16 @@ export class AdminPage {
     try {
       const res = await this.fetchFn(apiUrl(`games/${encodeURIComponent(id)}/state`, this.token));
       if (!current()) return;
-      if (res.status === 404)
+      if (res.status === 404) {
+        this.controls.setState(undefined);
         return this.statePanel.showMessage('This game is not open; no live state.');
+      }
       if (!res.ok) throw new Error(String(res.status));
       const body = (await res.json()) as AdminState;
-      if (current()) this.statePanel.update(body);
+      if (current()) {
+        this.statePanel.update(body);
+        this.controls.setState(body);
+      }
     } catch {
       // Keep the last good state but dim it, so old data never passes for current; the next refresh retries.
       if (current()) this.statePanel.markStale();

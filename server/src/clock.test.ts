@@ -330,3 +330,36 @@ describe('GameClock barrier', () => {
     expect(clock.now()).toBe(0);
   });
 });
+
+describe('GameClock.skipTo (admin step, #128)', () => {
+  it.each([
+    ['realtime', 'running'],
+    ['realtime', 'paused'],
+    ['manual', 'running'],
+    ['fast-forward', 'paused'],
+  ] as const)('moves %s %s time forward in one change and keeps both', (mode, status) => {
+    const wall = fakeWall();
+    const clock = new GameClock(wall, { rate: 4, mode, status });
+    clock.skipTo(60_000);
+    expect(clock.now()).toBe(60_000);
+    expect(clock.mode).toBe(mode);
+    expect(clock.status).toBe(status);
+    expect(clock.history().map((c) => c.kind)).toEqual(['advance']);
+  });
+
+  it('stalls at the barrier, never goes back, and refuses a stopped clock', () => {
+    const wall = fakeWall();
+    const clock = new GameClock(wall, { status: 'paused' });
+    clock.skipTo(1000);
+    clock.setBarrier(1500);
+    clock.skipTo(9000);
+    expect(clock.now()).toBe(1500);
+    // The anchor and the audit entry are capped too, not just the reading.
+    expect(clock.snapshot().gameMsAtAnchor).toBe(1500);
+    expect(clock.history().at(-1)).toMatchObject({ kind: 'advance', gameMs: 1500 });
+    clock.skipTo(10);
+    expect(clock.now()).toBe(1500);
+    clock.stop();
+    expect(() => clock.skipTo(2000)).toThrow('clock is stopped');
+  });
+});

@@ -102,7 +102,8 @@ export const DEFAULT_NARRATE_TIMEOUT_MS = 150_000;
 export const DEFAULT_PARSE_RETRY_DELAY_MS = 1_000;
 
 export type CommandResult =
-  | { ok: true; orderId?: string }
+  /** `stalledAt`: an admin step the LLM barrier held short of its target, and where it stopped. */
+  | { ok: true; orderId?: string; stalledAt?: number }
   | { ok: false; kind: 'clarification'; question: string; options?: string[] }
   | { ok: false; kind: 'rejection'; reason: string };
 
@@ -373,6 +374,11 @@ export class GameActor {
     return this.clock;
   }
 
+  /** Game time of the next queued event, for the admin "step to next event" control. */
+  get nextEventAt(): number | undefined {
+    return this.engine.queue[0]?.time;
+  }
+
   /** The pause vote: its phase and the open proposal, for the views. Undefined without voters. */
   get pauseState():
     | { phase: PauseVoting['phase']; proposal: PauseVoting['open']; voters: number; nowMs: number }
@@ -422,12 +428,13 @@ export class GameActor {
   }
 
   /** Queue a command. Resolves when it has been applied. */
-  submit(command: GameCommand): Promise<CommandResult> {
+  submit(command: GameCommand, options: { admin?: boolean } = {}): Promise<CommandResult> {
+    const admin = options.admin === true;
     // The id of the request being handled, or a fresh one for a caller outside any request.
     const id = this.trace.enabled ? (currentCorrelationId() ?? newCorrelationId()) : undefined;
     if (command.kind === 'order') return this.submitOrder(command, id);
-    if (id === undefined) return this.enqueue(() => this.apply(command));
-    return this.enqueue(() => withCorrelationId(id, () => this.apply(command)));
+    if (id === undefined) return this.enqueue(() => this.apply(command, admin));
+    return this.enqueue(() => withCorrelationId(id, () => this.apply(command, admin)));
   }
 
   /** Stop the scheduler, finish queued work, and refuse new commands. Safe to call twice. */
@@ -1189,11 +1196,22 @@ export class GameActor {
     }
   }
 
-  private async apply(command: GameCommand): Promise<CommandResult> {
-    const entry: InputLogEntry = { seq: ++this.seq, wallMs: this.wallNow(), gameMs: 0, command };
+  private async apply(command: GameCommand, admin = false): Promise<CommandResult> {
+    const entry: InputLogEntry = {
+      seq: ++this.seq,
+      wallMs: this.wallNow(),
+      gameMs: 0,
+      command,
+      ...(admin ? { admin } : {}),
+    };
     let result: CommandResult;
     const tracing = this.trace.enabled;
-    if (tracing) this.trace.record(this.id, 'command', { seq: entry.seq, command });
+    if (tracing)
+      this.trace.record(this.id, 'command', {
+        seq: entry.seq,
+        command,
+        ...(admin ? { admin } : {}),
+      });
     const before = tracing ? this.clockView() : undefined;
     try {
       this.sync();
@@ -1347,6 +1365,22 @@ export class GameActor {
       case 'advanceTo':
         this.clock.advanceTo(command.gameMs);
         return { ok: true };
+      case 'step': {
+        // Resolve the target here, under the queue, so it is never behind the clock however long
+        // the command waited. Log it so the audit trail shows where the step was aimed.
+        const from = this.clock.now();
+        const next = this.nextEventAt;
+        if (command.ms === undefined && next === undefined) throw new Error('no event is queued');
+        const target = command.ms === undefined ? Math.max(next!, from) : from + command.ms;
+        entry.command = {
+          kind: 'step',
+          ...(command.ms === undefined ? {} : { ms: command.ms }),
+          gameMs: target,
+        };
+        this.clock.skipTo(target);
+        const reached = this.clock.now();
+        return reached < target ? { ok: true, stalledAt: reached } : { ok: true };
+      }
       case 'order':
         throw new Error('orders go through submitOrder');
       case 'narrate':

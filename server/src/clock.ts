@@ -251,6 +251,18 @@ export class GameClock {
     this.reanchor('advance', {}, Math.min(gameMs, this.barrierMs ?? Infinity));
   }
 
+  /**
+   * Admin step (#128): move game time forward to `gameMs` whatever the mode and pause state, which
+   * stay as they are. One re-anchor and one `advance` history entry. Stalls at the barrier; a
+   * target at or before the current reading leaves game time where it is.
+   */
+  skipTo(gameMs: number): void {
+    if (this.state.status === 'stopped') throw new Error('clock is stopped');
+    if (!Number.isFinite(gameMs)) throw new RangeError(`gameMs must be finite, got ${gameMs}`);
+    const from = this.now();
+    this.reanchor('advance', {}, Math.max(from, Math.min(gameMs, this.barrierMs ?? Infinity)));
+  }
+
   /** Manual and fast-forward modes: advance game time by `dtMs`. */
   step(dtMs: number): void {
     this.advanceTo(this.now() + dtMs);
