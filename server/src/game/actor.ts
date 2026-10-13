@@ -49,7 +49,14 @@ import { advanceUntilOver, applyLoggedOrder } from './replay.js';
 import { parseContextOf } from './parseContext.js';
 import { hiddenTerms } from '../umpire/leakGuard.js';
 import {
+  breakerAllows,
+  breakerAt,
+  breakerCooldownMs,
+  breakerSummary,
+  closedBreaker,
   narrateReports,
+  recordNarrateCall,
+  type NarrateBreakerState,
   STAFF_OVERLOADED_NOTICE,
   narrateWindowMs,
   reportsDueForNarration,
@@ -193,6 +200,8 @@ export interface GameActorOptions {
   umpire?: UmpireClient;
   /** The umpire's voice for narration (3.11); tone only. Default the dry staff officer. */
   persona?: UmpirePersona;
+  /** The narration circuit breaker of a reopened game, from its input log (#419). Default closed. */
+  narrateBreaker?: NarrateBreakerState;
   /** Server-side agents that play scripted sides (see `opponent/`). */
   agents?: SideAgent[];
   /** Pause voting: who votes and the host's rules. Unset: the vote commands are refused. */
@@ -307,6 +316,10 @@ export class GameActor {
   private readonly narratedUntil = new Map<string, number>();
   private readonly narrations = new Map<string, SideNarration>();
   private readonly narrating = new Set<string>();
+  /** Sides a server-side agent plays (`options.agents`): nobody reads their dispatches, so they are never narrated (#419). */
+  private readonly scriptedSides: ReadonlySet<string>;
+  /** The narrate stage's circuit breaker, shared by the game's sides (#419). */
+  private narrateBreaker: NarrateBreakerState;
   /** Sides whose latest narration was refused by the game's budget or rate limit. */
   private readonly overloaded = new Set<string>();
   /** Each side's questions to its staff officers and their answers (D6b), oldest first. */
@@ -363,6 +376,7 @@ export class GameActor {
     this.seq = options.seq ?? 0;
     this.umpire = options.umpire;
     this.persona = options.persona;
+    this.narrateBreaker = options.narrateBreaker ?? closedBreaker();
     for (const [side, list] of options.staffHistory ?? []) {
       this.staffHistory.set(side, [...list]);
       // Asked before a stop and not yet answered: answered when due, as if the game had not stopped.
@@ -387,6 +401,7 @@ export class GameActor {
     }
     // Decisions fall on multiples of the interval; a resumed game picks up at the next one.
     const t = this.engine.time;
+    this.scriptedSides = new Set((options.agents ?? []).map((a) => a.side));
     this.agents = (options.agents ?? []).map((agent) => ({
       agent,
       nextAt: t === 0 ? 0 : (Math.floor(t / agent.intervalMs) + 1) * agent.intervalMs,
@@ -444,6 +459,11 @@ export class GameActor {
   /** What `side` is shown in place of template text: pass to `sideViewOf`. */
   narrationFor(side: string): ReadonlyMap<string, string | null> | undefined {
     return this.narrations.get(side);
+  }
+
+  /** The narrate stage's circuit breaker now (#419). */
+  get narrationBreaker(): Readonly<NarrateBreakerState> {
+    return this.narrateBreaker;
   }
 
   /** The in-fiction notice for a side whose latest narration the umpire's cap refused. */
@@ -631,7 +651,7 @@ export class GameActor {
     if (!umpire || this.turns || this.closed || this.engine.world.outcome) return;
     const now = this.engine.time;
     for (const side of this.engine.world.sides) {
-      if (this.narrating.has(side.id)) continue;
+      if (this.narrating.has(side.id) || this.scriptedSides.has(side.id)) continue;
       const since = this.narratedUntil.get(side.id) ?? now;
       if (now < since + narrateWindowMs(this.clock.rate)) continue;
       // The window is closed: reports delivered later belong to the next one, whether or not any are due.
@@ -639,6 +659,15 @@ export class GameActor {
       const view = viewFor(this.engine.world, side.id, now);
       const due = reportsDueForNarration(view.reports, since, now, this.clock.rate);
       if (due.length === 0) continue;
+      this.narrateBreaker = breakerAt(this.narrateBreaker, now);
+      if (!breakerAllows(this.narrateBreaker, now)) {
+        // The model has been failing: the reports keep their template text and no call is made.
+        const breaker = this.narrateBreaker;
+        void this.enqueueCompletion(() => this.logPausedNarration(side.id, now, breaker)).catch(
+          (e) => this.onError?.(e),
+        );
+        continue;
+      }
       this.narrating.add(side.id);
       const before = this.clock.barrier;
       const dep: Dependency = {
@@ -662,11 +691,24 @@ export class GameActor {
       // At the deadline the reports already narrated are kept and the rest fall back to template text.
       const abort = new AbortController();
       const deadline = this.parseTimer(() => abort.abort(), this.narrateTimeoutMs);
+      const cooldownMs = breakerCooldownMs(narrateWindowMs(this.clock.rate));
       const work = narrateReports(client, side.id as SideId, due, {
         hidden: hiddenTerms(this.engine.world, side.id as SideId),
         signal: abort.signal,
         persona: this.persona,
         ownUnits: view.ownUnits,
+        // Game time stands at `now` while the stage works (the barrier), so the breaker's clock is `now`.
+        breaker: {
+          allows: () => breakerAllows(this.narrateBreaker, now),
+          reason: () => breakerSummary(this.narrateBreaker),
+          record: (ok) => {
+            const wasOpen = !breakerAllows(this.narrateBreaker, now);
+            this.narrateBreaker = recordNarrateCall(this.narrateBreaker, ok, now, cooldownMs);
+            if (!wasOpen && !breakerAllows(this.narrateBreaker, now)) {
+              this.traceBreaker(this.narrateBreaker, 'opened');
+            }
+          },
+        },
       }).then(
         (result) => {
           this.clearParseTimer(deadline);
@@ -715,6 +757,8 @@ export class GameActor {
         }
         this.narrations.set(side, text);
       }
+      // As this window left it: `sync` may begin another side's window, which can move the breaker on.
+      const narrateBreaker = this.narrateBreaker;
       this.sync();
       if (this.trace.enabled) {
         // One admin LLM row per report that kept its template text, with the reason (#359).
@@ -737,6 +781,7 @@ export class GameActor {
         endGameMs: this.engine.time,
         command: { kind: 'narrate', side, windowEndMs },
         calls,
+        narrateBreaker,
         ...(result?.fellBack
           ? {
               error: `narration fell back to template text: ${narrationFallbackReason(result)}`,
@@ -750,6 +795,47 @@ export class GameActor {
       this.reschedule();
       this.notify();
     }
+  }
+
+  /** Journal a window the open breaker skipped: its reports keep their template text (#419). */
+  private async logPausedNarration(
+    side: string,
+    windowEndMs: number,
+    breaker: NarrateBreakerState,
+  ): Promise<void> {
+    if (this.closed) return;
+    this.traceBreaker(breaker, `${side} window skipped`);
+    const entry: InputLogEntry = {
+      seq: ++this.seq,
+      wallMs: this.wallNow(),
+      gameMs: this.engine.time,
+      endGameMs: this.engine.time,
+      command: { kind: 'narrate', side, windowEndMs },
+      calls: [],
+      narrateBreaker: breaker,
+      error: `narration fell back to template text: ${breakerSummary(breaker)}`,
+    };
+    if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+    await this.commit(entry);
+  }
+
+  /** One admin LLM row for the breaker: "model narration paused: 5 of 6 failed" and until when. */
+  private traceBreaker(breaker: NarrateBreakerState, what: string): void {
+    if (!this.trace.enabled) return;
+    const until =
+      breaker.pausedUntil === undefined
+        ? ''
+        : `, until game minute ${Math.round(breaker.pausedUntil / 60_000)}`;
+    const reason = `${breakerSummary(breaker)}${until}`;
+    this.trace.record(this.id, 'llm', {
+      mode: 'fallback',
+      stage: 'narrate',
+      provider: 'narration breaker',
+      ok: false,
+      errorKind: 'model narration paused',
+      error: `${reason} (${what})`,
+      fallbackFor: { reason },
+    });
   }
 
   /**
@@ -1036,7 +1122,7 @@ export class GameActor {
     if (!this.umpire || this.turns || this.engine.world.outcome) return undefined;
     let next: number | undefined;
     for (const side of this.engine.world.sides) {
-      if (this.narrating.has(side.id)) continue;
+      if (this.narrating.has(side.id) || this.scriptedSides.has(side.id)) continue;
       const at =
         (this.narratedUntil.get(side.id) ?? this.engine.time) + narrateWindowMs(this.clock.rate);
       if (next === undefined || at < next) next = at;

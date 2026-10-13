@@ -300,13 +300,13 @@ describe('who may sign', () => {
     sub.send({ kind: 'issueOrder', orderId: 's2', text: 'blue-2 march to the bridge' });
     lead.send({ kind: 'issueOrder', orderId: 'l1', text: 'blue-1 march to the bridge' });
     await lead.until((m) =>
-      m.find((x) => x.kind === 'dispatch' && x.dispatch.text.includes('received its orders')),
+      m.find((x) => x.kind === 'dispatch' && x.dispatch.text.includes('your orders')),
     );
     await sub.until((m) =>
       m.find(
         (x) =>
           x.kind === 'dispatch' &&
-          x.dispatch.text.includes('received its orders') &&
+          x.dispatch.text.includes('your orders') &&
           x.dispatch.from.includes('2'),
       ),
     );
@@ -331,7 +331,7 @@ describe('forwarding from HQ', () => {
     // blue-1 receives an order and reports back to HQ: a paper the subordinate of blue-2 never saw.
     lead.send({ kind: 'issueOrder', orderId: 'l1', text: 'blue-1 march to the bridge' });
     const paper = await lead.until((m) =>
-      m.find((x) => x.kind === 'dispatch' && x.dispatch.text.includes('received its orders')),
+      m.find((x) => x.kind === 'dispatch' && x.dispatch.text.includes('your orders')),
     );
     const id = (paper as { dispatch: { id: string } }).dispatch.id;
     await sub.until((m) => (sub.lastView() && m.length > 0 ? true : undefined));
@@ -395,7 +395,7 @@ describe('forwarding up the chain of command', () => {
     // The subordinate's formation receives an order and files a report.
     lead.send({ kind: 'issueOrder', orderId: 'u1', text: 'blue-2 march to the bridge' });
     const filed = await sub.until((m) =>
-      m.find((x) => x.kind === 'dispatch' && x.dispatch.text.includes('received its orders')),
+      m.find((x) => x.kind === 'dispatch' && x.dispatch.text.includes('your orders')),
     );
     return { lead, cos, sub, id: (filed as { dispatch: { id: string } }).dispatch.id };
   }

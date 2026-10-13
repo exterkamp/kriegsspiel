@@ -370,7 +370,7 @@ describe('reports', () => {
       ageMs: COURIER_DELAY_MS + 3 * MS_PER_MINUTE,
       sizeEstimate: 'about a battalion',
     });
-    expect(r!.text).toContain('sighted about a battalion');
+    expect(r!.text).toContain('about a battalion');
     expect(JSON.stringify(r)).not.toContain('437');
   });
 
@@ -884,9 +884,12 @@ describe('places in reports', () => {
     s = advanceTo(s, COURIER_DELAY_MS, registry()).state;
     const r = viewFor(s.world, 'blue', s.time).reports.find((x) => x.kind === 'contact');
     expect(r).toMatchObject({ place: 'near the mill, east of the road', uncertaintyRadius: 60 });
-    expect(r!.text).toBe(
-      'Sir, Unit b sighted about a battalion near the mill, east of the road, about 10 minutes ago (medium confidence).',
-    );
+    // A field note from Unit b, hedged as its medium confidence calls for (#419).
+    expect(r!.text).toMatch(/^Sir, /);
+    expect(r!.text).toContain('about a battalion');
+    expect(r!.text).toContain('near the mill, east of the road');
+    expect(r!.text).toMatch(/as far as I can make out|as near as we can tell/);
+    expect(r!.text).toMatch(/— Unit b, about 10 minutes ago\.$/);
     expect(r!.text).not.toMatch(/\d+, \d+/);
   });
 

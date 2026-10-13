@@ -92,6 +92,17 @@ export {
 } from './narrate.js';
 export type { NarrateOptions, NarrateOutput, NarrateResult, NarratedDispatch } from './narrate.js';
 export {
+  BREAKER_FAILURES,
+  BREAKER_RECENT,
+  breakerAllows,
+  breakerAt,
+  breakerCooldownMs,
+  breakerSummary,
+  closedBreaker,
+  recordNarrateCall,
+} from './narrateBreaker.js';
+export type { NarrateBreakerState } from './narrateBreaker.js';
+export {
   STAFF_MESSAGE_KINDS,
   STAFF_PROMPT_VERSION,
   STAFF_SCHEMA,

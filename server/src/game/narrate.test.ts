@@ -20,8 +20,10 @@ import {
   UmpireError,
   staffOfficerFor,
 } from '../umpire/index.js';
+import type { TraceSink } from '../debug/trace.js';
 import { umpireConfigFromEnv } from '../umpire/config.js';
 import { createUmpireClient } from '../umpire/createUmpireClient.js';
+import type { StaffAtWork } from './actor.js';
 import { GameHost, MemoryGameStore } from './index.js';
 import { FakeTime } from './testing.js';
 
@@ -42,6 +44,19 @@ const parser: OrderParser = {
     unitId: 'blue-1',
     intents: [{ kind: 'move', to: BRIDGE }],
   }),
+};
+
+/** What the stub's note says happened, by report kind: a field note that passes `checkNarration` (#419). */
+const HAPPENED: Record<string, string> = {
+  orderDelivered: 'we have your orders',
+  contact: 'we see enemy troops',
+  engaged: 'we are engaged',
+  heavyLosses: 'we are taking heavy losses',
+  broke: 'we have broken and fall back',
+  lowAmmo: 'we are short of ammunition',
+  exhausted: 'we are exhausted',
+  destroyed: 'we have destroyed them',
+  situation: 'we are in position',
 };
 
 /** Narrates each report on its own, quoting the officer, once the gate (if any) opens. */
@@ -66,11 +81,15 @@ class StubUmpire implements UmpireClient {
         messages: this.staffText === undefined ? [] : [{ kind: 'advice', text: this.staffText }],
       };
     } else {
-      const { reports } = request.input as { reports: { id: string; from: string }[] };
+      const { reports } = request.input as {
+        reports: { id: string; from: string; kind: string }[];
+      };
       output = {
         dispatches: reports.map((r) => ({
           reportIds: [r.id],
-          text: this.narrateText?.(r.from) ?? `Sir, ${r.from} writes.`,
+          text:
+            this.narrateText?.(r.from) ??
+            `Sir, ${r.from} writes: ${HAPPENED[r.kind] ?? 'we hold, and it is lost'}.`,
         })),
       };
     }
@@ -97,7 +116,15 @@ afterEach(async () => {
   host = undefined;
 });
 
-async function newGame(umpire?: UmpireClient, extra: { narrateTimeoutMs?: number } = {}) {
+async function newGame(
+  umpire?: UmpireClient,
+  extra: {
+    narrateTimeoutMs?: number;
+    scriptedOpponents?: boolean;
+    trace?: TraceSink;
+    onStaffAtWork?: (gameId: string, state: StaffAtWork) => void;
+  } = {},
+) {
   const time = new FakeTime();
   const store = new MemoryGameStore();
   host = new GameHost({
@@ -222,6 +249,108 @@ describe('narrate stage in the actor', () => {
       await time.advance(NARRATE_WINDOW_BASE_MS);
     }
     expect(game.overloadedFor(side)).toBeUndefined();
+  });
+
+  it('never narrates a side a scripted agent plays (#419)', async () => {
+    const umpire = new StubUmpire();
+    const { time, game } = await newGame(umpire, { scriptedOpponents: true });
+    await runUntilReport(time, game);
+    for (let i = 0; i < 12; i++) await time.advance(NARRATE_WINDOW_BASE_MS);
+
+    const sides = umpire.requests
+      .filter((r) => r.stage === 'narrate')
+      .map((r) => (r.input as { side: string }).side);
+    expect(sides).toContain('blue');
+    expect(sides).not.toContain('red');
+    // Red had reports to narrate: nobody reads them, so no model was asked.
+    expect(viewFor(game.state.world, 'red', game.state.time).reports.length).toBeGreaterThan(0);
+    expect(game.narrationFor('red')).toBeUndefined();
+  });
+
+  it('stops calling a failing model for a cooling-off in game time, logs why, and tries again after (#419)', async () => {
+    const umpire = new StubUmpire();
+    // An officer the reports never name: every reply fails the checks.
+    umpire.narrateText = () => 'Sir, Colonel Zorn writes.';
+    const llmRows: Record<string, unknown>[] = [];
+    const trace: TraceSink = {
+      enabled: true,
+      record: (_id, kind, data) => {
+        if (kind === 'llm') llmRows.push(data as Record<string, unknown>);
+      },
+    };
+    const atWork: StaffAtWork[] = [];
+    const { time, store, game } = await newGame(umpire, {
+      trace,
+      onStaffAtWork: (_id, state) => atWork.push(state),
+    });
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' });
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march on' });
+    const narrateCalls = () => umpire.requests.filter((r) => r.stage === 'narrate').length;
+    for (let i = 0; i < 60 && game.narrationBreaker.pausedUntil === undefined; i++) {
+      await time.advance(NARRATE_WINDOW_BASE_MS);
+    }
+    const pausedUntil = game.narrationBreaker.pausedUntil!;
+    expect(pausedUntil).toBeDefined();
+    expect(game.narrationBreaker.failed).toBeGreaterThanOrEqual(3);
+
+    // Cooling off: windows close with reports due, but the model is not asked and game time is not held.
+    const before = narrateCalls();
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 hold' });
+    await time.flush();
+    atWork.length = 0;
+    llmRows.length = 0;
+    while (game.state.time + NARRATE_WINDOW_BASE_MS < pausedUntil) {
+      await time.advance(NARRATE_WINDOW_BASE_MS);
+    }
+    expect(narrateCalls()).toBe(before);
+    expect(atWork.filter((s) => s.working)).toEqual([]);
+    expect(llmRows).toContainEqual(
+      expect.objectContaining({
+        provider: 'narration breaker',
+        error: expect.stringMatching(/blue window skipped/),
+      }),
+    );
+    const log = (await store.inputLog('g1')).filter((e) => e.command.kind === 'narrate');
+    const skipped = log.filter((e) => e.calls?.length === 0);
+    expect(skipped.length).toBeGreaterThan(0);
+    expect(skipped[0]!.error).toMatch(/model narration paused: \d+ of \d+ failed/);
+    expect(skipped[0]!.narrateBreaker?.pausedUntil).toBe(pausedUntil);
+
+    // After it the model is asked again, and its good text is shown.
+    umpire.narrateText = undefined;
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' });
+    for (let i = 0; i < 20 && narrateCalls() === before; i++) {
+      await time.advance(NARRATE_WINDOW_BASE_MS);
+    }
+    expect(narrateCalls()).toBeGreaterThan(before);
+    expect(game.state.time).toBeGreaterThanOrEqual(pausedUntil);
+    expect([...(game.narrationFor('blue')?.values() ?? [])]).toContain(
+      'Sir, 1st Battalion writes: we have your orders.',
+    );
+    expect(game.narrationBreaker.pausedUntil).toBeUndefined();
+  });
+
+  it('restores the breaker from the input log when a game is reopened (#419)', async () => {
+    const umpire = new StubUmpire();
+    umpire.narrateText = () => 'Sir, Colonel Zorn writes.';
+    const { time, store, game } = await newGame(umpire);
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' });
+    await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march on' });
+    for (let i = 0; i < 60 && game.narrationBreaker.pausedUntil === undefined; i++) {
+      await time.advance(NARRATE_WINDOW_BASE_MS);
+    }
+    const state = structuredClone(game.narrationBreaker);
+    expect(state.pausedUntil).toBeDefined();
+    await host!.close('g1');
+    host = new GameHost({
+      store,
+      parser,
+      registry: registry(),
+      wallNow: time.now,
+      timers: time,
+      narrator: () => umpire,
+    });
+    expect((await host.open('g1')).narrationBreaker).toEqual(state);
   });
 
   it('keeps template text when no umpire is set', async () => {

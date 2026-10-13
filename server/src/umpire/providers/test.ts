@@ -56,26 +56,29 @@ function narrate(input: Json) {
       const radius = num(r.radiusM);
       const when = minutes === 0 ? 'just now' : `about ${plural(minutes, 'minute', 'minutes')} ago`;
       const where = place ? ` ${place}` : '';
+      // In the sender's own voice (#419), except the kinds headquarters writes about a unit.
       const body =
         r.kind === 'contact'
-          ? `${from} sighted ${size || 'enemy troops'}${where}, ${when}`
+          ? `${from} here: we have sighted ${size || 'enemy troops'}${where}, ${when}`
           : r.kind === 'unitLost'
             ? `${from} is lost to us${where}, ${when}; I cannot say more`
             : r.kind === 'courierLost'
               ? `no word from ${from}${where}; the courier is overdue and must be given up for lost`
               : r.kind === 'orderDelivered'
-                ? `${from} has received its orders${where}, ${when}`
+                ? `${from} here: we have received your orders${where}, ${when}`
                 : r.kind === 'lowAmmo'
-                  ? `${from} is running short of ammunition${where}, ${when}`
+                  ? `${from} here: we are running short of ammunition${where}, ${when}`
                   : r.kind === 'exhausted'
-                    ? `${from} is exhausted${where}, ${when}`
+                    ? `${from} here: my men are exhausted${where}, ${when}`
                     : r.kind === 'engaged'
-                      ? `${from} is engaged${where}, ${when}`
+                      ? `${from} here: we are engaged${where}, ${when}`
                       : r.kind === 'heavyLosses'
-                        ? `${from} is taking heavy losses${where}, ${when}`
+                        ? `${from} here: we are taking heavy losses${where}, ${when}`
                         : r.kind === 'broke'
-                          ? `${from} has broken and is falling back${where}, ${when}`
-                          : `${from} reports its situation${where}, ${when}`;
+                          ? `${from} here: we have broken and are falling back${where}, ${when}`
+                          : r.kind === 'destroyed'
+                            ? `${from} here: we have destroyed ${size || 'enemy troops'}${where}, ${when}`
+                            : `${from} here: we are in position${where}, ${when}`;
       // Only what the staff saw for themselves is hedged or vouched for.
       const sure =
         r.kind !== 'contact' && r.kind !== 'situation'

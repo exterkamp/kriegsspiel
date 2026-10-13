@@ -181,19 +181,20 @@ describe('the in-tray of a live game', () => {
     'holds an opening report and an order-delivered note after 10 game minutes at rate %i',
     async (rate) => {
       const run = await play(rate, 10 * MIN);
-      const blue = viewFor(run.state.world, 'blue', run.state.time).reports.map(toDispatch);
-      const opening = blue.find((d) => d.text.includes('no enemy yet in sight'));
+      const reports = viewFor(run.state.world, 'blue', run.state.time).reports;
+      const blue = reports.map(toDispatch);
+      const opening = blue.find((_, i) => reports[i]!.kind === 'situation');
       expect(opening).toMatchObject({
         from: 'Chief of staff',
         category: 'staff',
         receivedAtGame: 0,
       });
       expect(opening!.location).toBeDefined();
-      const ack = blue.find((d) => d.text.includes('received its orders'));
+      const ack = blue.find((_, i) => reports[i]!.kind === 'orderDelivered');
       expect(ack).toMatchObject({ category: 'subordinates', confidence: 'high' });
       expect(ack!.receivedAtGame).toBeLessThanOrEqual(10 * MIN);
       // Red's own opening report never reaches Blue.
-      expect(blue.filter((d) => d.text.includes('no enemy yet in sight'))).toHaveLength(1);
+      expect(reports.filter((r) => r.kind === 'situation')).toHaveLength(1);
     },
     60_000,
   );
@@ -256,8 +257,8 @@ describe('a battle is decided (#315)', () => {
         // Nothing a side could not know: no men counts or morale figures in the umpire's words.
         expect(narrative).not.toMatch(/\d/);
       }
-      const blueTexts = viewFor(w, 'blue', run.state.time).reports.map(toDispatch);
-      expect(blueTexts.some((d) => /destroyed/.test(d.text))).toBe(true);
+      const blueReports = viewFor(w, 'blue', run.state.time).reports;
+      expect(blueReports.some((r) => r.kind === 'destroyed')).toBe(true);
       const redLost = viewFor(w, 'red', run.state.time).reports.filter(
         (r) => r.kind === 'unitLost',
       );

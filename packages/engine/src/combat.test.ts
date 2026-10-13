@@ -1111,7 +1111,7 @@ describe('battle visibility (#320)', () => {
       const engaged = reportsOf(state, side).filter((r) => r.kind === 'engaged');
       expect(engaged).toHaveLength(1);
       expect(engaged[0]!.from).toBe(side === 'blue' ? 'blue-1' : 'red-1');
-      expect(engaged[0]!.text).toContain('engaged');
+      expect(engaged[0]!.text).toMatch(/engaged|fighting|in action|blows/);
       expect(engaged[0]!.observedAt).toBe(COMBAT_TICK_MS);
     }
   });
@@ -1191,7 +1191,7 @@ describe('battle visibility (#320)', () => {
     expect(kinds).toContain('engaged');
     expect(kinds).toContain('broke');
     const broke = reportsOf(state, 'blue').find((r) => r.kind === 'broke')!;
-    expect(broke.text).toMatch(/broken and is falling back/);
+    expect(broke.text).toMatch(/broken|falling back|given way|driven back/);
     expect(broke.observedAt).toBe(COMBAT_TICK_MS);
     // Red's units did not break, so Red is told nothing of Blue's break.
     expect(reportsOf(state, 'red').some((r) => r.kind === 'broke')).toBe(false);

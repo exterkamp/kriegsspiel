@@ -319,7 +319,7 @@ describe('test provider: narrate', () => {
   it('is used by narrateReports without falling back to the template', async () => {
     const out = await narrateReports(client(), 'blue', reports());
     expect(out).toMatchObject({ fellBack: false, calls: reports().length });
-    expect(out.dispatches[0]!.text).toContain('2nd Hussars sighted about 400 men');
+    expect(out.dispatches[0]!.text).toContain('we have sighted about 400 men');
     expect(out.dispatches[0]!.text).not.toBe('template');
     // The place the report carries is in the text.
     expect(out.dispatches[0]!.text).toContain('near the mill, east of the Albrecht road');
