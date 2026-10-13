@@ -51,6 +51,13 @@ export type GameCommand =
   | { kind: 'setMode'; mode: ClockMode }
   /** Manual and fast-forward modes: move game time to this point. */
   | { kind: 'advanceTo'; gameMs: number }
+  /**
+   * Admin step (#128): move game time forward whatever the mode and pause state, which stay as they
+   * were. By `ms`, or to the next queued event when `ms` is absent. The target is resolved when the
+   * command runs and recorded in `gameMs` on the logged command. It stalls at the LLM barrier, so
+   * replay settles to the entry's `endGameMs` (where the step really ended), not to `gameMs`.
+   */
+  | { kind: 'step'; ms?: number; gameMs?: number }
   /** Pause voting (docs/architecture.md). `by` is a voter's player id. */
   | { kind: 'proposePause'; by: string; reason?: string }
   | { kind: 'proposeResume'; by: string }
@@ -144,6 +151,8 @@ export interface InputLogEntry {
   parse?: ParseResult;
   /** The parser failed on every attempt and the conservative fallback was used instead. */
   fallback?: { attempts: number; error: string };
+  /** Issued from the admin view (#128), not by a player or the game's own scheduler. */
+  admin?: boolean;
   /** Issued by a scripted side's agent, not a player. Replay applies it at `gameMs` before any command at the same instant. */
   agent?: boolean;
   /** Written by a player's deputy, within this discretion (D6f). Always set with `agent`. */

@@ -9,6 +9,7 @@ type Rec = Record<string, unknown>;
 export interface AdminState {
   id: string;
   clock?: { rate?: number; status?: string; [k: string]: unknown };
+  control?: { mode?: string; gameMs?: number; barrierMs?: number; nextEventAt?: number };
   staffAtWork?: { working: boolean; needAtMs?: number };
   engine: {
     time: number;
