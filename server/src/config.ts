@@ -128,6 +128,27 @@ export function llmOrderParserEnabled(
   return spec.type === 'anthropic' ? Boolean(env[spec.apiKeyEnv ?? 'ANTHROPIC_API_KEY']) : true;
 }
 
+/**
+ * Whether turn-mode games at the `standard` and `free` dials are adjudicated by the umpire (D39,
+ * 11.6). Off by default when no capable model serves the `adjudicate` stage: then every turn is the
+ * engine's, as at `rigid`. Capable means an Anthropic route with its key, or any other configured
+ * provider but the canned `test` one and a local Ollama (the benchmark found no local model this
+ * host can run fit to adjudicate a turn, #398). Naming the stage's provider explicitly
+ * (`UMPIRE_PROVIDER_ADJUDICATE`) turns it on whatever the provider, so `test` can drive the whole
+ * pipeline in development; `TURN_UMPIRE=off` turns it off.
+ */
+export function turnUmpireEnabled(
+  env: Record<string, string | undefined>,
+  config: UmpireConfig,
+): boolean {
+  if (/^(0|false|off)$/i.test(env.TURN_UMPIRE?.trim() ?? '')) return false;
+  if (env.UMPIRE_PROVIDER_ADJUDICATE?.trim()) return true;
+  const spec = config.providers[config.stages.adjudicate.provider];
+  if (!spec) return false;
+  if (spec.type === 'anthropic') return Boolean(env[spec.apiKeyEnv ?? 'ANTHROPIC_API_KEY']);
+  return spec.type !== 'test' && spec.type !== 'ollama';
+}
+
 /** Whether any stage runs on the test provider (canned responses), so the game can say so. */
 export function usesTestUmpire(config: UmpireConfig): boolean {
   const isTest = (s: UmpireStage) => config.providers[config.stages[s].provider]?.type === 'test';

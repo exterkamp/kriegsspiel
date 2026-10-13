@@ -96,7 +96,11 @@ export class ProviderUmpireClient implements UmpireClient {
       let terminal = false;
       let repair: { reply: string; problem: string } | undefined;
       try {
-        const res = await this.sendWithTimeout(provider, { ...base, messages: [...messages] });
+        const res = await this.sendWithTimeout(
+          provider,
+          { ...base, messages: [...messages] },
+          this.config.stageTimeoutMs?.[request.stage] ?? this.config.timeoutMs,
+        );
         usage = addUsage(usage, res.usage);
         const c = costUsd(model, res.usage);
         cost = cost === null || c === null ? null : cost + c;
@@ -193,14 +197,18 @@ export class ProviderUmpireClient implements UmpireClient {
     return Math.round(exp * (0.5 + this.random() / 2));
   }
 
-  private async sendWithTimeout(provider: LlmProvider, request: ProviderRequest) {
+  private async sendWithTimeout(
+    provider: LlmProvider,
+    request: ProviderRequest,
+    timeoutMs: number,
+  ) {
     const ctrl = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
         ctrl.abort();
-        reject(new UmpireError(`timed out after ${this.config.timeoutMs}ms`, 'timeout', 0));
-      }, this.config.timeoutMs);
+        reject(new UmpireError(`timed out after ${timeoutMs}ms`, 'timeout', 0));
+      }, timeoutMs);
     });
     try {
       // Race so a transport that ignores the abort signal still times out.

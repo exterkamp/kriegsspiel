@@ -18,6 +18,7 @@ export const UMPIRE_STAGES: readonly UmpireStage[] = [
   'staff',
   'command',
   'critique',
+  'adjudicate',
 ];
 
 /** One configured model server. `type` names a factory in the `ProviderRegistry`. */
@@ -51,6 +52,8 @@ export interface UmpireConfig {
   stages: Record<UmpireStage, StageRoute>;
   /** Per-attempt timeout. */
   timeoutMs: number;
+  /** Per-attempt timeout for a stage, where it differs from `timeoutMs`. */
+  stageTimeoutMs?: Partial<Record<UmpireStage, number>>;
   /** Total attempts including the first. */
   maxAttempts: number;
   /** Backoff before retry n is `min(maxBackoffMs, baseBackoffMs * 2^(n-1))`, with jitter. */
@@ -88,6 +91,10 @@ function ollamaStages(env: Env): readonly UmpireStage[] {
   }
   return names as UmpireStage[];
 }
+/** D39's `adjudicateTimeoutMs`: a turn may take minutes (the benchmark's Claude turns took 30 to 55 s). */
+export const ADJUDICATE_TIMEOUT_MS = 300_000;
+export const ADJUDICATE_MAX_TOKENS = 12_000;
+
 export const OLLAMA_DEFAULT_MODEL = 'qwen2.5:0.5b';
 /** A CPU model answers in seconds to a minute, so the call timeout is generous. */
 export const OLLAMA_DEFAULT_TIMEOUT_MS = 60_000;
@@ -102,8 +109,15 @@ export const DEFAULT_UMPIRE_CONFIG: UmpireConfig = {
     staff: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
     command: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
     critique: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
+    // A whole turn in one reply (D39): the benchmark's answers run to about 5,000 tokens (#398).
+    adjudicate: {
+      provider: 'anthropic',
+      model: 'claude-sonnet-5-5',
+      params: { maxTokens: ADJUDICATE_MAX_TOKENS },
+    },
   },
   timeoutMs: 60_000,
+  stageTimeoutMs: { adjudicate: ADJUDICATE_TIMEOUT_MS },
   maxAttempts: 3,
   baseBackoffMs: 500,
   maxBackoffMs: 8_000,
@@ -161,7 +175,8 @@ function checkFile(file: UmpireConfigFile): void {
  * Builds the config: defaults, then the optional file, then env overrides. Env reads `UMPIRE_PROVIDER` (every
  * stage; `test` answers with canned responses), `UMPIRE_KEYLESS_PROVIDER` (the provider for stages that would use
  * Anthropic with no API key; `ollama` serves parse, narrate and staff from a local model with `test` as the fallback, configured by
- * `OLLAMA_URL`, `OLLAMA_MODEL`, `OLLAMA_STAGES`, `OLLAMA_NUM_CTX` and `OLLAMA_TIMEOUT_MS`), `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_TIMEOUT_MS`,
+ * `OLLAMA_URL`, `OLLAMA_MODEL`, `OLLAMA_STAGES`, `OLLAMA_NUM_CTX` and `OLLAMA_TIMEOUT_MS`), `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND|CRITIQUE|ADJUDICATE`, `UMPIRE_MODEL_<same>`, `UMPIRE_TIMEOUT_MS`,
+ * `UMPIRE_TIMEOUT_MS_ADJUDICATE` (default 300 s),
  * `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`,
  * `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS` and the per-game
  * `UMPIRE_GAME_BUDGET_USD`, `UMPIRE_GAME_BUDGET_TOKENS` and `UMPIRE_GAME_CALLS_PER_MINUTE`. Throws if a stage names
@@ -257,6 +272,15 @@ export function umpireConfigFromEnv(
           ? positiveInt(env, 'OLLAMA_TIMEOUT_MS', OLLAMA_DEFAULT_TIMEOUT_MS)
           : d.timeoutMs),
     ),
+    stageTimeoutMs: {
+      ...d.stageTimeoutMs,
+      ...file.stageTimeoutMs,
+      adjudicate: positiveInt(
+        env,
+        'UMPIRE_TIMEOUT_MS_ADJUDICATE',
+        file.stageTimeoutMs?.adjudicate ?? ADJUDICATE_TIMEOUT_MS,
+      ),
+    },
     maxAttempts: positiveInt(
       env,
       'UMPIRE_MAX_ATTEMPTS',

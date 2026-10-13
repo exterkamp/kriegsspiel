@@ -27,8 +27,10 @@ function stageOf(
   | 'judge'
   | 'command'
   | 'critique'
+  | 'adjudicate'
   | undefined {
   const keys = Object.keys((schema.properties as Json | undefined) ?? {});
+  if (keys.includes('observations')) return 'adjudicate';
   if (keys.includes('result')) return 'parse';
   if (keys.includes('action')) return 'interpret';
   if (keys.includes('dispatches')) return 'narrate';
@@ -263,6 +265,45 @@ function critique(input: Json) {
   };
 }
 
+/**
+ * The canned adjudicator (D39, "Keyless demo"): the engine's projection as the proposal, with no
+ * departures. Each order that arrived is carried out, each still on the road has not arrived, and
+ * the sightings are the engine's own.
+ */
+function adjudicate(input: Json) {
+  const projection = (input.projection ?? {}) as Json;
+  const orders = arr(input.orders);
+  const names = new Map(arr(input.units).map((u) => [str(u.id), str(u.name)]));
+  return {
+    turn: num(input.turn),
+    units: arr(projection.units).map((p) => {
+      const id = str(p.unitId);
+      return {
+        unitId: id,
+        x: num(p.x),
+        y: num(p.y),
+        facingDeg: num(p.facingDeg),
+        formation: str(p.formation),
+        strength: num(p.strength),
+        morale: num(p.morale),
+        fatigue: num(p.fatigue),
+        ammo: num(p.ammo),
+        status: str(p.status),
+        continuing: p.continuing,
+        orders: orders
+          .filter((o) => str(o.to) === id)
+          .map((o) => ({
+            orderId: str(o.orderId),
+            result: o.status === 'arrived' ? 'carried-out' : 'not-arrived',
+          })),
+        account: `The ${names.get(id) || id} acted as the staff tables direct.`,
+      };
+    }),
+    observations: arr(projection.observations),
+    summary: 'The turn was resolved by the tables.',
+  };
+}
+
 export function testReply(schema: Json, input: Json): unknown {
   switch (stageOf(schema)) {
     case 'parse':
@@ -279,6 +320,8 @@ export function testReply(schema: Json, input: Json): unknown {
       return command(input);
     case 'critique':
       return critique(input);
+    case 'adjudicate':
+      return adjudicate(input);
     case 'judge':
       return 'modifier' in (schema.properties as Json) ? judgeSituation() : { placements: [] };
     default:

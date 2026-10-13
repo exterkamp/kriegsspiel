@@ -137,7 +137,7 @@ export {
   registerOrders,
 } from './orders.js';
 export type { ForcedIssue } from './orders.js';
-export { courierPass, engineTurnStart } from './engineTurn.js';
+export { courierPass, engineTurnStart, heldTurnStart } from './engineTurn.js';
 export type { CourierPass, TurnCourier } from './engineTurn.js';
 export {
   GARBLE_MAX_M,

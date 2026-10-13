@@ -110,6 +110,7 @@ export class GameUmpireClient implements UmpireClient {
     command: { calls: 0, costUsd: 0, totalTokens: 0 },
     critique: { calls: 0, costUsd: 0, totalTokens: 0 },
     staff: { calls: 0, costUsd: 0, totalTokens: 0 },
+    adjudicate: { calls: 0, costUsd: 0, totalTokens: 0 },
   };
   private readonly limits: GameLimits;
   private readonly now: () => number;

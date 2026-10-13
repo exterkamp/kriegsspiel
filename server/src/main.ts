@@ -32,6 +32,7 @@ import {
   guestPerHourFromEnv,
   guestPlayFromEnv,
   llmOrderParserEnabled,
+  turnUmpireEnabled,
   scriptedOpponentsFromEnv,
   trustProxyFromEnv,
   usesTestUmpire,
@@ -65,7 +66,9 @@ const lobby = process.env.DB_PATH ? new SqliteLobbyStore(process.env.DB_PATH) : 
 const ai = aiCommanderFromEnv(process.env);
 const loadedConfig = loadUmpireConfig(process.env);
 const llmParser = llmOrderParserEnabled(process.env, loadedConfig);
-const umpireConfig = ai || llmParser ? loadedConfig : undefined;
+// The turn umpire is on only with a capable model on `adjudicate` (the keyless demo stays on the engine).
+const turnUmpire = turnUmpireEnabled(process.env, loadedConfig);
+const umpireConfig = ai || llmParser || turnUmpire ? loadedConfig : undefined;
 if (ai && umpireConfig) {
   const warning = aiCommanderBudgetWarning(umpireConfig.gameBudget);
   if (warning) console.warn(warning);
@@ -145,6 +148,7 @@ const { server } = await buildApp({
         (gameId) => gameUmpire(gameId)
       : undefined,
   critic: umpire && umpireConfig ? (gameId) => gameUmpire(gameId) : undefined,
+  adjudicator: umpire && turnUmpire ? (gameId) => gameUmpire(gameId) : undefined,
   admin: {
     ...admin,
     trace,
