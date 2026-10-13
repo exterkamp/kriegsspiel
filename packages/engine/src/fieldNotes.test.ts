@@ -115,6 +115,20 @@ describe('field notes (#419)', () => {
     }
   });
 
+  it('reads right for a side with one formation', () => {
+    for (const id of ids) {
+      const text = fieldNote(
+        { ...report('situation', id), sizeEstimate: '1 formation' },
+        0,
+        false,
+        {},
+        7,
+      );
+      expect(text, text).toContain('1 formation');
+      expect(text, text).not.toMatch(/1 formation are|all 1 formation/);
+    }
+  });
+
   it('leaves the umpire’s ruling as written', () => {
     expect(fieldNote({ ...report('battle'), text: 'The umpire rules.' }, 0, false, {}, 1)).toBe(
       'The umpire rules.',

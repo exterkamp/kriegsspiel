@@ -16,11 +16,12 @@ import type { JsonSchema, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
 import { hiddenIn } from './leakGuard.js';
 
-export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v6';
+export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v7';
 
 /**
- * Short on purpose: a 0.5b model follows a few plain rules better than many (#419). Each rule is one the
- * checks enforce (`checkProse`, `checkFieldNote`), so a reply that obeys the prompt passes.
+ * Short on purpose: a 0.5b model follows a few plain rules better than many (#419). Each rule but the
+ * hedging one is enforced by the checks (`checkProse`, `checkFieldNote`), so a reply that obeys the
+ * prompt passes.
  */
 export const NARRATE_SYSTEM = `You write one hasty note from an officer in the field to his general, in the Napoleonic wars.
 
@@ -31,13 +32,17 @@ Write the note:
 - Say what happened, using the report's own words for the kind and the place.
 - Then his judgement or one short question for the general that fits the report and his manner: pursue a beaten enemy, hold or fall back when hard pressed or tired, engage or watch an enemy sighted.
 - Use only the names, places and numbers in the report. Never say how long anything lasted, how strong a line is, or anything the report does not say.
+- If "confidence" is low or medium, hedge: "perhaps", "I think".
 - Mention his condition only if it matters, in at most one word from "condition", and never list it.
 - Two or three short sentences, under 60 words.
 - If "kind" is "unitLost", "courierLost" or "situation", the staff at headquarters write instead, in the third person, and ask nothing.
 
 Return {"dispatches":[{"reportIds":[the report's id],"text":the note}]}. Reply with the JSON object only.`;
 
-/** The longest reply a note needs, in tokens: a short note in its JSON (#419). */
+/**
+ * The longest reply a note needs, in tokens: a short note in its JSON (#419). The keyless Ollama route
+ * uses it as its narrate limit (`config.ts`); a route with its own `maxTokens` keeps that.
+ */
 export const NARRATE_MAX_TOKENS = 220;
 
 export const NARRATE_SCHEMA: JsonSchema = {
@@ -569,10 +574,24 @@ const COMBAT_KINDS: ReadonlySet<ViewReport['kind']> = new Set([
   'unitLost',
 ]);
 
-/** The phrases of one sentence's worth of words: ", " and " and " split a list of conditions. */
+/**
+ * The next words that make a condition word describe something other than the sender's men: "fresh
+ * troops" are the enemy's or a reinforcement, "a steady fire" is the firing, not the morale.
+ */
+const NOT_THE_MEN: Readonly<Record<string, string>> = {
+  fresh:
+    '(?:troops|regiments?|battalions?|columns?|reserves?|enemy|horses|supply|supplies|ammunition|cartridges)',
+  steady: '(?:fire|volleys?|rain|advance|pace|march)',
+  spent: '(?:balls?|shot|cartridges)',
+};
+
+/** The condition words (`CONDITION_GROUPS`) in `text` that describe the men, not the enemy or the firing. */
 function conditionWordsIn(text: string): string[] {
   const lower = text.toLowerCase();
-  return CONDITION_GROUPS.flat().filter((w) => new RegExp(`\\b${w}\\b`).test(lower));
+  return CONDITION_GROUPS.flat().filter((w) => {
+    const not = NOT_THE_MEN[w];
+    return new RegExp(`\\b${w}\\b${not ? `(?! ${not}\\b)` : ''}`).test(lower);
+  });
 }
 
 /**
@@ -592,7 +611,11 @@ export function checkFieldNote(text: string, report: Input['reports'][number]): 
   if (text.length > NARRATE_MAX_CHARS) {
     problems.push(`too long (${text.length} characters, at most ${NARRATE_MAX_CHARS})`);
   }
-  const sentences = text.split(/[.!?]+(?:\s|$)/).filter((x) => x.trim() !== '').length;
+  // "Lt. Col. Aubry" is one name, not three sentences.
+  const sentences = text
+    .replace(/\b(Lt|Col|Maj|Gen|Capt|Sgt|Brig|St)\./g, '$1')
+    .split(/[.!?]+(?:\s|$)/)
+    .filter((x) => x.trim() !== '').length;
   if (sentences > NARRATE_MAX_SENTENCES) {
     problems.push(`too long (${sentences} sentences, at most ${NARRATE_MAX_SENTENCES})`);
   }
@@ -781,7 +804,6 @@ export async function narrateReports(
             system: withPersona(NARRATE_SYSTEM, opts.persona),
             input: retry ? { ...input, rejected: retry } : input,
             schema: NARRATE_SCHEMA,
-            maxTokens: NARRATE_MAX_TOKENS,
           }),
           opts.signal,
         ));

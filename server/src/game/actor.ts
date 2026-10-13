@@ -757,6 +757,8 @@ export class GameActor {
         }
         this.narrations.set(side, text);
       }
+      // As this window left it: `sync` may begin another side's window, which can move the breaker on.
+      const narrateBreaker = this.narrateBreaker;
       this.sync();
       if (this.trace.enabled) {
         // One admin LLM row per report that kept its template text, with the reason (#359).
@@ -779,7 +781,7 @@ export class GameActor {
         endGameMs: this.engine.time,
         command: { kind: 'narrate', side, windowEndMs },
         calls,
-        narrateBreaker: this.narrateBreaker,
+        narrateBreaker,
         ...(result?.fellBack
           ? {
               error: `narration fell back to template text: ${narrationFallbackReason(result)}`,

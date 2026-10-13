@@ -79,17 +79,17 @@ export function contactAgedOut(world: GameState, c: Contact, now: GameTime): boo
   return Math.ceil((now - c.seenAt) / MS_PER_MINUTE) * UNCERTAINTY_MM_PER_MINUTE > capMm;
 }
 
-/**
- * True when a lost-courier report's unit had a report of its own reach HQ, about something after its
- * orders were due, by the time the lost-courier report did. Fixed once delivered, so the text does
- * not change between readings.
- */
 /** The public trait of the unit that sent `r`, for its note's manner (#419). */
 function senderOf(state: GameState, side: SideId, r: Report): NoteSender {
   const u = state.units.find((x) => x.side === side && x.name === r.from);
   return u?.trait === undefined ? {} : { trait: u.trait };
 }
 
+/**
+ * True when a lost-courier report's unit had a report of its own reach HQ, about something after its
+ * orders were due, by the time the lost-courier report did. Fixed once delivered, so the text does
+ * not change between readings.
+ */
 function heardFromSince(reports: Report[], r: Report): boolean {
   if (r.kind !== 'courierLost' || r.orderDueAt === undefined) return false;
   const due = r.orderDueAt;

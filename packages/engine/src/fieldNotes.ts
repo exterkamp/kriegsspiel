@@ -135,7 +135,7 @@ const CLOSINGS: Record<UnitKind, Record<Temper, string[]>> = {
       'Get us powder and we fight on.',
     ],
     cautious: [
-      'Without fresh supply I cannot answer for the position.',
+      'Without more ammunition I cannot answer for the position.',
       'May we fall back to resupply?',
     ],
     steady: ['We husband what is left. Send more when you can.', 'I ask for a resupply.'],
@@ -181,8 +181,8 @@ const STAFF_NOTES: Record<StaffKind, Line[]> = {
   situation: [
     (p) => `${p.from} reports ${p.size} in position ${p.where}; no enemy yet in sight.`,
     (p) => `the army stands ready: ${p.size} in position ${p.where}. Nothing of the enemy as yet.`,
-    (p) => `${p.size} are posted ${p.where}, sir. The enemy has not shown himself.`,
-    (p) => `all ${p.size} in position ${p.where}. No enemy in sight.`,
+    (p) => `${p.size} posted ${p.where}, sir. The enemy has not shown himself.`,
+    (p) => `${p.size} in position ${p.where}. No enemy in sight.`,
     (p) => `we are deployed, ${p.size} ${p.where}. No sign of the enemy.`,
   ],
   unitLost: [

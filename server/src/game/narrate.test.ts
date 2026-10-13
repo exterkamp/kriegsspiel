@@ -20,8 +20,10 @@ import {
   UmpireError,
   staffOfficerFor,
 } from '../umpire/index.js';
+import type { TraceSink } from '../debug/trace.js';
 import { umpireConfigFromEnv } from '../umpire/config.js';
 import { createUmpireClient } from '../umpire/createUmpireClient.js';
+import type { StaffAtWork } from './actor.js';
 import { GameHost, MemoryGameStore } from './index.js';
 import { FakeTime } from './testing.js';
 
@@ -116,7 +118,12 @@ afterEach(async () => {
 
 async function newGame(
   umpire?: UmpireClient,
-  extra: { narrateTimeoutMs?: number; scriptedOpponents?: boolean } = {},
+  extra: {
+    narrateTimeoutMs?: number;
+    scriptedOpponents?: boolean;
+    trace?: TraceSink;
+    onStaffAtWork?: (gameId: string, state: StaffAtWork) => void;
+  } = {},
 ) {
   const time = new FakeTime();
   const store = new MemoryGameStore();
@@ -264,7 +271,18 @@ describe('narrate stage in the actor', () => {
     const umpire = new StubUmpire();
     // An officer the reports never name: every reply fails the checks.
     umpire.narrateText = () => 'Sir, Colonel Zorn writes.';
-    const { time, store, game } = await newGame(umpire);
+    const llmRows: Record<string, unknown>[] = [];
+    const trace: TraceSink = {
+      enabled: true,
+      record: (_id, kind, data) => {
+        if (kind === 'llm') llmRows.push(data as Record<string, unknown>);
+      },
+    };
+    const atWork: StaffAtWork[] = [];
+    const { time, store, game } = await newGame(umpire, {
+      trace,
+      onStaffAtWork: (_id, state) => atWork.push(state),
+    });
     await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march' });
     await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 march on' });
     const narrateCalls = () => umpire.requests.filter((r) => r.stage === 'narrate').length;
@@ -275,13 +293,23 @@ describe('narrate stage in the actor', () => {
     expect(pausedUntil).toBeDefined();
     expect(game.narrationBreaker.failed).toBeGreaterThanOrEqual(3);
 
-    // Cooling off: windows close with reports due, but the model is not asked.
+    // Cooling off: windows close with reports due, but the model is not asked and game time is not held.
     const before = narrateCalls();
     await game.submit({ kind: 'order', side: 'blue', text: 'blue-1 hold' });
+    await time.flush();
+    atWork.length = 0;
+    llmRows.length = 0;
     while (game.state.time + NARRATE_WINDOW_BASE_MS < pausedUntil) {
       await time.advance(NARRATE_WINDOW_BASE_MS);
     }
     expect(narrateCalls()).toBe(before);
+    expect(atWork.filter((s) => s.working)).toEqual([]);
+    expect(llmRows).toContainEqual(
+      expect.objectContaining({
+        provider: 'narration breaker',
+        error: expect.stringMatching(/blue window skipped/),
+      }),
+    );
     const log = (await store.inputLog('g1')).filter((e) => e.command.kind === 'narrate');
     const skipped = log.filter((e) => e.calls?.length === 0);
     expect(skipped.length).toBeGreaterThan(0);

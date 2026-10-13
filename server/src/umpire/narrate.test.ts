@@ -490,6 +490,28 @@ describe('field-note checks (#419)', () => {
     );
   });
 
+  it('reads "fresh troops" and "a steady fire" as not the men’s condition', () => {
+    const worn = sent(
+      {
+        id: 'blue-r8',
+        kind: 'engaged',
+        from: '1st Battalion',
+        place: 'at the bridge',
+      },
+      { name: '1st Battalion', morale: 30, fatigue: 60, ammo: 10 },
+    );
+    expect(worn.reports[0]!.condition).toBe('wavering, tiring, ammunition nearly gone');
+    for (const note of [
+      'Sir, we are engaged at the bridge. The enemy brings up fresh troops. Shall we fall back?',
+      'Sir, we are engaged at the bridge and keep up a steady fire. Send cartridges.',
+    ]) {
+      expect(checkFieldNote(note, worn.reports[0]!), note).toEqual([]);
+    }
+    expect(
+      checkFieldNote('Sir, we are engaged at the bridge. My men are fresh.', worn.reports[0]!),
+    ).toEqual(['condition "fresh" is not the unit’s']);
+  });
+
   it('lets the report’s kind supply its condition word', () => {
     const tired = sent(
       { id: 'blue-r5', kind: 'exhausted', from: '1st Battalion', place: 'near the bridge' },
@@ -516,6 +538,13 @@ describe('field-note checks (#419)', () => {
     expect(
       checkFieldNote('Orders, sir. We go. We march. We halt. We wait.', hartmann.reports[0]!),
     ).toEqual(['too long (5 sentences, at most 4)']);
+    // An abbreviated rank does not end a sentence.
+    expect(
+      checkFieldNote(
+        'Sir, we are engaged at the bridge. Lt. Col. Aubry asks: may we fall back? We hold.',
+        aubry.reports[0]!,
+      ),
+    ).toEqual([]);
   });
 
   it('lets headquarters write a lost unit in the third person', () => {
@@ -541,38 +570,49 @@ describe('the engine’s field notes as fallback (#419)', () => {
       'heavyLosses',
       'broke',
     ] as const;
-    const unit = {
-      id: 'blue-1',
-      name: '1st Battalion',
-      strength: 500,
-      morale: 80,
-      fatigue: 10,
-      ammo: 90,
-    } as ViewUnit;
-    for (const kind of kinds) {
-      for (const trait of [undefined, 'bold', 'cautious', 'steady and methodical']) {
-        for (let i = 0; i < 30; i++) {
-          const r = report({
-            id: `blue-r${i}`,
-            kind,
-            from: '1st Battalion',
-            place: 'at the bridge, on the High road',
-            observedAt: 0,
-            deliveredAt: 3 * MS_PER_MINUTE,
-            ...(kind === 'contact' || kind === 'destroyed' ? {} : { sizeEstimate: undefined }),
-          });
-          const text = fieldNote(
-            { ...r, deliverAt: r.deliveredAt, uncertainty: 0 },
-            3 * MS_PER_MINUTE,
-            false,
-            trait === undefined ? {} : { trait },
-            11,
-          );
-          const input = narrateInput('blue', [r], [{ ...unit, ...(trait ? { trait } : {}) }]);
-          expect(
-            checkNarration({ dispatches: [{ reportIds: [r.id], text }] }, input),
-            text,
-          ).toEqual([]);
+    // Fresh and well supplied, worn and short of cartridges, and spent with almost none.
+    const states = [
+      [80, 10, 90],
+      [30, 60, 10],
+      [50, 90, 5],
+    ] as const;
+    for (const [morale, fatigue, ammo] of states) {
+      const unit = {
+        id: 'blue-1',
+        name: '1st Battalion',
+        strength: 500,
+        morale,
+        fatigue,
+        ammo,
+      } as ViewUnit;
+      sweep(unit);
+    }
+    function sweep(unit: ViewUnit) {
+      for (const kind of kinds) {
+        for (const trait of [undefined, 'bold', 'cautious', 'steady and methodical']) {
+          for (let i = 0; i < 30; i++) {
+            const r = report({
+              id: `blue-r${i}`,
+              kind,
+              from: '1st Battalion',
+              place: 'at the bridge, on the High road',
+              observedAt: 0,
+              deliveredAt: 3 * MS_PER_MINUTE,
+              ...(kind === 'contact' || kind === 'destroyed' ? {} : { sizeEstimate: undefined }),
+            });
+            const text = fieldNote(
+              { ...r, deliverAt: r.deliveredAt, uncertainty: 0 },
+              3 * MS_PER_MINUTE,
+              false,
+              trait === undefined ? {} : { trait },
+              11,
+            );
+            const input = narrateInput('blue', [r], [{ ...unit, ...(trait ? { trait } : {}) }]);
+            expect(
+              checkNarration({ dispatches: [{ reportIds: [r.id], text }] }, input),
+              text,
+            ).toEqual([]);
+          }
         }
       }
     }
