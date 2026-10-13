@@ -33,6 +33,7 @@ ul {
 @media (max-width: 600px) {
   .over {
     top: auto;
+    /* Clears the desk bar and tools strip below (about 128px together); keep in step with them. */
     bottom: 128px;
     max-height: 38vh;
     overflow-y: auto;
