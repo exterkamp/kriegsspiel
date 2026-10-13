@@ -150,6 +150,23 @@ describe('narrate stage in the actor', () => {
     expect(entries[0]!.calls?.[0]).toMatchObject({ stage: 'narrate', model: 'stub' });
   });
 
+  it('tells the model who sent each report, his manner and his unit’s condition (#390)', async () => {
+    const umpire = new StubUmpire();
+    const { time, game } = await newGame(umpire);
+    await runUntilReport(time, game);
+    await time.advance(NARRATE_WINDOW_BASE_MS);
+
+    const units = viewFor(game.state.world, 'blue', game.state.time).ownUnits;
+    const sent = umpire.requests
+      .filter((r) => r.stage === 'narrate')
+      .flatMap((r) => (r.input as { reports: Record<string, unknown>[] }).reports);
+    const fromUnit = sent.find((r) => units.some((u) => u.name === r.from && u.commander));
+    expect(fromUnit).toBeDefined();
+    const unit = units.find((u) => u.name === fromUnit!.from)!;
+    expect(fromUnit).toMatchObject({ commander: unit.commander, trait: unit.trait });
+    expect(fromUnit!.condition).toMatch(/^(steady|shaken|wavering), /);
+  });
+
   it('holds game time while the model works', async () => {
     const umpire = new StubUmpire();
     let open!: () => void;

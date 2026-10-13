@@ -9,24 +9,26 @@
  * dispatch is never lost and never invented. One call covers one report (#359).
  */
 import { MS_PER_MINUTE } from '@kriegsspiel/engine';
-import type { SideId, ViewReport } from '@kriegsspiel/engine';
+import type { SideId, ViewReport, ViewUnit } from '@kriegsspiel/engine';
 import type { UmpirePersona } from '@kriegsspiel/protocol';
 import { withPersona } from './persona.js';
 import type { JsonSchema, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
 import { hiddenIn } from './leakGuard.js';
 
-export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v3';
+export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v4';
 
-export const NARRATE_SYSTEM = `You are the scribe at a Napoleonic army headquarters, turning staff reports into the period dispatches that reach the general's desk. You write in the voice of the officer who sent each report: a cautious subordinate hedges, a veteran scout is terse.
+export const NARRATE_SYSTEM = `You write the notes that officers in the field send back to their general at a Napoleonic army headquarters. Each is a hasty note in the sender's own hand: first person ("we", "my men"), to the general ("Sir"), in the manner of the officer who sent it. A cautious officer hedges and asks for orders, a bold one wants to press on, a veteran is terse.
 
-Input: "reports", the only things this headquarters knows. Each has an "id", the "from" officer or unit, a "kind", the "place", how many "minutesAgo" before it reached headquarters it happened, a "sizeEstimate" (contacts only), a "confidence", and how far off the location may be ("radiusM").
+Input: "reports", the only things this headquarters knows. Each has an "id", the "from" officer or unit, a "kind", the "place", how many "minutesAgo" before it reached headquarters it happened, a "sizeEstimate" (contacts only), a "confidence", and how far off the location may be ("radiusM"). When known it also has the "commander" who writes, his "trait" (his manner) and the sending unit's "condition" now (morale, fatigue, ammunition).
 
 Rules:
 - Write only from the reports. Do not add units, officers, places, numbers, times or events that are not in them. Where the report is unsure, say so.
 - Name an officer, unit or place only as it appears in the reports. Quote numbers as given; do not compute new ones.
 - Lower confidence means more hedging ("perhaps", "it is thought"); high confidence means plain statement.
-- You are given one report. Return one dispatch of one or two short sentences for it, with its id in "reportIds".
+- Do not just restate the report. Give the officer's judgement of what it means for his men and, where it follows from the report and his condition, one question or concern for the general: after an enemy force is destroyed, whether to pursue; when engaged with tired men or little ammunition, whether he can hold; after heavy losses, a break, low ammunition or exhaustion, whether to fall back or be relieved; on a first sighting, whether to engage or watch. Ask nothing that does not fit this report.
+- A judgement or question adds no facts: it names only what the report names.
+- You are given one report. Return one dispatch of two or three short sentences for it, with its id in "reportIds".
 Reply with the JSON object only.`;
 
 export const NARRATE_SCHEMA: JsonSchema = {
@@ -77,21 +79,51 @@ export interface NarrateResult {
 export const STAFF_OVERLOADED_NOTICE =
   'The staff are overwhelmed, sir. Dispatches reach you as written, without a fair copy.';
 
-/** What the model sees for one report. Metres and minutes, no ids of anything the side cannot know. */
-export function narrateInput(side: SideId, reports: readonly ViewReport[]) {
+/**
+ * How a unit stands, in words and never in figures, so its note can say whether it can hold or
+ * should fall back (#390). The side already sees its own units' state; no number reaches the prose.
+ */
+export function unitCondition(u: Pick<ViewUnit, 'morale' | 'fatigue' | 'ammo'>): string {
+  const morale = u.morale >= 70 ? 'steady' : u.morale >= 40 ? 'shaken' : 'wavering';
+  const fatigue = u.fatigue < 30 ? 'fresh' : u.fatigue < 70 ? 'tiring' : 'spent';
+  const ammo =
+    u.ammo > 50
+      ? 'well supplied'
+      : u.ammo > 20
+        ? 'ammunition running low'
+        : 'ammunition nearly gone';
+  return `${morale}, ${fatigue}, ${ammo}`;
+}
+
+/**
+ * What the model sees for one report. Metres and minutes, no ids of anything the side cannot know.
+ * `ownUnits` (the side's own, from its view) gives the sender's commander, manner and condition,
+ * so the note can carry his voice and judgement; a sender not among them gets none.
+ */
+export function narrateInput(
+  side: SideId,
+  reports: readonly ViewReport[],
+  ownUnits: readonly ViewUnit[] = [],
+) {
   return {
     side,
-    reports: reports.map((r) => ({
-      id: r.id,
-      kind: r.kind,
-      from: r.from,
-      place: r.place,
-      // Before it reached HQ, not before now: the text is read later, beside the time it was received.
-      minutesAgo: Math.round((r.deliveredAt - r.observedAt) / MS_PER_MINUTE),
-      ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
-      confidence: r.confidence,
-      radiusM: Math.round(r.uncertaintyRadius),
-    })),
+    reports: reports.map((r) => {
+      const sender = ownUnits.find((u) => u.name === r.from && u.strength > 0);
+      return {
+        id: r.id,
+        kind: r.kind,
+        from: r.from,
+        place: r.place,
+        // Before it reached HQ, not before now: the text is read later, beside the time it was received.
+        minutesAgo: Math.round((r.deliveredAt - r.observedAt) / MS_PER_MINUTE),
+        ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
+        confidence: r.confidence,
+        radiusM: Math.round(r.uncertaintyRadius),
+        ...(sender?.commander === undefined ? {} : { commander: sender.commander }),
+        ...(sender?.trait === undefined ? {} : { trait: sender.trait }),
+        ...(sender === undefined ? {} : { condition: unitCondition(sender) }),
+      };
+    }),
   };
 }
 
@@ -199,7 +231,9 @@ const SENTENCE_OPENERS = new Set([
   'about',
   'after',
   'all',
+  'alas',
   'although',
+  'am',
   'an',
   'and',
   'any',
@@ -210,8 +244,11 @@ const SENTENCE_OPENERS = new Set([
   'both',
   'but',
   'by',
+  'can',
   'could',
+  'did',
   'do',
+  'does',
   'each',
   'enemy',
   'every',
@@ -232,8 +269,11 @@ const SENTENCE_OPENERS = new Set([
   'its',
   'later',
   'many',
+  'may',
+  'might',
   'more',
   'most',
+  'must',
   'my',
   'near',
   'no',
@@ -250,8 +290,12 @@ const SENTENCE_OPENERS = new Set([
   'our',
   'out',
   'perhaps',
+  'pray',
+  'request',
   'scouts',
+  'shall',
   'she',
+  'should',
   'since',
   'so',
   'some',
@@ -317,7 +361,13 @@ function wordsIn(text: string): string[] {
  */
 export function checkProse(text: string, input: Input): string[] {
   // Only the fields the model is meant to draw on: ids and JSON keys are not facts to cite.
-  const facts = input.reports.flatMap((r) => [r.from, r.place, r.sizeEstimate ?? '']);
+  const facts = input.reports.flatMap((r) => [
+    r.from,
+    r.place,
+    r.sizeEstimate ?? '',
+    r.commander ?? '',
+    r.trait ?? '',
+  ]);
   const factText = facts.join('\n');
   return checkProseAgainst(text, {
     numbers: [...numbersIn(factText), ...input.reports.flatMap((r) => [r.minutesAgo, r.radiusM])],
@@ -445,6 +495,8 @@ export interface NarrateOptions {
   hidden?: readonly string[];
   /** The umpire's voice (3.11); tone only. Default the dry staff officer. */
   persona?: UmpirePersona;
+  /** The side's own units (`viewFor(...).ownUnits`): each sender's commander, manner and condition (#390). */
+  ownUnits?: readonly ViewUnit[];
 }
 
 const TIMED_OUT = 'timed out';
@@ -524,7 +576,7 @@ export async function narrateReports(
       result.fallbacks.push({ reportId: r.id, reason: stopped });
       continue;
     }
-    const input = narrateInput(side, [r]);
+    const input = narrateInput(side, [r], opts.ownUnits);
     const rejections: string[][] = [];
     let narrated: NarratedDispatch | undefined;
     let calls = 0;
