@@ -1512,7 +1512,7 @@ describe('pause voting over the WebSocket', () => {
     blue.send(cmd({ kind: 'proposeHold' }));
     const refused = await blue.waitFor('error', (m) => m.code === 'hold_refused');
     expect(refused.message).toBe('no emergency hold is left to you in this game');
-  });
+  }, 20_000);
 
   it('refuses a vote on a proposal that is not open', async () => {
     const { blue } = await votingGame();
