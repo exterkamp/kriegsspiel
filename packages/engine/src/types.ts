@@ -399,7 +399,10 @@ export interface GameState {
   turn?: TurnFlag;
 }
 
-/** The turn being resolved: turn `n` covers game time `[startMs, endMs)`. */
+/**
+ * The turn being resolved: turn `n` covers game time `[startMs, endMs]`. Under the umpire,
+ * `endMs` itself is held too, so no other event at `T1` can undo what `umpire.turn` applied.
+ */
 export interface TurnFlag {
   n: number;
   startMs: GameTime;

@@ -1,17 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import {
+  COMBAT_TICK_MS,
   EventRegistry,
   MS_PER_MINUTE,
   RALLY_RULES,
+  STANDING_EVENT,
   TURN_EVENT,
   advanceTo,
   beginTurn,
   createState,
+  issueAttack,
   issueMove,
   issueOrder,
+  issuePlacement,
   issueTurn,
   metres,
+  overlapsBeyondTolerance,
   positionAt,
   registerCombat,
   registerMovement,
@@ -23,6 +28,7 @@ import {
   startVisibility,
   validateProposal,
   type EngineState,
+  type AppliedOutcome,
   type GameState,
   type TurnContext,
   type TurnProposal,
@@ -32,6 +38,8 @@ import {
 } from './index.js';
 import { bridge, miniWorld, river, wood } from './scenario.testkit.js';
 import { violations } from './invariants.testkit.js';
+import { RALLY_EVENT } from './contact.js';
+import { schedule } from './queue.js';
 
 const TURN_MS = 20 * MS_PER_MINUTE;
 const T0 = 0;
@@ -116,6 +124,28 @@ function play(w: GameState, p: TurnProposal, c: TurnContext = ctx()) {
   return advanceTo(s, T1, registry());
 }
 
+/** The unit as an outcome leaves it on the ground, for overlap checks. */
+function standing(w: GameState, o: AppliedOutcome): Unit {
+  const u = unit(w, o.unitId);
+  const placed: Unit = { ...u, center: o.center, facing: o.facing, formation: o.formation };
+  placed.footprint = o.footprint;
+  if (o.shape) placed.shape = o.shape;
+  else delete placed.shape;
+  return placed;
+}
+
+/** Every pair of friends whose outcomes overlap beyond the tolerance. */
+function friendlyOverlaps(w: GameState, outcomes: AppliedOutcome[]): string[] {
+  const on = outcomes.filter((o) => o.status !== 'destroyed').map((o) => standing(w, o));
+  const bad: string[] = [];
+  for (const [i, a] of on.entries()) {
+    for (const b of on.slice(i + 1)) {
+      if (a.side === b.side && overlapsBeyondTolerance(a, b)) bad.push(`${a.id}/${b.id}`);
+    }
+  }
+  return bad;
+}
+
 const turnRulings = (w: GameState) =>
   w.rulings.filter((r): r is TurnRuling => 'kind' in r && r.kind === 'turn');
 
@@ -194,6 +224,15 @@ describe('validateProposal', () => {
       ['b', 'position'],
     ]);
     expect(v.corrections[1]!.reason).toMatch(/put back .* overlaps a/);
+    // The other way round: `b` is refused, `a` wanted `b`'s old spot.
+    const w2 = validateProposal(
+      w,
+      proposal(w, { a: { x: 1300, y: 600 }, b: { x: 1300, y: 2000 } }),
+      ctx(),
+    );
+    expect(w2.outcomes.find((o) => o.unitId === 'a')!.center).toEqual(unit(w, 'a').center);
+    expect(w2.corrections.at(-1)).toMatchObject({ unitId: 'a', field: 'position' });
+    expect(w2.corrections.at(-1)!.reason).toMatch(/put back .* overlaps b/);
   });
 
   it('clamps losses above strength and strength that rises; none left is destroyed', () => {
@@ -469,6 +508,153 @@ describe('validateProposal', () => {
     expect(v.problems.join('\n')).toMatch(/b: no outcome was given/);
   });
 
+  it('never leaves two clamped friends on the same ground', () => {
+    // Two converging marches, both too far: each is clamped towards the other.
+    const w = miniWorld({
+      width: 9000,
+      height: 3000,
+      units: [
+        { id: 'a', x: 1000, y: 1000 },
+        { id: 'b', x: 5000, y: 1000 },
+        { id: 'c', side: 'red', x: 8500, y: 2500 },
+      ],
+    });
+    const v = validateProposal(
+      w,
+      proposal(w, { a: { x: 7000, y: 1000 }, b: { x: 300, y: 1000 } }),
+      ctx(),
+    );
+    expect(friendlyOverlaps(w, v.outcomes)).toEqual([]);
+    // `a` keeps its clamped march; `b`, later in unit-id order, goes back where it started.
+    expect(v.outcomes.find((o) => o.unitId === 'a')!.center.x).toBeGreaterThan(1_000_000);
+    expect(v.outcomes.find((o) => o.unitId === 'b')!.center).toEqual(unit(w, 'b').center);
+    expect(v.corrections.at(-1)).toMatchObject({ unitId: 'b', field: 'position' });
+    expect(v.corrections.at(-1)!.reason).toMatch(/put back where it started: .* overlaps a/);
+  });
+
+  it('puts back a friend that marched onto a unit the out-of-reach rule kept alive', () => {
+    const w = miniWorld({
+      width: 30_000,
+      height: 4000,
+      units: [
+        { id: 'a', x: 1000, y: 1000 },
+        { id: 'b', x: 1500, y: 1000 },
+        { id: 'c', side: 'red', x: 29_000, y: 1000 },
+      ],
+    });
+    // `a` is proposed destroyed with no enemy in reach, and `b` onto `a`'s spot.
+    const v = validateProposal(
+      w,
+      proposal(w, { a: { status: 'destroyed', strength: 0 }, b: { x: 1000, y: 1000 } }),
+      ctx(),
+    );
+    expect(v.outcomes.find((o) => o.unitId === 'a')).toMatchObject({
+      status: 'active',
+      center: unit(w, 'a').center,
+    });
+    expect(v.outcomes.find((o) => o.unitId === 'b')!.center).toEqual(unit(w, 'b').center);
+    expect(friendlyOverlaps(w, v.outcomes)).toEqual([]);
+    expect(
+      v.corrections.some((c) => c.unitId === 'b' && /put back .* overlaps a/.test(c.reason)),
+    ).toBe(true);
+  });
+
+  it('reads the projection at the turn end for a unit still on the march', () => {
+    const w = world();
+    const a = unit(w, 'a');
+    // In the projection `a` is part-way along a leg at the turn's end; `center` is still its start.
+    const to = { x: 2_000_000, y: 600_000 };
+    const marching: Unit = {
+      ...a,
+      intent: { kind: 'move', to, startedAt: T0 },
+      leg: { from: a.center, to, startedAt: T0, arriveAt: 3 * T1 },
+    };
+    const projected = w.units.map((u) => (u.id === 'a' ? marching : u));
+    const at = positionAt(w.map, marching, T1);
+    expect(at.x).toBeGreaterThan(a.center.x);
+    // A unit with no outcome takes the projection's position at the turn's end.
+    const p = proposal(w);
+    const missing = { ...p, units: p.units.filter((o) => o.unitId !== 'a') };
+    const filled = validateProposal(w, missing, ctx({ projection: projected }));
+    expect(filled.outcomes.find((o) => o.unitId === 'a')!.center).toEqual(at);
+    // Under `standard`, proposing exactly that point is no departure.
+    const there = proposal(w, { a: { x: metres(at.x), y: metres(at.y) } });
+    const std = validateProposal(w, there, ctx({ dial: 'standard', projection: projected }));
+    expect(std.corrections).toEqual([]);
+  });
+
+  it('drops an end observation of an enemy destroyed in the turn', () => {
+    const w = miniWorld({
+      units: [
+        { id: 'a', x: 500, y: 500 },
+        { id: 'c', side: 'red', x: 1000, y: 500 },
+      ],
+    });
+    const v = validateProposal(
+      w,
+      proposal(
+        w,
+        { c: { status: 'destroyed', strength: 0 } },
+        { observations: [{ side: 'blue', unitId: 'c', by: 'a', when: 'end' }] },
+      ),
+      ctx(),
+    );
+    expect(v.observations).toEqual([]);
+    expect(v.corrections.map((c) => c.reason)).toEqual(['observation dropped: c was gone']);
+  });
+
+  it('counts only clamped unit outcomes toward the fallback', () => {
+    const w = world();
+    const dead = {
+      ...w,
+      units: w.units.map((u) =>
+        u.id === 'b' ? { ...u, status: 'destroyed' as const, strength: 0 } : u,
+      ),
+    };
+    // A stale outcome for `b` (destroyed before the turn), a sighting `a` could not make and one
+    // by a unit that does not exist: all dropped, none a clamped unit.
+    const v = validateProposal(
+      dead,
+      proposal(
+        w,
+        {},
+        {
+          observations: [
+            { side: 'blue', unitId: 'c', by: 'a', when: 'end' },
+            { side: 'blue', unitId: 'c', by: 'zz', when: 'end' },
+          ],
+        },
+      ),
+      ctx(),
+    );
+    expect(v.corrections.map((c) => c.field)).toEqual(['outcome', 'observation', 'observation']);
+    expect(v.clampedUnits).toBe(0);
+    expect(v.units).toBe(2);
+  });
+
+  it("lets a broken unit rally on the projection's own roll", () => {
+    const w = world();
+    const broken = {
+      ...w,
+      startStrength: { a: 437, b: 437, c: 437 },
+      units: w.units.map((u) =>
+        u.id === 'a' ? { ...u, status: 'withdrawn' as const, brokenAt: 0 } : u,
+      ),
+    };
+    // The engine rallied `a` in the projection; the umpire leaves `a` to it.
+    const projected = broken.units.map((u) =>
+      u.id === 'a' ? { ...u, status: 'active' as const } : u,
+    );
+    const p = proposal(broken);
+    const left = { ...p, units: p.units.filter((o) => o.unitId !== 'a') };
+    const v = validateProposal(broken, left, ctx({ projection: projected }));
+    expect(v.outcomes.find((o) => o.unitId === 'a')).toMatchObject({
+      status: 'active',
+      rallied: true,
+    });
+    expect(v.corrections.map((c) => c.reason)).toEqual(['no outcome was given for the unit']);
+  });
+
   it('refuses a proposal for another turn', () => {
     const w = world();
     const v = validateProposal(w, { ...proposal(w), turn: 2 }, ctx());
@@ -535,6 +721,152 @@ describe('umpire.turn', () => {
     expect(held.emitted.some((e) => e.type === 'order_delivered')).toBe(true);
     expect(held.emitted.some((e) => e.type === 'contact.begin')).toBe(false);
     expect(held.state.world.intel.blue.contacts).toEqual([]);
+  });
+
+  it('fires no standing order in a held turn, and keeps it for after the turn', () => {
+    const w = world();
+    const T20 = 20 * MS_PER_MINUTE;
+    const T40 = 40 * MS_PER_MINUTE;
+    let s: EngineState<GameState> = startGame(startVisibility(createState(w.seed, w, 0)));
+    s = issueOrder(s, {
+      id: 'o1',
+      side: 'blue',
+      to: 'a',
+      issuedAt: 0,
+      text: 'At half past, advance east.',
+      intents: [
+        {
+          kind: 'at',
+          gameTime: 30 * MS_PER_MINUTE,
+          then: [{ kind: 'move', to: { x: 3_000_000, y: 600_000 } }],
+        },
+      ],
+    });
+    s = advanceTo(s, T20, registry()).state;
+    const before = unit(s.world, 'a');
+    expect(before.standing?.map((x) => x.trigger)).toEqual([
+      { kind: 'timeReached', gameTime: 30 * MS_PER_MINUTE },
+    ]);
+    const c2 = ctx({ turn: { n: 2, startMs: T20, endMs: T40 } });
+    s = beginTurn(s, { ...c2.turn, adjudicator: 'umpire' });
+    s = issueTurn(s, { proposal: { ...proposal(s.world), turn: 2 }, context: c2 });
+    const mid = advanceTo(s, T40 - 1, registry()).state;
+    const a = unit(mid.world, 'a');
+    expect(a.standing).toEqual(before.standing);
+    expect(a.intent).toEqual(before.intent);
+    expect(a.leg).toBeUndefined();
+    expect(mid.queue.some((e) => e.type === STANDING_EVENT && e.time === T40 + 1)).toBe(true);
+    // If the next turn is the engine's, the order fires just past the held turn.
+    let after = advanceTo(s, T40, registry()).state;
+    after = beginTurn(after, { n: 3, startMs: T40, endMs: T40 + T1, adjudicator: 'engine' });
+    const fired = unit(advanceTo(after, T40 + 1, registry()).state.world, 'a');
+    expect(fired.standing ?? []).toEqual([]);
+    expect(fired.intent).toMatchObject({ kind: 'move', to: { x: 3_000_000, y: 600_000 } });
+  });
+
+  it('rolls no rally in a held turn but keeps the chain while the unit can still rally', () => {
+    const w = world();
+    const broken = {
+      ...w,
+      startStrength: { a: 437, b: 437, c: 437 },
+      units: w.units.map((u) =>
+        u.id === 'a' ? { ...u, status: 'withdrawn' as const, brokenAt: 0 } : u,
+      ),
+    };
+    let s: EngineState<GameState> = startGame(startVisibility(createState(w.seed, broken, 0)));
+    s = beginTurn(s, { n: 1, startMs: T0, endMs: T1, adjudicator: 'umpire' });
+    // A try for `a` (still broken) and a stale one for `b` (never broke) inside the turn.
+    const at = 5 * MS_PER_MINUTE;
+    s = schedule(s, [
+      { time: at, type: RALLY_EVENT, payload: { unitId: 'a' } },
+      { time: at, type: RALLY_EVENT, payload: { unitId: 'b' } },
+    ]);
+    const mid = advanceTo(s, at, registry()).state;
+    expect(unit(mid.world, 'a')).toMatchObject({ status: 'withdrawn', brokenAt: 0 });
+    expect(mid.rng).toEqual(s.rng);
+    const tries = mid.queue
+      .filter((e) => e.type === RALLY_EVENT)
+      .map((e) => [(e.payload as { unitId: string }).unitId, e.time]);
+    expect(tries).toEqual([['a', at + RALLY_RULES.retryMs]]);
+  });
+
+  it('runs no supply tick in a held turn', () => {
+    const w = world();
+    const tired = {
+      ...w,
+      units: w.units.map((u) => (u.id === 'a' ? { ...u, fatigue: 60, morale: 50, ammo: 40 } : u)),
+    };
+    let s: EngineState<GameState> = startGame(startVisibility(createState(w.seed, tired, 0)));
+    s = beginTurn(s, { n: 1, startMs: T0, endMs: T1, adjudicator: 'umpire' });
+    // The first supply tick (at 10 minutes) falls inside the turn.
+    const mid = advanceTo(s, T1 - 1, registry()).state;
+    expect(unit(mid.world, 'a')).toMatchObject({ fatigue: 60, morale: 50, ammo: 40 });
+    expect(mid.queue.some((e) => e.type === 'supply.tick' && e.time > T1 - 1)).toBe(true);
+  });
+
+  it('adopts no attack in a held turn', () => {
+    const w = world();
+    let s: EngineState<GameState> = startGame(startVisibility(createState(w.seed, w, 0)));
+    s = beginTurn(s, { n: 1, startMs: T0, endMs: T1, adjudicator: 'umpire' });
+    s = issueAttack(s, 'a', 'c', MS_PER_MINUTE);
+    const mid = advanceTo(s, T1 - 1, registry());
+    expect(unit(mid.state.world, 'a').intent).toEqual({ kind: 'idle' });
+    expect(unit(mid.state.world, 'a').leg).toBeUndefined();
+  });
+
+  it("re-checks contact just past the turn when the next turn is the engine's", () => {
+    // `a` and `c` end the turn in contact, and nobody moves.
+    const base = miniWorld({
+      units: [
+        { id: 'a', x: 500, y: 500 },
+        { id: 'c', side: 'red', x: 700, y: 500 },
+      ],
+    });
+    const w = { ...base, victory: { ...base.victory, holdMs: 10 * 60 * MS_PER_MINUTE } };
+    const ended = play(w, proposal(w)).state;
+    expect(ended.world.combatActive).toBe(false);
+    const next = beginTurn(ended, { n: 2, startMs: T1, endMs: 2 * T1, adjudicator: 'engine' });
+    const { state, emitted } = advanceTo(next, T1 + COMBAT_TICK_MS, registry());
+    expect(emitted.some((e) => e.type === 'contact.begin')).toBe(true);
+    expect(state.world.combatActive).toBe(true);
+    // A held next turn ignores it.
+    const heldNext = beginTurn(ended, { n: 2, startMs: T1, endMs: 2 * T1, adjudicator: 'umpire' });
+    const held = advanceTo(heldNext, T1 + COMBAT_TICK_MS, registry());
+    expect(held.emitted.some((e) => e.type === 'contact.begin')).toBe(false);
+  });
+
+  it("sets off a march the umpire left under way when the next turn is the engine's", () => {
+    const w = world();
+    const p = proposal(w, { a: { continuing: { kind: 'move', x: 2000, y: 600 } } });
+    const ended = play(w, p).state;
+    const next = beginTurn(ended, { n: 2, startMs: T1, endMs: 2 * T1, adjudicator: 'engine' });
+    const marched = advanceTo(next, T1 + 5 * MS_PER_MINUTE, registry()).state;
+    const a = unit(marched.world, 'a');
+    expect(positionAt(marched.world.map, a, marched.time).x).toBeGreaterThan(1_000_000);
+    // A held next turn leaves it where the umpire put it.
+    const heldNext = beginTurn(ended, { n: 2, startMs: T1, endMs: 2 * T1, adjudicator: 'umpire' });
+    const held = advanceTo(heldNext, T1 + 5 * MS_PER_MINUTE, registry()).state;
+    expect(positionAt(held.world.map, unit(held.world, 'a'), held.time)).toEqual(
+      unit(w, 'a').center,
+    );
+  });
+
+  it('applies no umpire placement in a held turn', () => {
+    const w = world();
+    let s: EngineState<GameState> = startGame(startVisibility(createState(w.seed, w, 0)));
+    s = beginTurn(s, { n: 1, startMs: T0, endMs: T1, adjudicator: 'umpire' });
+    s = issuePlacement(
+      s,
+      {
+        proposal: { unitId: 'a', center: { x: 1_100_000, y: 700_000 }, elapsedMs: TURN_MS },
+        rationale: 'r',
+        narrative: 'n',
+      },
+      MS_PER_MINUTE,
+    );
+    const mid = advanceTo(s, T1 - 1, registry()).state.world;
+    expect(unit(mid, 'a').center).toEqual(unit(w, 'a').center);
+    expect(mid.rulings).toEqual([]);
   });
 
   it('records one ruling per correction, with the reason', () => {
@@ -669,6 +1001,13 @@ describe('umpire.turn', () => {
         const { state } = play(w, p);
         const bad = violations(w, state.world, T1, ids);
         expect(bad).toEqual([]);
+        // No two friends end on the same ground.
+        const on = state.world.units.filter((u) => u.status !== 'destroyed');
+        for (const [i, x] of on.entries()) {
+          for (const y of on.slice(i + 1)) {
+            if (x.side === y.side) expect(overlapsBeyondTolerance(x, y)).toBe(false);
+          }
+        }
         for (const u of state.world.units) {
           if (u.status === 'destroyed') continue;
           const from = unit(w, u.id).center;

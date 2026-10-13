@@ -7,13 +7,13 @@
  * The proposal is the `TurnProposal` zod schema in `@kriegsspiel/protocol`; the engine depends on
  * no package, so it mirrors that shape here (metres and compass degrees, absolute values).
  */
-import { RALLY_EVENT, distanceMm } from './contact.js';
+import { COMBAT_CHECK_EVENT, RALLY_EVENT, distanceMm } from './contact.js';
 import { RALLY_RULES } from './combatRules.js';
 import { turnVictory } from './combat.js';
 import type { EngineState, EventRegistry, Json, NewEvent } from './events.js';
 import { metres, mm } from './geometry.js';
 import type { Dial } from './judgment.js';
-import { positionAt } from './movement.js';
+import { MOVE_INTENT_EVENT, positionAt } from './movement.js';
 import { overlapsBeyondTolerance, proposedArrangement, validatePlacement } from './placement.js';
 import { schedule } from './queue.js';
 import { ROAD_CLASS_COST } from './terrain.js';
@@ -284,6 +284,10 @@ export function validateProposal(
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const startAt = new Map(live.map((u) => [u.id, positionAt(world.map, u, startMs)]));
   const projected = new Map((ctx.projection ?? []).map((u) => [u.id, u]));
+  // Where the projection has each unit at the turn's end: one still on a leg is part-way along it.
+  const projAt = new Map(
+    (ctx.projection ?? []).map((u) => [u.id, positionAt(world.map, u, endMs)]),
+  );
 
   // Which outcome speaks for which unit.
   const wants = new Map<string, Want>();
@@ -306,7 +310,7 @@ export function validateProposal(
   for (const u of live) {
     if (wants.has(u.id)) continue;
     const p = projected.get(u.id);
-    wants.set(u.id, p ? fromUnit(p, p.center) : fromUnit(u, startAt.get(u.id)!));
+    wants.set(u.id, p ? fromUnit(p, projAt.get(u.id)!) : fromUnit(u, startAt.get(u.id)!));
     note(u.id, 'outcome', null, p ? 'projected' : 'unchanged', 'no outcome was given for the unit');
   }
 
@@ -316,13 +320,13 @@ export function validateProposal(
       const w = wants.get(u.id)!;
       const p = projected.get(u.id);
       if (!p || (w.departure ?? '').trim() !== '') continue;
-      const projStatus = fromUnit(p, p.center).status;
-      const far = distanceMm(w.center, p.center) > mm(DEPARTURE_TOLERANCE_M);
+      const projStatus = fromUnit(p, projAt.get(u.id)!).status;
+      const far = distanceMm(w.center, projAt.get(u.id)!) > mm(DEPARTURE_TOLERANCE_M);
       const losses =
         Math.abs(w.strength - p.strength) > DEPARTURE_LOSS_SHARE * Math.max(1, u.strength);
       const status = (w.status === 'captured' ? 'destroyed' : w.status) !== projStatus;
       if (far || losses || status) {
-        wants.set(u.id, { ...fromUnit(p, p.center, w.orders) });
+        wants.set(u.id, { ...fromUnit(p, projAt.get(u.id)!, w.orders) });
         note(
           u.id,
           'departure',
@@ -404,31 +408,45 @@ export function validateProposal(
       );
     }
   }
-  // A unit put back where it started may now stand in a friend's end position: put that one back
-  // too, in unit-id order, until nothing overlaps.
-  for (let changed = true; changed;) {
-    changed = false;
-    for (const id of [...atStart].sort()) {
-      const back = placed.get(id)!;
-      for (const v of live) {
-        if (v.id === id || atStart.has(v.id) || v.side !== back.side) continue;
-        if (gone(wants.get(v.id)!)) continue;
-        const there = placed.get(v.id)!;
-        if (!overlapsBeyondTolerance(back, there)) continue;
-        placed.set(v.id, startArrangement(v));
-        atStart.add(v.id);
-        const s = startAt.get(v.id)!;
-        note(
-          v.id,
-          'position',
-          { x: m(there.center.x), y: m(there.center.y) },
-          { x: m(s.x), y: m(s.y) },
-          `put back where it started: its end position overlaps ${id}, which could not move`,
-        );
-        changed = true;
+  // No two friends may end overlapping, and the march checks above saw each friend at its
+  // proposed end, not at its clamped one. So once status is settled (below), every pair that still
+  // overlaps is settled: the one that moved goes back where it started (the later in unit-id order
+  // if both moved), until stable. `stays` says which units stand on the ground at the end.
+  const settle = (stays: (id: string) => boolean): Set<string> => {
+    const moved = new Set<string>();
+    let changed: boolean;
+    do {
+      changed = false;
+      for (const [i, a] of live.entries()) {
+        for (const b of live.slice(i + 1)) {
+          if (a.side !== b.side || !stays(a.id) || !stays(b.id)) continue;
+          const pa = placed.get(a.id)!;
+          const pb = placed.get(b.id)!;
+          if (!overlapsBeyondTolerance(pa, pb)) continue;
+          const v = !atStart.has(b.id) ? b : !atStart.has(a.id) ? a : undefined;
+          if (!v) continue; // both where they started: the turn's start allowed it
+          const keep = v === b ? a : b;
+          const there = placed.get(v.id)!;
+          placed.set(v.id, startArrangement(v));
+          atStart.add(v.id);
+          moved.add(v.id);
+          const s = startAt.get(v.id)!;
+          note(
+            v.id,
+            'position',
+            { x: m(there.center.x), y: m(there.center.y) },
+            { x: m(s.x), y: m(s.y) },
+            `put back where it started: its end position overlaps ${keep.id}`,
+          );
+          changed = true;
+        }
       }
-    }
-  }
+    } while (changed);
+    return moved;
+  };
+  // Units the proposal marks gone are already at the start; the out-of-reach rule may bring one
+  // back, so they count in the settle once their status is known.
+  for (const u of live) if (gone(wants.get(u.id)!)) atStart.add(u.id);
 
   // Who could have been hit: some enemy within its reach plus its march, at either end.
   const reachable = (u: Unit) =>
@@ -473,7 +491,7 @@ export function validateProposal(
       }
       if (status === 'destroyed' || status === 'captured') {
         const back = p
-          ? fromUnit(p, p.center).status
+          ? fromUnit(p, projAt.get(u.id)!).status
           : u.status === 'withdrawn'
             ? 'broken'
             : 'active';
@@ -523,7 +541,20 @@ export function validateProposal(
         const we = wants.get(e.id)!;
         return we.status === 'active' && we.strength > 0;
       };
-      const why = rallyRefused(world, u, w, where, strength, placed, live, standing, ctx);
+      // The projection's own rally already rests on an engine die.
+      const projected = p?.status === 'active';
+      const why = rallyRefused(
+        world,
+        u,
+        w,
+        where,
+        strength,
+        placed,
+        live,
+        standing,
+        ctx,
+        projected,
+      );
       if (why) {
         note(u.id, 'status', 'active', 'broken', `no rally: ${why}`);
         engineStatus = 'withdrawn';
@@ -587,6 +618,28 @@ export function validateProposal(
     });
   }
 
+  // Settle with every unit still on the ground, a revived one included (a friend may have marched
+  // onto its start). Reach and rally were judged at the end positions as marched.
+  const standsAfter = new Set(
+    outcomes.filter((o) => o.status !== 'destroyed').map((o) => o.unitId),
+  );
+  const putBack = settle((id) => standsAfter.has(id));
+  for (const [i, o] of outcomes.entries()) {
+    if (!putBack.has(o.unitId)) continue;
+    const where = placed.get(o.unitId)!;
+    const next: AppliedOutcome = {
+      ...o,
+      center: { ...where.center },
+      facing: where.facing,
+      formation: where.formation,
+      footprint: where.footprint,
+      intent: o.intent.kind === 'hold' ? { kind: 'hold', at: { ...where.center } } : o.intent,
+    };
+    if (where.shape) next.shape = where.shape;
+    else delete next.shape;
+    outcomes[i] = next;
+  }
+
   // Observations: the side's own unit sees the enemy at the end the observation names.
   const applied: GameState = { ...world, time: endMs, units: appliedUnits(world, outcomes, endMs) };
   const started: GameState = {
@@ -606,7 +659,7 @@ export function validateProposal(
     else if (!by || by.side !== o.side) why = `${o.by} is not a unit of ${o.side}`;
     else if (!target || target.side === o.side) why = `${o.unitId} is not an enemy of ${o.side}`;
     else if (by.status === 'destroyed') why = `${o.by} was destroyed`;
-    else if (target.status === 'destroyed' && o.when === 'start') why = `${o.unitId} was gone`;
+    else if (target.status === 'destroyed') why = `${o.unitId} was gone`;
     else if (!canSee(w, by, target)) {
       why = `${o.by} could not see ${o.unitId} at the turn's ${o.when}`;
     } else if (seenKeys.has(key)) continue;
@@ -618,7 +671,14 @@ export function validateProposal(
     observations.push({ ...o });
   }
 
-  const clampedUnits = new Set(corrections.filter((c) => c.clamp).map((c) => c.unitId)).size;
+  // The fallback counts units whose own outcome was clamped (D39): not dropped observations, and
+  // not outcomes for units that were gone before the turn.
+  const liveIds = new Set(live.map((u) => u.id));
+  const clampedUnits = new Set(
+    corrections
+      .filter((c) => c.clamp && c.field !== 'observation' && liveIds.has(c.unitId))
+      .map((c) => c.unitId),
+  ).size;
   return { problems, outcomes, observations, corrections, clampedUnits, units: live.length };
 }
 
@@ -633,9 +693,11 @@ function rallyRefused(
   live: Unit[],
   standing: (e: Unit) => boolean,
   ctx: TurnContext,
+  projectedRally: boolean,
 ): string | undefined {
   const rolls = ctx.rolls ?? [];
-  if (!w.rollIds?.length || !w.rollIds.every((id) => rolls.some((r) => r.id === id))) {
+  const cited = !!w.rollIds?.length && w.rollIds.every((id) => rolls.some((r) => r.id === id));
+  if (!cited && !projectedRally) {
     return 'a rally must rest on a roll';
   }
   const start = world.startStrength?.[u.id] ?? u.strength;
@@ -782,7 +844,10 @@ export function registerTurn(registry: EventRegistry<GameState>): void {
     // this same instant leave the applied outcome as it is.
     world = { ...world, rulings: [...world.rulings, ...rulings], combatActive: false };
 
-    const next: NewEvent[] = [];
+    // Just past the held instant: a march the umpire left under way sets off, and combat is
+    // checked for units still in contact. Both matter only if the next turn is the engine's (rigid
+    // or fallback); a held next turn ignores them.
+    const next: NewEvent[] = [{ time: endMs + 1, type: COMBAT_CHECK_EVENT }];
     for (const o of check.outcomes) {
       if (o.broke) {
         next.push({
@@ -790,6 +855,10 @@ export function registerTurn(registry: EventRegistry<GameState>): void {
           type: RALLY_EVENT,
           payload: { unitId: o.unitId },
         });
+      }
+      if (o.status === 'active' && o.intent.kind === 'move') {
+        const to: [number, number] = [o.intent.to.x, o.intent.to.y];
+        next.push({ time: endMs + 1, type: MOVE_INTENT_EVENT, payload: { unitId: o.unitId, to } });
       }
     }
     const emit: Array<{ type: string; payload?: Json }> = [

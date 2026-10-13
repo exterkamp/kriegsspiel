@@ -569,16 +569,17 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     // The result of a declared battle stands, so a rally after it changes nothing.
     if (world.outcome || world.battle) return { world };
     const { unitId } = ev.payload as unknown as { unitId: string };
-    // A held turn rolls no rally: the try waits for the next one (the give-up still counts).
+    const u = world.units.find((x) => x.id === unitId);
+    if (!u || u.status !== 'withdrawn' || u.brokenAt === undefined) return { world };
+    if (ev.time - u.brokenAt > RALLY_RULES.giveUpMs) return { world };
+    // A held turn rolls no rally: the try waits for the next one. The chain still ends when the
+    // unit rallies, is lost or gives up, so a later break starts only one chain.
     if (heldTurn(world, ev.time)) {
       return {
         world,
         schedule: [{ time: ev.time + RALLY_RULES.retryMs, type: RALLY_EVENT, payload: { unitId } }],
       };
     }
-    const u = world.units.find((x) => x.id === unitId);
-    if (!u || u.status !== 'withdrawn' || u.brokenAt === undefined) return { world };
-    if (ev.time - u.brokenAt > RALLY_RULES.giveUpMs) return { world };
     const start = world.startStrength?.[u.id] ?? u.strength;
     if (u.strength < RALLY_RULES.minStrengthShare * start) return { world };
     const retry: NewEvent = {
@@ -630,7 +631,8 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
 
   registry.register(COMBAT_TICK_EVENT, (world, ev, rng) => {
     if (world.outcome) return { world };
-    // The chain ends in a held turn; the check `umpire.turn` queues starts it again.
+    // The chain ends in a held turn; the check `umpire.turn` queues just past the turn's end
+    // starts it again if units are still in contact.
     if (heldTurn(world, ev.time)) return { world: { ...world, combatActive: false } };
     const active = activeUnits(world);
     const shots: Shot[] = [];

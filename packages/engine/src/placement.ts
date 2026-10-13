@@ -7,6 +7,7 @@ import {
 import { COMBAT_CHECK_EVENT } from './contact.js';
 import type { EngineState, EventRegistry, Json } from './events.js';
 import { schedule } from './queue.js';
+import { heldTurn } from './held.js';
 import { findPath } from './navigation.js';
 import { unitTypeOf } from './unitTypes.js';
 import { legDuration, pathDuration, positionAlong, positionAt, updateUnit } from './movement.js';
@@ -292,6 +293,8 @@ export function issuePlacement(
  */
 export function registerPlacement(registry: EventRegistry<GameState>): void {
   registry.register(PLACEMENT_EVENT, (w, ev) => {
+    // In an umpire turn only `umpire.turn` places units (D39).
+    if (heldTurn(w, ev.time)) return { world: w };
     const { proposal, rationale, narrative } = ev.payload as unknown as PlacementRuling;
     const world: GameState = { ...w, time: ev.time };
     const verdict = validatePlacement(world, proposal);
