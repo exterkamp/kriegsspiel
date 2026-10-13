@@ -288,6 +288,8 @@ export interface ModelRow {
   cases: number;
   schemaPass: number;
   allPass: number;
+  /** Every check but D39's ammunition ceiling, which also fails an umpire whose units fire less than the engine's. */
+  passExceptAmmo: number;
   failsByCheck: Record<CheckName, number>;
   medianS: number | null;
   p95S: number | null;
@@ -308,8 +310,9 @@ export function summarise(
     const g = grades[letterOf.get(model) ?? ''] ?? {};
     const rubric = Object.fromEntries(
       RUBRIC.map((r) => {
-        const xs = Object.values(g)
-          .map((x) => x[r.key])
+        // Only the cases the model ran: a grader scores a case it has no answer for as 1.
+        const xs = rs
+          .map((run) => g[run.caseId]?.[r.key])
           .filter((n): n is number => typeof n === 'number');
         return [
           r.key,
@@ -325,6 +328,9 @@ export function summarise(
       cases: rs.length,
       schemaPass: rs.filter((r) => r.checks.problems.schema.length === 0).length,
       allPass: rs.filter((r) => r.checks.pass).length,
+      passExceptAmmo: rs.filter((r) =>
+        CHECKS.every((k) => k === 'ammo' || r.checks.problems[k].length === 0),
+      ).length,
       failsByCheck: Object.fromEntries(
         CHECKS.map((k) => [k, rs.filter((r) => r.checks.problems[k].length > 0).length]),
       ) as Record<CheckName, number>,
@@ -345,6 +351,7 @@ export function tableMarkdown(rows: ModelRow[]): string {
     'Model',
     'Schema',
     'All checks',
+    'All but ammo',
     'Failing checks (cases)',
     'Median s',
     'p95 s',
@@ -361,6 +368,7 @@ export function tableMarkdown(rows: ModelRow[]): string {
       r.model,
       `${r.schemaPass}/${r.cases}`,
       `${r.allPass}/${r.cases}`,
+      `${r.passExceptAmmo}/${r.cases}`,
       fails || 'none',
       f(r.medianS),
       f(r.p95S),

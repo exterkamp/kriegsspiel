@@ -344,6 +344,8 @@ describe('runner', () => {
       loadRuns(out),
       {
         [letter]: {
+          // graded but never run: left out of the means
+          'no-such-case': { plausibility: 1, faithfulness: 1, consistency: 1, fog: 1, prose: 1 },
           'uncontested-march': {
             plausibility: 4,
             faithfulness: 2,
@@ -359,7 +361,7 @@ describe('runner', () => {
     const row = rows.find((r) => r.model === 'secret-model-name')!;
     expect(row.rubric).toMatchObject({ plausibility: 4, faithfulness: 2 });
     expect(row.rubricMean).toBe(3.8);
-    expect(tableMarkdown(rows)).toContain('| secret-model-name | 12/12 | 12/12 | none |');
+    expect(tableMarkdown(rows)).toContain('| secret-model-name | 12/12 | 12/12 | 12/12 | none |');
   });
 
   it('reads JSON wrapped in prose or a fence', () => {
