@@ -12,6 +12,8 @@
  *   later `hold` clause means the place before it; a first `hold` with no place holds `here`. A
  *   later clause with no verb but a place (`hold the bridge and the ford`) takes the verb before
  *   it; with neither, the clause is not understood and the first part is offered on its own.
+ *   A later clause that has no verb and only points back (`and there`, `and it`) adds nothing and is
+ *   skipped: the earlier clause already covers that place.
  *   `from X to Y` means Y: the place after the last `to`/`toward`.
  * - An order that names several units (`the 1st and 2nd battalions`) asks which one first, since
  *   an answer carries one unit.
