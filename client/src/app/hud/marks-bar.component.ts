@@ -107,7 +107,8 @@ const OVERLAYS: ReadonlyArray<readonly [keyof Overlays, string]> = [
       top: 44px;
       width: min(300px, calc(100% - 16px));
     }
-    #marks:has(#marks-body[hidden]) {
+    /* :not([hidden]) so this display does not undo the hiding behind a desk sheet (#364). */
+    #marks:not([hidden]):has(#marks-body[hidden]) {
       width: auto;
       display: inline-block;
     }

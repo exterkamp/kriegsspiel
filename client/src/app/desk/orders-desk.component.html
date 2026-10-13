@@ -1,108 +1,112 @@
 <div class="form" [class.stamping]="stamping()">
   <h2>Orders</h2>
-  <div class="field">
-    <label for="order-to">To</label>
-    <select
-      id="order-to"
-      [value]="draft().to"
-      (change)="patch({ to: $any($event.target).value })"
-      [disabled]="over()"
-      [attr.aria-invalid]="error()?.field === 'to'"
-      [attr.aria-describedby]="error()?.field === 'to' ? 'order-err-to' : null"
-    >
-      <option value="" [selected]="draft().to === ''">(choose a commander)</option>
-      @for (u of units(); track u.id) {
-        <option [value]="u.id" [selected]="draft().to === u.id">{{ u.name }}</option>
+  @if (over()) {
+    <p class="hint" id="orders-closed">The game is over; no more orders can be sent.</p>
+  } @else {
+    <div class="field">
+      <label for="order-to">To</label>
+      <select
+        id="order-to"
+        [value]="draft().to"
+        (change)="patch({ to: $any($event.target).value })"
+        [disabled]="over()"
+        [attr.aria-invalid]="error()?.field === 'to'"
+        [attr.aria-describedby]="error()?.field === 'to' ? 'order-err-to' : null"
+      >
+        <option value="" [selected]="draft().to === ''">(choose a commander)</option>
+        @for (u of units(); track u.id) {
+          <option [value]="u.id" [selected]="draft().to === u.id">{{ u.name }}</option>
+        }
+      </select>
+    </div>
+    <div class="err ks-error" id="order-err-to" role="alert">{{ errorFor('to') }}</div>
+
+    <div class="field">
+      <label for="desk-order-text">Order</label>
+      <textarea
+        id="desk-order-text"
+        rows="5"
+        maxlength="2000"
+        placeholder="Write the order…"
+        [value]="draft().text"
+        (input)="patch({ text: $any($event.target).value })"
+        (keydown)="onKey($event)"
+        [disabled]="over()"
+        [attr.aria-invalid]="error()?.field === 'text'"
+        [attr.aria-describedby]="error()?.field === 'text' ? 'order-err-text' : null"
+      ></textarea>
+    </div>
+    <div class="err ks-error" id="order-err-text" role="alert">{{ errorFor('text') }}</div>
+    <p class="hint">The staff understand orders such as {{ examples }}.</p>
+
+    <fieldset class="annex">
+      <legend>Marked-map annex</legend>
+      @if (arrows().length === 0) {
+        <p class="hint">Draw arrows on the map table to attach them to the order.</p>
+      } @else {
+        @for (a of arrows(); track a.id) {
+          <label class="check">
+            <input
+              type="checkbox"
+              [checked]="draft().annex.includes(a.id)"
+              (change)="toggleArrow(a.id, $any($event.target).checked)"
+              [disabled]="over()"
+            />
+            {{ annexLine(a) }}
+          </label>
+        }
       }
-    </select>
-  </div>
-  <div class="err ks-error" id="order-err-to" role="alert">{{ errorFor('to') }}</div>
+    </fieldset>
 
-  <div class="field">
-    <label for="desk-order-text">Order</label>
-    <textarea
-      id="desk-order-text"
-      rows="5"
-      maxlength="2000"
-      placeholder="Write the order…"
-      [value]="draft().text"
-      (input)="patch({ text: $any($event.target).value })"
-      (keydown)="onKey($event)"
-      [disabled]="over()"
-      [attr.aria-invalid]="error()?.field === 'text'"
-      [attr.aria-describedby]="error()?.field === 'text' ? 'order-err-text' : null"
-    ></textarea>
-  </div>
-  <div class="err ks-error" id="order-err-text" role="alert">{{ errorFor('text') }}</div>
-  <p class="hint">The staff understand orders such as {{ examples }}.</p>
-
-  <fieldset class="annex">
-    <legend>Marked-map annex</legend>
-    @if (arrows().length === 0) {
-      <p class="hint">Draw arrows on the map table to attach them to the order.</p>
-    } @else {
-      @for (a of arrows(); track a.id) {
-        <label class="check">
+    <fieldset class="couriers">
+      <legend>Courier</legend>
+      @for (c of couriers; track c.id) {
+        <label class="courier">
           <input
-            type="checkbox"
-            [checked]="draft().annex.includes(a.id)"
-            (change)="toggleArrow(a.id, $any($event.target).checked)"
+            type="radio"
+            name="courier"
+            [value]="c.id"
+            [checked]="draft().courier === c.id"
+            (change)="patch({ courier: c.id })"
             [disabled]="over()"
           />
-          {{ annexLine(a) }}
+          <span>
+            <b>{{ c.label }}</b>
+            <span class="est">{{ estimates()[c.id] }}</span>
+            <small>{{ c.blurb }}</small>
+          </span>
         </label>
       }
-    }
-  </fieldset>
+      <p class="hint">
+        The staff reckon the ride on the straight line; a road shortens it and rough ground
+        lengthens it.
+      </p>
+    </fieldset>
 
-  <fieldset class="couriers">
-    <legend>Courier</legend>
-    @for (c of couriers; track c.id) {
-      <label class="courier">
-        <input
-          type="radio"
-          name="courier"
-          [value]="c.id"
-          [checked]="draft().courier === c.id"
-          (change)="patch({ courier: c.id })"
-          [disabled]="over()"
-        />
-        <span>
-          <b>{{ c.label }}</b>
-          <span class="est">{{ estimates()[c.id] }}</span>
-          <small>{{ c.blurb }}</small>
-        </span>
-      </label>
-    }
-    <p class="hint">
-      The staff reckon the ride on the straight line; a road shortens it and rough ground lengthens
-      it.
-    </p>
-  </fieldset>
-
-  <div class="sign">
-    <span class="signature" aria-hidden="true">{{
-      stamping() ? 'Signed, the Commander' : ''
-    }}</span>
-    <button type="button" id="order-sign" (click)="sign()" [disabled]="over()">
-      Sign and send
-    </button>
-  </div>
-  <div class="err ks-error" id="order-err-send" role="alert">{{ errorFor('send') }}</div>
-  @if (confirmation()) {
-    <p class="confirmation" role="status">{{ confirmation() }}</p>
-  }
-  @if (notice(); as n) {
-    <div class="notices" role="status">
-      <p>{{ n.text }}</p>
-      @if (n.options.length > 0) {
-        <div class="options" role="group" aria-label="Choose one">
-          @for (o of n.options; track o) {
-            <button type="button" (click)="choose(o)" [disabled]="over()">{{ o }}</button>
-          }
-        </div>
-      }
+    <div class="sign">
+      <span class="signature" aria-hidden="true">{{
+        stamping() ? 'Signed, the Commander' : ''
+      }}</span>
+      <button type="button" id="order-sign" (click)="sign()" [disabled]="over()">
+        Sign and send
+      </button>
     </div>
+    <div class="err ks-error" id="order-err-send" role="alert">{{ errorFor('send') }}</div>
+    @if (confirmation()) {
+      <p class="confirmation" role="status">{{ confirmation() }}</p>
+    }
+    @if (notice(); as n) {
+      <div class="notices" role="status">
+        <p>{{ n.text }}</p>
+        @if (n.options.length > 0) {
+          <div class="options" role="group" aria-label="Choose one">
+            @for (o of n.options; track o) {
+              <button type="button" (click)="choose(o)" [disabled]="over()">{{ o }}</button>
+            }
+          </div>
+        }
+      </div>
+    }
   }
 
   @if (stamping()) {

@@ -106,7 +106,8 @@ describe('JournalComponent', () => {
     const unknown = await open(pending());
     const noEta = unknown.el.querySelector('li[data-kind=order]')!;
     expect(noEta.querySelector('progress')).toBeNull();
-    expect(noEta.textContent).toContain('Courier riding; no estimate');
+    expect(noEta.textContent).toContain('Sent Day 1');
+    expect(noEta.textContent).toContain('awaiting word');
   });
 
   it('re-reads delivery against game time on a timer', () => {

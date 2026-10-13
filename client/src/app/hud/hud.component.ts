@@ -18,6 +18,9 @@ import { TableService } from '../game/table.service';
         <button id="obl" type="button" (click)="table.scene()?.snapOblique()">Oblique</button>
       }
       <span id="pick">{{ table.status() }}</span>
+      @if (overloaded(); as notice) {
+        <span id="overload" role="status">{{ notice }}</span>
+      }
     </div>
     <section id="gameover" aria-label="Game over" role="status" [hidden]="over() === undefined">
       {{ over() }}
@@ -44,6 +47,12 @@ import { TableService } from '../game/table.service';
         max-width: calc(100% - 128px);
       }
     }
+    #overload {
+      padding: 2px 8px;
+      border: 1px solid var(--ks-warn-on-dark);
+      color: var(--ks-warn-on-dark);
+      border-radius: var(--ks-radius);
+    }
     #gameover {
       position: absolute;
       width: 1px;
@@ -56,5 +65,7 @@ import { TableService } from '../game/table.service';
 export class HudComponent {
   protected readonly table = inject(TableService);
   private readonly game = inject(GameService);
+  /** The umpire is rate limited or over budget; nothing while it is healthy. */
+  protected readonly overloaded = computed(() => this.game.state().view?.staffOverloaded);
   protected readonly over = computed(() => gameOverText(this.game.state()));
 }

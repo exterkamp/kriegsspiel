@@ -125,7 +125,11 @@ export interface Delivery {
 /** Where a sent order stands, from the staff's estimate. The server reports the real delivery as a dispatch. */
 export function deliveryStatus(p: PendingOrder, nowGame: number): Delivery {
   if (p.etaGame === undefined)
-    return { state: 'unknown', fraction: 0, label: 'Courier riding; no estimate' };
+    return {
+      state: 'unknown',
+      fraction: 0,
+      label: `Sent ${formatGameTime(p.sentAtGame)}; awaiting word`,
+    };
   const span = Math.max(1, p.etaGame - p.sentAtGame);
   const fraction = Math.min(1, Math.max(0, (nowGame - p.sentAtGame) / span));
   if (nowGame >= p.etaGame)

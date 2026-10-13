@@ -152,6 +152,7 @@ import { PageFrameComponent } from '../ui/page-frame.component';
     }
     /* Start stays in view while the form is longer than the window (#323). */
     form .actions {
+      margin-top: var(--ks-space-3);
       position: sticky;
       bottom: 0;
       padding: 10px 0;

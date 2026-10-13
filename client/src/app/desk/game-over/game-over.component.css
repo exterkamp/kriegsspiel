@@ -29,3 +29,16 @@ ul {
 .err {
   color: var(--ks-danger);
 }
+/* On a phone the paper sits low and scrolls, so the map above it stays in view (#364). */
+@media (max-width: 600px) {
+  .over {
+    top: auto;
+    /* Clears the desk bar and tools strip below (about 128px together); keep in step with them. */
+    bottom: 128px;
+    max-height: 38vh;
+    overflow-y: auto;
+  }
+  h2 {
+    font-size: 22px;
+  }
+}

@@ -37,6 +37,22 @@ describe('HudComponent', () => {
     expect(el.querySelector('#pick')?.textContent).toBe('hello');
   });
 
+  it('shows a notice only while the umpire is overloaded', async () => {
+    const g = configure();
+    const f = TestBed.createComponent(HudComponent);
+    await f.whenStable();
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector('#overload')).toBeNull();
+    (g.fake as unknown as { set: (p: object) => void }).set({
+      view: { staffOverloaded: 'The staff are overwhelmed, sir.' },
+    });
+    await f.whenStable();
+    expect(el.querySelector('#overload')?.textContent).toContain('overwhelmed');
+    (g.fake as unknown as { set: (p: object) => void }).set({ view: {} });
+    await f.whenStable();
+    expect(el.querySelector('#overload')).toBeNull();
+  });
+
   it('keeps the game over status hidden until the game ends', async () => {
     const g = configure();
     const f = TestBed.createComponent(HudComponent);

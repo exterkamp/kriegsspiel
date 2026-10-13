@@ -23,7 +23,8 @@ export function clockView(state: ClientState, nowWall: number): ClockView {
   const open = state.pause?.proposal;
   return {
     ...(open && !state.gameOver ? { vote: open.kind } : {}),
-    time: formatGameTime(gameNowMs(c, nowWall)),
+    // After the game ends the clock stands at the final moment; it must not tick or step back.
+    time: formatGameTime(state.gameOver ? state.gameOver.atGame : gameNowMs(c, nowWall)),
     rate: formatRate(c.rate),
     status: c.status,
     staffAtWork: state.staffAtWork && !state.gameOver,
