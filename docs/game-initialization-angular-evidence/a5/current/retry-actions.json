@@ -1,0 +1,68 @@
+[
+  {
+    "label": "Explicit separate native mount failure injection",
+    "at": "2026-10-12T23:27:26.082Z",
+    "selector": {
+      "role": "button",
+      "name": "Inject: fail next new-session native mount",
+      "exact": true
+    },
+    "attempted": true,
+    "actionReturned": true
+  },
+  {
+    "label": "Normal Settings",
+    "at": "2026-10-12T23:27:26.380Z",
+    "selector": {
+      "role": "button",
+      "name": "Settings",
+      "exact": true
+    },
+    "attempted": true,
+    "actionReturned": true
+  },
+  {
+    "label": "Normal New game",
+    "at": "2026-10-12T23:27:26.672Z",
+    "selector": {
+      "role": "button",
+      "name": "New game",
+      "exact": true
+    },
+    "attempted": true,
+    "actionReturned": true
+  },
+  {
+    "label": "Separate certified Start injects native mount failure",
+    "at": "2026-10-12T23:27:56.621Z",
+    "selector": {
+      "role": "button",
+      "name": "Start game",
+      "exact": true
+    },
+    "attempted": true,
+    "actionReturned": true
+  },
+  {
+    "label": "Actual native product Retry same board in separate case",
+    "at": "2026-10-12T23:28:12.038Z",
+    "selector": {
+      "role": "button",
+      "name": "Retry same board",
+      "exact": true
+    },
+    "attempted": true,
+    "actionReturned": true
+  },
+  {
+    "label": "Terminal retire separate Retry proof",
+    "at": "2026-10-12T23:28:44.444Z",
+    "selector": {
+      "role": "button",
+      "name": "Retire proof resources",
+      "exact": true
+    },
+    "attempted": true,
+    "actionReturned": true
+  }
+]

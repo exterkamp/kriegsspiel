@@ -1,0 +1,37 @@
+{
+  "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+  "base": "36406f70c485e7f23befb9f9b9e27fdfbd4c32e0",
+  "gameId": "d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+  "scenario": "hold-the-bridge",
+  "seed": "Explicit real API-created lobby; synthetic signed-in host authenticated through local disabled-mail log sink. Browser guest/sign-in/scenario actions separate. No browser cookies extracted or external mail/model.",
+  "status": 201,
+  "lobbyInfo": {
+    "id": "d99eb5d6-f366-4657-95f5-a2ec9daf886f",
+    "scenario": "hold-the-bridge",
+    "status": "lobby",
+    "sessionType": "team_vs_team",
+    "rate": 12,
+    "side": "blue",
+    "creator": true,
+    "createdAtMs": 1791847844165,
+    "you": "blue",
+    "removed": false,
+    "ready": true,
+    "role": null,
+    "pause": null,
+    "sides": [
+      {
+        "side": "blue",
+        "taken": true,
+        "roles": [],
+        "ready": true
+      },
+      {
+        "side": "red",
+        "taken": false,
+        "roles": [],
+        "ready": false
+      }
+    ]
+  }
+}

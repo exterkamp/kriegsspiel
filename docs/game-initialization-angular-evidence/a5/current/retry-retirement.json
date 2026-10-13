@@ -1,0 +1,542 @@
+{
+  "mode": "source-authored isolated diagnostics; injected controls explicitly labeled",
+  "proofDocumentId": "25d534a1-96ab-4771-91bc-a1fb83916c30",
+  "sourceCheckpoint": "c38727836520003bfe5d5419917fa465d7abbae3",
+  "media": {
+    "forcedColors": false,
+    "reducedMotion": false,
+    "prefersContrast": false
+  },
+  "active": false,
+  "proofRetirement": "retired",
+  "observerRestoration": {
+    "pending": 0,
+    "failed": false
+  },
+  "phase": "no native child",
+  "available": false,
+  "modal": null,
+  "cancelling": false,
+  "ownerError": null,
+  "uiError": null,
+  "current": null,
+  "injections": {
+    "deferNextDefault": false,
+    "defaultReturnGatesReserved": 0,
+    "failNextNewSessionMount": false,
+    "deferNextCompletedListResult": false,
+    "deferNextCompletedSaveResult": false,
+    "armedOldSessionAcknowledgmentKey": null,
+    "returns": []
+  },
+  "knownOwnRecords": [
+    {
+      "scope": {
+        "gameId": "local-a8eb547c-7dc9-4152-80d1-481f7d92cbcb",
+        "sideId": "blue",
+        "playerId": "local-general"
+      },
+      "binding": {
+        "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "bounds": {
+          "minX": 0,
+          "minY": 0,
+          "maxX": 5000,
+          "maxY": 3000
+        },
+        "registration": {
+          "origin": "north-west",
+          "units": "metres",
+          "xAxis": "east",
+          "yAxis": "south"
+        }
+      },
+      "retiredRepository": "released",
+      "observedSuccessfulMarksSave": false,
+      "observedSuccessfulNotebookSave": false
+    },
+    {
+      "scope": {
+        "gameId": "local-93c3a34c-4dad-4c2c-ad05-dffecc62cc4a",
+        "sideId": "blue",
+        "playerId": "local-general"
+      },
+      "binding": {
+        "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "bounds": {
+          "minX": 0,
+          "minY": 0,
+          "maxX": 5000,
+          "maxY": 3000
+        },
+        "registration": {
+          "origin": "north-west",
+          "units": "metres",
+          "xAxis": "east",
+          "yAxis": "south"
+        }
+      },
+      "retiredRepository": "released",
+      "observedSuccessfulMarksSave": false,
+      "observedSuccessfulNotebookSave": false
+    },
+    {
+      "scope": {
+        "gameId": "local-d250b5d3-7f6e-40b7-8ad0-552ef6f6ebd7",
+        "sideId": "blue",
+        "playerId": "local-general"
+      },
+      "binding": {
+        "assetIdentity": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "revision": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "mapId": "local-map:26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+        "bounds": {
+          "minX": 0,
+          "minY": 0,
+          "maxX": 5000,
+          "maxY": 3000
+        },
+        "registration": {
+          "origin": "north-west",
+          "units": "metres",
+          "xAxis": "east",
+          "yAxis": "south"
+        }
+      },
+      "retiredRepository": "released",
+      "observedSuccessfulMarksSave": false,
+      "observedSuccessfulNotebookSave": false
+    }
+  ],
+  "retiredOwnRecordChecks": [],
+  "networkObservation": {
+    "totals": {
+      "fetch": 3,
+      "websocket": 0,
+      "auth": 0,
+      "gameCreate": 0,
+      "gameWebsocket": 0,
+      "devHmrWebsocket": 0,
+      "droppedUrlBuckets": 0
+    },
+    "paths": [
+      {
+        "transport": "fetch",
+        "path": "/__local-default/*",
+        "method": "GET",
+        "calls": 1
+      },
+      {
+        "transport": "fetch",
+        "path": "/__local/maps",
+        "method": "GET",
+        "calls": 1
+      },
+      {
+        "transport": "fetch",
+        "path": "/__local/maps/*",
+        "method": "GET",
+        "calls": 1
+      }
+    ],
+    "limits": "Observer installed before proof child/default only. Initial page/bootstrap/HMR connection may predate it; constructors/calls, not transport completion or server receipt. Paths omit query/fragment/credentials; no bodies/cookies/headers retained. Dev HMR sockets classified separately. Zero applies only to this observed interval."
+  },
+  "counts": {
+    "owner.acquired": 1,
+    "owner.defaultStart.calls": 1,
+    "default.calls": 1,
+    "default.preparation.factory": 1,
+    "default preparation.acquired": 1,
+    "default.preparation.load.calls": 1,
+    "native.Worker.constructor.attempts": 2,
+    "native.Worker.constructed": 2,
+    "native.Worker.terminate.calls": 2,
+    "default.preparation.load.completed": 1,
+    "default.certified": 1,
+    "default.returned": 1,
+    "binding.calls": 3,
+    "binding.completed": 3,
+    "freshKey.calls": 3,
+    "repository.acquired": 3,
+    "personal store.acquired": 3,
+    "session surface.acquired": 3,
+    "personal.initialize.calls": 3,
+    "personal.initialize.completed": 3,
+    "attached host origin.acquired": 3,
+    "borrowed host lease.acquired": 3,
+    "native board surface.acquired": 3,
+    "native.mount.calls": 3,
+    "scene.constructor.attempts": 3,
+    "native scene.acquired": 3,
+    "raster.prepare.calls": 3,
+    "raster.prepare.completed": 3,
+    "scene.apply.calls": 8,
+    "scene.first-real-frame.completed": 3,
+    "native.mount.completed": 2,
+    "modal.catalog.factory": 1,
+    "modal.preparation.factory": 1,
+    "modal preparation.acquired": 1,
+    "native setup control.acquired": 1,
+    "attached setup origin.acquired": 1,
+    "actual.preview.constructor.attempts": 1,
+    "actual setup MapPreview.acquired": 1,
+    "modal.preparation.load.calls": 1,
+    "modal.preparation.load.completed": 1,
+    "actual.preview.load.calls": 1,
+    "actual.preview.load.valid": 1,
+    "native Angular host.acquired": 3,
+    "native.unmount.calls": 3,
+    "native.unmount.completed": 3
+  },
+  "resources": [
+    {
+      "id": 1,
+      "kind": "owner",
+      "key": null,
+      "releaseCalls": 2,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 2,
+      "kind": "default preparation",
+      "key": null,
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 3,
+      "kind": "repository",
+      "key": "local-a8eb547c-7dc9-4152-80d1-481f7d92cbcb",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 4,
+      "kind": "personal store",
+      "key": "local-a8eb547c-7dc9-4152-80d1-481f7d92cbcb",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 5,
+      "kind": "session surface",
+      "key": "local-a8eb547c-7dc9-4152-80d1-481f7d92cbcb",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 6,
+      "kind": "attached host origin",
+      "key": "local-a8eb547c-7dc9-4152-80d1-481f7d92cbcb",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 7,
+      "kind": "borrowed host lease",
+      "key": "local-a8eb547c-7dc9-4152-80d1-481f7d92cbcb",
+      "releaseCalls": 2,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 8,
+      "kind": "native board surface",
+      "key": "local-a8eb547c-7dc9-4152-80d1-481f7d92cbcb",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 9,
+      "kind": "native scene",
+      "key": "local-a8eb547c-7dc9-4152-80d1-481f7d92cbcb",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 10,
+      "kind": "modal preparation",
+      "key": null,
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 11,
+      "kind": "native setup control",
+      "key": null,
+      "releaseCalls": 3,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 12,
+      "kind": "attached setup origin",
+      "key": null,
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 13,
+      "kind": "actual setup MapPreview",
+      "key": null,
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 14,
+      "kind": "native Angular host",
+      "key": null,
+      "releaseCalls": 3,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 15,
+      "kind": "repository",
+      "key": "local-93c3a34c-4dad-4c2c-ad05-dffecc62cc4a",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 16,
+      "kind": "personal store",
+      "key": "local-93c3a34c-4dad-4c2c-ad05-dffecc62cc4a",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 17,
+      "kind": "session surface",
+      "key": "local-93c3a34c-4dad-4c2c-ad05-dffecc62cc4a",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 18,
+      "kind": "attached host origin",
+      "key": "local-93c3a34c-4dad-4c2c-ad05-dffecc62cc4a",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 19,
+      "kind": "borrowed host lease",
+      "key": "local-93c3a34c-4dad-4c2c-ad05-dffecc62cc4a",
+      "releaseCalls": 2,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 20,
+      "kind": "native board surface",
+      "key": "local-93c3a34c-4dad-4c2c-ad05-dffecc62cc4a",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 21,
+      "kind": "native scene",
+      "key": "local-93c3a34c-4dad-4c2c-ad05-dffecc62cc4a",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 22,
+      "kind": "native Angular host",
+      "key": null,
+      "releaseCalls": 3,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 23,
+      "kind": "repository",
+      "key": "local-d250b5d3-7f6e-40b7-8ad0-552ef6f6ebd7",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 24,
+      "kind": "personal store",
+      "key": "local-d250b5d3-7f6e-40b7-8ad0-552ef6f6ebd7",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 25,
+      "kind": "session surface",
+      "key": "local-d250b5d3-7f6e-40b7-8ad0-552ef6f6ebd7",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 26,
+      "kind": "attached host origin",
+      "key": "local-d250b5d3-7f6e-40b7-8ad0-552ef6f6ebd7",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 27,
+      "kind": "borrowed host lease",
+      "key": "local-d250b5d3-7f6e-40b7-8ad0-552ef6f6ebd7",
+      "releaseCalls": 2,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 28,
+      "kind": "native board surface",
+      "key": "local-d250b5d3-7f6e-40b7-8ad0-552ef6f6ebd7",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 29,
+      "kind": "native scene",
+      "key": "local-d250b5d3-7f6e-40b7-8ad0-552ef6f6ebd7",
+      "releaseCalls": 1,
+      "acknowledgment": "released",
+      "cachedResult": true
+    },
+    {
+      "id": 30,
+      "kind": "native Angular host",
+      "key": null,
+      "releaseCalls": 3,
+      "acknowledgment": "released",
+      "cachedResult": true
+    }
+  ],
+  "nativeWorkers": [
+    {
+      "id": 1,
+      "url": "http://127.0.0.1:41856/worker-TMRGVNIY.js?worker_file&type=module",
+      "type": "module",
+      "operation": "default real load #1",
+      "terminateCalls": 1,
+      "terminated": true,
+      "errors": 0
+    },
+    {
+      "id": 2,
+      "url": "http://127.0.0.1:41856/worker-TMRGVNIY.js?worker_file&type=module",
+      "type": "module",
+      "operation": "modal real load #2",
+      "terminateCalls": 1,
+      "terminated": true,
+      "errors": 0
+    }
+  ],
+  "nativeWorkerTotals": {
+    "constructed": 2,
+    "terminateCalled": 2,
+    "remainingWithoutTerminateCall": 0
+  },
+  "defaultNativeFactoryTotals": {
+    "preparationCreated": 1,
+    "nativeWorkersConstructedDuringDefault": 1,
+    "nativeWorkersWithoutTerminateDuringDefault": 0,
+    "preparationReleaseAcknowledged": 1,
+    "note": "Default certification uses real validation workers; zero outstanding resources is checked after completion, never zero construction by assumption."
+  },
+  "rasters": [
+    {
+      "key": "local-a8eb547c-7dc9-4152-80d1-481f7d92cbcb",
+      "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "widthM": 5000,
+      "heightM": 3000,
+      "pixelWidth": 4096,
+      "pixelHeight": 2458
+    },
+    {
+      "key": "local-93c3a34c-4dad-4c2c-ad05-dffecc62cc4a",
+      "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "widthM": 5000,
+      "heightM": 3000,
+      "pixelWidth": 4096,
+      "pixelHeight": 2458
+    },
+    {
+      "key": "local-d250b5d3-7f6e-40b7-8ad0-552ef6f6ebd7",
+      "sourceKey": "26c444cba00bb0320aaaf7605007d9a3557d317d4a3e989e69d3e75146de7c84",
+      "widthM": 5000,
+      "heightM": 3000,
+      "pixelWidth": 4096,
+      "pixelHeight": 2458
+    }
+  ],
+  "actualOwnerRetirementAcknowledgments": [
+    {
+      "id": 1,
+      "kind": "owner",
+      "key": null,
+      "releaseCalls": 2,
+      "acknowledgment": "released",
+      "cachedResult": true
+    }
+  ],
+  "events": [
+    "default preparation 2 actual release completed",
+    "INJECTED next newly allocated session mount failure armed",
+    "actual setup MapPreview 13 actual release completed",
+    "modal preparation 10 actual release completed",
+    "native setup control 11 actual release completed",
+    "native scene 9 actual release completed",
+    "repository 3 actual release completed",
+    "personal store 4 actual release completed",
+    "borrowed host lease 7 actual release completed",
+    "native Angular host 14 actual release completed",
+    "native board surface 8 actual release completed",
+    "session surface 5 actual release completed",
+    "host origin 6 actual Angular destroyed callback",
+    "setup origin 12 actual Angular destroyed callback",
+    "INJECTED postcommit native mount frame failure",
+    "native scene 21 actual release completed",
+    "repository 15 actual release completed",
+    "personal store 16 actual release completed",
+    "borrowed host lease 19 actual release completed",
+    "native Angular host 22 actual release completed",
+    "native board surface 20 actual release completed",
+    "session surface 17 actual release completed",
+    "host origin 18 actual Angular destroyed callback",
+    "host origin 26 actual Angular destroyed callback",
+    "native scene 29 actual release completed",
+    "repository 23 actual release completed",
+    "personal store 24 actual release completed",
+    "borrowed host lease 27 actual release completed",
+    "native Angular host 30 actual release completed",
+    "native board surface 28 actual release completed",
+    "session surface 25 actual release completed",
+    "owner 1 actual release completed",
+    "proof actual owner leaf retirement completed"
+  ],
+  "errors": ["native mount rejected"],
+  "limits": "Method acknowledgments and native terminate calls are observable; GPU memory, actual worker exit, swallowed prerequisite cleanup errors and HMR transport require independent browser evidence. No success is inferred from DOM removal."
+}

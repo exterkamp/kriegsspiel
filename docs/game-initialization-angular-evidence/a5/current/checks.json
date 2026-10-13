@@ -1,0 +1,45 @@
+{
+  "head": "3d787b66cffb475f543c09a72cbb682c2e231038",
+  "base": "36406f70c485e7f23befb9f9b9e27fdfbd4c32e0",
+  "tree": "ed8994d2ca153fcb8be2606869122e56c4dbb2f5",
+  "snapshot": "/private/tmp/kriegsspiel-angular-a5-source-final",
+  "NG_BUILD_MAX_WORKERS": "2",
+  "results": [
+    {
+      "name": "setup",
+      "command": ["npm", "run", "setup:map-source"],
+      "code": 0,
+      "seconds": 4.038551092147827
+    },
+    {
+      "name": "install",
+      "command": ["npm", "ci"],
+      "code": 0,
+      "seconds": 5.08843207359314
+    },
+    {
+      "name": "lint",
+      "command": ["npm", "run", "lint"],
+      "code": 0,
+      "seconds": 11.711682081222534
+    },
+    {
+      "name": "typecheck",
+      "command": ["npm", "run", "typecheck"],
+      "code": 0,
+      "seconds": 15.502297163009644
+    },
+    {
+      "name": "test",
+      "command": ["npm", "test"],
+      "code": 0,
+      "seconds": 138.4651279449463
+    },
+    {
+      "name": "build",
+      "command": ["npm", "run", "build"],
+      "code": 0,
+      "seconds": 17.504194021224976
+    }
+  ]
+}
