@@ -139,5 +139,9 @@ describe('TurnPanelComponent', () => {
       'it is 10 minutes, not 20',
     );
     expect(t.el.querySelector('#clock')!.textContent).toContain('Turn 3 of 3: 00:40 to 00:50');
+    // Over a desk view the dock stays short; the orders desk explains turns itself.
+    t.desk.activeView.set('orders');
+    await t.tick();
+    expect(t.panel()!.querySelector('[data-testid=turn-how]')).toBeNull();
   });
 });

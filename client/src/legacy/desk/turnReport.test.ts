@@ -215,6 +215,7 @@ describe('unit status (#439)', () => {
       doing: 'Destroyed',
       men: 'none left',
     });
+    expect(b2).not.toHaveProperty('morale');
   });
 
   it('shows the held order while the turn is written, and the courier while no word has come', () => {

@@ -13,6 +13,7 @@ import type { TurnOrder } from '@kriegsspiel/protocol';
 import {
   deadlineText,
   heldLine,
+  howTurnsWork,
   lastTurnText,
   sidesSent,
   timeOfDay,
@@ -57,6 +58,13 @@ export class TurnOrdersComponent {
     const t = this.turn();
     const s = this.game.state();
     return t && !t.pursuitUntil ? lastTurnText(t, s.turnMinutes, s.battleMinutes) : undefined;
+  });
+  /** What a turn is, for a first-time player (#439). */
+  protected readonly howItWorks = computed(() => {
+    const s = this.game.state();
+    const t = this.turn();
+    const minutes = s.turnMinutes ?? (t ? Math.round((t.endsAt - t.startsAt) / 60_000) : undefined);
+    return minutes ? howTurnsWork(minutes, s.battleMinutes) : undefined;
   });
   /** Each own unit at a glance, from the side's own view (#439). */
   protected readonly units = computed(() => {

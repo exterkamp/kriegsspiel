@@ -4,6 +4,12 @@
   @if (lastTurn(); as text) {
     <p class="hint last" data-testid="turn-orders-last">{{ text }}</p>
   }
+  @if (howItWorks(); as text) {
+    <details class="how" data-testid="turn-orders-how">
+      <summary>How turns work</summary>
+      <p class="hint">{{ text }}</p>
+    </details>
+  }
 
   @if (units().length > 0) {
     <section class="units" aria-labelledby="turn-units-h" data-testid="turn-units">
@@ -25,7 +31,7 @@
               <dt>Doing</dt>
               <dd>{{ u.doing }}</dd>
               <dt>Strength</dt>
-              <dd>{{ u.men }}, {{ u.morale }}</dd>
+              <dd>{{ u.men }}{{ u.morale ? ', ' + u.morale : '' }}</dd>
             </dl>
           </li>
         }

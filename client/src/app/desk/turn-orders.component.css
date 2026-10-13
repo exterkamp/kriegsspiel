@@ -107,14 +107,15 @@ small {
 .earlier {
   margin: var(--ks-space-2) 0;
 }
-.earlier summary {
-  cursor: pointer;
-  font-size: var(--ks-text-sm);
-}
 .earlier ol {
   margin: var(--ks-space-1) 0 0;
   padding-left: 1.4em;
 }
 .earlier li {
   margin-bottom: var(--ks-space-2);
+}
+.how summary,
+.earlier summary {
+  cursor: pointer;
+  font-size: var(--ks-text-sm);
 }

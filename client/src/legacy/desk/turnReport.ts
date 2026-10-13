@@ -198,7 +198,8 @@ export interface UnitStatus {
   where: string;
   doing: string;
   men: string;
-  morale: string;
+  /** Left out for a unit with no men left. */
+  morale?: string;
 }
 
 const short = (text: string, max = 90): string =>
@@ -245,7 +246,8 @@ export function unitStatuses(a: {
       where: u.place ?? 'not reported',
       doing: doingOf(u, a.papers, marching.has(u.id), a.view.visibleEnemies),
       men: menBand(u.strength),
-      morale: moraleBand(u.morale),
+      // A unit with no men left has no spirit to speak of.
+      ...(u.strength !== undefined && u.strength <= 0 ? {} : { morale: moraleBand(u.morale) }),
     };
   });
 }

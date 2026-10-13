@@ -55,6 +55,8 @@ export class TurnPanelComponent {
   protected readonly resolvingText = RESOLVING_TEXT;
   /** What a turn is, for a first-time player, and a word on the last turn when it is short (#439). */
   protected readonly howItWorks = computed(() => {
+    // Over a desk view the dock stays short (the orders desk explains it itself); the table has room.
+    if (this.desk.activeView() !== 'table') return undefined;
     const s = this.game.state();
     const t = this.turn();
     const minutes = s.turnMinutes ?? (t ? Math.round((t.endsAt - t.startsAt) / 60_000) : undefined);

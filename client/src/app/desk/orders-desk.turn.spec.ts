@@ -334,6 +334,9 @@ describe('the turn desk for a first-time player (#439)', () => {
     });
     expect(t.q('#turn-orders-h').textContent).toContain('Turn 3 of 3: 00:40 to 00:50');
     expect(t.q('[data-testid=turn-orders-last]').textContent).toContain('it is 10 minutes, not 20');
+    expect(t.q('[data-testid=turn-orders-how]').textContent).toContain(
+      'The battle lasts about 50 minutes, so about 3 turns',
+    );
   });
 
   it('shows each own unit: what it was told, where it is, what it does, men and morale', async () => {
