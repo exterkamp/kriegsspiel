@@ -10,6 +10,7 @@
     "test": "vitest run",
     "eval:orders": "tsc -p tsconfig.build.json && node dist/orders/eval/cli.js",
     "bench:ollama": "tsc -p tsconfig.build.json && node dist/umpire/ollamaBench.js",
+    "bench:umpire": "tsc -p tsconfig.build.json && node dist/umpire/eval/benchCli.js",
     "start": "node dist/main.js",
     "dev": "npm run build -w @kriegsspiel/engine -w @kriegsspiel/protocol && tsc -p tsconfig.build.json && node dist/main.js",
     "replay": "tsc -p tsconfig.build.json && node dist/game/replayCli.js"
