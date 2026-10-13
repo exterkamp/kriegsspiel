@@ -25,25 +25,31 @@ export const rateLabel = (rate: number): string => `${rate}:1`;
 /**
  * How the game is paced, for its title: the clock rate, or for a turn-mode game (D39) its turns,
  * `turns of 20 min` or `turns of 20 min, orders due in 24 h`. A started turn game counts its turns
- * (#429): `3 turns of 20 min` once over (no deadline then), `turn 3, turns of 20 min` while it is played.
+ * (#429, #438): `Turn 3 of about 3 (20 min turns)` while it is played, given the scenario's length in
+ * game minutes (`Turn 3 (20 min turns)` without it), and `Finished after 2 turns` once over.
  */
 export function paceLabel(
   g: Pick<GameSummary, 'rate' | 'umpire'> &
     Partial<Pick<GameSummary, 'status'>> & { finished?: boolean; gameTimeMs?: number },
+  lengthMinutes?: number,
 ): string {
   const t = turnSettingsOf(g.umpire);
   if (!t) return rateLabel(g.rate);
   const due = t.turnDeadlineHours === undefined ? '' : `, orders due in ${t.turnDeadlineHours} h`;
-  const turns = `turns of ${t.turnMinutes} min${due}`;
-  if (g.status !== 'started' || g.gameTimeMs === undefined) return turns;
+  if (g.status !== 'started' || g.gameTimeMs === undefined)
+    return `turns of ${t.turnMinutes} min${due}`;
   const turnMs = t.turnMinutes * 60_000;
   if (g.finished) {
     // The last turn may end early, at the time limit or at the victory.
     const n = Math.max(1, Math.ceil(g.gameTimeMs / turnMs));
-    // No orders are due on a game that is over.
-    return `${n} ${n === 1 ? 'turn' : 'turns'} of ${t.turnMinutes} min`;
+    return `Finished after ${n} ${n === 1 ? 'turn' : 'turns'}`;
   }
-  return `turn ${Math.floor(g.gameTimeMs / turnMs) + 1}, ${turns}`;
+  const n = Math.floor(g.gameTimeMs / turnMs) + 1;
+  // About: a victory may end the game sooner than the time limit.
+  const of = lengthMinutes
+    ? ` of about ${Math.max(n, Math.ceil(lengthMinutes / t.turnMinutes))}`
+    : '';
+  return `Turn ${n}${of} (${t.turnMinutes} min turns${due})`;
 }
 
 /** What the start button should do now: ready, or the reason it is not. */

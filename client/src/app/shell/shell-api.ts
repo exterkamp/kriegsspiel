@@ -32,7 +32,7 @@ import { createGame, fetchScenarioOptions } from '@legacy/shell/newGameApi';
 export interface ShellApi {
   fetchMe: () => Promise<Me | undefined>;
   fetchGames: () => Promise<Array<GameSummary | PlayedGame>>;
-  fetchScenarios: () => Promise<Array<{ id: string; name: string }>>;
+  fetchScenarios: () => Promise<Array<{ id: string; name: string; lengthMinutes?: number }>>;
   fetchScenarioOptions: () => Promise<ScenarioOptions>;
   createGame: (req: CreateRequest) => Promise<string>;
   requestLink: (email: string) => Promise<string | undefined>;

@@ -99,7 +99,8 @@ describe('clockView', () => {
       { v, kind: 'gameOver', winner: 'red', reason: 'objective-taken', atGame: 2_400_000 },
       0,
     );
-    expect(clockView(s, 0)).toMatchObject({ rate: '1:1', label: 'Stopped' });
+    // A finished real-time game says Game over too (#438).
+    expect(clockView(s, 0)).toMatchObject({ rate: '1:1', status: 'stopped', label: 'Game over' });
     s = withTurnSettings(s, { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 20 });
     const view = clockView(s, 0);
     expect(view).toMatchObject({

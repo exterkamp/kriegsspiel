@@ -64,11 +64,14 @@ export class GameListComponent implements OnInit {
     Promise.all([this.api.fetchGames(), this.api.fetchScenarios().catch(() => [])]).then(
       ([games, scenarios]) =>
         this.rows.set(
-          (games as Array<GameSummary | PlayedGame>).map((g) => ({
-            id: g.id,
-            title: `${scenarios.find((s) => s.id === g.scenario)?.name ?? g.scenario}, ${SESSION_LABELS[g.sessionType]}, ${paceLabel(g)}`,
-            state: gameStatus(g),
-          })),
+          (games as Array<GameSummary | PlayedGame>).map((g) => {
+            const sc = scenarios.find((s) => s.id === g.scenario);
+            return {
+              id: g.id,
+              title: `${sc?.name ?? g.scenario}, ${SESSION_LABELS[g.sessionType]}, ${paceLabel(g, sc?.lengthMinutes)}`,
+              state: gameStatus(g),
+            };
+          }),
         ),
       (e: unknown) => this.error.set(e instanceof Error ? e.message : String(e)),
     );

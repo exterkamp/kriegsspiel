@@ -44,7 +44,8 @@ export function clockView(state: ClientState, nowWall: number): ClockView {
     rate: formatRate(c.rate),
     status: c.status,
     staffAtWork: state.staffAtWork && !state.gameOver,
-    label: LABEL[c.status],
+    // Over is over, in real time as in turns (#438).
+    label: state.gameOver ? TURN_LABEL.over : LABEL[c.status],
   };
 }
 

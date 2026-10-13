@@ -76,12 +76,17 @@ async function failure(res: Response, what: string): Promise<Error> {
   return new Error(`${what} (${code || res.status})`);
 }
 
-export async function fetchScenarios(
-  f: Fetch = fetch,
-): Promise<Array<{ id: string; name: string }>> {
+/** A scenario as the lobby lists it: its time limit in game minutes, when the server gives one. */
+export interface ScenarioListing {
+  id: string;
+  name: string;
+  lengthMinutes?: number;
+}
+
+export async function fetchScenarios(f: Fetch = fetch): Promise<ScenarioListing[]> {
   const res = await f('/scenarios');
   if (!res.ok) throw await failure(res, 'could not load the scenarios');
-  return ((await res.json()) as { scenarios: Array<{ id: string; name: string }> }).scenarios;
+  return ((await res.json()) as { scenarios: ScenarioListing[] }).scenarios;
 }
 
 export async function fetchGames(f: Fetch = fetch): Promise<GameSummary[]> {
