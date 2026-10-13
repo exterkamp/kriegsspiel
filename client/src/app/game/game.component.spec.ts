@@ -26,6 +26,7 @@ function fakeScene() {
     apply: vi.fn(),
     resize: vi.fn(),
     setDesk: vi.fn(),
+    setGlide: vi.fn(),
     setOverlays: vi.fn(),
     setMarks: vi.fn(),
     panTo: vi.fn(),

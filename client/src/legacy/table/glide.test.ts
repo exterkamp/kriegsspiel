@@ -14,7 +14,12 @@ describe('nextGlides', () => {
   });
 
   it('slides a moved piece from its old place to its new one', () => {
-    const s = nextGlides(nextGlides(NO_GLIDES, at([['own:a', 0, 0]]), 0, 1500), at([['own:a', 1000, 0]]), 100, 1500);
+    const s = nextGlides(
+      nextGlides(NO_GLIDES, at([['own:a', 0, 0]]), 0, 1500),
+      at([['own:a', 1000, 0]]),
+      100,
+      1500,
+    );
     const to = { x: 1000, y: 0 };
     expect(drawnAt(s, 'own:a', to, 100)).toEqual({ x: 0, y: 0 });
     const mid = drawnAt(s, 'own:a', to, 850);
@@ -27,7 +32,15 @@ describe('nextGlides', () => {
 
   it('does not glide a new piece or one that barely moved', () => {
     const before = nextGlides(NO_GLIDES, at([['own:a', 0, 0]]), 0, 1500);
-    const s = nextGlides(before, at([['own:a', 0.5, 0], ['ghost:r', 100, 100]]), 0, 1500);
+    const s = nextGlides(
+      before,
+      at([
+        ['own:a', 0.5, 0],
+        ['ghost:r', 100, 100],
+      ]),
+      0,
+      1500,
+    );
     expect(s.glides.size).toBe(0);
   });
 

@@ -15,12 +15,12 @@
       v().turn
         ? ''
         : v().status === 'paused'
-        ? '⏸'
-        : v().status === 'stopped'
-          ? '⏹'
-          : v().status === 'running'
-            ? '▶'
-            : ''
+          ? '⏸'
+          : v().status === 'stopped'
+            ? '⏹'
+            : v().status === 'running'
+              ? '▶'
+              : ''
     }}</span>
     <span>{{ v().label }}</span>
   </span>

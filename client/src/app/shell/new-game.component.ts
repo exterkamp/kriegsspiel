@@ -136,44 +136,44 @@ import { PageFrameComponent } from '../ui/page-frame.component';
               </p>
             </fieldset>
           } @else {
-          <fieldset>
-            <legend>Clock rate</legend>
-            @for (r of presets; track r) {
+            <fieldset>
+              <legend>Clock rate</legend>
+              @for (r of presets; track r) {
+                <label class="ks-choice">
+                  <input
+                    type="radio"
+                    name="rate"
+                    [value]="r"
+                    [checked]="form()!.rate === r"
+                    (change)="patch({ rate: r })"
+                  />
+                  {{ r }}:1
+                </label>
+              }
               <label class="ks-choice">
                 <input
                   type="radio"
                   name="rate"
-                  [value]="r"
-                  [checked]="form()!.rate === r"
-                  (change)="patch({ rate: r })"
+                  value="custom"
+                  [checked]="form()!.rate === 'custom'"
+                  (change)="patch({ rate: 'custom' })"
                 />
-                {{ r }}:1
+                Custom
               </label>
-            }
-            <label class="ks-choice">
-              <input
-                type="radio"
-                name="rate"
-                value="custom"
-                [checked]="form()!.rate === 'custom'"
-                (change)="patch({ rate: 'custom' })"
-              />
-              Custom
-            </label>
-            @if (form()!.rate === 'custom') {
-              <label>
-                Battle hours per real hour
-                <input
-                  type="text"
-                  inputmode="decimal"
-                  aria-label="Custom clock rate"
-                  [value]="form()!.customRate"
-                  (input)="patch({ customRate: $any($event.target).value })"
-                />
-              </label>
-            }
-            <p class="ks-muted" role="status">{{ rateLine() }}</p>
-          </fieldset>
+              @if (form()!.rate === 'custom') {
+                <label>
+                  Battle hours per real hour
+                  <input
+                    type="text"
+                    inputmode="decimal"
+                    aria-label="Custom clock rate"
+                    [value]="form()!.customRate"
+                    (input)="patch({ customRate: $any($event.target).value })"
+                  />
+                </label>
+              }
+              <p class="ks-muted" role="status">{{ rateLine() }}</p>
+            </fieldset>
           }
 
           <fieldset>

@@ -128,14 +128,21 @@ describe('new game form', () => {
     expect(deadlineHoursOf({ deadlineHours: '0.1' })).toBeUndefined();
     expect(deadlineHoursOf({ deadlineHours: 'soon' })).toBeUndefined();
     expect(validate(f, o)).toBeUndefined();
-    expect(validate({ ...f, turnMinutes: '90' }, o)).toMatch(/whole number of minutes from 5 to 60/);
+    expect(validate({ ...f, turnMinutes: '90' }, o)).toMatch(
+      /whole number of minutes from 5 to 60/,
+    );
     expect(validate({ ...f, deadlineHours: '999' }, o)).toMatch(/deadline/);
     // The rate is not asked for in turn mode, so a bad custom rate does not stop the form.
     expect(validate({ ...f, rate: 'custom', customRate: '' }, o)).toBeUndefined();
     expect(validate({ ...f, mode: 'realtime', turnMinutes: '90' }, o)).toBeUndefined();
   });
   it('builds a turn-mode request with its settings', () => {
-    const f = { ...initialForm(o)!, mode: 'turns' as const, turnMinutes: '30', dial: 'rigid' as const };
+    const f = {
+      ...initialForm(o)!,
+      mode: 'turns' as const,
+      turnMinutes: '30',
+      dial: 'rigid' as const,
+    };
     expect(toRequest(f, o)).toEqual({
       scenario: 'a',
       side: 'blue',

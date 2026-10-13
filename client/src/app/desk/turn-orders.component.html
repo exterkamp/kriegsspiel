@@ -58,7 +58,14 @@
     @if (confirming()) {
       <div class="confirm" role="group" aria-labelledby="turn-confirm-q">
         <p id="turn-confirm-q">
-          Send {{ held().length === 0 ? 'no orders' : held().length === 1 ? 'this order' : 'these ' + held().length + ' orders' }}
+          Send
+          {{
+            held().length === 0
+              ? 'no orders'
+              : held().length === 1
+                ? 'this order'
+                : 'these ' + held().length + ' orders'
+          }}
           for the turn? This is final for your side.
           @if (unheldWords()) {
             <b>The words still in the order box have not been held and will not go.</b>

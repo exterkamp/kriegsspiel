@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PROTOCOL_VERSION, type SideView } from '@kriegsspiel/protocol';
+import { PROTOCOL_VERSION, type ServerMessage, type SideView } from '@kriegsspiel/protocol';
 import { applyServerMessage, initialState, type ClientState } from '../net/state.js';
 import { clockSummary, clockView } from './clock.js';
 import {
@@ -26,20 +26,18 @@ const view = {
   clock: { gameMsAtAnchor: 0, wallMsAtAnchor: 0, rate: 1, status: 'paused' },
 } as unknown as SideView;
 
-const turnState = (
-  over: Partial<Extract<Parameters<typeof applyServerMessage>[1], { kind: 'turnState' }>> = {},
-) =>
-  ({
-    v,
-    kind: 'turnState',
-    turn: 3,
-    startsAt: 8 * 60 * MIN + 20 * MIN,
-    endsAt: 8 * 60 * MIN + 40 * MIN,
-    sent: [],
-    resolving: false,
-    held: [],
-    ...over,
-  }) as const;
+type TurnStateMessage = Extract<ServerMessage, { kind: 'turnState' }>;
+const turnState = (over: Partial<TurnStateMessage> = {}): TurnStateMessage => ({
+  v,
+  kind: 'turnState',
+  turn: 3,
+  startsAt: 8 * 60 * MIN + 20 * MIN,
+  endsAt: 8 * 60 * MIN + 40 * MIN,
+  sent: [],
+  resolving: false,
+  held: [],
+  ...over,
+});
 
 const withView = (s: ClientState): ClientState => ({ ...s, view });
 
@@ -80,7 +78,11 @@ describe('turnPhase', () => {
     expect(turnPhase(s)).toBe('sent');
     s = applyServerMessage(s, turnState({ sent: ['red', 'blue'], resolving: true }), 0);
     expect(turnPhase(s)).toBe('resolving');
-    s = applyServerMessage(s, { v, kind: 'gameOver', winner: 'red', reason: 'objective', atGame: 0 } as never, 0);
+    s = applyServerMessage(
+      s,
+      { v, kind: 'gameOver', winner: 'red', reason: 'objective', atGame: 0 } as never,
+      0,
+    );
     expect(turnPhase(s)).toBe('over');
   });
 });
@@ -158,7 +160,9 @@ describe('the clock in a turn-mode game', () => {
 
 describe('a sent turn in the client state', () => {
   it('keeps held orders as drafts until the side sends, then they join the sent orders', () => {
-    const held = [{ orderId: 't-1', to: 'b1', text: 'March to the bridge', courier: 'fast' as const }];
+    const held = [
+      { orderId: 't-1', to: 'b1', text: 'March to the bridge', courier: 'fast' as const },
+    ];
     let s = applyServerMessage(withView(initialState), turnState({ held }), 0);
     expect(s.pending).toEqual([]);
     s = applyServerMessage(s, turnState({ held, sent: ['blue'] }), 0);
