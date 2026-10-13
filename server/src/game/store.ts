@@ -76,6 +76,21 @@ export type GameCommand =
       question: string;
       /** The conference record, so a restart restores it (D6b). Absent in entries from before it was kept. */
       exchange?: StaffExchange;
+    }
+  /**
+   * The chief of staff read a shared draft (the staff check, D6d). Journal only: the reading is
+   * advice and never changes the engine. `text` is the draft as read and `earlier` the side's own
+   * earlier orders shown to the model; the model calls are on the entry (`calls`), so replay needs
+   * no model.
+   */
+  | {
+      kind: 'draftCheck';
+      side: string;
+      checkId: string;
+      draft: string;
+      rev: number;
+      text: string;
+      earlier: Array<{ id: string; text: string; sentAtGame: number }>;
     };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */

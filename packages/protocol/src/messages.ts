@@ -13,6 +13,21 @@ export const MAX_PAUSE_REASON = 200;
 /** Longest question put to a staff officer. */
 export const MAX_STAFF_QUESTION = 400;
 
+/** Longest reading or finding in a staff check. */
+export const MAX_DRAFT_CHECK_TEXT = 600;
+
+/** What a staff check can flag in a draft order (D6d). */
+export const DraftCheckKind = z.enum([
+  'ambiguity',
+  'missing_place',
+  'missing_time',
+  'timing',
+  'condition',
+  'contradiction',
+  'unknown_reference',
+]);
+export type DraftCheckKind = z.infer<typeof DraftCheckKind>;
+
 /** Where the pause vote stands, as the server's state machine has it (docs/architecture.md). */
 export const PausePhase = z.enum(['running', 'pause_proposed', 'paused', 'resume_proposed']);
 export type PausePhase = z.infer<typeof PausePhase>;
@@ -94,6 +109,10 @@ export const Command = z.discriminatedUnion('kind', [
       question: z.string().trim().min(1).max(MAX_STAFF_QUESTION),
     })
     .strict(),
+  // Ask the chief of staff to read a shared draft before it is signed (the LLM staff check, D6d). The
+  // server reads the draft's current text itself and charges the officer's game-time cost: the
+  // officer is busy until `draftCheckQueued.answerAtGame`. Errors for it are prefixed `<checkId>: `.
+  z.object({ ...Envelope, kind: z.literal('checkDraft'), checkId: Id.max(64), draft: Id }).strict(),
   // Shared order drafts (D6c). None of these reach the engine or the input log. Drafts belong to the
   // sender's side; ids are chosen by the client and unique within a side.
   z
@@ -246,6 +265,50 @@ export const ServerMessage = z.discriminatedUnion('kind', [
       text: z.string().max(2000).optional(),
       basedOnGame: GameMs,
       officer: z.object({ name: z.string(), traits: z.array(z.string()) }).strict(),
+    })
+    .strict(),
+  // The server took a staff check and charged the chief of staff's time: the reading is due at
+  // `answerAtGame` (game time, so a paused game does not move it). `rev` is the draft's rev that is read.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('draftCheckQueued'),
+      checkId: Id,
+      draft: Id,
+      rev: z.number().int().nonnegative(),
+      askedAtGame: GameMs,
+      answerAtGame: GameMs,
+      costMs: GameMs,
+    })
+    .strict(),
+  // How a subordinate would likely read the draft at `rev`, what it leaves out and where it clashes
+  // with an order already sent. To every connection of the side; the client shows it once game time
+  // reaches the check's `answerAtGame`. `unavailable`: the staff stage is off or gave nothing usable,
+  // so there is no reading. `caveat` always says the reading is not a guarantee of the real parse.
+  z
+    .object({
+      ...Envelope,
+      kind: z.literal('draftCheck'),
+      checkId: Id,
+      draft: Id,
+      rev: z.number().int().nonnegative(),
+      basedOnGame: GameMs,
+      officer: z.object({ name: z.string(), traits: z.array(z.string()) }).strict(),
+      reading: z.string().max(MAX_DRAFT_CHECK_TEXT).optional(),
+      unitId: z.string().optional(),
+      findings: z
+        .array(
+          z
+            .object({
+              kind: DraftCheckKind,
+              text: z.string().max(MAX_DRAFT_CHECK_TEXT),
+              earlierOrder: z.string().optional(),
+            })
+            .strict(),
+        )
+        .max(8),
+      unavailable: z.literal(true).optional(),
+      caveat: z.string(),
     })
     .strict(),
   z.object({ ...Envelope, kind: z.literal('clockState'), clock: ClockState }).strict(),

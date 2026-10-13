@@ -36,6 +36,11 @@ import {
   type TraceSink,
 } from '../debug/trace.js';
 import type { OrderParser, ParseContext, ParseResult } from '../orders/index.js';
+import {
+  checkDraftWithStaff,
+  type EarlierOrder,
+  type StaffCheckReport,
+} from '../orders/staffCheck.js';
 import type { AgentOrder, SideAgent } from '../opponent/index.js';
 import { PauseVoting, type PauseConfig, type PauseTransition } from '../pause.js';
 import { RatioVoting, type RatioTransition } from '../ratioVote.js';
@@ -647,6 +652,62 @@ export class GameActor {
     return answer;
   }
 
+  /**
+   * The chief of staff reads a shared draft on the `staff` stage (the staff check, D6d). Like a
+   * conference answer it is off the clock's critical path: game time does not wait for it, and the
+   * hub holds the result until the officer's cost has elapsed. It sees the side's own units, the
+   * named places and the orders the side already sent, never master state. Logged as a
+   * journal-only entry with its model calls, so replay needs no model. Undefined when there is no
+   * umpire or the stage gave nothing usable.
+   */
+  async checkDraft(
+    side: SideId,
+    check: { checkId: string; draft: string; rev: number; text: string },
+    earlier: readonly EarlierOrder[],
+  ): Promise<StaffCheckReport | undefined> {
+    const umpire = this.umpire;
+    if (!umpire || this.closed || this.engine.world.outcome) return undefined;
+    let report: StaffCheckReport | undefined;
+    let failure: string | undefined;
+    try {
+      report = await checkDraftWithStaff(
+        umpire,
+        this.parseContext(side),
+        this.engine.world.seed,
+        side,
+        check.text,
+        earlier,
+        this.engine.time,
+      );
+    } catch (e) {
+      failure = e instanceof Error ? e.message : 'staff check failed';
+    }
+    if (this.closed) return undefined;
+    await this.enqueueCompletion(async () => {
+      const entry: InputLogEntry = {
+        seq: ++this.seq,
+        wallMs: this.wallNow(),
+        gameMs: this.engine.time,
+        endGameMs: this.engine.time,
+        command: {
+          kind: 'draftCheck',
+          side,
+          checkId: check.checkId,
+          draft: check.draft,
+          rev: check.rev,
+          text: check.text,
+          earlier: earlier.map((o) => ({ id: o.id, text: o.text, sentAtGame: o.sentAtGame })),
+        },
+        calls: report?.records ?? [],
+        ...(report === undefined ? { error: failure ?? 'staff check unusable' } : {}),
+      };
+      if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+      await this.commit(entry);
+      this.notify();
+    });
+    return report;
+  }
+
   /** Game time the soonest narration window closes, when the narrate stage is on. */
   private nextNarrationAt(): number | undefined {
     if (!this.umpire || this.engine.world.outcome) return undefined;
@@ -1077,6 +1138,8 @@ export class GameActor {
         throw new Error('narration is logged by the scheduler');
       case 'staffAnswer':
         throw new Error('staff answers are logged by answerStaff');
+      case 'draftCheck':
+        throw new Error('staff checks are logged by checkDraft');
     }
   }
 

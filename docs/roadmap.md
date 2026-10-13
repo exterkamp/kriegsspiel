@@ -114,7 +114,7 @@ Historical annotation remains #85/#88. Detailed erosion, elaborate cities, a ful
 - [x] Notifications (WebSocket, web push, email) with per-player thresholds (D17b)
 - [ ] Deputy mode: LLM staff officer acting within standing orders
 - [ ] Roles per side, with LLM filling empty staff roles
-- [ ] Shared order drafts: comments, tracked edits, sign and stamp, LLM staff check
+- [ ] Shared order drafts: comments, tracked edits, sign and stamp, LLM staff check (server side: D6d)
 - [ ] Shared HQ and chain-of-command modes
 - [x] AI opposing commander (fog-respecting)
 - [ ] Full procedural scenario assembly (objectives, orders of battle, balance); consume generated maps from M3c
