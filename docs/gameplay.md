@@ -131,7 +131,7 @@ A wing commander's scout report reaches HQ only if they send it, and it takes ti
 
 Both supported, set in the lobby:
 - **Shared HQ.** Everyone on the side sees the same desk and map. Simpler, and good for friends planning together.
-- **Chain of command.** Each human has their own desk and sector. Messages between players take in-game time. Human subordinates can misread or improvise.
+- **Chain of command.** Each human has their own desk and sector. Messages between players take in-game time. Human subordinates can misread or improvise. A subordinate's reports reach HQ only when the subordinate forwards them, and they ride there (distance at courier pace); in shared HQ forwarding takes no time (#79).
 
 ### Session shapes
 
