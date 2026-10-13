@@ -41,6 +41,8 @@ export class CritiqueService {
     if (!run) {
       run = this.write(gameId, input, endMs).finally(() => this.running.delete(gameId));
       this.running.set(gameId, run);
+      // A run that outlives its request must not surface as an unhandled rejection if it fails later.
+      run.catch(() => undefined);
     }
     const waitMs = this.o.waitMs ?? CRITIQUE_WAIT_MS;
     let timer: NodeJS.Timeout | undefined;
