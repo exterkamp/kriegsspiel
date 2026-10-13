@@ -94,7 +94,7 @@ Real life happens. The game can be **paused by a vote of all human players** acr
 - Any player can propose a pause, with an optional reason. A single "no" or a timeout cancels the proposal. The host can instead allow a majority.
 - While paused, game time stops. Players can still read, draft and sign orders, but a signed order's courier only leaves when the clock resumes, so nothing can be gained from a pause.
 - Resuming needs everyone to mark themselves ready, or a host-set maximum pause length.
-- An **emergency hold** lets any one player stop the clock for a few minutes, a limited number of times per game, unless a vote ratifies it.
+- An **emergency hold** lets any one player stop the clock at once for five minutes by default, twice per player and six times per game by default (the host can change these), unless the other players ratify it with a vote, which makes it an ordinary pause (D5).
 - If the server was ever down, the game comes back paused and asks everyone to confirm. We never skip game time silently.
 - Pauses are recorded in the journal.
 

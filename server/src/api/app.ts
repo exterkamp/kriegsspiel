@@ -89,6 +89,10 @@ const PauseSettings = z
   .object({
     rule: z.enum(['unanimous', 'majority']),
     voteTimeoutMs: z.number().int().min(1000).max(3_600_000).optional(),
+    // Emergency hold (D5): how long it stops the clock, and how many a player and the game may call.
+    holdMs: z.number().int().min(1000).max(3_600_000).optional(),
+    holdsPerPlayer: z.number().int().min(0).max(20).optional(),
+    holdsPerGame: z.number().int().min(0).max(100).optional(),
     maxPauseMs: z
       .number()
       .int()

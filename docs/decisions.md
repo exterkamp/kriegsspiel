@@ -34,7 +34,8 @@ Short records of decisions made, why, and what is still open. Newest at the bott
 ## D5: Pause by unanimous vote
 
 **Decision.** All human players across all sides can vote to pause. One "no" or a timeout cancels it (hosts may allow a majority). A paused game allows reading and drafting, but signed orders dispatch on resume. After server downtime the game restarts paused.
-**Suggested, not confirmed.** Emergency hold: a short, limited, single-player clock stop that lapses unless ratified.
+**Emergency hold (confirmed by the maintainer, #66).** A single voter can stop the clock at once for a short wall-clock period, a limited number of times per game. The hold lapses unless the other voters ratify it; a ratifying vote turns it into an ordinary pause (with the usual resume vote and maximum pause length), while a "no" or the deadline resumes the clock where it stopped. It is the pause machine's own proposal flow (`PauseVoting.callHold`, command `proposeHold`, same `vote`/`pauseExpire` commands), not a parallel mechanism: the phase stays `pause_proposed` and the proposal and its transitions carry `hold: true`. The actor stops and resumes the game clock with `clock.pause()`/`resume()`, so the LLM barrier and every rate and mode behave as for any pause, and the hold's wall-clock deadline and every vote are inputs in the log (replay needs no model calls).
+**Hold settings** are the `PauseConfig` fields `holdMs` (default 300,000: five minutes), `holdsPerPlayer` (default 2) and `holdsPerGame` (default 6; zero turns holds off), also accepted in the lobby's `pause` settings. A lapsed or refused hold still counts as used, and the counts are rebuilt from the input log when a game is reopened, so a restart does not refund them. A game that restarts during a hold comes back paused like any other (the hold becomes a plain pause). Only one hold can be open, and none while a pause vote is open or the game is paused. Refusals use fixed wording (`hold_refused`: "no emergency hold is left to you in this game"); `pauseState` carries `holdsLeft` for the viewer and the proposal's `hold` flag, with vote tallies only, never names.
 **See.** [architecture.md](architecture.md), [gameplay.md](gameplay.md)
 
 ## D6: Collaborative play with roles and shared drafts
@@ -165,7 +166,7 @@ Mail goes through the `Mailer` interface: `WebhookMailer` POSTs `{to, subject, t
 
 - Default clock ratio (decide after the first scenario).
 - Command level and default hierarchy (assumptions above).
-- Emergency hold: keep or drop.
+- Emergency hold: confirmed, see D5 (the desk UI for it is a follow-up).
 - First historical scenario and map source: Ball's Bluff proposed in D9, awaiting maintainer decision; map licence verified (D9).
 - How much auto-plotting of reports onto the map players get.
 - Rules tables (march rates, frontage, fire, casualties): first pass recorded in `src/data/` with citations (see `docs/rules.md`). Still missing: full movement table, Die 4 row, artillery tables other than 12-pdr 1500-2000, cavalry and artillery frontages.
