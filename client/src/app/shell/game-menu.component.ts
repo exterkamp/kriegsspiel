@@ -32,7 +32,7 @@ import { ModalComponent } from '../ui/modal.component';
           <button type="button" (click)="leave.emit()">Leave to main menu</button>
           <button type="button" class="ks-danger" (click)="signOut.emit()">Sign out</button>
           @if (debugGame(); as id) {
-            <a class="ks-row ks-link" [href]="debugUrl(id)" target="_blank" rel="noopener"
+            <a class="ks-btn" [href]="debugUrl(id)" target="_blank" rel="noopener"
               >Debug this game</a
             >
           }
