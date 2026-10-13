@@ -364,8 +364,8 @@ function untilAborted<T>(
  * failed, refused, cancelled or unusable reply comes back with `error` and no proposal, and the
  * caller falls back to the engine (D39, "Fallback"). A refusal by the game's budget or rate limit
  * is not retried; a transport failure, a schema failure or a reply with problems gets the one
- * resend. When a reply that passed the gate was sent back and the resend fails or does not pass,
- * that first reply is used, clamped when applied.
+ * resend. When a reply that passed the gate was sent back and the resend fails, does not pass or
+ * runs out of the turn's time, that first reply is used, clamped when applied.
  */
 export async function adjudicateTurn(
   client: UmpireClient,
@@ -390,7 +390,7 @@ export async function adjudicateTurn(
     const last = call === maxCalls;
     if (opts.signal?.aborted) {
       error = 'cancelled: the turn ran out of time';
-      return { calls, attempts, error, ...(resent ? { resent } : {}) };
+      return result();
     }
     let output: unknown;
     try {
@@ -408,7 +408,8 @@ export async function adjudicateTurn(
       );
       if (res === CANCELLED) {
         error = 'cancelled: the turn ran out of time';
-        return { calls, attempts: attempts + 1, error, ...(resent ? { resent } : {}) };
+        attempts += 1;
+        return result();
       }
       attempts += res.record.attempts;
       calls.push(res.record);
@@ -421,7 +422,7 @@ export async function adjudicateTurn(
     }
     if (opts.signal?.aborted) {
       error = 'cancelled: the turn ran out of time';
-      return { calls, attempts, error, ...(resent ? { resent } : {}) };
+      return result();
     }
     const verdict = judge(output, world, turn, opts.context);
     if (verdict.proposal && verdict.problems.length === 0) {

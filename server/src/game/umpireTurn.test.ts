@@ -455,22 +455,57 @@ describe('the adjudicate pipeline: checks, one resend, clamp or fall back', () =
 
   it('falls back to the engine, not dropping the orders, when checking a reply throws', async () => {
     const { state, input } = firstTurn();
-    const boom = new ScriptedModel({
-      adjudicate: () =>
-        new Proxy(
+    // The call answers; reading its reply in the checks throws.
+    const boom: UmpireClient = {
+      call: async (r) => ({
+        output: new Proxy(
           {},
           {
             get: () => {
               throw new Error('odd reply');
             },
           },
-        ),
-    });
+        ) as never,
+        record: {
+          stage: r.stage,
+          model: 'm',
+          promptVersion: r.promptVersion,
+          system: r.system,
+          input: r.input,
+          rawOutput: '{}',
+          usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+          costUsd: 0,
+          attempts: 1,
+        },
+      }),
+    };
     const r = await resolver(boom).resolve(state, input);
     const engine = await new EngineTurnResolver(registry).resolve(state, input);
     expect(r.adjudicator).toBe('engine');
     expect(r.output).toEqual(engine.output);
     expect(r.fallback!.error).toMatch(/fell back to the engine: odd reply/);
+  });
+
+  it('keeps a usable first reply when the turn runs out of time during the resend', async () => {
+    const { state, input } = firstTurn();
+    let call = 0;
+    const model = editing((p) => ({
+      ...p,
+      units: p.units.map((u) => (u.unitId === 'red-1' ? { ...u, strength: 99_999 } : u)),
+    }));
+    const hangsOnResend: UmpireClient = {
+      call: (req) => (++call === 2 ? new Promise(() => {}) : model.call(req)),
+    };
+    const r = await new UmpireTurnResolver({
+      registry,
+      client: hangsOnResend,
+      dial: 'standard',
+      turnTimeoutMs: 50,
+    }).resolve(state, input);
+    expect(call).toBe(2);
+    expect(r.adjudicator).toBe('umpire');
+    expect(r.fallback).toBeUndefined();
+    expect((r.output as UmpireTurnOutput).resent!.some((p) => p.includes('red-1'))).toBe(true);
   });
 
   it('asks for the stage’s reply tokens on every request', async () => {
