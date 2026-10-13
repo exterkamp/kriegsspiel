@@ -183,6 +183,7 @@ describe('main menu', () => {
       ['Map editor', '/map-authoring'],
       ['Map benchmark', '/map-benchmark'],
       ['Table benchmark', '/table-benchmark'],
+      ['Board spike', '/spike/board'],
       ['Style guide', '/style-guide'],
       ['Admin view', '/admin/'],
     ]);

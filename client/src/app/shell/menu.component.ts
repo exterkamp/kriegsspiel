@@ -29,6 +29,11 @@ const DEV_TOOLS = [
     about: 'Time the 3D table scene on this device.',
   },
   {
+    href: '/spike/board',
+    name: 'Board spike',
+    about: 'Try board and order ideas on a local fixture battle.',
+  },
+  {
     href: '/style-guide',
     name: 'Style guide',
     about: 'Tokens and every shared control in each state.',

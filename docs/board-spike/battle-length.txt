@@ -1,0 +1,31 @@
+200 seeds; minutes from a unit's first exchange, p10/p50/p90; a '-' is never within 3 h
+
+current
+  case                          losses       wavering     broken       breaks  melee
+  firefight 150 m, morale 80    6/8/12       58/86/118    148/168/178  132     0%
+  red attacks from 400 m        12/14/18     136/156/172  -/-/-        0       0%
+  Hold the Bridge, all attack   0/6/16       0/6/66       2/6/22       400     6%
+
+cap 8
+  case                          losses       wavering     broken       breaks  melee
+  firefight 150 m, morale 80    6/8/12       58/86/118    148/168/178  132     0%
+  red attacks from 400 m        12/14/18     136/156/172  -/-/-        0       0%
+  Hold the Bridge, all attack   0/8/14       8/18/64      10/20/84     401     1%
+
+cap 6, long range 0.5
+  case                          losses       wavering     broken       breaks  melee
+  firefight 150 m, morale 80    4/6/8        18/38/68     82/108/128   203     0%
+  red attacks from 400 m        4/6/10       38/66/96     126/146/166  206     0%
+file:///tmp/ks-battle-2BrNnW/combat.js:804
+                    targetStrength: after.strength,
+                                          ^
+
+TypeError: Cannot read properties of undefined (reading 'strength')
+    at file:///tmp/ks-battle-2BrNnW/combat.js:804:43
+    at Module.advanceTo (file:///tmp/ks-battle-2BrNnW/advance.js:24:42)
+    at stages (file:///home/shane/code/kriegsspiel/.claude/worktrees/fix-443/tools/board-spike/battle-length.mjs:122:25)
+    at file:///home/shane/code/kriegsspiel/.claude/worktrees/fix-443/tools/board-spike/battle-length.mjs:163:58
+    at Function.from (<anonymous>)
+    at file:///home/shane/code/kriegsspiel/.claude/worktrees/fix-443/tools/board-spike/battle-length.mjs:163:24
+
+Node.js v22.23.3
