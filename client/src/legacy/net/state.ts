@@ -262,8 +262,19 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
         },
       };
     case 'turnState': {
-      const { v: _v, kind: _kind, ...turn } = m;
-      return { ...s, turn };
+      const { turn, startsAt, endsAt, sent, deadline, resolving, held } = m;
+      return {
+        ...s,
+        turn: {
+          turn,
+          startsAt,
+          endsAt,
+          sent,
+          ...(deadline === undefined ? {} : { deadline }),
+          resolving,
+          held,
+        },
+      };
     }
     case 'pauseResult': {
       const message = pauseResultText(m);

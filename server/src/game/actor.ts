@@ -512,7 +512,8 @@ export class GameActor {
       if (this.turns && !this.openTurn) await this.openNextTurn();
       this.reschedule();
       // A reopened game whose sides had all sent before the stop resolves that turn now.
-      if (this.turnReady()) void this.enqueue(() => this.closeTurn('all-sent')).catch(() => undefined);
+      if (this.turnReady())
+        void this.enqueue(() => this.closeTurn('all-sent')).catch(() => undefined);
     });
   }
 

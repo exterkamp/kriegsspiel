@@ -204,10 +204,7 @@ export class GameHost {
       agents: this.agentsFor(id, world),
       ...(turns ? { turns } : { pause: this.options.pause?.(id, world) }),
       persona: settings?.persona,
-      clock: new GameClock(
-        this.options.wallNow,
-        turns ? { mode: 'manual' } : { rate: clock.rate },
-      ),
+      clock: new GameClock(this.options.wallNow, turns ? { mode: 'manual' } : { rate: clock.rate }),
     });
     this.games.set(id, actor);
     await actor.start();
@@ -255,8 +252,7 @@ export class GameHost {
       gameMs: state.time,
       rate,
       mode: turnOptions ? 'manual' : mode,
-      status:
-        snap.clock.status === 'stopped' ? 'stopped' : turnOptions ? 'running' : 'paused',
+      status: snap.clock.status === 'stopped' ? 'stopped' : turnOptions ? 'running' : 'paused',
     });
     // The conference is not in a snapshot, so it comes from the whole log.
     const log = await store.inputLog(id);
