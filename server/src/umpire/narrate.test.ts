@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MS_PER_MINUTE } from '@kriegsspiel/engine';
+import { LOW_AMMO, MS_PER_MINUTE } from '@kriegsspiel/engine';
 import type { ViewReport, ViewUnit } from '@kriegsspiel/engine';
 import { MockUmpireClient } from './mockUmpireClient.js';
 import type { UmpireFixture } from './mockUmpireClient.js';
@@ -108,6 +108,13 @@ describe('narrate input: the sender (#390)', () => {
     );
     expect(unitCondition({ morale: 50, fatigue: 50, ammo: 40 })).toBe(
       'shaken, tiring, ammunition running low',
+    );
+    // A unit that has just filed its lowAmmo report reads as nearly gone.
+    expect(unitCondition({ morale: 90, fatigue: 10, ammo: LOW_AMMO })).toBe(
+      'steady, fresh, ammunition nearly gone',
+    );
+    expect(unitCondition({ morale: 90, fatigue: 10, ammo: LOW_AMMO + 1 })).toBe(
+      'steady, fresh, ammunition running low',
     );
   });
 

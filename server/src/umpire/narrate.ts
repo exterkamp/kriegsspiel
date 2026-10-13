@@ -97,14 +97,15 @@ export function unitCondition(u: Pick<ViewUnit, 'morale' | 'fatigue' | 'ammo'>):
   return `${morale}, ${fatigue}, ${ammo}`;
 }
 
+/** Report kinds the named unit did not write (it is destroyed, or never had the orders): HQ writes them. */
+const STAFF_KINDS: ReadonlySet<ViewReport['kind']> = new Set(['unitLost', 'courierLost']);
+
 /**
  * What the model sees for one report. Metres and minutes, no ids of anything the side cannot know.
  * `ownUnits` (the side's own, from its view) gives the sender's commander, manner and condition,
  * so the note can carry his voice and judgement; a sender not among them gets none. Nor do the
  * kinds the unit did not write (`STAFF_KINDS`): HQ writes those.
  */
-const STAFF_KINDS: ReadonlySet<ViewReport['kind']> = new Set(['unitLost', 'courierLost']);
-
 export function narrateInput(
   side: SideId,
   reports: readonly ViewReport[],
