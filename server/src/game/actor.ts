@@ -208,6 +208,8 @@ export class GameActor {
   private snapshotSeq: number;
   /** How many clock history entries the store already has. */
   private historySaved = 0;
+  /** The outcome is written once; later persists skip it. */
+  private outcomeSaved = false;
   /** Pending LLM dependencies: the game time each is needed and how to answer its caller. */
   private readonly dependencies = new Map<number, Dependency>();
   private nextDependency = 1;
@@ -789,7 +791,10 @@ export class GameActor {
     await this.flushAgentLog();
     await this.store.saveProgress(this.id, this.engine.time);
     const outcome = this.engine.world.outcome;
-    if (outcome) await this.store.saveOutcome(this.id, outcome.winner);
+    if (outcome && !this.outcomeSaved) {
+      await this.store.saveOutcome(this.id, outcome.winner);
+      this.outcomeSaved = true;
+    }
     await this.store.saveHeartbeat(this.id, this.wallNow());
     const history = this.clock.history();
     if (history.length > this.historySaved) {

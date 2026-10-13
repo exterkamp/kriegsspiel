@@ -237,7 +237,7 @@ export class MemoryGameStore implements GameStore {
     return {
       known: true,
       gameMs: this.progress.get(gameId) ?? 0,
-      ...(log.length > 0 ? { lastPlayedMs: Math.max(...log.map((e) => e.wallMs)) } : {}),
+      ...(log.length > 0 ? { lastPlayedMs: log.reduce((m, e) => Math.max(m, e.wallMs), 0) } : {}),
       finished,
       ...(finished ? { winner: this.outcomes.get(gameId) ?? null } : {}),
     };

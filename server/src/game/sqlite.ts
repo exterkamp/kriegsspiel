@@ -84,8 +84,7 @@ export const MIGRATIONS: readonly string[] = [
   `ALTER TABLE games ADD COLUMN last_played_ms REAL;
    ALTER TABLE games ADD COLUMN finished INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE games ADD COLUMN winner TEXT;
-   ALTER TABLE games ADD COLUMN summarized INTEGER NOT NULL DEFAULT 0;
-   UPDATE games SET summarized = 0;`,
+   ALTER TABLE games ADD COLUMN summarized INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 /** Older snapshots kept besides the newest (not yet used as a fallback: recovery reads the newest). */
