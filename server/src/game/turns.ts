@@ -10,7 +10,9 @@
  * cannot differ. Only after that does the actor advance the clock to the turn's end.
  *
  * The engine adjudicator (`engine`, 11.4, `engineTurn.ts`) resolves a turn by the rigid rules
- * with no model; `GameHost` uses its resolver unless told otherwise. 11.6 (#402) adds the umpire's.
+ * with no model; `GameHost` uses its resolver unless told otherwise. The umpire adjudicator
+ * (`umpire`, 11.6, `umpireTurn.ts`) applies a turn the `adjudicate` stage decided; the app gives
+ * `standard` and `free` games its resolver when a capable model is configured.
  * `none` logs the sent orders without carrying them out (units go on with their last orders).
  */
 import {
@@ -22,6 +24,7 @@ import {
 import { MAX_TURN_ORDERS, type TurnCause, type TurnOrder } from '@kriegsspiel/protocol';
 import type { UmpireCallRecord } from '../umpire/umpireClient.js';
 import { ENGINE_ADJUDICATOR, engineAdjudicator } from './engineTurn.js';
+import { UMPIRE_ADJUDICATOR, umpireAdjudicator } from './umpireTurn.js';
 import type { InputLogEntry, SentTurnOrder, TurnRecord } from './store.js';
 
 /** What a resolver is given when a turn closes. */
@@ -100,6 +103,7 @@ export const NO_ADJUDICATOR = 'none';
 const adjudicators = new Map<string, TurnAdjudicator>([
   [NO_ADJUDICATOR, (state) => state],
   [ENGINE_ADJUDICATOR, engineAdjudicator],
+  [UMPIRE_ADJUDICATOR, umpireAdjudicator],
 ]);
 
 /** Make an adjudicator known to live play and replay by the name a resolver logs. */

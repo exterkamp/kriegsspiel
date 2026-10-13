@@ -70,8 +70,9 @@ export function createUmpireClient(opts: CreateUmpireClientOptions): UmpireClien
     const local = UMPIRE_STAGES.filter((s) => config.stages[s].provider !== fb);
     // The limiter guards the local model only: fallback answers and `test`-routed stages are instant and must
     // never queue behind a slow model call.
-    client = new FallbackUmpireClient({
-      primary: limit(primary),
+    const limited = limit(primary);
+    const withFallback = new FallbackUmpireClient({
+      primary: limited,
       fallback: new ProviderUmpireClient({
         providers: { [fb]: fbProvider },
         config: { ...config, stages: fbStages, maxAttempts: 1 },
@@ -81,6 +82,15 @@ export function createUmpireClient(opts: CreateUmpireClientOptions): UmpireClien
       routeFor: (stage) => config.stages[stage],
       ...(opts.onFallback ? { onFallback: opts.onFallback } : {}),
     });
+    // A turn the model cannot decide falls back to the engine (D39), not to a canned answer that
+    // would be logged as the umpire's; nor does its failure send the local stages into cooldown.
+    const direct = config.stages.adjudicate.provider !== fb;
+    client = {
+      call: (request) =>
+        direct && request.stage === 'adjudicate'
+          ? limited.call(request)
+          : withFallback.call(request),
+    };
   } else {
     client = limit(primary);
   }

@@ -37,6 +37,10 @@ import { hiddenTerms } from './leakGuard.js';
 import { narrateReports } from './narrate.js';
 import { StaffRoster, answerStaffQuestion, runStaff } from './staff.js';
 import type { UmpireClient } from './umpireClient.js';
+import { createRegistry, startingState } from '../game/registry.js';
+import { applyTurn, type TurnInput } from '../game/turns.js';
+import { UmpireTurnResolver } from '../game/umpireTurn.js';
+import { testReply } from './providers/test.js';
 
 const SIDES: SideId[] = ['blue', 'red'];
 const MIN = 60_000;
@@ -354,4 +358,125 @@ describe('the interpret task (#45)', () => {
       expect(describeLeaks(probe.findLeaks(SECRETS, { outputs: false, retries: false }))).toBe('');
     },
   );
+});
+
+/**
+ * The turn umpire (`adjudicate`, 11.6) sees master state by design (it is the umpire), so the
+ * per-side prompt probe does not apply to it. What must hold is that nothing it writes reaches a
+ * side except through the engine: after its turn each side's view carries no canary of the other.
+ */
+describe('the turn umpire delivers a side nothing but its own view (adjudicate, 11.6)', () => {
+  const planted = plantCanaries();
+  const registry = createRegistry();
+  const state = startingState(createState(planted.world.seed, planted.world, 0));
+  const input: TurnInput = {
+    gameId: 'leak',
+    n: 1,
+    startMs: 0,
+    endMs: 20 * MIN,
+    cause: 'all-sent',
+    orders: [
+      { orderId: 'b1', side: 'blue', to: 'blue-1', text: ADVERSARIAL_ORDERS[0]! },
+      { orderId: 'r1', side: 'red', to: 'red-1', text: ADVERSARIAL_ORDERS[1]! },
+    ],
+    sent: ['blue', 'red'],
+  };
+  const everyName = planted.world.units.map(
+    (u) => `${u.name} under ${u.commander}, ${u.strength} men`,
+  );
+  /** The canned answer, with every canary of both sides in the summary and, if asked, the accounts. */
+  const leaking = (accounts: boolean) =>
+    new ScriptedModel({
+      adjudicate: (req) => {
+        const p = testReply(req.schema as Record<string, unknown>, req.input as never) as {
+          units: { account: string }[];
+          observations: unknown[];
+          summary: string;
+        };
+        return {
+          ...p,
+          summary: everyName.join('; ').slice(0, 2000),
+          units: p.units.map((u) =>
+            accounts ? { ...u, account: everyName.join('; ').slice(0, 600) } : u,
+          ),
+          // Every unit claims to have seen every enemy at both ends.
+          observations: planted.world.units.flatMap((by) =>
+            planted.world.units
+              .filter((t) => t.side !== by.side)
+              .flatMap((t) =>
+                (['start', 'end'] as const).map((when) => ({
+                  side: by.side,
+                  by: by.id,
+                  unitId: t.id,
+                  when,
+                })),
+              ),
+          ),
+        };
+      },
+    });
+
+  const after = async (client: UmpireClient) => {
+    const r = await new UmpireTurnResolver({ registry, client, dial: 'standard' }).resolve(
+      state,
+      input,
+    );
+    const turn = {
+      n: 1,
+      startMs: 0,
+      endMs: input.endMs,
+      cause: input.cause,
+      orders: [...input.orders],
+      sent: [...input.sent],
+      adjudicator: r.adjudicator,
+      output: r.output,
+    };
+    const end = advanceTo(
+      applyTurn(state, turn, { gameId: 'leak', registry }),
+      input.endMs,
+      registry,
+    );
+    return { r, world: end.state.world };
+  };
+
+  it.each([
+    [
+      'the canned umpire',
+      () =>
+        createUmpireClient({ config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }), env: {} }),
+    ],
+    ['an umpire whose summary names every unit', () => leaking(false)],
+    ['an umpire whose accounts name every unit', () => leaking(true)],
+  ] as const)('%s: no canary of the other side in either view', async (_label, client) => {
+    const { r, world } = await after(client());
+    for (const side of SIDES) {
+      const leaks = scan(
+        JSON.stringify(viewFor(world, side, input.endMs)),
+        planted.secrets,
+        side,
+        `${side} view`,
+      );
+      expect(describeLeaks(leaks)).toBe('');
+    }
+    // The commanders' accounts are in their own voice: naming the enemy fails the gate, and the
+    // engine resolves the turn instead.
+    if (_label.includes('accounts')) expect(r.adjudicator).toBe('engine');
+  });
+
+  it('keeps only the sightings the engine’s sight test allows', async () => {
+    const claimed = await after(leaking(false));
+    const canned = await after(
+      createUmpireClient({ config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }), env: {} }),
+    );
+    expect(claimed.r.adjudicator).toBe('umpire');
+    // Every impossible sighting is dropped (and recorded as a ruling); what each side learns is
+    // what the engine's own sight test gave the canned umpire.
+    const dropped = claimed.world.rulings.filter(
+      (x) => 'kind' in x && x.kind === 'turn' && 'field' in x && x.field === 'observation',
+    );
+    expect(dropped.length).toBeGreaterThan(0);
+    for (const side of SIDES) {
+      expect(claimed.world.intel[side]).toEqual(canned.world.intel[side]);
+    }
+  });
 });

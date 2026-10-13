@@ -9,7 +9,8 @@ import { umpireConfigFromEnv } from './config.js';
 import { createUmpireClient } from './createUmpireClient.js';
 import { NARRATE_SCHEMA, checkNarration, narrateInput, narrateReports } from './narrate.js';
 import { StaffRoster, checkStaffOutput, runStaff, staffInput, staffOfficer } from './staff.js';
-import { TestProvider } from './providers/test.js';
+import { TestProvider, testReply } from './providers/test.js';
+import { ADJUDICATE_SCHEMA } from './adjudicate.js';
 import { defaultProviderRegistry } from './providers/index.js';
 import type { UmpireCallRecord } from './umpireClient.js';
 import { TraceStore, traceUmpire } from '../debug/index.js';
@@ -526,5 +527,62 @@ describe('test provider: admin trace', () => {
       .map((e) => (e.data as { mode: string }).mode);
     expect(modes).toEqual(['test', 'live']);
     await trace.close();
+  });
+});
+
+describe('test provider: adjudicate (D39, 11.6)', () => {
+  it('answers with the projection as the proposal: arrived orders carried out, the rest not arrived', () => {
+    const input = {
+      turn: 2,
+      units: [{ id: 'blue-1', name: '1st Battalion' }],
+      orders: [
+        { orderId: 'blue-o1', to: 'blue-1', status: 'arrived' },
+        { orderId: 'blue-o2', to: 'blue-1', status: 'on-the-road' },
+      ],
+      projection: {
+        units: [
+          {
+            unitId: 'blue-1',
+            x: 10,
+            y: 20,
+            facingDeg: 90,
+            formation: 'line',
+            strength: 500,
+            morale: 70,
+            fatigue: 10,
+            ammo: 90,
+            status: 'active',
+            continuing: { kind: 'hold' },
+            at: 'the bridge',
+          },
+        ],
+        observations: [{ side: 'blue', by: 'blue-1', unitId: 'red-1', when: 'end' }],
+      },
+    };
+    expect(testReply(ADJUDICATE_SCHEMA as Record<string, unknown>, input)).toEqual({
+      turn: 2,
+      units: [
+        {
+          unitId: 'blue-1',
+          x: 10,
+          y: 20,
+          facingDeg: 90,
+          formation: 'line',
+          strength: 500,
+          morale: 70,
+          fatigue: 10,
+          ammo: 90,
+          status: 'active',
+          continuing: { kind: 'hold' },
+          orders: [
+            { orderId: 'blue-o1', result: 'carried-out' },
+            { orderId: 'blue-o2', result: 'not-arrived' },
+          ],
+          account: 'The 1st Battalion acted as the staff tables direct.',
+        },
+      ],
+      observations: [{ side: 'blue', by: 'blue-1', unitId: 'red-1', when: 'end' }],
+      summary: 'The turn was resolved by the tables.',
+    });
   });
 });

@@ -4,6 +4,9 @@ import { MemoryGameStore } from '../game/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { buildApp, type App } from './app.js';
 import { MAX_TURN_COMMANDS_PER_MINUTE } from './hub.js';
+import { umpireConfigFromEnv } from '../umpire/config.js';
+import { createUmpireClient } from '../umpire/createUmpireClient.js';
+import type { UmpireClient, UmpireRequest } from '../umpire/umpireClient.js';
 
 const v = PROTOCOL_VERSION;
 const RATE = 3600;
@@ -89,9 +92,16 @@ interface Table {
 }
 
 /** A started turn-mode game: blue's commander, chief of staff and intelligence officer, and red's player. */
-async function startedTable(): Promise<Table> {
+async function startedTable(
+  opts: { adjudicator?: () => UmpireClient; dial?: string } = {},
+): Promise<Table> {
   store = new MemoryGameStore();
-  app = await buildApp({ parser: new StubOrderParser(), store, auth: { mailer } });
+  app = await buildApp({
+    parser: new StubOrderParser(),
+    store,
+    auth: { mailer },
+    ...(opts.adjudicator ? { adjudicator: opts.adjudicator } : {}),
+  });
   const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
   const [lead, red, cos, intel] = await Promise.all(
     ['lead', 'red', 'cos', 'intel'].map((n) => signIn(base, `${n}@example.test`)),
@@ -104,10 +114,16 @@ async function startedTable(): Promise<Table> {
       sessionType: 'team_vs_team',
       side: 'blue',
       mode: 'turns',
+      ...(opts.dial ? { dial: opts.dial } : {}),
     }),
   );
   const { id, umpire } = (await created.json()) as { id: string; umpire: unknown };
-  expect(umpire).toEqual({ dial: 'standard', persona: 'dry', mode: 'turns', turnMinutes: 20 });
+  expect(umpire).toEqual({
+    dial: opts.dial ?? 'standard',
+    persona: 'dry',
+    mode: 'turns',
+    turnMinutes: 20,
+  });
   const j = (cookie: string, body: unknown) =>
     fetch(`${base}/games/${id}/join`, post(cookie, body));
   expect((await j(red!, { side: 'red' })).status).toBe(200);
@@ -304,6 +320,72 @@ describe('turn mode over the socket', () => {
       from: "The umpire's ruling",
       receivedAtGame: end.atGame,
     });
+    app!.hub.closeAll();
+  });
+});
+
+describe('the turn umpire in the app (D39, 11.6)', () => {
+  /** The canned umpire, keeping every request it was sent. */
+  const counting = () => {
+    const requests: UmpireRequest[] = [];
+    const inner = createUmpireClient({
+      config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }),
+      env: {},
+    });
+    const client: UmpireClient = {
+      call: (r) => {
+        requests.push(r);
+        return inner.call(r);
+      },
+    };
+    return { requests, client };
+  };
+
+  const playOneTurn = async (t: Table) => {
+    const lead = await Tap.open(t.url, t.lead);
+    const red = await Tap.open(t.url, t.red);
+    await lead.until(lastTurn);
+    lead.send({
+      kind: 'holdTurnOrder',
+      order: { orderId: 'o1', to: 'blue-1', text: 'March to the bridge and hold it' },
+    });
+    await lead.until((m) => (lastTurn(m)?.held.length === 1 ? true : undefined));
+    red.send({ kind: 'sendTurn' });
+    lead.send({ kind: 'sendTurn' });
+    await lead.until((m) => (lastTurn(m)?.turn === 2 ? true : undefined));
+    const log = await store.inputLog(t.id);
+    return { log, lead, red };
+  };
+
+  it('adjudicates a standard turn with the umpire, and sends a side none of its words', async () => {
+    const { requests, client } = counting();
+    const t = await startedTable({ adjudicator: () => client });
+    const { log, red, lead } = await playOneTurn(t);
+    expect(requests.map((r) => r.stage)).toEqual(['adjudicate']);
+    const turn = log.find((e) => e.command.kind === 'resolveTurn')!;
+    expect(turn.turn!.adjudicator).toBe('umpire');
+    expect(turn.calls).toHaveLength(1);
+    // The proposal is master state: its accounts and summary go to no side.
+    for (const tap of [red, lead]) {
+      expect(JSON.stringify(tap.messages)).not.toContain('staff tables');
+      expect(JSON.stringify(tap.messages)).not.toContain('resolved by the tables');
+    }
+    app!.hub.closeAll();
+  });
+
+  it('keeps a rigid turn on the engine: no adjudicate call', async () => {
+    const { requests, client } = counting();
+    const t = await startedTable({ adjudicator: () => client, dial: 'rigid' });
+    const { log } = await playOneTurn(t);
+    expect(requests).toEqual([]);
+    expect(log.find((e) => e.command.kind === 'resolveTurn')!.turn!.adjudicator).toBe('engine');
+    app!.hub.closeAll();
+  });
+
+  it('keeps every turn on the engine with no adjudicator configured (the keyless demo)', async () => {
+    const t = await startedTable();
+    const { log } = await playOneTurn(t);
+    expect(log.find((e) => e.command.kind === 'resolveTurn')!.turn!.adjudicator).toBe('engine');
     app!.hub.closeAll();
   });
 });

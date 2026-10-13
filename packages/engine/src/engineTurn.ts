@@ -125,10 +125,8 @@ export function courierPass(
   turn: Bounds,
   registry: EventRegistry<GameState>,
 ): CourierPass {
-  let s = beginTurn(state, flag(turn, 'umpire'));
-  s = { ...s, world: { ...s.world, couriers: s.world.couriers.map(withoutForced) } };
-  const riding = s.world.couriers.filter((c) => c.lostAt === undefined);
-  for (const o of orders) s = issueOrder(s, o, turn.startMs);
+  const riding = state.world.couriers.filter((c) => c.lostAt === undefined).map(withoutForced);
+  const s = heldTurnStart(state, orders, turn);
   // The new couriers set out at `T0` (their loss and garbling are rolled then) and the turn rides.
   const recording = new SetOutRegistry(registry);
   const end = advanceTo(s, turn.endMs, recording);
@@ -182,6 +180,23 @@ export function courierPass(
   for (const c of riding) describe(c.order, c);
   for (const o of orders) describe(o, recording.setOut.get(o.id)?.courier);
   return { couriers, rng: end.state.rng, forced };
+}
+
+/**
+ * The world at the start of a held (umpire) turn: the turn flag set as held, any earlier forcing
+ * cleared, and the turn's new orders issued at `T0`. Advanced to `T1`, the couriers ride and roll
+ * and the units stand still. The courier pass runs it on a copy; an umpire turn's apply step runs
+ * it on the real world (11.6), so both roll the same rides. Pure.
+ */
+export function heldTurnStart(
+  state: EngineState<GameState>,
+  orders: readonly Order[],
+  turn: Bounds,
+): EngineState<GameState> {
+  let s = beginTurn(state, flag(turn, 'umpire'));
+  s = { ...s, world: { ...s.world, couriers: s.world.couriers.map(withoutForced) } };
+  for (const o of orders) s = issueOrder(s, o, turn.startMs);
+  return s;
 }
 
 /**

@@ -61,6 +61,7 @@ import {
   loadScenarioById,
   scenarioList,
   startingState,
+  UmpireTurnResolver,
   type GameStore,
   type Timers,
 } from '../game/index.js';
@@ -203,6 +204,12 @@ export interface AppOptions {
   narrator?: GameHostOptions['narrator'];
   /** The umpire that writes the post-game critique, per game. Unset: the critique is the log's own wording. */
   critic?: GameHostOptions['narrator'];
+  /**
+   * The umpire that adjudicates a turn-mode game's turns at the `standard` and `free` dials (D39,
+   * 11.6), per game. Unset, or undefined for a game: every turn is the engine's, as at `rigid`.
+   * `main.ts` sets it only when a capable model serves the `adjudicate` stage.
+   */
+  adjudicator?: GameHostOptions['narrator'];
   /** Directory of the built client to serve at `/`. Unset: API only (dev uses the Vite server). */
   staticDir?: string;
   /**
@@ -420,10 +427,11 @@ export async function buildApp(options: AppOptions): Promise<App> {
         ];
   /** A role changed hands in a running game: its voters follow (D6e). */
   const syncVoters = (rec: LobbyGame): void => host.get(rec.id)?.setVoters(votersOf(rec));
+  const registry = createRegistry();
   const host: GameHost = new GameHost({
     store,
     parser: options.parser,
-    registry: createRegistry(),
+    registry,
     wallNow: options.wallNow ?? Date.now,
     timers: options.timers,
     init: startingState,
@@ -437,6 +445,22 @@ export async function buildApp(options: AppOptions): Promise<App> {
       options.scriptedOpponents === true && recordOf(id)?.sessionType === 'co_op_vs_ai',
     aiAgents: options.aiAgents,
     narrator: options.narrator,
+    // The dial picks the adjudicator (D39): `rigid` is the engine alone, `standard` and `free` the umpire.
+    turnResolver: (id, settings) => {
+      if (settings.dial === 'rigid') return undefined;
+      const client = options.adjudicator?.(id);
+      if (!client) return undefined;
+      return new UmpireTurnResolver({
+        registry,
+        client,
+        dial: settings.dial,
+        persona: settings.persona,
+        onFallback: (turn, reason) => {
+          server.log.warn({ gameId: id, turn, reason }, 'turn umpire fallback');
+          if (trace?.enabled) trace.record(id, 'error', { source: 'adjudicate', turn, reason });
+        },
+      });
+    },
     deputyAway: (id, side, seat) => hub.isAway(id, side as SideId, seat),
     trace,
     onUpdate: (id) => {
