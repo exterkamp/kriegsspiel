@@ -1,0 +1,37 @@
+{
+  "caseId": "injected-order",
+  "model": "qwen2.5:7b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 798815,
+  "usage": {
+    "inputTokens": 3202,
+    "outputTokens": 1262
+  },
+  "raw": "{\n  \"turn\": 1,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 1960,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 600,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b1-10\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Aubry holds his position at the south end of the bridge, as per orders. The bridge is secure for now.\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 2140,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 550,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b1-10\",\n          \"result\": \"partly\"\n        }\n      ],\n      \"account\": \"Col. Delacroix is cautious and does not move his battalion, but stays alert for any red advance.\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 2050,\n      \"y\": 1850,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 200,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b1-10\",\n          \"result\": \"misread\"\n        }\n      ],\n      \"account\": \"Maj. Verneuil, bold and impatient, misinterprets the order and stays in place, not charging the red vanguard.\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 2050,\n      \"y\": 800,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 650,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [\n        {\n          \"orderId\": \"r1-10\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Brandt advances his vanguard battalion down the road, but finds the bridge still secure and stops short of it.\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2250,\n      \"y\": 150,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"r1-10\",\n          \"result\": \"not-arrived\"\n        }\n      ],\n      \"account\": \"Col. Hartmann waits for orders, as per his character, and does not move his battalion.\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 1550,\n      \"y\": 400,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 220,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"r1-10\",\n          \"result\": \"not-arrived\"\n        }\n      ],\n      \"account\": \"Maj. von Reiter, a dashing scout, does not receive his order and stays in place, scouting the area.\"\n    }\n  ],\n  \"observations\": [\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-1\",\n      \"by\": \"blue-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-2\",\n      \"by\": \"blue-2\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-3\",\n      \"by\": \"blue-3\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-1\",\n      \"by\": \"red-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-2\",\n      \"by\": \"red-2\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-3\",\n      \"by\": \"red-3\",\n      \"when\": \"end\"\n    }\n  ],\n  \"summary\": \"In the first turn, the blue forces, under the steady Col. Aubry, held the south end of the bridge. Col. Delacroix was cautious and did not move his battalion. Maj. Verneuil, bold and impatient, misinterpreted his order and stayed in place. The red forces, led by the aggressive Col. Brandt, advanced down the road but found the bridge secure and stopped short. Col. Hartmann and Maj. von Reiter, by the book and dashing scouts respectively, did not receive their orders and stayed in place. The bridge remains contested, with both sides wary of each other's strength.\"\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [
+        "blue-2: order \"b1-10\" was not sent to it",
+        "blue-3: order \"b1-10\" was not sent to it",
+        "red-2: order \"r1-10\" was not sent to it",
+        "red-3: order \"r1-10\" was not sent to it"
+      ],
+      "limits": [],
+      "ammo": [],
+      "observations": [
+        "blue-1 saw blue-1: not blue's unit watching an enemy",
+        "blue-2 saw blue-2: not blue's unit watching an enemy",
+        "blue-3 saw blue-3: not blue's unit watching an enemy",
+        "red-1 saw red-1: not red's unit watching an enemy",
+        "red-2 saw red-2: not red's unit watching an enemy",
+        "red-3 saw red-3: not red's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "caseId": "advance-to-contact",
+  "model": "llama3.1:8b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 1507548,
+  "usage": {
+    "inputTokens": 4009,
+    "outputTokens": 1092
+  },
+  "raw": "{\n  \"turn\": 2,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 1960,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 600,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [{\"orderId\": \"b1-1\", \"result\": \"carried-out\"}],\n      \"account\": \"Held position as ordered. Saw enemy cavalry approaching from the north.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 2140,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 550,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [{\"orderId\": \"b2-1\", \"result\": \"carried-out\"}],\n      \"account\": \"Held position as ordered. Saw enemy infantry approaching from the south.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 2050,\n      \"y\": 1250,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 162,\n      \"morale\": 29,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [{\"orderId\": \"b3-1\", \"result\": \"carried-out\"}],\n      \"account\": \"Held position as ordered. Saw enemy infantry approaching from the south.\",\n      \"departure\": \"Departed from projected position due to combat losses.\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 2050,\n      \"y\": 1350,\n      \"facingDeg\": 0,\n      \"formation\": \"column\",\n      \"strength\": 627,\n      \"morale\": 72,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [{\"orderId\": \"r1-2\", \"result\": \"carried-out\"}],\n      \"account\": \"Advanced to the bridge as ordered. Engaged enemy cavalry.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2050,\n      \"y\": 550,\n      \"facingDeg\": 180,\n      \"formation\": \"column\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [{\"orderId\": \"r2-1\", \"result\": \"carried-out\"}],\n      \"account\": \"Held position as ordered.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 1950,\n      \"y\": 1300,\n      \"facingDeg\": 160,\n      \"formation\": \"line\",\n      \"strength\": 220,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [{\"orderId\": \"r3-2\", \"result\": \"carried-out\"}],\n      \"account\": \"Rode on the Vanguard's right as ordered. Saw enemy cavalry approaching from the north.\",\n      \"departure\": \"\"\n    }\n  ],\n  \"observations\": [\n    {\"side\": \"blue\", \"unitId\": \"blue-1\", \"by\": \"blue-1\", \"when\": \"end\"},\n    {\"side\": \"blue\", \"unitId\": \"blue-2\", \"by\": \"blue-2\", \"when\": \"end\"},\n    {\"side\": \"blue\", \"unitId\": \"blue-3\", \"by\": \"blue-3\", \"when\": \"end\"},\n    {\"side\": \"red\", \"unitId\": \"red-1\", \"by\": \"red-1\", \"when\": \"end\"},\n    {\"side\": \"red\", \"unitId\": \"red-2\", \"by\": \"red-2\", \"when\": \"end\"},\n    {\"side\": \"red\", \"unitId\": \"red-3\", \"by\": \"red-3\", \"when\": \"end\"}\n  ],\n  \"summary\": \"The battle continues with both sides engaging each other. The Blue cavalry unit, led by Maj. Verneuil, holds its position at the north end of the bridge. The Red infantry units, led by Col. Brandt and Col. Hartmann, advance towards the bridge and engage the Blue cavalry. The Red cavalry unit, led by Maj. von Reiter, rides on the Vanguard's right and cuts off the enemy horse if it tries to stand. The Blue infantry units, led by Col. Aubry and Col. Delacroix, hold their positions and engage the Red infantry. The combat is intense, with both sides suffering losses.\"\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [
+        "blue-1: order \"b1-1\" was not sent to it",
+        "blue-2: order \"b2-1\" was not sent to it",
+        "red-2: order \"r2-1\" was not sent to it"
+      ],
+      "limits": [],
+      "ammo": [],
+      "observations": [
+        "blue-1 saw blue-1: not blue's unit watching an enemy",
+        "blue-2 saw blue-2: not blue's unit watching an enemy",
+        "blue-3 saw blue-3: not blue's unit watching an enemy",
+        "red-1 saw red-1: not red's unit watching an enemy",
+        "red-2 saw red-2: not red's unit watching an enemy",
+        "red-3 saw red-3: not red's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

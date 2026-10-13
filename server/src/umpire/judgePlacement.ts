@@ -76,7 +76,7 @@ const m = (millimetres: number) => Math.round(metres(millimetres) * 1000) / 1000
 const inMetres = (p: Point) => ({ x: m(p.x), y: m(p.y) });
 const deg = (rad: number) => Math.round(((rad * 180) / Math.PI) * 10) / 10;
 
-function featureInput(f: TerrainFeature) {
+export function featureInput(f: TerrainFeature) {
   const g = f.geometry;
   const geometry =
     g.shape === 'polygon'

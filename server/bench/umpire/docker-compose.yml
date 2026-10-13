@@ -1,0 +1,19 @@
+# A throwaway Ollama for the umpire benchmark (#398), separate from the demo's `kriegsspiel-ollama-1`:
+# its own compose project, volume and port. Run it, bench, then remove it with its volume:
+#   docker compose -p ks-umpire-bench -f server/bench/umpire/docker-compose.yml up -d
+#   docker compose -p ks-umpire-bench -f server/bench/umpire/docker-compose.yml down -v
+services:
+  ollama:
+    image: ollama/ollama:0.40.3
+    # The default bridge: this host has no free address pool for a new compose network.
+    network_mode: bridge
+    ports:
+      - '127.0.0.1:11435:11434'
+    environment:
+      OLLAMA_KEEP_ALIVE: 30m
+      OLLAMA_NUM_PARALLEL: '1'
+      OLLAMA_MAX_LOADED_MODELS: '1'
+    volumes:
+      - bench-models:/root/.ollama
+volumes:
+  bench-models:

@@ -1,0 +1,28 @@
+{
+  "caseId": "advance-to-contact",
+  "model": "gemma4:e4b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 1946882,
+  "usage": {
+    "inputTokens": 4289,
+    "outputTokens": 3597
+  },
+  "raw": "{\n  \"turn\": 2,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 1960,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 600,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"The battalion maintained its position, holding the line as ordered. The enemy's advance was not yet a direct threat to our position.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 2140,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 550,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"The battalion remained in reserve, maintaining its defensive posture. The commander was cautious, waiting for the main thrust of the enemy to materialize before committing.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 2050,\n      \"y\": 1250,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 162,\n      \"morale\": 32,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"b3-1\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Following the order, the squadron held its position near the bridge, acting as a picket. When the enemy column advanced, the squadron engaged, suffering heavy losses in the skirmish.\",\n      \"departure\": \"The unit engaged in combat, resulting in significant morale and strength losses, consistent with the projection.\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 2050,\n      \"y\": 1150,\n      \"facingDeg\": 0,\n      \"formation\": \"column\",\n      \"strength\": 627,\n      \"morale\": 72,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"move\",\n        \"x\": 2050,\n        \"y\": 1150\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"r1-2\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"The aggressive commander pressed the advance towards the bridge as ordered. The column engaged the enemy cavalry, taking heavy casualties but maintaining momentum.\",\n      \"departure\": \"The unit advanced significantly towards the bridge, engaging the enemy cavalry in combat.\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2050,\n      \"y\": 550,\n      \"facingDeg\": 180,\n      \"formation\": \"column\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"The battalion remained in its assigned position, awaiting further orders from command.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 2150,\n      \"y\": 1100,\n      \"facingDeg\": 160,\n      \"formation\": \"line\",\n      \"strength\": 220,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"move\",\n        \"x\": 2150,\n        \"y\": 1100\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"r3-2\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"The hussars executed the order, riding to the right flank of the vanguard column to screen and cut off any enemy cavalry attempting to exploit the advance.\",\n      \"departure\": \"The unit moved to flank the advancing vanguard, fulfilling the order.\"\n    }\n  ],\n  \"observations\": [\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-1\",\n      \"by\": \"red-3\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-1\",\n      \"by\": \"red-2\",\n      \"when\": \"end\"\n    }\n  ],\n  \"summary\": \"The Red forces initiated a strong advance. The Vanguard Battalion (red-1) moved aggressively towards the bridge, supported by the Hussars (red-3) who took up a flanking position. The Blue cavalry squadron (blue-3), positioned as a picket, met the advancing column. A fierce engagement ensued, with the cavalry suffering heavy losses while attempting to halt the column's momentum. The infantry units (blue-1 and blue-2) held their defensive lines, observing the action at the bridge. The Red Line Battalion (red-2) remained static, awaiting further orders.\"\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [],
+      "limits": [],
+      "ammo": [],
+      "observations": [
+        "red-3 saw red-1: not red's unit watching an enemy",
+        "red-2 saw red-1: not red's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

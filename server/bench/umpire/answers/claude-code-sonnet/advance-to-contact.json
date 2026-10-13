@@ -1,0 +1,27 @@
+{"turn":2,"units":[
+{"unitId":"blue-1","x":1960,"y":1680,"facingDeg":0,"formation":"line","strength":600,"morale":80,"fatigue":0,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[],"account":"Col. Aubry keeps his battalion in line south of the river, facing the bridge, as before. He sees the enemy column come down to the far end of the bridge and the horse fall back through to his rear, and holds his fire since nothing is yet within 200 m."},
+{"unitId":"blue-2","x":2140,"y":1680,"facingDeg":0,"formation":"line","strength":550,"morale":75,"fatigue":0,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[],"account":"Col. Delacroix stays in line beside the 1st Battalion and does not commit his reserve. He watches the enemy halt at the far end of the bridge and waits for them to make the first move."},
+{"unitId":"blue-3","x":2050,"y":1760,"facingDeg":0,"formation":"line","strength":188,"morale":68,"fatigue":15,"ammo":85,"status":"active","continuing":{"kind":"hold"},"orders":[{"orderId":"b3-1","result":"carried-out"}],"account":"Maj. Verneuil held the north end of the bridge as ordered and watched the road. When the enemy column came within carbine range and hussars appeared on its flank, he exchanged a few shots, then, being pressed by infantry as his orders foresaw, drew off over the bridge and re-formed behind the 1st Battalion. He would rather have charged, but obeyed.","departure":"Projection has the squadron stand at 100 m from a formed column and be shot down to 162 men and morale 29. Verneuil's orders say to fall back over the bridge if pressed by infantry, and the fast horse can cross 500 m in a couple of minutes, so he disengages after a brief exchange instead. Position, losses and morale therefore differ."},
+{"unitId":"red-1","x":2050,"y":1400,"facingDeg":180,"formation":"column","strength":638,"morale":78,"fatigue":28,"ammo":85,"status":"active","continuing":{"kind":"hold"},"orders":[{"orderId":"r1-2","result":"carried-out"}],"account":"Col. Brandt marched down the high road at once, brushed the enemy picket of horse off the road with a few volleys so that it fell back over the bridge, and halted his column at the north end of the bridge. He holds there, deploying his front companies, rather than throw the column onto the bridge under the fire of the line beyond.","departure":"Projection puts the column at (2050,1350) with 627 men and 30% ammo after a long fight with the cavalry; here the cavalry withdraws, so the fight is short, losses are 12, ammo is higher, and the column halts at the bridge head (about 50 m from the projection)."},
+{"unitId":"red-2","x":2050,"y":550,"facingDeg":180,"formation":"column","strength":650,"morale":70,"fatigue":7,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[],"account":"Col. Hartmann has no new orders and stays where he was, by the book, with his column on the road."},
+{"unitId":"red-3","x":1960,"y":1380,"facingDeg":180,"formation":"line","strength":220,"morale":85,"fatigue":8,"ammo":100,"status":"active","continuing":{"kind":"hold"},"orders":[{"orderId":"r3-2","result":"carried-out"}],"account":"Maj. von Reiter rode down on the right of the Vanguard as ordered. The enemy horse drew back over the bridge before he could cut it off. He halts on the river bank and does not follow onto the bridge against the infantry beyond."}
+],
+"observations":[
+{"side":"blue","by":"blue-3","unitId":"red-1","when":"start"},
+{"side":"blue","by":"blue-3","unitId":"red-3","when":"start"},
+{"side":"red","by":"red-1","unitId":"blue-3","when":"start"},
+{"side":"red","by":"red-3","unitId":"blue-3","when":"start"},
+{"side":"blue","by":"blue-1","unitId":"red-1","when":"end"},
+{"side":"blue","by":"blue-1","unitId":"red-3","when":"end"},
+{"side":"blue","by":"blue-2","unitId":"red-1","when":"end"},
+{"side":"blue","by":"blue-2","unitId":"red-3","when":"end"},
+{"side":"blue","by":"blue-3","unitId":"red-1","when":"end"},
+{"side":"blue","by":"blue-3","unitId":"red-3","when":"end"},
+{"side":"red","by":"red-1","unitId":"blue-1","when":"end"},
+{"side":"red","by":"red-1","unitId":"blue-2","when":"end"},
+{"side":"red","by":"red-1","unitId":"blue-3","when":"end"},
+{"side":"red","by":"red-3","unitId":"blue-1","when":"end"},
+{"side":"red","by":"red-3","unitId":"blue-2","when":"end"},
+{"side":"red","by":"red-3","unitId":"blue-3","when":"end"}
+],
+"summary":"The Red vanguard column came down the high road and met the Blue cavalry picket at the north end of the bridge. After a short exchange of fire the picket, pressed by infantry as its orders foresaw, fell back over the bridge and re-formed behind the 1st Battalion. Red hussars rode on the column's right but could not cut it off. Red-1 halted at the bridge head and Red-3 on the river bank. Blue infantry held their line south of the river, out of range. Losses were light: about 12 Red infantry and about 12 Blue horse. The projection kept the cavalry standing and destroyed it; the umpire let it obey its orders to withdraw."}

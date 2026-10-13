@@ -1,0 +1,37 @@
+{
+  "caseId": "impossible-order",
+  "model": "qwen2.5:7b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 1429884,
+  "usage": {
+    "inputTokens": 4178,
+    "outputTokens": 1290
+  },
+  "raw": "{\n  \"turn\": 1,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 1960,\n      \"y\": 1680,\n      \"facingDeg\": 103,\n      \"formation\": \"line\",\n      \"strength\": 589,\n      \"morale\": 76,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b2-9\",\n          \"result\": \"partly\"\n        }\n      ],\n      \"account\": \"Col. Aubry cautiously moved his battalion to the river, but stopped short of the bridge, waiting for the second battalion to arrive.\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 2050,\n      \"y\": 60,\n      \"facingDeg\": 325,\n      \"formation\": \"line\",\n      \"strength\": 541,\n      \"morale\": 72,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b2-9\",\n          \"result\": \"partly\"\n        }\n      ],\n      \"account\": \"Col. Delacroix's cautious nature led him to march his battalion to the river, but he hesitated to cross without orders.\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 1650,\n      \"y\": 400,\n      \"facingDeg\": 270,\n      \"formation\": \"line\",\n      \"strength\": 200,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [\n        {\n          \"orderId\": \"b2-9\",\n          \"result\": \"not-arrived\"\n        }\n      ],\n      \"account\": \"Maj. Verneuil's aggressive nature made him impatient to move, but he was still holding his position, awaiting further orders.\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 1950,\n      \"y\": 300,\n      \"facingDeg\": 145,\n      \"formation\": \"line\",\n      \"strength\": 647,\n      \"morale\": 79,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"r3-9\",\n          \"result\": \"not-arrived\"\n        }\n      ],\n      \"account\": \"Col. Brandt's aggressive nature drove him to move his battalion towards the river, but he was cautious and did not cross.\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2250,\n      \"y\": 150,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\"kind\": \"hold\"},\n      \"orders\": [\n        {\n          \"orderId\": \"r3-9\",\n          \"result\": \"not-arrived\"\n        }\n      ],\n      \"account\": \"Col. Hartmann's by-the-book nature kept his battalion in position, awaiting further orders.\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 1550,\n      \"y\": 400,\n      \"facingDeg\": 283,\n      \"formation\": \"line\",\n      \"strength\": 0,\n      \"morale\": 0,\n      \"status\": \"destroyed\",\n      \"continuing\": {\"kind\": \"idle\"},\n      \"orders\": [\n        {\n          \"orderId\": \"r3-9\",\n          \"result\": \"partly\"\n        }\n      ],\n      \"account\": \"Maj. von Reiter's dashing nature led him to overextend his squadron, resulting in its destruction.\"\n    }\n  ],\n  \"observations\": [\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-1\",\n      \"by\": \"blue-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-2\",\n      \"by\": \"blue-2\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-3\",\n      \"by\": \"blue-3\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-1\",\n      \"by\": \"red-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-2\",\n      \"by\": \"red-2\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-3\",\n      \"by\": \"red-3\",\n      \"when\": \"end\"\n    }\n  ],\n  \"summary\": \"In the first turn, both sides cautiously moved their units towards the river. The blue side's 1st and 2nd battalions approached the river, while the 3rd cavalry squadron remained in position. The red side's 1st and 2nd battalions also moved cautiously, with the 3rd hussar squadron overextending and being destroyed. Combat broke out, with the blue side inflicting significant casualties on the red side, leading to the destruction of the red 3rd squadron. The red 3rd squadron's morale broke, and it was destroyed. The blue side's 2nd battalion arrived at the river, but the 1st battalion hesitated. The red side's 2nd battalion remained in position, awaiting further orders.\"\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [
+        "blue-1: order \"b2-9\" was not sent to it",
+        "blue-3: order \"b2-9\" was not sent to it",
+        "red-1: order \"r3-9\" was not sent to it",
+        "red-2: order \"r3-9\" was not sent to it"
+      ],
+      "limits": [],
+      "ammo": [],
+      "observations": [
+        "blue-1 saw blue-1: not blue's unit watching an enemy",
+        "blue-2 saw blue-2: not blue's unit watching an enemy",
+        "blue-3 saw blue-3: not blue's unit watching an enemy",
+        "red-1 saw red-1: not red's unit watching an enemy",
+        "red-2 saw red-2: not red's unit watching an enemy",
+        "red-3 saw red-3: not red's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

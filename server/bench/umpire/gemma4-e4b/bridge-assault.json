@@ -1,0 +1,32 @@
+{
+  "caseId": "bridge-assault",
+  "model": "gemma4:e4b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 2141386,
+  "usage": {
+    "inputTokens": 4566,
+    "outputTokens": 3601
+  },
+  "raw": "{\n  \"turn\": 2,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 1980,\n      \"y\": 1660,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 580,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"b1-3\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Aubry, being literal, maintained his position and fired volleys as ordered, holding the line firmly against the advancing enemy. The pressure was intense, but the discipline held.\",\n      \"departure\": \"Sustained heavy casualties from the enemy advance.\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 2120,\n      \"y\": 1660,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 550,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"b2-3\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Delacroix, cautious, held his line beside the 1st Battalion, providing supporting fire on the bridge as instructed. He maintained his defensive posture, unwilling to commit reserves prematurely.\",\n      \"departure\": \"Engaged in heavy fire exchange with the enemy line.\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 2050,\n      \"y\": 1550,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 180,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"Maj. Verneuil, driven by aggressive initiative, ordered his cavalry to charge down towards the main line of battle, aiming to disrupt the enemy's advance and exploit the chaos at the bridge.\",\n      \"departure\": \"The charge was costly, but it successfully engaged the enemy's forward elements.\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 2050,\n      \"y\": 1500,\n      \"facingDeg\": 0,\n      \"formation\": \"column\",\n      \"strength\": 50,\n      \"morale\": 0,\n      \"status\": \"broken\",\n      \"continuing\": {\n        \"kind\": \"idle\"\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"r1-3\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Despite the order to storm the bridge, the unit was already broken and morale was nonexistent. The attempt to charge was a desperate, disorganized rush into the line of fire, resulting in massive losses and immediate rout.\",\n      \"departure\": \"The unit failed to take the bridge and was routed immediately upon contact.\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2250,\n      \"y\": 1500,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"r2-3\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Hartmann, adhering strictly to orders, moved his battalion to the river bank and began firing on the enemy battalions covering the bridge, establishing a strong defensive line.\",\n      \"departure\": \"Engaged in sustained fire with Blue-1 and Blue-2.\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 1700,\n      \"y\": 1200,\n      \"facingDeg\": 180,\n      \"formation\": \"line\",\n      \"strength\": 220,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"Maj. von Reiter maintained his position, recognizing the main thrust was focused on the bridge. He held his line, ready to exploit any weakness in the enemy's flank.\",\n      \"departure\": \"Maintained position, observing the main engagement.\"\n    }\n  ],\n  \"observations\": [\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-1\",\n      \"by\": \"blue-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-2\",\n      \"by\": \"blue-2\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-3\",\n      \"by\": \"blue-3\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-2\",\n      \"by\": \"red-3\",\n      \"when\": \"end\"\n    }\n  ],\n  \"summary\": \"The battle intensified around the bridge. Red-1, despite the aggressive order, was already broken and suffered catastrophic losses attempting a desperate charge across the bridge, failing to take the objective. Red-2 successfully positioned itself along the river bank, establishing a strong firing line against the blue infantry. Blue-1 and Blue-2 held their positions, executing their defensive orders and repelling the initial assault. Blue-3, capitalizing on the initiative, charged down to support the infantry defense, engaging the enemy's forward elements. The blue defense held firm, though casualties were heavy, while the red attack faltered due to the state of Red-1.\",\n  \"rolls\": []\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [],
+      "limits": [
+        "red-2: end position (2250, 1500) fails the march check (a position is on impassable ground)"
+      ],
+      "ammo": [],
+      "observations": [
+        "blue-1 saw blue-1: not blue's unit watching an enemy",
+        "blue-2 saw blue-2: not blue's unit watching an enemy",
+        "blue-3 saw blue-3: not blue's unit watching an enemy",
+        "red-3 saw red-2: not red's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

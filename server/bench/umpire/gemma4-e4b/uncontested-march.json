@@ -1,0 +1,34 @@
+{
+  "caseId": "uncontested-march",
+  "model": "gemma4:e4b",
+  "provider": "ollama",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 2623855,
+  "usage": {
+    "inputTokens": 3135,
+    "outputTokens": 4365
+  },
+  "raw": "{\n  \"turn\": 1,\n  \"units\": [\n    {\n      \"unitId\": \"blue-1\",\n      \"x\": 1960,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 580,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"Col. Aubry maintained the defensive line, holding his position steadfastly. The arrival of the enemy cavalry squadron forced a skirmish, but the battalion held firm against the charge, sustaining minor casualties.\",\n      \"departure\": \"Minor losses sustained due to engagement with Red-3.\"\n    },\n    {\n      \"unitId\": \"blue-2\",\n      \"x\": 2140,\n      \"y\": 1680,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 550,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"Col. Delacroix maintained his defensive posture, remaining cautious and refusing to commit his reserve forces despite the enemy's advance.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"blue-3\",\n      \"x\": 2050,\n      \"y\": 1850,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 200,\n      \"morale\": 85,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"Maj. Verneuil held his position, maintaining observation of the enemy's movements along the high road, awaiting a suitable opportunity to engage.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"red-1\",\n      \"x\": 2050,\n      \"y\": 1900,\n      \"facingDeg\": 180,\n      \"formation\": \"column\",\n      \"strength\": 650,\n      \"morale\": 80,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"r1-1\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Brandt, being aggressive, executed the order immediately. He marched his vanguard down the high road until he halted 400 paces short of the river, establishing a forward position.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"red-2\",\n      \"x\": 2050,\n      \"y\": 2200,\n      \"facingDeg\": 180,\n      \"formation\": \"column\",\n      \"strength\": 650,\n      \"morale\": 70,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [\n        {\n          \"orderId\": \"r2-1\",\n          \"result\": \"carried-out\"\n        }\n      ],\n      \"account\": \"Col. Hartmann, adhering strictly to orders, followed the Vanguard, maintaining the specified distance down the high road. He established a strong position further south.\",\n      \"departure\": \"\"\n    },\n    {\n      \"unitId\": \"red-3\",\n      \"x\": 2050,\n      \"y\": 1500,\n      \"facingDeg\": 0,\n      \"formation\": \"line\",\n      \"strength\": 130,\n      \"morale\": 75,\n      \"status\": \"active\",\n      \"continuing\": {\n        \"kind\": \"hold\"\n      },\n      \"orders\": [],\n      \"account\": \"Maj. von Reiter, driven by his aggressive nature and desire to strike early, moved rapidly towards the center of the enemy line. Upon reaching the vicinity of the objective, he initiated a charge against the nearest infantry battalion, suffering heavy losses in the engagement.\",\n      \"departure\": \"Significant losses sustained during the charge against Blue-1.\"\n    }\n  ],\n  \"observations\": [\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-3\",\n      \"by\": \"red-3\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-1\",\n      \"by\": \"red-3\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"red\",\n      \"unitId\": \"red-2\",\n      \"by\": \"red-3\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-1\",\n      \"by\": \"blue-3\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"blue-2\",\n      \"by\": \"blue-3\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"red-1\",\n      \"by\": \"blue-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"red-2\",\n      \"by\": \"blue-1\",\n      \"when\": \"end\"\n    },\n    {\n      \"side\": \"blue\",\n      \"unitId\": \"red-3\",\n      \"by\": \"blue-1\",\n      \"when\": \"end\"\n    }\n  ],\n  \"summary\": \"The Red forces initiated a rapid advance along the high road. Red-1 (Vanguard) and Red-2 (Line) successfully marched south, establishing strong positions near the objective area. Red-3 (Hussars), driven by aggressive initiative, moved quickly towards the Blue defensive line. Upon arrival, Red-3 engaged Blue-1, initiating a cavalry charge against the infantry. Although the charge inflicted casualties on the Blue battalion, the disciplined defense held the line. The Blue units maintained their defensive positions, observing the Red advance. The Red forces have successfully positioned themselves to threaten the objective, but the Blue line remains intact.\",\n  \"rolls\": []\n}",
+  "checks": {
+    "pass": false,
+    "problems": {
+      "schema": [],
+      "ids": [],
+      "limits": [],
+      "ammo": [],
+      "observations": [
+        "red-3 saw red-3: not red's unit watching an enemy",
+        "red-3 saw red-1: not red's unit watching an enemy",
+        "red-3 saw red-2: not red's unit watching an enemy",
+        "blue-3 saw blue-1: not blue's unit watching an enemy",
+        "blue-3 saw blue-2: not blue's unit watching an enemy"
+      ],
+      "fog": [],
+      "departure": [
+        "red-1: 800 m from the projection, no departure reason",
+        "red-2: 1350 m from the projection, no departure reason"
+      ],
+      "injection": []
+    }
+  }
+}

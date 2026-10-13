@@ -1,0 +1,16 @@
+{
+  "qwen2.5:7b": {
+    "diskGb": 4.7,
+    "memGb": 5.7,
+    "note": "memory from /api/ps; docker stats showed 6.3 GiB for the container while it ran"
+  },
+  "llama3.1:8b": {
+    "diskGb": 4.9,
+    "note": "resident memory not recorded: the Docker daemon crashed during its last case"
+  },
+  "gemma4:e4b": {
+    "diskGb": 6.6,
+    "memGb": 7.6,
+    "note": "memory is the container's use under docker stats while it ran; /api/ps reported 1.9 GB after the last case"
+  }
+}
