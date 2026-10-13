@@ -176,6 +176,16 @@ export function forceBroken(world: GameState, side: SideId): boolean {
   return lostSome && share < BROKEN_FORCE_FRACTION;
 }
 
+/**
+ * When a victory timer (the objective's hold, a declared battle's close) starts counting. In turn
+ * mode it counts from the game minute, as the clock shows it, so a hold or close that completes in
+ * the minute a turn ends at decides that turn, not a turn opened after it (#429). Real-time play
+ * counts from the event itself.
+ */
+function timerFrom(world: GameState, time: number): number {
+  return world.turn ? Math.floor(time / MS_PER_MINUTE) * MS_PER_MINUTE : time;
+}
+
 /** True while only the attacker's active units have their centres on the objective. */
 function attackerHolds(world: GameState): boolean {
   const { attacker, objective } = world.victory;
@@ -194,9 +204,10 @@ function trackHold(world: GameState, time: number): { world: GameState; schedule
     return { world: since === null ? world : { ...world, heldSince: null }, schedule: [] };
   if (since !== null) return { world, schedule: [] };
   const takeMs = world.victory.takeMs ?? DEFAULT_TAKE_MS;
+  const from = timerFrom(world, time);
   return {
-    world: { ...world, heldSince: time },
-    schedule: [{ time: time + takeMs, type: COMBAT_CHECK_EVENT }],
+    world: { ...world, heldSince: from },
+    schedule: [{ time: Math.max(time, from + takeMs), type: COMBAT_CHECK_EVENT }],
   };
 }
 
@@ -214,7 +225,8 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
   if (battle) {
     const loser = world.sides.find((s) => s.id !== battle.winner)!.id;
     const loserOut = out.get(loser);
-    if (out.size === 0 && time < battle.declaredAt + BATTLE_CLOSE_MS) return null;
+    if (out.size === 0 && time < timerFrom(world, battle.declaredAt) + BATTLE_CLOSE_MS)
+      return null;
     return {
       winner: battle.winner,
       reason: battle.reason,
@@ -349,7 +361,12 @@ function declareBattle(
   }
   return {
     world: w,
-    schedule: [{ time: time + BATTLE_CLOSE_MS, type: COMBAT_CHECK_EVENT }],
+    schedule: [
+      {
+        time: Math.max(time, timerFrom(world, time) + BATTLE_CLOSE_MS),
+        type: COMBAT_CHECK_EVENT,
+      },
+    ],
     emit: [
       {
         type: 'umpire.ruling',
