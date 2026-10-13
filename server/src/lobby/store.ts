@@ -8,6 +8,7 @@
  */
 import { DatabaseSync } from 'node:sqlite';
 import type { Role } from '@kriegsspiel/engine';
+import type { UmpireSettings } from '@kriegsspiel/protocol';
 
 export type SessionType = 'team_vs_team' | 'co_op_vs_ai' | 'hot_seat';
 
@@ -54,6 +55,8 @@ export interface LobbyGame {
   rate: number;
   sessionType: SessionType;
   pause?: PauseSettings;
+  /** The rigid-to-free dial and the umpire's persona chosen at creation (3.11). Absent: the defaults. */
+  umpire?: UmpireSettings;
   /** The account that made the game; only they may start it. In hot-seat they play every side. */
   creator: string;
   status: 'lobby' | 'started';

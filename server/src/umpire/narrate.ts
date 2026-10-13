@@ -10,11 +10,13 @@
  */
 import { MS_PER_MINUTE } from '@kriegsspiel/engine';
 import type { SideId, ViewReport } from '@kriegsspiel/engine';
+import type { UmpirePersona } from '@kriegsspiel/protocol';
+import { withPersona } from './persona.js';
 import type { JsonSchema, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
 import { hiddenIn } from './leakGuard.js';
 
-export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v2';
+export const NARRATE_PROMPT_VERSION = 'narrate-dispatches-v3';
 
 export const NARRATE_SYSTEM = `You are the scribe at a Napoleonic army headquarters, turning staff reports into the period dispatches that reach the general's desk. You write in the voice of the officer who sent each report: a cautious subordinate hedges, a veteran scout is terse.
 
@@ -441,6 +443,8 @@ export interface NarrateOptions {
   signal?: AbortSignal;
   /** Names the side must not read (`hiddenTerms`): a dispatch that carries one, in any case or spacing, is rejected. */
   hidden?: readonly string[];
+  /** The umpire's voice (3.11); tone only. Default the dry staff officer. */
+  persona?: UmpirePersona;
 }
 
 const TIMED_OUT = 'timed out';
@@ -535,7 +539,7 @@ export async function narrateReports(
           client.call<NarrateOutput>({
             stage: 'narrate',
             promptVersion: NARRATE_PROMPT_VERSION,
-            system: NARRATE_SYSTEM,
+            system: withPersona(NARRATE_SYSTEM, opts.persona),
             input: retry ? { ...input, rejected: retry } : input,
             schema: NARRATE_SCHEMA,
           }),

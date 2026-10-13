@@ -14,6 +14,7 @@ const mailer = {
 };
 
 let app: App | undefined;
+let store: MemoryGameStore;
 
 afterEach(async () => {
   await app?.server.close();
@@ -24,7 +25,7 @@ afterEach(async () => {
 async function start(scriptedOpponents = false, aiAgents?: BuildOptions['aiAgents']) {
   app = await buildApp({
     parser: new StubOrderParser(),
-    store: new MemoryGameStore(),
+    store: (store = new MemoryGameStore()),
     scriptedOpponents,
     aiAgents,
     auth: { mailer },
@@ -110,6 +111,46 @@ describe('lobby', () => {
     expect(actor.gameClock.rate).toBe(12);
     expect((await fetch(`${base}/games/${game.id}/start`, post(a))).status).toBe(409);
     app!.hub.closeAll();
+  });
+
+  describe('umpire dial and persona', () => {
+    const createHotSeat = (base: string, cookie: string, extra: object) =>
+      fetch(`${base}/games`, post(cookie, { lobby: true, sessionType: 'hot_seat', ...extra }));
+
+    it('carries the chosen dial and persona from the request into the started game', async () => {
+      const base = await start();
+      const a = await signIn(base, 'a@example.test');
+      const created = await createHotSeat(base, a, { dial: 'free', persona: 'dramatic' });
+      expect(created.status).toBe(201);
+      const game = (await created.json()) as { id: string };
+      expect((await fetch(`${base}/games/${game.id}/start`, post(a))).status).toBe(200);
+      expect(app!.host.get(game.id)!.state.world.dial).toBe('free');
+      expect((await store.logHeader(game.id))?.settings).toEqual({
+        dial: 'free',
+        persona: 'dramatic',
+      });
+      app!.hub.closeAll();
+    });
+
+    it('defaults to the standard dial and the dry persona', async () => {
+      const base = await start();
+      const a = await signIn(base, 'a@example.test');
+      const game = (await (await createHotSeat(base, a, {})).json()) as { id: string };
+      expect((await fetch(`${base}/games/${game.id}/start`, post(a))).status).toBe(200);
+      expect(app!.host.get(game.id)!.state.world.dial).toBe('standard');
+      expect((await store.logHeader(game.id))?.settings).toEqual({
+        dial: 'standard',
+        persona: 'dry',
+      });
+      app!.hub.closeAll();
+    });
+
+    it('rejects an unknown dial or persona', async () => {
+      const base = await start();
+      const a = await signIn(base, 'a@example.test');
+      expect((await createHotSeat(base, a, { dial: 'bogus' })).status).toBe(400);
+      expect((await createHotSeat(base, a, { persona: 'bogus' })).status).toBe(400);
+    });
   });
 
   it('keeps a lobby game closed to its WebSocket until it starts', async () => {

@@ -8,8 +8,30 @@ import type { EngineState, EventRegistry, Json } from './events.js';
 import { schedule } from './queue.js';
 import type { GameState, JudgmentRuling } from './types.js';
 
-/** The largest swing a ruling may give, as a fraction of the rule's figure (0.25 is 25%). */
-export const JUDGMENT_CAP = 0.25;
+/**
+ * The rigid-to-free dial (a per-game setting chosen at creation): how far the judge may depart
+ * from the tables. It changes only the cap on a judgment modifier (below) and nothing else.
+ */
+export type Dial = 'rigid' | 'standard' | 'free';
+
+export const DIALS: readonly Dial[] = ['rigid', 'standard', 'free'];
+
+export const DEFAULT_DIAL: Dial = 'standard';
+
+/** The largest swing a ruling may give per dial setting, as a fraction of the rule's figure. */
+export const DIAL_CAPS: Readonly<Record<Dial, number>> = {
+  rigid: 0,
+  standard: 0.25,
+  free: 0.4,
+};
+
+/** The largest swing a ruling may give at the default dial (0.25 is 25%). */
+export const JUDGMENT_CAP = DIAL_CAPS[DEFAULT_DIAL];
+
+/** The cap this game's dial allows; a game with no dial set uses the default. */
+export function judgmentCap(world: Pick<GameState, 'dial'>): number {
+  return DIAL_CAPS[world.dial ?? DEFAULT_DIAL];
+}
 
 export const JUDGMENT_EVENT = 'umpire.judgment';
 
@@ -31,9 +53,12 @@ export interface JudgmentProposal {
   precedent?: boolean;
 }
 
-export function clampModifier(requested: number): { modifier: number; clamped: boolean } {
+export function clampModifier(
+  requested: number,
+  cap = JUDGMENT_CAP,
+): { modifier: number; clamped: boolean } {
   if (!Number.isFinite(requested)) return { modifier: 0, clamped: true };
-  const modifier = Math.max(-JUDGMENT_CAP, Math.min(JUDGMENT_CAP, requested));
+  const modifier = Math.max(-cap, Math.min(cap, requested)) + 0;
   return { modifier: Math.round(modifier * 1000) / 1000, clamped: modifier !== requested };
 }
 
@@ -50,7 +75,7 @@ export function registerJudgment(registry: EventRegistry<GameState>): void {
   registry.register(JUDGMENT_EVENT, (w, ev) => {
     const p = ev.payload as unknown as JudgmentProposal;
     const world: GameState = { ...w, time: ev.time };
-    const { modifier, clamped } = clampModifier(p.modifier);
+    const { modifier, clamped } = clampModifier(p.modifier, judgmentCap(world));
     const ruling: JudgmentRuling = {
       id: `ruling-${world.rulings.length + 1}`,
       time: ev.time,
