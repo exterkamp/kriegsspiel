@@ -1,0 +1,20 @@
+{
+  "caseId": "courier-mid-turn",
+  "model": "test",
+  "provider": "test",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 0,
+  "raw": "{\"turn\":2,\"units\":[{\"unitId\":\"blue-1\",\"x\":1960,\"y\":1680,\"facingDeg\":0,\"formation\":\"line\",\"strength\":600,\"morale\":80,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[{\"orderId\":\"b1-7\",\"result\":\"not-arrived\"}],\"account\":\"The 1st Battalion acted as the staff tables direct.\"},{\"unitId\":\"blue-2\",\"x\":1820,\"y\":1700,\"facingDeg\":0,\"formation\":\"line\",\"strength\":550,\"morale\":75,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"idle\"},\"orders\":[{\"orderId\":\"b2-7\",\"result\":\"carried-out\"}],\"account\":\"The 2nd Battalion acted as the staff tables direct.\"},{\"unitId\":\"blue-3\",\"x\":2050,\"y\":1850,\"facingDeg\":0,\"formation\":\"line\",\"strength\":200,\"morale\":85,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"The Cavalry Squadron acted as the staff tables direct.\"},{\"unitId\":\"red-1\",\"x\":2050,\"y\":1380,\"facingDeg\":180,\"formation\":\"column\",\"strength\":650,\"morale\":80,\"fatigue\":8,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"idle\"},\"orders\":[{\"orderId\":\"r1-7\",\"result\":\"carried-out\"}],\"account\":\"The Vanguard Battalion acted as the staff tables direct.\"},{\"unitId\":\"red-2\",\"x\":2250,\"y\":700,\"facingDeg\":180,\"formation\":\"column\",\"strength\":650,\"morale\":70,\"fatigue\":7,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"The Line Battalion acted as the staff tables direct.\"},{\"unitId\":\"red-3\",\"x\":1550,\"y\":400,\"facingDeg\":180,\"formation\":\"line\",\"strength\":220,\"morale\":85,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"The Hussar Squadron acted as the staff tables direct.\"}],\"observations\":[],\"summary\":\"The turn was resolved by the tables.\"}",
+  "checks": {
+    "pass": true,
+    "problems": {
+      "schema": [],
+      "ids": [],
+      "limits": [],
+      "observations": [],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

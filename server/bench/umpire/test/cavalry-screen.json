@@ -1,0 +1,20 @@
+{
+  "caseId": "cavalry-screen",
+  "model": "test",
+  "provider": "test",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 0,
+  "raw": "{\"turn\":2,\"units\":[{\"unitId\":\"blue-1\",\"x\":1960,\"y\":1680,\"facingDeg\":0,\"formation\":\"line\",\"strength\":600,\"morale\":80,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"The 1st Battalion acted as the staff tables direct.\"},{\"unitId\":\"blue-2\",\"x\":2140,\"y\":1680,\"facingDeg\":0,\"formation\":\"line\",\"strength\":550,\"morale\":75,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"The 2nd Battalion acted as the staff tables direct.\"},{\"unitId\":\"blue-3\",\"x\":2100,\"y\":750,\"facingDeg\":315,\"formation\":\"line\",\"strength\":200,\"morale\":85,\"fatigue\":3,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"idle\"},\"orders\":[{\"orderId\":\"b3-6\",\"result\":\"carried-out\"}],\"account\":\"The Cavalry Squadron acted as the staff tables direct.\"},{\"unitId\":\"red-1\",\"x\":1900,\"y\":650,\"facingDeg\":180,\"formation\":\"column\",\"strength\":650,\"morale\":80,\"fatigue\":2,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"The Vanguard Battalion acted as the staff tables direct.\"},{\"unitId\":\"red-2\",\"x\":2150,\"y\":550,\"facingDeg\":180,\"formation\":\"column\",\"strength\":650,\"morale\":70,\"fatigue\":2,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"The Line Battalion acted as the staff tables direct.\"},{\"unitId\":\"red-3\",\"x\":2050,\"y\":1000,\"facingDeg\":180,\"formation\":\"loose\",\"strength\":220,\"morale\":85,\"fatigue\":2,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[{\"orderId\":\"r3-6\",\"result\":\"carried-out\"}],\"account\":\"The Hussar Squadron acted as the staff tables direct.\"}],\"observations\":[],\"summary\":\"The turn was resolved by the tables.\"}",
+  "checks": {
+    "pass": true,
+    "problems": {
+      "schema": [],
+      "ids": [],
+      "limits": [],
+      "observations": [],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

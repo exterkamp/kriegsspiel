@@ -166,7 +166,17 @@ function describe(type: string, payload: unknown, atMs: number, t0: number): str
     /^(unit\.|combat\.|order_|courier_|melee|charge|rout|pursuit|objective|victory|battle)/;
   if (!keep.test(type) || type === 'unit.moved' || type === 'unit.step') return undefined;
   const minute = Math.round((atMs - t0) / MS_PER_MINUTE);
-  return `minute ${minute}: ${type} ${JSON.stringify(payload)}`.slice(0, 240);
+  // Engine points are millimetres; the umpire works in metres. Fire factors are noise here.
+  const body = JSON.stringify(payload, (k, v: unknown) =>
+    k === 'factors'
+      ? undefined
+      : (k === 'at' || k === 'to') && Array.isArray(v)
+        ? v.map((n) => m(n as number))
+        : typeof v === 'number' && !Number.isInteger(v)
+          ? Math.round(v * 10) / 10
+          : v,
+  );
+  return `minute ${minute}: ${type} ${body}`.slice(0, 240);
 }
 
 /** The engine's own resolution of the turn: what `rigid` would apply and what the umpire is shown. */
