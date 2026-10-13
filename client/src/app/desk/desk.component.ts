@@ -126,6 +126,24 @@ export class DeskComponent {
     this.desk.activeView.set(v);
   }
 
+  /** The umpire's window is a table overlay: another desk view is read without it over it (#438). */
+  protected readonly windowShown = computed(
+    () =>
+      this.desk.windowOpen() &&
+      this.state().gameOver !== undefined &&
+      this.desk.activeView() === 'table',
+  );
+
+  /** The desk bar's button: close the window, or open it at the table. */
+  protected toggleWindow(): void {
+    if (this.windowShown()) {
+      this.desk.windowOpen.set(false);
+      return;
+    }
+    this.desk.activeView.set('table');
+    this.desk.windowOpen.set(true);
+  }
+
   protected onKey(e: KeyboardEvent): void {
     if (isTypingTarget(e.target) && e.key !== 'Escape') return;
     const v = viewForKey(e);

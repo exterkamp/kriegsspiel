@@ -36,11 +36,33 @@ export const Dispatch = z
     writtenAtGame: GameMs,
     receivedAtGame: GameMs,
     category: z.enum(['urgent', 'scouts', 'subordinates', 'staff', 'intelligence', 'rumour']),
+    /**
+     * What the paper reports, for a unit's or the staff's report: `orderDelivered` is a unit's word
+     * that it has its orders, `courierLost` the staff giving a courier up (#438).
+     */
+    kind: z
+      .enum([
+        'situation',
+        'contact',
+        'unitLost',
+        'courierLost',
+        'orderDelivered',
+        'lowAmmo',
+        'exhausted',
+        'destroyed',
+        'engaged',
+        'heavyLosses',
+        'broke',
+        'battle',
+      ])
+      .optional(),
     location: Coord.optional(),
     unit: z.string().optional(),
     sizeEstimate: z.string().optional(),
     confidence: z.enum(['low', 'medium', 'high']).optional(),
     text: z.string(),
+    /** For `orderDelivered` and `courierLost`: the id of the order the paper is about, as the desk sent it (#438). */
+    orderId: z.string().optional(),
   })
   .strict();
 export type Dispatch = z.infer<typeof Dispatch>;

@@ -41,4 +41,9 @@ export const TurnStateMessage = {
   resolving: z.boolean(),
   /** This side's orders for the turn: the ones it sent, or those it is still writing. */
   held: z.array(TurnOrder).max(MAX_TURN_ORDERS),
+  /**
+   * Set once the umpire has ruled the battle (D13): the turn is the pursuit, and the game closes by
+   * this game time. Orders are still taken; a side may send none (#438).
+   */
+  pursuitUntil: GameMs.optional(),
 };

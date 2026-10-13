@@ -176,6 +176,24 @@ const CLOSINGS: Record<UnitKind, Record<Temper, string[]>> = {
   },
 };
 
+/**
+ * A broken unit's words while it falls back (#438): it was beaten, so it does not say it holds. Used
+ * for a `routed` report in place of the body and closing of an `engaged` or `heavyLosses` note.
+ */
+const ROUTED_BODIES: Line[] = [
+  (p) => `we are being cut up as we fall back ${p.where}.`,
+  (p) => `the enemy presses us hard as we fall back ${p.where}; we have lost many men.`,
+  (p) => `we are falling back ${p.where}, and the losses are heavy.`,
+  (p) => `the men are streaming back ${p.where}, and we are losing them fast.`,
+  (p) => `we cannot stand ${p.where}; the enemy is among us as we go back.`,
+];
+const ROUTED_CLOSINGS: Record<Temper, string[]> = {
+  bold: ['I will rally them as soon as we are clear.', 'Give me time and I will turn them again.'],
+  cautious: ['We must be relieved.', 'I can do nothing more without support.'],
+  steady: ['I will rally them behind the line.', 'We reform where we can.'],
+  plain: ['We must be relieved.', 'Orders, sir?'],
+};
+
 /** Headquarters' wording of the kinds no unit wrote: the opening situation, a lost unit or courier. */
 const STAFF_NOTES: Record<StaffKind, Line[]> = {
   situation: [
@@ -275,9 +293,17 @@ export function fieldNote(
     const lines = r.kind === 'courierLost' && heardSince ? HEARD_SINCE : STAFF_NOTES[r.kind];
     return `Sir, ${pick(lines)(parts)}`;
   }
-  const body = pick(BODIES[r.kind])(parts);
   // A contact note is read by the intelligence officer too, who is not told the officers' manners.
   const temper = r.kind === 'contact' ? 'plain' : temperOf(sender.trait);
+  if (r.routed) {
+    const body = pick(ROUTED_BODIES)(parts);
+    return `Sir, ${body} ${pick(ROUTED_CLOSINGS[temper])} — ${r.from}, ${parts.when}.`;
+  }
+  const body = pick(BODIES[r.kind])(parts);
   const closing = pick(CLOSINGS[r.kind][temper]);
-  return `Sir, ${body} ${closing} — ${r.from}, ${parts.when}.`;
+  // The first word after a rally says so, before the unit says it holds again (#438).
+  const opening = r.rallied
+    ? `Sir, we have rallied. ${body[0]!.toUpperCase()}${body.slice(1)}`
+    : `Sir, ${body}`;
+  return `${opening} ${closing} — ${r.from}, ${parts.when}.`;
 }

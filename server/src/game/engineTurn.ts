@@ -124,6 +124,7 @@ export function engineOrdersOf(
       intents: p.intents ?? [],
       ...(p.intents ? {} : { textOnly: true as const }),
       ...(o?.courier ? { courier: o.courier } : {}),
+      ref: p.orderId,
     };
   });
 }

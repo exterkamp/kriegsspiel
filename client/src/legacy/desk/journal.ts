@@ -49,6 +49,14 @@ export const arrivedEntry = (p: PendingOrder, d: Dispatch): JournalEntry => ({
   text: `Order to ${p.toName} arrived: word came back at ${formatGameTime(d.receivedAtGame)}.`,
 });
 
+/** The staff gave the order's courier up for lost. */
+export const lostEntry = (p: PendingOrder, d: Dispatch): JournalEntry => ({
+  id: `outcome:${p.orderId}`,
+  kind: 'order',
+  at: d.receivedAtGame,
+  text: `Order to ${p.toName} lost: the courier was given up at ${formatGameTime(d.receivedAtGame)}.`,
+});
+
 export const dispatchEntry = (d: Dispatch): JournalEntry => ({
   id: `dispatch:${d.id}`,
   kind: 'dispatch',

@@ -20,6 +20,7 @@ import {
   heldTurn,
   mayDraft,
   maySign,
+  pursuitEndsAt,
   serialize,
   viewFor,
   type EmittedEvent,
@@ -129,6 +130,8 @@ export interface TurnStateView {
   resolving: boolean;
   /** The side's own held (or sent) orders. */
   held: TurnOrder[];
+  /** The battle has been ruled (D13): the turn is its pursuit, and the game closes by this time. */
+  pursuitUntil?: number;
 }
 
 /** Defaults for the parse retry policy. */
@@ -460,6 +463,10 @@ export class GameActor {
   turnStateFor(side: string): TurnStateView | undefined {
     const t = this.openTurn;
     if (!t || this.engine.world.outcome) return undefined;
+    // The time limit cuts the pursuit short (D13), so the banner never names a later minute.
+    const close = pursuitEndsAt(this.engine.world);
+    const pursuit =
+      close === undefined ? undefined : Math.min(close, this.engine.world.victory.holdMs);
     return {
       turn: t.n,
       startsAt: t.startMs,
@@ -468,6 +475,7 @@ export class GameActor {
       ...(t.deadlineWallMs === undefined ? {} : { deadline: t.deadlineWallMs }),
       resolving: t.resolving,
       held: structuredClone(t.held.get(side) ?? []),
+      ...(pursuit === undefined ? {} : { pursuitUntil: pursuit }),
     };
   }
 
@@ -2284,6 +2292,8 @@ export class GameActor {
       command.side,
       parsed,
       command.courier,
+      undefined,
+      command.orderId,
     );
     if ('reason' in applied) {
       if (parsed.kind === 'clarification') {

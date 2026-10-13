@@ -89,14 +89,15 @@ async function play(
   if (fast) await game.submit({ kind: 'setMode', mode: 'fast-forward' });
   const horizon = untilMs === 'end' ? Infinity : untilMs;
   let at = 0;
-  for (const step of script) {
+  for (const [i, step] of script.entries()) {
     if (step.atMs > horizon || game.state.world.outcome) break;
     if (fast) await game.submit({ kind: 'advanceTo', gameMs: step.atMs });
     else await time.advance((step.atMs - at) / (rate as number));
     at = step.atMs;
     // The advance may have ended the game; nobody signs orders in a finished game.
     if (game.state.world.outcome) break;
-    await game.submit({ kind: 'order', side: 'blue', text: step.text });
+    // The desk's own id, as the hub passes it on: the unit's acknowledgement names it (#438).
+    await game.submit({ kind: 'order', side: 'blue', text: step.text, orderId: `desk-${i}` });
   }
   if (fast) {
     if (untilMs === 'end') await time.advance(0);
@@ -192,6 +193,7 @@ describe('the in-tray of a live game', () => {
       expect(opening!.location).toBeDefined();
       const ack = blue.find((_, i) => reports[i]!.kind === 'orderDelivered');
       expect(ack).toMatchObject({ category: 'subordinates', confidence: 'high' });
+      expect(ack!.orderId).toMatch(/^desk-\d+$/);
       expect(ack!.receivedAtGame).toBeLessThanOrEqual(10 * MIN);
       // Red's own opening report never reaches Blue.
       expect(reports.filter((r) => r.kind === 'situation')).toHaveLength(1);

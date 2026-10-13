@@ -31,9 +31,9 @@ describe('ClockComponent after a turn game ends (#429)', () => {
     expect(el.textContent).not.toContain('⏹');
   });
 
-  it('keeps the rate and Stopped for a finished real-time game', async () => {
+  it('keeps the rate for a finished real-time game, and says Game over as a turn game does (#438)', async () => {
     const el = await render(withTurnSettings(over, { dial: 'standard', persona: 'dry' }));
     expect(el.querySelector('[data-testid="clock-rate"]')?.textContent).toBe('1:1');
-    expect(el.querySelector('[data-testid="clock-status"]')?.textContent).toContain('Stopped');
+    expect(el.querySelector('[data-testid="clock-status"]')?.textContent).toContain('Game over');
   });
 });

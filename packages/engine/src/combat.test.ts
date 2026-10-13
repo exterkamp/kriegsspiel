@@ -32,11 +32,13 @@ import {
   BATTLE_CLOSE_MS,
   forceBroken,
   evaluateVictory,
+  standing,
   outcomeText,
   turnVictory,
 } from './combat.js';
 import { viewFor } from './index.js';
-import type { BattleRuling } from './types.js';
+import type { BattleRuling, Report } from './types.js';
+import { fileReport } from './visibility.js';
 import { polygonCentroid } from './geometry.js';
 import { river, wood } from './scenario.testkit.js';
 
@@ -486,6 +488,42 @@ describe('victory conditions', () => {
     const later = run(issueMove(end.state, 'red-2', T(9, 4)), 60);
     expect(later.state.world.units.map((u) => [u.id, u.center, u.intent])).toEqual(frozen);
     expect(later.emitted).toEqual([]);
+  });
+
+  it('hands in at the end a dispatch captured before it, but not one dated after (#438)', () => {
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'red-1', side: 'red', x: 3, y: 2 },
+    ]);
+    s = issueMove(s, 'red-1', T(5, 2));
+    const doc = (id: string, capturedMin: number) => ({
+      id,
+      kind: 'capturedDispatch' as const,
+      capturedAt: capturedMin * MS_PER_MINUTE,
+      deliverAt: 40 * MS_PER_MINUTE,
+      issuedAt: 0,
+      fromSide: 'blue' as const,
+      addressedTo: 'blue-1',
+      location: T(9, 4),
+      place: '',
+      text: 'Hold',
+    });
+    const red = s.world.intel.red;
+    s = {
+      ...s,
+      world: {
+        ...s.world,
+        intel: {
+          ...s.world.intel,
+          red: { ...red, documents: [doc('before', 10), doc('after', 13)] },
+        },
+      },
+    };
+    const end = run(s, 30).state.world;
+    expect(end.outcome).toMatchObject({ reason: 'objective-taken', time: 12 * MS_PER_MINUTE });
+    const byId = new Map(end.intel.red.documents.map((d) => [d.id, d.deliverAt]));
+    expect(byId.get('before')).toBe(12 * MS_PER_MINUTE);
+    expect(byId.get('after')).toBe(40 * MS_PER_MINUTE);
   });
 
   it('defender wins by keeping the attacker off the objective until the time is up', () => {
@@ -1478,5 +1516,40 @@ describe('combat v2: balance smoke test', () => {
   it('a unit shot in the flank by an equal one loses more often than not', () => {
     // Blue faces north, so Red's fire from the east is a flank shot; Red faces Blue.
     expect(winRates({ facingDeg: 0 }, {}).red).toBeGreaterThan(0.6);
+  });
+});
+
+describe('how a unit in the fight stands as it writes (#438)', () => {
+  const s = field(duel);
+  const blue = unit(s, 'blue-1');
+  /** The world with these fight reports from blue-1 on file, oldest first. */
+  const filed = (...kinds: [Report['kind'], Pick<Report, 'routed' | 'rallied'>?][]): GameState => {
+    let w = s.world;
+    for (const [i, [kind, extra]] of kinds.entries())
+      w = fileReport(w, kind, blue, i * MS_PER_MINUTE, 0, extra ?? {});
+    return w;
+  };
+
+  it('is routed while broken and falling back, and in the tick it breaks', () => {
+    const withdrawn = { ...blue, status: 'withdrawn' as const, brokenAt: 0 };
+    expect(standing(s.world, withdrawn)).toEqual({ routed: true });
+    expect(standing(s.world, { ...blue, morale: BREAK_MORALE - 1 })).toEqual({ routed: true });
+  });
+
+  it('is plain for a unit that has not broken', () => {
+    expect(standing(s.world, blue)).toEqual({});
+    expect(standing(filed(['engaged'], ['heavyLosses']), blue)).toEqual({});
+    // A withdrawal by order is not a rout.
+    expect(standing(s.world, { ...blue, status: 'withdrawn' as const })).toEqual({});
+  });
+
+  it('says it rallied in its first fight report after a break, and is plain after that', () => {
+    expect(standing(filed(['engaged'], ['broke']), blue)).toEqual({ rallied: true });
+    expect(standing(filed(['broke'], ['heavyLosses', { routed: true }]), blue)).toEqual({
+      rallied: true,
+    });
+    expect(standing(filed(['broke'], ['engaged', { rallied: true }]), blue)).toEqual({});
+    // Other papers from the unit, such as an acknowledgement, are not fight reports.
+    expect(standing(filed(['broke'], ['orderDelivered']), blue)).toEqual({ rallied: true });
   });
 });

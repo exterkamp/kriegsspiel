@@ -140,6 +140,31 @@ describe('game over screen (held PR #266)', () => {
     expect(desk.windowOpen()).toBe(true);
   });
 
+  it('shows the umpire window only at the table, and its button brings the table back (#438)', async () => {
+    vi.stubGlobal('fetch', async () => new Response('{}', { status: 500 }));
+    const { el, desk, tick } = mount({ gameOver: over }, 'g1');
+    await tick();
+    desk.windowOpen.set(true);
+    await tick();
+    expect(el.querySelector('ks-umpire-window')).not.toBeNull();
+    // Another view of the desk is read on its own, with no outcome over it.
+    desk.activeView.set('roster');
+    await tick();
+    expect(el.querySelector('#view-roster')).not.toBeNull();
+    expect(el.querySelector('ks-umpire-window')).toBeNull();
+    expect(el.querySelector('#over-h')).toBeNull();
+    // The desk bar's window button opens it at the table.
+    const button = [...el.querySelectorAll<HTMLButtonElement>('.desk-bar button')].find((b) =>
+      b.textContent?.includes("Umpire's window"),
+    )!;
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    button.click();
+    await tick();
+    expect(desk.activeView()).toBe('table');
+    expect(desk.windowOpen()).toBe(true);
+    expect(el.querySelector('ks-umpire-window')).not.toBeNull();
+  });
+
   it('headlines the result for the side being played', async () => {
     const { el, tick } = mount({ gameOver: over, view: { ...fixtureView, side: 'red' } }, 'g1');
     vi.stubGlobal('fetch', async () => new Response('{}', { status: 500 }));

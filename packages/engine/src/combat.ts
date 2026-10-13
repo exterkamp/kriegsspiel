@@ -40,6 +40,7 @@ import {
   DEFAULT_TAKE_MS,
   MS_PER_MINUTE,
   type BattleRuling,
+  type GameTime,
   type GameState,
   type Outcome,
   type Point,
@@ -187,6 +188,15 @@ function timerFrom(world: GameState, time: number): number {
   return world.turn ? Math.floor(time / MS_PER_MINUTE) * MS_PER_MINUTE : time;
 }
 
+/**
+ * When a declared battle closes (D13): the pursuit runs `BATTLE_CLOSE_MS` from the ruling, counted
+ * from its game minute in turn mode. It closes sooner if a side has nobody left. Undefined until a
+ * battle is declared. Public, like the ruling.
+ */
+export function pursuitEndsAt(world: GameState): GameTime | undefined {
+  return world.battle && timerFrom(world, world.battle.declaredAt) + BATTLE_CLOSE_MS;
+}
+
 /** True while only the attacker's active units have their centres on the objective. */
 function attackerHolds(world: GameState): boolean {
   const { attacker, objective } = world.victory;
@@ -226,7 +236,7 @@ export function evaluateVictory(world: GameState, time: number): Outcome | null 
   if (battle) {
     const loser = world.sides.find((s) => s.id !== battle.winner)!.id;
     const loserOut = out.get(loser);
-    if (out.size === 0 && time < timerFrom(world, battle.declaredAt) + BATTLE_CLOSE_MS) return null;
+    if (out.size === 0 && time < pursuitEndsAt(world)!) return null;
     return {
       winner: battle.winner,
       reason: battle.reason,
@@ -345,7 +355,7 @@ function declareBattle(
     world: w,
     schedule: [
       {
-        time: Math.max(time, timerFrom(world, time) + BATTLE_CLOSE_MS),
+        time: Math.max(time, pursuitEndsAt(w)!),
         type: COMBAT_CHECK_EVENT,
       },
     ],
@@ -374,6 +384,25 @@ function conclude(world: GameState, outcome: Outcome): HandlerResult<GameState> 
   return { ...end, emit: [...(declared?.emit ?? []), ...(end.emit ?? [])] };
 }
 
+/** The unit's own fight reports, in the order written. */
+const FIGHT_REPORTS: ReadonlySet<Report['kind']> = new Set(['engaged', 'heavyLosses', 'broke']);
+
+/**
+ * How a unit in the fight stands as it writes (#438): `routed` while it is broken and falling back,
+ * so its note does not say it holds; `rallied` in its first report of the fight since it rallied
+ * from a break, so the note says so before it says it holds again.
+ */
+export function standing(world: GameState, u: Unit): Pick<Report, 'routed' | 'rallied'> {
+  // Broken, or breaking in this very tick (its `broke` report follows this one).
+  if (u.status === 'withdrawn' && u.brokenAt !== undefined) return { routed: true };
+  if (u.status === 'active' && u.morale < unitTypeOf(u).breakMorale) return { routed: true };
+  const mine = world.intel[u.side].reports.filter(
+    (r) => r.from === u.name && FIGHT_REPORTS.has(r.kind),
+  );
+  const last = mine.at(-1);
+  return last && (last.kind === 'broke' || last.routed) ? { rallied: true } : {};
+}
+
 function finish(world: GameState, outcome: Outcome): HandlerResult<GameState> {
   // The game is over: every unit stops where it stands and takes no further orders.
   const units = world.units.map((u) => {
@@ -383,13 +412,24 @@ function finish(world: GameState, outcome: Outcome): HandlerResult<GameState> {
     return stopped;
   });
   // The game is over: reports still on the road are handed in, so the closing dispatches are read.
+  // One dated after the end is never written, so it stays undelivered: HQ gives a courier up only
+  // once it is overdue, and that paper is filed ahead of its time (#438).
   const intel = Object.fromEntries(
     Object.entries(world.intel).map(([side, i]) => [
       side,
       {
         ...i,
         reports: i.reports.map((r) =>
-          r.deliverAt > outcome.time ? { ...r, deliverAt: outcome.time } : r,
+          r.deliverAt > outcome.time && r.observedAt <= outcome.time
+            ? { ...r, deliverAt: outcome.time }
+            : r,
+        ),
+        // Dispatches taken before the end are read too, though captured ones are dated to the
+        // turn's end in turn mode (#438).
+        documents: i.documents.map((d) =>
+          d.deliverAt > outcome.time && d.capturedAt <= outcome.time
+            ? { ...d, deliverAt: outcome.time }
+            : d,
         ),
       },
     ]),
@@ -925,7 +965,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
             r.kind === 'engaged' && r.from === u.name && r.observedAt > ev.time - ENGAGED_REPEAT_MS,
         )
       ) {
-        w = fileReport(w, 'engaged', now, ev.time, FIELD_REPORT_DELAY_MS);
+        w = fileReport(w, 'engaged', now, ev.time, FIELD_REPORT_DELAY_MS, standing(w, now));
       }
       const start = world.startStrength?.[u.id] ?? u.strength;
       const heavy = HEAVY_LOSS_FRACTION * start;
@@ -933,7 +973,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       // breaks, or while it is being run down after: most of a beaten unit's men are lost in the
       // pursuit, and the commander still wants to hear of it.
       if (now.strength > 0 && u.strength >= heavy && now.strength < heavy) {
-        w = fileReport(w, 'heavyLosses', now, ev.time, FIELD_REPORT_DELAY_MS);
+        w = fileReport(w, 'heavyLosses', now, ev.time, FIELD_REPORT_DELAY_MS, standing(w, now));
       }
     }
     for (const u of w.units) {

@@ -93,6 +93,33 @@ describe('TurnPanelComponent', () => {
     expect(t.el.querySelector('[data-testid="turn-decided"]')).toBeNull();
   });
 
+  it('says the battle is decided and the turn is the pursuit, once the umpire has ruled (#438)', async () => {
+    const before = await mount();
+    expect(before.el.querySelector('[data-testid="turn-pursuit"]')).toBeNull();
+    TestBed.resetTestingModule();
+    const after = await mount(
+      turn({ turn: 3, startsAt: 40 * MIN, endsAt: 60 * MIN, pursuitUntil: 51 * MIN }),
+    );
+    const note = after.el.querySelector('[data-testid="turn-pursuit"]');
+    expect(note?.textContent).toContain('The battle is decided; this turn is the pursuit');
+    expect(note?.textContent).toContain('00:51');
+    expect(note?.textContent).toContain('no orders');
+  });
+
+  it('drops "send with no orders" from the pursuit note once the side has sent or the turn is being decided', async () => {
+    const pursuit = { turn: 3, startsAt: 40 * MIN, endsAt: 60 * MIN, pursuitUntil: 51 * MIN };
+    for (const t of [
+      turn({ ...pursuit, sent: ['blue'] }),
+      turn({ ...pursuit, sent: ['blue', 'red'], resolving: true }),
+    ]) {
+      TestBed.resetTestingModule();
+      const m = await mount(t);
+      const note = m.el.querySelector('[data-testid="turn-pursuit"]');
+      expect(note?.textContent).toContain('closes by 00:51 at the latest');
+      expect(note?.textContent).not.toContain('no orders');
+    }
+  });
+
   it('is gone once the game is over', async () => {
     const t = await mount();
     t.g.fake.set({ gameOver: { winner: 'blue', reason: 'eliminated', atGame: 0 } });

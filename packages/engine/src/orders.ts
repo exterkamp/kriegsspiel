@@ -17,7 +17,7 @@ import type { Pace } from './fatigue.js';
 import { findPath, legCost } from './navigation.js';
 import { describePlace } from './place.js';
 import { schedule } from './queue.js';
-import { heldTurn } from './held.js';
+import { heldTurn, reachesHqAt } from './held.js';
 import { applyIntents, fireOnReceipt, registerStanding } from './standing.js';
 import { COURIER_DELAY_MS, REPORT_EVENT, fileReport } from './visibility.js';
 import {
@@ -71,6 +71,12 @@ export interface Order {
    * it as "no new order" and carries on as before. `intents` is then empty.
    */
   textOnly?: true;
+  /**
+   * The desk's own id for the order, when a player sent it. The unit's acknowledgement and the
+   * staff's lost-courier paper carry it (`Report.orderRef`), so the desk knows which order a paper
+   * is about (#438).
+   */
+  ref?: string;
 }
 
 /** A fast courier rides hard and is more likely to be lost or to garble; a safe one takes the quiet way. */
@@ -209,7 +215,10 @@ function reportOverdue(world: GameState, c: Courier, time: number): GameState {
   if (!unit || unit.strength <= 0) return world;
   const orderDueAt = arrivalOf(c, c.order.issuedAt);
   const due = Math.max(time, orderDueAt + COURIER_OVERDUE_MS);
-  return fileReport(world, 'courierLost', unit, due, 0, { orderDueAt });
+  return fileReport(world, 'courierLost', unit, due, 0, {
+    orderDueAt,
+    ...(c.order.ref === undefined ? {} : { orderRef: c.order.ref }),
+  });
 }
 const arrivalOf = (c: Courier, issuedAt: number) => c.legs.at(-1)?.arriveAt ?? issuedAt;
 
@@ -330,7 +339,7 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       id: `${captor.side}-d${world.intel[captor.side].documents.length + 1}`,
       kind: 'capturedDispatch' as const,
       capturedAt: ev.time,
-      deliverAt: ev.time + COURIER_DELAY_MS,
+      deliverAt: reachesHqAt(world, ev.time, COURIER_DELAY_MS),
       issuedAt: c.order.issuedAt,
       fromSide: c.side,
       addressedTo: world.units.find((u) => u.id === c.order.to)?.name ?? c.order.to,
@@ -379,7 +388,11 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     const ack = {
       time: ev.time,
       type: REPORT_EVENT,
-      payload: { kind: 'orderDelivered', unitId: unit.id },
+      payload: {
+        kind: 'orderDelivered',
+        unitId: unit.id,
+        ...(order.ref === undefined ? {} : { orderRef: order.ref }),
+      },
     };
     // In an umpire turn the order is delivered and acknowledged, but the umpire decides what
     // the unit makes of it: no intent is adopted (D39).

@@ -35,6 +35,10 @@ p:last-child {
   border-bottom: 1px solid var(--ks-brass);
   padding-bottom: 4px;
 }
+.pursuit {
+  font-style: italic;
+  color: var(--ks-brass-hi);
+}
 .deadline {
   font-size: var(--ks-text-xs);
   opacity: 0.85;

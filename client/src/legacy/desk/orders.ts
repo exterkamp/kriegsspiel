@@ -214,19 +214,69 @@ export function noticeText(
   return o ? refusalText(o) : n.message.replace(/^o-[\w-]+:\s*/, '');
 }
 
+const byWritten = (dispatches: readonly Dispatch[]): Dispatch[] =>
+  [...dispatches].sort((a, b) => a.writtenAtGame - b.writtenAtGame);
+
 /**
- * Word that an order arrived: the first dispatch from its addressee written after it was sent (written, not received:
- * a report already riding when the order went out says nothing about the order).
- * The addressee answering is the only proof of delivery the client has.
+ * The first paper of `kind` about the order, from `sorted` (in written order). A paper that names its order (`orderId`)
+ * is about that order only (#438). One that does not, from a game before papers named them, is taken to be about the
+ * addressee's order if it was written after the order was sent (written, not received: one already riding when the
+ * order went out is for an earlier order).
+ */
+function firstAbout(
+  p: PendingOrder,
+  sorted: readonly Dispatch[],
+  kind: NonNullable<Dispatch['kind']>,
+): Dispatch | undefined {
+  return sorted.find(
+    (d) =>
+      d.kind === kind &&
+      (d.orderId !== undefined
+        ? d.orderId === p.orderId
+        : !!p.toName && d.from === p.toName && d.writtenAtGame >= p.sentAtGame),
+  );
+}
+
+/** What became of the order, from papers in written order: lost when the staff gave its courier up before any word that it arrived. */
+function outcomeOf(
+  p: PendingOrder,
+  sorted: readonly Dispatch[],
+): { arrived: Dispatch } | { lost: Dispatch } | undefined {
+  const ack = firstAbout(p, sorted, 'orderDelivered');
+  const lost = firstAbout(p, sorted, 'courierLost');
+  if (lost && (!ack || ack.writtenAtGame > lost.writtenAtGame)) return { lost };
+  return ack ? { arrived: ack } : undefined;
+}
+
+/**
+ * Word that an order arrived: the unit's acknowledgement of it. Any other report from the unit says nothing of the
+ * order: its courier may still be lost (#438).
  */
 export function deliveredBy(
   p: PendingOrder,
   dispatches: readonly Dispatch[],
 ): Dispatch | undefined {
-  if (!p.toName) return undefined;
-  return [...dispatches]
-    .sort((a, b) => a.writtenAtGame - b.writtenAtGame)
-    .find((d) => d.from === p.toName && d.writtenAtGame >= p.sentAtGame);
+  return firstAbout(p, byWritten(dispatches), 'orderDelivered');
+}
+
+/** Word that an order was lost: the staff giving up its courier, when no acknowledgement came first. */
+export function lostBy(p: PendingOrder, dispatches: readonly Dispatch[]): Dispatch | undefined {
+  const o = outcomeOf(p, byWritten(dispatches));
+  return o && 'lost' in o ? o.lost : undefined;
+}
+
+/** What became of each order, as `deliveredBy` and `lostBy` would say, sorting the papers once. */
+export function orderOutcomes(
+  pending: readonly PendingOrder[],
+  dispatches: readonly Dispatch[],
+): Map<string, { arrived: Dispatch } | { lost: Dispatch }> {
+  const sorted = byWritten(dispatches);
+  const out = new Map<string, { arrived: Dispatch } | { lost: Dispatch }>();
+  for (const p of pending) {
+    const o = outcomeOf(p, sorted);
+    if (o) out.set(p.orderId, o);
+  }
+  return out;
 }
 
 /** What the desk says once an order is signed: to whom, by which courier and, if known, when it should arrive. */

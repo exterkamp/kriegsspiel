@@ -13,7 +13,7 @@ import type { ClockState } from '@kriegsspiel/protocol';
 import type { BeliefChoice } from '@legacy/window/model';
 import { gameNowMs } from '@legacy/net/state';
 import {
-  deliveredBy,
+  orderOutcomes,
   emptyDraft,
   loadDraft,
   saveDraft,
@@ -22,6 +22,7 @@ import {
 import {
   addEntries,
   arrivedEntry,
+  lostEntry,
   clockEntry,
   dispatchEntry,
   loadJournal,
@@ -156,6 +157,7 @@ export class DeskStore {
     const stopGame = this.run(() => {
       const s = this.game.state();
       untracked(() => {
+        const outcomes = orderOutcomes(s.pending, s.dispatches);
         const found: JournalEntry[] = [
           ...s.pending.map(orderEntry),
           ...s.dispatches.map(dispatchEntry),
@@ -163,8 +165,8 @@ export class DeskStore {
             refusedEntry(id, o, s.clock ? s.clock.gameMs : o.sentAtGame),
           ),
           ...s.pending.flatMap((p) => {
-            const d = deliveredBy(p, s.dispatches);
-            return d ? [arrivedEntry(p, d)] : [];
+            const o = outcomes.get(p.orderId);
+            return !o ? [] : 'lost' in o ? [lostEntry(p, o.lost)] : [arrivedEntry(p, o.arrived)];
           }),
         ];
         // A turn-mode game's clock never runs (D39): each turn's heading stands in for pauses and resumes.

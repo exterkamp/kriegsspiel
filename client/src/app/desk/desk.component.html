@@ -26,18 +26,14 @@
       </button>
     }
     @if (state().gameOver && gameId()) {
-      <button
-        type="button"
-        [attr.aria-pressed]="desk.windowOpen()"
-        (click)="desk.windowOpen.set(!desk.windowOpen())"
-      >
+      <button type="button" [attr.aria-pressed]="windowShown()" (click)="toggleWindow()">
         Umpire's window
       </button>
     }
   </nav>
 </div>
 
-@if (desk.windowOpen() && state().gameOver) {
+@if (windowShown()) {
   <ks-umpire-window />
 } @else if (state().gameOver && desk.activeView() === 'table') {
   <ks-game-over

@@ -46,6 +46,7 @@ export function applyLoggedOrder(
   parsed: ParseResult,
   courier?: Order['courier'],
   deputy?: boolean,
+  ref?: string,
 ): { state: EngineState<GameState>; orderId: string } | { reason: string } {
   if (parsed.kind === 'clarification') return { reason: parsed.question };
   if (parsed.kind === 'rejection') return { reason: parsed.reason };
@@ -61,6 +62,7 @@ export function applyLoggedOrder(
     intents,
     ...(courier ? { courier } : {}),
     ...(deputy ? { deputy: true as const } : {}),
+    ...(ref === undefined ? {} : { ref }),
     ...(parsed.interpretation ? { interpretation: parsed.interpretation } : {}),
   };
   return { state: issueOrder(state, order, state.time), orderId: order.id };
@@ -149,6 +151,7 @@ export function replayFrom(
           entry.parse,
           command.courier,
           entry.deputy !== undefined,
+          command.orderId,
         );
         if ('state' in res) state = res.state;
       } else if (command.kind === 'resolveTurn' && entry.turn && !state.world.outcome) {

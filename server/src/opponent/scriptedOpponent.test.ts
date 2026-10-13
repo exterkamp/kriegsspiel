@@ -133,6 +133,22 @@ describe('behaviour', () => {
     }
   });
 
+  it('puts no second preposition before a place that carries its own (#438)', () => {
+    const agent = new ScriptedOpponent({
+      ...CONFIG,
+      describe: () => 'at the bridge, on the High road',
+    });
+    agent.think(view());
+    const [o] = agent.think(
+      view({ time: FORM_UP_MS + 300_000, visibleEnemies: [enemy(1950, 900)] }),
+    );
+    expect(o?.text).toBe('Vanguard advance on the enemy at the bridge, on the High road');
+    const near = new ScriptedOpponent({ ...CONFIG, describe: () => 'near the mill' });
+    for (const x of near.think(view())) {
+      expect(x.text).not.toMatch(/\b(at|to) (at|near|in|on)\b/);
+    }
+  });
+
   it('forms up first: no order, and not settled, until FORM_UP_MS has passed', () => {
     const bot = new ScriptedOpponent(CONFIG);
     expect(bot.think(view({ time: 0 }))).toEqual([]);

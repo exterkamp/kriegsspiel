@@ -18,23 +18,36 @@ describe('paceLabel', () => {
     );
   });
 
-  it('counts the turns of a started or finished turn game (#429)', () => {
+  it('counts the turns of a started or finished turn game (#429, #438)', () => {
     const umpire = { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 20 } as const;
     const MIN = 60_000;
     const g = { rate: 4, umpire, status: 'started' as const };
     // Over at 00:40 after two turns; over mid-turn at 00:45 after three.
-    expect(paceLabel({ ...g, finished: true, gameTimeMs: 40 * MIN })).toBe('2 turns of 20 min');
-    expect(paceLabel({ ...g, finished: true, gameTimeMs: 45 * MIN })).toBe('3 turns of 20 min');
-    expect(paceLabel({ ...g, finished: true, gameTimeMs: 5 * MIN })).toBe('1 turn of 20 min');
-    // Being played: turn 3 is open at 00:40.
+    expect(paceLabel({ ...g, finished: true, gameTimeMs: 40 * MIN })).toBe(
+      'Finished after 2 turns',
+    );
+    expect(paceLabel({ ...g, finished: true, gameTimeMs: 45 * MIN })).toBe(
+      'Finished after 3 turns',
+    );
+    expect(paceLabel({ ...g, finished: true, gameTimeMs: 5 * MIN })).toBe('Finished after 1 turn');
+    // Being played: turn 3 is open at 00:40, of about 3 in a 50-minute scenario.
+    expect(paceLabel({ ...g, finished: false, gameTimeMs: 40 * MIN }, 50)).toBe(
+      'Turn 3 of about 3 (20 min turns)',
+    );
+    expect(paceLabel({ ...g, finished: false, gameTimeMs: 0 }, 50)).toBe(
+      'Turn 1 of about 3 (20 min turns)',
+    );
+    // Without the scenario's length the count is left out.
     expect(paceLabel({ ...g, finished: false, gameTimeMs: 40 * MIN })).toBe(
-      'turn 3, turns of 20 min',
+      'Turn 3 (20 min turns)',
     );
     // A finished game with a deadline has no orders due; a live one still does.
     const due = { ...g, umpire: { ...umpire, turnDeadlineHours: 24 } };
-    expect(paceLabel({ ...due, finished: true, gameTimeMs: 40 * MIN })).toBe('2 turns of 20 min');
-    expect(paceLabel({ ...due, finished: false, gameTimeMs: 40 * MIN })).toBe(
-      'turn 3, turns of 20 min, orders due in 24 h',
+    expect(paceLabel({ ...due, finished: true, gameTimeMs: 40 * MIN })).toBe(
+      'Finished after 2 turns',
+    );
+    expect(paceLabel({ ...due, finished: false, gameTimeMs: 40 * MIN }, 50)).toBe(
+      'Turn 3 of about 3 (20 min turns, orders due in 24 h)',
     );
     // In the lobby, and a real-time game, as before.
     expect(paceLabel({ ...g, status: 'lobby', gameTimeMs: 0 })).toBe('turns of 20 min');

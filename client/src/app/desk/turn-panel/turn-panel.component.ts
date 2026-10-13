@@ -11,6 +11,7 @@ import {
 import {
   RESOLVING_TEXT,
   deadlineText,
+  pursuitText,
   resolvedText,
   sidesSent,
   turnPhase,
@@ -50,6 +51,8 @@ export class TurnPanelComponent {
   protected readonly heldCount = computed(() => this.turn()?.held.length ?? 0);
   protected readonly deadline = computed(() => deadlineText(this.turn()?.deadline, this.now()));
   protected readonly resolvingText = RESOLVING_TEXT;
+  /** After the umpire's ruling: the turn is the pursuit, and while writing, it may go with no orders (#438). */
+  protected readonly pursuit = computed(() => pursuitText(this.turn(), this.phase() === 'writing'));
 
   /** The last turn decided while this desk was open, until the player reads its papers or dismisses it. */
   private readonly decided = signal<Decided | undefined>(undefined);

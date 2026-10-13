@@ -65,10 +65,12 @@ export function toDispatch(r: ViewReport): Dispatch {
     writtenAtGame: r.observedAt,
     receivedAtGame: r.deliveredAt,
     category: CATEGORY[r.kind],
+    kind: r.kind,
     location: r.location,
     ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
     confidence: r.confidence,
     text: r.text,
+    ...(r.orderRef === undefined ? {} : { orderId: r.orderRef }),
   };
 }
 
@@ -176,6 +178,11 @@ export function toSideView(
   overloaded?: string,
   deputy?: DeputyState,
 ): SideView {
+  const reports = view.reports.flatMap((r) => {
+    const text = narration?.get(r.id);
+    if (text === null) return [];
+    return [text === undefined ? toDispatch(r) : { ...toDispatch(r), text }];
+  });
   return {
     side: view.side,
     ...(seed === undefined ? {} : { staffOfficers: officersOnWire(seed, view.side) }),
@@ -233,12 +240,11 @@ export function toSideView(
       sizeEstimate: c.sizeEstimate,
     })),
     dispatches: [
-      ...view.reports.flatMap((r) => {
-        const text = narration?.get(r.id);
-        if (text === null) return [];
-        return [text === undefined ? toDispatch(r) : { ...toDispatch(r), text }];
-      }),
+      ...reports.filter((d) => d.kind !== 'battle'),
       ...view.documents.map(documentToDispatch),
+      // The umpire's papers on the battle close the in-tray: a captured dispatch handed in at the
+      // same turn's end comes before the ruling (#438).
+      ...reports.filter((d) => d.kind === 'battle'),
       ...staff.flatMap((x) => staffDispatch(x, view.time)),
       ...(deputy?.account ?? []).map(deputyDispatch),
     ],
