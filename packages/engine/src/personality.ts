@@ -41,7 +41,7 @@ export interface Deviation {
 const dist = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y);
 
 /**
- * Apply `interp` to the first immediate move in `intents`, if `unit`'s traits allow it. The caller
+ * Apply `interp` to the move in `intents` that runs now (the first non-conditional intent), if `unit`'s traits allow it. The caller
  * draws `roll` (uniform in [0,1)) from the game RNG whenever `interp.action` is not `none`, so the
  * RNG stream never depends on the traits. Every number is clamped here: a model that proposes
  * more, or a deviation the traits do not permit, changes nothing.
@@ -63,9 +63,11 @@ export function shapeIntents(
       : traits.includes('aggressive') || traits.includes('initiative');
   if (!permitted) return { intents };
   if (roll >= (interp.intentStated ? INTENT_CHANCE : DEVIATION_CHANCE)) return { intents };
-  const i = intents.findIndex((x) => x.kind === 'move');
-  if (i < 0) return { intents };
-  const move = intents[i] as Extract<OrderIntent, { kind: 'move' }>;
+  // `applyIntents` runs the first non-conditional intent now; only a move there can be shaped.
+  const i = intents.findIndex((x) => x.kind !== 'when' && x.kind !== 'at');
+  const first = intents[i];
+  if (!first || first.kind !== 'move') return { intents };
+  const move = first;
   const leg = dist(unit.center, move.to);
   if (leg <= 0) return { intents };
   const damp = interp.intentStated ? INTENT_DAMPING : 1;

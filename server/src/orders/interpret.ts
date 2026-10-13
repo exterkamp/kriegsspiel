@@ -61,7 +61,9 @@ const metres = (a: { x: number; y: number }, b: { x: number; y: number }) =>
 export function interpretInput(parsed: Intents, unit: ParseContext['units'][number]) {
   let at = unit.center;
   const legs: Array<{ kind: string; metres: number }> = [];
-  for (const i of parsed.intents) {
+  // Only a move that runs now can be shaped (shapeIntents); behind a withdraw there is none.
+  const legsShown = parsed.intents[0]?.kind === 'move' ? parsed.intents : [];
+  for (const i of legsShown) {
     const to = i.kind === 'move' ? i.to : i.kind === 'withdraw' ? i.toward : undefined;
     if (!to) continue;
     legs.push({ kind: i.kind, metres: metres(at, to) });

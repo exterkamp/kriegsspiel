@@ -76,6 +76,16 @@ describe('shapeIntents', () => {
     );
   });
 
+  it('shapes only a move that runs now, not one behind a withdraw', () => {
+    const behind: OrderIntent[] = [
+      { kind: 'withdraw', toward: pointMm(0, 500) },
+      { kind: 'move', to: pointMm(1000, 0) },
+    ];
+    const r = shapeIntents(unitWith(['aggressive']), behind, exceed(100), 0, bounds);
+    expect(r.intents).toBe(behind);
+    expect(r.deviation).toBeUndefined();
+  });
+
   it('keeps the destination on the map and refuses nonsense amounts', () => {
     const edge = { width: 1_050_000, height: 1_000_000 };
     expect(dest(shapeIntents(unitWith(['aggressive']), move, exceed(400), 0, edge))).toBe(

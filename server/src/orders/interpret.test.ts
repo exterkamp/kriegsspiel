@@ -87,6 +87,30 @@ describe('same order, different traits', () => {
     });
   });
 
+  it('shows no legs when the move that runs now is behind a withdraw', async () => {
+    const client = new CannedClient();
+    const parser = new InterpretingParser(
+      {
+        async parse(): Promise<ParseResult> {
+          return {
+            kind: 'intents',
+            text: 'Fall back, then advance.',
+            unitId: 'blue-1',
+            intents: [
+              { kind: 'withdraw', toward: at(1850, 2900) },
+              { kind: 'move', to: at(2050, 1500) },
+            ],
+          };
+        },
+      },
+      client,
+    );
+    const r = await parser.parse('Fall back, then advance.', ctx(['aggressive']));
+    expect(client.calls[0]!.input).toMatchObject({ legs: [] });
+    expect(r).toMatchObject({ kind: 'intents' });
+    expect((r as { interpretation?: unknown }).interpretation).toBeUndefined();
+  });
+
   it('records a stated intent, which the engine uses to damp the deviation', async () => {
     const r = await run('Move to the bridge so that the guns can deploy.', ['aggressive']);
     expect(r).toMatchObject({ interpretation: { action: 'exceed', intentStated: true } });
