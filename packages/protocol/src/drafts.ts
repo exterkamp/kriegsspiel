@@ -104,6 +104,21 @@ export const DraftSnapshot = z
     forkOf: z.object({ draft: Id, rev: z.number().int().nonnegative() }).strict().optional(),
     /** Set once a fork has been merged back (it then takes no more edits). */
     mergedInto: Id.optional(),
+    /**
+     * Set once an order was signed and sent from this draft (#77): the order's id, who stamped it,
+     * as which role, and when. A sent draft takes no more edits; fork it to write another.
+     */
+    sent: z
+      .object({
+        orderId: Id,
+        by: Id,
+        role: z
+          .enum(['commander', 'chiefOfStaff', 'intelligence', 'quartermaster', 'subordinate'])
+          .optional(),
+        at: z.number().finite().nonnegative(),
+      })
+      .strict()
+      .optional(),
     history: z.array(DraftEntry),
   })
   .strict();
