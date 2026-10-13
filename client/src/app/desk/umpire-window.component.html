@@ -33,6 +33,46 @@
         }
       }
     </section>
+    <section class="critique" aria-label="Umpire's critique">
+      <h3>Critique</h3>
+      @if (critique(); as c) {
+        <p class="summary">{{ c.summary }}</p>
+        @if (c.source === 'template') {
+          <p class="why">
+            Taken straight from the log: the umpire's own account was not available.
+          </p>
+        }
+        <ol>
+          @for (p of c.points; track $index) {
+            <li>
+              <span class="kind">{{ kindLabels[p.kind] }}</span>
+              <span class="side">{{ p.side === 'both' ? 'both sides' : p.side }}</span>
+              <button type="button" class="jump" (click)="load(p.minute * 60000)">
+                {{ formatGameTime(p.minute * 60000) }}
+              </button>
+              {{ p.text }}
+              <span class="cites"
+                >Cites:
+                @for (cite of p.cites; track cite.id) {
+                  <button
+                    type="button"
+                    class="cite"
+                    [title]="cite.label"
+                    (click)="load(cite.minute * 60000)"
+                  >
+                    {{ formatGameTime(cite.minute * 60000) }}
+                  </button>
+                }
+              </span>
+            </li>
+          }
+        </ol>
+      } @else if (critiqueError()) {
+        <p class="why">The critique could not be loaded: {{ critiqueError() }}</p>
+      } @else {
+        <p role="status">The umpire is writing the critique…</p>
+      }
+    </section>
     <div class="scrub">
       <button type="button" aria-label="Previous event" (click)="step(-1)">◀</button>
       <input

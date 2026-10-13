@@ -8,7 +8,7 @@
 import { appendFile, mkdir, readFile, truncate, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Seat } from '@kriegsspiel/engine';
-import type { DraftSnapshot, Mark, StaffExchange } from '@kriegsspiel/protocol';
+import type { Critique, DraftSnapshot, Mark, StaffExchange } from '@kriegsspiel/protocol';
 import type { UmpireCallRecord } from '../umpire/umpireClient.js';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
@@ -74,7 +74,13 @@ export type GameCommand =
       question: string;
       /** The conference record, so a restart restores it (D6b). Absent in entries from before it was kept. */
       exchange?: StaffExchange;
-    };
+    }
+  /**
+   * The umpire wrote the post-game critique (docs/gameplay.md, After the game) once the game was
+   * over. Journal only: it never changes the engine, and is kept so a restart serves the same text
+   * with no new model call; the model calls are on the entry (`calls`).
+   */
+  | { kind: 'critique'; critique: Critique };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
 export interface InputLogHeader {

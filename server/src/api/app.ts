@@ -19,6 +19,7 @@
  *   POST /games/:id/start          the creator: start a lobby game once every side is taken and every player is ready
  *   GET  /games/:id/window         seated, game over: the umpire's window timeline (403 `game_not_over` before the end)
  *   GET  /games/:id/window/at?at=  seated, game over: true positions, beliefs, dice and rulings at a game time
+ *   GET  /games/:id/critique       seated, game over: the umpire's critique, each point citing logged events (403 `game_not_over` before the end)
  *   GET  /games/:id/ws             WebSocket for the side the signed-in user holds (`@kriegsspiel/protocol` messages);
  *                                  in hot-seat, `?side=` picks which of the creator's sides
  *   /notifications/*               signed in: notification preferences and web push subscriptions (see ../notify)
@@ -75,6 +76,7 @@ import {
   type PushSender,
 } from '../notify/index.js';
 import { Hub, type Socket } from './hub.js';
+import { CritiqueService } from './critiqueService.js';
 import { windowAt, windowTimeline } from './umpireWindow.js';
 
 /** Fastest clock a client may ask for: 1 game day per wall second. */
@@ -165,6 +167,8 @@ export interface AppOptions {
   testUmpire?: boolean;
   /** Narrates each side's dispatches per window. See `GameHostOptions.narrator`. */
   narrator?: GameHostOptions['narrator'];
+  /** The umpire that writes the post-game critique, per game. Unset: the critique is the log's own wording. */
+  critic?: GameHostOptions['narrator'];
   /** Directory of the built client to serve at `/`. Unset: API only (dev uses the Vite server). */
   staticDir?: string;
   /**
@@ -974,6 +978,24 @@ export async function buildApp(options: AppOptions): Promise<App> {
       const w = await windowFor(req.params.id, user.id, undefined);
       if ('error' in w) return reply.code(w.status).send({ error: w.error });
       return w.timeline;
+    });
+  });
+
+  const critiques = new CritiqueService({
+    store,
+    client: options.critic,
+    wallNow,
+    onNote: (gameId, note) => server.log.warn({ gameId, note }, 'critique'),
+  });
+
+  server.get<{ Params: { id: string } }>('/games/:id/critique', async (req, reply) => {
+    const user = auth.userOf(req);
+    if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+    if (!recordOf(req.params.id)) return reply.code(404).send({ error: 'no_such_game' });
+    return tracedHttp(req.params.id, req, reply, async () => {
+      const w = await windowFor(req.params.id, user.id, undefined);
+      if ('error' in w) return reply.code(w.status).send({ error: w.error });
+      return critiques.get(req.params.id, w.input, w.timeline.endMs);
     });
   });
 

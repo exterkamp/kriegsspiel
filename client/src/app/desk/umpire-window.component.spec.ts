@@ -41,7 +41,23 @@ const timeline = {
 } as unknown as WindowTimeline;
 
 /** Answers the two window routes; `at` records each requested moment. */
-function stubFetch(over: { timeline?: () => Promise<Response> } = {}) {
+const critique = {
+  source: 'model',
+  summary: 'Blue held the bridge.',
+  points: [
+    {
+      kind: 'knowledge',
+      side: 'blue',
+      minute: 10,
+      text: 'Blue learned of the advance ten minutes late.',
+      cites: [{ id: 'fact-3', minute: 10, label: 'Blue received a report' }],
+    },
+  ],
+};
+
+function stubFetch(
+  over: { timeline?: () => Promise<Response>; critique?: () => Promise<Response> } = {},
+) {
   const at: number[] = [];
   const json = (b: unknown, status = 200) =>
     Promise.resolve(new Response(JSON.stringify(b), { status }));
@@ -51,6 +67,7 @@ function stubFetch(over: { timeline?: () => Promise<Response> } = {}) {
       at.push(ms);
       return json(frameAt(ms));
     }
+    if (url.endsWith('/critique')) return over.critique ? over.critique() : json(critique);
     return over.timeline ? over.timeline() : json(timeline);
   });
   vi.stubGlobal('fetch', fn);
@@ -87,6 +104,43 @@ describe('UmpireWindowComponent', () => {
     expect(t.desk.windowFrame()?.gameMs).toBe(3_600_000);
     expect(t.el.querySelector('output')!.textContent).toBe('Day 1 01:00');
     expect(t.el.querySelector('input[type=range]')!.getAttribute('aria-label')).toBe('Game time');
+  });
+
+  it('shows the critique with each point dated and its cites, and jumps the scrubber to them', async () => {
+    const f = stubFetch();
+    const t = await open();
+    expect(f.fn.mock.calls.map((c) => c[0])).toContain('/games/g1/critique');
+    const sec = t.el.querySelector('.critique')!;
+    expect(sec.textContent).toContain('Blue held the bridge.');
+    expect(sec.textContent).toContain('What was known');
+    expect(sec.textContent).toContain('Blue learned of the advance ten minutes late.');
+    const cite = sec.querySelector<HTMLButtonElement>('button.cite')!;
+    expect(cite.title).toBe('Blue received a report');
+    cite.click();
+    await t.settle();
+    expect(f.at.at(-1)).toBe(600_000);
+  });
+
+  it('says so when the critique is the log wording, and when it cannot be loaded', async () => {
+    stubFetch({
+      critique: () =>
+        Promise.resolve(new Response(JSON.stringify({ ...critique, source: 'template' }))),
+    });
+    const a = await open();
+    expect(a.el.querySelector('.critique .why')!.textContent).toContain('straight from the log');
+    TestBed.resetTestingModule();
+    stubFetch({
+      critique: () => Promise.resolve(new Response('{"error":"cannot_replay"}', { status: 422 })),
+    });
+    const b = await open();
+    expect(b.el.querySelector('.critique .why')!.textContent).toContain('cannot_replay');
+    expect(b.el.querySelector('output')).not.toBeNull();
+  });
+
+  it('says the umpire is writing while the critique is pending', async () => {
+    stubFetch({ critique: () => new Promise(() => undefined) });
+    const t = await open();
+    expect(t.el.querySelector('.critique [role=status]')!.textContent).toContain('writing');
   });
 
   it('says it is rebuilding while the log loads', async () => {

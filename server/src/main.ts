@@ -138,6 +138,7 @@ const { server } = await buildApp({
       ? // The same client as the parser's, so one game has one budget.
         (gameId) => gameUmpire(gameId)
       : undefined,
+  critic: umpire && umpireConfig ? (gameId) => gameUmpire(gameId) : undefined,
   admin: { ...admin, trace },
   testUmpire: umpireConfig ? usesTestUmpire(umpireConfig) : false,
   trustProxy: trustProxyFromEnv(process.env),
