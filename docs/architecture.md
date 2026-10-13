@@ -1,6 +1,6 @@
 # Architecture (proposed)
 
-The server runs a **continuous-time event simulation**. The game clock is tied to wall-clock time at a configurable ratio (1:1, 4:1, 12:1, any value), can be paused by player vote, and can be driven manually or run flat out for tests. "Turns" are not a core concept. A turn-based game is just a clock that only advances when told to.
+The server runs a **continuous-time event simulation**. The game clock is tied to wall-clock time at a configurable ratio (1:1, 4:1, 12:1, any value), can be paused by player vote, and can be driven manually or run flat out for tests. "Turns" are not a core concept. A turn-based game is just a clock that only advances when told to. The turn-based umpire mode (D39) is built that way; its pipeline is in [Turn-based mode](#turn-based-mode-the-turn-pipeline).
 
 ```
 ┌────────────┐  commands (orders,   ┌───────────────────────────────────────────────┐
@@ -161,6 +161,29 @@ The hub remembers the game time of the last view pushed to each side and saves i
 ## Determinism and replay
 
 The simulation is a function of: scenario, seed, and the **ordered log of inputs with their game timestamps** (commands, LLM outputs, pause and rate changes). Replaying that log through the engine on a manual clock gives identical state, regardless of the wall-clock rate used during the original game. LLM outputs are recorded and played back, so replays never call the model. Implemented in `server/src/game/replay.ts` (see D14a); run it with `npm run replay -w server -- <logfile>`.
+
+## Turn-based mode: the turn pipeline
+
+A turn-mode game (D39) keeps the same actor, engine, store and filter; only how game time advances and who decides outcomes changes. The real-time pipeline above is unchanged. The clock stays in `manual` mode, so there is no LLM barrier: game time does not move while a turn is being resolved, and it then jumps to the turn's end.
+
+```
+collect ──► project ──► adjudicate ──► validate / clamp ──► apply ──► report ──► advance
+ 11.3        11.4        11.6-11.8       11.5               11.5      11.9       11.3
+               │             │ any failure, or dial = rigid
+               └─────────────┴──────────► engine resolution (11.4) ──► report ──► advance
+```
+
+1. **Collect** (11.3, #399). Each seat's orders for turn `n` (`TurnOrder`: addressee, free text, courier) are held until the side sends them (`sendTurn`, journal-only in the input log). The turn closes when every human seat has sent or the wall-clock deadline (`turnDeadlineHours`) fires; scripted sides send when the turn opens.
+2. **Project** (11.4, #400). On a copy of the state at `T0` the engine issues the orders, read by the no-model rules parser, and advances to `T1`. Pure and deterministic, no model call. The result is the umpire's reference (`standard`) or advice (`free`), and the turn itself when the dial is `rigid` or the umpire fails.
+3. **Adjudicate** (11.6, #402; dice 11.7, #403; journal and case law 11.8, #404). One `adjudicate` stage call with master state, every side's orders as written with courier status, the addressed commanders' traits, the projection and the umpire's journal. It returns a `TurnProposal`. If it asks for rolls, the engine rolls them with the seeded RNG and a second call returns the final proposal.
+4. **Validate and clamp** (11.5, #401). The engine checks the proposal against the hard limits (march over the ground through `validatePlacement`, strength, bounds and status, line of sight for observations, which orders a unit had received) and, under `standard`, that departures from the projection carry a reason. Problems go back to the umpire once; then whatever still breaks a limit is clamped, and each clamp is a `TurnRuling`.
+5. **Apply** (11.5). The engine issues the orders at `T0` (couriers ride and roll as in real-time mode), advances the held world to `T1`, and fires one `umpire.turn` event carrying the validated proposal and its rolls: unit outcomes, standing intents for the next turn, sightings and rulings, then a victory check. The LLM never writes state.
+6. **Report** (11.9, #405). Each side's reports are written from its own `viewFor` after the turn plus its own units' accounts, through the existing `checkProseAgainst` and `hiddenTerms` checks, with template text as the fallback; they arrive in the in-tray, and the table moves (client, 11.10, #406).
+7. **Advance** (11.3). The clock is moved to `T1` and the next turn opens. The `resolveTurn` input-log entry holds the orders, the adjudicator used, the final proposal, the rolls, the rulings, any fallback and the model calls, so replay (11.11, #407) applies the logged proposal through the same validator and needs no model.
+
+**Fallback.** A timeout, a spent budget or rate limit (`GameUmpireClient`), a refusal, a schema failure after repair, or a proposal that would be clamped in most of its units resolves the whole turn by the engine (step 2's result applied to the real state), logs the failure on the turn entry and tells each side in-fiction. Turns therefore never hang, and the keyless demo (whose `test` provider adopts the projection) plays turn mode with no model at all.
+
+**Cost.** Per turn: one adjudicate call, a second when rolls are asked for, at most one resend, plus one report call per side. Nothing is called between turns.
 
 ## Scripted opponent
 
