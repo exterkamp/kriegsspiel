@@ -25,6 +25,7 @@ import {
 import { pieceAtPoint } from '@legacy/table/picking';
 import { markAgeFactor } from '@legacy/table/marks';
 import { buildSceneState } from '@legacy/table/sceneState';
+import type { SceneState } from '@legacy/table/types';
 import {
   GLIDE_MS,
   NO_GLIDES,
@@ -363,9 +364,12 @@ export class FlatBoardComponent {
    * is the wall time of the frame being drawn; it only ticks while a glide is running.
    */
   private readonly frameNow = signal(0);
-  private readonly glide = linkedSignal<ReturnType<typeof this.scene>, GlideState>({
-    source: this.scene,
-    computation: (s, prev) => {
+  private readonly glide = linkedSignal<
+    { scene: SceneState | undefined; frame: boolean },
+    GlideState
+  >({
+    source: () => ({ scene: this.scene(), frame: this.desk.windowFrame() !== undefined }),
+    computation: ({ scene: s, frame }, prev) => {
       const at = new Map([
         ...(s?.own ?? []).map((o) => [`own:${o.id}`, o.position] as const),
         ...(s?.ghosts ?? []).map((g) => [`ghost:${g.id}`, g.position] as const),
@@ -373,8 +377,9 @@ export class FlatBoardComponent {
       const still =
         typeof window !== 'undefined' &&
         window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      // Only a new scene starts a glide; the mode is read, not tracked.
-      const turns = untracked(() => !this.desk.windowFrame() && this.game.state().turnMode);
+      // Only a new scene starts a glide; the mode is read, not tracked. The umpire's window's frames, and the way
+      // back from them to the live picture, are set down at once.
+      const turns = untracked(() => this.game.state().turnMode) && !frame && !prev?.source.frame;
       const ms = turns && !still ? GLIDE_MS : 0;
       return nextGlides(prev?.value ?? NO_GLIDES, at, performance.now(), ms);
     },

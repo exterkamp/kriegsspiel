@@ -68,4 +68,42 @@ describe('game over logic (from held PR #266)', () => {
       replayRequest({ scenario: 's', rate: 12, sessionType: 'hot_seat', pause }, undefined).pause,
     ).toBe(pause);
   });
+  it('repeats the umpire dial and persona, and a turn-mode game as one (D39)', () => {
+    const umpire = {
+      dial: 'free',
+      persona: 'dramatic',
+      mode: 'turns',
+      turnMinutes: 30,
+      turnDeadlineHours: 24,
+    } as const;
+    expect(
+      replayRequest({ scenario: 's', rate: 1, sessionType: 'team_vs_team', umpire }, 'blue'),
+    ).toEqual({
+      scenario: 's',
+      rate: 1,
+      sessionType: 'team_vs_team',
+      dial: 'free',
+      persona: 'dramatic',
+      mode: 'turns',
+      turnMinutes: 30,
+      turnDeadlineHours: 24,
+      side: 'blue',
+    });
+    const rt = replayRequest(
+      {
+        scenario: 's',
+        rate: 4,
+        sessionType: 'team_vs_team',
+        umpire: { dial: 'rigid', persona: 'dry' },
+      },
+      undefined,
+    );
+    expect(rt).toEqual({
+      scenario: 's',
+      rate: 4,
+      sessionType: 'team_vs_team',
+      dial: 'rigid',
+      persona: 'dry',
+    });
+  });
 });

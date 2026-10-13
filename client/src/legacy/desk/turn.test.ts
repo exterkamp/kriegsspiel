@@ -113,6 +113,8 @@ describe('deadlineText', () => {
     expect(deadlineText(130 * MIN, 0)).toBe('Orders due in 2 h 10 min.');
     expect(deadlineText(120 * MIN, 0)).toBe('Orders due in 2 h.');
     expect(deadlineText(72 * 60 * MIN, 0)).toBe('Orders due in 3 days.');
+    expect(deadlineText(60 * 60 * MIN, 0)).toBe('Orders due in 2 days.');
+    expect(deadlineText(48 * 60 * MIN, 0)).toBe('Orders due in 2 days.');
     expect(deadlineText(0, 1)).toBe('Orders are due now; the turn closes at once.');
   });
 });

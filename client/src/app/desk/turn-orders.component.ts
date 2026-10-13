@@ -3,9 +3,11 @@ import {
   Component,
   DestroyRef,
   computed,
+  effect,
   inject,
   output,
   signal,
+  untracked,
 } from '@angular/core';
 import type { TurnOrder } from '@kriegsspiel/protocol';
 import { deadlineText, heldLine, sidesSent, turnLine, turnPhase } from '@legacy/desk/turn';
@@ -63,6 +65,13 @@ export class TurnOrdersComponent {
   constructor() {
     const t = setInterval(() => this.now.set(Date.now()), 15_000);
     inject(DestroyRef).onDestroy(() => clearInterval(t));
+    // The question belongs to one turn's writing: once the side has sent, the turn has closed or the next one has
+    // opened, it is put away, so a single press can never send a later turn.
+    const moved = computed(() => `${this.turn()?.turn}:${this.phase()}`);
+    effect(() => {
+      moved();
+      untracked(() => this.confirming.set(false));
+    });
   }
 
   protected line(o: TurnOrder): string {
@@ -85,7 +94,8 @@ export class TurnOrdersComponent {
       return;
     }
     if (!this.ok(this.actions.send())) return;
+    // Pressing twice is not sending twice. The order being edited is let go by the desk once the `turnState` shows
+    // the side has sent, so a refused send (a staff seat, say) leaves it as it was.
     this.confirming.set(false);
-    this.editing.set(undefined);
   }
 }

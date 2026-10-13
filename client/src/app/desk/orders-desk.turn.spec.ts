@@ -185,4 +185,134 @@ describe('OrdersDeskComponent in a turn-mode game', () => {
     expect(t.q('#order-err-send').textContent).toContain('Not connected');
     expect(t.desk.orderDraft().text).toBe('Advance to the ford.');
   });
+
+  it('puts the send question away when the turn moves on, so one press cannot send the next turn', async () => {
+    const t = await open(turn({ held: [held] }));
+    t.q('#turn-send').click();
+    await t.settle();
+    expect(t.el.querySelector('#turn-send-confirm')).not.toBeNull();
+    // The deadline closes turn 2 without this side, and turn 3 opens.
+    t.game.set({ turn: turn({ turn: 3, startsAt: 40 * MIN, endsAt: 60 * MIN }) });
+    await t.settle();
+    expect(t.el.querySelector('#turn-send-confirm')).toBeNull();
+    expect(t.el.querySelector('#turn-send')).not.toBeNull();
+    expect(t.actions.send).not.toHaveBeenCalled();
+  });
+
+  it('puts the send question away once the side has sent', async () => {
+    const t = await open(turn({ held: [held] }));
+    t.q('#turn-send').click();
+    await t.settle();
+    t.game.set({ turn: turn({ held: [held], sent: ['blue'] }) });
+    await t.settle();
+    t.game.set({ turn: turn({ turn: 3, held: [] }) });
+    await t.settle();
+    expect(t.el.querySelector('#turn-send-confirm')).toBeNull();
+  });
+
+  it('lets go of the order being edited when its turn closes, so the next hold is a new order', async () => {
+    const t = await open(turn({ held: [held] }));
+    t.button('Edit').click();
+    await t.settle();
+    expect(t.desk.editingTurnOrder()).toBe('t-1');
+    // The commander sends from another seat; then turn 3 opens.
+    t.game.set({ turn: turn({ held: [held], sent: ['blue'] }) });
+    await t.settle();
+    expect(t.desk.editingTurnOrder()).toBeUndefined();
+    t.game.set({ turn: turn({ turn: 3 }) });
+    await t.settle();
+    // The words stay for the player to hold again, as a new order.
+    expect(t.desk.orderDraft().text).toBe('Hold the bridge.');
+    expect(t.q('#order-sign').textContent!.trim()).toBe('Hold for this turn');
+    t.q('#order-sign').click();
+    await t.settle();
+    expect(t.actions.hold).toHaveBeenCalledWith(expect.objectContaining({ orderId: 't-new' }));
+  });
+
+  it('lets go of the order being edited when the next turn opens while still writing', async () => {
+    const t = await open(turn({ held: [held] }));
+    t.button('Edit').click();
+    await t.settle();
+    t.game.set({ turn: turn({ turn: 3 }) });
+    await t.settle();
+    expect(t.desk.editingTurnOrder()).toBeUndefined();
+  });
+
+  it('keeps editing through turn states that leave the turn open', async () => {
+    const t = await open(turn({ held: [held] }));
+    t.button('Edit').click();
+    await t.settle();
+    t.game.set({ turn: turn({ held: [held], sent: ['red'] }) });
+    await t.settle();
+    expect(t.desk.editingTurnOrder()).toBe('t-1');
+  });
+
+  it('gives the words back when the server refuses a hold', async () => {
+    const t = await open();
+    await t.fill('Precious words');
+    t.q('#order-sign').click();
+    await t.settle();
+    expect(t.desk.orderDraft().text).toBe('');
+    t.game.set({
+      notices: [
+        { code: 'turn_refused', message: 't-new: a side may hold at most 40 orders for a turn' },
+      ],
+    });
+    await t.settle();
+    expect(t.desk.orderDraft()).toMatchObject({ to: unit.id, text: 'Precious words' });
+    expect(t.el.querySelector('.confirmation')?.textContent ?? '').not.toContain('Held');
+    expect(t.el.textContent).toContain('a side may hold at most 40 orders');
+  });
+
+  it('gives a refused change back still as a change to the held order', async () => {
+    const t = await open(turn({ held: [held] }));
+    t.button('Edit').click();
+    await t.settle();
+    await t.fill('Hold the bridge at all costs.');
+    t.q('#order-sign').click();
+    await t.settle();
+    t.game.set({
+      notices: [{ code: 'rate_limited', message: 't-1: too many turn commands; wait a moment' }],
+    });
+    await t.settle();
+    expect(t.desk.orderDraft().text).toBe('Hold the bridge at all costs.');
+    expect(t.desk.editingTurnOrder()).toBe('t-1');
+  });
+
+  it('does not put a refused hold over words the player has begun again', async () => {
+    const t = await open();
+    await t.fill('First');
+    t.q('#order-sign').click();
+    await t.settle();
+    await t.fill('Second');
+    t.game.set({ notices: [{ code: 'turn_refused', message: 't-new: the turn has closed' }] });
+    await t.settle();
+    expect(t.desk.orderDraft().text).toBe('Second');
+  });
+
+  it('forgets a hold once the turn lists it, so a later refusal of that id gives nothing back', async () => {
+    const t = await open();
+    await t.fill('Advance to the ford.');
+    t.q('#order-sign').click();
+    await t.settle();
+    t.game.set({
+      turn: turn({
+        held: [{ orderId: 't-new', to: unit.id, text: 'Advance to the ford.', courier: 'safe' }],
+      }),
+    });
+    await t.settle();
+    t.game.set({ notices: [{ code: 'turn_refused', message: 't-new: no such held order' }] });
+    await t.settle();
+    expect(t.desk.orderDraft().text).toBe('');
+  });
+
+  it('ignores a refusal of some other order', async () => {
+    const t = await open();
+    await t.fill('Mine');
+    t.q('#order-sign').click();
+    await t.settle();
+    t.game.set({ notices: [{ code: 'turn_refused', message: 't-9: not yours' }] });
+    await t.settle();
+    expect(t.desk.orderDraft().text).toBe('');
+  });
 });

@@ -78,13 +78,17 @@ export class TableHostComponent implements OnDestroy {
       }
     });
     // The player's picture, or after the game the umpire's window at the scrubbed time.
+    let shownFrame = false;
     effect(() => {
       const scene = this.tableService.scene();
       const frame = this.desk.windowFrame();
       const view = this.game.view();
       if (!scene) return;
       const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      scene.setGlide(!frame && this.turnMode() && !still ? GLIDE_MS : 0);
+      // Only a turn glides: the window's frames, and the way back from them to the live picture, are set down at once.
+      const glide = !frame && !shownFrame && this.turnMode() && !still;
+      shownFrame = !!frame;
+      scene.setGlide(glide ? GLIDE_MS : 0);
       if (frame) scene.apply(buildWindowScene(frame, this.desk.windowBelief(), fixtureMap));
       else if (view) scene.apply(buildSceneState(view, fixtureMap));
     });

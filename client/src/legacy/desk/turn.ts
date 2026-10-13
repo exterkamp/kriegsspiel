@@ -58,7 +58,8 @@ export function deadlineText(deadline: number | undefined, nowWall: number): str
   if (min < 60) return `Orders due in ${min} min.`;
   const h = Math.floor(min / 60);
   if (h < 48) return `Orders due in ${h} h${min % 60 ? ` ${min % 60} min` : ''}.`;
-  return `Orders due in ${Math.round(h / 24)} days.`;
+  // Whole days left, rounded down: a deadline must never seem further off than it is.
+  return `Orders due in ${Math.floor(h / 24)} days.`;
 }
 
 /** One line of the held list: `To 1st Battalion, by steady courier`. */

@@ -76,4 +76,13 @@ describe('clockView', () => {
     );
     expect(clockView(s, 0).staffAtWork).toBe(false);
   });
+
+  it('sums up a finished turn-mode game with no empty rate (D39)', () => {
+    const s: ClientState = {
+      ...initialState,
+      turnMode: true,
+      gameOver: { winner: 'blue', reason: 'eliminated', atGame: 3_000_000 },
+    };
+    expect(clockSummary(clockView(s, 0))).toBe('Day 1 00:50, game over');
+  });
 });

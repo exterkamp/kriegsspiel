@@ -33,7 +33,7 @@ import {
   type JournalEntry,
 } from '@legacy/desk/journal';
 import { loadMarks, saveMarks, type TrayMarks } from '@legacy/desk/tray';
-import { turnEntry } from '@legacy/desk/turn';
+import { turnEntry, turnPhase } from '@legacy/desk/turn';
 import type { ViewId } from '@legacy/desk/views';
 import { fixtureClient, type ConferenceClient, type Exchange } from '@legacy/desk/conference';
 import { GameService } from '../game/game.service';
@@ -79,6 +79,27 @@ export class DeskStore {
 
   /** The war diary: orders sent, dispatches received, pauses and the player's notes. */
   readonly journal = signal<JournalEntry[]>([]);
+
+  /** Which turn the side is writing, if any: a held order being rewritten belongs to that turn alone. */
+  private readonly writingTurn = computed(() => {
+    const s = this.game.state();
+    return turnPhase(s) === 'writing' ? s.turn?.turn : undefined;
+  });
+
+  constructor() {
+    // Once the side stops writing the turn (it sent, the deadline passed, or the next turn opened), the order being
+    // rewritten is no longer the one a hold would replace. The words stay in the box; holding them makes a new order.
+    let writing: number | undefined | null = null;
+    effect(() => {
+      const t = this.writingTurn();
+      untracked(() => {
+        // The first run only notes the turn; nothing has moved on yet.
+        if (writing !== null && (t === undefined || t !== writing))
+          this.editingTurnOrder.set(undefined);
+        writing = t;
+      });
+    });
+  }
 
   setFiled(id: string, on: boolean): void {
     toggle(this.trayFiled, id, on);

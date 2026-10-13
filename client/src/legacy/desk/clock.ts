@@ -66,7 +66,8 @@ function turnClockView(state: ClientState): ClockView {
 export function clockSummary(v: ClockView): string {
   if (v.turn) return [v.turn, v.label.toLowerCase()].join(', ');
   if (v.status === 'none') return 'No clock yet';
-  const parts = [v.time, v.label.toLowerCase(), `rate ${v.rate}`];
+  // A finished turn-mode game has no rate to give.
+  const parts = [v.time, v.label.toLowerCase(), ...(v.rate ? [`rate ${v.rate}`] : [])];
   if (v.vote) parts.push(`${v.vote} proposed`);
   if (v.staffAtWork) parts.push('staff at work');
   return parts.join(', ');

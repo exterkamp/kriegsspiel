@@ -113,6 +113,20 @@ export class OrdersDeskComponent {
   private readonly injector = inject(Injector);
   /** The last order signed: its words and annex, to put back if the staff refuse it. */
   private lastSent: { words: string; annex: string[] } | undefined;
+  /**
+   * Turn mode: the last order held, to put back if the server refuses it. Held orders are not pending, so a refusal
+   * is known only by the order id that prefixes the notice; `after` is the notice that was last before it went.
+   */
+  private lastHeld:
+    | {
+        orderId: string;
+        text: string;
+        draft: OrderDraft;
+        replaced: boolean;
+        turn?: number;
+        after: unknown;
+      }
+    | undefined;
   private readonly seenOutcomes = new Set<string>();
 
   constructor() {
@@ -126,6 +140,23 @@ export class OrdersDeskComponent {
           this.seenOutcomes.add(id);
           this.refuse(o.text);
         }
+      });
+    });
+    // A hold the server refused (too many orders, too many commands, the turn closing) did not go: give it back.
+    effect(() => {
+      const { notices, turn } = this.game.state();
+      untracked(() => {
+        const held = this.lastHeld;
+        if (!held) return;
+        // Once the turn lists it as written, it went.
+        if (turn?.held.some((o) => o.orderId === held.orderId && o.text === held.text)) {
+          this.lastHeld = undefined;
+          return;
+        }
+        const from = notices.indexOf(held.after as never) + 1;
+        if (!notices.slice(from).some((n) => orderIdOf(n.message) === held.orderId)) return;
+        this.lastHeld = undefined;
+        this.unhold(held);
       });
     });
     // Bring the staff's word into view; the panel scrolls and it would sit below the fold.
@@ -148,6 +179,20 @@ export class OrdersDeskComponent {
     this.lastSent = undefined;
     // Never over words the player has already begun again.
     if (this.draft().text.trim() === '') this.patch({ text: sent.words, annex: sent.annex });
+  }
+
+  private unhold(held: NonNullable<OrdersDeskComponent['lastHeld']>): void {
+    this.confirmation.set('');
+    // Never over words the player has already begun again.
+    if (this.draft().text.trim() !== '') return;
+    this.desk.orderDraft.set(held.draft);
+    // A change to a held order that is still held this turn is still a change to it.
+    const s = this.game.state();
+    const still =
+      s.turn?.turn === held.turn &&
+      turnPhase(s) === 'writing' &&
+      !!s.turn?.held.some((o) => o.orderId === held.orderId);
+    if (held.replaced && still) this.desk.editingTurnOrder.set(held.orderId);
   }
 
   /** Resend the refused order with the chosen option filled in. */
@@ -233,6 +278,14 @@ export class OrdersDeskComponent {
     }
     this.dismissed.set(state.notices.at(-1));
     const replaced = this.editing() !== undefined;
+    this.lastHeld = {
+      orderId,
+      text,
+      draft: d,
+      replaced,
+      ...(state.turn ? { turn: state.turn.turn } : {}),
+      after: state.notices.at(-1),
+    };
     this.desk.editingTurnOrder.set(undefined);
     this.patch({ text: '', annex: [] });
     this.confirmation.set(
