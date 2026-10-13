@@ -21,6 +21,7 @@ import { pieceAtPoint } from '@legacy/table/picking';
 import { markAgeFactor } from '@legacy/table/marks';
 import { buildSceneState } from '@legacy/table/sceneState';
 import type { PickResult } from '@legacy/table/picking';
+import { boardLines } from '@legacy/table/boardText';
 import { buildWindowScene } from '@legacy/window/model';
 import { DeskStore } from '../desk/desk.store';
 import { GameService } from './game.service';
@@ -39,8 +40,9 @@ import { MarksService, type Picker } from './marks.service';
   template: `
     <svg
       #svg
-      role="application"
-      aria-label="Flat map board"
+      role="img"
+      aria-label="Flat map board. The units on it are listed in the map summary."
+      aria-describedby="board-summary"
       preserveAspectRatio="xMidYMid meet"
       [attr.viewBox]="'0 0 ' + map.width + ' ' + map.height"
       [style.font-size.px]="fontSize"
@@ -171,6 +173,11 @@ import { MarksService, type Picker } from './marks.service';
         </text>
       }
     </svg>
+    <ul id="board-summary" class="ks-sr-only" aria-label="Map summary">
+      @for (line of summary(); track $index) {
+        <li>{{ line }}</li>
+      }
+    </ul>
   `,
   styles: `
     :host {
@@ -279,6 +286,8 @@ import { MarksService, type Picker } from './marks.service';
     }
     .piece.enemy {
       fill: var(--ks-map-enemy);
+      /* Side is not colour alone: enemy outlines are dashed, your own are solid. */
+      stroke-dasharray: 24 12;
     }
     .piece.stale {
       fill-opacity: 0.45;
@@ -335,6 +344,7 @@ export class FlatBoardComponent {
     const view = this.game.view();
     return view ? buildSceneState(view, fixtureMap) : undefined;
   });
+  protected readonly summary = computed(() => boardLines(this.scene(), fixtureMap));
   protected readonly own = computed(() => this.scene()?.own ?? []);
   protected readonly ghosts = computed(() => this.scene()?.ghosts ?? []);
   protected readonly fights = computed(() => this.scene()?.engagements ?? []);

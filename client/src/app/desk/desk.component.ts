@@ -6,8 +6,10 @@ import {
   computed,
   effect,
   inject,
+  signal,
   untracked,
 } from '@angular/core';
+import { answerAnnouncement, dispatchAnnouncement } from '@legacy/desk/announce';
 import { unreadCount } from '@legacy/desk/tray';
 import { VIEWS, isDeskView, isTypingTarget, viewForKey, type ViewId } from '@legacy/desk/views';
 import { ClockComponent } from '../game/clock.component';
@@ -68,7 +70,48 @@ export class DeskComponent {
     unreadCount(this.game.state().dispatches, this.desk.trayMarks()),
   );
 
+  /** Spoken to screen readers: a dispatch arrived, a staff officer answered. */
+  protected readonly announcement = signal('');
+  private pending: string[] = [];
+  private flip = false;
+
+  /**
+   * Queues a message for the live region. Messages raised in the same tick are joined so none overwrites another,
+   * and the text alternates with a trailing no-break space so a repeat of the last message still changes the DOM.
+   */
+  private speak(message: string): void {
+    this.pending.push(message);
+    if (this.pending.length > 1) return;
+    queueMicrotask(() => {
+      this.flip = !this.flip;
+      this.announcement.set(this.pending.join(' ') + (this.flip ? '\u00a0' : ''));
+      this.pending = [];
+    });
+  }
+
   constructor() {
+    // The first run only records what is already there; after that, new dispatches and answers are announced.
+    // This assumes the game state is loaded when the desk first renders; nothing here guards against a late load.
+    const seenDispatches = new Set<string>();
+    let first = true;
+    effect(() => {
+      const list = this.game.state().dispatches;
+      untracked(() => {
+        const say = first ? '' : dispatchAnnouncement(seenDispatches, list);
+        for (const d of list) seenDispatches.add(d.id);
+        if (say) this.speak(say);
+      });
+    });
+    const seenAnswers = new Set<number>();
+    effect(() => {
+      const log = this.desk.conferenceLog();
+      untracked(() => {
+        const say = first ? '' : answerAnnouncement(seenAnswers, log);
+        for (const e of log) if (e.answer !== undefined || e.failed) seenAnswers.add(e.id);
+        if (say) this.speak(say);
+      });
+    });
+    afterNextRender(() => (first = false), { injector: this.injector });
     // The game ending brings up the result whatever view was open.
     effect(() => {
       if (this.ended()) untracked(() => this.desk.activeView.set('table'));
