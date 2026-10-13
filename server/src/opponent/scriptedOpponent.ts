@@ -46,6 +46,12 @@ export interface SideAgent {
   settled?(): boolean;
   /** True while the agent should not decide at all (a deputy whose player is back at the table). */
   dormant?(): boolean;
+  /**
+   * A copy that thinks as this agent would from here, memory included, without changing it. A
+   * rigid turn's projection runs the copy through the turn (#430, D39). An agent with none (or
+   * whose `fork` returns nothing) is not run in the projection.
+   */
+  fork?(): SideAgent | undefined;
 }
 
 /** Game ms between decisions: five game minutes. */
@@ -159,6 +165,15 @@ export class ScriptedOpponent implements SideAgent {
   constructor(private readonly config: ScriptedOpponentConfig) {
     this.side = config.side;
     this.intervalMs = config.intervalMs ?? THINK_INTERVAL_MS;
+  }
+
+  fork(): ScriptedOpponent {
+    const copy = new ScriptedOpponent(this.config);
+    for (const [k, v] of this.standing) copy.standing.set(k, v);
+    for (const [k, v] of this.peak) copy.peak.set(k, v);
+    for (const [k, v] of this.still) copy.still.set(k, v);
+    copy.hesitated = this.hesitated;
+    return copy;
   }
 
   think(view: EngineSideView): AgentOrder[] {

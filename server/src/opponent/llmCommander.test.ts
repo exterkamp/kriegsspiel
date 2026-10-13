@@ -20,6 +20,7 @@ import { createGameUmpire } from '../umpire/gameLimits.js';
 import { UmpireError } from '../umpire/umpireClient.js';
 import type { UmpireClient, UmpireRequest, UmpireResponse } from '../umpire/umpireClient.js';
 import { llmAgents, scriptedAgents, LlmCommander, assertFogOnly, FORM_UP_MS } from './index.js';
+import type { SideAgent } from './scriptedOpponent.js';
 
 const BRIDGE = { x: 2_050_000, y: 1_500_000 };
 
@@ -191,6 +192,30 @@ describe('translating orders', () => {
     expect(orders.map((o) => o.unitId)).toEqual(view.ownUnits.map((u) => u.id));
     expect(view.ownUnits.length).toBeGreaterThan(1);
     expect(peak).toBe(view.ownUnits.length);
+  });
+});
+
+describe('turn mode', () => {
+  it('forks into a commander that decides as the original would, leaving the original untouched', () => {
+    const world = loadScenario(holdTheBridge);
+    const agent = commander(new FakeModel(), world);
+    // Some memory first: the fallback has seen Red's units stand.
+    agent.think(viewFor(world, 'red', FORM_UP_MS));
+    const copy = agent.fork();
+    expect(copy).toBeInstanceOf(LlmCommander);
+    // Units that stay still are ordered again after a few decisions, so the memory shows.
+    const later = [1, 2, 3, 4].map((i) => viewFor(world, 'red', FORM_UP_MS + i * 300_000));
+    const fromCopy = later.map((v) => copy!.think(v));
+    expect(fromCopy.flat().length).toBeGreaterThan(0);
+    // The copy's decisions did not touch the original's memory: it decides the same.
+    expect(later.map((v) => agent.think(v))).toEqual(fromCopy);
+  });
+
+  it('cannot be copied when its fallback cannot', () => {
+    const world = loadScenario(holdTheBridge);
+    const fallback: SideAgent = { side: 'red', intervalMs: 300_000, think: () => [] };
+    const agent = new LlmCommander({ ...commander(new FakeModel(), world)['cfg'], fallback });
+    expect(agent.fork()).toBeUndefined();
   });
 });
 

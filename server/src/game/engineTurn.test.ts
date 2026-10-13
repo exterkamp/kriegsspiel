@@ -12,7 +12,7 @@ import {
 import { GameHost, MemoryGameStore, createRegistry, startingState } from './index.js';
 import { replayLog } from './replay.js';
 import { FakeTime } from './testing.js';
-import type { TurnInput, TurnResolver } from './turns.js';
+import type { TurnResolveContext, TurnInput, TurnResolver } from './turns.js';
 
 const MINUTE = 60_000;
 
@@ -54,12 +54,12 @@ class Watching implements TurnResolver {
   constructor(private readonly registry = createRegistry()) {
     this.inner = new EngineTurnResolver(this.registry);
   }
-  async resolve(state: EngineState<GameState>, input: TurnInput) {
+  async resolve(state: EngineState<GameState>, input: TurnInput, context?: TurnResolveContext) {
     const before = structuredClone(state);
-    this.projections.push(projectTurn(state, input, this.registry));
+    this.projections.push(projectTurn(state, input, this.registry, context));
     // The projection never touches the live world.
     expect(state).toEqual(before);
-    return this.inner.resolve(state, input);
+    return this.inner.resolve(state, input, context);
   }
 }
 
@@ -186,21 +186,71 @@ describe('the engine adjudicator: rigid turn mode (D39, 11.4)', () => {
     expect(outputs(b.log)).toEqual(outputs(a.log));
   });
 
-  it('folds a scripted side into the turn: it sends at the turn start and the turn still ends as projected', async () => {
+  it('folds a scripted side into the turn: it thinks at its interval inside it and the turn still ends as projected', async () => {
     const run = await play({ scripted: true });
     expect(run.game.state.world.outcome).toBeDefined();
     const agentTimes = run.log.filter((e) => e.agent).map((e) => e.gameMs);
     expect(agentTimes.length).toBeGreaterThan(0);
+    // On its 5-minute interval, as in real time (#430), not only when a turn opens.
+    for (const t of agentTimes) expect(t % (5 * MINUTE)).toBe(0);
     const starts = new Set(
       run.log.filter((e) => e.command.kind === 'openTurn').map((e) => e.gameMs),
     );
-    for (const t of agentTimes) expect(starts.has(t)).toBe(true);
-    // The next turn's scripted orders are already riding when a turn is read back, so compare units.
+    expect(agentTimes.some((t) => !starts.has(t))).toBe(true);
+    // The projection ran copies of the scripted side, so each turn ends with the units it projected.
+    // A turn's orders thought at its end are already queued when it is read back, so compare units.
     for (const [i, p] of run.projections.entries()) {
       const units = JSON.parse(run.ends[i]!).units;
       expect(units).toEqual(JSON.parse(JSON.stringify(p.state.world.units)));
     }
     expect(JSON.stringify(run.replayed.state.world)).toBe(JSON.stringify(run.game.state.world));
+  });
+
+  it('gives two scripted sides’ copies orders of their own, so a turn they both order in still ends as projected', async () => {
+    const time = new FakeTime();
+    const watching = new Watching();
+    host = new GameHost({
+      store: new MemoryGameStore(),
+      parser,
+      registry: createRegistry(),
+      wallNow: time.now,
+      timers: time,
+      init: startingState,
+      scriptedOpponents: true,
+      turnResolver: () => watching,
+    });
+    // No human side, so each turn closes at its deadline.
+    const settings: UmpireSettings = {
+      dial: 'rigid',
+      persona: 'dry',
+      mode: 'turns',
+      turnMinutes: 20,
+      turnDeadlineHours: 1,
+    };
+    const base = loadScenario(holdTheBridge);
+    const scenario = {
+      ...base,
+      seed: 1815,
+      sides: base.sides.map((s) => ({ ...s, controller: 'scripted' as const })),
+    };
+    const game = await host.create('g1', scenario, { settings });
+    const ends: string[] = [];
+    for (let guard = 0; guard < 30 && !game.state.world.outcome; guard++) {
+      await time.advance(3_600_000);
+      ends.push(JSON.stringify(game.state.world.units));
+    }
+    expect(watching.projections.length).toBe(ends.length);
+    // Both copies' orders reached their units inside one projection: their couriers must not share an id.
+    const both = watching.projections.some((p) => {
+      const units = p.emitted
+        .filter((e) => e.type === 'order_delivered')
+        .map((e) => (e.payload as { unitId: string }).unitId);
+      return units.some((u) => u.startsWith('blue')) && units.some((u) => u.startsWith('red'));
+    });
+    expect(both).toBe(true);
+    for (const [i, p] of watching.projections.entries()) {
+      expect(JSON.parse(ends[i]!)).toEqual(JSON.parse(JSON.stringify(p.state.world.units)));
+    }
   });
 
   it('keeps the projection summary of a 20-minute Hold the Bridge turn under 2,000 tokens', async () => {

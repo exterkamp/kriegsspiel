@@ -36,6 +36,31 @@ export interface TurnInput {
   sent: readonly string[];
 }
 
+/** What a resolver may run beside the turn's data; not logged, and not plain data. */
+export interface TurnResolveContext {
+  /**
+   * Fresh copies of the scripted sides, for a resolution that runs the turn under the engine: they
+   * think inside it at their interval as the live agents will (#430). What the live agents order
+   * is logged as they order it.
+   */
+  agents?: () => TurnAgent[];
+}
+
+/** A scripted side as a turn's projection runs it: a copy, so the live agent is untouched. */
+export interface TurnAgent {
+  /** Game ms between decisions. */
+  intervalMs: number;
+  /** Game time of its next decision. */
+  nextAt: number;
+  /** As the actor keeps it: its last decision changed nothing and nothing has happened since. */
+  idle: boolean;
+  /**
+   * Decide from `state` (the world at that instant, which it sees only through its side's view)
+   * and issue its orders as the live agent's are issued. `idle` is the actor's rule for the result.
+   */
+  think(state: EngineState<GameState>): { state: EngineState<GameState>; idle: boolean };
+}
+
 /** A resolver's answer: what to log and apply. It never carries a state. */
 export interface TurnResolution {
   /** The adjudicator that applies `output` (`registerTurnAdjudicator`). */
@@ -52,7 +77,11 @@ export interface TurnResolution {
  * engine's own resolution on any failure (D39, "Fallback").
  */
 export interface TurnResolver {
-  resolve(state: EngineState<GameState>, input: TurnInput): Promise<TurnResolution>;
+  resolve(
+    state: EngineState<GameState>,
+    input: TurnInput,
+    context?: TurnResolveContext,
+  ): Promise<TurnResolution>;
 }
 
 /**

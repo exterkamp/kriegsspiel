@@ -1,6 +1,7 @@
 import { holdTheBridge, loadScenario, type GameState } from '@kriegsspiel/engine';
 import type { TurnOrder, UmpireSettings } from '@kriegsspiel/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { SideAgent } from '../opponent/index.js';
 import type { OrderParser } from '../orders/index.js';
 import { TURN_MODE_REFUSAL } from './actor.js';
 import { GameHost, MemoryGameStore, createRegistry, startingState } from './index.js';
@@ -627,5 +628,52 @@ describe('turn bookkeeping', () => {
       e(3, { kind: 'resolveTurn', turn: 1, cause: 'all-sent' }, 'unknown adjudicator'),
     ];
     expect(openTurnFromLog(failed)).toBeUndefined();
+  });
+});
+
+describe('turn mode: scripted sides across a reopen (#430)', () => {
+  it('does not think again at minute 0 when the game is reopened with turn 1 open', async () => {
+    const store = new MemoryGameStore();
+    const time = new FakeTime();
+    const thinks: number[] = [];
+    const agent = (): SideAgent => ({
+      side: 'red',
+      intervalMs: 5 * MINUTE,
+      think: (view) => {
+        thinks.push(view.time);
+        return [];
+      },
+      settled: () => false,
+    });
+    const make = () =>
+      new GameHost({
+        store,
+        parser,
+        registry: createRegistry(),
+        wallNow: time.now,
+        timers: time,
+        init: startingState,
+        scriptedOpponents: true,
+        aiAgents: () => [agent()],
+        turnResolver: () => new FakeResolver(),
+      });
+    const settings: UmpireSettings = {
+      dial: 'rigid',
+      persona: 'dry',
+      mode: 'turns',
+      turnMinutes: 20,
+    };
+    const first = make();
+    host = first;
+    await first.create('g1', loadScenario(holdTheBridge), { settings });
+    expect(thinks).toEqual([0]);
+    await first.shutdown();
+
+    host = make();
+    const back = await host.open('g1');
+    await back.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order('b1', 'blue-1') });
+    await time.advance(HOUR);
+    // Its minute-0 decision is already logged: the reopened game does not make it again.
+    expect(thinks).toEqual([0]);
   });
 });
