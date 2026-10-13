@@ -483,6 +483,14 @@ ks-admin {
     .or-top {
       grid-template-columns: 1fr;
     }
+    /* Keep the order text readable on a phone: wall time, signer and call count are in the detail. */
+    .or-table th:is(:nth-child(1), :nth-child(4), :nth-child(8)),
+    .or-table td:is(:nth-child(1), :nth-child(4), :nth-child(8)) {
+      display: none;
+    }
+    .or-table td:nth-child(5) {
+      min-width: 14ch;
+    }
     .lp-body {
       grid-template-columns: 1fr;
       grid-template-rows: 1fr 1fr;
