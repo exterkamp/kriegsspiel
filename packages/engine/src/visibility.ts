@@ -663,7 +663,7 @@ export function fileReport(
   unit: Unit,
   time: GameTime,
   delayMs: number = COURIER_DELAY_MS,
-  extra: Partial<Report> = {},
+  extra: Pick<Report, 'orderDueAt'> = {},
 ): GameState {
   const report: Report = {
     id: reportId(world, unit.side),
