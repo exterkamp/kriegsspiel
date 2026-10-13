@@ -78,6 +78,24 @@ export function contactAgedOut(world: GameState, c: Contact, now: GameTime): boo
   return Math.ceil((now - c.seenAt) / MS_PER_MINUTE) * UNCERTAINTY_MM_PER_MINUTE > capMm;
 }
 
+/**
+ * True when a lost-courier report's unit had a report of its own reach HQ, about something after its
+ * orders were due, by the time the lost-courier report did. Fixed once delivered, so the text does
+ * not change between readings.
+ */
+function heardFromSince(reports: Report[], r: Report): boolean {
+  if (r.kind !== 'courierLost' || r.orderDueAt === undefined) return false;
+  const due = r.orderDueAt;
+  return reports.some(
+    (o) =>
+      o.from === r.from &&
+      o.kind !== 'courierLost' &&
+      o.kind !== 'unitLost' &&
+      o.observedAt >= due &&
+      o.deliverAt <= r.deliverAt,
+  );
+}
+
 /** Whether a delivered report has told this side that enemy `unitId` is destroyed (#110). */
 function destructionDelivered(reports: Report[], unitId: string, now: GameTime): boolean {
   return reports.some((r) => r.kind === 'destroyed' && r.subject === unitId && r.deliverAt <= now);
@@ -327,7 +345,7 @@ export interface EngineSideView {
  * "received" time shown beside it (#318); never an age measured against the clock at read time.
  * Every kind says it one way: "about N minutes ago", or "just now" (#325).
  */
-export function renderReport(r: Report, leadMs: number): string {
+export function renderReport(r: Report, leadMs: number, heardSince = false): string {
   const mins = Math.round(leadMs / MS_PER_MINUTE);
   const where = r.place;
   const when = mins === 0 ? 'just now' : `about ${mins} ${mins === 1 ? 'minute' : 'minutes'} ago`;
@@ -345,9 +363,14 @@ export function renderReport(r: Report, leadMs: number): string {
     case 'unitLost':
       return sir(`${r.from} is lost ${where}, ${when}.`);
     case 'courierLost':
-      return sir(
-        `no word from ${r.from} ${where}: the courier carrying its orders is overdue and must be given up for lost. Send the orders again.`,
-      );
+      // A unit that has sent word since its orders were due is not silent, only without them (#417).
+      return heardSince
+        ? sir(
+            `${r.from} ${where} has sent word, but not that it has its orders: the courier carrying them is overdue and must be given up for lost. Send the orders again.`,
+          )
+        : sir(
+            `no word from ${r.from} ${where}: the courier carrying its orders is overdue and must be given up for lost. Send the orders again.`,
+          );
     case 'orderDelivered':
       return sir(`${r.from} received its orders ${where}, ${when}.`);
     case 'lowAmmo':
@@ -527,7 +550,7 @@ export function viewFor(
           uncertaintyRadius: metres(r.uncertainty),
           ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
           confidence: r.confidence,
-          text: renderReport(r, r.deliverAt - r.observedAt),
+          text: renderReport(r, r.deliverAt - r.observedAt, heardFromSince(intel.reports, r)),
         };
       }),
     documents: intel.documents
@@ -640,6 +663,7 @@ export function fileReport(
   unit: Unit,
   time: GameTime,
   delayMs: number = COURIER_DELAY_MS,
+  extra: Pick<Report, 'orderDueAt'> = {},
 ): GameState {
   const report: Report = {
     id: reportId(world, unit.side),
@@ -651,6 +675,7 @@ export function fileReport(
     place: describePlace(world.map, unit.center),
     uncertainty: 0,
     confidence: 'high',
+    ...extra,
   };
   return withIntel(world, unit.side, { reports: [...world.intel[unit.side].reports, report] });
 }
