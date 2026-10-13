@@ -20,6 +20,7 @@
  * - A place is found by its name, or by its kind (`the wood`) narrowed by words in its name
  *   (`the northern wood`). Several fits: ask which. None: refuse.
  * - Conditions and times ("if pressed", "at noon") are ignored; the intents are the plain order.
+ * - With an `addressee` (the sender chose the unit), an order that names no unit is for it.
  */
 import type { ParseOrdersOutput } from '../../orders/llmParser.js';
 
@@ -40,6 +41,11 @@ interface ParseInput {
   order: string;
   units: Unit[];
   places: Place[];
+  /**
+   * The unit the order is addressed to, when the sender has already chosen it (turn mode, D39): an
+   * order that names no unit is for it, not for the unit nearest its place.
+   */
+  addressee?: string;
 }
 
 type Kind = 'move' | 'hold' | 'attack' | 'withdraw';
@@ -51,7 +57,7 @@ const VERBS: [RegExp, Kind][] = [
   ],
   [/\b(?:attack(?:s|ing)?|assault(?:s|ing)?|storm(?:s|ing)?|charge(?:s|ing)?)\b/, 'attack'],
   [
-    /\b(?:hold(?:s|ing)?|defend(?:s|ing)?|screen(?:s|ing)?|picket|garrison|occupy|guard|stand)\b/,
+    /\b(?:hold(?:s|ing)?|defend(?:s|ing)?|screen(?:s|ing)?|picket|garrison|occupy|guard|stand|halt)\b/,
     'hold',
   ],
   [/\b(?:move|march(?:es|ing)?|advance|proceed|go|push|cross|redeploy|shift)\b/, 'move'],
@@ -253,6 +259,37 @@ function leftmostVerb(clause: string): { kind: Kind; index: number; end: number 
 const INJECTION =
   /\b(?:ignore (?:all |the |your )?(?:previous|prior|above)|system prompt|you are now|reveal your|new instructions)\b/;
 
+/** A time of day ("noon", "1st light", "2 pm", "14:00", "1400 hours", "at 3, march"). */
+const CLOCK =
+  '(?:dawn|dusk|noon|midnight|daybreak|nightfall|sunrise|sunset|1st light|' +
+  '\\d{1,2}(?::\\d\\d)? ?(?:am|pm|o clock|hours|hrs)|\\d{1,2}:\\d\\d|\\d{3,4} hours|' +
+  '\\d{1,4}(?= *(?:$|[,.;]| (?:and|then)\\b)))';
+
+/**
+ * A condition or a time in an order ("if pressed", "at noon", "until relieved"). "At once", and a
+ * number that is not a time ("in 2 columns", "by 2 roads"), are not one.
+ */
+const CONDITION_OR_TIME = new RegExp(
+  '\\b(?:if|unless|when|whenever|until|before|after|' +
+    'once (?:the|we|you|it|they|he|she|our|your|their|in|there|relieved|pressed|attacked)' +
+    `|at ${CLOCK}|by ${CLOCK}|in (?:\\d+|an|a|half an) (?:minutes?|mins?|hours?|hrs?))\\b`,
+);
+
+/**
+ * Whether `order` has a condition or a time the rules cannot express. In turn mode (D39) such an
+ * order is "no new order" for the engine, not its plain verb as `testParse` reads it. Read with
+ * its punctuation, which tells "at 3, march" (a time) from "at 3 paces".
+ */
+export function hasConditionOrTime(order: string): boolean {
+  const text = order
+    .toLowerCase()
+    .replace(/[^a-z0-9\s,.;:-]/g, ' ')
+    .replace(/\b(first|second|third|fourth|fifth)\b/g, (w) => ORDINALS[w] as string)
+    .replace(/\s+/g, ' ')
+    .trim();
+  return CONDITION_OR_TIME.test(text);
+}
+
 const distance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -341,7 +378,8 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
     if (refersBack) {
       place = previous;
       if (!place && verb.kind === 'hold') {
-        intents.push({ kind: 'hold', place: 'here' });
+        // "Halt and hold here": one hold where it stands, not two.
+        if (lastKind !== 'hold') intents.push({ kind: 'hold', place: 'here' });
         lastKind = 'hold';
         continue;
       }
@@ -377,7 +415,8 @@ export function testParse(input: ParseInput): ParseOrdersOutput {
   }
   if (intents.length === 0) return refuse('I cannot find an order in that, sir.');
 
-  let unit: Unit | undefined = match.kind === 'one' ? match.unit : undefined;
+  let unit: Unit | undefined =
+    match.kind === 'one' ? match.unit : input.units.find((u) => u.id === input.addressee);
   if (!unit) {
     // No unit named: the nearest to the first place, which is the one that can act soonest.
     const anchor = nearestTo;

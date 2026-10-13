@@ -131,9 +131,13 @@ export {
   COURIER_MS_PER_METRE,
   COURIER_STEP_EVENT,
   choiceRisk,
+  issueForcedOrder,
   issueOrder,
   registerOrders,
 } from './orders.js';
+export type { ForcedIssue } from './orders.js';
+export { courierPass, engineTurnStart } from './engineTurn.js';
+export type { CourierPass, TurnCourier } from './engineTurn.js';
 export {
   GARBLE_MAX_M,
   GARBLE_MIN_M,
