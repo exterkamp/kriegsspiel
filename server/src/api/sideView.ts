@@ -67,6 +67,7 @@ export function toDispatch(r: ViewReport): Dispatch {
     category: CATEGORY[r.kind],
     kind: r.kind,
     location: r.location,
+    place: r.place,
     ...(r.sizeEstimate === undefined ? {} : { sizeEstimate: r.sizeEstimate }),
     confidence: r.confidence,
     text: r.text,
@@ -83,6 +84,7 @@ export function documentToDispatch(d: ViewDocument): Dispatch {
     receivedAtGame: d.deliveredAt,
     category: 'intelligence',
     location: d.location,
+    place: d.place,
     text: renderDocument(d),
   };
 }
@@ -193,6 +195,7 @@ export function toSideView(
       id: u.id,
       name: u.name,
       position: u.position,
+      ...(u.place ? { place: u.place } : {}),
       facing: u.facing,
       formation: u.formation,
       footprint: u.footprint,

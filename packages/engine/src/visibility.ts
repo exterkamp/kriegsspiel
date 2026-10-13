@@ -6,7 +6,7 @@ import { courierPosition, destinationOf } from './courier.js';
 import { findPath } from './navigation.js';
 import { distance, metres } from './geometry.js';
 import { describePlace } from './place.js';
-import { fieldNote, type NoteSender } from './fieldNotes.js';
+import { clockTime, fieldNote, type NoteSender } from './fieldNotes.js';
 import { evaluateStanding } from './standing.js';
 import { unitTypeOf } from './unitTypes.js';
 import { BLOCKS_SIGHT, profileAlong, terrainAt } from './terrain.js';
@@ -218,6 +218,8 @@ export interface ViewUnit {
   kind: UnitKind;
   /** Centre of the footprint, in metres. */
   position: Point;
+  /** Where it stands in plain words, "near the bridge, on the High road" (`describePlace`). */
+  place: string;
   /** Compass bearing in radians (0 north, growing clockwise). */
   facing: number;
   formation: Formation;
@@ -321,6 +323,8 @@ export interface ViewDocument {
   place: string;
   /** The order exactly as the enemy wrote it. */
   text: string;
+  /** A turn-mode game: its prose names the clock time it was taken, not its age (#439). */
+  clock?: true;
 }
 
 /**
@@ -354,6 +358,7 @@ export interface EngineSideView {
  * is the same whenever it is read and agrees with the "received" time shown beside it (#318); never an
  * age measured against the clock at read time. Every kind says it one way: "about N minutes ago", or
  * "just now" (#325). `sender` and `seed` choose the manner and wording; without them, the first wording.
+ * `clock` (a turn-mode game) gives the clock time of the event instead, "at 00:12" (#439).
  */
 export function renderReport(
   r: Report,
@@ -361,14 +366,21 @@ export function renderReport(
   heardSince = false,
   sender?: NoteSender,
   seed?: number,
+  clock = false,
 ): string {
-  return fieldNote(r, leadMs, heardSince, sender, seed);
+  return fieldNote(r, leadMs, heardSince, sender, seed, clock);
 }
 
-/** Prose for the table: where and when the dispatch was taken, then the enemy's own words. */
+/**
+ * Prose for the table: where and when the dispatch was taken, then the enemy's own words. In a turn-mode
+ * game (`d.clock`) "when" is the clock time it was taken, as for a report (#439).
+ */
 export function renderDocument(d: ViewDocument): string {
   const mins = Math.round(d.ageMs / MS_PER_MINUTE);
-  return `Enemy dispatch to ${d.addressedTo}, taken from a courier ${d.place}, ${mins} ${mins === 1 ? 'minute' : 'minutes'} ago: "${d.text}"`;
+  const when = d.clock
+    ? `at ${clockTime(d.capturedAt)}`
+    : `${mins} ${mins === 1 ? 'minute' : 'minutes'} ago`;
+  return `Enemy dispatch to ${d.addressedTo}, taken from a courier ${d.place}, ${when}: "${d.text}"`;
 }
 
 function couriersOf(state: GameState, side: SideId): ViewCourier[] {
@@ -462,6 +474,8 @@ export function viewFor(
         ...(u.trait === undefined ? {} : { trait: u.trait }),
         kind: u.kind,
         position: viewPoint(u.center),
+        // Where it stands, in the words its papers use, for the desk's status of each unit (#439).
+        place: describePlace(state.map, u.center),
         facing: u.facing,
         formation: u.formation,
         footprint: viewFootprint(u),
@@ -529,6 +543,8 @@ export function viewFor(
             heardFromSince(intel.reports, r),
             senderOf(state, side, r),
             state.seed,
+            // A turn-mode game, once its first turn is under way: its papers name clock times (#439).
+            state.turn !== undefined,
           ),
           ...(r.orderRef === undefined ? {} : { orderRef: r.orderRef }),
         };
@@ -546,6 +562,7 @@ export function viewFor(
         location: viewPoint(d.location),
         place: d.place,
         text: d.text,
+        ...(state.turn === undefined ? {} : { clock: true as const }),
       })),
   };
 }

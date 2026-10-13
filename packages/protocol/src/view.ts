@@ -57,6 +57,8 @@ export const Dispatch = z
       ])
       .optional(),
     location: Coord.optional(),
+    /** `location` in the paper's own words, "near the bridge, on the High road" (#439). */
+    place: z.string().optional(),
     unit: z.string().optional(),
     sizeEstimate: z.string().optional(),
     confidence: z.enum(['low', 'medium', 'high']).optional(),
@@ -93,6 +95,8 @@ export const OwnUnit = z
     trait: z.string().optional(),
     /** Centre of the footprint, in metres. */
     position: Coord,
+    /** Where it stands in the words its papers use, "near the bridge, on the High road" (#439). */
+    place: z.string().optional(),
     facing: Facing,
     formation: Formation,
     footprint: Footprint,

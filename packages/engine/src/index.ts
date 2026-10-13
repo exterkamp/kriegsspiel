@@ -186,7 +186,7 @@ export type {
   ViewUnit,
 } from './visibility.js';
 export * from './fatigue.js';
-export { fieldNote, temperOf } from './fieldNotes.js';
+export { clockTime, fieldNote, temperOf } from './fieldNotes.js';
 export type { NoteSender, Temper } from './fieldNotes.js';
 export {
   AMMO_PER_FIRE_TICK,
