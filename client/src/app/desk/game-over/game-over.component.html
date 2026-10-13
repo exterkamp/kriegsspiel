@@ -4,6 +4,8 @@
   aria-labelledby="over-h"
   aria-modal="true"
   role="dialog"
+  (keydown)="trap($event)"
+  #panel
 >
   <h2 id="over-h">{{ headline() }}</h2>
   <p class="reason">{{ reason() }}</p>

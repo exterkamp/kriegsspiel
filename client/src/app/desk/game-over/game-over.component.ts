@@ -11,6 +11,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { trapTab } from '../../ui/focus';
 import { fetchGame } from '@legacy/lobby/api';
 import { fetchWindowAt } from '@legacy/window/api';
 import { GameService } from '../../game/game.service';
@@ -56,6 +57,7 @@ export class GameOverComponent {
   protected readonly busy = signal(false);
   protected readonly error = signal('');
   private readonly first = viewChild<ElementRef<HTMLButtonElement>>('first');
+  private readonly panel = viewChild.required<ElementRef<HTMLElement>>('panel');
 
   constructor() {
     let destroyed = false;
@@ -73,6 +75,10 @@ export class GameOverComponent {
         .catch(() => {});
     });
     afterNextRender(() => this.first()?.nativeElement.focus());
+  }
+
+  protected trap(e: KeyboardEvent): void {
+    trapTab(e, this.panel().nativeElement);
   }
 
   protected async playAgain(): Promise<void> {

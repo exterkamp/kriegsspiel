@@ -6,6 +6,7 @@ import {
   input,
   viewChild,
 } from '@angular/core';
+import { trapTab } from './focus';
 
 /**
  * A modal dialog (#327): scrim, a paper panel with a title, focus moved in when it opens, and Tab kept inside while it
@@ -54,22 +55,6 @@ export class ModalComponent {
   }
 
   protected trap(e: KeyboardEvent): void {
-    if (e.key !== 'Tab') return;
-    const items = [
-      ...this.panel().nativeElement.querySelectorAll<HTMLElement>(
-        'button, input, select, textarea, a[href]',
-      ),
-    ];
-    const first = items[0];
-    const last = items[items.length - 1];
-    if (!first || !last) return;
-    const at = document.activeElement;
-    if (e.shiftKey && at === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && at === last) {
-      e.preventDefault();
-      first.focus();
-    }
+    trapTab(e, this.panel().nativeElement);
   }
 }
