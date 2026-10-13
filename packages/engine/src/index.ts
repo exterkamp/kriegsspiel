@@ -201,3 +201,13 @@ export {
   parseCombatData,
 } from './combatRules.js';
 export type { CombatData } from './combatRules.js';
+export {
+  DEVIATION_CHANCE,
+  EXCEED_MAX_M,
+  HALT_SHORT_MAX,
+  INTENT_CHANCE,
+  INTENT_DAMPING,
+  TRAITS,
+  shapeIntents,
+} from './personality.js';
+export type { Deviation, Interpretation, Trait } from './personality.js';

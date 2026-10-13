@@ -56,6 +56,7 @@ export function applyLoggedOrder(
     text: parsed.text,
     intents,
     ...(courier ? { courier } : {}),
+    ...(parsed.interpretation ? { interpretation: parsed.interpretation } : {}),
   };
   return { state: issueOrder(state, order, state.time), orderId: order.id };
 }

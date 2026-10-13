@@ -1,7 +1,8 @@
 /** Per-game umpire clients are evicted (#263) and the parser wiring from main.ts is testable. */
 import { describe, expect, it } from 'vitest';
 import { CORPUS_CONTEXT } from '../orders/eval/corpus.js';
-import { LlmOrderParser } from '../orders/llmParser.js';
+import { InterpretingParser } from '../orders/interpret.js';
+import type { OrderParser } from '../orders/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { GameClients, orderParserFor } from './gameClients.js';
 import { MockUmpireClient } from './mockUmpireClient.js';
@@ -56,7 +57,7 @@ describe('orderParserFor', () => {
     });
     expect(typeof parser).toBe('function');
     const make = parser as (id: string) => unknown;
-    expect(make('g1')).toBeInstanceOf(LlmOrderParser);
+    expect(make('g1')).toBeInstanceOf(InterpretingParser);
     make('g2');
     expect(asked).toEqual(['g1', 'g2']);
   });
@@ -72,7 +73,7 @@ describe('orderParserFor', () => {
       llm: true,
       clientFor: () => failing,
       onFallback: (id, reason) => seen.push([id, reason]),
-    }) as (id: string) => LlmOrderParser;
+    }) as (id: string) => OrderParser;
     const r = await make('g1').parse('1st Battalion march to the bridge', CORPUS_CONTEXT);
     expect(r.kind).toBe('intents');
     expect(seen).toHaveLength(1);
@@ -93,7 +94,7 @@ describe('orderParserFor', () => {
       },
     };
     const make = orderParserFor({ llm: true, clientFor: () => failing, cannedParser: canned });
-    const r = await (make as (id: string) => LlmOrderParser)('g').parse('Advance', CORPUS_CONTEXT);
+    const r = await (make as (id: string) => OrderParser)('g').parse('Advance', CORPUS_CONTEXT);
     expect(calls).toEqual(['Advance']);
     expect(r).toMatchObject({ kind: 'intents', unitId: 'blue-1' });
   });

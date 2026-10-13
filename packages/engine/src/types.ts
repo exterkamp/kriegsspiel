@@ -1,5 +1,6 @@
 import type { Pace } from './fatigue.js';
 import type { Order, OrderIntent } from './orders.js';
+import type { Trait } from './personality.js';
 import type { PlacementProposal, PlacementVerdict } from './placement.js';
 import type { Dial } from './judgment.js';
 
@@ -180,6 +181,8 @@ export interface Unit {
   commander?: string;
   /** A short note on the commander's manner, for the roster tooltip. */
   trait?: string;
+  /** The commander's traits. Master state only: never in a view (see personality.ts). */
+  personality?: Trait[];
   /** Centre of the unit's footprint. */
   center: Point;
   /** Compass bearing in radians the unit faces: 0 is north (-y), growing clockwise (east is pi/2). */

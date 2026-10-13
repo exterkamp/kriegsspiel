@@ -60,3 +60,36 @@ describe('the parse context the actor builds (#354)', () => {
     });
   }
 });
+
+describe('traits in the parse context (#45)', () => {
+  for (const side of ['blue', 'red'] as const) {
+    it(`carries the ${side} parser only its own side's personalities`, async () => {
+      const contexts: ParseContext[] = [];
+      const parser: OrderParser = {
+        parse: async (text, context) => {
+          contexts.push(context);
+          return { kind: 'rejected', text, reason: 'No order found.' } as never;
+        },
+      };
+      const time = new FakeTime();
+      host = new GameHost({
+        store: new MemoryGameStore(),
+        parser,
+        registry: registry(),
+        wallNow: time.now,
+        timers: time,
+      });
+      const game = await host.create('g1', loadScenario(holdTheBridge), { rate: 1 });
+      for (const u of game.state.world.units) u.personality = ['cautious'];
+      await game.submit({ kind: 'order', side, text: 'hold the bridge' });
+
+      const units = contexts[0]!.units;
+      expect(units.some((u) => u.side === side)).toBe(true);
+      expect(units.some((u) => u.side !== side)).toBe(true);
+      for (const u of units) {
+        if (u.side === side) expect(u.personality).toEqual(['cautious']);
+        else expect(u).not.toHaveProperty('personality');
+      }
+    });
+  }
+});
