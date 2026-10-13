@@ -1,0 +1,197 @@
+[
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:06:24.807Z",
+    "label": "Current-source signed-out production menu",
+    "url": "http://a5-resume.localhost:41029/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph:\n    - button \"Play as guest\"\n  - paragraph: No email needed. Sign in later to keep your games on other devices.\n  - form \"Sign in\":\n    - heading \"Sign in\" [level=2]\n    - text: Email\n    - textbox \"Email\"\n    - button \"Send me a login link\"",
+    "rendered": {
+      "active": "BODY",
+      "canvases": 0,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:07:39.920Z",
+    "label": "Settled current guest main menu",
+    "url": "http://a5-resume.localhost:41029/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph: An umpired war game, played in real time or slower.\n  - navigation \"Main menu\":\n    - button \"New game\"\n  - region \"Account\":\n    - heading \"Account\" [level=2]\n    - paragraph: Playing as a guest. Your games stay in this browser.\n    - button \"Sign in to keep your games on other devices\"\n    - button \"High contrast\"\n  - region \"Developer tools\":\n    - heading \"Developer tools\" [level=2]\n    - paragraph: For development; not part of the game.\n    - list:\n      - link \"Map editor Generate, preview and export a battlefield.\":\n        - /url: /map-authoring\n        - generic: Map editor\n        - generic: Generate, preview and export a battlefield.\n      - link \"Map benchmark Time map generation and rendering on this device.\":\n        - /url: /map-benchmark\n        - generic: Map benchmark\n        - generic: Time map generation and rendering on this device.\n      - link \"Table benchmark Time the 3D table scene on this device.\":\n        - /url: /table-benchmark\n        - generic: Table benchmark\n        - generic: Time the 3D table scene on this device.\n      - link \"Style guide Tokens and every shared control in each state.\":\n        - /url: /style-guide\n        - generic: Style guide\n        - generic: Tokens and every shared control in each state.\n      - link \"Admin view Operator console; off on this server.\":\n        - /url: /admin/\n        - generic: Admin view\n        - generic: Operator console; off on this server.\n  - region \"About\":\n    - heading \"About\" [level=2]\n    - paragraph:\n      - text: You command one side of a battle from a desk. Orders are written in plain words and carried by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game keeps running on the server while you are away.\n      - link \"Read how it plays\":\n        - /url: https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md\n      - text: .",
+    "rendered": {
+      "active": "BODY",
+      "canvases": 0,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:07:51.919Z",
+    "label": "Actual pre-dispatch ordinary form: Real time default, 12:1, Standard, Dry; isolated stub/test providers",
+    "url": "http://a5-resume.localhost:41029/?lobby=1",
+    "dom": "- main:\n  - paragraph:\n    - button \"← Main menu\"\n  - heading \"New game\" [level=1]\n  - form \"New game\":\n    - group \"Scenario\":\n      - generic: Scenario\n      - radio \"Hold the Bridge\" [checked]\n      - generic: Hold the Bridge\n      - paragraph: Blue holds a river crossing on the high road against a Red advance from the north. Blue wins by keeping the objective for 50 minutes; Red wins by taking it, or by breaking the defence.\n      - paragraph: \"Sides: Blue and Red. About 50 minutes of battle, 4 minutes at this rate.\"\n    - group \"Your side\":\n      - generic: Your side\n      - paragraph: Blue\n      - paragraph: A computer opponent plays the other side.\n    - group \"How the game is played\":\n      - generic: How the game is played\n      - radio \"Real time\" [checked]\n      - generic: Real time\n      - radio \"Turns, umpire decides\"\n      - generic: Turns, umpire decides\n      - status: The clock runs at the rate you choose; orders ride by courier while the battle goes on.\n    - group \"Clock rate\":\n      - generic: Clock rate\n      - radio \"1:1\"\n      - text: 1:1\n      - radio \"4:1\"\n      - text: 4:1\n      - radio \"12:1\" [checked]\n      - text: 12:1\n      - radio \"Custom\"\n      - text: Custom\n      - status: 12:1 means one hour of battle passes in five minutes.\n    - group \"How strictly the umpire follows the rules\":\n      - generic: How strictly the umpire follows the rules\n      - radio \"Rigid\"\n      - generic: Rigid\n      - radio \"Standard\" [checked]\n      - generic: Standard\n      - radio \"Free\"\n      - generic: Free\n      - status: The tables decide, and where the rules are silent the umpire may nudge a result by up to a quarter either way.\n    - group \"Umpire's manner\":\n      - generic: Umpire's manner\n      - radio \"Dry staff officer\" [checked]\n      - generic: Dry staff officer\n      - radio \"Pedantic umpire\"\n      - generic: Pedantic umpire\n      - radio \"Dramatic correspondent\"\n      - generic: Dramatic correspondent\n      - status: Terse and matter-of-fact reports and rulings, as from a seasoned staff officer.\n      - paragraph: The manner changes only how the umpire writes, never what happens.\n    - button \"Start\"\n    - button \"Back\"\n  - heading \"Your games\" [level=2]\n  - list:\n    - listitem: No games yet.",
+    "rendered": {
+      "active": "BODY",
+      "canvases": 0,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:09:39.637Z",
+    "label": "Current ordinary native Start settled in real-time HQ",
+    "url": "http://a5-resume.localhost:41029/?game=5a0bfe02-ae2c-4f42-ad2d-0f35ac2eef08",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- region \"Map marks\":\n  - button \"Tools\" [expanded]\n  - toolbar:\n    - button \"Look\" [pressed]\n    - button \"Move\"\n    - button \"Pin\"\n    - button \"Pencil\"\n    - button \"Arrow\"\n    - button \"Range ring\"\n  - textbox \"Note for the next mark\"\n  - button \"Delete mark\" [disabled]\n  - button \"Plot report\" [disabled]\n  - checkbox \"Order arrows\" [checked]\n  - text: Order arrows\n  - checkbox \"Planned routes\" [checked]\n  - text: Planned routes\n  - checkbox \"Last known\" [checked]\n  - text: Last known\n- status: New dispatch from Chief of staff.\n- region \"Clock\":\n  - generic: Day 1 00:20\n  - generic: 12:1\n  - status: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\" [pressed]:\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 1 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"1 unread\": \"1\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- button \"Menu (Esc)\"",
+    "rendered": {
+      "active": "BODY",
+      "canvases": 1,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:09:40.070Z",
+    "label": "Current live roster panel",
+    "url": "http://a5-resume.localhost:41029/?game=5a0bfe02-ae2c-4f42-ad2d-0f35ac2eef08",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- status: New dispatch from Chief of staff.\n- region \"Clock\":\n  - generic: Day 1 00:20\n  - generic: 12:1\n  - status: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\":\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 1 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"1 unread\": \"1\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\" [active] [pressed]:\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- region \"Order of battle\":\n  - heading \"Order of battle\" [level=2]\n  - table:\n    - rowgroup:\n      - row \"Formation Strength Supply Morale Reported\":\n        - columnheader \"Formation\"\n        - columnheader \"Strength\"\n        - columnheader \"Supply\"\n        - columnheader \"Morale\"\n        - columnheader \"Reported\"\n    - rowgroup:\n      - row \"Show 1st Battalion on the table Col. Aubry 600 100% 80% Day 1 00:20 just now\":\n        - rowheader \"Show 1st Battalion on the table Col. Aubry\":\n          - button \"Show 1st Battalion on the table\": 1st Battalion\n          - generic \"steady and methodical; holds a line under fire\": Col. Aubry\n        - cell \"600\"\n        - cell \"100%\"\n        - cell \"80%\"\n        - cell \"Day 1 00:20 just now\":\n          - text: Day 1 00:20\n          - generic: just now\n      - row \"Show 2nd Battalion on the table Col. Delacroix 550 100% 75% Day 1 00:20 just now\":\n        - rowheader \"Show 2nd Battalion on the table Col. Delacroix\":\n          - button \"Show 2nd Battalion on the table\": 2nd Battalion\n          - generic \"cautious; slow to commit his reserve\": Col. Delacroix\n        - cell \"550\"\n        - cell \"100%\"\n        - cell \"75%\"\n        - cell \"Day 1 00:20 just now\":\n          - text: Day 1 00:20\n          - generic: just now\n      - row \"Show Cavalry Squadron on the table Maj. Verneuil 200 100% 85% Day 1 00:20 just now\":\n        - rowheader \"Show Cavalry Squadron on the table Maj. Verneuil\":\n          - button \"Show Cavalry Squadron on the table\": Cavalry Squadron\n          - generic \"bold and impatient; apt to charge early\": Maj. Verneuil\n        - cell \"200\"\n        - cell \"100%\"\n        - cell \"85%\"\n        - cell \"Day 1 00:20 just now\":\n          - text: Day 1 00:20\n          - generic: just now\n- button \"Menu (Esc)\"",
+    "rendered": {
+      "active": "BUTTON",
+      "canvases": 1,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:09:50.576Z",
+    "label": "Current orders/drafts view with courier estimates; no order/draft submitted",
+    "url": "http://a5-resume.localhost:41029/?game=5a0bfe02-ae2c-4f42-ad2d-0f35ac2eef08",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- status: New dispatch from Chief of staff.\n- region \"Clock\":\n  - generic: Day 1 00:22\n  - generic: 12:1\n  - status: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\":\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 1 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"1 unread\": \"1\"\n  - button \"Orders desk O\" [active] [pressed]:\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- region \"Orders desk\":\n  - heading \"Orders\" [level=2]\n  - region \"Drafts\":\n    - heading \"Drafts\" [level=3]\n    - paragraph: Draft the order together with your staff. Everyone on your side sees the same wording as it changes.\n    - status\n    - button \"New draft\"\n    - paragraph: No drafts yet. Start one and your staff can write in it with you.\n  - generic: To\n  - combobox \"To\":\n    - option \"(choose a commander)\"\n    - option \"1st Battalion\" [selected]\n    - option \"2nd Battalion\"\n    - option \"Cavalry Squadron\"\n  - alert\n  - generic: Order\n  - textbox \"Order\":\n    - /placeholder: Write the order…\n  - alert\n  - paragraph: The staff understand orders such as \"1st Battalion march to the bridge\" or \"Hold the wood\".\n  - group \"Marked-map annex\":\n    - generic: Marked-map annex\n    - paragraph: Draw arrows on the map table to attach them to the order.\n  - group \"Courier\":\n    - generic: Courier\n    - radio \"Fast rider about 2 min Rides hard and arrives sooner, but is more likely to be lost, taken or to garble the order.\"\n    - generic: Fast rider\n    - generic: about 2 min\n    - generic: Rides hard and arrives sooner, but is more likely to be lost, taken or to garble the order.\n    - radio \"Steady courier about 4 min Keeps to the quiet way. Arrives later, but is less likely to be lost, taken or to garble the order.\" [checked]\n    - generic: Steady courier\n    - generic: about 4 min\n    - generic: Keeps to the quiet way. Arrives later, but is less likely to be lost, taken or to garble the order.\n    - paragraph: The staff reckon the ride on the straight line; a road shortens it and rough ground lengthens it.\n  - button \"Sign and send\"\n  - alert\n- button \"Menu (Esc)\"",
+    "rendered": {
+      "active": "BUTTON",
+      "canvases": 1,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:10:01.826Z",
+    "label": "Current staff pane loaded; no question/model action submitted",
+    "url": "http://a5-resume.localhost:41029/?game=5a0bfe02-ae2c-4f42-ad2d-0f35ac2eef08",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- status: New dispatch from 2nd Battalion.\n- region \"Clock\":\n  - generic: Day 1 00:24\n  - generic: 12:1\n  - status: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\":\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 3 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"3 unread\": \"3\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\" [active] [pressed]:\n    - text: Staff conference\n    - generic: C\n- region \"Staff conference\":\n  - heading \"Staff conference\" [level=2]\n  - group \"Staff officer\":\n    - button \"Chief of staff\" [pressed]\n    - button \"Intelligence officer\"\n    - button \"Quartermaster\"\n    - button \"Engineer\"\n  - paragraph:\n    - strong: Captain Evrard\n    - text: \", chief of staff. Traits: cautious, meticulous, long-winded. Each question takes about 10 min of game time to answer.\"\n  - paragraph:\n    - emphasis: No questions yet.\n  - generic: Ask Captain Evrard\n  - textbox \"Ask Captain Evrard\"\n  - button \"Ask (costs 10 min)\"\n- button \"Menu (Esc)\"",
+    "rendered": {
+      "active": "BUTTON",
+      "canvases": 1,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:10:03.737Z",
+    "label": "Current journal route",
+    "url": "http://a5-resume.localhost:41029/?game=5a0bfe02-ae2c-4f42-ad2d-0f35ac2eef08",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- status: New dispatch from 1st Battalion.\n- region \"Clock\":\n  - generic: Day 1 00:25\n  - generic: 12:1\n  - status: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\":\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 4 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"4 unread\": \"4\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\" [active] [pressed]:\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- region \"Journal\":\n  - heading \"Journal\" [level=2]\n  - generic: Add a note\n  - textbox \"Add a note\"\n  - button \"Write in diary\" [disabled]\n  - generic: Search\n  - searchbox \"Search\"\n  - button \"Orders\"\n  - button \"Dispatches\"\n  - button \"Pauses\"\n  - button \"Notes\"\n  - button \"Export as text\"\n  - list:\n    - listitem: \"Day 1 00:25 1st Battalion: Sir, we have sighted a small detachment at the bridge, on the High road. I await orders. — 1st Battalion, about 10 minutes ago.\"\n    - listitem: \"Day 1 00:24 2nd Battalion: Sir, we are engaged near the bridge, east of the High road. I am not certain we can hold. Your orders? — 2nd Battalion, about 3 minutes ago.\"\n    - listitem: \"Day 1 00:24 1st Battalion: Sir, heavy firing near the bridge, west of the High road: we are engaged. We hold. — 1st Battalion, about 3 minutes ago.\"\n    - listitem: \"Day 1 00:00 Chief of staff: Sir, the army stands ready: 3 formations in position on the High road. Nothing of the enemy as yet.\"\n- button \"Menu (Esc)\"",
+    "rendered": {
+      "active": "BUTTON",
+      "canvases": 1,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:10:36.665Z",
+    "label": "Current live Menu shows guest/Leave; no account action",
+    "url": "http://a5-resume.localhost:41029/?game=5a0bfe02-ae2c-4f42-ad2d-0f35ac2eef08",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- status: New dispatch from Cavalry Squadron.\n- region \"Clock\":\n  - generic: Day 1 00:31\n  - generic: 12:1\n  - status: ▶Running\n- navigation \"Desk\":\n  - button \"Map table T\":\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 7 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"7 unread\": \"7\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\" [pressed]:\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n- region \"Journal\":\n  - heading \"Journal\" [level=2]\n  - generic: Add a note\n  - textbox \"Add a note\"\n  - button \"Write in diary\" [disabled]\n  - generic: Search\n  - searchbox \"Search\"\n  - button \"Orders\"\n  - button \"Dispatches\"\n  - button \"Pauses\"\n  - button \"Notes\"\n  - button \"Export as text\"\n  - list:\n    - listitem: \"Day 1 00:28 Cavalry Squadron: Sir, the enemy is upon us near the bridge, on the High road; we are fighting. The men are eager; we press them hard. — Cavalry Squadron, about 3 minutes ago.\"\n    - listitem: \"Day 1 00:28 1st Battalion: Sir, there are about a battalion before us near the bridge, on the High road, as near as we can tell. Shall we engage or watch them? — 1st Battalion, about 10 minutes ago.\"\n    - listitem: \"Day 1 00:26 1st Battalion: Sir, there are about a battalion before us near the bridge, on the High road, as near as we can tell. I keep them under watch. — 1st Battalion, about 10 minutes ago.\"\n    - listitem: \"Day 1 00:25 1st Battalion: Sir, we have sighted a small detachment at the bridge, on the High road. I await orders. — 1st Battalion, about 10 minutes ago.\"\n    - listitem: \"Day 1 00:24 2nd Battalion: Sir, we are engaged near the bridge, east of the High road. I am not certain we can hold. Your orders? — 2nd Battalion, about 3 minutes ago.\"\n    - listitem: \"Day 1 00:24 1st Battalion: Sir, heavy firing near the bridge, west of the High road: we are engaged. We hold. — 1st Battalion, about 3 minutes ago.\"\n    - listitem: \"Day 1 00:00 Chief of staff: Sir, the army stands ready: 3 formations in position on the High road. Nothing of the enemy as yet.\"\n- button \"Menu (Esc)\"\n- dialog \"Menu\":\n  - heading \"Menu\" [level=2]\n  - button \"Resume\" [active]\n  - button \"Leave to main menu\"\n  - button \"Sign out\"\n  - generic: Guest\n  - link \"Games\":\n    - /url: /?lobby=1\n  - button \"Delete account\"\n  - paragraph: Leaving does not end the game. It keeps running on the server.",
+    "rendered": {
+      "active": "BUTTON",
+      "canvases": 1,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:11:11.991Z",
+    "label": "Current ordinary menu after Leave; own Continue row",
+    "url": "http://a5-resume.localhost:41029/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph: An umpired war game, played in real time or slower.\n  - navigation \"Main menu\":\n    - button \"New game\"\n  - region \"Continue\":\n    - heading \"Continue\" [level=2]\n    - list:\n      - 'button \"Continue: Hold the Bridge, playing blue, game time Day 1 00:31, last played just now\"':\n        - generic: Hold the Bridge\n        - generic: blue\n        - generic: Day 1 00:31\n        - generic: played just now\n  - region \"Account\":\n    - heading \"Account\" [level=2]\n    - paragraph: Playing as a guest. Your games stay in this browser.\n    - button \"Sign in to keep your games on other devices\"\n    - button \"High contrast\"\n  - region \"Developer tools\":\n    - heading \"Developer tools\" [level=2]\n    - paragraph: For development; not part of the game.\n    - list:\n      - link \"Map editor Generate, preview and export a battlefield.\":\n        - /url: /map-authoring\n        - generic: Map editor\n        - generic: Generate, preview and export a battlefield.\n      - link \"Map benchmark Time map generation and rendering on this device.\":\n        - /url: /map-benchmark\n        - generic: Map benchmark\n        - generic: Time map generation and rendering on this device.\n      - link \"Table benchmark Time the 3D table scene on this device.\":\n        - /url: /table-benchmark\n        - generic: Table benchmark\n        - generic: Time the 3D table scene on this device.\n      - link \"Style guide Tokens and every shared control in each state.\":\n        - /url: /style-guide\n        - generic: Style guide\n        - generic: Tokens and every shared control in each state.\n      - link \"Admin view Operator console; off on this server.\":\n        - /url: /admin/\n        - generic: Admin view\n        - generic: Operator console; off on this server.\n  - region \"About\":\n    - heading \"About\" [level=2]\n    - paragraph:\n      - text: You command one side of a battle from a desk. Orders are written in plain words and carried by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game keeps running on the server while you are away.\n      - link \"Read how it plays\":\n        - /url: https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md\n      - text: .",
+    "rendered": {
+      "active": "BODY",
+      "canvases": 0,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:12:55.137Z",
+    "label": "Current Continue rejoined same game",
+    "url": "http://a5-resume.localhost:41029/?game=5a0bfe02-ae2c-4f42-ad2d-0f35ac2eef08",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- status \"Game over\": \"Victory: the objective was held. Game time elapsed Day 1 00:50.\"\n- status: New dispatch from Cavalry Squadron.\n- region \"Clock\":\n  - generic: Day 1 00:50\n  - generic: 12:1\n  - status: ⏹Stopped\n- navigation \"Desk\":\n  - button \"Map table T\" [pressed]:\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 10 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"10 unread\": \"10\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n  - button \"Umpire's window\"\n- dialog \"Victory\":\n  - heading \"Victory\" [level=2]\n  - paragraph: Blue held the objective at Day 1 00:50.\n  - list:\n    - listitem: \"Game time elapsed: Day 1 00:50\"\n    - listitem: \"Your losses: 153\"\n    - listitem: \"Enemy losses: 762\"\n  - button \"View the umpire's window\" [active]\n  - button \"Read the journal\"\n  - button \"Play again\"\n  - button \"New game\"\n  - button \"Main menu\"\n- button \"Menu (Esc)\"",
+    "rendered": {
+      "active": "BUTTON",
+      "canvases": 1,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:13:35.106Z",
+    "label": "Actual natural Victory at 50 with stopped clock after Continue",
+    "url": "http://a5-resume.localhost:41029/?game=5a0bfe02-ae2c-4f42-ad2d-0f35ac2eef08",
+    "dom": "- button \"Top-down\"\n- button \"Oblique\"\n- generic: Click the map\n- status \"Game over\": \"Victory: the objective was held. Game time elapsed Day 1 00:50.\"\n- status: New dispatch from Cavalry Squadron.\n- region \"Clock\":\n  - generic: Day 1 00:50\n  - generic: 12:1\n  - status: ⏹Stopped\n- navigation \"Desk\":\n  - button \"Map table T\" [pressed]:\n    - text: Map table\n    - generic: T\n  - button \"In-tray I 10 unread\":\n    - text: In-tray\n    - generic: I\n    - generic \"10 unread\": \"10\"\n  - button \"Orders desk O\":\n    - text: Orders desk\n    - generic: O\n  - button \"Order of battle R\":\n    - text: Order of battle\n    - generic: R\n  - button \"Journal J\":\n    - text: Journal\n    - generic: J\n  - button \"Staff conference C\":\n    - text: Staff conference\n    - generic: C\n  - button \"Umpire's window\"\n- dialog \"Victory\":\n  - heading \"Victory\" [level=2]\n  - paragraph: Blue held the objective at Day 1 00:50.\n  - list:\n    - listitem: \"Game time elapsed: Day 1 00:50\"\n    - listitem: \"Your losses: 153\"\n    - listitem: \"Enemy losses: 762\"\n  - button \"View the umpire's window\" [active]\n  - button \"Read the journal\"\n  - button \"Play again\"\n  - button \"New game\"\n  - button \"Main menu\"\n- button \"Menu (Esc)\"",
+    "rendered": {
+      "active": "BUTTON",
+      "canvases": 1,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  },
+  {
+    "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+    "base": "3193d53c87eab1f1947906d533bd161c55ca1e3f",
+    "at": "2026-10-13T16:14:07.358Z",
+    "label": "Actual final ordinary guest menu after game over, zero canvases",
+    "url": "http://a5-resume.localhost:41029/",
+    "dom": "- main:\n  - heading \"Kriegsspiel\" [level=1]\n  - paragraph: An umpired war game, played in real time or slower.\n  - navigation \"Main menu\":\n    - button \"New game\"\n  - region \"Account\":\n    - heading \"Account\" [level=2]\n    - paragraph: Playing as a guest. Your games stay in this browser.\n    - button \"Sign in to keep your games on other devices\"\n    - button \"High contrast\"\n  - region \"Developer tools\":\n    - heading \"Developer tools\" [level=2]\n    - paragraph: For development; not part of the game.\n    - list:\n      - link \"Map editor Generate, preview and export a battlefield.\":\n        - /url: /map-authoring\n        - generic: Map editor\n        - generic: Generate, preview and export a battlefield.\n      - link \"Map benchmark Time map generation and rendering on this device.\":\n        - /url: /map-benchmark\n        - generic: Map benchmark\n        - generic: Time map generation and rendering on this device.\n      - link \"Table benchmark Time the 3D table scene on this device.\":\n        - /url: /table-benchmark\n        - generic: Table benchmark\n        - generic: Time the 3D table scene on this device.\n      - link \"Style guide Tokens and every shared control in each state.\":\n        - /url: /style-guide\n        - generic: Style guide\n        - generic: Tokens and every shared control in each state.\n      - link \"Admin view Operator console; off on this server.\":\n        - /url: /admin/\n        - generic: Admin view\n        - generic: Operator console; off on this server.\n  - region \"About\":\n    - heading \"About\" [level=2]\n    - paragraph:\n      - text: You command one side of a battle from a desk. Orders are written in plain words and carried by couriers, reports arrive late and incomplete, and an umpire rules on what happens. The game keeps running on the server while you are away.\n      - link \"Read how it plays\":\n        - /url: https://github.com/exterkamp/kriegsspiel/blob/main/docs/gameplay.md\n      - text: .",
+    "rendered": {
+      "active": "BODY",
+      "canvases": 0,
+      "documentWidth": 1456,
+      "height": 846,
+      "width": 1456
+    }
+  }
+]

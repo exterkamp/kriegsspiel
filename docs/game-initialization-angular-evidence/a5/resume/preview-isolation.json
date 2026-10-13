@@ -1,0 +1,14 @@
+{
+  "head": "0a7476494f67414d83f5bae40876ae18be04b35d",
+  "pid": 16996,
+  "checks": {
+    "ownDatabase": true,
+    "stubParser": true,
+    "scriptedCommander": true,
+    "testProvider": true,
+    "mailUrlDisabled": true,
+    "mailTokenDisabled": true
+  },
+  "environmentIsolation": "Started with env -i and an explicit whitelist; no inherited credentials/provider config/push/admin environment. Admin remains default off.",
+  "limits": "Root checked whitelist values in actual process; no full environment or credentials printed. Not complete transport absence proof."
+}
