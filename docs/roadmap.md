@@ -110,11 +110,11 @@ Historical annotation remains #85/#88. Detailed erosion, elaborate cities, a ful
 ## M5: Remote async play and collaboration
 - [x] Accounts (magic-link login, sessions, seats; D17)
 - [x] Lobbies and guest play (no email needed, D17a, D17c), clock ratio chosen in the lobby (1:1, 4:1, 12:1, custom), mid-game ratio change by vote (`ratioVote.ts`)
-- [ ] Pause voting (server state machine and desk pause panel done; WebSocket wiring is #182), emergency hold, resume rules, safe restart after downtime
+- [ ] Pause voting (server state machine and desk pause panel done; WebSocket wiring is #182; emergency hold server side done, #66), emergency hold desk UI (follow-up), resume rules, safe restart after downtime
 - [x] Notifications (WebSocket, web push, email) with per-player thresholds (D17b)
 - [ ] Deputy mode: LLM staff officer acting within standing orders
 - [ ] Roles per side, with LLM filling empty staff roles
-- [ ] Shared order drafts: comments, tracked edits, sign and stamp, LLM staff check
+- [ ] Shared order drafts: comments, tracked edits, sign and stamp, LLM staff check (server side: D6d)
 - [ ] Shared HQ and chain-of-command modes
 - [x] AI opposing commander (fog-respecting)
 - [ ] Full procedural scenario assembly (objectives, orders of battle, balance); consume generated maps from M3c

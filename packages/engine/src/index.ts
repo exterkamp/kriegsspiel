@@ -85,7 +85,11 @@ export type {
   PlacementVerdict,
 } from './placement.js';
 export {
+  DEFAULT_DIAL,
+  DIALS,
+  DIAL_CAPS,
   JUDGMENT_CAP,
+  judgmentCap,
   JUDGMENT_EVENT,
   caseLaw,
   clampModifier,
@@ -94,7 +98,7 @@ export {
   precedentFor,
   registerJudgment,
 } from './judgment.js';
-export type { JudgmentProposal, JudgmentRequest } from './judgment.js';
+export type { Dial, JudgmentProposal, JudgmentRequest } from './judgment.js';
 export {
   BREAK_MORALE,
   COMBAT_TICK_MS,
@@ -187,6 +191,15 @@ export {
   wagonsReach,
 } from './supply.js';
 export { ROLES, maySign, mayDraft, mayForward, viewForRole } from './roles.js';
+export type { ChainOfCommand } from './roles.js';
+export {
+  FORWARD_HANDLING_MS,
+  arrivedForwards,
+  forwardDelayMs,
+  sendForward,
+  type ForwardedPaper,
+  type Hierarchy,
+} from './forwarding.js';
 export type { EngineRoleView, Role, Seat, ViewUnitOutline } from './roles.js';
 export {
   COMBAT_DATA,

@@ -296,6 +296,8 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
     case 'draftState':
     case 'draftEntry':
     case 'draftReceipt':
+    case 'draftCheckQueued':
+    case 'draftCheck':
       // The drafting desk is not built yet (a follow-up story); the server sends these to the side.
       return s;
     case 'staffAtWork':

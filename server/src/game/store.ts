@@ -8,7 +8,13 @@
 import { appendFile, mkdir, readFile, truncate, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Seat } from '@kriegsspiel/engine';
-import type { Dissent, DraftSnapshot, Mark, StaffExchange } from '@kriegsspiel/protocol';
+import type {
+  Dissent,
+  DraftSnapshot,
+  Mark,
+  StaffExchange,
+  UmpireSettings,
+} from '@kriegsspiel/protocol';
 import type { UmpireCallRecord } from '../umpire/umpireClient.js';
 import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
@@ -45,6 +51,8 @@ export type GameCommand =
   /** Pause voting (docs/architecture.md). `by` is a voter's player id. */
   | { kind: 'proposePause'; by: string; reason?: string }
   | { kind: 'proposeResume'; by: string }
+  /** Emergency hold (D5): stops the clock now; lapses unless the voters ratify it in time. */
+  | { kind: 'proposeHold'; by: string; reason?: string }
   | { kind: 'vote'; by: string; proposal: string; yes: boolean }
   /** A vote or the maximum pause length ran out. Issued by the actor's own timer. */
   | { kind: 'pauseExpire' }
@@ -79,6 +87,21 @@ export type GameCommand =
       question: string;
       /** The conference record, so a restart restores it (D6b). Absent in entries from before it was kept. */
       exchange?: StaffExchange;
+    }
+  /**
+   * The chief of staff read a shared draft (the staff check, D6d). Journal only: the reading is
+   * advice and never changes the engine. `text` is the draft as read and `earlier` the side's own
+   * earlier orders shown to the model; the model calls are on the entry (`calls`), so replay needs
+   * no model.
+   */
+  | {
+      kind: 'draftCheck';
+      side: string;
+      checkId: string;
+      draft: string;
+      rev: number;
+      text: string;
+      earlier: Array<{ id: string; text: string; sentAtGame: number }>;
     };
 
 /** First record of a game's input log: what replay needs to rebuild the starting state. */
@@ -87,6 +110,8 @@ export interface InputLogHeader {
   scenarioId: string;
   /** Seed of the game's RNG. */
   seed: number;
+  /** Umpire settings chosen at creation (3.11). Absent on older games: the defaults. Replay applies the dial. */
+  settings?: UmpireSettings;
 }
 
 export interface InputLogEntry {

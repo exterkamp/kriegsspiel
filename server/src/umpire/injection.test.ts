@@ -18,6 +18,7 @@ import { HOSTILE, LONG_INPUT } from './injection.corpus.js';
 import { hiddenIn } from './leakGuard.js';
 import { LeakProbe, ScriptedModel, plantCanaries } from './leakKit.testkit.js';
 import { narrateReports, NARRATE_SYSTEM } from './narrate.js';
+import { withPersona } from './persona.js';
 import { STAFF_ANSWER_SYSTEM, answerStaffQuestion } from './staff.js';
 import type { UmpireRequest } from './umpireClient.js';
 
@@ -289,7 +290,7 @@ describe('text that came from the other side', () => {
     await narrateReports(probe.client('blue', model), 'blue', reports);
     expect(probe.exchanges.length).toBeGreaterThan(0);
     for (const ex of probe.exchanges) {
-      expect(ex.request.system).toBe(NARRATE_SYSTEM);
+      expect(ex.request.system).toBe(withPersona(NARRATE_SYSTEM));
       expect(JSON.stringify(ex.request.input)).not.toContain('Ignore previous');
     }
   });

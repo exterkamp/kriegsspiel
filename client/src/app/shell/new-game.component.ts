@@ -8,7 +8,9 @@ import {
   signal,
 } from '@angular/core';
 import {
+  DIAL_CHOICES,
   OPPONENT_LABEL,
+  PERSONA_CHOICES,
   allowedSides,
   chooseScenario,
   initialForm,
@@ -117,6 +119,43 @@ import { PageFrameComponent } from '../ui/page-frame.component';
             <p class="ks-muted" role="status">{{ rateLine() }}</p>
           </fieldset>
 
+          <fieldset>
+            <legend>How strictly the umpire follows the rules</legend>
+            @for (d of dials; track d.id) {
+              <label class="ks-choice">
+                <input
+                  type="radio"
+                  name="dial"
+                  [value]="d.id"
+                  [checked]="form()!.dial === d.id"
+                  (change)="patch({ dial: d.id })"
+                />
+                <b>{{ d.label }}</b>
+              </label>
+            }
+            <p class="ks-muted" role="status">{{ dialLine() }}</p>
+          </fieldset>
+
+          <fieldset>
+            <legend>Umpire's manner</legend>
+            @for (p of personas; track p.id) {
+              <label class="ks-choice">
+                <input
+                  type="radio"
+                  name="persona"
+                  [value]="p.id"
+                  [checked]="form()!.persona === p.id"
+                  (change)="patch({ persona: p.id })"
+                />
+                <b>{{ p.label }}</b>
+              </label>
+            }
+            <p class="ks-muted" role="status">{{ personaLine() }}</p>
+            <p class="ks-muted">
+              The manner changes only how the umpire writes, never what happens.
+            </p>
+          </fieldset>
+
           @if (error()) {
             <p role="alert" class="ks-status ks-error">{{ error() }}</p>
           }
@@ -168,6 +207,8 @@ export class NewGameComponent implements OnInit {
   readonly started = output<string>();
   readonly back = output();
   protected readonly presets = ['1', '4', '12'];
+  protected readonly dials = DIAL_CHOICES;
+  protected readonly personas = PERSONA_CHOICES;
   protected readonly options = signal<ScenarioOptions | undefined>(undefined);
   protected readonly form = signal<Form | undefined>(undefined);
   protected readonly loadError = signal<string | undefined>(undefined);
@@ -202,6 +243,12 @@ export class NewGameComponent implements OnInit {
     const r = this.rate();
     return r !== undefined ? rateExplanation(r) : 'Enter a ratio such as 6 or 6:1.';
   });
+  protected readonly dialLine = computed(
+    () => DIAL_CHOICES.find((d) => d.id === this.form()?.dial)?.description ?? '',
+  );
+  protected readonly personaLine = computed(
+    () => PERSONA_CHOICES.find((p) => p.id === this.form()?.persona)?.description ?? '',
+  );
   private busy = false;
 
   ngOnInit(): void {
@@ -217,7 +264,7 @@ export class NewGameComponent implements OnInit {
   }
 
   protected pick(id: string): void {
-    const next = chooseScenario(this.options()!, id);
+    const next = chooseScenario(this.options()!, id, this.form());
     if (next) this.form.set(next);
   }
 

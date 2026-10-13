@@ -22,10 +22,20 @@ import type { GameActor, GameStore } from '../game/index.js';
 import { NOOP_TRACE, traceRequest, type TraceSink } from '../debug/trace.js';
 import type { PauseTransition } from '../pause.js';
 import { DraftBook, DraftError } from '../drafts/book.js';
-import { StaffDesk } from './conference.js';
+import { DRAFT_CHECK_COST_MS, StaffDesk } from './conference.js';
+import { STAFF_CHECK_CAVEAT } from '../orders/staffCheck.js';
 import { seatKey, sideViewOf } from './sideView.js';
 import { staffOfficerFor } from '../umpire/index.js';
-import { mayForward, viewForRole, type Seat, type SideId } from '@kriegsspiel/engine';
+import {
+  arrivedForwards,
+  mayForward,
+  sendForward,
+  viewForRole,
+  type ChainOfCommand,
+  type Hierarchy,
+  type Seat,
+  type SideId,
+} from '@kriegsspiel/engine';
 import type { Forward } from '../lobby/store.js';
 import { buildBriefing } from '../briefing.js';
 import { signedOrders } from '../journal.js';
@@ -129,6 +139,10 @@ export class Hub {
       undefined,
     /** Papers HQ has forwarded in a game (kept by the lobby record, so they survive a restart). */
     private readonly forwards: {
+      /** How the game's humans are organised; chain of command makes forwarding take game time. */
+      hierarchy?(gameId: string): Hierarchy;
+      /** The unit ids human subordinates command on a side. */
+      subordinateUnits?(gameId: string, side: SideId): readonly string[];
       list(gameId: string): readonly Forward[];
       add(gameId: string, forward: Forward): void;
     } = { list: () => [], add: () => undefined },
@@ -143,6 +157,34 @@ export class Hub {
       undefined,
   ) {}
 
+  /** Where a user's current seat is read from: the lobby record, so authority follows who holds the role now (#77). */
+  private seatResolver: ((gameId: string, userId: string) => Seat | undefined) | undefined;
+
+  /** Have seats re-read from `resolve` on every command, not fixed when the socket opened. */
+  setSeatResolver(resolve: (gameId: string, userId: string) => Seat | undefined): void {
+    this.seatResolver = resolve;
+  }
+
+  /**
+   * Bring a connection's seat up to date before a command is handled. Command authority belongs to
+   * the role, not the socket: when the role changed hands the old holder's connection is closed
+   * (never left as shared HQ, which would let it sign for anyone), and a changed seat on the same
+   * user (say a subordinate who took over other formations) applies from now on. False: closed.
+   */
+  private refreshSeat(gameId: string, conn: Connection): boolean {
+    if (!this.seatResolver || !conn.seat || conn.userId === undefined) return true;
+    const now = this.seatResolver(gameId, conn.userId);
+    if (!now) {
+      conn.socket.close(1008, 'your seat changed hands');
+      return false;
+    }
+    if (seatKey(now) !== seatKey(conn.seat)) {
+      conn.seat = now;
+      this.push(gameId, conn);
+    }
+    return true;
+  }
+
   /** Forwards per game, read from the lobby record once and kept in step by `handleForward`. */
   private readonly forwardCache = new Map<string, Forward[]>();
 
@@ -155,12 +197,38 @@ export class Hub {
     return list;
   }
 
-  /** The ids of papers HQ forwarded to the seat's formations. */
-  private forwardedTo(gameId: string, conn: Connection): string[] {
+  /** The ids of papers HQ forwarded to the seat's formations that have reached them by `now`. */
+  private forwardedTo(gameId: string, conn: Connection, now: number): string[] {
     const units = conn.seat?.role === 'subordinate' ? (conn.seat.units ?? []) : [];
-    return this.forwardsOf(gameId)
-      .filter((f) => f.side === conn.side && units.includes(f.unit))
-      .map((f) => f.dispatchId);
+    return arrivedForwards(this.timedForwards(gameId), conn.side, 'down', now, units);
+  }
+
+  /** Forwards with their times; a record made before forwarding took time arrived when sent. */
+  private timedForwards(gameId: string) {
+    return this.forwardsOf(gameId).map((f) => ({
+      side: f.side as SideId,
+      dispatchId: f.dispatchId,
+      unit: f.unit,
+      direction: f.direction ?? ('down' as const),
+      sentAt: f.sentAt ?? 0,
+      deliverAt: f.deliverAt ?? 0,
+    }));
+  }
+
+  private hierarchyOf(gameId: string): Hierarchy {
+    return this.forwards.hierarchy?.(gameId) ?? 'shared';
+  }
+
+  /**
+   * In a chain of command, the human subordinates' formations and the reports forwarded up to HQ
+   * that have arrived. Undefined in shared HQ, where HQ sees every report of the side at once.
+   */
+  private chainOf(gameId: string, side: SideId, now: number): ChainOfCommand | undefined {
+    if (this.hierarchyOf(gameId) !== 'chain') return undefined;
+    return {
+      subordinateUnits: this.forwards.subordinateUnits?.(gameId, side) ?? [],
+      deliveredUp: arrivedForwards(this.timedForwards(gameId), side, 'up', now),
+    };
   }
 
   private viewOf(gameId: string, game: GameActor, conn: Connection) {
@@ -169,10 +237,11 @@ export class Hub {
       conn.side,
       game.gameClock.snapshot(),
       conn.seat,
-      conn.seat ? this.forwardedTo(gameId, conn) : [],
+      conn.seat ? this.forwardedTo(gameId, conn, game.state.time) : [],
       game.narrationFor(conn.side),
       game.staffHistoryFor(conn.side),
       game.overloadedFor(conn.side),
+      this.chainOf(gameId, conn.side, game.state.time),
     );
   }
 
@@ -350,6 +419,31 @@ export class Hub {
       return;
     }
     this.saveDrafts(gameId, side, book);
+  }
+
+  /** Mark a draft sent, tell the side, and keep the book. A draft sent meanwhile is left as it is. */
+  private stampDraft(
+    gameId: string,
+    conn: Connection,
+    book: DraftBook,
+    draftId: string,
+    orderId: string,
+  ): void {
+    try {
+      const d = book.stamp(draftId, Date.now(), {
+        orderId,
+        by: conn.userId ?? conn.side,
+        ...(conn.seat ? { role: conn.seat.role } : {}),
+      });
+      this.broadcastSide(gameId, conn.side, {
+        v: PROTOCOL_VERSION,
+        kind: 'draftState',
+        draft: structuredClone(d),
+      });
+      this.saveDrafts(gameId, conn.side, book);
+    } catch (e) {
+      if (!(e instanceof DraftError)) throw e;
+    }
   }
 
   /** Tell every connection of a side its marks. */
@@ -682,6 +776,7 @@ export class Hub {
         kind: state.phase === 'resume_proposed' ? 'resume' : 'pause',
         ...(bySide === undefined ? {} : { bySide }),
         byYou: conn.userId !== undefined && open.by === conn.userId,
+        ...(open.hold ? { hold: true } : {}),
         ...(open.reason === undefined ? {} : { reason: open.reason }),
         yes: votes.filter((v) => v).length,
         no: votes.filter((v) => !v).length,
@@ -691,7 +786,8 @@ export class Hub {
       };
     }
     // The countdown changes every push, so only the rest decides whether anything is new.
-    const key = JSON.stringify([state.phase, proposal && { ...proposal, msLeft: 0 }]);
+    const holdsLeft = conn.userId === undefined ? undefined : game.holdsLeftFor(conn.userId);
+    const key = JSON.stringify([state.phase, proposal && { ...proposal, msLeft: 0 }, holdsLeft]);
     if (key === conn.lastPause) return;
     conn.lastPause = key;
     this.send(conn, {
@@ -699,6 +795,7 @@ export class Hub {
       kind: 'pauseState',
       phase: state.phase,
       ...(proposal ? { proposal } : {}),
+      ...(holdsLeft === undefined ? {} : { holdsLeft }),
     });
   }
 
@@ -734,6 +831,84 @@ export class Hub {
     });
   }
 
+  /**
+   * The staff check (D6d): the chief of staff reads a shared draft. The hub takes the draft's text
+   * from its own book (a client cannot have a different text read), charges the chief of staff's
+   * game time (the same busy state as a conference question), tells the side the check is queued
+   * and, when the stage has written the reading, sends it to every connection of the side. The
+   * client shows it once game time reaches `answerAtGame`. With no umpire or no usable reply the
+   * message says `unavailable`, and nothing else is changed.
+   */
+  private async handleCheckDraft(
+    gameId: string,
+    game: GameActor,
+    conn: Connection,
+    command: Extract<Command, { kind: 'checkDraft' }>,
+  ): Promise<void> {
+    const fail = (code: string, message: string) =>
+      this.send(conn, error(code, `${command.checkId}: ${message}`));
+    if (game.state.world.outcome) return fail('game_over', 'the game has ended');
+    const side = conn.side;
+    const draft = (await this.draftsOf(gameId, side)).get(command.draft);
+    if (!draft) return fail('draft_unknown', `no draft ${command.draft}`);
+    if (!draft.text.trim())
+      return fail('bad_draft', 'the draft is empty; there is nothing to read');
+    const charge = this.staffDesk.ask(
+      gameId,
+      side,
+      'chiefOfStaff',
+      game.gameClock.now(),
+      DRAFT_CHECK_COST_MS,
+    );
+    if (!charge.ok)
+      return fail('staff_busy', 'the chief of staff is still at work on your last request');
+    const { rev, text } = draft;
+    this.broadcastSide(gameId, side, {
+      v: PROTOCOL_VERSION,
+      kind: 'draftCheckQueued',
+      checkId: command.checkId,
+      draft: command.draft,
+      rev,
+      askedAtGame: charge.askedAtGame,
+      answerAtGame: charge.answerAtGame,
+      costMs: charge.costMs,
+    });
+    const officer = staffOfficerFor(game.state.world.seed, side, 'chiefOfStaff');
+    let report;
+    try {
+      const earlier = (await this.sentOrdersOf(gameId, conn)).map((o) => ({
+        id: o.id,
+        text: o.text,
+        sentAtGame: o.sentAtGame,
+      }));
+      report = await game.checkDraft(
+        side,
+        { checkId: command.checkId, draft: command.draft, rev, text },
+        earlier,
+      );
+    } catch (e) {
+      this.onError(gameId, e);
+    }
+    const who = report?.officer ?? officer;
+    this.broadcastSide(gameId, side, {
+      v: PROTOCOL_VERSION,
+      kind: 'draftCheck',
+      checkId: command.checkId,
+      draft: command.draft,
+      rev,
+      basedOnGame: report?.basedOnGame ?? game.state.time,
+      officer: { name: who.name, traits: who.traits },
+      ...(report
+        ? {
+            reading: report.reading,
+            ...(report.unitId === undefined ? {} : { unitId: report.unitId }),
+          }
+        : { unavailable: true as const }),
+      findings: report?.findings ?? [],
+      caveat: STAFF_CHECK_CAVEAT,
+    });
+  }
+
   /** HQ passes a paper in its own view on to the subordinate commanding `unit`. */
   private handleForward(
     gameId: string,
@@ -752,7 +927,14 @@ export class Hub {
       return;
     }
     // Only a paper the forwarder can see themselves can be passed on.
-    const mine = viewForRole(world, conn.side, conn.seat, game.state.time);
+    const mine = viewForRole(
+      world,
+      conn.side,
+      conn.seat,
+      game.state.time,
+      [],
+      this.chainOf(gameId, conn.side, game.state.time),
+    );
     const known = [...mine.reports, ...mine.documents].some((p) => p.id === command.dispatchId);
     if (!known) {
       this.send(conn, error('no_such_dispatch', 'you hold no such paper'));
@@ -762,17 +944,61 @@ export class Hub {
       (f) => f.side === conn.side && f.unit === command.unit && f.dispatchId === command.dispatchId,
     );
     if (!already) {
-      const forward = { side: conn.side, dispatchId: command.dispatchId, unit: command.unit };
-      this.forwards.add(gameId, forward);
-      this.forwardsOf(gameId).push(forward);
-      this.notify(gameId);
+      this.record(gameId, game, conn.side, command.dispatchId, command.unit, 'down');
     }
+  }
+
+  /** File a forward, timed by the hierarchy and the distance, and tell the table. */
+  private record(
+    gameId: string,
+    game: GameActor,
+    side: SideId,
+    dispatchId: string,
+    unit: string,
+    direction: 'down' | 'up',
+  ): void {
+    const { sentAt, deliverAt } = sendForward(
+      game.state.world,
+      side,
+      this.hierarchyOf(gameId),
+      { dispatchId, unit, direction },
+      game.state.time,
+    );
+    const forward: Forward = { side, dispatchId, unit, direction, sentAt, deliverAt };
+    this.forwards.add(gameId, forward);
+    this.forwardsOf(gameId).push(forward);
+    this.notify(gameId);
+  }
+
+  /** A subordinate sends a report one of their own formations filed up to HQ. */
+  private handleForwardReport(
+    gameId: string,
+    game: GameActor,
+    conn: Connection,
+    command: Extract<Command, { kind: 'forwardReport' }>,
+  ): void {
+    if (conn.seat?.role !== 'subordinate') {
+      this.send(conn, error('not_permitted', 'only a subordinate sends their reports up'));
+      return;
+    }
+    const world = game.state.world;
+    const mine = viewForRole(world, conn.side, conn.seat, game.state.time);
+    const report = mine.reports.find((r) => r.id === command.reportId);
+    const unit = report && world.units.find((u) => u.name === report.from && u.side === conn.side);
+    if (!report || !unit || !(conn.seat.units ?? []).includes(unit.id)) {
+      this.send(conn, error('no_such_dispatch', 'none of your formations filed that report'));
+      return;
+    }
+    const already = this.forwardsOf(gameId).some(
+      (f) => f.side === conn.side && f.direction === 'up' && f.dispatchId === command.reportId,
+    );
+    if (!already) this.record(gameId, game, conn.side, command.reportId, unit.id, 'up');
   }
 
   private async handlePauseCommand(
     game: GameActor,
     conn: Connection,
-    command: Extract<Command, { kind: 'proposePause' | 'proposeResume' | 'vote' }>,
+    command: Extract<Command, { kind: 'proposePause' | 'proposeHold' | 'proposeResume' | 'vote' }>,
   ): Promise<void> {
     if (!game.pauseState) {
       this.send(conn, error('pause_unavailable', 'this game has no pause voting'));
@@ -794,6 +1020,9 @@ export class Hub {
         });
       } else if (command.kind === 'proposeResume') {
         result = await game.submit({ kind: 'proposeResume', by });
+      } else if (command.kind === 'proposeHold') {
+        const reason = command.reason?.trim();
+        result = await game.submit({ kind: 'proposeHold', by, ...(reason ? { reason } : {}) });
       } else {
         const reason = command.reason?.trim();
         result = await game.submit({ kind: 'proposePause', by, ...(reason ? { reason } : {}) });
@@ -807,6 +1036,9 @@ export class Hub {
     const text = result.kind === 'rejection' ? result.reason : '';
     if (/not a voter/.test(text)) {
       this.send(conn, error('not_a_voter', 'you do not vote in this game'));
+    } else if (/hold limit/.test(text)) {
+      // Fixed wording: it says no hold is left, not whose holds were used.
+      this.send(conn, error('hold_refused', 'no emergency hold is left to you in this game'));
     } else if (/already voted/.test(text)) {
       this.send(conn, error('pause_refused', 'you have already voted on that'));
     } else {
@@ -863,6 +1095,7 @@ export class Hub {
       this.send(conn, error('bad_message', parsed.error));
       return;
     }
+    if (!this.refreshSeat(gameId, conn)) return;
     const game = this.lookup(gameId);
     if (!game) {
       this.send(conn, error('game_closed', 'this game is no longer running'));
@@ -903,6 +1136,7 @@ export class Hub {
     }
     if (
       command.kind === 'proposePause' ||
+      command.kind === 'proposeHold' ||
       command.kind === 'proposeResume' ||
       command.kind === 'vote'
     ) {
@@ -915,6 +1149,15 @@ export class Hub {
     }
     if (command.kind === 'forwardDispatch') {
       this.handleForward(gameId, game, conn, command);
+      return;
+    }
+    if (command.kind === 'checkDraft') {
+      // Not awaited: the model call must not hold up this connection's other commands.
+      void this.handleCheckDraft(gameId, game, conn, command).catch((e) => this.onError(gameId, e));
+      return;
+    }
+    if (command.kind === 'forwardReport') {
+      this.handleForwardReport(gameId, game, conn, command);
       return;
     }
     if (command.kind === 'askStaff') {
@@ -967,16 +1210,31 @@ export class Hub {
       this.send(conn, error('game_over', `${command.orderId}: the game has ended`));
       return;
     }
-    if (command.text === undefined) {
-      this.send(conn, error('not_implemented', 'order drafts are not supported yet; send text'));
-      return;
-    }
     // Only the commander and subordinate commanders sign. Whether a subordinate may sign for the
     // addressee is checked by the actor once the parse names it.
     if (conn.seat && conn.seat.role !== 'commander' && conn.seat.role !== 'subordinate') {
       this.send(conn, error('not_permitted', 'staff officers draft orders; the commander signs'));
       return;
     }
+    // Signing a draft sends the wording the server holds, never text the signer supplies. Anyone
+    // may have proposed it; the check above and the actor's decide who may stamp it.
+    let draftBook: DraftBook | undefined;
+    let text = command.text;
+    if (command.draft !== undefined) {
+      draftBook = await this.draftsOf(gameId, conn.side);
+      try {
+        text = draftBook.signable(command.draft).text.trim();
+      } catch (e) {
+        if (!(e instanceof DraftError)) throw e;
+        this.send(conn, error(e.code, `${command.orderId}: ${e.message}`));
+        return;
+      }
+      if (text === '') {
+        this.send(conn, error('bad_draft', `${command.orderId}: the draft is empty`));
+        return;
+      }
+    }
+    if (text === undefined) return;
     const now = Date.now();
     conn.orderTimes = conn.orderTimes.filter((t) => now - t < 60_000);
     if (
@@ -995,7 +1253,7 @@ export class Hub {
       return;
     }
     // The same words again within a few seconds are a double click or a retry under a new id: say so, send nothing (#343).
-    const words = `${command.courier ?? ''}|${command.text.trim().replace(/\s+/g, ' ').toLowerCase()}`;
+    const words = `${command.courier ?? ''}|${text.trim().replace(/\s+/g, ' ').toLowerCase()}`;
     const last = this.lastOrderText.get(idKey);
     if (last && last.words === words && now - last.at < DUPLICATE_TEXT_MS) {
       this.send(
@@ -1016,7 +1274,7 @@ export class Hub {
       result = await game.submit({
         kind: 'order',
         side: conn.side,
-        text: command.text,
+        text,
         orderId: command.orderId,
         ...(conn.seat ? { signer: conn.seat } : {}),
         ...(command.courier ? { courier: command.courier } : {}),
@@ -1029,7 +1287,11 @@ export class Hub {
     } finally {
       conn.ordersInFlight--;
     }
-    if (result.ok) return;
+    if (result.ok) {
+      if (draftBook && command.draft !== undefined)
+        this.stampDraft(gameId, conn, draftBook, command.draft, command.orderId);
+      return;
+    }
     // Nothing was issued, so the player may send the id again after fixing the text.
     ids.delete(command.orderId);
     this.lastOrderText.delete(idKey);

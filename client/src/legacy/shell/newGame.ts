@@ -1,4 +1,14 @@
 /** Pure rules for the new-game form: state, validation and the request it makes. The DOM lives in NewGame.svelte. */
+import {
+  DEFAULT_UMPIRE_DIAL,
+  DEFAULT_UMPIRE_PERSONA,
+  DIALS,
+  DIAL_INFO,
+  PERSONAS,
+  PERSONA_INFO,
+  type UmpireDial,
+  type UmpirePersona,
+} from '@kriegsspiel/protocol';
 import { MAX_RATE, MIN_RATE, RATE_PRESETS, parseRate } from '../lobby/model.js';
 
 export interface ScenarioInfo {
@@ -24,12 +34,18 @@ export interface Form {
   /** A preset's number as text, or `custom`. */
   rate: string;
   customRate: string;
+  /** Rigid-to-free dial (3.11). */
+  dial: UmpireDial;
+  /** The umpire's voice (3.11). */
+  persona: UmpirePersona;
 }
 
 export interface CreateRequest {
   scenario: string;
   side: string;
   rate: number;
+  dial: UmpireDial;
+  persona: UmpirePersona;
   sessionType?: 'co_op_vs_ai';
 }
 
@@ -56,14 +72,22 @@ function formFor(s: ScenarioInfo, opponent: Opponent): Form {
     side: side.id,
     rate: preset ? String(s.defaults.rate) : 'custom',
     customRate: preset ? '' : String(s.defaults.rate),
+    dial: DEFAULT_UMPIRE_DIAL,
+    persona: DEFAULT_UMPIRE_PERSONA,
   };
 }
 
 /** Switching scenario resets the side and rate to that scenario's defaults. */
-export function chooseScenario(o: ScenarioOptions, id: string): Form | undefined {
+export function chooseScenario(o: ScenarioOptions, id: string, keep?: Form): Form | undefined {
   const s = o.scenarios.find((x) => x.id === id);
-  return s ? formFor(s, o.opponent) : undefined;
+  if (!s) return undefined;
+  const next = formFor(s, o.opponent);
+  // The umpire's dial and persona are the player's taste, not the scenario's: they carry over.
+  return keep ? { ...next, dial: keep.dial, persona: keep.persona } : next;
 }
+
+export const DIAL_CHOICES = DIALS.map((id) => ({ id, ...DIAL_INFO[id] }));
+export const PERSONA_CHOICES = PERSONAS.map((id) => ({ id, ...PERSONA_INFO[id] }));
 
 /** The chosen clock rate, or undefined when a custom value is unusable. */
 export function rateOf(f: Form): number | undefined {
@@ -115,6 +139,8 @@ export function toRequest(f: Form, o: ScenarioOptions): CreateRequest {
     scenario: f.scenario,
     side: f.side,
     rate: rateOf(f)!,
+    dial: f.dial,
+    persona: f.persona,
     ...(o.opponent ? { sessionType: 'co_op_vs_ai' as const } : {}),
   };
 }
