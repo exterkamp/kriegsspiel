@@ -22,6 +22,7 @@ export const ALL_KINDS: readonly TraceKind[] = [
   'clock',
   'error',
   'llm',
+  'order',
 ];
 
 export interface Column {

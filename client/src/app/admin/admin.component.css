@@ -381,7 +381,104 @@ ks-admin {
   .lp-chain button[aria-current='true'] {
     color: var(--accent);
   }
+  /* Orders panel (#395). */
+  .or-top {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 8px;
+    min-height: 0;
+  }
+  .or-list {
+    overflow: auto;
+    max-height: 45vh;
+    border: 1px solid var(--line);
+  }
+  .or-table td:nth-child(5) {
+    white-space: normal;
+    min-width: 16ch;
+  }
+  .or-table tr.bad td {
+    color: var(--ks-wax);
+  }
+  .or-detail {
+    overflow: auto;
+    max-height: 45vh;
+    border: 1px solid var(--line);
+    padding: 6px 8px;
+  }
+  .or-detail pre,
+  .or-results pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 40vh;
+  }
+  .or-call {
+    border-top: 1px solid var(--line);
+    margin-top: 6px;
+    padding-top: 4px;
+  }
+  .or-problems {
+    margin: 2px 0;
+    padding-left: 20px;
+  }
+  .ok {
+    color: var(--ks-ok);
+  }
+  .badge.model {
+    color: var(--ks-ok);
+  }
+  .badge.canned,
+  .badge.rules {
+    color: var(--ks-warn);
+  }
+  .badge.none {
+    color: var(--ks-wax);
+  }
+  .or-playground {
+    margin-top: 10px;
+    border: 1px solid var(--line);
+    padding: 4px 8px;
+  }
+  .or-playground > summary {
+    color: var(--accent);
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .or-form {
+    display: grid;
+    gap: 6px;
+    margin: 6px 0;
+  }
+  .or-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    align-items: flex-end;
+  }
+  .or-row label {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .or-row input[type='number'] {
+    width: 9ch;
+  }
+  .or-grow {
+    flex: 1 1 280px;
+    min-width: 0;
+  }
+  .or-form textarea {
+    width: 100%;
+    font-family: var(--ks-font-mono);
+  }
+  .or-col {
+    flex: 1 1 260px;
+    min-width: 0;
+  }
   @media (max-width: 800px) {
+    .or-top {
+      grid-template-columns: 1fr;
+    }
     .lp-body {
       grid-template-columns: 1fr;
       grid-template-rows: 1fr 1fr;

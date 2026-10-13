@@ -44,8 +44,8 @@ afterEach(() => {
 
 describe('model', () => {
   it('moves between panels with wraparound and digit keys', () => {
-    expect(stepPanel('State', -1)).toBe('Replay');
-    expect(stepPanel('Replay', 1)).toBe('State');
+    expect(stepPanel('State', -1)).toBe('Orders');
+    expect(stepPanel('Orders', 1)).toBe('State');
     expect(panelForKey('3')).toBe('Requests');
     expect(panelForKey('9')).toBeUndefined();
     expect(panelForKey('x')).toBeUndefined();
@@ -85,6 +85,7 @@ describe('AdminPage', () => {
       'Requests',
       'LLM',
       'Replay',
+      'Orders',
     ]);
     expect(secs.filter((s) => !s.hidden)).toHaveLength(1);
     document.dispatchEvent(new KeyboardEvent('keydown', { key: '4' }));
@@ -95,7 +96,7 @@ describe('AdminPage', () => {
     const page = mount(vi.fn(() => ok({ games })));
     page.start();
     await flush();
-    expect([...document.querySelectorAll('option')].map((o) => o.value)).toEqual([
+    expect([...document.querySelectorAll('#game option')].map((o) => o.value)).toEqual([
       'aaaaaaaa-1',
       'bbbbbbbb-2',
     ]);

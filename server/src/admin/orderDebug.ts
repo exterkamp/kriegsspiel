@@ -229,8 +229,12 @@ export function orderAttempts(
 
 /** The row without the joined trace entries, for the history list. */
 export function attemptRow(d: OrderAttemptDetail): OrderAttempt {
-  const { result: _r, calls: _c, notes: _n, chain: _ch, ...row } = d;
-  return row;
+  const row: Partial<OrderAttemptDetail> = { ...d };
+  delete row.result;
+  delete row.calls;
+  delete row.notes;
+  delete row.chain;
+  return row as OrderAttempt;
 }
 
 // --- Playground ---------------------------------------------------------------------------------

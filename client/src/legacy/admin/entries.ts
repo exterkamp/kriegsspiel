@@ -4,7 +4,7 @@
  * Entries arrive already redacted from the admin API; nothing here talks to a game client.
  */
 
-export type TraceKind = 'request' | 'command' | 'engine' | 'clock' | 'error' | 'llm';
+export type TraceKind = 'request' | 'command' | 'engine' | 'clock' | 'error' | 'llm' | 'order';
 
 /** Mirrors the server's `TraceEntry`. */
 export interface TraceEntry {
