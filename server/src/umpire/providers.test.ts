@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import {
   AnthropicProvider,
   BudgetedUmpireClient,
+  ClaudeBridgeProvider,
   DEFAULT_UMPIRE_CONFIG,
   OllamaProvider,
   OpenAiCompatibleProvider,
@@ -169,6 +170,33 @@ const wires: Wire[] = [
     },
     expectJsonMode: (b) => expect(b.format).toBe('json'),
   },
+  {
+    name: 'claude-bridge',
+    path: '/v1/generate',
+    make: () => new ClaudeBridgeProvider({ baseUrl, secret: 'bridge-secret-123456' }),
+    ok: (text, t = { in: 7, out: 3 }) => ({
+      text,
+      usage: { inputTokens: t.in, outputTokens: t.out, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      durationMs: 5,
+    }),
+    truncated: (text) => ({
+      text,
+      usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      truncated: true,
+    }),
+    expectNative: (b) => {
+      expect(b).toEqual({
+        model: treq.model,
+        system: treq.system,
+        messages: treq.messages,
+        schema,
+        structured: 'native',
+        maxTokens: 100,
+      });
+      expect(seen[0]!.headers.authorization).toBe('Bearer bridge-secret-123456');
+    },
+    expectJsonMode: (b) => expect(b.structured).toBe('json-mode'),
+  },
 ];
 
 function clientFor(provider: LlmProvider, extra: Partial<UmpireConfig> = {}) {
@@ -237,9 +265,11 @@ describe.each(wires)('provider contract: $name', (wire) => {
     const p =
       wire.name === 'ollama'
         ? new OllamaProvider({ baseUrl: url })
-        : wire.name === 'openai-compatible'
-          ? new OpenAiCompatibleProvider({ baseUrl: `${url}/v1` })
-          : new AnthropicProvider(new Anthropic({ apiKey: 't', maxRetries: 0, baseURL: url }));
+        : wire.name === 'claude-bridge'
+          ? new ClaudeBridgeProvider({ baseUrl: url })
+          : wire.name === 'openai-compatible'
+            ? new OpenAiCompatibleProvider({ baseUrl: `${url}/v1` })
+            : new AnthropicProvider(new Anthropic({ apiKey: 't', maxRetries: 0, baseURL: url }));
     await expect(p.generate(treq, new AbortController().signal)).rejects.toMatchObject({
       retryable: true,
     });
@@ -360,6 +390,7 @@ describe.each(wires)('provider contract: $name', (wire) => {
     });
 
     it('budget counts dollars for a priced model', async () => {
+      if (wire.name === 'claude-bridge') return; // the bridge reports its own cost; see below
       replies = [{ body: wire.ok('{"verdict":"ok"}', { in: 1_000_000, out: 0 }) }];
       const { client } = clientFor(wire.make());
       const budgeted = new BudgetedUmpireClient(client, { maxCostUsd: 3 });
@@ -392,6 +423,63 @@ describe('openai-compatible usage', () => {
       cacheReadTokens: 40,
       cacheWriteTokens: 0,
     });
+  });
+});
+
+describe('claude-bridge cost and errors', () => {
+  const ok = (extra: object = {}) => ({
+    body: {
+      text: '{"verdict":"ok"}',
+      usage: { inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      ...extra,
+    },
+  });
+
+  it('counts no dollars on a subscription, so a priced model name does not trip the budget', async () => {
+    replies = [ok(), ok()];
+    const { client, recorded } = clientFor(new ClaudeBridgeProvider({ baseUrl }));
+    const budgeted = new BudgetedUmpireClient(client, { maxCostUsd: 3 });
+    await budgeted.call(request);
+    await budgeted.call(request);
+    expect(budgeted.spent.costUsd).toBe(0);
+    expect(budgeted.spent.totalTokens).toBe(2_000_000);
+    expect(recorded[0]!.costUsd).toBe(0);
+    expect(seen[0]!.headers.authorization).toBeUndefined();
+  });
+
+  it('counts the cost the bridge reports when it bills an API key', async () => {
+    replies = [ok({ costUsd: 1.25 })];
+    const { client, recorded } = clientFor(new ClaudeBridgeProvider({ baseUrl }));
+    await client.call(request);
+    expect(recorded[0]!.costUsd).toBe(1.25);
+  });
+
+  it('does not retry a bridge whose CLI is missing or logged out, and retries a timeout', async () => {
+    const p = new ClaudeBridgeProvider({ baseUrl });
+    const signal = new AbortController().signal;
+    replies = [
+      { status: 424, body: { error: { code: 'not_logged_in', message: 'run claude /login' } } },
+    ];
+    await expect(p.generate(treq, signal)).rejects.toMatchObject({ retryable: false });
+    replies = [{ status: 504, body: { error: { code: 'timeout', message: 'slow' } } }];
+    await expect(p.generate(treq, signal)).rejects.toMatchObject({ retryable: true });
+    replies = [{ body: { usage: {} } }];
+    await expect(p.generate(treq, signal)).rejects.toMatchObject({ retryable: false });
+  });
+
+  it('is built from config with the secret from CLAUDE_BRIDGE_SECRET', async () => {
+    replies = [ok()];
+    const config = umpireConfigFromEnv({
+      UMPIRE_PROVIDER: 'claude-bridge',
+      CLAUDE_BRIDGE_URL: baseUrl,
+    });
+    const client = createUmpireClient({
+      config,
+      env: { CLAUDE_BRIDGE_SECRET: 'bridge-secret-123456' },
+    });
+    const res = await client.call<{ verdict: string }>(request);
+    expect(res.record).toMatchObject({ provider: 'claude-bridge', model: 'claude-opus-5-5' });
+    expect(seen[0]!.headers.authorization).toBe('Bearer bridge-secret-123456');
   });
 });
 

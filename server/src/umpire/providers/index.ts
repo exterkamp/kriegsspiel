@@ -1,16 +1,18 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { ProviderRegistry } from '../registry.js';
 import { AnthropicProvider } from './anthropic.js';
+import { ClaudeBridgeProvider } from './claudeBridge.js';
 import { OllamaProvider } from './ollama.js';
 import { OpenAiCompatibleProvider } from './openaiCompatible.js';
 import { TestProvider } from './test.js';
 
 export { AnthropicProvider } from './anthropic.js';
+export { ClaudeBridgeProvider, CLAUDE_BRIDGE_DEFAULT_URL } from './claudeBridge.js';
 export { OllamaProvider, OLLAMA_DEFAULT_URL } from './ollama.js';
 export { OpenAiCompatibleProvider } from './openaiCompatible.js';
 export { TEST_MODEL, TestProvider } from './test.js';
 
-/** The registry with the built-in adapters: `anthropic`, `openai-compatible`, `ollama` and `test`. */
+/** The registry with the built-in adapters: `anthropic`, `openai-compatible`, `ollama`, `claude-bridge` and `test`. */
 export function defaultProviderRegistry(): ProviderRegistry {
   return new ProviderRegistry()
     .register('anthropic', ({ spec, env, fetch }) => {
@@ -46,7 +48,17 @@ export function defaultProviderRegistry(): ProviderRegistry {
           capabilities: capabilitiesOf(spec),
           ...(fetch ? { fetch } : {}),
         }),
-    );
+    )
+    .register('claude-bridge', ({ id, spec, env, fetch }) => {
+      const secret = env[spec.apiKeyEnv ?? 'CLAUDE_BRIDGE_SECRET'];
+      return new ClaudeBridgeProvider({
+        id,
+        ...(spec.baseUrl ? { baseUrl: spec.baseUrl } : {}),
+        ...(secret ? { secret } : {}),
+        capabilities: capabilitiesOf(spec),
+        ...(fetch ? { fetch } : {}),
+      });
+    });
 }
 
 function capabilitiesOf(spec: {

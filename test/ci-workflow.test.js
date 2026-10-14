@@ -7,7 +7,7 @@ const root = new URL('../', import.meta.url);
 const { scripts, workspaces } = JSON.parse(readFileSync(new URL('package.json', root)));
 const workflow = readFileSync(new URL('.github/workflows/ci.yml', root), 'utf8');
 
-test('CI test groups cover every workspace exactly once and retain repository/catalog tests', () => {
+test('CI test groups cover every workspace exactly once and retain repository/catalog/bridge tests', () => {
   const groups = [scripts['test:ci-maps'], scripts['test:ci-application']];
   const selected = groups.flatMap((script) =>
     [...script.matchAll(/ -w ([\w/-]+)/g)].map((m) => m[1]),
@@ -17,13 +17,14 @@ test('CI test groups cover every workspace exactly once and retain repository/ca
   for (const group of groups) assert.ok(group.startsWith('npm run verify:map-source && '));
   assert.ok(scripts['test:ci-application'].includes('--if-present && npm run test:repository'));
   assert.ok(scripts['test:ci-maps'].endsWith('&& npm run test:local-map-catalog'));
+  assert.ok(scripts['test:ci-application'].endsWith('&& npm run test:claude-bridge'));
   assert.equal(
     scripts['test:repository'],
     'node --test "test/*.test.js" "scripts/maps-assessment/*.test.mjs"',
   );
   assert.equal(
     scripts.test,
-    'npm run verify:map-source && npm run test --workspaces --if-present && npm run test:repository && npm run test:local-map-catalog',
+    'npm run verify:map-source && npm run test --workspaces --if-present && npm run test:repository && npm run test:local-map-catalog && npm run test:claude-bridge',
   );
   for (const name of ['test:ci-maps', 'test:ci-application'])
     assert.ok(workflow.includes(`run: npm run ${name}`));

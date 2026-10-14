@@ -16,7 +16,8 @@ Compose reads the shell environment and a git-ignored `.env` next to `docker-com
 |---|---|---|
 | `KRIEGSSPIEL_PORT` | `3000` | Host port for the web UI and API |
 | `ANTHROPIC_API_KEY` | empty | Passed to the server for the Anthropic provider (see [llm-providers.md](llm-providers.md)). Empty: the umpire runs on the test provider (below) |
-| `UMPIRE_KEYLESS_PROVIDER` | `ollama` in the compose file, `test` in the bare image | The provider used by any stage that would use Anthropic with no key. `ollama` is the small local model with `test` as its fallback; `test` is the canned-response umpire (below). For the rule-based order parser alone, set `ORDER_PARSER=stub` |
+| `UMPIRE_KEYLESS_PROVIDER` | `ollama` in the compose file, `test` in the bare image | The provider used by any stage that would use Anthropic with no key. `ollama` is the small local model with `test` as its fallback; `claude-bridge` is Claude Code on the host (below), also with `test` as its fallback; `test` is the canned-response umpire (below). For the rule-based order parser alone, set `ORDER_PARSER=stub` |
+| `CLAUDE_BRIDGE_URL`, `CLAUDE_BRIDGE_SECRET` | empty; the bridge override sets the URL to `http://172.17.0.1:8790` | Where the server reaches the host's Claude Code bridge and the shared secret it sends (see [below](#claude-code-models-through-the-host-bridge)) |
 | `ORDER_PARSER` | unset | With a provider (a key, or the test provider) the umpire parses orders; `stub` forces the rule-based parser |
 | `BACKUP_DIR` | `./backups` | Host directory that receives backups |
 | `BACKUP_KEEP` | `14` | Number of newest backups kept |
@@ -70,6 +71,18 @@ environment: # on kriegsspiel; 172.17.0.1 is the docker0 gateway, which the publ
 ```
 
 with `OLLAMA_BIND=172.17.0.1` in `.env` so the model server is not published on every interface. Ollama has no authentication, so never publish it beyond the host.
+
+### Claude Code models through the host bridge
+
+To run the umpire on Claude Code's models with the host's `claude` login instead of an API key, start the bridge on the host and add the override file (#457):
+
+```bash
+echo "CLAUDE_BRIDGE_SECRET=$(openssl rand -hex 24)" >> .env   # once; the bridge and the container both read it
+npm run claude-bridge                                          # on the host; listens on http://172.17.0.1:8790
+docker compose -f docker-compose.yml -f docker-compose.claude-bridge.yml up -d
+```
+
+The override sets `UMPIRE_KEYLESS_PROVIDER=claude-bridge`, `CLAUDE_BRIDGE_URL=http://172.17.0.1:8790` (the docker0 gateway, a host address the container can reach; checked with `network_mode: bridge`, and a compose network normally routes to it too unless a host firewall blocks it) and passes `CLAUDE_BRIDGE_SECRET`. Every umpire stage then asks the bridge, the turn umpire included; while the bridge is down each stage answers from the `test` provider and a turn is resolved by the engine, and the admin LLM panel marks those calls `fallback`. The bridge must keep running on the host (a `systemd --user` unit or a tmux pane); it binds only the docker0 address and refuses requests without the secret, so other machines on the LAN cannot spend the subscription. Never publish its port. Use the override rather than setting `UMPIRE_KEYLESS_PROVIDER=claude-bridge` in `.env` alone: without `CLAUDE_BRIDGE_URL` the server tries `http://127.0.0.1:8790`, which inside the container is the container itself, so every call falls back to `test` with only a warning in the log. The `ollama` service still starts but is unused. Details, the bridge's settings and its isolation (no tools, no session, an empty working directory per call) are in [llm-providers.md](llm-providers.md#claude-code-bridge).
 
 ### Canned umpire: the `test` provider
 
