@@ -902,7 +902,10 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     }
     for (const m of moraleLog) emit.push({ type: 'combat.morale', payload: m });
     for (const s of shots) {
-      const after = fate.get(s.target.id)!;
+      // A target whose total casualties this tick round to 0 earned no fate entry: the
+      // loss phase left it untouched, so the shot is reported against the unit as it
+      // stands, with its strength and morale unchanged (#445).
+      const after = fate.get(s.target.id) ?? s.target;
       emit.push({
         type: 'combat.fire',
         payload: {
