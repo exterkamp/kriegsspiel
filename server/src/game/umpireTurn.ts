@@ -263,6 +263,7 @@ export class UmpireTurnResolver implements TurnResolver {
       turn: { n: input.n, startMs: input.startMs, endMs: input.endMs },
       dial,
       projection: p.state.world.units.filter((u) => live.has(u.id)),
+      resupply: p.resupply,
       orders: orders.map((o) => ({
         orderId: o.orderId,
         unitId: o.to,
