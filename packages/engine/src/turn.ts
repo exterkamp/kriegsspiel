@@ -102,8 +102,9 @@ export interface TurnContext {
   dial: Dial;
   /**
    * The engine's projection of the turn (11.4): its units at `endMs`. It sets the ceilings an
-   * outcome may not pass (ammunition, losses out of reach) and, under `standard`, the outcome a
-   * departure must explain. Without it the start-of-turn values stand in.
+   * outcome may not pass (losses out of reach; ammunition's ceiling is the start-of-turn value
+   * plus `resupply`) and, under `standard`, the outcome a departure must explain. Without it the
+   * start-of-turn values stand in.
    */
   projection?: Unit[];
   /**
@@ -532,7 +533,10 @@ export function validateProposal(
     };
     const morale = bounded('morale', finite(w.morale, u.morale));
     const fatigue = bounded('fatigue', finite(w.fatigue, p?.fatigue ?? u.fatigue));
-    const ammoCeiling = Math.min(100, p?.ammo ?? u.ammo);
+    // The ceiling is what the unit started with plus what the supply rule gave it in the
+    // projection (#436): a proposal that fired less than the projection keeps the difference,
+    // rather than being corrected down to the projection's end value.
+    const ammoCeiling = Math.min(100, u.ammo + (ctx.resupply?.[u.id] ?? 0));
     const ammo = bounded('ammo', finite(w.ammo, p?.ammo ?? u.ammo), ammoCeiling);
 
     // Status: destroyed and captured are final; broken is stored withdrawn; a rally needs a roll.

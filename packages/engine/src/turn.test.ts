@@ -306,10 +306,12 @@ describe('validateProposal', () => {
     expect(v.outcomes.find((o) => o.unitId === 'b')!.morale).toBe(0);
     const projected = w.units.map((u) => (u.id === 'a' ? { ...u, ammo: 90 } : u));
     const lowAmmo = { ...w, units: w.units.map((u) => (u.id === 'a' ? { ...u, ammo: 50 } : u)) };
+    // The projection took `a` from 50 to 90 by resupply alone, so the ceiling is 50 + 40 and a
+    // proposal of 95 is still corrected, to 90 (#436).
     const resupplied = validateProposal(
       lowAmmo,
       proposal(lowAmmo, { a: { ammo: 95 } }),
-      ctx({ projection: projected }),
+      ctx({ projection: projected, resupply: { a: 40 } }),
     );
     expect(resupplied.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(90);
   });
