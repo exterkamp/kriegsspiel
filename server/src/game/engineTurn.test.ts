@@ -292,12 +292,20 @@ describe('the engine adjudicator: rigid turn mode (D39, 11.4)', () => {
         units: world.units.map((u) => (u.id === 'blue-3' ? { ...u, ammo: 30 } : u)),
       }),
     );
-    const p = projectTurn(start, { n: 1, startMs: 0, endMs: 20 * MINUTE, orders: [] }, createRegistry());
+    const p = projectTurn(
+      start,
+      { n: 1, startMs: 0, endMs: 20 * MINUTE, orders: [] },
+      createRegistry(),
+    );
     expect(p.resupply).toEqual({ 'blue-3': 50 });
     expect(p.state.world.units.find((u) => u.id === 'blue-3')!.ammo).toBe(80);
     // The projection still ends where the caller's own registry would run it: measuring
     // changed nothing.
-    const plain = projectTurn(start, { n: 1, startMs: 0, endMs: 20 * MINUTE, orders: [] }, createRegistry());
+    const plain = projectTurn(
+      start,
+      { n: 1, startMs: 0, endMs: 20 * MINUTE, orders: [] },
+      createRegistry(),
+    );
     expect(JSON.stringify(plain.state.world)).toBe(JSON.stringify(p.state.world));
   });
 });
