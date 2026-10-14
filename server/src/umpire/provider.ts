@@ -41,6 +41,11 @@ export interface ProviderResponse {
   truncated?: boolean;
   /** Set by the test provider: the answer came from canned rules, not a model. */
   canned?: boolean;
+  /**
+   * The call's cost when the provider knows it better than the price table, e.g. `0` from the Claude Code bridge on
+   * a subscription. Absent: the client prices `usage` by model.
+   */
+  costUsd?: number;
 }
 
 /** A failed send. `retryable` is the provider's judgment (429, 5xx, network); not 4xx. */

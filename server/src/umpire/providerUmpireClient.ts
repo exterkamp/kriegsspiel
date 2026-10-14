@@ -102,7 +102,7 @@ export class ProviderUmpireClient implements UmpireClient {
           this.config.stageTimeoutMs?.[request.stage] ?? this.config.timeoutMs,
         );
         usage = addUsage(usage, res.usage);
-        const c = costUsd(model, res.usage);
+        const c = res.costUsd ?? costUsd(model, res.usage);
         cost = cost === null || c === null ? null : cost + c;
 
         if (res.refusal) {

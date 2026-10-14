@@ -3,6 +3,7 @@ import type { StructuredOutputSupport } from './provider.js';
 import type { GameLimits } from './gameLimits.js';
 import type { UmpireStage } from './umpireClient.js';
 import { TEST_MODEL } from './providers/test.js';
+import { CLAUDE_BRIDGE_DEFAULT_URL } from './providers/claudeBridge.js';
 import { NARRATE_MAX_TOKENS } from './narrate.js';
 
 /** The keyless Ollama route's reply limit per stage, where it differs from 700. */
@@ -66,7 +67,7 @@ export interface UmpireConfig {
   gameBudget?: GameLimits;
   /**
    * Provider id (a `test` provider) that answers when a stage's own provider fails, so the game continues. Set when
-   * `UMPIRE_KEYLESS_PROVIDER=ollama`; `createUmpireClient` wraps the stages that use a local model.
+   * `UMPIRE_KEYLESS_PROVIDER` is `ollama` or `claude-bridge`; `createUmpireClient` wraps the stages that use that model.
    */
   fallbackProvider?: string;
 }
@@ -99,6 +100,20 @@ export const OLLAMA_DEFAULT_MODEL = 'qwen2.5:0.5b';
 /** A CPU model answers in seconds to a minute, so the call timeout is generous. */
 export const OLLAMA_DEFAULT_TIMEOUT_MS = 60_000;
 export const OLLAMA_DEFAULT_NUM_CTX = 4096;
+
+/** The provider id (and type) of the host-side Claude Code bridge (#457). */
+export const CLAUDE_BRIDGE = 'claude-bridge';
+
+/** Whether the env names the Claude Code bridge anywhere, so its provider is configured from `CLAUDE_BRIDGE_URL`. */
+function namesClaudeBridge(env: Env): boolean {
+  if (env.CLAUDE_BRIDGE_URL) return true;
+  const names = [
+    'UMPIRE_PROVIDER',
+    'UMPIRE_KEYLESS_PROVIDER',
+    ...UMPIRE_STAGES.map((s) => `UMPIRE_PROVIDER_${s.toUpperCase()}`),
+  ];
+  return names.some((n) => env[n] === CLAUDE_BRIDGE);
+}
 
 export const DEFAULT_UMPIRE_CONFIG: UmpireConfig = {
   providers: { anthropic: { type: 'anthropic' }, test: { type: 'test' } },
@@ -175,7 +190,8 @@ function checkFile(file: UmpireConfigFile): void {
  * Builds the config: defaults, then the optional file, then env overrides. Env reads `UMPIRE_PROVIDER` (every
  * stage; `test` answers with canned responses), `UMPIRE_KEYLESS_PROVIDER` (the provider for stages that would use
  * Anthropic with no API key; `ollama` serves parse, narrate and staff from a local model with `test` as the fallback, configured by
- * `OLLAMA_URL`, `OLLAMA_MODEL`, `OLLAMA_STAGES`, `OLLAMA_NUM_CTX` and `OLLAMA_TIMEOUT_MS`), `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND|CRITIQUE|ADJUDICATE`, `UMPIRE_MODEL_<same>`, `UMPIRE_TIMEOUT_MS`,
+ * `OLLAMA_URL`, `OLLAMA_MODEL`, `OLLAMA_STAGES`, `OLLAMA_NUM_CTX` and `OLLAMA_TIMEOUT_MS`; `claude-bridge` serves every such
+ * stage from the host's Claude Code bridge at `CLAUDE_BRIDGE_URL`, also with `test` as the fallback), `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND|CRITIQUE|ADJUDICATE`, `UMPIRE_MODEL_<same>`, `UMPIRE_TIMEOUT_MS`,
  * `UMPIRE_TIMEOUT_MS_ADJUDICATE` (default 300 s),
  * `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`,
  * `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS` and the per-game
@@ -197,8 +213,16 @@ export function umpireConfigFromEnv(
       numCtx: positiveInt(env, 'OLLAMA_NUM_CTX', OLLAMA_DEFAULT_NUM_CTX),
     };
   }
+  if (namesClaudeBridge(env) && !file.providers?.[CLAUDE_BRIDGE]) {
+    providers[CLAUDE_BRIDGE] = {
+      type: CLAUDE_BRIDGE,
+      baseUrl: env.CLAUDE_BRIDGE_URL || CLAUDE_BRIDGE_DEFAULT_URL,
+    };
+  }
   const onOllama = ollamaStages(env);
   let usesOllama = false;
+  // Keyless stages on the Claude Code bridge fall back to `test` when the bridge is down, as for Ollama.
+  let usesKeylessBridge = false;
   const stages = { ...d.stages, ...file.stages } as Record<UmpireStage, StageRoute>;
   for (const stage of UMPIRE_STAGES) {
     const key = stage.toUpperCase();
@@ -220,6 +244,7 @@ export function umpireConfigFromEnv(
       : provider;
     const local = Boolean(keyless) && chosen === 'ollama';
     usesOllama ||= local;
+    usesKeylessBridge ||= Boolean(keyless) && chosen === CLAUDE_BRIDGE;
     stages[stage] = {
       ...route,
       provider: chosen,
@@ -286,7 +311,7 @@ export function umpireConfigFromEnv(
       'UMPIRE_MAX_ATTEMPTS',
       file.maxAttempts ?? (usesOllama ? 2 : d.maxAttempts),
     ),
-    ...(usesOllama ? { fallbackProvider: 'test' } : {}),
+    ...(usesOllama || usesKeylessBridge ? { fallbackProvider: 'test' } : {}),
     baseBackoffMs: positiveInt(
       env,
       'UMPIRE_BASE_BACKOFF_MS',
