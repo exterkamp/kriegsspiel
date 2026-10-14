@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // A stand-in for the `claude` CLI in the bridge tests. FAKE_CLAUDE picks what it does; it writes
 // what it was given (args, cwd, env, stdin) to FAKE_CLAUDE_LOG so a test can check the call.
+import { spawn } from 'node:child_process';
 import { appendFileSync, readdirSync } from 'node:fs';
 
 let stdin = '';
@@ -8,6 +9,14 @@ process.stdin.setEncoding('utf8');
 process.stdin.on('data', (c) => (stdin += c));
 process.stdin.on('end', () => {
   const mode = process.env.FAKE_CLAUDE ?? 'ok';
+  // `hang` starts a grandchild that also ignores SIGTERM, as a tool or MCP server the CLI started
+  // would be: only a kill of the whole process group ends it. No pipes, so it holds nothing open.
+  const grandchild =
+    mode === 'hang'
+      ? spawn(process.execPath, ['-e', "process.on('SIGTERM',()=>{});setInterval(()=>{},1000)"], {
+          stdio: 'ignore',
+        })
+      : undefined;
   if (process.env.FAKE_CLAUDE_LOG) {
     appendFileSync(
       process.env.FAKE_CLAUDE_LOG,
@@ -16,6 +25,7 @@ process.stdin.on('end', () => {
         cwd: process.cwd(),
         cwdEntries: readdirSync(process.cwd()),
         pid: process.pid,
+        grandchildPid: grandchild?.pid ?? null,
         stdin,
         env: {
           ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? null,

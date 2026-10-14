@@ -44,6 +44,9 @@ export class BridgeError extends Error {
   }
 }
 
+/** Default wait between SIGTERM and SIGKILL. */
+export const KILL_GRACE_MS = 2_000;
+
 export interface RunOptions {
   /** The `claude` executable. */
   bin: string;
@@ -211,24 +214,25 @@ function resetDelayMs(text: string, now: number): number | undefined {
 export function errorOf(ev: ResultEvent, now = Date.now()): BridgeError {
   const text = (ev.result ?? '').slice(0, 500) || `claude failed (${ev.subtype ?? 'error'})`;
   const status = ev.api_error_status ?? undefined;
-  if (
-    /not logged in|\/login|invalid api key|oauth token|authentication/i.test(text) ||
-    status === 401 ||
-    status === 403
-  ) {
-    return new BridgeError(
-      424,
-      'not_logged_in',
-      `claude is not logged in on the bridge host: ${text}`,
-    );
+  const notLoggedIn = () =>
+    new BridgeError(424, 'not_logged_in', `claude is not logged in on the bridge host: ${text}`);
+  const rateLimited = () =>
+    new BridgeError(429, 'rate_limited', text, resetDelayMs(text, now) ?? 60_000);
+  const overloaded = () => new BridgeError(503, 'overloaded', text);
+  // The API status decides when there is one: a 5xx whose text mentions authentication is still transient.
+  if (status !== undefined) {
+    if (status === 401 || status === 403) return notLoggedIn();
+    if (status === 429) return rateLimited();
+    if (status === 529) return overloaded();
+    // A bad model name or request will fail again the same way.
+    if (status >= 400 && status < 500) return new BridgeError(400, 'rejected', text);
+    if (status >= 500 && /overloaded/i.test(text)) return overloaded();
+    return new BridgeError(502, 'cli_error', text);
   }
-  if (status === 429 || /rate.?limit|usage limit|too many requests/i.test(text)) {
-    return new BridgeError(429, 'rate_limited', text, resetDelayMs(text, now) ?? 60_000);
-  }
-  if (status === 529 || /overloaded/i.test(text)) return new BridgeError(503, 'overloaded', text);
-  // A bad model name or request will fail again the same way.
-  if (status !== undefined && status >= 400 && status < 500)
-    return new BridgeError(400, 'rejected', text);
+  if (/not logged in|\/login|invalid api key|oauth token|authentication/i.test(text))
+    return notLoggedIn();
+  if (/rate.?limit|usage limit|too many requests/i.test(text)) return rateLimited();
+  if (/overloaded/i.test(text)) return overloaded();
   return new BridgeError(502, 'cli_error', text);
 }
 
@@ -317,7 +321,7 @@ function spawnClaude(
         }
       };
       group('SIGTERM');
-      killTimer = setTimeout(() => group('SIGKILL'), opts.killGraceMs ?? 2_000);
+      killTimer = setTimeout(() => group('SIGKILL'), opts.killGraceMs ?? KILL_GRACE_MS);
       killTimer.unref();
     };
     const timer = setTimeout(
@@ -327,6 +331,8 @@ function spawnClaude(
     );
     const onAbort = () => kill(new BridgeError(499, 'aborted', 'request aborted'));
     signal.addEventListener('abort', onAbort, { once: true });
+    // An abort during the temp-dir setup has already fired, so the listener would never see it.
+    if (signal.aborted) onAbort();
     const done = () => {
       clearTimeout(timer);
       signal.removeEventListener('abort', onAbort);

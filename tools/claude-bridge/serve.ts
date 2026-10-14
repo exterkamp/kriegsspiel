@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
-import { isIP } from 'node:net';
+import { BlockList, isIP } from 'node:net';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runClaude } from './claude.js';
+import { KILL_GRACE_MS, runClaude } from './claude.js';
 import { createBridgeHandler } from './handler.js';
 
 /** The docker0 gateway: the container reaches the host here, and other LAN hosts cannot. */
@@ -20,6 +20,13 @@ export interface BridgeConfig {
   timeoutMs: number;
   billing: 'subscription' | 'api';
 }
+
+/** `0.0.0.0` and `::` in any spelling (`::0`, `0:0:0:0:0:0:0:0`, ...). */
+const unspecified = new BlockList();
+unspecified.addAddress('0.0.0.0', 'ipv4');
+unspecified.addAddress('::', 'ipv6');
+const isUnspecified = (host: string) =>
+  isIP(host) !== 0 && unspecified.check(host, isIP(host) === 6 ? 'ipv6' : 'ipv4');
 
 const isLoopback = (host: string) => host === 'localhost' || host === '::1' || /^127\./.test(host);
 
@@ -43,7 +50,7 @@ export function bridgeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Bridg
   const host = env.CLAUDE_BRIDGE_HOST?.trim() || DEFAULT_HOST;
   if (host !== 'localhost' && !isIP(host))
     throw new Error(`CLAUDE_BRIDGE_HOST must be an IP address, got "${host}"`);
-  if (host === '0.0.0.0' || host === '::') {
+  if (isUnspecified(host)) {
     throw new Error(
       'CLAUDE_BRIDGE_HOST must not be every interface; bind the docker0 gateway or the loopback',
     );
@@ -79,7 +86,7 @@ const log = (line: Record<string, unknown>) =>
 
 export async function startBridge(
   config: BridgeConfig,
-): Promise<{ server: Server; abortAll: () => void }> {
+): Promise<{ server: Server; abortAll: () => Promise<void> }> {
   const { handle, abortAll } = createBridgeHandler({
     run: (req, signal) =>
       runClaude(
@@ -124,10 +131,17 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       timeoutMs: config.timeoutMs,
       billing: config.billing,
     });
+    let stopping = false;
     const stop = () => {
-      abortAll();
-      server.close(() => process.exit(0));
-      server.closeAllConnections();
+      if (stopping) return;
+      stopping = true;
+      server.close();
+      // Wait for the killed runs to finish (SIGKILL after the grace, temp dirs removed), but not forever.
+      const cap = new Promise<void>((r) => setTimeout(r, KILL_GRACE_MS + 1_000).unref());
+      void Promise.race([abortAll(), cap]).then(() => {
+        server.closeAllConnections();
+        process.exit(0);
+      });
     };
     process.on('SIGINT', stop);
     process.on('SIGTERM', stop);

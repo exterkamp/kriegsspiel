@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BridgeError, checkRequest, promptOf, runClaude } from './claude.js';
+import { BridgeError, checkRequest, errorOf, promptOf, runClaude } from './claude.js';
 import type { GenerateRequest, GenerateResponse } from './claude.js';
 import { createBridgeHandler } from './handler.js';
 import { bridgeConfigFromEnv } from './serve.js';
@@ -30,7 +30,12 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'bridge-test-'));
   logFile = join(dir, 'calls.ndjson');
 });
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
+afterEach(() => {
+  // A grandchild that a broken kill left behind must not outlive the test.
+  for (const c of calls())
+    if (c.grandchildPid && alive(c.grandchildPid)) process.kill(c.grandchildPid, 'SIGKILL');
+  rmSync(dir, { recursive: true, force: true });
+});
 
 /** What the fake CLI was given, one entry per run. */
 const calls = (): {
@@ -38,6 +43,8 @@ const calls = (): {
   cwd: string;
   cwdEntries: string[];
   pid: number;
+  /** In `hang` mode, a process the fake started that also ignores SIGTERM. */
+  grandchildPid: number | null;
   stdin: string;
   env: Record<string, string | null>;
 }[] =>
@@ -181,23 +188,63 @@ describe('runClaude with a fake CLI', () => {
     await expect(res).rejects.toMatchObject({ status: 424, code: 'cli_missing' });
   });
 
-  it('kills a hung CLI at the timeout, even one that ignores SIGTERM', async () => {
-    await expect(run('hang', {}, { timeoutMs: 300 })).rejects.toMatchObject({
-      status: 504,
-      code: 'timeout',
-    });
+  it('kills a hung CLI and what it started at the timeout, even if they ignore SIGTERM', async () => {
+    const p = run('hang', {}, { timeoutMs: 300 });
+    // Wait for the log so the kill lands after the fake has started its grandchild.
+    await vi.waitFor(() => expect(calls()).toHaveLength(1));
+    await expect(p).rejects.toMatchObject({ status: 504, code: 'timeout' });
     const [call] = calls();
     expect(alive(call!.pid)).toBe(false);
+    // Only a kill of the process group reaches the grandchild.
+    await vi.waitFor(() => expect(alive(call!.grandchildPid!)).toBe(false));
     expect(existsSync(call!.cwd)).toBe(false);
   });
 
-  it('kills the CLI when the request is aborted', async () => {
+  it('kills the CLI and what it started when the request is aborted', async () => {
     const ctrl = new AbortController();
     const p = run('hang', {}, { signal: ctrl.signal });
     await vi.waitFor(() => expect(calls()).toHaveLength(1));
     ctrl.abort();
     await expect(p).rejects.toMatchObject({ code: 'aborted' });
-    expect(alive(calls()[0]!.pid)).toBe(false);
+    const [call] = calls();
+    expect(alive(call!.pid)).toBe(false);
+    await vi.waitFor(() => expect(alive(call!.grandchildPid!)).toBe(false));
+  });
+
+  it('kills the CLI when the request is aborted while its directory is being made', async () => {
+    const ctrl = new AbortController();
+    const started = Date.now();
+    const p = run('hang', {}, { signal: ctrl.signal, timeoutMs: 5_000 });
+    // After runClaude's first check, during its mkdtemp.
+    queueMicrotask(() => ctrl.abort());
+    await expect(p).rejects.toMatchObject({ code: 'aborted' });
+    expect(Date.now() - started).toBeLessThan(2_000);
+    for (const c of calls()) expect(alive(c.pid)).toBe(false);
+  });
+});
+
+describe('error mapping', () => {
+  const ev = (api_error_status: number | null, result: string) =>
+    ({ type: 'result', is_error: true, api_error_status, result }) as Parameters<typeof errorOf>[0];
+
+  it('decides by the API status when there is one, so a transient error stays retryable', () => {
+    expect(errorOf(ev(529, 'authentication service unavailable'))).toMatchObject({ status: 503 });
+    expect(errorOf(ev(500, 'OAuth token refresh failed'))).toMatchObject({ status: 502 });
+    expect(errorOf(ev(500, 'Overloaded'))).toMatchObject({ status: 503 });
+    expect(errorOf(ev(401, 'Invalid API key'))).toMatchObject({ status: 424 });
+    expect(errorOf(ev(429, 'usage limit|1'))).toMatchObject({ status: 429, retryAfterMs: 60_000 });
+    expect(errorOf(ev(404, 'There is an issue with the selected model'))).toMatchObject({
+      status: 400,
+    });
+  });
+
+  it('falls back to the text when there is no status', () => {
+    expect(errorOf(ev(null, 'Not logged in · Please run /login'))).toMatchObject({ status: 424 });
+    expect(
+      errorOf(ev(null, 'Claude AI usage limit reached|2000000000'), 1_999_999_999_000),
+    ).toMatchObject({ status: 429, retryAfterMs: 1_000 });
+    expect(errorOf(ev(null, 'API Error: Overloaded'))).toMatchObject({ status: 503 });
+    expect(errorOf(ev(null, 'something else'))).toMatchObject({ status: 502 });
   });
 });
 
@@ -242,6 +289,15 @@ describe('bridge config', () => {
         CLAUDE_BRIDGE_SECRET: 'a-long-enough-secret',
       }),
     ).toThrow(/every interface/);
+    for (const host of ['::', '::0', '0:0:0:0:0:0:0:0']) {
+      expect(() =>
+        bridgeConfigFromEnv({
+          CLAUDE_BRIDGE_HOST: host,
+          CLAUDE_BRIDGE_SECRET: 'a-long-enough-secret',
+        }),
+      ).toThrow(/every interface/);
+    }
+    expect(bridgeConfigFromEnv({ CLAUDE_BRIDGE_HOST: '::1' }).host).toBe('::1');
     expect(() =>
       bridgeConfigFromEnv({ CLAUDE_BRIDGE_HOST: '127.0.0.1', CLAUDE_BRIDGE_SECRET: 'short' }),
     ).toThrow(/16/);
@@ -258,7 +314,7 @@ describe('HTTP handler', () => {
   };
 
   async function start(opts: Partial<Parameters<typeof createBridgeHandler>[0]>) {
-    const { handle } = createBridgeHandler({
+    const { handle, abortAll } = createBridgeHandler({
       run: async () => answer,
       maxConcurrent: 2,
       maxQueue: 4,
@@ -267,6 +323,7 @@ describe('HTTP handler', () => {
     server = createServer((rq, rs) => void handle(rq, rs));
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     url = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    return { abortAll };
   }
   afterEach(() => {
     server?.closeAllConnections();
@@ -328,6 +385,72 @@ describe('HTTP handler', () => {
     expect((await first).status).toBe(200);
     expect((await second).status).toBe(200);
     expect(peak).toBe(1);
+  });
+
+  it('drops a queued request whose client went away, so its slot is not lost', async () => {
+    let runs = 0;
+    const gates: (() => void)[] = [];
+    await start({
+      maxConcurrent: 1,
+      run: async () => {
+        runs++;
+        await new Promise<void>((r) => gates.push(r));
+        return answer;
+      },
+    });
+    const first = post(req);
+    await vi.waitFor(() => expect(gates).toHaveLength(1));
+    const ctrl = new AbortController();
+    const second = post(req, {}, ctrl.signal).catch(() => 'aborted');
+    await new Promise((r) => setTimeout(r, 50)); // queued behind the first
+    ctrl.abort();
+    expect(await second).toBe('aborted');
+    await new Promise((r) => setTimeout(r, 50)); // the bridge sees the close
+    gates.shift()!();
+    expect((await first).status).toBe(200);
+    // A leaked slot would hand the third request's place to the dead second one.
+    const third = post(req);
+    await vi.waitFor(() => expect(gates).toHaveLength(1));
+    gates.shift()!();
+    expect((await third).status).toBe(200);
+    expect(runs).toBe(2);
+  });
+
+  it('answers 413 to a body over the limit, rather than dropping the connection', async () => {
+    let runs = 0;
+    await start({
+      maxBodyBytes: 2_000,
+      run: async () => {
+        runs++;
+        return answer;
+      },
+    });
+    const res = await post({ ...req, system: 'x'.repeat(100_000) });
+    expect(res.status).toBe(413);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('too_large');
+    expect(runs).toBe(0);
+    expect((await post(req)).status).toBe(200);
+  });
+
+  it('waits for aborted runs to finish on shutdown', async () => {
+    let cleanedUp = false;
+    const { abortAll } = await start({
+      run: (_r, signal) =>
+        new Promise((_, reject) =>
+          signal.addEventListener('abort', () =>
+            // As runClaude does: the CLI takes a moment to die, then the temp dir is removed.
+            setTimeout(() => {
+              cleanedUp = true;
+              reject(new BridgeError(499, 'aborted', 'gone'));
+            }, 100),
+          ),
+        ),
+    });
+    const p = post(req).catch(() => 'closed');
+    await new Promise((r) => setTimeout(r, 50));
+    await abortAll();
+    expect(cleanedUp).toBe(true);
+    expect((await p) === 'closed' || ((await p) as Response).status === 499).toBe(true);
   });
 
   it('aborts the run when the client goes away', async () => {

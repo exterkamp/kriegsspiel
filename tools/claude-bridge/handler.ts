@@ -70,9 +70,11 @@ function readBody(req: IncomingMessage, limit: number): Promise<string> {
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => {
       size += c.length;
+      // Over the limit: stop keeping the body but keep reading it, so the 413 reaches the client
+      // (destroying the socket would look like a network error, which the server retries).
       if (size > limit) {
+        chunks.length = 0;
         reject(new BridgeError(413, 'too_large', `request body over ${limit} bytes`));
-        req.destroy();
       } else chunks.push(c);
     });
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
@@ -100,7 +102,14 @@ export function createBridgeHandler(opts: BridgeHandlerOptions) {
   const slots = new Semaphore(opts.maxConcurrent);
   const log = opts.log ?? (() => {});
   const live = new Set<AbortController>();
-  const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+  const inflight = new Set<Promise<void>>();
+  const handle = (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    const p = handleOne(req, res);
+    inflight.add(p);
+    void p.finally(() => inflight.delete(p));
+    return p;
+  };
+  const handleOne = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const path = (req.url ?? '').split('?')[0];
     if (req.method === 'GET' && path === '/healthz') return send(res, 200, { ok: true });
     if (path !== '/v1/generate')
@@ -162,15 +171,23 @@ export function createBridgeHandler(opts: BridgeHandlerOptions) {
         res,
         e.status,
         { error: { code: e.code, message: e.message } },
-        e.retryAfterMs ? { 'retry-after': String(Math.ceil(e.retryAfterMs / 1000)) } : {},
+        {
+          ...(e.retryAfterMs ? { 'retry-after': String(Math.ceil(e.retryAfterMs / 1000)) } : {}),
+          // The rest of an oversized body is not worth reading on a kept-alive connection.
+          ...(e.status === 413 ? { connection: 'close' } : {}),
+        },
       );
     } finally {
       release?.();
     }
   };
-  /** Kills every queued and running request, for shutdown: the CLI runs in its own process group. */
-  const abortAll = () => {
+  /**
+   * Kills every queued and running request, for shutdown: the CLI runs in its own process group.
+   * Resolves once they have all finished (their CLI is dead and its temp directory removed).
+   */
+  const abortAll = async (): Promise<void> => {
     for (const c of live) c.abort();
+    await Promise.allSettled([...inflight]);
   };
   return { handle, abortAll };
 }
