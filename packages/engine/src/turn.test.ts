@@ -314,6 +314,26 @@ describe('validateProposal', () => {
     expect(resupplied.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(90);
   });
 
+  it('does not correct ammunition for a unit that fired less than the projection (#436)', () => {
+    // At T0 `a` has 50. The projection resupplied it 25 (one wagon tick) and fired 50 away, so
+    // it ends at 25. The umpire's `a` fired less and ends at 70: more than the projection, but
+    // no more than it started with plus the resupply, so nothing is corrected.
+    const w = world();
+    const lowAmmo = { ...w, units: w.units.map((u) => (u.id === 'a' ? { ...u, ammo: 50 } : u)) };
+    const projected = lowAmmo.units.map((u) => (u.id === 'a' ? { ...u, ammo: 25 } : u));
+    const c = ctx({ projection: projected, resupply: { a: 25 } });
+    const kept = validateProposal(lowAmmo, proposal(lowAmmo, { a: { ammo: 70 } }), c);
+    expect(kept.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(70);
+    expect(kept.corrections.filter((x) => x.field === 'ammo')).toEqual([]);
+    // Past the start plus the resupply (75), the ceiling still bites.
+    const over = validateProposal(lowAmmo, proposal(lowAmmo, { a: { ammo: 80 } }), c);
+    expect(over.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(75);
+    expect(over.corrections).toMatchObject([
+      { unitId: 'a', field: 'ammo', proposed: 80, applied: 75 },
+    ]);
+    expect(over.corrections[0]!.reason).toMatch(/rises only by supply, to 75/);
+  });
+
   it('refuses to bring back a destroyed unit', () => {
     const w = world();
     const dead = {

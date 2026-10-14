@@ -106,6 +106,13 @@ export interface TurnContext {
    * departure must explain. Without it the start-of-turn values stand in.
    */
   projection?: Unit[];
+  /**
+   * Ammunition the projection's supply rule gave each unit in the turn, by unit id (#436). The
+   * ammunition ceiling is the start-of-turn value plus this: a unit the umpire had fire less
+   * than the projection keeps the difference, which the projection's end value alone would
+   * wrongly clamp away. Absent: no resupply is known, so the start-of-turn value is the ceiling.
+   */
+  resupply?: Record<string, number>;
   /** Every order sent to a unit so far, with whether it had arrived. Absent: orders unchecked. */
   orders?: TurnOrderStatus[];
   /** The rolls the engine made for this turn (11.7). */
