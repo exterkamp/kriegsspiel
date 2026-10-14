@@ -362,6 +362,40 @@ describe('fire', () => {
     // 0.5 + morale / 200: 0.65 against 1.0.
     expect(shaken.casualties / steady.casualties).toBeCloseTo(0.65, 1);
   });
+
+  it('a shot whose casualties round to 0 fires against the target as it stands (#445)', () => {
+    // A remnant of four men with no cartridges, at the edge of its range, firing on a
+    // battalion in the wood: the shot's casualties round to 0, so the target earns no
+    // entry in the tick's losses. The tick must still emit the shot's combat.fire, with
+    // the target's strength and morale unchanged, not throw on the missing entry.
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 5, y: 1, strength: 4 },
+      { id: 'red-1', side: 'red', x: 7, y: 1 },
+    ]);
+    s = {
+      ...s,
+      world: {
+        ...s.world,
+        units: s.world.units.map((u) => (u.id === 'blue-1' ? { ...u, ammo: 0 } : u)),
+      },
+    };
+    const { state, emitted } = run(s, 2);
+    const shot = ofType(emitted, 'combat.fire').find(
+      (e) => (e.payload as { attacker: string }).attacker === 'blue-1',
+    )!.payload as {
+      target: string;
+      casualties: number;
+      targetStrength: number;
+      targetMorale: number;
+    };
+    expect(shot.target).toBe('red-1');
+    expect(shot.casualties).toBe(0);
+    expect(shot.targetStrength).toBe(600);
+    expect(shot.targetMorale).toBe(80);
+    const red = unit(state, 'red-1');
+    expect(red.strength).toBe(600);
+    expect(red.morale).toBe(80);
+  });
 });
 
 describe('morale and withdrawal', () => {
