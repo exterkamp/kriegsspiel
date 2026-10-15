@@ -23,6 +23,11 @@ import { SqliteNotifyStore, pushFromEnv } from './notify/index.js';
 import { allowedOriginsFromEnv } from './auth/origin.js';
 import { SqliteCreationStore } from './lobby/creation-store.js';
 import { MapLibraryService } from './map-library/service.js';
+import {
+  NativeBattlefieldRegistry,
+  DEFAULT_BRIDGE_PAIRING,
+  OPEN_BRIDGE_PAIRING,
+} from './game/native-battlefield-registry.js';
 
 import {
   aiCommanderBudgetWarning,
@@ -59,6 +64,8 @@ const store = process.env.DB_PATH ? new SqliteGameStore(process.env.DB_PATH) : u
 
 const creations = new SqliteCreationStore(process.env.DB_PATH ?? ':memory:');
 const authStore = creations.auth;
+// Availability is an explicit authored allowlist; library geography never enters this registry.
+const battlefields = new NativeBattlefieldRegistry([DEFAULT_BRIDGE_PAIRING, OPEN_BRIDGE_PAIRING]);
 // No durable owner means no library capability or browser storage fallback.
 const mapLibrary = creations.durable
   ? await MapLibraryService.open(creations, new URL('../../data/maps/', import.meta.url))
@@ -132,6 +139,7 @@ const { server } = await buildApp({
   lobby,
   creations,
   mapLibrary,
+  battlefields,
   staticDir: process.env.STATIC_DIR,
   spaFallback: !/^(0|false|off)$/i.test(process.env.SPA_FALLBACK ?? ''),
   logger: true,
