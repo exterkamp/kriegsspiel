@@ -36,6 +36,7 @@ const MISSES_BEFORE_WARNING = 3;
     >
       <section class="ks-panel ks-stack" aria-label="Battlefield map">
         <h2>Battlefield map</h2>
+        <p>Scenario: {{ info().scenario }}</p>
         @if (battlefield(); as selected) {
           <p>
             <strong>{{ selected.map.name }}</strong> · {{ selected.map.widthM / 1000 }} ×
