@@ -1,5 +1,5 @@
 import { decodeLibraryMapSummary, decodeLibraryPage } from '@kriegsspiel/protocol';
-import { assetIdentity, canonicalizeAsset, importAsset } from '@kriegsspiel/maps';
+import { verifyLibraryAsset, type LibraryAssetInput } from './asset-check';
 import type { LibraryMapSummary, MapLibraryPort } from './contracts';
 
 const assetType = 'application/vnd.kriegsspiel.map+json';
@@ -131,7 +131,7 @@ function headerSummary(headers: Headers): LibraryMapSummary {
   });
 }
 
-/** A bounded, abortable phase covers fetch, body and validation, including late fetch/hash results. */
+/** A bounded, abortable phase covers fetch, body and verification, including late results. */
 async function phase<T>(
   fetcher: typeof fetch,
   url: string,
@@ -139,7 +139,12 @@ async function phase<T>(
   caller: AbortSignal,
   limit: number,
   inspect: (response: Response) => void,
-  consume: (response: Response, text: string, check: () => void) => Promise<T> | T,
+  consume: (
+    response: Response,
+    text: string,
+    check: () => void,
+    signal: AbortSignal,
+  ) => Promise<T> | T,
   listing = false,
 ): Promise<T> {
   if (caller.aborted) throw abortError();
@@ -226,7 +231,7 @@ async function phase<T>(
     );
     check();
     if (!response.ok) throw httpError(status, listing);
-    const result = await consume(response, text, check);
+    const result = await consume(response, text, check, controller.signal);
     check();
     return result;
   };
@@ -264,8 +269,19 @@ function savedSummary(
   return item;
 }
 
-/** Same-origin transport only. No session creation, generated keys, automatic PUT retry or capability. */
-export function createHttpMapLibrary(fetcher: typeof fetch = fetch): MapLibraryPort {
+export type LibraryAssetVerifier = (
+  value: LibraryAssetInput,
+  signal: AbortSignal,
+) => ReturnType<typeof verifyLibraryAsset>;
+
+/** Same-origin transport. Read verification defaults to a fresh trusted module worker.
+ * The optional verifier is a trusted embedding/test seam, not an untrusted validation bypass.
+ * No session creation, generated keys, automatic PUT retry or capability.
+ */
+export function createHttpMapLibrary(
+  fetcher: typeof fetch = fetch,
+  verifier: LibraryAssetVerifier = verifyLibraryAsset,
+): MapLibraryPort {
   return {
     async list(source, signal, cursor) {
       if (signal.aborted) throw abortError();
@@ -316,18 +332,17 @@ export function createHttpMapLibrary(fetcher: typeof fetch = fetch): MapLibraryP
           if (item.ref.kind !== wanted.kind || item.ref.id !== wanted.id)
             throw new Error('Foreign reference');
         },
-        async (_response, canonicalJson, check) => {
-          const asset = importAsset(canonicalJson);
+        async (_response, canonicalJson, check, phaseSignal) => {
           check();
-          if (
-            canonicalizeAsset(asset) !== canonicalJson ||
-            asset.bounds.minX !== 0 ||
-            asset.bounds.minY !== 0 ||
-            asset.bounds.maxX !== item.widthM ||
-            asset.bounds.maxY !== item.heightM ||
-            (await assetIdentity(asset, 'asset')) !== item.assetIdentity
-          )
-            throw new Error('Map mismatch');
+          await verifier(
+            {
+              canonicalJson,
+              assetIdentity: item.assetIdentity,
+              widthM: item.widthM,
+              heightM: item.heightM,
+            },
+            phaseSignal,
+          );
           check();
           return { item, canonicalJson };
         },

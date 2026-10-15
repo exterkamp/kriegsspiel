@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "outDir": "./out-tsc/worker", "lib": ["ES2022", "WebWorker"], "types": [] },
-  "include": ["src/legacy/map-authoring/*.worker.ts"]
+  "include": ["src/legacy/map-authoring/*.worker.ts", "src/shared/lobby-map-library/*.worker.ts"]
 }
