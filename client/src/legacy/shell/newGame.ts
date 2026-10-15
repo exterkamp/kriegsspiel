@@ -34,6 +34,8 @@ export interface ScenarioInfo {
 export type Opponent = 'scripted' | 'ai_commander' | undefined;
 
 export interface ScenarioOptions {
+  /** Present only for an independently advertised durable map library. */
+  mapLibrary?: boolean;
   scenarios: ScenarioInfo[];
   opponent: Opponent;
 }

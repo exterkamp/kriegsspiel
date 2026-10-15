@@ -695,3 +695,64 @@ describe('transport deadline and cancellation', () => {
     },
   );
 });
+
+describe('optional durable library capability projection', () => {
+  it('preserves only the exact supported advertisement as a boolean without changing ordinary setup or create requests', async () => {
+    const baseline = modernOptions();
+    const source = { ...baseline, mapLibrary: { schemaVersion: 1, available: true } };
+    const f = vi.fn<typeof fetch>().mockResolvedValue(json(source));
+    const result = await fetchScenarioOptions(f);
+    expect(result.mapLibrary).toBe(true);
+    expect(result.scenarios).toEqual(source.scenarios);
+    expect(result.scenarios[0]).not.toBe(source.scenarios[0]);
+    expect(initialForm(result)).toEqual(initialForm(baseline));
+    expect(toRequest(initialForm(result)!, result)).toEqual(
+      toRequest(initialForm(baseline)!, baseline),
+    );
+    expect(toRequest(initialForm(result)!, result)).not.toHaveProperty('mapLibrary');
+    expect(f).toHaveBeenCalledExactlyOnceWith(
+      '/scenarios',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    );
+  });
+
+  it.each([
+    undefined,
+    null,
+    true,
+    false,
+    'true',
+    [],
+    {},
+    { schemaVersion: 1 },
+    { available: true },
+    { schemaVersion: 1, available: false },
+    { schemaVersion: 2, available: true },
+    { schemaVersion: '1', available: true },
+    { schemaVersion: 1, available: 'true' },
+    { schemaVersion: 1, available: 1 },
+    { schemaVersion: 1, available: true, ownerId: 'private' },
+    { schemaVersion: 1, available: true, temporary: true },
+  ])(
+    'omits unknown, false or malformed capability %j while preserving ordinary scenario setup',
+    async (mapLibrary) => {
+      const source = { ...options, mapLibrary };
+      const result = await fetchScenarioOptions(async () => json(source));
+      expect(Object.hasOwn(result, 'mapLibrary')).toBe(false);
+      expect(result).toEqual(options);
+      expect(initialForm(result)).toEqual(initialForm(options));
+      expect(toRequest(initialForm(result)!, result)).toEqual(
+        toRequest(initialForm(options)!, options),
+      );
+    },
+  );
+
+  it('does not promote a per-scenario or unknown root advertisement into the durable capability', async () => {
+    const source = {
+      ...options,
+      library: { schemaVersion: 1, available: true },
+      scenarios: [{ ...options.scenarios[0]!, mapLibrary: { schemaVersion: 1, available: true } }],
+    };
+    expect(await fetchScenarioOptions(async () => json(source))).toEqual(options);
+  });
+});

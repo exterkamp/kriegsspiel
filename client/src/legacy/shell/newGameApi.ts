@@ -195,7 +195,17 @@ function scenarioOptions(value: unknown): ScenarioOptions {
       result.battlefields = decodeBattlefieldCatalog(scenario['battlefields'], result.id);
     return result;
   });
-  return { scenarios, opponent: body['opponent'] as ScenarioOptions['opponent'] };
+  const library = record(body['mapLibrary']);
+  const mapLibrary =
+    library &&
+    Object.keys(library).length === 2 &&
+    library['schemaVersion'] === 1 &&
+    library['available'] === true;
+  return {
+    scenarios,
+    opponent: body['opponent'] as ScenarioOptions['opponent'],
+    ...(mapLibrary ? { mapLibrary: true } : {}),
+  };
 }
 
 export async function fetchScenarioOptions(
