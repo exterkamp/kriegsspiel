@@ -3,6 +3,7 @@ FROM node:22.23.3-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages ./packages
+COPY data/maps ./data/maps
 COPY server ./server
 COPY client ./client
 COPY scripts ./scripts
@@ -30,6 +31,7 @@ WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages ./packages
+COPY --from=build /app/data/maps ./data/maps
 COPY --from=build /app/server/package.json ./server/package.json
 COPY --from=build /app/server/dist ./server/dist
 COPY server/backup-loop.sh ./server/backup-loop.sh

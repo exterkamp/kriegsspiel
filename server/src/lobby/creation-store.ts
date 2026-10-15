@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
 import { assertBattlefieldBudget } from '@kriegsspiel/protocol';
-import { SqliteAuthStore } from '../auth/store.js';
+import { SqliteAuthStore, type AuthOwnershipParticipant } from '../auth/store.js';
 import {
   decodeNativeScenarioPin,
   nativeCanonicalJson,
@@ -191,6 +191,7 @@ export class SqliteCreationStore {
   readonly durable: boolean;
   private readonly ownsDatabase: boolean;
   private failedTransaction = false;
+  private readonly ownershipParticipants = new Set<AuthOwnershipParticipant>();
 
   constructor(
     database: string | DatabaseSync,
@@ -210,6 +211,7 @@ export class SqliteCreationStore {
         this.lobby.reassignUser(from, to);
         for (const receipt of this.ownedReceipts(from))
           this.updateReceipt({ ...receipt, ownerId: to });
+        for (const participant of this.ownershipParticipants) participant.adoptGuest?.(from, to);
       },
       deleteUser: (id) => {
         const retiredOwnerGuest = this.auth.getUser(id)?.guest ?? true;
@@ -222,10 +224,20 @@ export class SqliteCreationStore {
             retiredOwnerId: id,
             retiredOwnerGuest,
           });
+        for (const participant of this.ownershipParticipants) participant.deleteUser?.(id);
       },
     });
     const location = this.database.prepare('PRAGMA database_list').get() as { file?: unknown };
     this.durable = typeof location.file === 'string' && location.file.length > 0;
+  }
+
+  /** Trusted startup composition only; participants share the existing auth transaction. */
+  registerOwnershipParticipant(participant: AuthOwnershipParticipant): void {
+    if (this.failedTransaction || this.database.isTransaction)
+      throw new CreationStoreError('creation_recovery_required');
+    if (this.ownershipParticipants.has(participant))
+      throw new Error('Ownership participant already registered');
+    this.ownershipParticipants.add(participant);
   }
 
   private transaction<T>(run: () => T): T {

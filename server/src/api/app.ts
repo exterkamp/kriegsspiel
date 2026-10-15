@@ -1,3 +1,5 @@
+import { mapLibraryRoutes } from '../map-library/routes.js';
+import type { MapLibraryService } from '../map-library/service.js';
 /**
  * The HTTP and WebSocket API. See docs/architecture.md (Components).
  *
@@ -211,6 +213,7 @@ export interface AppOptions {
   store?: GameStore;
   /** Shared account/receipt/lobby transaction owner. Required before native alternatives are offered. */
   creations?: SqliteCreationStore;
+  mapLibrary?: MapLibraryService;
   /** Trusted reviewed native availability, never request supplied. Default remains default-only. */
   battlefields?: NativeBattlefieldRegistry;
   /** A game ended or was closed: drop per-game resources such as its umpire client. May be called more than once. */
@@ -712,7 +715,14 @@ export async function buildApp(options: AppOptions): Promise<App> {
     createdAtMs: rec.createdAtMs,
   });
 
+  if (options.mapLibrary) {
+    if (options.mapLibrary.owner !== creations || !creations?.durable)
+      throw new Error('Map library requires the shared durable account owner');
+    await mapLibraryRoutes(server, auth, options.mapLibrary);
+  }
+
   server.get('/scenarios', async () => ({
+    ...(options.mapLibrary ? { mapLibrary: { schemaVersion: 1, available: true } } : {}),
     scenarios: scenarioList().map((scenario) => ({
       ...scenario,
       ...(creations ? { battlefields: battlefields.publicCatalog(scenario.id) } : {}),
