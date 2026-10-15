@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   ApprovedBattlefieldSchema,
   BATTLEFIELD_LIMITS,
@@ -228,5 +228,96 @@ describe('preflight before recursive work', () => {
       return value;
     });
     expect(() => decodeBattlefieldCatalog({ ...catalog(), entries }, 'bridge')).toThrow(/byte/);
+  });
+});
+
+describe('resource and exact-millimetre review regressions', () => {
+  it.each([1e-10, Number.MIN_VALUE, 0.001 + Number.EPSILON, 1.001000000000001])(
+    'rejects non-mm coordinate/radius/width %s without changing it',
+    (value) => {
+      for (const geometry of [
+        { shape: 'point', at: { x: value, y: 1500 }, radiusM: 110 },
+        { shape: 'point', at: { x: 2050, y: 1500 }, radiusM: value },
+        {
+          shape: 'polyline',
+          points: [
+            { x: 2050, y: 0 },
+            { x: 2050, y: 3000 },
+          ],
+          widthM: value,
+        },
+      ])
+        expect(() =>
+          decodeApprovedBattlefield(
+            {
+              ...entry(),
+              map: {
+                ...entry().map,
+                preview: [{ id: 'bridge', kind: 'bridge', layer: 4, geometry }],
+              },
+            },
+            'bridge',
+          ),
+        ).toThrow();
+    },
+  );
+
+  it('accepts exact zero coordinates and positive one-millimetre geometry unchanged', () => {
+    const input = entry();
+    input.map.preview[0]!.geometry = { shape: 'point', at: { x: 0, y: 0.001 }, radiusM: 0.001 };
+    expect(decodeApprovedBattlefield(input, 'bridge')).toEqual(input);
+  });
+
+  it('rejects cumulative strings and oversized keys before full serialization or encoding', () => {
+    const inputs = [Array(32).fill('x'.repeat(60_000)), { ['x'.repeat(70_000)]: null }];
+    for (const value of inputs) {
+      const stringify = vi.spyOn(JSON, 'stringify');
+      const encode = vi.spyOn(TextEncoder.prototype, 'encode');
+      let rejected = false;
+      try {
+        assertBattlefieldBudget(value, 65_536);
+      } catch {
+        rejected = true;
+      }
+      const calls = [stringify.mock.calls.length, encode.mock.calls.length];
+      stringify.mockRestore();
+      encode.mockRestore();
+      expect(rejected).toBe(true);
+      expect(calls).toEqual([0, 0]);
+    }
+  });
+
+  it('rejects a wide object without allocating an Object.values staging array', () => {
+    const value = Object.fromEntries(Array.from({ length: 65_536 }, (_, i) => [`k${i}`, null]));
+    const values = vi.spyOn(Object, 'values');
+    let rejected = false;
+    try {
+      assertBattlefieldBudget(value, 1024 * 1024);
+    } catch {
+      rejected = true;
+    }
+    const calls = values.mock.calls.length;
+    values.mockRestore();
+    expect(rejected).toBe(true);
+    expect(calls).toBe(0);
+  });
+
+  it('counts exact JSON bytes at Unicode, escape, numeric and punctuation boundaries', () => {
+    for (const value of [
+      null,
+      true,
+      false,
+      0,
+      -0,
+      1e-7,
+      [],
+      {},
+      '\\"\n\b\u0000é界😀\ud800',
+      { 'key"\n': ['a', '😀', 0.001] },
+    ]) {
+      const bytes = new TextEncoder().encode(JSON.stringify(value)).byteLength;
+      expect(() => assertBattlefieldBudget(value, bytes)).not.toThrow();
+      expect(() => assertBattlefieldBudget(value, bytes - 1)).toThrow(/byte/);
+    }
   });
 });

@@ -16,33 +16,86 @@ export const BATTLEFIELD_LIMITS = {
   values: 65_536,
 } as const;
 
-/** Iterative resource gate before recursive schemas, cloning, or digest work. */
+/** Iterative JSON byte/resource gate; never serializes or stages an unbounded collection. */
 export function assertBattlefieldBudget(value: unknown, maxBytes: number): void {
   const stack: Array<{ value: unknown; depth: number }> = [{ value, depth: 0 }];
   const seen = new Set<object>();
   let values = 0;
+  let bytes = 0;
+  const add = (count: number): void => {
+    bytes += count;
+    if (bytes > maxBytes) throw new Error('Battlefield exceeds byte limit');
+  };
+  const string = (text: string): void => {
+    add(2); // JSON quotes.
+    if (text.length > maxBytes - bytes) throw new Error('Battlefield exceeds byte limit');
+    for (let i = 0; i < text.length; i++) {
+      const c = text.charCodeAt(i);
+      if (c === 0x22 || c === 0x5c) add(2);
+      else if (c < 0x20) add([8, 9, 10, 12, 13].includes(c) ? 2 : 6);
+      else if (c >= 0xd800 && c <= 0xdbff) {
+        const next = text.charCodeAt(i + 1);
+        if (next >= 0xdc00 && next <= 0xdfff) {
+          add(4);
+          i++;
+        } else add(6); // JSON escapes unpaired surrogates.
+      } else if (c >= 0xdc00 && c <= 0xdfff) add(6);
+      else add(c < 0x80 ? 1 : c < 0x800 ? 2 : 3);
+    }
+  };
+  const push = (next: unknown, depth: number): void => {
+    if (values + stack.length + 1 > BATTLEFIELD_LIMITS.values)
+      throw new Error('Battlefield exceeds structural limits');
+    stack.push({ value: next, depth });
+  };
   while (stack.length) {
     const item = stack.pop()!;
     if (++values > BATTLEFIELD_LIMITS.values || item.depth > BATTLEFIELD_LIMITS.depth)
       throw new Error('Battlefield exceeds structural limits');
     const v = item.value;
-    if (v === null || typeof v === 'boolean') continue;
-    if (typeof v === 'number') {
+    if (v === null) add(4);
+    else if (typeof v === 'boolean') add(v ? 4 : 5);
+    else if (typeof v === 'number') {
       if (!Number.isFinite(v)) throw new Error('Battlefield contains a nonfinite number');
-    } else if (typeof v === 'string') {
-      if (v.length > maxBytes) throw new Error('Battlefield exceeds byte limit');
-    } else if (typeof v === 'object') {
+      add(String(v).length);
+    } else if (typeof v === 'string') string(v);
+    else if (typeof v === 'object') {
       if (seen.has(v)) throw new Error('Battlefield must contain detached JSON values');
       seen.add(v);
-      const entries = Array.isArray(v) ? v : Object.values(v);
-      if (entries.length > BATTLEFIELD_LIMITS.values - values - stack.length)
-        throw new Error('Battlefield exceeds structural limits');
-      for (const entry of entries) stack.push({ value: entry, depth: item.depth + 1 });
+      add(2); // Braces or brackets.
+      if (Array.isArray(v)) {
+        if (v.length > BATTLEFIELD_LIMITS.values - values - stack.length)
+          throw new Error('Battlefield exceeds structural limits');
+        add(Math.max(0, v.length - 1));
+        for (let i = 0; i < v.length; i++) {
+          const property = Object.getOwnPropertyDescriptor(v, String(i));
+          if (!property || !('value' in property))
+            throw new Error('Battlefield must contain JSON values');
+          push(property.value, item.depth + 1);
+        }
+      } else {
+        const prototype = Object.getPrototypeOf(v);
+        if (prototype !== Object.prototype && prototype !== null)
+          throw new Error('Battlefield must contain JSON objects');
+        let count = 0;
+        for (const key in v) {
+          if (!Object.hasOwn(v, key)) continue;
+          const property = Object.getOwnPropertyDescriptor(v, key)!;
+          if (!('value' in property)) throw new Error('Battlefield must contain JSON values');
+          if (count++) add(1);
+          string(key);
+          add(1); // Property name and colon.
+          push(property.value, item.depth + 1);
+        }
+      }
     } else throw new Error('Battlefield must contain JSON values');
   }
-  const text = JSON.stringify(value);
-  if (new TextEncoder().encode(text).byteLength > maxBytes)
-    throw new Error('Battlefield exceeds byte limit');
+}
+
+/** Exact numeric membership in the integer-mm domain, without changing the supplied value. */
+export function isIntegerMillimetres(value: number): boolean {
+  const mm = Math.round(value * 1000);
+  return Number.isFinite(value) && Number.isSafeInteger(mm) && mm / 1000 === value;
 }
 
 const id = z
@@ -55,19 +108,18 @@ const name = z
   .min(1)
   .max(BATTLEFIELD_LIMITS.nameChars)
   .refine((value) => value.trim().length > 0);
-const millimetres = (v: number) => Math.abs(v * 1000 - Math.round(v * 1000)) < 0.000001;
 const length = z
   .number()
   .finite()
   .positive()
   .max(BATTLEFIELD_LIMITS.maxExtentM)
-  .refine(millimetres);
+  .refine(isIntegerMillimetres);
 const coordinate = z
   .number()
   .finite()
   .min(0)
   .max(BATTLEFIELD_LIMITS.maxExtentM)
-  .refine(millimetres);
+  .refine(isIntegerMillimetres);
 const point = z.object({ x: coordinate, y: coordinate }).strict();
 const points = z.array(point).max(BATTLEFIELD_LIMITS.pointsPerGeometry);
 const geometry = z.discriminatedUnion('shape', [
