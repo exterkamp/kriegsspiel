@@ -159,6 +159,40 @@ describe('private pinned input headers', () => {
     ).toThrow(/header exceeds/);
   });
 
+  it('distinguishes absent native settings from empty, malformed and invalid stored settings', async () => {
+    const path = join(await folder(), 'settings.sqlite');
+    const store = new SqliteGameStore(path);
+    const input = { ...header(), settings: { dial: 'free' as const, persona: 'dry' as const } };
+    await store.saveLogHeader(input);
+    const database = new DatabaseSync(path);
+    const update = (value: string | null) =>
+      database.prepare('UPDATE games SET settings = ? WHERE game_id = ?').run(value, input.gameId);
+    try {
+      expect((await store.logHeader(input.gameId))!.settings).toEqual(input.settings);
+      expect((await loadReplayInput(store, input.gameId))!.header.settings).toEqual(input.settings);
+      update(null);
+      expect(await store.logHeader(input.gameId)).not.toHaveProperty('settings');
+      expect((await loadReplayInput(store, input.gameId))!.header).not.toHaveProperty('settings');
+      for (const invalid of [
+        '',
+        '{',
+        'null',
+        '{}',
+        '{"dial":"unknown","persona":"dry"}',
+        'x'.repeat(16385),
+      ]) {
+        update(invalid);
+        await expect(store.logHeader(input.gameId)).rejects.toThrow();
+        await expect(loadReplayInput(store, input.gameId)).rejects.toThrow();
+      }
+      update(JSON.stringify(input.settings));
+      expect((await store.logHeader(input.gameId))!.settings).toEqual(input.settings);
+    } finally {
+      database.close();
+      store.close();
+    }
+  });
+
   it('rejects missing/corrupt/oversized SQLite pin columns instead of dropping the format', async () => {
     const path = join(await folder(), 'game.sqlite');
     const store = new SqliteGameStore(path);

@@ -198,7 +198,9 @@ export class SqliteGameStore implements GameStore {
       gameId,
       scenarioId: r.scenario_id,
       seed: r.seed,
-      ...(r.settings ? { settings: JSON.parse(r.settings) as UmpireSettings } : {}),
+      ...((modern ? r.settings !== null : !!r.settings)
+        ? { settings: JSON.parse(r.settings!) as UmpireSettings }
+        : {}),
       ...(modern
         ? {
             battlefieldFormat: r.battlefield_format as 1,
