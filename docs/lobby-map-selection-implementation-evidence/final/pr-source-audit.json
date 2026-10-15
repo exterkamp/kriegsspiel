@@ -1,0 +1,735 @@
+{
+  "data": {
+    "repository": {
+      "p462": {
+        "number": 462,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/462",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-entry",
+        "baseRefName": "main",
+        "headRefOid": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+        "baseRefOid": "d82eec1027d1fe300c9c0e4613da7e3a2d0b6a5c",
+        "potentialMergeCommit": {
+          "oid": "ccd259f3fab410ad5fedcc7a12f6f53423f4fd90",
+          "tree": {
+            "oid": "ee778d9f42f6f14e007e69c231102c3c964c8997"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+                "tree": {
+                  "oid": "ee778d9f42f6f14e007e69c231102c3c964c8997"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p463": {
+        "number": 463,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/463",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-selection-ui",
+        "baseRefName": "feat/lobby-map-entry",
+        "headRefOid": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+        "baseRefOid": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+        "potentialMergeCommit": {
+          "oid": "01eb0762ecd97fae9cc542cb8fd0659bd94b1279",
+          "tree": {
+            "oid": "2f40fe3ccf71e8c611bcf0ec4ef0c185dc944b7d"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+                "tree": {
+                  "oid": "2f40fe3ccf71e8c611bcf0ec4ef0c185dc944b7d"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p464": {
+        "number": 464,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/464",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-pairings",
+        "baseRefName": "feat/lobby-map-selection-ui",
+        "headRefOid": "97bed058c3214d103539f80859b91dcc84dc02b5",
+        "baseRefOid": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+        "potentialMergeCommit": {
+          "oid": "b4c27bf7ac53e38b0817a0a5cfde6a6dab94f41a",
+          "tree": {
+            "oid": "ac54b6399fd20c8aaa80548b594f48a4d0e7e7bb"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "97bed058c3214d103539f80859b91dcc84dc02b5",
+                "tree": {
+                  "oid": "ac54b6399fd20c8aaa80548b594f48a4d0e7e7bb"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p465": {
+        "number": 465,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/465",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-shared-db",
+        "baseRefName": "feat/lobby-map-host-recovery",
+        "headRefOid": "2cbfb79a20869754631fe4ca7a2a247d5b5e1662",
+        "baseRefOid": "41b89ca06c655b8eecf397d637911a9ad9509a0e",
+        "potentialMergeCommit": {
+          "oid": "3e25a37060edfef27e53acc49bc80e0b91378778",
+          "tree": {
+            "oid": "578012ffa88c69cb2ebb2c343435329170b87a0b"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "2cbfb79a20869754631fe4ca7a2a247d5b5e1662",
+                "tree": {
+                  "oid": "578012ffa88c69cb2ebb2c343435329170b87a0b"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p466": {
+        "number": 466,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/466",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-native-pin",
+        "baseRefName": "feat/lobby-map-pairings",
+        "headRefOid": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+        "baseRefOid": "97bed058c3214d103539f80859b91dcc84dc02b5",
+        "potentialMergeCommit": {
+          "oid": "64d1eb12db917640fb51a20243fb35ca2ac9b3c1",
+          "tree": {
+            "oid": "7ffa96fc5343ccd71e9acfc657af0230030f9090"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+                "tree": {
+                  "oid": "7ffa96fc5343ccd71e9acfc657af0230030f9090"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p467": {
+        "number": 467,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/467",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-render-adapter",
+        "baseRefName": "feat/lobby-map-native-pin",
+        "headRefOid": "e0644f57194e5610b0efe5da3e7029d0f8dcea98",
+        "baseRefOid": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+        "potentialMergeCommit": {
+          "oid": "5f78c865801d3ea7836301b005c13901987423fc",
+          "tree": {
+            "oid": "db37052f5bd0e340c028551608aa4c74523dc245"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "e0644f57194e5610b0efe5da3e7029d0f8dcea98",
+                "tree": {
+                  "oid": "db37052f5bd0e340c028551608aa4c74523dc245"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p468": {
+        "number": 468,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/468",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-pinned-replay",
+        "baseRefName": "feat/lobby-map-render-adapter",
+        "headRefOid": "6ddffa08aa5efd8b805b86da6bb16a7f5bc4c42c",
+        "baseRefOid": "e0644f57194e5610b0efe5da3e7029d0f8dcea98",
+        "potentialMergeCommit": {
+          "oid": "3c74c857bb4b95dcbea00db2de8058b24f629065",
+          "tree": {
+            "oid": "c0aa9a606a4d0ec51bd9475b37aa9dcd97ebe59c"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "6ddffa08aa5efd8b805b86da6bb16a7f5bc4c42c",
+                "tree": {
+                  "oid": "c0aa9a606a4d0ec51bd9475b37aa9dcd97ebe59c"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p469": {
+        "number": 469,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/469",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-host-recovery",
+        "baseRefName": "feat/lobby-map-pinned-replay",
+        "headRefOid": "41b89ca06c655b8eecf397d637911a9ad9509a0e",
+        "baseRefOid": "6ddffa08aa5efd8b805b86da6bb16a7f5bc4c42c",
+        "potentialMergeCommit": {
+          "oid": "0b10b693266e1b0b79ff9c3bdae48058e8d847ec",
+          "tree": {
+            "oid": "7bd43d02ed248a0cdead7b56f33334f48e121a60"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "41b89ca06c655b8eecf397d637911a9ad9509a0e",
+                "tree": {
+                  "oid": "7bd43d02ed248a0cdead7b56f33334f48e121a60"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p470": {
+        "number": 470,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/470",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-creation-receipts",
+        "baseRefName": "feat/lobby-map-shared-db",
+        "headRefOid": "9aee88ee3c7a7fc50311ab8d2a4dd55efe180253",
+        "baseRefOid": "2cbfb79a20869754631fe4ca7a2a247d5b5e1662",
+        "potentialMergeCommit": {
+          "oid": "3abe7e29a41c8ef96db5b461ce6329b5ab85cd2f",
+          "tree": {
+            "oid": "0c930ba99f2ea80c0091f04cb073b33533230cae"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "9aee88ee3c7a7fc50311ab8d2a4dd55efe180253",
+                "tree": {
+                  "oid": "0c930ba99f2ea80c0091f04cb073b33533230cae"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p471": {
+        "number": 471,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/471",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-native-api",
+        "baseRefName": "feat/lobby-map-creation-receipts",
+        "headRefOid": "1fa53df66b348cca14e4bd7963778036969169d6",
+        "baseRefOid": "9aee88ee3c7a7fc50311ab8d2a4dd55efe180253",
+        "potentialMergeCommit": {
+          "oid": "896c87764fe0113e2cd6dff8f3bf1995f561c4ad",
+          "tree": {
+            "oid": "f7b6b079cd691e8cc8e38a9dfd01fb3a289d85c9"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "1fa53df66b348cca14e4bd7963778036969169d6",
+                "tree": {
+                  "oid": "f7b6b079cd691e8cc8e38a9dfd01fb3a289d85c9"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p472": {
+        "number": 472,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/472",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-playable-choices",
+        "baseRefName": "feat/lobby-map-native-api",
+        "headRefOid": "eb40829d0ca749c5109b658726daa4fa9d1a11ad",
+        "baseRefOid": "1fa53df66b348cca14e4bd7963778036969169d6",
+        "potentialMergeCommit": {
+          "oid": "314bee46893e087e77e3f581933bc779cdb46448",
+          "tree": {
+            "oid": "73af87de97eb281cd8d73281db51d754ffe9036a"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "eb40829d0ca749c5109b658726daa4fa9d1a11ad",
+                "tree": {
+                  "oid": "73af87de97eb281cd8d73281db51d754ffe9036a"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p473": {
+        "number": 473,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/473",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-live-terrain",
+        "baseRefName": "feat/lobby-map-playable-choices",
+        "headRefOid": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+        "baseRefOid": "eb40829d0ca749c5109b658726daa4fa9d1a11ad",
+        "potentialMergeCommit": {
+          "oid": "412f67abce108202c6f6f73203d6b7f03d7799ae",
+          "tree": {
+            "oid": "ba43102a23616f58fcda02d75a05bd2edbac32e9"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+                "tree": {
+                  "oid": "ba43102a23616f58fcda02d75a05bd2edbac32e9"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p474": {
+        "number": 474,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/474",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-safe-create-transport",
+        "baseRefName": "feat/lobby-map-live-terrain",
+        "headRefOid": "f49c6f53aa2da7d012379791ad9cd28372296f64",
+        "baseRefOid": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+        "potentialMergeCommit": {
+          "oid": "6ef936cea2eab19ae671abeac9ef5799f5bb71b8",
+          "tree": {
+            "oid": "33bdd9e98c92811e8ac0249f1676fd16134969c0"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "f49c6f53aa2da7d012379791ad9cd28372296f64",
+                "tree": {
+                  "oid": "33bdd9e98c92811e8ac0249f1676fd16134969c0"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p475": {
+        "number": 475,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/475",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-owned-storage",
+        "baseRefName": "feat/lobby-map-safe-create-transport",
+        "headRefOid": "28011596f86493b034a068b18a43d712c4c6c004",
+        "baseRefOid": "f49c6f53aa2da7d012379791ad9cd28372296f64",
+        "potentialMergeCommit": {
+          "oid": "4732891aa6cea869d883a27741038e6ac41e5291",
+          "tree": {
+            "oid": "d3da15640085a9bc6fca1fa2fee3c04486b07b8d"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "28011596f86493b034a068b18a43d712c4c6c004",
+                "tree": {
+                  "oid": "d3da15640085a9bc6fca1fa2fee3c04486b07b8d"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p476": {
+        "number": 476,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/476",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-owned-api",
+        "baseRefName": "feat/lobby-map-owned-storage",
+        "headRefOid": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+        "baseRefOid": "28011596f86493b034a068b18a43d712c4c6c004",
+        "potentialMergeCommit": {
+          "oid": "da0e72c66719ce65b2ee333a08ffee28c21f4c1b",
+          "tree": {
+            "oid": "f482d0152d6f2d3a90d7bf03c6a8e98a9c887ab5"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+                "tree": {
+                  "oid": "f482d0152d6f2d3a90d7bf03c6a8e98a9c887ab5"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p477": {
+        "number": 477,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/477",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-add-geography",
+        "baseRefName": "feat/lobby-map-owned-api",
+        "headRefOid": "d975101892e72f7d74a75f68cf4a5f1aea892a22",
+        "baseRefOid": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+        "potentialMergeCommit": {
+          "oid": "9280137571ff782628f1367d31590197403590d3",
+          "tree": {
+            "oid": "b703e1c9fdd0152ff4f4558e62aadba7c1fd52d8"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "d975101892e72f7d74a75f68cf4a5f1aea892a22",
+                "tree": {
+                  "oid": "b703e1c9fdd0152ff4f4558e62aadba7c1fd52d8"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p478": {
+        "number": 478,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/478",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-owned-picker",
+        "baseRefName": "feat/lobby-map-add-geography",
+        "headRefOid": "0c37cc4036cc5018e72fcd8443994666af958b6b",
+        "baseRefOid": "d975101892e72f7d74a75f68cf4a5f1aea892a22",
+        "potentialMergeCommit": {
+          "oid": "1c0e15713a355107cc50b609e4a8fb13e80aacb9",
+          "tree": {
+            "oid": "00f081d30d58f0416845d41f5661efd99251be84"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "0c37cc4036cc5018e72fcd8443994666af958b6b",
+                "tree": {
+                  "oid": "00f081d30d58f0416845d41f5661efd99251be84"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p479": {
+        "number": 479,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/479",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-retained-create",
+        "baseRefName": "feat/lobby-map-owned-picker",
+        "headRefOid": "8eea8d64ada8b6c0160a544626b0d2a6d660bd24",
+        "baseRefOid": "0c37cc4036cc5018e72fcd8443994666af958b6b",
+        "potentialMergeCommit": {
+          "oid": "8fd13d48b8f2fb2185b992404b3b6b427ed513f7",
+          "tree": {
+            "oid": "af4af52b8834cef63c0daaa98e080d7f25b088d6"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "8eea8d64ada8b6c0160a544626b0d2a6d660bd24",
+                "tree": {
+                  "oid": "af4af52b8834cef63c0daaa98e080d7f25b088d6"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p480": {
+        "number": 480,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/480",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-owned-http",
+        "baseRefName": "feat/lobby-map-retained-create",
+        "headRefOid": "5c0f0e2af69bbb6fa0aacde983a4277689ca8f8f",
+        "baseRefOid": "8eea8d64ada8b6c0160a544626b0d2a6d660bd24",
+        "potentialMergeCommit": {
+          "oid": "8e68790bc852d27dfd86da61ccd7eddcf270161b",
+          "tree": {
+            "oid": "e5061ba272cc7e8339d2055bc41199dc369e3c93"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "5c0f0e2af69bbb6fa0aacde983a4277689ca8f8f",
+                "tree": {
+                  "oid": "e5061ba272cc7e8339d2055bc41199dc369e3c93"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p481": {
+        "number": 481,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/481",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-owned-entry",
+        "baseRefName": "feat/lobby-map-owned-http",
+        "headRefOid": "555f114275e4f0e4ad2e8dad8bfcf419ec2cfce3",
+        "baseRefOid": "5c0f0e2af69bbb6fa0aacde983a4277689ca8f8f",
+        "potentialMergeCommit": {
+          "oid": "10295d5a93eb54b43d52e89ae0372e3cbdf3adf3",
+          "tree": {
+            "oid": "3b61186fb7a737a1dcee75a24e494ad0cff1b633"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "555f114275e4f0e4ad2e8dad8bfcf419ec2cfce3",
+                "tree": {
+                  "oid": "3b61186fb7a737a1dcee75a24e494ad0cff1b633"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p482": {
+        "number": 482,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/482",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-worker-read",
+        "baseRefName": "feat/lobby-map-owned-entry",
+        "headRefOid": "591837657601d67e520a22a4bf3f76a63d2db281",
+        "baseRefOid": "555f114275e4f0e4ad2e8dad8bfcf419ec2cfce3",
+        "potentialMergeCommit": {
+          "oid": "aecee808391eb3c18ff71ce82ec843444d0877c5",
+          "tree": {
+            "oid": "396484ad405bb786fef86fa0e11b9725022b19b0"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "591837657601d67e520a22a4bf3f76a63d2db281",
+                "tree": {
+                  "oid": "396484ad405bb786fef86fa0e11b9725022b19b0"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p483": {
+        "number": 483,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/483",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-preparation-offload",
+        "baseRefName": "feat/lobby-map-worker-read",
+        "headRefOid": "62c03dda2d696d6c0e49792ce63d4e19e3faf2cb",
+        "baseRefOid": "591837657601d67e520a22a4bf3f76a63d2db281",
+        "potentialMergeCommit": {
+          "oid": "8d01e50f3aa3430a0641b98332341416a288029d",
+          "tree": {
+            "oid": "b96cdcf54b750ef617e24d41b4cb04a6106f95d8"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "62c03dda2d696d6c0e49792ce63d4e19e3faf2cb",
+                "tree": {
+                  "oid": "b96cdcf54b750ef617e24d41b4cb04a6106f95d8"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p484": {
+        "number": 484,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/484",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-main-pairings",
+        "baseRefName": "feat/lobby-map-preparation-offload",
+        "headRefOid": "5e91b6fb15ce64fa1c3e778b1f87886deb6144da",
+        "baseRefOid": "62c03dda2d696d6c0e49792ce63d4e19e3faf2cb",
+        "potentialMergeCommit": {
+          "oid": "279493447d1c54a3dbcc3bce2a21e7852a5f9040",
+          "tree": {
+            "oid": "3781ee077129573af4ae7f6bda439323b199f63d"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "5e91b6fb15ce64fa1c3e778b1f87886deb6144da",
+                "tree": {
+                  "oid": "3781ee077129573af4ae7f6bda439323b199f63d"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p485": {
+        "number": 485,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/485",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-room-summary",
+        "baseRefName": "feat/lobby-map-main-pairings",
+        "headRefOid": "be1b1a9e4a18af4145587f97c54544ef59a4c2b1",
+        "baseRefOid": "5e91b6fb15ce64fa1c3e778b1f87886deb6144da",
+        "potentialMergeCommit": {
+          "oid": "46655ad3991fc462010a8c097ff80f5e8b7c3e90",
+          "tree": {
+            "oid": "7fda6d2c1eac9764508dcc9068c1f82315e4e451"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "be1b1a9e4a18af4145587f97c54544ef59a4c2b1",
+                "tree": {
+                  "oid": "7fda6d2c1eac9764508dcc9068c1f82315e4e451"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p486": {
+        "number": 486,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/486",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-ui-verification",
+        "baseRefName": "feat/lobby-map-room-summary",
+        "headRefOid": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+        "baseRefOid": "be1b1a9e4a18af4145587f97c54544ef59a4c2b1",
+        "potentialMergeCommit": {
+          "oid": "b1e1a73ddd391d19d6c0372a6736e66e13e9e3a3",
+          "tree": {
+            "oid": "1350db5182cb6371e8ba963f0ab8ef40f59ffe9e"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+                "tree": {
+                  "oid": "1350db5182cb6371e8ba963f0ab8ef40f59ffe9e"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p487": {
+        "number": 487,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/487",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-room-copy",
+        "baseRefName": "feat/lobby-map-ui-verification",
+        "headRefOid": "d6b1eafbb1b1965df1083bc0869e4d4ca8b755ee",
+        "baseRefOid": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+        "potentialMergeCommit": {
+          "oid": "168d16f45cc80e32816af77cfed0b36a862828c4",
+          "tree": {
+            "oid": "0573f1c954faa6a3962fa82255d0a195d9bbf63f"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "d6b1eafbb1b1965df1083bc0869e4d4ca8b755ee",
+                "tree": {
+                  "oid": "0573f1c954faa6a3962fa82255d0a195d9bbf63f"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "p488": {
+        "number": 488,
+        "url": "https://github.com/exterkamp/kriegsspiel/pull/488",
+        "isDraft": true,
+        "headRefName": "feat/lobby-map-draft-retention",
+        "baseRefName": "feat/lobby-map-room-copy",
+        "headRefOid": "f8fb3e4bba04a384c593745fd95bf41dd51b39f1",
+        "baseRefOid": "d6b1eafbb1b1965df1083bc0869e4d4ca8b755ee",
+        "potentialMergeCommit": {
+          "oid": "27523f542f185f264827a3152e6c82bfae2f5538",
+          "tree": {
+            "oid": "032539ae6158c945d2ec9b86ea30368573f8b13a"
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "f8fb3e4bba04a384c593745fd95bf41dd51b39f1",
+                "tree": {
+                  "oid": "032539ae6158c945d2ec9b86ea30368573f8b13a"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

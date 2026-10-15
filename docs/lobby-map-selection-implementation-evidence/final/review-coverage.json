@@ -1,0 +1,1687 @@
+{
+  "base": "d82eec1027d1fe300c9c0e4613da7e3a2d0b6a5c",
+  "head": "f8fb3e4bba04a384c593745fd95bf41dd51b39f1",
+  "tree": "032539ae6158c945d2ec9b86ea30368573f8b13a",
+  "pathCount": 154,
+  "coverage": [
+    {
+      "path": "Dockerfile",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 476,
+      "packetHead": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+      "reviewRecords": ["docs/lobby-map-selection-library-api-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "17cea92f3af08bf7b27bfb5551329d3c900cf292",
+      "finalSHA256": "5246c9ef5c01773992c022cefe468cb87c33fd2502fb53804d90bca6d48d6850"
+    },
+    {
+      "path": "client/proxy.conf.cjs",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 479,
+      "packetHead": "8eea8d64ada8b6c0160a544626b0d2a6d660bd24",
+      "reviewRecords": ["docs/lobby-map-selection-native-parent-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "06890bec70cab84b238afa1d3ba2ebd3a2d9f251",
+      "finalSHA256": "eb0c34df5759f84eb7fa56aa4d059152d9b8135883ead4ad4d72c3e760c2c469"
+    },
+    {
+      "path": "client/src/app/desk/fake-game.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "2edfbd47bb95eb772212bd11b7607beb0818c151",
+      "finalSHA256": "7a973aa82c703cd14fdcb1d30364cbfa15f2db5e10884d6c929db02fea057729"
+    },
+    {
+      "path": "client/src/app/game/clock.component.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": ["docs/lobby-map-selection-live-fixtures-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "fa28a2b6232201d706c912bc5b4ade1f6122e003",
+      "finalSHA256": "789b335c0ce6bfcd9b5511817a017dedc76649686d5e35e4c8bbb1f0fcbc1d0d"
+    },
+    {
+      "path": "client/src/app/game/flat-board.component.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "d674b7afb8d6860ca450742c65da1735af29ca37",
+      "finalSHA256": "93b54e0b2bbe44a6cca904e471357b1efab3a132ea172b70f5525431ccdaaa30"
+    },
+    {
+      "path": "client/src/app/game/flat-board.component.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "b4d3d9f3315e3e53900d2de876975651e943dd3b",
+      "finalSHA256": "68ad85247f53fdef68d1ec4cef44308c3ab6213eec0c916ad91e5e8d3a6594a1"
+    },
+    {
+      "path": "client/src/app/game/game.component.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "29173f9523eb72196e24ad57fc32bad868f714ac",
+      "finalSHA256": "60a1708d613884adbdc6191693aa282f349e34cff2abf996d4a3de48f7fb0877"
+    },
+    {
+      "path": "client/src/app/game/game.component.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "d29ef21aaffbe010e04adf02dae92372e6c044d7",
+      "finalSHA256": "9ba63e284b72249e73ce0fdbbd1abe71e3c0fb288702b773ae1859799300891f"
+    },
+    {
+      "path": "client/src/app/game/game.service.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "f01bbc80b92e3a8b09f3df4a94fe557ec03453f7",
+      "finalSHA256": "a059d113c42ae3fc65a69bd7b2ce864056c05df8454e5e1166c72509526b2804"
+    },
+    {
+      "path": "client/src/app/game/game.service.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "a2b1be53d74c4261550b5c238fb873d2b70e6dc5",
+      "finalSHA256": "bcbe1e54627c7b9f7ff10c945a35006859f72eb0a3e6e1efd783f4bf521a5965"
+    },
+    {
+      "path": "client/src/app/game/marks.service.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "bce4fd66655710bafc2ae0b5c5e14af9609f5f65",
+      "finalSHA256": "891947afd1116800627a0631a3a50bb0975abf9dadbcb73e07d298ca1d28bc13"
+    },
+    {
+      "path": "client/src/app/game/marks.service.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "fd36e139cf29fb236900304fcc85c5403aa9c1d3",
+      "finalSHA256": "1545c32ca816de16817a4baae1fd3390062067b7c324c1b83ecd9492e74a4f0b"
+    },
+    {
+      "path": "client/src/app/game/ports.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": ["docs/lobby-map-selection-live-fixtures-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "61578c58d8539a69396980dfdff89e1956a0d7d3",
+      "finalSHA256": "59e81949de88302ca974136697cb26f7a6b55417dbbe183c61e9ce786e22c0ec"
+    },
+    {
+      "path": "client/src/app/game/table-host.component.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "53748729643f9b701067c9d7b920fab7a8afa591",
+      "finalSHA256": "8201c390900fa007a6db37cfae6c595094ef6c3bc069d2edc9a646f20aa4b24d"
+    },
+    {
+      "path": "client/src/app/game/table-host.component.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "51778c21e6f154fd0723a6b8e6d30a97f5054deb",
+      "finalSHA256": "5ddea8bf0d22a91b69a91644a9e985315d4892350f0d793afa4b2951b50e9c84"
+    },
+    {
+      "path": "client/src/app/game/table.service.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "98d82eb4fb73ac6f378078c340681af1b9d87b81",
+      "finalSHA256": "abcfe3e6f508b38a4f178bae7570cbd4f88b1c5e9d2292518683a95eb2d4b5e0"
+    },
+    {
+      "path": "client/src/app/game/table.service.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "2777fe76a51d1c58602e4663090b4c18a5c15118",
+      "finalSHA256": "3145024f2703070764b4a4955198bb4822d815b3cdcdec25ceaa029f72d0f930"
+    },
+    {
+      "path": "client/src/app/lobby/battlefield-map/battlefield-map.component.css",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 478,
+      "packetHead": "0c37cc4036cc5018e72fcd8443994666af958b6b",
+      "reviewRecords": [
+        "docs/lobby-map-selection-picker-library-review.md",
+        "docs/lobby-map-selection-saved-focus-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "5f2ffbf9236676def14f0b0d992b784f669a0582",
+      "finalSHA256": "e2d16ef46236003c061410432196e05d83e89b54f54dece366cc8a18427f32e0"
+    },
+    {
+      "path": "client/src/app/lobby/battlefield-map/battlefield-map.component.html",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 478,
+      "packetHead": "0c37cc4036cc5018e72fcd8443994666af958b6b",
+      "reviewRecords": [
+        "docs/lobby-map-selection-picker-library-review.md",
+        "docs/lobby-map-selection-saved-focus-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "1719c87f2e9cca2e867d76a782b503336ad03bde",
+      "finalSHA256": "93fe7d5003aa6f3a44dcda9adc59efdce4005b9fa78455d3d3119308986bcba2"
+    },
+    {
+      "path": "client/src/app/lobby/battlefield-map/battlefield-map.component.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 486,
+      "packetHead": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+      "reviewRecords": ["docs/lobby-map-selection-ui-verification-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "58d6df1e7aff27ee47d17336e932bac7778e46c1",
+      "finalSHA256": "3b6a22b3a886d0f12cc87a3cbc09eac1c73b10ac823d76ee142c9e11d2d98bfc"
+    },
+    {
+      "path": "client/src/app/lobby/battlefield-map/battlefield-map.component.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 478,
+      "packetHead": "0c37cc4036cc5018e72fcd8443994666af958b6b",
+      "reviewRecords": [
+        "docs/lobby-map-selection-picker-library-review.md",
+        "docs/lobby-map-selection-saved-focus-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "94d2f51b9deaf02ba6c7002cc87824f5f25035dd",
+      "finalSHA256": "3282c1f1b8d57e33abd1505a745d79e19074a9251119e2771c1591bd586a4b9b"
+    },
+    {
+      "path": "client/src/app/lobby/battlefield-map/battlefield-preview.component.css",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "e27831a0dcafcb5615a9a91840fa80e97a2c2039",
+      "finalSHA256": "4bf04b1fa9385515c8986d714efd04aa0619f8cdf38ef3cfad96c79ba48d057f"
+    },
+    {
+      "path": "client/src/app/lobby/battlefield-map/battlefield-preview.component.html",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 487,
+      "packetHead": "d6b1eafbb1b1965df1083bc0869e4d4ca8b755ee",
+      "reviewRecords": ["docs/lobby-map-selection-room-copy-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "2a11e6c01020eda3a75bee716cd648097ed44b19",
+      "finalSHA256": "b15ff4c9f9e968e3482b0b2ea6712f6578df4a67b4990ffc6eaada5935c847f6"
+    },
+    {
+      "path": "client/src/app/lobby/battlefield-map/battlefield-preview.component.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "f874e065379d86d878eee688415ad311434b5d97",
+      "finalSHA256": "952062cab3ca3b463974c76fdb99b94597c86f5bf00859dbf012df6432939e81"
+    },
+    {
+      "path": "client/src/app/lobby/map-library/asset-verifier.testing.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 486,
+      "packetHead": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+      "reviewRecords": ["docs/lobby-map-selection-ui-verification-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "28d1f0e449f2d6d21e056f44185e8e433dd8e950",
+      "finalSHA256": "10048df5aab7ec1a94037a80d48f01f295557ab7b5d76259634672ec84e3ef95"
+    },
+    {
+      "path": "client/src/app/lobby/map-library/asset-verifier.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 486,
+      "packetHead": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+      "reviewRecords": ["docs/lobby-map-selection-ui-verification-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "07e58d447e32414931f36fb1e0fa98c2f13ca2db",
+      "finalSHA256": "69b5223ce800a3448ddf4a8bf33413d9bb6d581e5645fd17d93b57cdc18827cd"
+    },
+    {
+      "path": "client/src/app/lobby/map-library/library-browser.component.css",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 478,
+      "packetHead": "0c37cc4036cc5018e72fcd8443994666af958b6b",
+      "reviewRecords": [
+        "docs/lobby-map-selection-picker-library-review.md",
+        "docs/lobby-map-selection-saved-focus-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "bea8090b93eb48e13cc1c53f917cb8c29d030d29",
+      "finalSHA256": "900f959b4e71de2b74d22b35053673640df455e7443fba39c3c88d08fe28fc2c"
+    },
+    {
+      "path": "client/src/app/lobby/map-library/library-browser.component.html",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 478,
+      "packetHead": "0c37cc4036cc5018e72fcd8443994666af958b6b",
+      "reviewRecords": [
+        "docs/lobby-map-selection-picker-library-review.md",
+        "docs/lobby-map-selection-saved-focus-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "c127f91133b4e0225c557383bf2dd55d8d98711f",
+      "finalSHA256": "9b628db36032128a70f4f8809f6ea72608e5213ebf7b149403ec4c0c45bd7571"
+    },
+    {
+      "path": "client/src/app/lobby/map-library/library-browser.component.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 486,
+      "packetHead": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+      "reviewRecords": ["docs/lobby-map-selection-ui-verification-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "eb414c5dacd9d0d07da5e2eebd085be856a11aa1",
+      "finalSHA256": "166c95d4658000afdd2c1c67ffedac3891b69f93db9ebf3bc37d8f8ee0c0733d"
+    },
+    {
+      "path": "client/src/app/lobby/map-library/library-browser.component.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 486,
+      "packetHead": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+      "reviewRecords": ["docs/lobby-map-selection-ui-verification-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "0beb9f666bf7edbdfb39e0fe677502cc40a034e0",
+      "finalSHA256": "7af1c3effe7ef7cf20198b9f19375763be9f788719371e50b9b819f39ac40497"
+    },
+    {
+      "path": "client/src/app/lobby/map-library/map-library-state.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 486,
+      "packetHead": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+      "reviewRecords": ["docs/lobby-map-selection-ui-verification-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "1c3a909fce84d9156ed5c0e682abbbb1d743b9b2",
+      "finalSHA256": "06fa5e3bbb0b915a12eada507e7e129482abaf60f9ca3d2daea41e3ee49531b4"
+    },
+    {
+      "path": "client/src/app/lobby/map-library/map-library-state.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 486,
+      "packetHead": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+      "reviewRecords": ["docs/lobby-map-selection-ui-verification-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "96f59baeb203bde91a27d47c85256005f4007cdb",
+      "finalSHA256": "652e345cd842594a884c34ad773ce5160b432f714e296a93926051eee51f4ce9"
+    },
+    {
+      "path": "client/src/app/lobby/map-library/map-library.component.css",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 477,
+      "packetHead": "d975101892e72f7d74a75f68cf4a5f1aea892a22",
+      "reviewRecords": [
+        "docs/lobby-map-selection-add-child-review.md",
+        "docs/lobby-map-selection-library-http-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "7941354966b0388f87bdf58a3e3c79bb3deea24a",
+      "finalSHA256": "253fa9fc3e45fb315114daebb29aba52649ac56140fade5c3823c3f2e1a7d78b"
+    },
+    {
+      "path": "client/src/app/lobby/map-library/map-library.component.html",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 477,
+      "packetHead": "d975101892e72f7d74a75f68cf4a5f1aea892a22",
+      "reviewRecords": [
+        "docs/lobby-map-selection-add-child-review.md",
+        "docs/lobby-map-selection-library-http-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "991d46446af95807d171c82d51e20e10f83947be",
+      "finalSHA256": "3252de9f55f49ea47802eb637642e0432f6ea3d96e85551075b3ba8c0a2fb210"
+    },
+    {
+      "path": "client/src/app/lobby/map-library/map-library.component.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 486,
+      "packetHead": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+      "reviewRecords": ["docs/lobby-map-selection-ui-verification-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "95dde9387a50c8cbb477f614858ca5dcd7e371bb",
+      "finalSHA256": "0a8dfa7e22b9451f5d4e64dcbe138adf195493c17df1942e8daa901062ef6728"
+    },
+    {
+      "path": "client/src/app/lobby/map-library/map-library.component.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 486,
+      "packetHead": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+      "reviewRecords": ["docs/lobby-map-selection-ui-verification-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "61b0bb5ce372cd0239223b330b7d25542b1e5732",
+      "finalSHA256": "3d7082b87fda198d3a59494177c068ee19c2d0bebb53a0683f769fa1e439285b"
+    },
+    {
+      "path": "client/src/app/lobby/room.component.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 487,
+      "packetHead": "d6b1eafbb1b1965df1083bc0869e4d4ca8b755ee",
+      "reviewRecords": ["docs/lobby-map-selection-room-copy-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "3660a40c26fba34f377906db5c75b1c1e2f55c6f",
+      "finalSHA256": "1d0b1b128a25cd9638e999d3dd390d6bc2187613c85e46bf2610b3d8ad4b61e6"
+    },
+    {
+      "path": "client/src/app/lobby/room.component.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 487,
+      "packetHead": "d6b1eafbb1b1965df1083bc0869e4d4ca8b755ee",
+      "reviewRecords": ["docs/lobby-map-selection-room-copy-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "2f409ab14839c7aced2033768d69f6620b9a5010",
+      "finalSHA256": "ea4257ab1ea60bb44277a1b945d75f2a58db90f146c2c75ba2e1bf0d20fd2abc"
+    },
+    {
+      "path": "client/src/app/shell/new-game.component.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 488,
+      "packetHead": "f8fb3e4bba04a384c593745fd95bf41dd51b39f1",
+      "reviewRecords": ["docs/lobby-map-selection-draft-retention-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "274e3d582c5704354b95af688109254ef9794f36",
+      "finalSHA256": "8ad88943c0f03b0e173a50839b946891ef56380c1fdc10a6cef8600c6c216e9b"
+    },
+    {
+      "path": "client/src/app/shell/new-game.component.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 488,
+      "packetHead": "f8fb3e4bba04a384c593745fd95bf41dd51b39f1",
+      "reviewRecords": ["docs/lobby-map-selection-draft-retention-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "f700a92f8645d5dcbac9ddb76292d667a523cf53",
+      "finalSHA256": "c9ed063a5c9fd14cf318c4d256d9bbc7e152ad4913aa10f28aaa27ef6521c99f"
+    },
+    {
+      "path": "client/src/app/shell/shell.component.spec.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 488,
+      "packetHead": "f8fb3e4bba04a384c593745fd95bf41dd51b39f1",
+      "reviewRecords": ["docs/lobby-map-selection-draft-retention-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "26d582f059f950f3759d0b01efbf92a1a0ce7f0a",
+      "finalSHA256": "7627d2f091e80507ba9eec2463e4a8ff6f029e80d263f580f030ca7810ec21e6"
+    },
+    {
+      "path": "client/src/app/shell/shell.component.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 488,
+      "packetHead": "f8fb3e4bba04a384c593745fd95bf41dd51b39f1",
+      "reviewRecords": ["docs/lobby-map-selection-draft-retention-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "f166b4b11dde12a4feadf8e9f493f76978756104",
+      "finalSHA256": "22a2557b8b63af9e36b728e696862f6e8c2f24e81476788d56db4562fa69b1f9"
+    },
+    {
+      "path": "client/src/legacy/lobby/api.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 473,
+      "packetHead": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+      "reviewRecords": [
+        "docs/lobby-map-selection-live-render-delta-review.md",
+        "docs/lobby-map-selection-live-fixtures-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "c77a24f424cbb02cbf43420051d495fbfcfbdb0a",
+      "finalSHA256": "c41f945f20fe3fb8582700fada89d61492e424c05e74a93b0d9691ed37b898a6"
+    },
+    {
+      "path": "client/src/legacy/lobby/battlefield.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 472,
+      "packetHead": "eb40829d0ca749c5109b658726daa4fa9d1a11ad",
+      "reviewRecords": [
+        "docs/lobby-map-selection-fetch-review.md",
+        "docs/lobby-map-selection-picker-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "d4ae9cfe2bc52b5dd8523d7a1806ff04c2e9e769",
+      "finalSHA256": "7c41293da3a794496a1bb0d27e8e82893715333cc3a75d443b15e59e6b232c0d"
+    },
+    {
+      "path": "client/src/legacy/lobby/battlefield.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 472,
+      "packetHead": "eb40829d0ca749c5109b658726daa4fa9d1a11ad",
+      "reviewRecords": [
+        "docs/lobby-map-selection-fetch-review.md",
+        "docs/lobby-map-selection-picker-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "7edfa6041f848ba73c58c2335471fa917311c799",
+      "finalSHA256": "d765de7f540c0c148c53d36ef468578ff93d9cf6c807f718f742d440b2e7d49e"
+    },
+    {
+      "path": "client/src/legacy/shell/newGame.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 480,
+      "packetHead": "5c0f0e2af69bbb6fa0aacde983a4277689ca8f8f",
+      "reviewRecords": ["docs/lobby-map-selection-library-http-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "c4916c2c751fae26c028be8bee4c9d916cb41b48",
+      "finalSHA256": "74030c60441ee8edb56e34e6ab62886dacd25463b65afe37b397caecf5aa9e60"
+    },
+    {
+      "path": "client/src/legacy/shell/newGameApi.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 480,
+      "packetHead": "5c0f0e2af69bbb6fa0aacde983a4277689ca8f8f",
+      "reviewRecords": ["docs/lobby-map-selection-library-http-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "b2ae793a28a2c5d4b582bc09809b5d498140adff",
+      "finalSHA256": "b268c52b387cdde7d48d49fe015dc0cb0eb498b51885f90d583c4588f7ca1208"
+    },
+    {
+      "path": "client/src/legacy/shell/newGameApi.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 480,
+      "packetHead": "5c0f0e2af69bbb6fa0aacde983a4277689ca8f8f",
+      "reviewRecords": ["docs/lobby-map-selection-library-http-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "b2eea8e2eef58f3bf8ec319946f6072a3213b193",
+      "finalSHA256": "32127a3cd7510cbc9683730112b2ab6897782edf651bd09b42c7185a4c148a3d"
+    },
+    {
+      "path": "client/src/legacy/shell/pendingCreation.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 479,
+      "packetHead": "8eea8d64ada8b6c0160a544626b0d2a6d660bd24",
+      "reviewRecords": ["docs/lobby-map-selection-native-parent-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "0ea9843121c03c6a540c46d15a39fc59b4540076",
+      "finalSHA256": "c00429b8593a34f5325f7734a4bf9b4585118e34b4a8f1eb1cb42b36b4d98000"
+    },
+    {
+      "path": "client/src/legacy/shell/pendingCreation.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 479,
+      "packetHead": "8eea8d64ada8b6c0160a544626b0d2a6d660bd24",
+      "reviewRecords": ["docs/lobby-map-selection-native-parent-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "9c4e4833b3a88473677caf8232e1ebda5d274ff1",
+      "finalSHA256": "d85dbf1d8c4f6769031849ae3b4d26b5b5c9a58a09594bf82bd6ab3535a8e575"
+    },
+    {
+      "path": "client/src/legacy/table/battlefieldMap.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 467,
+      "packetHead": "e0644f57194e5610b0efe5da3e7029d0f8dcea98",
+      "reviewRecords": ["docs/lobby-map-selection-render-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "5d16b0c306350092edfa105c32f1c60c58c3cda8",
+      "finalSHA256": "99f8ed7cecb72818e6d2d54aabbdfb1e6d0d1eef2e8c553252d2ca98a2681f12"
+    },
+    {
+      "path": "client/src/legacy/table/battlefieldMap.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 467,
+      "packetHead": "e0644f57194e5610b0efe5da3e7029d0f8dcea98",
+      "reviewRecords": ["docs/lobby-map-selection-render-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "c0db8446076e842fb755b704a2ba1361953804dc",
+      "finalSHA256": "59583d83609d1f2853fda208e60ab1eba800e171756b4ed5ea9c95f124bd1a64"
+    },
+    {
+      "path": "client/src/legacy/table/mapTexture.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 467,
+      "packetHead": "e0644f57194e5610b0efe5da3e7029d0f8dcea98",
+      "reviewRecords": ["docs/lobby-map-selection-render-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "df2c638d95d26cd62e0674bf1298d566a40aeeab",
+      "finalSHA256": "dd49c4d49ec5a4ca29b92ff7153ab8c6bacf9bfc3fe684b807c69b2ab788e00d"
+    },
+    {
+      "path": "client/src/legacy/table/paintOrder.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 467,
+      "packetHead": "e0644f57194e5610b0efe5da3e7029d0f8dcea98",
+      "reviewRecords": ["docs/lobby-map-selection-render-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "dcecba2c94867306c7fddaf885b464906993ff5e",
+      "finalSHA256": "a448e891c2012a78f9999eb037d709251127e3b004916f93fdc29bd807ae4f50"
+    },
+    {
+      "path": "client/src/legacy/table/paintOrder.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 467,
+      "packetHead": "e0644f57194e5610b0efe5da3e7029d0f8dcea98",
+      "reviewRecords": ["docs/lobby-map-selection-render-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "3d053e341fdd9a50b2a1de8b01e84e9559f85f39",
+      "finalSHA256": "74b515b783715ea862306e7023de4a8f7e2c16fb02b212901ec8b59a52237364"
+    },
+    {
+      "path": "client/src/legacy/table/types.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 467,
+      "packetHead": "e0644f57194e5610b0efe5da3e7029d0f8dcea98",
+      "reviewRecords": ["docs/lobby-map-selection-render-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "c0c1e03e6f69b3d53a1ac7986818dd918376e557",
+      "finalSHA256": "04d9202607d345e5c10a87b2aa6028158ae1c22a26a772fa0c027578657be3a9"
+    },
+    {
+      "path": "client/src/shared/game-setup/preparation.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 483,
+      "packetHead": "62c03dda2d696d6c0e49792ce63d4e19e3faf2cb",
+      "reviewRecords": ["docs/lobby-map-selection-preparation-offload-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "ce919d94ddc30f3b6c6b3272ff9288320cd22049",
+      "finalSHA256": "d07587ac40f423e29d48e2b7283f4f31f667f4e4e48c5830e056aa73257b451d"
+    },
+    {
+      "path": "client/src/shared/game-setup/preparation.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 483,
+      "packetHead": "62c03dda2d696d6c0e49792ce63d4e19e3faf2cb",
+      "reviewRecords": ["docs/lobby-map-selection-preparation-offload-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "43ba74fc8633c2a19f6a6b4790778e36774ba3af",
+      "finalSHA256": "fadeba1a20eab520135184f0049fbaeb938f7167e82c2f09b52235a18a008105"
+    },
+    {
+      "path": "client/src/shared/lobby-map-library/asset-check.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 482,
+      "packetHead": "591837657601d67e520a22a4bf3f76a63d2db281",
+      "reviewRecords": ["docs/lobby-map-selection-worker-read-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "943dff6f6926d2b6bf251284a2aa263223d7b5b1",
+      "finalSHA256": "1c12c2fe8dbabeb9c1f28ebde556a7f1a820c5375b2cb4e4c53b6c90ecd562c8"
+    },
+    {
+      "path": "client/src/shared/lobby-map-library/asset-check.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 482,
+      "packetHead": "591837657601d67e520a22a4bf3f76a63d2db281",
+      "reviewRecords": ["docs/lobby-map-selection-worker-read-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "02127b9ca02df9ce6058228d7f473293c4b6ec97",
+      "finalSHA256": "7d28e73841fd0183eb8fbec10d913b8db07a42df77faf5d9f1f10db0de1a3958"
+    },
+    {
+      "path": "client/src/shared/lobby-map-library/asset-check.worker.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 482,
+      "packetHead": "591837657601d67e520a22a4bf3f76a63d2db281",
+      "reviewRecords": ["docs/lobby-map-selection-worker-read-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "dc60d693e5b0a6596422ef0ea068109074eddb65",
+      "finalSHA256": "9ee4230a5ca1ae19675511a444004becab9a308a43d9b6c1cad023500053aef6"
+    },
+    {
+      "path": "client/src/shared/lobby-map-library/contracts.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 477,
+      "packetHead": "d975101892e72f7d74a75f68cf4a5f1aea892a22",
+      "reviewRecords": [
+        "docs/lobby-map-selection-add-child-review.md",
+        "docs/lobby-map-selection-library-http-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "151e0f7beb7dba08644d2eef75334a891f97e55c",
+      "finalSHA256": "bc0c8873aef2633897ba810d019a33e9e61e29e1b1f5d738208b12a764d8a215"
+    },
+    {
+      "path": "client/src/shared/lobby-map-library/http.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 482,
+      "packetHead": "591837657601d67e520a22a4bf3f76a63d2db281",
+      "reviewRecords": ["docs/lobby-map-selection-worker-read-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "afd2a7cf0ca9bb8e0595cdd332f67f739ece3c7b",
+      "finalSHA256": "184da0fdb2746d76efa830bc0b610247ad603017fb2385ff009175d821c0261d"
+    },
+    {
+      "path": "client/src/shared/lobby-map-library/http.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 482,
+      "packetHead": "591837657601d67e520a22a4bf3f76a63d2db281",
+      "reviewRecords": ["docs/lobby-map-selection-worker-read-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "6246beb19ac2d017cd58fd7e4fed05aaa843b1e3",
+      "finalSHA256": "e0c2752e8f7b4c294d49c3ca85ce26cf1d75863fbd81361c6abb8b43bf69716d"
+    },
+    {
+      "path": "client/src/shared/lobby-map-library/preparation-verifier.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 483,
+      "packetHead": "62c03dda2d696d6c0e49792ce63d4e19e3faf2cb",
+      "reviewRecords": ["docs/lobby-map-selection-preparation-offload-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "a8edbbf4097864cd0acc4922773caec591a06782",
+      "finalSHA256": "4606ba967f0b8240812d7fad8226ef8f1ef44cfa78f6ce0fbd4d77a1a28e9438"
+    },
+    {
+      "path": "client/src/shared/lobby-map-library/preparation-verifier.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 483,
+      "packetHead": "62c03dda2d696d6c0e49792ce63d4e19e3faf2cb",
+      "reviewRecords": ["docs/lobby-map-selection-preparation-offload-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "c65bc038d32ff6b267c3f2ed346c89a08f4d256f",
+      "finalSHA256": "baefba253c20ba6786258a5d61ced1d8edb7f8dc8a5ccb79d92e63107d36dd67"
+    },
+    {
+      "path": "client/tsconfig.worker.json",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 482,
+      "packetHead": "591837657601d67e520a22a4bf3f76a63d2db281",
+      "reviewRecords": ["docs/lobby-map-selection-worker-read-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "54cd8f853fd709cf8e5a37ca322fb70d683fe6d9",
+      "finalSHA256": "53ca629be00ee2014d129f0016dea9e33ec60c0899a8f43deda94dbf3f55f39d"
+    },
+    {
+      "path": "docs/decisions.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 484,
+      "packetHead": "5e91b6fb15ce64fa1c3e778b1f87886deb6144da",
+      "reviewRecords": ["docs/lobby-map-selection-main-pairings-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "afce1207e85ba92d286917539bf01c926c67f7e8",
+      "finalSHA256": "d14877b85104b5269bbac3d16e64e415c24a70257b8b158a60b212110ce9a3d4"
+    },
+    {
+      "path": "docs/lobby-map-selection-chunk1-delta-review.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "b61a3b5968ab0ead7d122ac1fae24b91265e8763",
+      "finalSHA256": "72b2c662cbe896b3bab0273cd6e70043482b9334fd2f42201c875a8283ac453a"
+    },
+    {
+      "path": "docs/lobby-map-selection-chunk1-final-review.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 464,
+      "packetHead": "97bed058c3214d103539f80859b91dcc84dc02b5",
+      "reviewRecords": ["docs/lobby-map-selection-schema-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "3924eb6889a33733dc443e71fb174f98de77383c",
+      "finalSHA256": "aea8669de7c81aae22d5b61fe20b09071f8ec33ca96d9e4fd138be730096b23e"
+    },
+    {
+      "path": "docs/lobby-map-selection-chunk1-review.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "01f914ccf7a9def2ccbd0cf7ed0dabdc90411edd",
+      "finalSHA256": "e60e07afdc26d7d6b5a0a09e13170d29c1bc59be34fc8a424370af267ba8f449"
+    },
+    {
+      "path": "docs/lobby-map-selection-contract-review.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "8ffe7e05a1a32cdfebb0eb5bd301d074648bd538",
+      "finalSHA256": "cb9f94b884f209a97804627387ee3a80d6b297f796e942ab21f2f192ff33b6f1"
+    },
+    {
+      "path": "docs/lobby-map-selection-execution-log.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 468,
+      "packetHead": "6ddffa08aa5efd8b805b86da6bb16a7f5bc4c42c",
+      "reviewRecords": ["docs/lobby-map-selection-pinned-header-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "be919ec099c41839ce2853ab860776c398ac13f8",
+      "finalSHA256": "1df7efc82534a8a31a6e0618689f34c55d4d6b981ebce5cde45e8680e44c94b0"
+    },
+    {
+      "path": "docs/lobby-map-selection-implementation-evidence/chunk1/320-add.jpg",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "505ed6f67097b609838c0eb92e8ce54140107fc7",
+      "finalSHA256": "a8a55a72d5898639c714a3f5baea4d6e4336e08bb3ae7b064f1d5b472971361c"
+    },
+    {
+      "path": "docs/lobby-map-selection-implementation-evidence/chunk1/320-chooser.jpg",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "9d9e48aa0c74b322cd9214755202548d62bb8211",
+      "finalSHA256": "2bb451359d9af7259ea80eeee9b6e30adcada4068deef1efaf110c6e96903eb3"
+    },
+    {
+      "path": "docs/lobby-map-selection-implementation-evidence/chunk1/320-entry.jpg",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "bf98c9efc7af1c8473c1c3d326a6b4dfdf06d7c5",
+      "finalSHA256": "12277ee050f9262b90ee3a5ae409fcdffead94ff5e3a970c12b2de04b7593011"
+    },
+    {
+      "path": "docs/lobby-map-selection-implementation-evidence/chunk1/390-add.jpg",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "b2fed4d0e5b8e7dc1a7c6a023bd951057aeb72f6",
+      "finalSHA256": "6655a41ec1eab5f96be332be1109c487a331f69088a7795b6b7680733d5a16c2"
+    },
+    {
+      "path": "docs/lobby-map-selection-implementation-evidence/chunk1/390-chooser.jpg",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "275788caeb91bbf217dd2798800a9a83fc072dc0",
+      "finalSHA256": "b883df61b66860a6b864a088322778226ba005afc9af75c251ccbe5b7666bdd6"
+    },
+    {
+      "path": "docs/lobby-map-selection-implementation-evidence/chunk1/390-entry.jpg",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "03faba282af76d84a7baab5ea34d0209120715d4",
+      "finalSHA256": "d467cfbd08b3b3e75be26645bbc829dc0dc39b0830781eaa2a30011e58645d71"
+    },
+    {
+      "path": "docs/lobby-map-selection-implementation-evidence/chunk1/README.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "bdafe15be58aa942dd99a7e35acc8eb674168519",
+      "finalSHA256": "dea28e80731f694ac3b082d30bbadb604ff1f2667f11e73e5359614c69c31adf"
+    },
+    {
+      "path": "docs/lobby-map-selection-implementation-evidence/chunk1/desktop-chooser.jpg",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "1a7f1126f2df6260d86000b34eed0284f391330e",
+      "finalSHA256": "ce2e8e266ef77ae146846d84c84f73a932046ab26fb6d4fb9d39a468ff7c4ff3"
+    },
+    {
+      "path": "docs/lobby-map-selection-implementation-evidence/chunk1/desktop-confirmed.jpg",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "fb75cdb740199ca1860ac42cbce2d500dbbb561b",
+      "finalSHA256": "01e2f5df3997e91de7e13b24fba5b532447e029976a27cadfbf49d6764e2fc68"
+    },
+    {
+      "path": "docs/lobby-map-selection-implementation-evidence/chunk1/desktop-entry-full.jpg",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 463,
+      "packetHead": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+      "reviewRecords": ["docs/lobby-map-selection-chunk1-final-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "30c937d79696fb9ac53f87ba3daa43bb3e5bf70d",
+      "finalSHA256": "176eab8fa9c80fcfcb1af182012d582238759ad27e7d0c46bb60602124fe18af"
+    },
+    {
+      "path": "docs/lobby-map-selection-native-pin-review.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 466,
+      "packetHead": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+      "reviewRecords": [
+        "docs/lobby-map-selection-native-tests-review.md",
+        "docs/lobby-map-selection-native-pin-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "b600687c5c446f566abf15db0bdc36a2285e83a5",
+      "finalSHA256": "51d644ddf6f23c34323c6bc3e8b08eefce506ed5637966593ab6950c241c3a56"
+    },
+    {
+      "path": "docs/lobby-map-selection-native-tests-review.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 468,
+      "packetHead": "6ddffa08aa5efd8b805b86da6bb16a7f5bc4c42c",
+      "reviewRecords": ["docs/lobby-map-selection-pinned-header-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "afdc009422a27f5540d0143b0d07708ab5976b43",
+      "finalSHA256": "72a4596e5c96c560794b1ab19f124d148b84eb9287b03676acb4d9bfddc28889"
+    },
+    {
+      "path": "docs/lobby-map-selection-pairing-contract-review.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 464,
+      "packetHead": "97bed058c3214d103539f80859b91dcc84dc02b5",
+      "reviewRecords": ["docs/lobby-map-selection-schema-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "841e3b110066fa31e2c5d14973cbb1de42049e1a",
+      "finalSHA256": "57c87958bb4e81f356454bc7d6ba13f5083a04a4dc43e1cc33b272e2d4c5e29c"
+    },
+    {
+      "path": "docs/lobby-map-selection-pairing-contract.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 464,
+      "packetHead": "97bed058c3214d103539f80859b91dcc84dc02b5",
+      "reviewRecords": ["docs/lobby-map-selection-schema-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "edc1fc65cc3afa6a5593117e6b0f5f61c3c76a2f",
+      "finalSHA256": "e0e950d00e53c7ed88d290f62023fb496483f0eae5c1fd317ee9c3cc6ed989e6"
+    },
+    {
+      "path": "docs/lobby-map-selection-render-review.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 468,
+      "packetHead": "6ddffa08aa5efd8b805b86da6bb16a7f5bc4c42c",
+      "reviewRecords": ["docs/lobby-map-selection-pinned-header-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "8a0a358d940fee754a2cb5ee45c40019df9eeb10",
+      "finalSHA256": "585ab4d6b1e2a227441c902cde414071267801bad82b4bfbd9cdd305ca499cd8"
+    },
+    {
+      "path": "docs/lobby-map-selection-schema-delta-review.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 466,
+      "packetHead": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+      "reviewRecords": [
+        "docs/lobby-map-selection-native-tests-review.md",
+        "docs/lobby-map-selection-native-pin-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "a7a3d88df500d22e01e78052af5a2f7418e25808",
+      "finalSHA256": "fdd2bedda86894ad119651975ea1518399964339ec7dfca7931c93d65c960485"
+    },
+    {
+      "path": "docs/lobby-map-selection-schema-review.md",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 464,
+      "packetHead": "97bed058c3214d103539f80859b91dcc84dc02b5",
+      "reviewRecords": ["docs/lobby-map-selection-schema-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "8e8cd244a09c6e7d990a8e20e0c62ca36365defe",
+      "finalSHA256": "11886a39d2245ba277de8f83016b279c8c014cbb8b9b7453e63e002ff8282306"
+    },
+    {
+      "path": "docs/lobby-map-selection-ux-design.md",
+      "primary": "Owner-approved design",
+      "lastPacketPR": 462,
+      "packetHead": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+      "reviewRecords": ["docs/lobby-map-selection-ux-design.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "31d1380a77ee428e2fb619b4ca3af6ac2fa6132a",
+      "finalSHA256": "fd4a22f4e729dd8eaf3f236a46b804773d5d46f3e78a935a8108adf5a8305272"
+    },
+    {
+      "path": "docs/lobby-map-selection-ux-design/desktop.png",
+      "primary": "Owner-approved design",
+      "lastPacketPR": 462,
+      "packetHead": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+      "reviewRecords": ["docs/lobby-map-selection-ux-design.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "f9400d3414aaadcbf32c592452d0e39835c06047",
+      "finalSHA256": "28915919f897d3239775d0b11766d025e16f43f5dccf78a7eedc21a4e139e3b4"
+    },
+    {
+      "path": "docs/lobby-map-selection-ux-design/desktop.svg",
+      "primary": "Owner-approved design",
+      "lastPacketPR": 462,
+      "packetHead": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+      "reviewRecords": ["docs/lobby-map-selection-ux-design.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "1c3a773e449b928d16b61c5fd2ecec917044af5a",
+      "finalSHA256": "fc52130fa7884c9fbb7e13d972ca62c37429a77ccc376838b673ff5f67bea99a"
+    },
+    {
+      "path": "docs/lobby-map-selection-ux-design/inspection.md",
+      "primary": "Owner-approved design",
+      "lastPacketPR": 462,
+      "packetHead": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+      "reviewRecords": ["docs/lobby-map-selection-ux-design.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "378a9e6f0fa27876fe6ace282c3914d772b6ef49",
+      "finalSHA256": "0fc9757e3f0d54c1bb6844bc5f32b45af34ddf3d204ee0a90d0ef04b593637bc"
+    },
+    {
+      "path": "docs/lobby-map-selection-ux-design/narrow.png",
+      "primary": "Owner-approved design",
+      "lastPacketPR": 462,
+      "packetHead": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+      "reviewRecords": ["docs/lobby-map-selection-ux-design.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "5522e852162f7fc2e4d893b8311b00876b1bbfe5",
+      "finalSHA256": "64320ba427c2960d8f05798a17f01b1def43640d5ac2977a7cec70ea2ab9dcef"
+    },
+    {
+      "path": "docs/lobby-map-selection-ux-design/narrow.svg",
+      "primary": "Owner-approved design",
+      "lastPacketPR": 462,
+      "packetHead": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+      "reviewRecords": ["docs/lobby-map-selection-ux-design.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "816636ec344d897227ffd94e80f4b6875e36c250",
+      "finalSHA256": "e9eb68f92a68ff7387914a7847fee1493a24ed77fb91a9698ba1eb7f888ae650"
+    },
+    {
+      "path": "docs/lobby-map-selection-ux-design/render_wireframes.py",
+      "primary": "Owner-approved design",
+      "lastPacketPR": 462,
+      "packetHead": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+      "reviewRecords": ["docs/lobby-map-selection-ux-design.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "b4b4477dbdff9aeafefd7c5ee2b05287050f3818",
+      "finalSHA256": "8d03dee98df4fc69a8129401a8d87c358ab60b8470f53da80740d5ebd2d24dcc"
+    },
+    {
+      "path": "package-lock.json",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 475,
+      "packetHead": "28011596f86493b034a068b18a43d712c4c6c004",
+      "reviewRecords": [
+        "docs/lobby-map-selection-library-storage-review.md",
+        "docs/lobby-map-selection-library-api-delta-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "cfb3568308aeda29ae731000c8e765f71ec45a6b",
+      "finalSHA256": "2224dd263d5b8540af298bff0d13b016132e85d34523ab1972fdd5c7bf12cc45"
+    },
+    {
+      "path": "packages/protocol/src/battlefield-catalog.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 464,
+      "packetHead": "97bed058c3214d103539f80859b91dcc84dc02b5",
+      "reviewRecords": ["docs/lobby-map-selection-schema-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "5e0954beb6072f8dba136e69230f33504ae946f0",
+      "finalSHA256": "0b20f2314af33098e749f712ace34c0d66cc72f69f65071b53aa48c8e53471b5"
+    },
+    {
+      "path": "packages/protocol/src/battlefield-catalog.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 464,
+      "packetHead": "97bed058c3214d103539f80859b91dcc84dc02b5",
+      "reviewRecords": ["docs/lobby-map-selection-schema-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "0e6a772e439ec3c7f4106dd2fc9ba7c5ecb8988f",
+      "finalSHA256": "f21344a2b99a7f7e22c8e22fbdcd9c78ac5ad30c9164f48f5934e924502bf161"
+    },
+    {
+      "path": "packages/protocol/src/battlefield.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 462,
+      "packetHead": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+      "reviewRecords": ["docs/lobby-map-selection-contract-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "2a27e0b9b5873fad831cc7400cd235711ca6e063",
+      "finalSHA256": "3fc96529932d4c8748f4531d75978a8cca9d530c2a55d99f4031cf76de4ab8bc"
+    },
+    {
+      "path": "packages/protocol/src/index.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 475,
+      "packetHead": "28011596f86493b034a068b18a43d712c4c6c004",
+      "reviewRecords": [
+        "docs/lobby-map-selection-library-storage-review.md",
+        "docs/lobby-map-selection-library-api-delta-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "493aef0be384e1c47f63f5fde842641f38873109",
+      "finalSHA256": "08350863c7bdec6f86f2054159780b5ee01e5b52885da28af7307790e2c78e75"
+    },
+    {
+      "path": "packages/protocol/src/map-library.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 475,
+      "packetHead": "28011596f86493b034a068b18a43d712c4c6c004",
+      "reviewRecords": [
+        "docs/lobby-map-selection-library-storage-review.md",
+        "docs/lobby-map-selection-library-api-delta-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "55f99d439a0da07f191ab79c1d402c2139e6b0b3",
+      "finalSHA256": "764bc3ee99cac27def1ed0153d6fedc04672870a7c19b04f0503406607443a9f"
+    },
+    {
+      "path": "packages/protocol/src/map-library.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 475,
+      "packetHead": "28011596f86493b034a068b18a43d712c4c6c004",
+      "reviewRecords": [
+        "docs/lobby-map-selection-library-storage-review.md",
+        "docs/lobby-map-selection-library-api-delta-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "ef188ac17ccb7e09b4859e31edb320f6d960788a",
+      "finalSHA256": "74131e152459ce97323a3d3db6f1c10ddd8ef3191a7c7b37229ae72a5cae7d68"
+    },
+    {
+      "path": "server/package.json",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 475,
+      "packetHead": "28011596f86493b034a068b18a43d712c4c6c004",
+      "reviewRecords": [
+        "docs/lobby-map-selection-library-storage-review.md",
+        "docs/lobby-map-selection-library-api-delta-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "44188469a3088a15e2c6524e91e690401567e80f",
+      "finalSHA256": "de8a5ffd0ddd67097abc3c82057ec0697ea83177a66445bc591ff037c0e7f320"
+    },
+    {
+      "path": "server/src/admin/replayView.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 468,
+      "packetHead": "6ddffa08aa5efd8b805b86da6bb16a7f5bc4c42c",
+      "reviewRecords": ["docs/lobby-map-selection-pinned-header-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "2bc7ff525b41d5ee6aec3218da941830bdecf827",
+      "finalSHA256": "d94e12729004588d2975414830abbe7160871792867ac83ae783be62e86c3529"
+    },
+    {
+      "path": "server/src/api/app.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 476,
+      "packetHead": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+      "reviewRecords": ["docs/lobby-map-selection-library-api-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "b0a20ad59d8dc4d8bd134fc1745f36679bb7cfbd",
+      "finalSHA256": "e5c6948daaaf4d8ab785a0ef04f0fa0fa8220ed71b7980623f42d52abcfb2375"
+    },
+    {
+      "path": "server/src/api/battlefield-selection.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 471,
+      "packetHead": "1fa53df66b348cca14e4bd7963778036969169d6",
+      "reviewRecords": ["docs/lobby-map-selection-native-api-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "84ee3abe244b972265b83a5f33b0f008f37d2def",
+      "finalSHA256": "4bd2e3d23a4d95f01b1a363ea387a6cab63920e2815bff605568c353e2056e24"
+    },
+    {
+      "path": "server/src/api/battlefield.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 462,
+      "packetHead": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+      "reviewRecords": ["docs/lobby-map-selection-contract-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "0da60b20b0c5454d01c58fbf2494e650441393bb",
+      "finalSHA256": "ee8166a500a661ed4c192e2cc5a7270703ff5f7c262deec7ef9ad1329c3a2e62"
+    },
+    {
+      "path": "server/src/auth/store.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 470,
+      "packetHead": "9aee88ee3c7a7fc50311ab8d2a4dd55efe180253",
+      "reviewRecords": ["docs/lobby-map-selection-creation-core-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "a562677a6823c700feb057f946d8dcbc17a662c5",
+      "finalSHA256": "a2f863849789e7e84af33d966774fd8433a3a2474cc35cec5803207540f2eec2"
+    },
+    {
+      "path": "server/src/game/actor.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 469,
+      "packetHead": "41b89ca06c655b8eecf397d637911a9ad9509a0e",
+      "reviewRecords": ["docs/lobby-map-selection-host-recovery-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "241a3db7859f976b2eff60687df8fb33faee57fa",
+      "finalSHA256": "8ed402cc34534895a209ac31a9cc0e34f2b3121b516b40a45ab2931053ff2679"
+    },
+    {
+      "path": "server/src/game/battlefield.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 462,
+      "packetHead": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+      "reviewRecords": ["docs/lobby-map-selection-contract-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "736cdeee4a7d6eb1467333283362b821652602ce",
+      "finalSHA256": "c4724fea8347a4cafdcf4b2999ed4d7be936497908285b75e75ef6f5f982306e"
+    },
+    {
+      "path": "server/src/game/battlefield.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 462,
+      "packetHead": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+      "reviewRecords": ["docs/lobby-map-selection-contract-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "2cca1bb5aec1450049bc41ce96adb65e8b2701fb",
+      "finalSHA256": "c4e4e99f87ac11c0a066fb2920746148f60158548cfdbffc0ce5bd8cb16c0e7f"
+    },
+    {
+      "path": "server/src/game/host-pin.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 469,
+      "packetHead": "41b89ca06c655b8eecf397d637911a9ad9509a0e",
+      "reviewRecords": ["docs/lobby-map-selection-host-recovery-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "835799cf67b39ea47bb9ae8f5d1680dcf27d98e4",
+      "finalSHA256": "dd6edc9fa4439f883df72b0349b6ffd97accd91bccedddac3b7621931b67ec5e"
+    },
+    {
+      "path": "server/src/game/host.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 469,
+      "packetHead": "41b89ca06c655b8eecf397d637911a9ad9509a0e",
+      "reviewRecords": ["docs/lobby-map-selection-host-recovery-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "fe74e5257de9dba015c1e0ec2b3d35f5f787b6a9",
+      "finalSHA256": "9cd11c8629f1db4672ef1dc64c501cf337fbe2c2794323e37c9e5ef7bac34fdf"
+    },
+    {
+      "path": "server/src/game/native-battlefield-registry.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 466,
+      "packetHead": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+      "reviewRecords": [
+        "docs/lobby-map-selection-native-tests-review.md",
+        "docs/lobby-map-selection-native-pin-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "095c739f5cece471840c5c84407bafd9b6727d60",
+      "finalSHA256": "390ae6b5be73d2c4dd066a334b1d7c31079bdffd715c75cd415cf444a402efa8"
+    },
+    {
+      "path": "server/src/game/native-battlefield-registry.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 466,
+      "packetHead": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+      "reviewRecords": [
+        "docs/lobby-map-selection-native-tests-review.md",
+        "docs/lobby-map-selection-native-pin-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "8f835eb199fcf3ad51937ea487cab0510ecd0016",
+      "finalSHA256": "7319857157e8d97e84d4168c7492fe6d54229f4bd90feda297f9acb757f6c8b6"
+    },
+    {
+      "path": "server/src/game/native-scenario-pin.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 466,
+      "packetHead": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+      "reviewRecords": [
+        "docs/lobby-map-selection-native-tests-review.md",
+        "docs/lobby-map-selection-native-pin-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "a44dc78c5d348bb0178b8ec7c4623c88d03bba21",
+      "finalSHA256": "ac923456d50ceda9c3b46f372f3fc52a3ee39c9a06e632a5708ff3b98c7822a1"
+    },
+    {
+      "path": "server/src/game/native-scenario-pin.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 466,
+      "packetHead": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+      "reviewRecords": [
+        "docs/lobby-map-selection-native-tests-review.md",
+        "docs/lobby-map-selection-native-pin-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "ad9ae1b36de598759bd6260b3eb1c442c9377cd6",
+      "finalSHA256": "7ea059bb939232dd15a0cc61d59683d82aa7b2121ed2db3f7a27f214eb2105a7"
+    },
+    {
+      "path": "server/src/game/native-scenario-replay.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 466,
+      "packetHead": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+      "reviewRecords": [
+        "docs/lobby-map-selection-native-tests-review.md",
+        "docs/lobby-map-selection-native-pin-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "54a03d19a4fcf99f77853caa150d0ed51e7920e9",
+      "finalSHA256": "fb98ce925a8cb303b5ee8374456a525591306464d5dc2c6f3d52f73d36f0d166"
+    },
+    {
+      "path": "server/src/game/native-scenarios/default-bridge-v1.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 466,
+      "packetHead": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+      "reviewRecords": [
+        "docs/lobby-map-selection-native-tests-review.md",
+        "docs/lobby-map-selection-native-pin-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "e9cb18943fb782f4e3461d3ce977675c0a6d917f",
+      "finalSHA256": "cf79dc54d8835787f807a19a69893adab007758d788b721c31259626b856a619"
+    },
+    {
+      "path": "server/src/game/native-scenarios/open-bridge-v1.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 466,
+      "packetHead": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+      "reviewRecords": [
+        "docs/lobby-map-selection-native-tests-review.md",
+        "docs/lobby-map-selection-native-pin-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "07c96bb0c460ad0e1a010b1f662b23062037102a",
+      "finalSHA256": "717b03af56f8134747a07575f9bcd96a504a9aee19ef4c63b312bba4e4cb1620"
+    },
+    {
+      "path": "server/src/game/native-scenarios/open-bridge-v1.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 466,
+      "packetHead": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+      "reviewRecords": [
+        "docs/lobby-map-selection-native-tests-review.md",
+        "docs/lobby-map-selection-native-pin-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "2611fa9656e8d023898529069c14d1be88940999",
+      "finalSHA256": "7ac1c6fc4a46eaad437d8d8fba76dafb0c67d40dae7ca8487ab08e0fdcb2a0f5"
+    },
+    {
+      "path": "server/src/game/pinned-header.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 468,
+      "packetHead": "6ddffa08aa5efd8b805b86da6bb16a7f5bc4c42c",
+      "reviewRecords": ["docs/lobby-map-selection-pinned-header-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "2c474b1d0cc989a6cb2900d847fc70b94d99c287",
+      "finalSHA256": "04d850124f803dd0efca45f1cd73df2cb5e0a10082a921766b612c53bdf02893"
+    },
+    {
+      "path": "server/src/game/pinned-header.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 468,
+      "packetHead": "6ddffa08aa5efd8b805b86da6bb16a7f5bc4c42c",
+      "reviewRecords": ["docs/lobby-map-selection-pinned-header-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "19c100af6eec20c94a3486f3f04ba775570b0104",
+      "finalSHA256": "e348ab31fb13d87c3a8e6b5a26d4020957820f19ae410ef1d5b43aa9cbb80cea"
+    },
+    {
+      "path": "server/src/game/registry.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 462,
+      "packetHead": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+      "reviewRecords": ["docs/lobby-map-selection-contract-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "6ce066dd69e943fdd0487cc65ec5346ce5c36f64",
+      "finalSHA256": "909fd248573fb86275ad2f839f5b63be5ec3ec8ec5eb066300aeb84991c12023"
+    },
+    {
+      "path": "server/src/game/replay.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 468,
+      "packetHead": "6ddffa08aa5efd8b805b86da6bb16a7f5bc4c42c",
+      "reviewRecords": ["docs/lobby-map-selection-pinned-header-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "9dcf92750514e900283ca44fbf9b0e37a8d60244",
+      "finalSHA256": "4a0f5fb5f019c39fa2c268886941a9c8192fee7c7404f993c1e238a1acf3a32e"
+    },
+    {
+      "path": "server/src/game/replayCli.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 468,
+      "packetHead": "6ddffa08aa5efd8b805b86da6bb16a7f5bc4c42c",
+      "reviewRecords": ["docs/lobby-map-selection-pinned-header-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "4c98c31b24e8ada5198b96b736a2f36a76e895ac",
+      "finalSHA256": "7f2240badb6a2df1de0f7870b664e333026b315b571742e9875e1072eaee6fbe"
+    },
+    {
+      "path": "server/src/game/snapshot-binding.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 469,
+      "packetHead": "41b89ca06c655b8eecf397d637911a9ad9509a0e",
+      "reviewRecords": ["docs/lobby-map-selection-host-recovery-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "bb8aa11d2e70c30cb74cf9fa4790b9e8496c9236",
+      "finalSHA256": "df5011187374565bc4a2b5e42e7fdcb9ebc42c5b0e9c7284cd2f61f8e2977203"
+    },
+    {
+      "path": "server/src/game/snapshot-binding.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 469,
+      "packetHead": "41b89ca06c655b8eecf397d637911a9ad9509a0e",
+      "reviewRecords": ["docs/lobby-map-selection-host-recovery-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "d99a4d084cbecf2ff7e930041535d71980b279f0",
+      "finalSHA256": "70c7a414ea824af71eadd1bdd5cd22ee0211ea280aa057ec4b8ceb79e8878f18"
+    },
+    {
+      "path": "server/src/game/sqlite.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 469,
+      "packetHead": "41b89ca06c655b8eecf397d637911a9ad9509a0e",
+      "reviewRecords": ["docs/lobby-map-selection-host-recovery-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "8f9bb9041368b798f91299712e1cf615ea69484b",
+      "finalSHA256": "ae1b10db8888ed9b2fcab4733ea1200af71689bcb978dd7b9912429aa98826fc"
+    },
+    {
+      "path": "server/src/game/store.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 469,
+      "packetHead": "41b89ca06c655b8eecf397d637911a9ad9509a0e",
+      "reviewRecords": ["docs/lobby-map-selection-host-recovery-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "34b5c964fccb1c8bcc838c0a866b9ab9e85c0fb8",
+      "finalSHA256": "b98eb6975ace70af92a6d289049d7420b3369f512b24abb2830ab9de5c2be3bf"
+    },
+    {
+      "path": "server/src/lobby/creation-intent.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 470,
+      "packetHead": "9aee88ee3c7a7fc50311ab8d2a4dd55efe180253",
+      "reviewRecords": ["docs/lobby-map-selection-creation-core-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "1a95a94cca4bc20f153ca41468fb142b7dc455ad",
+      "finalSHA256": "22d6082b7a4eca58d747214641fb114290c24900ec9cb9e11df5c3ea5a9aad48"
+    },
+    {
+      "path": "server/src/lobby/creation-intent.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 470,
+      "packetHead": "9aee88ee3c7a7fc50311ab8d2a4dd55efe180253",
+      "reviewRecords": ["docs/lobby-map-selection-creation-core-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "53121ec0c30d8b4a8691f341d36452ae5fa6c1c2",
+      "finalSHA256": "fd9685b288dab6c605e17496f16a4ce5cc9e690ea77a0a04f45262357c904ab4"
+    },
+    {
+      "path": "server/src/lobby/creation-store.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 470,
+      "packetHead": "9aee88ee3c7a7fc50311ab8d2a4dd55efe180253",
+      "reviewRecords": ["docs/lobby-map-selection-creation-core-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "be4b0c2cd54ed5728bff19f7855e3e480521a0e4",
+      "finalSHA256": "fb381253424570316b2a3985cfeded274e86702589e1c7083985165c4eb4b3e9"
+    },
+    {
+      "path": "server/src/lobby/creation-store.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 476,
+      "packetHead": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+      "reviewRecords": ["docs/lobby-map-selection-library-api-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "26e328442da4e135fe6ea757b9b711f27ca3d693",
+      "finalSHA256": "521b9a251873e713c621b340328bc073379896c5d17138c335d49286ab0c3aed"
+    },
+    {
+      "path": "server/src/lobby/pinned-game.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 471,
+      "packetHead": "1fa53df66b348cca14e4bd7963778036969169d6",
+      "reviewRecords": ["docs/lobby-map-selection-native-api-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "c1a649eead979427f4563289ac0ff794a87387df",
+      "finalSHA256": "43881734e0337e4173342369fae2709a49dacbbbb25adfd70a0b276616b35fec"
+    },
+    {
+      "path": "server/src/lobby/shared-database.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 465,
+      "packetHead": "2cbfb79a20869754631fe4ca7a2a247d5b5e1662",
+      "reviewRecords": ["docs/lobby-map-selection-shared-db-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "bb1c593086f3ead809db98a578154f6cac57506a",
+      "finalSHA256": "f3a2bf7358a5664bcd0c6afa23ab91bbc5dc0e7922de8323b44195ed5f5663a2"
+    },
+    {
+      "path": "server/src/lobby/store.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 465,
+      "packetHead": "2cbfb79a20869754631fe4ca7a2a247d5b5e1662",
+      "reviewRecords": ["docs/lobby-map-selection-shared-db-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "4a5fab159c526e926631e02ebebb091dfe9e2254",
+      "finalSHA256": "b571d6e0ad91158653249a820ad498f78b264b2f3d9f4eaca831d3690fbccf40"
+    },
+    {
+      "path": "server/src/main.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 484,
+      "packetHead": "5e91b6fb15ce64fa1c3e778b1f87886deb6144da",
+      "reviewRecords": ["docs/lobby-map-selection-main-pairings-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "8245d2976f89243b5acfa53c68431a8ed686743f",
+      "finalSHA256": "8ea86dd2699c52b5313df2f37e0a9914ea3b75390cfc67a3a3b8d8c3b0beb3ca"
+    },
+    {
+      "path": "server/src/map-library/admission.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 475,
+      "packetHead": "28011596f86493b034a068b18a43d712c4c6c004",
+      "reviewRecords": [
+        "docs/lobby-map-selection-library-storage-review.md",
+        "docs/lobby-map-selection-library-api-delta-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "7345c577cbd81cfecffc5e0e2cd9f2bd63f7021d",
+      "finalSHA256": "42200123e877534c85124d69049f15adb5a4c9ac5376653c87166e1479a495bf"
+    },
+    {
+      "path": "server/src/map-library/api-boundaries.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 476,
+      "packetHead": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+      "reviewRecords": ["docs/lobby-map-selection-library-api-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "55d30cabbdffb05304d71a6520f090bef2dfc8d2",
+      "finalSHA256": "621d0e6328708c45c9bf3239573224ad7783b9b86fc860669151b35af31164fa"
+    },
+    {
+      "path": "server/src/map-library/client-transport.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 482,
+      "packetHead": "591837657601d67e520a22a4bf3f76a63d2db281",
+      "reviewRecords": ["docs/lobby-map-selection-worker-read-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "360c18650d5ca26bc0ec12b5c04e4243b5925239",
+      "finalSHA256": "7ea1e45977918523ac0dd4a6552c4766b2ab814785c73772ff1a4cdd5d3c4d5a"
+    },
+    {
+      "path": "server/src/map-library/routes.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 476,
+      "packetHead": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+      "reviewRecords": ["docs/lobby-map-selection-library-api-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "c5174d99654429c41d9e14d1776e3f419313fa8d",
+      "finalSHA256": "b0221255d7a9cb17a042aede1a1fce198dd37f012a9b9582b50a832f624c49dd"
+    },
+    {
+      "path": "server/src/map-library/routes.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 476,
+      "packetHead": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+      "reviewRecords": ["docs/lobby-map-selection-library-api-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "e31f7275480ec8fd60b4aa087af3aac9845a646f",
+      "finalSHA256": "062f2dfa4ec61eec51b91c9f30e895f82b0e4e593bde52cd5a40bd6b53815bef"
+    },
+    {
+      "path": "server/src/map-library/service.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 476,
+      "packetHead": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+      "reviewRecords": ["docs/lobby-map-selection-library-api-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "e8648143d7685ed0a6cc6b0303e9014bff90d7c3",
+      "finalSHA256": "8930139660a8c1db5376533924530518d228f90d74f47b744913de6d842e08e5"
+    },
+    {
+      "path": "server/src/map-library/service.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 476,
+      "packetHead": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+      "reviewRecords": ["docs/lobby-map-selection-library-api-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "26f43e077b330cd4d7c3feaa2f72d1458a321f45",
+      "finalSHA256": "c9364ea3d67b234cace78de0b6b5c35809dad8744b15f033001eb072f92e97e9"
+    },
+    {
+      "path": "server/src/map-library/store.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 475,
+      "packetHead": "28011596f86493b034a068b18a43d712c4c6c004",
+      "reviewRecords": [
+        "docs/lobby-map-selection-library-storage-review.md",
+        "docs/lobby-map-selection-library-api-delta-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "5196261108afbbece7ecf469a319a11572ce93b8",
+      "finalSHA256": "cec77100674ed2e76e4f235b2cddbd02917478a42a6809453739c932508a329c"
+    },
+    {
+      "path": "server/src/map-library/store.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 475,
+      "packetHead": "28011596f86493b034a068b18a43d712c4c6c004",
+      "reviewRecords": [
+        "docs/lobby-map-selection-library-storage-review.md",
+        "docs/lobby-map-selection-library-api-delta-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "1dc80091c580d913acb45ed50e3b83e897584a99",
+      "finalSHA256": "c16995bbd54928e9f91243893ad8bdd58ee68b3fda43ca7e3ba67c84ec616b74"
+    },
+    {
+      "path": "server/src/map-library/validation.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 475,
+      "packetHead": "28011596f86493b034a068b18a43d712c4c6c004",
+      "reviewRecords": [
+        "docs/lobby-map-selection-library-storage-review.md",
+        "docs/lobby-map-selection-library-api-delta-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "0ededfb56d2d187948df546ac29f15a4a209ec30",
+      "finalSHA256": "5a4df514f02dff7e87ac167b0831afae7c4254a7031c65828bf2db8bede0ae3c"
+    },
+    {
+      "path": "server/src/map-library/validation.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 475,
+      "packetHead": "28011596f86493b034a068b18a43d712c4c6c004",
+      "reviewRecords": [
+        "docs/lobby-map-selection-library-storage-review.md",
+        "docs/lobby-map-selection-library-api-delta-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "e424eff2da92a58e084cb4e203e63453368f8482",
+      "finalSHA256": "87ebb9c0162d025a40080377a8c5c855544cb1719167eb6eae568ca0e7ecfe23"
+    },
+    {
+      "path": "server/src/map-library/wire.test.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 476,
+      "packetHead": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+      "reviewRecords": ["docs/lobby-map-selection-library-api-delta-review.md"],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "d81c08193ffc4199bcd213adc594b0c58a14c69f",
+      "finalSHA256": "084e9ff2fd89619362269783d0b9abc70e2ca53bf92ae4864cda60c14ca94d68"
+    },
+    {
+      "path": "server/tsconfig.json",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 475,
+      "packetHead": "28011596f86493b034a068b18a43d712c4c6c004",
+      "reviewRecords": [
+        "docs/lobby-map-selection-library-storage-review.md",
+        "docs/lobby-map-selection-library-api-delta-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "15f3668832aae83e6da2f8daf96c311989e63286",
+      "finalSHA256": "1492e799445f41406fdb00c54df05db57be9322c1c9236acf52d5e48ef5dbe0e"
+    },
+    {
+      "path": "server/vitest.config.ts",
+      "primary": "lobby-map-reviewer",
+      "lastPacketPR": 475,
+      "packetHead": "28011596f86493b034a068b18a43d712c4c6c004",
+      "reviewRecords": [
+        "docs/lobby-map-selection-library-storage-review.md",
+        "docs/lobby-map-selection-library-api-delta-review.md"
+      ],
+      "contentRebind": "R43 exact blob/tree rebind applies to rewritten delivery heads; previous reports retain original source IDs.",
+      "finalBlob": "9ccc7f857ad3ef3c74db9062be5ed368db234a9c",
+      "finalSHA256": "72db8a6ddf5fc6a9714796bc66cc5031efc5fe0c73d2bede841a92ace5288e5a"
+    }
+  ],
+  "limits": "Primary packet attribution and exact final blob inventory, not a new independent whole-product verdict. Owner-approved design assets are distinguished from independent product review. Browser gameplay and CI failures remain open."
+}

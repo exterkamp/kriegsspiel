@@ -1,0 +1,8 @@
+{
+  "head": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+  "checkedNonDocFiles": 1160,
+  "snapshotDifferences": [
+    "client/src/app/shell/shell.component.spec.ts"
+  ],
+  "scope": "Actual15km generation/save/read screenshots: map library, HTTP, preparation and worker source. Writer W17 may concurrently change the four shell form/navigation paths only."
+}

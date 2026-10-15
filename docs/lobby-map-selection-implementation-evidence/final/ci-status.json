@@ -1,0 +1,1649 @@
+[
+  {
+    "baseRefName": "main",
+    "headRefOid": "1d6fcb4b76a8a9a5881e8d909e72eddbbb4a4aa4",
+    "isDraft": true,
+    "number": 462,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T06:30:01Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38692624800/job/116281823443",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T06:28:39Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T06:30:25Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38692624800/job/116281823527",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T06:28:39Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T06:31:44Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38692624800/job/116281823148",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T06:28:39Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T06:29:25Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38692624800/job/116281823396",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T06:28:39Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T06:31:49Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38692624800/job/116282826424",
+        "name": "check",
+        "startedAt": "2026-10-15T06:31:46Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Describe the scenario battlefield for lobby map setup",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/462",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-entry",
+    "headRefOid": "5e8425de9c95a5b07ebd0a0e062181b0cd9cfa9b",
+    "isDraft": true,
+    "number": 463,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T06:42:03Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38693748615/job/116285416036",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T06:39:47Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T06:41:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38693748615/job/116285416041",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T06:39:48Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T06:42:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38693748615/job/116285416060",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T06:39:48Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T06:40:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38693748615/job/116285415753",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T06:39:47Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T06:42:59Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38693748615/job/116286444588",
+        "name": "check",
+        "startedAt": "2026-10-15T06:42:56Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Show the battlefield map in New game",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/463",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-selection-ui",
+    "headRefOid": "97bed058c3214d103539f80859b91dcc84dc02b5",
+    "isDraft": true,
+    "number": 464,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T07:08:56Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38696662185/job/116294697925",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T07:07:29Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T07:09:26Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38696662185/job/116294697959",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T07:07:29Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T07:10:34Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38696662185/job/116294697981",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T07:07:29Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T07:08:08Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38696662185/job/116294697699",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T07:07:29Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T07:10:39Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38696662185/job/116295798294",
+        "name": "check",
+        "startedAt": "2026-10-15T07:10:36Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Define bounded native battlefield catalog transport",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/464",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-host-recovery",
+    "headRefOid": "2cbfb79a20869754631fe4ca7a2a247d5b5e1662",
+    "isDraft": true,
+    "number": 465,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T09:06:48Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38710258780/job/116339600111",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T09:04:36Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T09:05:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38710258780/job/116339600560",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T09:04:36Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T09:07:40Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38710258780/job/116339600470",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T09:04:36Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T09:05:12Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38710258780/job/116339600568",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T09:04:36Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T09:07:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38710258780/job/116340869006",
+        "name": "check",
+        "startedAt": "2026-10-15T09:07:42Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Allow account and lobby stores to share a SQLite transaction",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/465",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-pairings",
+    "headRefOid": "2a71d553c92560c3b596ecc7ccb1df3a34aaa23d",
+    "isDraft": true,
+    "number": 466,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:03:44Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38702717687/job/116314541996",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T08:01:25Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:03:20Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38702717687/job/116314541937",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T08:01:25Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:05:14Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38702717687/job/116314541578",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T08:01:24Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:02:05Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38702717687/job/116314541806",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T08:01:25Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:05:20Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38702717687/job/116316022808",
+        "name": "check",
+        "startedAt": "2026-10-15T08:05:16Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Pin and resolve authored native battlefield assemblies",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/466",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-native-pin",
+    "headRefOid": "e0644f57194e5610b0efe5da3e7029d0f8dcea98",
+    "isDraft": true,
+    "number": 467,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:14:46Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38704036961/job/116318889225",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T08:12:40Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:14:33Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38704036961/job/116318889258",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T08:12:40Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:15:39Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38704036961/job/116318889253",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T08:12:39Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:13:09Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38704036961/job/116318888804",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T08:12:39Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:15:45Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38704036961/job/116320069763",
+        "name": "check",
+        "startedAt": "2026-10-15T08:15:41Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Preserve approved battlefield geometry and paint order",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/467",
+    "summary": "FAIL"
+  },
+  {
+    "baseRefName": "feat/lobby-map-render-adapter",
+    "headRefOid": "6ddffa08aa5efd8b805b86da6bb16a7f5bc4c42c",
+    "isDraft": true,
+    "number": 468,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:39:32Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38707014658/job/116328810699",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T08:37:42Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:39:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38707014658/job/116328810764",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T08:37:41Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:40:13Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38707014658/job/116328810816",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T08:37:41Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:38:19Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38707014658/job/116328810285",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T08:37:41Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:40:18Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38707014658/job/116329821253",
+        "name": "check",
+        "startedAt": "2026-10-15T08:40:15Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Retain native battlefield pins in game headers and replay",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/468",
+    "summary": "FAIL"
+  },
+  {
+    "baseRefName": "feat/lobby-map-pinned-replay",
+    "headRefOid": "41b89ca06c655b8eecf397d637911a9ad9509a0e",
+    "isDraft": true,
+    "number": 469,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:58:40Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38709248705/job/116336247645",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T08:56:19Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:57:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38709248705/job/116336247896",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T08:56:19Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:58:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38709248705/job/116336247996",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T08:56:19Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:57:06Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38709248705/job/116336248113",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T08:56:19Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T08:58:59Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38709248705/job/116337291867",
+        "name": "check",
+        "startedAt": "2026-10-15T08:58:56Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Bind native actor recovery to the retained battlefield",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/469",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-shared-db",
+    "headRefOid": "9aee88ee3c7a7fc50311ab8d2a4dd55efe180253",
+    "isDraft": true,
+    "number": 470,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T09:44:09Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38714853344/job/116354944062",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T09:42:00Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T09:43:48Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38714853344/job/116354944572",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T09:42:00Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T09:45:11Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38714853344/job/116354944659",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T09:42:00Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T09:42:40Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38714853344/job/116354944348",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T09:42:00Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T09:45:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38714853344/job/116356249919",
+        "name": "check",
+        "startedAt": "2026-10-15T09:45:14Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Reserve pinned games with owner-scoped creation receipts",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/470",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-creation-receipts",
+    "headRefOid": "1fa53df66b348cca14e4bd7963778036969169d6",
+    "isDraft": true,
+    "number": 471,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T10:16:12Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38718826895/job/116368042152",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T10:14:23Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T10:15:33Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38718826895/job/116368042202",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T10:14:23Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T10:18:21Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38718826895/job/116368042348",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T10:14:23Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T10:15:08Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38718826895/job/116368041808",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T10:14:23Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T10:18:27Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38718826895/job/116369635479",
+        "name": "check",
+        "startedAt": "2026-10-15T10:18:24Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Create and recover games with exact approved battlefield identity",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/471",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-native-api",
+    "headRefOid": "eb40829d0ca749c5109b658726daa4fa9d1a11ad",
+    "isDraft": true,
+    "number": 472,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T10:34:59Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38721119418/job/116375634617",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T10:33:34Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T10:35:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38721119418/job/116375633994",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T10:33:34Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T10:37:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38721119418/job/116375633679",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T10:33:34Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T10:34:06Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38721119418/job/116375634082",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T10:33:34Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T10:37:49Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38721119418/job/116377279194",
+        "name": "check",
+        "startedAt": "2026-10-15T10:37:46Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Preview and confirm approved native battlefield choices",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/472",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-playable-choices",
+    "headRefOid": "6187fdcfd07e101930ccd52f69f8b046f83829d7",
+    "isDraft": true,
+    "number": 473,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:43:10Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38729067176/job/116402045930",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:41:01Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:42:07Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38729067176/job/116402046294",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:41:01Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:45:06Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38729067176/job/116402046243",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:41:02Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:41:49Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38729067176/job/116402046337",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:41:02Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:45:11Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38729067176/job/116403683594",
+        "name": "check",
+        "startedAt": "2026-10-15T11:45:08Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Render verified game terrain across live map consumers",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/473",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-live-terrain",
+    "headRefOid": "f49c6f53aa2da7d012379791ad9cd28372296f64",
+    "isDraft": true,
+    "number": 474,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:43:33Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38729074379/job/116402070448",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:41:05Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:43:00Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38729074379/job/116402070176",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:41:05Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:44:31Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38729074379/job/116402070001",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:41:05Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:41:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38729074379/job/116402070371",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:41:05Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:44:36Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38729074379/job/116403453382",
+        "name": "check",
+        "startedAt": "2026-10-15T11:44:33Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Recover uncertain game creation through its original request key",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/474",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-safe-create-transport",
+    "headRefOid": "28011596f86493b034a068b18a43d712c4c6c004",
+    "isDraft": true,
+    "number": 475,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:54:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730490291/job/116406768776",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:52:52Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:54:47Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730490291/job/116406768831",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:52:52Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730490291/job/116406768449",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:52:52Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:53:38Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730490291/job/116406768721",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:52:52Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:24Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730490291/job/116408157470",
+        "name": "check",
+        "startedAt": "2026-10-15T11:56:21Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Store owned battlefield geography with bounded validation",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/475",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-owned-storage",
+    "headRefOid": "1cca1bd69a1e11503404b09aa6662e0f555f28c9",
+    "isDraft": true,
+    "number": 476,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:54:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730495711/job/116406787272",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:52:55Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:54:26Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730495711/job/116406787466",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:52:55Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:41Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730495711/job/116406787380",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:52:55Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:53:47Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730495711/job/116406786960",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:52:55Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730495711/job/116408316150",
+        "name": "check",
+        "startedAt": "2026-10-15T11:56:51Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Serve durable owned battlefield maps",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/476",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-owned-api",
+    "headRefOid": "d975101892e72f7d74a75f68cf4a5f1aea892a22",
+    "isDraft": true,
+    "number": 477,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:55:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730500897/job/116406803870",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:52:58Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:54:53Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730500897/job/116406803655",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:52:57Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:57:22Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730500897/job/116406804132",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:52:58Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:53:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730500897/job/116406803975",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:52:57Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:57:27Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730500897/job/116408592667",
+        "name": "check",
+        "startedAt": "2026-10-15T11:57:25Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Generate and save geography from the lobby",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/477",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-add-geography",
+    "headRefOid": "0c37cc4036cc5018e72fcd8443994666af958b6b",
+    "isDraft": true,
+    "number": 478,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:55:07Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730505922/job/116406821294",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:53:00Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:54:51Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730505922/job/116406821243",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:52:59Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:31Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730505922/job/116406822617",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:53:00Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:53:44Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730505922/job/116406820917",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:52:59Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:53Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730505922/job/116408251881",
+        "name": "check",
+        "startedAt": "2026-10-15T11:56:50Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Browse saved battlefield geography in Choose map",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/478",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-owned-picker",
+    "headRefOid": "8eea8d64ada8b6c0160a544626b0d2a6d660bd24",
+    "isDraft": true,
+    "number": 479,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:55:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730510940/job/116406839176",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:53:03Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:54:51Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730510940/job/116406838993",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:53:02Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:57:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730510940/job/116406838749",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:53:02Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:53:40Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730510940/job/116406839087",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:53:02Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:57:35Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730510940/job/116408640274",
+        "name": "check",
+        "startedAt": "2026-10-15T11:57:32Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Recover the same lobby creation across uncertain responses",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/479",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-retained-create",
+    "headRefOid": "5c0f0e2af69bbb6fa0aacde983a4277689ca8f8f",
+    "isDraft": true,
+    "number": 480,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:02Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730517003/job/116406857896",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:53:44Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:55:35Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730517003/job/116406858304",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:53:45Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:58:20Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730517003/job/116406857627",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:53:40Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:54:28Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730517003/job/116406857881",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:53:42Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:58:25Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730517003/job/116408974485",
+        "name": "check",
+        "startedAt": "2026-10-15T11:58:22Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Preserve exact owned map identity over HTTP",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/480",
+    "summary": "FAIL"
+  },
+  {
+    "baseRefName": "feat/lobby-map-owned-http",
+    "headRefOid": "555f114275e4f0e4ad2e8dad8bfcf419ec2cfce3",
+    "isDraft": true,
+    "number": 481,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:44Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730521119/job/116406871099",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:54:18Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:13Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730521119/job/116406871302",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:54:27Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:59:12Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730521119/job/116406871090",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:53:48Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:55:09Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730521119/job/116406871062",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:54:29Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:59:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730521119/job/116409321464",
+        "name": "check",
+        "startedAt": "2026-10-15T11:59:15Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Connect the owned map library to New game",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/481",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-owned-entry",
+    "headRefOid": "591837657601d67e520a22a4bf3f76a63d2db281",
+    "isDraft": true,
+    "number": 482,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:53Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730724867/job/116407542410",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:54:47Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:49Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730724867/job/116407542877",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:54:52Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:01:09Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730724867/job/116407542783",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:54:49Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:55:57Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730724867/job/116407542902",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:55:11Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:01:14Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730724867/job/116410126538",
+        "name": "check",
+        "startedAt": "2026-10-15T12:01:11Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Verify saved map reads in bounded browser workers",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/482",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-worker-read",
+    "headRefOid": "62c03dda2d696d6c0e49792ce63d4e19e3faf2cb",
+    "isDraft": true,
+    "number": 483,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:57:34Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730731320/job/116407564894",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:55:19Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:57:12Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730731320/job/116407565099",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:55:37Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:01:44Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730731320/job/116407564873",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:55:19Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:55:44Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730731320/job/116407564380",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:54:55Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:01:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730731320/job/116410365272",
+        "name": "check",
+        "startedAt": "2026-10-15T12:01:46Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Verify lobby preparation through the asset worker",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/483",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-preparation-offload",
+    "headRefOid": "5e91b6fb15ce64fa1c3e778b1f87886deb6144da",
+    "isDraft": true,
+    "number": 484,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:48Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730733245/job/116407570998",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:54:53Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:57:53Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730733245/job/116407571279",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:55:59Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:00:42Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730733245/job/116407571083",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:55:45Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:56:19Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730733245/job/116407571184",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:55:45Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:00:48Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730733245/job/116409935646",
+        "name": "check",
+        "startedAt": "2026-10-15T12:00:45Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Offer the two reviewed native battlefields in New game",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/484",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-main-pairings",
+    "headRefOid": "be1b1a9e4a18af4145587f97c54544ef59a4c2b1",
+    "isDraft": true,
+    "number": 485,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:58:36Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730739261/job/116407590954",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:56:15Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:57:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730739261/job/116407590960",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:56:18Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:02:23Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730739261/job/116407590929",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:56:05Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:55:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730739261/job/116407590524",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:55:09Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:02:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730739261/job/116410631112",
+        "name": "check",
+        "startedAt": "2026-10-15T12:02:25Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Show the retained battlefield in the waiting room",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/485",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-room-summary",
+    "headRefOid": "0af4feaaa5d20c203546ed4a1bb86a292ea9e947",
+    "isDraft": true,
+    "number": 486,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:59:16Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730745574/job/116407612467",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T11:56:43Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:58:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730745574/job/116407612597",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T11:56:46Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:01:30Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730745574/job/116407612460",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T11:56:33Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T11:57:19Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730745574/job/116407612134",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T11:56:25Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:01:36Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38730745574/job/116410271510",
+        "name": "check",
+        "startedAt": "2026-10-15T12:01:33Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Await worker verification before library previews and saves",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/486",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-ui-verification",
+    "headRefOid": "d6b1eafbb1b1965df1083bc0869e4d4ca8b755ee",
+    "isDraft": true,
+    "number": 487,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:03:44Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38731535569/job/116410237259",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T12:01:27Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:03:12Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38731535569/job/116410236989",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T12:01:27Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:07:48Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38731535569/job/116410237520",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T12:01:28Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:02:13Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38731535569/job/116410237829",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T12:01:27Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:07:55Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38731535569/job/116412858099",
+        "name": "check",
+        "startedAt": "2026-10-15T12:07:51Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Identify the lobby scenario and clarify preview keyboard help",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/487",
+    "summary": "pass"
+  },
+  {
+    "baseRefName": "feat/lobby-map-room-copy",
+    "headRefOid": "f8fb3e4bba04a384c593745fd95bf41dd51b39f1",
+    "isDraft": true,
+    "number": 488,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:03:05Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38731540891/job/116410254751",
+        "name": "validation (static-build)",
+        "startedAt": "2026-10-15T12:01:30Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:03:27Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38731540891/job/116410254407",
+        "name": "validation (maps)",
+        "startedAt": "2026-10-15T12:01:30Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:07:46Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38731540891/job/116410254768",
+        "name": "validation (application)",
+        "startedAt": "2026-10-15T12:01:30Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:02:04Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38731540891/job/116410254821",
+        "name": "test-effectiveness",
+        "startedAt": "2026-10-15T12:01:30Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-15T12:07:51Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/exterkamp/kriegsspiel/actions/runs/38731540891/job/116412847237",
+        "name": "check",
+        "startedAt": "2026-10-15T12:07:49Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      }
+    ],
+    "title": "Retain New game choices when returning from the menu",
+    "url": "https://github.com/exterkamp/kriegsspiel/pull/488",
+    "summary": "pass"
+  }
+]
