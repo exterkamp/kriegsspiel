@@ -13,11 +13,21 @@
     </p>
   }
   <div class="actions">
-    <button type="button" [disabled]="waiting() || !data()" (click)="open('choose', $event)">
+    <button
+      type="button"
+      [disabled]="!entryEnabled() || waiting() || !data()"
+      (click)="open('choose', $event)"
+    >
       Choose map
     </button>
-    <button type="button" [disabled]="waiting()" (click)="open('add', $event)">Add map</button>
-    <button type="button" [disabled]="waiting() || !data()" (click)="open('view', $event)">
+    <button type="button" [disabled]="!entryEnabled() || waiting()" (click)="open('add', $event)">
+      Add map
+    </button>
+    <button
+      type="button"
+      [disabled]="!entryEnabled() || waiting() || !data()"
+      (click)="open('view', $event)"
+    >
       View map
     </button>
   </div>

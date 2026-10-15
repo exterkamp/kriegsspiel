@@ -17,6 +17,7 @@ import { NewGameComponent } from './new-game.component';
 class MapFixture {
   readonly battlefield = input.required<ScenarioBattlefield>();
   readonly scenarioName = input.required<string>();
+  readonly canOpen = input<() => boolean>(() => true);
   readonly activeChange = output<boolean>();
 }
 
@@ -66,7 +67,7 @@ afterEach(() => {
   TestBed.resetTestingModule();
 });
 
-async function open(loaded = options) {
+async function open(loaded = options, realMap = false, create = vi.fn(async () => 'game-1')) {
   TestBed.configureTestingModule({
     providers: [
       provideZonelessChangeDetection(),
@@ -80,12 +81,12 @@ async function open(loaded = options) {
       },
     ],
   });
-  TestBed.overrideComponent(NewGameComponent, {
-    remove: { imports: [BattlefieldMapComponent] },
-    add: { imports: [MapFixture] },
-  });
+  if (!realMap)
+    TestBed.overrideComponent(NewGameComponent, {
+      remove: { imports: [BattlefieldMapComponent] },
+      add: { imports: [MapFixture] },
+    });
   fixture = TestBed.createComponent(NewGameComponent);
-  const create = vi.fn(async () => 'game-1');
   fixture.componentRef.setInput('load', async () => loaded);
   fixture.componentRef.setInput('create', create);
   fixture.detectChanges();
@@ -152,5 +153,48 @@ describe('new-game battlefield integration', () => {
     click(element, 'Start game');
     await fixture.whenStable();
     expect(create).toHaveBeenCalledOnce();
+  });
+
+  it('locks all real map entries synchronously during creation and restores controls after a definite failure', async () => {
+    let reject!: (reason: Error) => void;
+    const pending = new Promise<string>((_resolve, fail) => {
+      reject = fail;
+    });
+    const create = vi.fn(() => pending);
+    const { fixture, element } = await open(options, true, create);
+    const push = vi.spyOn(window.history, 'pushState');
+    const entries = [
+      ...element.querySelectorAll<HTMLButtonElement>('ks-battlefield-map > fieldset button'),
+    ];
+    expect(entries.map((b) => b.textContent?.trim())).toEqual([
+      'Choose map',
+      'Add map',
+      'View map',
+    ]);
+    click(element, 'Start game');
+    // Deliberately no detectChanges/whenStable between Start and these entry clicks.
+    // The child's live gate must observe pending creation before its DOM refresh.
+    for (const button of entries) button.click();
+    expect(create).toHaveBeenCalledOnce();
+    expect(push).not.toHaveBeenCalled();
+    expect(element.querySelector('dialog')?.open).toBe(false);
+    await fixture.whenStable();
+    expect(entries.every((b) => b.disabled)).toBe(true);
+    expect(element.querySelector('input[name=rate]')?.matches(':disabled')).toBe(true);
+
+    reject(new Error('The server refused this request.'));
+    // The externally rejected create promise resumes before Angular schedules
+    // its pending-state render; wait for that continuation before stability.
+    await Promise.resolve();
+    await fixture.whenStable();
+    expect(entries.every((b) => !b.disabled)).toBe(true);
+    expect(element.querySelector('input[name=rate]')?.matches(':disabled')).toBe(false);
+    expect(
+      fixture.debugElement
+        .query(By.directive(BattlefieldMapComponent))
+        .componentInstance.canOpen()(),
+    ).toBe(true);
+    expect(element.querySelector('[role=alert]')?.textContent).toContain('server refused');
+    push.mockRestore();
   });
 });

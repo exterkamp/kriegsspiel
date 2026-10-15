@@ -103,6 +103,9 @@ footer {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--ks-space-4);
   }
+  .scroller {
+    flex: 1 1 auto;
+  }
   header,
   footer,
   .scroller {

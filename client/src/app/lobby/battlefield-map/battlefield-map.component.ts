@@ -130,7 +130,9 @@ function checked(value: unknown, name: unknown): ScenarioBattlefield | null {
 export class BattlefieldMapComponent implements OnChanges, OnDestroy {
   readonly battlefield = input.required<ScenarioBattlefield>();
   readonly scenarioName = input.required<string>();
+  readonly canOpen = input<() => boolean>(() => true);
   readonly activeChange = output<boolean>();
+  protected readonly entryEnabled = computed(() => this.canOpen()());
   protected readonly data = computed(() => {
     // A malformed/older caller can omit even a required input at runtime.
     try {
@@ -212,7 +214,13 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
 
   protected open(view: View, event: Event): void {
     event.stopPropagation();
-    if (this.destroyed || this.active() || this.waiting() || (view !== 'add' && !this.data()))
+    if (
+      this.destroyed ||
+      this.active() ||
+      this.waiting() ||
+      !this.entryEnabled() ||
+      (view !== 'add' && !this.data())
+    )
       return;
     this.opener = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
     this.openedUrl = window.location.href;

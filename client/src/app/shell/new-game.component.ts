@@ -44,7 +44,7 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
         <p role="status" class="ks-muted">Loading scenarios…</p>
       } @else {
         <form (submit)="start($event)" aria-label="New game">
-          <fieldset>
+          <fieldset [disabled]="starting()">
             <legend>Scenario</legend>
             @for (s of options()!.scenarios; track s.id) {
               <label class="ks-choice">
@@ -66,17 +66,18 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
             <ks-battlefield-map
               [battlefield]="battlefield"
               [scenarioName]="scenario()!.name"
+              [canOpen]="canInspectMap"
               (activeChange)="mapDialogOpen.set($event)"
             />
           } @else {
-            <fieldset>
+            <fieldset [disabled]="starting()">
               <legend>Battlefield map</legend>
               <p>The scenario's default battlefield will be used.</p>
               <p class="ks-muted">Map previews are not available on this server.</p>
             </fieldset>
           }
 
-          <fieldset>
+          <fieldset [disabled]="starting()">
             <legend>Your side</legend>
             @if (sides().length === 1) {
               <p class="side-only">{{ sides()[0]!.name }}</p>
@@ -99,7 +100,7 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
             }
           </fieldset>
 
-          <fieldset>
+          <fieldset [disabled]="starting()">
             <legend>How the game is played</legend>
             @for (m of modes; track m.id) {
               <label class="ks-choice">
@@ -117,7 +118,7 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
           </fieldset>
 
           @if (form()!.mode === 'turns') {
-            <fieldset>
+            <fieldset [disabled]="starting()">
               <legend>Turns</legend>
               <label class="ks-field">
                 Game minutes per turn
@@ -151,7 +152,7 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
               </p>
             </fieldset>
           } @else {
-            <fieldset>
+            <fieldset [disabled]="starting()">
               <legend>Clock rate</legend>
               @for (r of presets; track r) {
                 <label class="ks-choice">
@@ -191,7 +192,7 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
             </fieldset>
           }
 
-          <fieldset>
+          <fieldset [disabled]="starting()">
             <legend>
               {{
                 form()!.mode === 'turns'
@@ -214,7 +215,7 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
             <p class="ks-muted" role="status">{{ dialLine() }}</p>
           </fieldset>
 
-          <fieldset>
+          <fieldset [disabled]="starting()">
             <legend>Umpire's manner</legend>
             @for (p of personas; track p.id) {
               <label class="ks-choice">
@@ -299,6 +300,7 @@ export class NewGameComponent implements OnInit {
   protected readonly error = signal<string | undefined>(undefined);
   protected readonly starting = signal(false);
   protected readonly mapDialogOpen = signal(false);
+  protected readonly canInspectMap = () => !this.starting();
   protected readonly scenario = computed(() =>
     this.options()?.scenarios.find((s) => s.id === this.form()?.scenario),
   );

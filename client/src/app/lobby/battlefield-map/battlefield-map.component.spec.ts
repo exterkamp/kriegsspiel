@@ -103,6 +103,7 @@ function battlefield(): ScenarioBattlefield {
       <ks-battlefield-map
         [battlefield]="data()!"
         [scenarioName]="name()"
+        [canOpen]="allowMapEntry"
         (activeChange)="gate($event)"
       />
       <button type="submit">Start game</button>
@@ -112,6 +113,8 @@ function battlefield(): ScenarioBattlefield {
 class Host {
   readonly data = signal<ScenarioBattlefield | undefined>(battlefield());
   readonly name = signal('Hold the Bridge');
+  readonly pending = signal(false);
+  readonly allowMapEntry = () => !this.pending();
   readonly transitions: boolean[] = [];
   readonly keys: string[] = [];
   active = false;
@@ -336,6 +339,39 @@ describe('public battlefield geography', () => {
 });
 
 describe('dialog ownership and parent isolation', () => {
+  it('blocks all three entries before rendering a changed pending signal and resumes when it clears', async () => {
+    const entries = ['Choose map', 'Add map', 'View map'].map((label) => button(label));
+    const historyLength = window.history.length;
+    const historyState: unknown = window.history.state;
+    expect(entries.every((entry) => !entry.disabled)).toBe(true);
+
+    host.pending.set(true);
+    // No change detection: stale enabled DOM must still be guarded by the live
+    // parent signal read through the stable callback, before any history push.
+    for (const entry of entries) {
+      expect(entry.disabled).toBe(false);
+      entry.click();
+    }
+    expect(modal.open).toBe(false);
+    expect(host.transitions).toEqual([]);
+    expect(window.history.length).toBe(historyLength);
+    expect(window.history.state).toEqual(historyState);
+
+    fixture.detectChanges();
+    expect(entries.every((entry) => entry.disabled)).toBe(true);
+    host.pending.set(false);
+    fixture.detectChanges();
+    expect(entries.every((entry) => !entry.disabled)).toBe(true);
+    for (const label of ['Choose map', 'Add map', 'View map']) {
+      click(label);
+      expect(modal.open).toBe(true);
+      await close(label === 'View map' ? 'Close' : 'Cancel');
+    }
+    expect(host.transitions).toEqual([true, false, true, false, true, false]);
+    expect(host.starts).toBe(0);
+    expect(window.history.state).toEqual(historyState);
+  });
+
   it('contains Tab from the initially focused heading and wraps both control boundaries', async () => {
     click('Choose map');
     const title = modal.querySelector<HTMLElement>('h2')!;
