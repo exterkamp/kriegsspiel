@@ -4,8 +4,10 @@ import {
   Component,
   OnDestroy,
   OnInit,
+  effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import type { Me } from '@legacy/auth';
 import type { GameInfo } from '@legacy/lobby/api';
@@ -25,7 +27,7 @@ import { RoomComponent } from '../lobby/room.component';
 import { AccountBarComponent } from './account-bar.component';
 import { GameMenuComponent } from './game-menu.component';
 import { MenuComponent } from './menu.component';
-import { NewGameComponent } from './new-game.component';
+import { NewGameComponent, type NewGameDraft } from './new-game.component';
 import { SHELL_API, SHELL_NOW, SHELL_WINDOW } from './shell-api';
 import { SignInComponent } from './sign-in.component';
 
@@ -82,6 +84,7 @@ type Prep =
             [load]="api.fetchScenarioOptions"
             [create]="api.createGame"
             [ownerId]="me()?.id"
+            [draft]="newGameDraft()"
             (started)="go({ name: 'game', game: $event })"
             (back)="go({ name: 'menu' })"
           />
@@ -136,6 +139,8 @@ export class ShellComponent implements OnInit, OnDestroy {
   private readonly win = inject(SHELL_WINDOW);
   private readonly now = inject(SHELL_NOW);
   private readonly game = inject(GameService);
+  private readonly newGame = viewChild(NewGameComponent);
+  protected readonly newGameDraft = signal<NewGameDraft | undefined>(undefined);
   protected readonly state = signal<ShellState | undefined>(undefined);
   protected readonly me = signal<Me | undefined>(undefined);
   protected readonly guestOn = signal(false);
@@ -149,11 +154,19 @@ export class ShellComponent implements OnInit, OnDestroy {
   private liveLoaded = false;
   private stopped = false;
 
+  constructor() {
+    effect(() => {
+      const owner = this.me()?.id;
+      if (this.newGameDraft()?.ownerId !== owner) this.newGameDraft.set(undefined);
+    });
+  }
+
   private readonly onPop = (): void => {
     const st = this.state();
     if (!st) return;
     const next = reduce(st, { type: 'location', search: this.win.location.search });
     if (needsReload(st.screen, next.screen, this.liveLoaded)) {
+      this.newGameDraft.set(undefined);
       this.game.disconnect();
       this.win.location.reload();
       return;
@@ -180,6 +193,7 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopped = true;
+    this.newGameDraft.set(undefined);
     this.win.removeEventListener('popstate', this.onPop);
   }
 
@@ -206,6 +220,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     const next = reduce(st, { type: 'go', screen });
     if (urlFor(next.screen) === urlFor(st.screen) && next.screen.name === st.screen.name) return;
     if (needsReload(st.screen, next.screen, this.liveLoaded)) {
+      this.newGameDraft.set(undefined);
       this.game.disconnect();
       this.win.location.assign(urlFor(next.screen));
       return;
@@ -215,11 +230,13 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   protected goHome(): void {
+    this.newGameDraft.set(undefined);
     this.game.disconnect();
     this.win.location.assign('/');
   }
 
   protected async signedOut(): Promise<void> {
+    this.newGameDraft.set(undefined);
     this.game.disconnect();
     await this.api.signOut();
     if (this.liveLoaded) return this.win.location.assign('/');
@@ -230,6 +247,12 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   private show(next: ShellState): void {
+    if (this.state()?.screen.name === 'new-game' && next.screen.name === 'menu') {
+      const draft = this.newGame()?.snapshotDraft();
+      this.newGameDraft.set(draft?.ownerId === this.me()?.id ? draft : undefined);
+    } else if (next.screen.name !== 'menu' && next.screen.name !== 'new-game') {
+      this.newGameDraft.set(undefined);
+    }
     this.state.set(next);
     if (isLiveScreen(next.screen)) {
       this.liveLoaded = true;
