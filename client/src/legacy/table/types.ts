@@ -38,6 +38,8 @@ export interface PointShape {
 export interface BaseFeature {
   id: string;
   kind: FeatureKind;
+  /** Native terrain precedence. Omission preserves legacy fixture kind ordering. */
+  layer?: number;
   geometry: PolygonShape | PolylineShape | PointShape;
 }
 
