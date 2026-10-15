@@ -13,3 +13,4 @@ export * from './umpireSettings.js';
 export * from './turn.js';
 export * from './turns.js';
 export * from './battlefield.js';
+export * from './battlefield-catalog.js';
