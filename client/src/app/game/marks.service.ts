@@ -1,11 +1,18 @@
-import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  Injectable,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  signal,
+  untracked,
+} from '@angular/core';
 import type { Dispatch, Mark } from '@kriegsspiel/protocol';
 import { gameNowMs } from '@legacy/net/state';
 import { Gesture, type MarkTool } from '@legacy/table/markTools';
 import { newMarkId } from '@legacy/table/marks';
 import { pickMinSize } from '@legacy/table/picking';
-import { fixtureMap } from '@legacy/table/fixture';
-import { ALL_OVERLAYS, type Overlays } from '@legacy/table/types';
+import { ALL_OVERLAYS, type BaseMap, type Overlays } from '@legacy/table/types';
 import type { TableScene } from '@legacy/table/TableScene';
 import { isDeskView } from '@legacy/desk/views';
 import { DeskStore } from '../desk/desk.store';
@@ -35,8 +42,14 @@ export class MarksService {
   private readonly table = inject(TableService);
 
   readonly tool = signal<MarkTool>('view');
-  readonly selectedId = signal<string | undefined>(undefined);
-  readonly draft = signal<Mark | undefined>(undefined);
+  readonly selectedId = linkedSignal<BaseMap | undefined, string | undefined>({
+    source: () => this.game.map(),
+    computation: () => undefined,
+  });
+  readonly draft = linkedSignal<BaseMap | undefined, Mark | undefined>({
+    source: () => this.game.map(),
+    computation: () => undefined,
+  });
   /** The note typed for the next mark; cleared once a mark has used it. */
   readonly label = signal('');
   readonly overlays = signal<Overlays>({ ...ALL_OVERLAYS });
@@ -47,8 +60,12 @@ export class MarksService {
 
   readonly deskOpen = computed(() => isDeskView(this.desk.activeView()));
   readonly windowShown = computed(() => this.desk.windowFrame() !== undefined);
-  readonly plottable = computed(() => !!this.lastReport()?.location);
+  readonly plottable = computed(
+    () =>
+      !!this.game.map() && this.mapIdentity === this.game.map() && !!this.lastReport()?.location,
+  );
   readonly shown = computed(() => {
+    if (!this.game.map()) return [];
     const marks = this.game.state().marks;
     const d = this.draft();
     return d ? [...marks.filter((m) => m.id !== d.id), d] : marks;
@@ -57,8 +74,14 @@ export class MarksService {
   private gesture: Gesture | undefined;
   private down: { x: number; y: number } | undefined;
   private seq = 0;
+  private mapIdentity = this.game.map();
+  private capture: { canvas: HTMLElement; pointerId: number } | undefined;
 
   constructor() {
+    effect(() => {
+      this.game.map();
+      untracked(() => this.checkedMap());
+    });
     // The toolbar and the drawing tools belong to the table: in a desk view, go back to Look.
     effect(() => {
       if (this.deskOpen()) untracked(() => this.setTool('view'));
@@ -77,11 +100,25 @@ export class MarksService {
 
   setTool(t: MarkTool): void {
     this.tool.set(t);
-    this.gesture = undefined;
-    this.draft.set(undefined);
+    this.pointerCancel();
+  }
+
+  /** Also run at event entry: signal changes precede Angular's next render/effect. */
+  private checkedMap(): BaseMap | undefined {
+    const map = this.game.map();
+    if (map !== this.mapIdentity) {
+      this.mapIdentity = map;
+      this.pointerCancel();
+      this.selectedId.set(undefined);
+      this.lastReport.set(undefined);
+      this.desk.windowHover.set(undefined);
+      this.table.status.set('Click the map');
+    }
+    return map;
   }
 
   deleteSelected(): void {
+    if (!this.checkedMap() || this.windowShown()) return;
     const id = this.selectedId();
     if (!id) return;
     this.game.deleteMark(id);
@@ -90,6 +127,7 @@ export class MarksService {
 
   /** Pin the last opened report where it says the sighting was; plotting it again moves its pin. */
   plotReport(): void {
+    if (!this.checkedMap() || this.windowShown()) return;
     const d = this.lastReport();
     if (!d?.location) return;
     const label = [d.sizeEstimate, d.unit].filter(Boolean).join(' ') || d.from;
@@ -117,12 +155,15 @@ export class MarksService {
   }
 
   pointerDown(scene: Picker, canvas: HTMLElement, e: PointerLike): void {
-    this.down = { x: e.clientX, y: e.clientY };
-    const tool = this.tool();
-    if (this.deskOpen() || this.windowShown() || tool === 'view' || e.button !== 0) return;
+    const map = this.checkedMap();
+    this.pointerCancel();
+    if (!map || this.deskOpen() || e.button !== 0) return;
     const c = this.mapPoint(scene, e);
     if (!c) return;
-    const span = pickMinSize(fixtureMap);
+    this.down = { x: e.clientX, y: e.clientY };
+    const tool = this.tool();
+    if (this.windowShown() || tool === 'view') return;
+    const span = pickMinSize(map);
     this.gesture = new Gesture(tool, c, {
       id: newMarkId(++this.seq, Date.now()),
       nowGame: this.nowGame(),
@@ -132,12 +173,15 @@ export class MarksService {
       minStep: span / 3,
     });
     canvas.setPointerCapture?.(e.pointerId);
+    this.capture = { canvas, pointerId: e.pointerId };
     if (tool === 'select') this.selectedId.set(this.gesture.grabbed?.id);
     this.draft.set(this.gesture.draft());
   }
 
   pointerMove(scene: Picker, e: PointerLike): void {
+    if (!this.checkedMap()) return;
     if (this.windowShown()) {
+      if (this.gesture) this.pointerCancel();
       const r = scene.pickAt(e.clientX, e.clientY);
       this.desk.windowHover.set(r.type === 'piece' && r.pieceKind === 'own' ? r.id : undefined);
       return;
@@ -150,12 +194,16 @@ export class MarksService {
   }
 
   pointerUp(scene: Picker, e: PointerLike): void {
+    if (!this.checkedMap()) return;
+    if (this.windowShown() && this.gesture) {
+      this.pointerCancel();
+      return;
+    }
     if (this.gesture) {
       const c = this.mapPoint(scene, e);
       const made = c ? this.gesture.finish(c) : this.gesture.draft();
       const wasSelect = this.gesture.tool === 'select';
-      this.gesture = undefined;
-      this.draft.set(undefined);
+      this.pointerCancel();
       if (made) {
         if (!wasSelect) this.label.set('');
         this.commit(made);
@@ -163,6 +211,7 @@ export class MarksService {
       return;
     }
     if (!this.down || Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y) > 4) return;
+    this.down = undefined;
     const r = scene.pickAt(e.clientX, e.clientY);
     this.table.status.set(JSON.stringify(r));
     // In the umpire's window a click pins the unit's notes, so touch users can read them too.
@@ -171,6 +220,15 @@ export class MarksService {
   }
 
   pointerCancel(): void {
+    const capture = this.capture;
+    this.capture = undefined;
+    try {
+      if (capture?.canvas.hasPointerCapture?.(capture.pointerId))
+        capture.canvas.releasePointerCapture(capture.pointerId);
+    } catch {
+      // The browser may already have released capture while removing the old board.
+    }
+    this.down = undefined;
     this.gesture = undefined;
     this.draft.set(undefined);
   }

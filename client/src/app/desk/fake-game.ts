@@ -3,12 +3,18 @@ import type { Mark } from '@kriegsspiel/protocol';
 import { computed, signal } from '@angular/core';
 import { initialState, withRead, type ClientState } from '@legacy/net/state';
 import { GameService } from '../game/game.service';
+import { fixtureMap } from '@legacy/table/fixture';
+import type { BaseMap } from '@legacy/table/types';
 
 /** A stand-in `GameService` for component specs: the state is a plain signal the spec sets directly. */
 export function fakeGame(state: Partial<ClientState> = {}, gameId?: string) {
   const s = signal<ClientState>({ ...initialState, ...state });
   const fake = {
     state: s.asReadonly(),
+    map: signal<BaseMap | undefined>(fixtureMap),
+    mapLoading: signal(false),
+    mapError: signal(''),
+    retry: vi.fn(),
     view: computed(() => s().view),
     gameId: signal(gameId).asReadonly(),
     sides: signal<readonly string[]>([]),
