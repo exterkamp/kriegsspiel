@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1660" height="1640" viewBox="0 0 1660 1640" role="img"><title>Desktop lobby map-selection recommendation: entry and two-column map dialogs</title>
+<rect width="1660" height="1640" fill="#e9dcb8"/>
+<text x="40" y="44" font-family="Georgia, serif" font-size="24" fill="#2a2118" font-weight="bold">LOBBY MAP SELECTION · DESKTOP DESIGN</text>
+<text x="40" y="76" font-family="Georgia, serif" font-size="17" fill="#51442c" font-weight="normal">Proposed UI. Add/generate requires durable storage; unpaired terrain cannot start a live battle.</text>
+<text x="40" y="124" font-family="Georgia, serif" font-size="20" fill="#2a2118" font-weight="bold">1 / New game entry</text>
+<rect x="40" y="144" width="580" height="1092" rx="3" fill="#f4eedb" stroke="#6f6038"/>
+<text x="650" y="124" font-family="Georgia, serif" font-size="20" fill="#2a2118" font-weight="bold">2 / Choose saved or default</text>
+<rect x="650" y="144" width="970" height="698" rx="3" fill="#f4eedb" stroke="#6f6038"/>
+<text x="650" y="868" font-family="Georgia, serif" font-size="20" fill="#2a2118" font-weight="bold">3 / Add and save geography</text>
+<rect x="650" y="888" width="970" height="698" rx="3" fill="#f4eedb" stroke="#6f6038"/>
+<text x="60" y="184" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">← Main menu</text>
+<text x="60" y="232" font-family="Georgia, serif" font-size="34" fill="#2a2118" font-weight="bold">New game</text>
+<rect x="60" y="256" width="540" height="154" rx="3" fill="#f4eedb" stroke="#6f6038"/>
+<text x="74" y="284" font-family="Georgia, serif" font-size="19" fill="#2a2118" font-weight="bold">Scenario</text>
+<text x="74" y="315" font-family="Georgia, serif" font-size="18" fill="#2a2118" font-weight="bold">◉ Hold the Bridge</text>
+<text x="74" y="347" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">Blue defends the crossing; Red advances.</text>
+<text x="74" y="371" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">Blue must hold for 50 minutes.</text>
+<text x="74" y="396" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">▸ Armies and objectives</text>
+<rect x="60" y="432" width="540" height="398" rx="3" fill="#f4eedb" stroke="#6f6038"/>
+<text x="74" y="461" font-family="Georgia, serif" font-size="19" fill="#2a2118" font-weight="bold">Battlefield map</text>
+<rect x="74" y="477" width="512" height="146" rx="3" fill="#d8cfa0" stroke="#6f6038"/>
+<path d="M74 551.46 Q196.88 535.4 345.36 552.92 T586 550.0" fill="none" stroke="#8fb4cc" stroke-width="16.06"/>
+<path d="M335.12 477 L350.48 623" stroke="#a8885a" stroke-width="6"/>
+<rect x="330.0" y="542.7" width="40.96" height="20.44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<path d="M135.44 495.98 L258.32 491.6 L242.96 528.1 L140.56 523.72 Z" fill="#8fa36b"/>
+<path d="M422.16 573.36 L539.9200000000001 577.74 L529.6800000000001 609.86 L432.4 608.4 Z" fill="#8fa36b"/>
+<text x="560" y="501" font-family="Georgia, serif" font-size="14" fill="#2a2118" font-weight="bold">N</text>
+<text x="84" y="613" font-family="Georgia, serif" font-size="12" fill="#51442c" font-weight="normal">Public terrain · schematic</text>
+<text x="74" y="655" font-family="Georgia, serif" font-size="19" fill="#2a2118" font-weight="bold">The bridge battlefield</text>
+<text x="74" y="682" font-family="Georgia, serif" font-size="16" fill="#51442c" font-weight="normal">4 × 3 km · Scenario default</text>
+<text x="74" y="709" font-family="Georgia, serif" font-size="16" fill="#2f6b2f" font-weight="bold">Ready for Hold the Bridge</text>
+<text x="74" y="735" font-family="Georgia, serif" font-size="15" fill="#51442c" font-weight="normal">Scenario supplies armies, starting</text>
+<text x="74" y="756" font-family="Georgia, serif" font-size="15" fill="#51442c" font-weight="normal">positions and objectives.</text>
+<rect x="74" y="778" width="126" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="86" y="806" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">Choose map</text>
+<rect x="210" y="778" width="104" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="222" y="806" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">Add map</text>
+<rect x="324" y="778" width="104" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="336" y="806" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">View map</text>
+<rect x="60" y="852" width="540" height="98" rx="3" fill="#f4eedb" stroke="#6f6038"/>
+<text x="74" y="879" font-family="Georgia, serif" font-size="18" fill="#2a2118" font-weight="bold">Your side</text>
+<text x="74" y="905" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="normal">Blue</text>
+<text x="74" y="931" font-family="Georgia, serif" font-size="15" fill="#51442c" font-weight="normal">A computer opponent plays Red.</text>
+<rect x="60" y="970" width="540" height="88" rx="3" fill="#f4eedb" stroke="#6f6038"/>
+<text x="74" y="997" font-family="Georgia, serif" font-size="18" fill="#2a2118" font-weight="bold">How the game is played</text>
+<text x="74" y="1027" font-family="Georgia, serif" font-size="14" fill="#2a2118" font-weight="normal">◉ Real time     ○ Turns, umpire decides</text>
+<text x="60" y="1084" font-family="Georgia, serif" font-size="14" fill="#51442c" font-weight="normal">Timing and umpire settings continue below.</text>
+<rect x="60" y="1106" width="540" height="68" rx="3" fill="#e9dcb8" stroke="#6f6038"/>
+<rect x="70" y="1118" width="128" height="44" rx="3" fill="#2a2118" stroke="#6f6038"/>
+<text x="82" y="1146" font-family="Georgia, serif" font-size="15" fill="#f4eedb" font-weight="normal">Start game</text>
+<rect x="210" y="1118" width="76" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="222" y="1146" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">Back</text>
+<text x="60" y="1202" font-family="Georgia, serif" font-size="20" fill="#2a2118" font-weight="bold">Your games</text>
+<text x="674" y="193" font-family="Georgia, serif" font-size="28" fill="#2a2118" font-weight="bold">Choose battlefield map</text>
+<text x="674" y="225" font-family="Georgia, serif" font-size="16" fill="#51442c" font-weight="normal">For Hold the Bridge</text>
+<text x="674" y="271" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="normal">◉ Scenario maps     ○ My maps</text>
+<rect x="674" y="294" width="106" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="686" y="322" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">Add map</text>
+<text x="674" y="378" font-family="Georgia, serif" font-size="18" fill="#2a2118" font-weight="bold">◉ The bridge battlefield</text>
+<text x="698" y="408" font-family="Georgia, serif" font-size="15" fill="#51442c" font-weight="normal">4 × 3 km · Scenario default</text>
+<text x="698" y="435" font-family="Georgia, serif" font-size="15" fill="#2f6b2f" font-weight="bold">Ready for Hold the Bridge</text>
+<text x="674" y="482" font-family="Georgia, serif" font-size="18" fill="#2a2118" font-weight="bold">Other included maps</text>
+<text x="674" y="516" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="normal">○ Countryside — 5 × 3 km</text>
+<text x="698" y="540" font-family="Georgia, serif" font-size="15" fill="#7a5200" font-weight="normal">Needs a scenario</text>
+<text x="674" y="573" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="normal">○ Wooded hills — 5 × 5 km</text>
+<text x="698" y="597" font-family="Georgia, serif" font-size="15" fill="#7a5200" font-weight="normal">Needs a scenario</text>
+<text x="674" y="630" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="normal">○ River valley — 5 × 5 km</text>
+<text x="698" y="654" font-family="Georgia, serif" font-size="15" fill="#7a5200" font-weight="normal">Needs a scenario</text>
+<rect x="1004" y="271" width="592" height="249" rx="3" fill="#d8cfa0" stroke="#6f6038"/>
+<path d="M1004 397.99 Q1146.08 370.6 1317.76 400.48 T1596 395.5" fill="none" stroke="#8fb4cc" stroke-width="27.39"/>
+<path d="M1305.92 271 L1323.68 520" stroke="#a8885a" stroke-width="6"/>
+<rect x="1300.0" y="383.05" width="47.36" height="34.86000000000001" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<path d="M1075.04 303.37 L1217.12 295.9 L1199.3600000000001 358.15 L1080.96 350.68 Z" fill="#8fa36b"/>
+<path d="M1406.56 435.34000000000003 L1542.72 442.80999999999995 L1530.88 497.59000000000003 L1418.4 495.1 Z" fill="#8fa36b"/>
+<text x="1570" y="295" font-family="Georgia, serif" font-size="14" fill="#2a2118" font-weight="bold">N</text>
+<text x="1014" y="510" font-family="Georgia, serif" font-size="12" fill="#51442c" font-weight="normal">Public terrain · schematic</text>
+<rect x="1004" y="535" width="96" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="1016" y="563" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">Fit map</text>
+<rect x="1112" y="535" width="52" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="1124" y="563" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">−</text>
+<rect x="1176" y="535" width="52" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="1188" y="563" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">+</text>
+<text x="1004" y="613" font-family="Georgia, serif" font-size="21" fill="#2a2118" font-weight="bold">The bridge battlefield · 4 × 3 km</text>
+<text x="1004" y="647" font-family="Georgia, serif" font-size="17" fill="#2f6b2f" font-weight="bold">Ready for Hold the Bridge</text>
+<text x="1004" y="678" font-family="Georgia, serif" font-size="16" fill="#51442c" font-weight="normal">The scenario supplies armies, starting positions</text>
+<text x="1004" y="702" font-family="Georgia, serif" font-size="16" fill="#51442c" font-weight="normal">and objectives. Selecting a row only previews it.</text>
+<rect x="674" y="741" width="922" height="68" rx="3" fill="#e9dcb8" stroke="#6f6038"/>
+<rect x="686" y="753" width="92" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="698" y="781" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">Cancel</text>
+<rect x="1464" y="753" width="120" height="44" rx="3" fill="#2a2118" stroke="#6f6038"/>
+<text x="1476" y="781" font-family="Georgia, serif" font-size="15" fill="#f4eedb" font-weight="normal">Use map</text>
+<text x="674" y="937" font-family="Georgia, serif" font-size="28" fill="#2a2118" font-weight="bold">Add battlefield map</text>
+<text x="674" y="971" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="normal">← Back to maps</text>
+<text x="674" y="1014" font-family="Georgia, serif" font-size="16" fill="#51442c" font-weight="normal">Create terrain for your map library. A map needs a scenario with armies and objectives before it can be played.</text>
+<text x="674" y="1062" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="bold">Landscape</text>
+<rect x="674" y="1074" width="290" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="686" y="1102" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="normal">Countryside                     ▾</text>
+<text x="674" y="1149" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="bold">Map size</text>
+<rect x="674" y="1161" width="290" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="686" y="1189" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="normal">5 × 5 km                          ▾</text>
+<text x="674" y="1241" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="normal">▸ Repeat this map</text>
+<rect x="674" y="1262" width="152" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="686" y="1290" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">Generate map</text>
+<text x="674" y="1347" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="normal">▸ Already have a map?</text>
+<text x="674" y="1377" font-family="Georgia, serif" font-size="16" fill="#8a1c10" font-weight="normal">Import map file</text>
+<rect x="1004" y="1047" width="592" height="214" rx="3" fill="#d8cfa0" stroke="#6f6038"/>
+<path d="M1305.92 1047 L1323.68 1261" stroke="#a8885a" stroke-width="6"/>
+<path d="M1004 1179.68 L1477.6 1147.58 L1596 1175.4" fill="none" stroke="#a8885a" stroke-width="4"/>
+<rect x="1388.8" y="1132.6" width="14.8" height="10.700000000000001" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<rect x="1424.32" y="1132.6" width="14.8" height="10.700000000000001" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<rect x="1459.8400000000001" y="1132.6" width="14.8" height="10.700000000000001" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<path d="M1075.04 1074.82 L1217.12 1068.4 L1199.3600000000001 1121.9 L1080.96 1115.48 Z" fill="#8fa36b"/>
+<path d="M1406.56 1188.24 L1542.72 1194.66 L1530.88 1241.74 L1418.4 1239.6 Z" fill="#8fa36b"/>
+<text x="1570" y="1071" font-family="Georgia, serif" font-size="14" fill="#2a2118" font-weight="bold">N</text>
+<text x="1014" y="1251" font-family="Georgia, serif" font-size="12" fill="#51442c" font-weight="normal">Public terrain · schematic</text>
+<text x="1004" y="1294" font-family="Georgia, serif" font-size="21" fill="#2a2118" font-weight="bold">Unsaved map · 5 × 5 km</text>
+<text x="1004" y="1337" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="bold">Map name</text>
+<rect x="1004" y="1349" width="592" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="1016" y="1377" font-family="Georgia, serif" font-size="16" fill="#2a2118" font-weight="normal">My countryside</text>
+<text x="1004" y="1422" font-family="Georgia, serif" font-size="17" fill="#7a5200" font-weight="bold">Needs a scenario</text>
+<text x="1004" y="1451" font-family="Georgia, serif" font-size="16" fill="#51442c" font-weight="normal">Saving adds terrain, not a playable game.</text>
+<rect x="674" y="1485" width="922" height="68" rx="3" fill="#e9dcb8" stroke="#6f6038"/>
+<rect x="686" y="1497" width="92" height="44" rx="3" fill="#efe6c8" stroke="#6f6038"/>
+<text x="698" y="1525" font-family="Georgia, serif" font-size="15" fill="#2a2118" font-weight="normal">Cancel</text>
+<rect x="1458" y="1497" width="126" height="44" rx="3" fill="#2a2118" stroke="#6f6038"/>
+<text x="1470" y="1525" font-family="Georgia, serif" font-size="15" fill="#f4eedb" font-weight="normal">Save map</text>
+<text x="40" y="1310" font-family="Georgia, serif" font-size="17" fill="#51442c" font-weight="normal">THE SAME NEW GAME DRAFT</text>
+<text x="40" y="1342" font-family="Georgia, serif" font-size="17" fill="#51442c" font-weight="normal">Both dialogs overlay the retained form.</text>
+<text x="40" y="1374" font-family="Georgia, serif" font-size="17" fill="#51442c" font-weight="normal">Cancel returns to the original selection.</text>
+<text x="40" y="1406" font-family="Georgia, serif" font-size="17" fill="#51442c" font-weight="normal">Use map confirms only an approved pairing.</text>
+<text x="40" y="1438" font-family="Georgia, serif" font-size="17" fill="#51442c" font-weight="normal">Save map adds geography to the library.</text>
+<text x="40" y="1470" font-family="Georgia, serif" font-size="17" fill="#51442c" font-weight="normal">Only Start game creates and starts play.</text>
+<text x="40" y="1608" font-family="Georgia, serif" font-size="16" fill="#51442c" font-weight="normal">Paper/ink controls follow Angular shell tokens. Public terrain thumbnails are schematic; lower form settings abbreviated.</text>
+</svg>
