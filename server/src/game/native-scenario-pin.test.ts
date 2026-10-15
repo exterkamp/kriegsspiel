@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { holdTheBridge, loadScenario } from '@kriegsspiel/engine';
-import { describe, expect, it } from 'vitest';
+import { holdTheBridge, loadScenario, ScenarioError } from '@kriegsspiel/engine';
+import * as engine from '@kriegsspiel/engine';
+import { describe, expect, it, vi } from 'vitest';
 import { describeDefaultBattlefield } from './battlefield.js';
 import {
   createNativeScenarioPin,
@@ -206,5 +207,135 @@ describe('private native initial-scenario pins', () => {
     const raw = stored.rawScenario;
     raw.units = Array.from({ length: 129 }, () => structuredClone(raw.units[0]!));
     expect(() => decodeNativeScenarioPin(reseal(stored))).toThrow();
+  });
+});
+
+type RawNativeScenario = NativeScenarioPinV1['rawScenario'];
+
+function createFromRaw(rawScenario: unknown): NativeScenarioPinV1 {
+  return createNativeScenarioPin({
+    rawScenario,
+    scenarioId: 'hold-the-bridge',
+    pairingId: 'hold-the-bridge:default',
+    name: 'The bridge battlefield',
+    isDefault: true,
+  });
+}
+
+/** Schema-admissible terrain for testing aggregate work gates, not playable content. */
+function denseTerrain(count: number): RawNativeScenario['map']['features'] {
+  return Array.from({ length: count }, (_, feature) => ({
+    id: `budget-field-${feature}`,
+    kind: 'field' as const,
+    polygon: Array.from({ length: 1024 }, (_, point): [number, number] => [point, 100 + feature]),
+  }));
+}
+
+describe('native pin creator validation gates (R7-N2)', () => {
+  const cases: Array<{
+    name: string;
+    change: (raw: RawNativeScenario) => void;
+    message: string;
+  }> = [
+    {
+      name: 'impassable unit placement',
+      change: (raw) => {
+        raw.units[0]!.at = { x: 1000, y: 1500 };
+      },
+      message: 'units[0] has a position on impassable ground',
+    },
+    {
+      name: 'impassable HQ',
+      change: (raw) => {
+        raw.sides[0]!.hq = { x: 1000, y: 1500 };
+      },
+      message: 'sides[0].hq must be on passable ground',
+    },
+    {
+      name: 'objective away from a bridge',
+      change: (raw) => {
+        raw.victory.objective = [
+          [900, 900],
+          [1000, 900],
+          [1000, 1000],
+        ];
+      },
+      message: 'victory.objective must be centred on a bridge',
+    },
+  ];
+
+  it.each(cases)(
+    'rejects $name with the actual engine ScenarioError at creation',
+    ({ change, message }) => {
+      const raw = defaultBridgeV1Input() as RawNativeScenario;
+      change(raw);
+      let failure: unknown;
+      try {
+        createFromRaw(raw);
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toBeInstanceOf(ScenarioError);
+      expect(failure).toHaveProperty('message', `Invalid scenario: ${message}`);
+    },
+  );
+
+  it('rejects aggregate terrain above 4096 points before calling the engine loader', () => {
+    const raw = defaultBridgeV1Input() as RawNativeScenario;
+    raw.map.features = denseTerrain(5);
+    const counts = raw.map.features.map((feature) =>
+      'polygon' in feature ? feature.polygon.length : 0,
+    );
+    expect(counts).toEqual([1024, 1024, 1024, 1024, 1024]);
+    expect(counts.reduce((sum, count) => sum + count, 0)).toBe(5120);
+    // A sentinel prevents accidental expensive loading if the preflight regresses.
+    const loader = vi.spyOn(engine, 'loadScenario').mockImplementation(() => {
+      throw new Error('Engine loader must not run for over-budget native input');
+    });
+    try {
+      expect(() => createFromRaw(raw)).toThrowError(
+        new Error('Native terrain exceeds point budget'),
+      );
+      expect(loader).not.toHaveBeenCalled();
+    } finally {
+      loader.mockRestore();
+    }
+  });
+
+  it('rejects over two million estimated placement checks at 4096 terrain points before loading', () => {
+    const raw = defaultBridgeV1Input() as RawNativeScenario;
+    raw.map.features = denseTerrain(4);
+    const template = raw.units[0]!;
+    raw.units = Array.from({ length: 64 }, (_, index) => ({
+      ...structuredClone(template),
+      id: `budget-unit-${index}`,
+      name: `Budget unit ${index}`,
+      side: index % 2 === 0 ? ('blue' as const) : ('red' as const),
+      at: { x: 100 + (index % 8) * 400, y: 100 + Math.floor(index / 8) * 350 },
+      shape: Array.from({ length: 8 }, (_, point): [number, number] => [point, 0]),
+    }));
+    const points = raw.map.features.reduce(
+      (sum, feature) => sum + ('polygon' in feature ? feature.polygon.length : 0),
+      0,
+    );
+    expect(points).toBe(4096);
+    expect(raw.units).toHaveLength(64);
+    expect(raw.units.map((unit) => unit.shape!.length)).toEqual(Array(64).fill(8));
+    expect(raw.sides.map((side) => side.depots?.length ?? 0)).toEqual([0, 0]);
+    // Eight shape samples plus four corners per unit, and the two HQ samples.
+    const estimatedChecks = (64 * (8 + 4) + 2) * points;
+    expect(estimatedChecks).toBe(3_153_920);
+    expect(estimatedChecks).toBeGreaterThan(2_000_000);
+    const loader = vi.spyOn(engine, 'loadScenario').mockImplementation(() => {
+      throw new Error('Engine loader must not run for over-budget native input');
+    });
+    try {
+      expect(() => createFromRaw(raw)).toThrowError(
+        new Error('Native scenario exceeds placement work budget'),
+      );
+      expect(loader).not.toHaveBeenCalled();
+    } finally {
+      loader.mockRestore();
+    }
   });
 });
