@@ -345,3 +345,31 @@ describe('atomic receipt ownership and activation', () => {
     expect(store.auth.seatOf(receipt.gameId, guest)).toBe('blue');
   });
 });
+
+describe('poisoned allocation recovery', () => {
+  it('never serves tentative receipt identity after both commit and rollback fail', () => {
+    const store = open();
+    const owner = store.auth.createGuest(0).id;
+    const key = randomUUID();
+    const exec = store.database.exec.bind(store.database);
+    const fault = vi.spyOn(store.database, 'exec').mockImplementation((sql) => {
+      if (sql === 'COMMIT') throw new Error('commit failed before execution');
+      if (sql === 'ROLLBACK') throw new Error('rollback failed before execution');
+      return exec(sql);
+    });
+    try {
+      expect(() => store.reserve(owner, { requestId: key }, plan)).toThrow(AggregateError);
+      expect(store.database.isTransaction).toBe(true);
+      const allocated = store.lobby.byCreator(owner)[0]!.id;
+      expect(() => store.forGame(allocated)).toThrow('creation_recovery_required');
+      expect(() => store.lookup(owner, key)).toThrow('creation_recovery_required');
+      expect(() => store.reserve(owner, { requestId: key }, plan)).toThrow(
+        'creation_recovery_required',
+      );
+      expect(() => store.activationResult(allocated, true)).toThrow('creation_recovery_required');
+    } finally {
+      fault.mockRestore();
+      exec('ROLLBACK');
+    }
+  });
+});

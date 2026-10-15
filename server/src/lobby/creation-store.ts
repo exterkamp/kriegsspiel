@@ -286,6 +286,7 @@ export class SqliteCreationStore {
 
   /** Server-only identity lookup; never expose this unscoped body through an API. */
   forGame(gameId: string): CreationReceipt | undefined {
+    if (this.failedTransaction) throw new CreationStoreError('creation_recovery_required');
     const row = this.database
       .prepare(`SELECT ${COLUMNS} FROM creation_receipts WHERE game_id = ?`)
       .get(gameId) as ReceiptRow | undefined;
