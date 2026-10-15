@@ -16,8 +16,9 @@ import {
 } from '@kriegsspiel/engine';
 import type { SideView } from '@kriegsspiel/protocol';
 import { toSideView } from '../api/sideView.js';
-import { createRegistry, loadScenarioById, startingState } from '../game/registry.js';
+import { createRegistry, startingState } from '../game/registry.js';
 import { replayLog } from '../game/replay.js';
+import { initialWorldFromHeader } from '../game/pinned-header.js';
 import type { GameStore, InputLogEntry, InputLogHeader } from '../game/store.js';
 
 export type MarkKind = 'input' | 'event' | 'contact' | 'order' | 'llm';
@@ -65,7 +66,7 @@ export async function loadReplayInput(
   if (!header) return undefined;
   return {
     header,
-    world: loadScenarioById(header.scenarioId),
+    world: initialWorldFromHeader(header, id),
     entries: await store.inputLog(id),
     registry: createRegistry(),
     init: startingState,

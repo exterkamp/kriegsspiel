@@ -26,6 +26,8 @@ import type { ClockChange, ClockMode, ClockState } from '../clock.js';
 import type { ParseResult } from '../orders/index.js';
 import type { PauseTransition } from '../pause.js';
 import type { RatioTransition } from '../ratioVote.js';
+import { detachedInputHeader } from './pinned-header.js';
+import type { NativeScenarioPinV1 } from './native-scenario-pin.js';
 
 /** Everything needed to resume a game: serialised engine state and the clock's anchor. */
 export interface GameSnapshot {
@@ -190,6 +192,11 @@ export interface InputLogHeader {
   seed: number;
   /** Umpire settings chosen at creation (3.11). Absent on older games: the defaults. Replay applies the dial. */
   settings?: UmpireSettings;
+  /** Present together for newly pinned games; missing/corrupt modern data never falls back. */
+  battlefieldFormat?: 1;
+  battlefieldPin?: NativeScenarioPinV1;
+  /** Binds recovery to the accepted allocation when creation receipts are used. */
+  creationReceiptId?: string;
 }
 
 export interface InputLogEntry {
@@ -399,12 +406,12 @@ export class MemoryGameStore implements GameStore {
   }
 
   async saveLogHeader(header: InputLogHeader): Promise<void> {
-    this.headers.set(header.gameId, { ...header });
+    this.headers.set(header.gameId, detachedInputHeader(header));
   }
 
   async logHeader(gameId: string): Promise<InputLogHeader | undefined> {
     const h = this.headers.get(gameId);
-    return h && { ...h };
+    return h && detachedInputHeader(h);
   }
 
   async saveSnapshot(gameId: string, snapshot: GameSnapshot): Promise<void> {
@@ -449,10 +456,11 @@ export class FileGameStore extends MemoryGameStore {
   }
 
   override async saveLogHeader(header: InputLogHeader): Promise<void> {
-    const path = this.logPath(header.gameId);
+    const saved = detachedInputHeader(header);
+    const path = this.logPath(saved.gameId);
     await mkdir(this.dir, { recursive: true });
     // 'wx': never overwrite the record of an existing game.
-    await writeFile(path, `${JSON.stringify(header)}\n`, { flag: 'wx' });
+    await writeFile(path, `${JSON.stringify(saved)}\n`, { flag: 'wx' });
   }
 
   override async logHeader(gameId: string): Promise<InputLogHeader | undefined> {
@@ -514,6 +522,12 @@ export class FileGameStore extends MemoryGameStore {
 export function parseInputLog(text: string): { header: InputLogHeader; entries: InputLogEntry[] } {
   const lines = text.split('\n');
   const complete = lines.at(-1) === '' ? lines.slice(0, -1) : lines;
+  if (
+    complete[0] &&
+    (complete[0].length > 2 * 1024 * 1024 ||
+      Buffer.byteLength(complete[0], 'utf8') > 2 * 1024 * 1024)
+  )
+    throw new Error('input log header exceeds byte limit');
   const records = complete.map((line, i) => {
     try {
       return JSON.parse(line) as unknown;
@@ -526,5 +540,8 @@ export function parseInputLog(text: string): { header: InputLogHeader; entries: 
   if (!header || typeof header.scenarioId !== 'string' || typeof header.seed !== 'number') {
     throw new Error('input log must start with a header line {gameId, scenarioId, seed}');
   }
-  return { header, entries: records.slice(1).filter((r) => r !== undefined) as InputLogEntry[] };
+  return {
+    header: detachedInputHeader(header),
+    entries: records.slice(1).filter((r) => r !== undefined) as InputLogEntry[],
+  };
 }
