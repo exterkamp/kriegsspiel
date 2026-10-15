@@ -1,0 +1,96 @@
+<section [attr.aria-label]="source() === 'owned' ? 'My maps' : 'Other included maps'">
+  <h3>{{ source() === 'owned' ? 'My maps' : 'Other included maps' }}</h3>
+  <p>
+    Geography only · Needs a scenario. These maps have no armies or objectives and cannot start a
+    game.
+  </p>
+  <button type="button" [disabled]="!enabled()" (click)="backRequested.emit()">
+    Back to scenario maps
+  </button>
+  <div class="layout">
+    <div>
+      @if (loading()) {
+        <p role="status">Loading maps…</p>
+      }
+      @if (listError()) {
+        <p class="ks-error" role="alert">{{ listError() }}</p>
+        <button type="button" [disabled]="!enabled() || loading()" (click)="loadPage(page())">
+          Retry maps
+        </button>
+        @if (page() > 0) {
+          <button type="button" [disabled]="!enabled() || loading()" (click)="restart()">
+            Restart maps
+          </button>
+        }
+      }
+      @for (item of items(); track item.ref.id) {
+        <button
+          type="button"
+          class="map-row"
+          [disabled]="!enabled()"
+          [attr.aria-pressed]="selected()?.ref?.id === item.ref.id"
+          (click)="inspect(item)"
+        >
+          <b>{{ item.name }}</b
+          ><span>{{ item.widthM / 1000 }} × {{ item.heightM / 1000 }} km · Needs a scenario</span>
+        </button>
+      } @empty {
+        @if (!loading() && !listError()) {
+          <p>
+            {{
+              source() === 'owned' ? 'No maps saved yet.' : 'No other included maps are available.'
+            }}
+          </p>
+        }
+      }
+      @if (source() === 'owned') {
+        <button type="button" [disabled]="!enabled()" (click)="addRequested.emit()">Add map</button>
+      }
+      <nav aria-label="Map pages">
+        <button
+          type="button"
+          [disabled]="!enabled() || loading() || page() === 0"
+          (click)="previous()"
+        >
+          Previous maps
+        </button>
+        <button
+          type="button"
+          [disabled]="!enabled() || loading() || !nextCursor()"
+          (click)="next()"
+        >
+          Next maps
+        </button>
+      </nav>
+    </div>
+    <section aria-label="Geography inspection">
+      @if (selected(); as item) {
+        <h3 #inspectionHeading tabindex="-1">{{ item.name }}</h3>
+        <p>{{ item.widthM / 1000 }} × {{ item.heightM / 1000 }} km · Needs a scenario</p>
+      } @else {
+        <p>Choose a map to inspect its geography.</p>
+      }
+      @if (reading()) {
+        <p role="status">Checking map…</p>
+      }
+      @if (readError()) {
+        <p class="ks-error" role="alert">{{ readError() }}</p>
+        <button type="button" [disabled]="!enabled()" (click)="retryRead()">Retry preview</button>
+      }
+      @if (board()) {
+        <canvas
+          #canvas
+          tabindex="0"
+          aria-label="Geography preview. Drag or arrow keys to pan, scroll or plus and minus to zoom, F to fit."
+        ></canvas>
+        <p>Drag or arrow keys to pan · scroll or + / − to zoom · F to fit</p>
+      }
+      @if (previewError()) {
+        <p class="ks-error" role="alert">{{ previewError() }}</p>
+        <button type="button" [disabled]="!enabled()" (click)="retryPreview()">
+          Retry preview
+        </button>
+      }
+    </section>
+  </div>
+</section>

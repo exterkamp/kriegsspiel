@@ -58,71 +58,136 @@
   <header>
     <h2 #title [id]="labelId" tabindex="-1">{{ heading() }}</h2>
   </header>
-  <div class="scroller">
+  <div class="scroller" [class.add-body]="view() === 'add' && addPreparation()">
     @if (active()) {
       @if (view() === 'add') {
-        <p>
-          Adding maps to live games is not available yet. You can choose from the ready maps
-          supplied for this scenario.
-        </p>
-        <p>A map needs a scenario with armies and objectives before it can be played.</p>
+        @if (addPreparation(); as preparation) {
+          <ks-map-library
+            #addBody
+            [preparation]="preparation"
+            [library]="library()!"
+            (saved)="savedMap($event, addBody)"
+            (cancelled)="addCancelled(addBody)"
+          />
+        } @else if (libraryEnabled()) {
+          <p class="ks-error" role="alert">
+            {{ modalError() || 'Add map could not be opened. Please try again.' }}
+          </p>
+          <button type="button" [disabled]="waiting() || !entryEnabled()" (click)="prepareAdd()">
+            Retry Add map
+          </button>
+        } @else {
+          <p>
+            Adding maps to live games is not available yet. You can choose from the ready maps
+            supplied for this scenario.
+          </p>
+          <p>A map needs a scenario with armies and objectives before it can be played.</p>
+        }
       } @else {
-        <div class="map-layout" [class.view-only]="view() === 'view'">
-          @if (view() === 'choose') {
-            <section aria-label="Scenario maps">
-              <h3>Scenario maps</h3>
-              @for (entry of choices(); track entry.pairing.id) {
-                <label class="ks-choice candidate">
-                  <input
-                    type="radio"
-                    [name]="labelId + '-candidate'"
-                    [value]="entry.pairing.id"
-                    [checked]="candidate() === entry"
+        @if (view() === 'choose' && libraryEnabled()) {
+          <nav class="sources" aria-label="Map sources">
+            <button
+              type="button"
+              [disabled]="waiting() || !entryEnabled()"
+              [attr.aria-pressed]="librarySource() === 'scenario'"
+              (click)="browse('scenario')"
+            >
+              Scenario maps
+            </button>
+            <button
+              type="button"
+              [disabled]="waiting() || !entryEnabled()"
+              [attr.aria-pressed]="librarySource() === 'owned'"
+              (click)="browse('owned')"
+            >
+              My maps
+            </button>
+          </nav>
+        }
+        @if (view() === 'choose' && libraryEnabled() && librarySource() !== 'scenario') {
+          <ks-library-browser
+            #libraryBody
+            [source]="librarySource() === 'owned' ? 'owned' : 'included'"
+            [library]="library()!"
+            [preparationFactory]="preparationFactory()!"
+            [initialItem]="inspected()"
+            [enabled]="entryEnabled() && !waiting()"
+            (backRequested)="browse('scenario')"
+            (addRequested)="add()"
+          />
+        } @else {
+          <div class="map-layout" [class.view-only]="view() === 'view'">
+            @if (view() === 'choose') {
+              <section aria-label="Scenario maps">
+                <h3>Scenario maps</h3>
+                @for (entry of choices(); track entry.pairing.id) {
+                  <label class="ks-choice candidate">
+                    <input
+                      type="radio"
+                      [name]="labelId + '-candidate'"
+                      [value]="entry.pairing.id"
+                      [checked]="candidate() === entry"
+                      [disabled]="waiting() || !entryEnabled()"
+                      (change)="choose(entry)"
+                    />
+                    <span>
+                      <b>{{ entry.map.name }}</b
+                      ><br />{{ extent(entry) }}<br />{{ source(entry) }} <br />Ready for
+                      {{ scenarioName() }}
+                    </span>
+                  </label>
+                } @empty {
+                  <p class="ks-error" role="alert">
+                    The maps for this scenario could not be checked.
+                  </p>
+                }
+                @if (choices().length === 1) {
+                  <p>One map is available for this scenario.</p>
+                }
+                @if (libraryEnabled()) {
+                  <h4>Other included maps</h4>
+                  <p>Geography to inspect · Needs a scenario</p>
+                  <button
+                    type="button"
                     [disabled]="waiting() || !entryEnabled()"
-                    (change)="choose(entry)"
-                  />
-                  <span>
-                    <b>{{ entry.map.name }}</b
-                    ><br />{{ extent(entry) }}<br />{{ source(entry) }} <br />Ready for
-                    {{ scenarioName() }}
-                  </span>
-                </label>
-              } @empty {
-                <p class="ks-error" role="alert">
-                  The maps for this scenario could not be checked.
-                </p>
-              }
-              @if (choices().length === 1) {
-                <p>One map is available for this scenario.</p>
-              }
-              <button type="button" [disabled]="waiting()" (click)="add()">Add map</button>
-            </section>
-          }
-          <section aria-label="Map preview">
-            @for (battlefield of displayed(); track battlefield.pairing.id) {
-              <h3>{{ battlefield.map.name }} · {{ extent(battlefield) }}</h3>
-              <p class="readiness">{{ source(battlefield) }} · Ready for {{ scenarioName() }}</p>
-              <ks-battlefield-preview [map]="battlefield.map" [interactive]="true" />
-              <p>The scenario supplies the armies, starting positions and objectives.</p>
-            } @empty {
-              <p class="ks-error" role="alert">No ready battlefield map is selected.</p>
+                    (click)="browse('included')"
+                  >
+                    Browse included maps
+                  </button>
+                }
+                <button type="button" [disabled]="waiting() || !entryEnabled()" (click)="add()">
+                  Add map
+                </button>
+              </section>
             }
-          </section>
-        </div>
+            <section aria-label="Map preview">
+              @for (battlefield of displayed(); track battlefield.pairing.id) {
+                <h3>{{ battlefield.map.name }} · {{ extent(battlefield) }}</h3>
+                <p class="readiness">{{ source(battlefield) }} · Ready for {{ scenarioName() }}</p>
+                <ks-battlefield-preview [map]="battlefield.map" [interactive]="true" />
+                <p>The scenario supplies the armies, starting positions and objectives.</p>
+              } @empty {
+                <p class="ks-error" role="alert">No ready battlefield map is selected.</p>
+              }
+            </section>
+          </div>
+        }
       }
     }
   </div>
   <footer>
-    <button type="button" [disabled]="waiting()" (click)="cancel()">
-      {{ view() === 'view' ? 'Close' : 'Cancel' }}
-    </button>
+    @if (!addPreparation()) {
+      <button type="button" [disabled]="waiting()" (click)="cancel()">
+        {{ view() === 'view' ? 'Close' : 'Cancel' }}
+      </button>
+    }
     @if (view() === 'add') {
       <button type="button" [disabled]="waiting()" (click)="backToMaps()">Back to maps</button>
     } @else if (view() === 'choose') {
       <button
         type="button"
         class="ks-primary"
-        [disabled]="waiting() || !entryEnabled() || !candidate()"
+        [disabled]="waiting() || !entryEnabled() || librarySource() !== 'scenario' || !candidate()"
         (click)="use()"
       >
         Use map

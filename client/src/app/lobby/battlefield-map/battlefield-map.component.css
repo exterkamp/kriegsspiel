@@ -123,3 +123,22 @@ footer {
     padding-bottom: max(var(--ks-space-3), env(safe-area-inset-bottom));
   }
 }
+
+.sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ks-space-2);
+  margin-bottom: var(--ks-space-3);
+}
+.scroller {
+  flex: 1 1 auto;
+}
+.scroller.add-body {
+  display: flex;
+  overflow: hidden;
+}
+ks-map-library {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
