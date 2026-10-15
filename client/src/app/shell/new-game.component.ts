@@ -29,14 +29,15 @@ import {
 } from '@legacy/shell/newGame';
 import { GameListComponent } from '../lobby/game-list.component';
 import { PageFrameComponent } from '../ui/page-frame.component';
+import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-map.component';
 
-/** Scenario, side and clock rate, then Start. The rules (defaults, validation, the request) are `shell/newGame.ts`. */
+/** Scenario-first live setup; map inspection is separately gated from the existing creation request. */
 @Component({
   selector: 'ks-new-game',
-  imports: [PageFrameComponent, GameListComponent],
+  imports: [PageFrameComponent, GameListComponent, BattlefieldMapComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <ks-page-frame heading="New game" [back]="true" (backClick)="back.emit()">
+    <ks-page-frame heading="New game" [back]="true" (backClick)="goBack()">
       @if (loadError()) {
         <p role="alert" class="ks-status ks-error">{{ loadError() }}</p>
       } @else if (!options() || !form() || !scenario()) {
@@ -60,6 +61,20 @@ import { PageFrameComponent } from '../ui/page-frame.component';
             <p>{{ scenario()!.briefing }}</p>
             <p class="ks-muted">Sides: {{ sideNames() }}. {{ length() }}</p>
           </fieldset>
+
+          @if (scenario()!.battlefield; as battlefield) {
+            <ks-battlefield-map
+              [battlefield]="battlefield"
+              [scenarioName]="scenario()!.name"
+              (activeChange)="mapDialogOpen.set($event)"
+            />
+          } @else {
+            <fieldset>
+              <legend>Battlefield map</legend>
+              <p>The scenario's default battlefield will be used.</p>
+              <p class="ks-muted">Map previews are not available on this server.</p>
+            </fieldset>
+          }
 
           <fieldset>
             <legend>Your side</legend>
@@ -227,16 +242,20 @@ import { PageFrameComponent } from '../ui/page-frame.component';
           }
 
           <div class="ks-actions actions">
-            <button type="submit" class="ks-primary" [attr.aria-disabled]="starting()">
-              {{ starting() ? 'Starting…' : 'Start' }}
+            <button
+              type="submit"
+              class="ks-primary"
+              [attr.aria-disabled]="starting() || mapDialogOpen()"
+            >
+              {{ starting() ? 'Starting game…' : 'Start game' }}
             </button>
-            <button type="button" (click)="back.emit()">Back</button>
+            <button type="button" (click)="goBack()">Back</button>
           </div>
         </form>
       }
       <ks-game-list class="ks-panel games" />
       @if (loadError()) {
-        <div class="ks-actions"><button type="button" (click)="back.emit()">Back</button></div>
+        <div class="ks-actions"><button type="button" (click)="goBack()">Back</button></div>
       }
     </ks-page-frame>
   `,
@@ -279,6 +298,7 @@ export class NewGameComponent implements OnInit {
   protected readonly loadError = signal<string | undefined>(undefined);
   protected readonly error = signal<string | undefined>(undefined);
   protected readonly starting = signal(false);
+  protected readonly mapDialogOpen = signal(false);
   protected readonly scenario = computed(() =>
     this.options()?.scenarios.find((s) => s.id === this.form()?.scenario),
   );
@@ -339,19 +359,25 @@ export class NewGameComponent implements OnInit {
   }
 
   protected pick(id: string): void {
+    if (this.mapDialogOpen() || this.busy) return;
     const next = chooseScenario(this.options()!, id, this.form());
     if (next) this.form.set(next);
   }
 
   protected patch(p: Partial<Form>): void {
+    if (this.mapDialogOpen() || this.busy) return;
     this.form.update((f) => (f ? { ...f, ...p } : f));
+  }
+
+  protected goBack(): void {
+    if (!this.mapDialogOpen() && !this.busy) this.back.emit();
   }
 
   protected async start(e: Event): Promise<void> {
     e.preventDefault();
     const options = this.options();
     const form = this.form();
-    if (this.busy || !options || !form) return;
+    if (this.busy || this.mapDialogOpen() || !options || !form) return;
     const problem = validate(form, options);
     if (problem) {
       this.error.set(problem);

@@ -1,0 +1,107 @@
+<figure>
+  <svg
+    [class.interactive]="interactive()"
+    [class.compact]="!interactive()"
+    [attr.viewBox]="viewBox()"
+    [attr.tabindex]="interactive() ? 0 : null"
+    role="img"
+    [attr.aria-label]="
+      map().name +
+      '. ' +
+      map().widthM +
+      ' by ' +
+      map().heightM +
+      ' metres. North is up; east is right.'
+    "
+    (keydown)="key($event)"
+    (pointerdown)="pointerDown($event)"
+    (pointermove)="pointerMove($event)"
+    (pointerup)="pointerEnd()"
+    (pointercancel)="pointerEnd()"
+    (lostpointercapture)="pointerEnd()"
+  >
+    <svg:rect
+      x="0"
+      y="0"
+      [attr.width]="map().widthM"
+      [attr.height]="map().heightM"
+      class="ground"
+    />
+    @for (feature of features(); track feature.id) {
+      @let geometry = feature.geometry;
+      <svg:g [attr.class]="'terrain terrain-' + feature.kind" [attr.data-feature-id]="feature.id">
+        <svg:title>{{ feature.name || feature.kind }}</svg:title>
+        @switch (geometry.shape) {
+          @case ('polygon') {
+            <svg:polygon [attr.points]="points(geometry.points)" />
+          }
+          @case ('polyline') {
+            <svg:polyline
+              [attr.points]="points(geometry.points)"
+              [attr.stroke-width]="geometry.widthM"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          }
+          @case ('point') {
+            <svg:circle
+              [attr.cx]="geometry.at.x"
+              [attr.cy]="geometry.at.y"
+              [attr.r]="geometry.radiusM"
+            />
+          }
+        }
+      </svg:g>
+    }
+  </svg>
+  @if (interactive()) {
+    <div class="tools" role="group" aria-label="Map preview controls">
+      <button type="button" (click)="fit()">Fit map</button>
+      <button type="button" (click)="zoom(2)" [disabled]="scale() === 8">Zoom in</button>
+      <button type="button" (click)="zoom(0.5)" [disabled]="scale() === 1">Zoom out</button>
+      <span role="status">{{ scale() }}×</span>
+    </div>
+    @if (scale() > 1) {
+      <div class="tools" role="group" aria-label="Move around the map">
+        <button type="button" (click)="pan(-box().width / 4, 0)">Pan west</button>
+        <button type="button" (click)="pan(box().width / 4, 0)">Pan east</button>
+        <button type="button" (click)="pan(0, -box().height / 4)">Pan north</button>
+        <button type="button" (click)="pan(0, box().height / 4)">Pan south</button>
+      </div>
+    }
+    <figcaption>
+      North is up. Focus the map: +/− to zoom, arrows to move, F to fit. Drag to move when zoomed.
+      Escape fits the map before closing it.
+    </figcaption>
+    <details>
+      <summary>Map description</summary>
+      <p>
+        {{ map().widthM }} × {{ map().heightM }} metres. Positions are metres east and south from
+        the north-west corner. Unmarked ground is open.
+      </p>
+      <ul>
+        @for (feature of features(); track feature.id) {
+          @let geometry = feature.geometry;
+          <li>
+            <b>{{ feature.name || feature.kind }}</b> ({{ feature.kind }}).
+            @switch (geometry.shape) {
+              @case ('polygon') {
+                Boundary: {{ points(geometry.points) }} metres.
+              }
+              @case ('polyline') {
+                Route: {{ points(geometry.points) }} metres; {{ geometry.widthM }} metres wide.
+              }
+              @case ('point') {
+                Centre: {{ geometry.at.x }}, {{ geometry.at.y }} metres; radius
+                {{ geometry.radiusM }} metres.
+              }
+            }
+          </li>
+        } @empty {
+          <li>Open ground throughout.</li>
+        }
+      </ul>
+    </details>
+  }
+</figure>

@@ -389,7 +389,7 @@ describe('moving between screens', () => {
     await settle();
     expect(el.textContent).toContain('wider room');
     expect(el.textContent).toContain('war correspondent');
-    click('Start');
+    click('Start game');
     await settle();
     expect(createGame).toHaveBeenCalledWith({
       scenario: 'hold-the-bridge',
@@ -423,7 +423,7 @@ describe('moving between screens', () => {
     due.dispatchEvent(new Event('input'));
     await settle();
     expect(el.textContent).toContain('tables alone decide each turn');
-    click('Start');
+    click('Start game');
     await settle();
     expect(createGame).toHaveBeenCalledWith({
       scenario: 'hold-the-bridge',
@@ -449,7 +449,7 @@ describe('moving between screens', () => {
     radio('input[name=rate][value="1"]').click();
     await settle();
     const start = [...el.querySelectorAll('button')].find(
-      (b) => b.textContent?.trim() === 'Start',
+      (b) => b.textContent?.trim() === 'Start game',
     )!;
     start.click();
     start.click();
@@ -457,7 +457,7 @@ describe('moving between screens', () => {
     expect(calls).toBe(1);
     expect(el.querySelector('[role=alert]')?.textContent).toContain('limit');
     expect(radio('input[name=rate][value="1"]').checked).toBe(true);
-    click('Start');
+    click('Start game');
     await settle();
     expect(calls).toBe(2);
   });
@@ -471,7 +471,7 @@ describe('moving between screens', () => {
     box.value = 'fast';
     box.dispatchEvent(new Event('input', { bubbles: true }));
     await settle();
-    click('Start');
+    click('Start game');
     await settle();
     expect(createGame).not.toHaveBeenCalled();
     expect(el.querySelector('[role=alert]')?.textContent).toContain('Clock rate');

@@ -1,0 +1,93 @@
+<fieldset>
+  <legend #summaryTitle tabindex="-1">Battlefield map</legend>
+  @if (data(); as battlefield) {
+    <ks-battlefield-preview [map]="battlefield.map" />
+    <p>
+      <b>{{ battlefield.map.name }}</b> · {{ extent() }}
+    </p>
+    <p class="readiness">Scenario default · Ready for {{ scenarioName() }}</p>
+    <p>The scenario supplies the armies, starting positions and objectives.</p>
+  } @else {
+    <p class="ks-error" role="alert">
+      This battlefield map could not be checked. It cannot be used for a game.
+    </p>
+  }
+  <div class="actions">
+    <button type="button" [disabled]="waiting() || !data()" (click)="open('choose', $event)">
+      Choose map
+    </button>
+    <button type="button" [disabled]="waiting()" (click)="open('add', $event)">Add map</button>
+    <button type="button" [disabled]="waiting() || !data()" (click)="open('view', $event)">
+      View map
+    </button>
+  </div>
+  <p class="ks-sr-only" role="status">{{ announcement() }}</p>
+  @if (modalError()) {
+    <p role="alert" class="ks-error">{{ modalError() }}</p>
+  }
+</fieldset>
+
+<dialog
+  #dialog
+  class="ks-theme"
+  [attr.aria-labelledby]="labelId"
+  (cancel)="cancel($event)"
+  (close)="nativeClose()"
+  (keydown)="key($event)"
+  (click)="$event.stopPropagation()"
+>
+  <header>
+    <h2 #title [id]="labelId" tabindex="-1">{{ heading() }}</h2>
+  </header>
+  <div class="scroller">
+    @if (active()) {
+      @if (view() === 'add') {
+        <p>
+          Adding maps to live games is not available yet. You can keep playing on the scenario's
+          default map.
+        </p>
+        <p>A map needs a scenario with armies and objectives before it can be played.</p>
+      } @else if (data(); as battlefield) {
+        <div class="map-layout" [class.view-only]="view() === 'view'">
+          @if (view() === 'choose') {
+            <section aria-label="Scenario maps">
+              <h3>Scenario maps</h3>
+              <label class="ks-choice candidate">
+                <input type="radio" [name]="labelId + '-candidate'" checked />
+                <span
+                  ><b>{{ battlefield.map.name }}</b
+                  ><br />{{ extent() }}<br />Scenario default<br />Ready for
+                  {{ scenarioName() }}</span
+                >
+              </label>
+              <p>Only the scenario's default map is available for this game.</p>
+              <button type="button" [disabled]="waiting()" (click)="add()">Add map</button>
+            </section>
+          }
+          <section aria-label="Map preview">
+            <h3>{{ battlefield.map.name }} · {{ extent() }}</h3>
+            <p class="readiness">Scenario default · Ready for {{ scenarioName() }}</p>
+            <ks-battlefield-preview [map]="battlefield.map" [interactive]="true" />
+            <p>The scenario supplies the armies, starting positions and objectives.</p>
+          </section>
+        </div>
+      } @else {
+        <p class="ks-error" role="alert">
+          This battlefield map could not be checked. It cannot be used for a game.
+        </p>
+      }
+    }
+  </div>
+  <footer>
+    <button type="button" [disabled]="waiting()" (click)="cancel()">
+      {{ view() === 'view' ? 'Close' : 'Cancel' }}
+    </button>
+    @if (view() === 'add') {
+      <button type="button" [disabled]="waiting()" (click)="backToMaps()">Back to maps</button>
+    } @else if (view() === 'choose') {
+      <button type="button" class="ks-primary" [disabled]="waiting() || !data()" (click)="use()">
+        Use map
+      </button>
+    }
+  </footer>
+</dialog>
