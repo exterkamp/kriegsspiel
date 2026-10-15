@@ -1,3 +1,4 @@
+import { assertSnapshotHeader, snapshotBinding } from './snapshot-binding.js';
 /** GameHost: many games in one process, one `GameActor` each. */
 import {
   advanceTo,
@@ -28,6 +29,21 @@ import { turnSettingsOf } from '@kriegsspiel/protocol';
 import type { GameStore, InputLogEntry } from './store.js';
 import { EngineTurnResolver } from './engineTurn.js';
 import { openTurnFromLog, sentTurnIdsFromLog, type TurnResolver } from './turns.js';
+import { assertPinnedWorld, detachedInputHeader } from './pinned-header.js';
+import {
+  decodeNativeScenarioPin,
+  nativeCanonicalJson,
+  type NativeScenarioPinV1,
+} from './native-scenario-pin.js';
+import { assertBattlefieldBudget } from '@kriegsspiel/protocol';
+
+/** Server-owned creation data; native pins never arrive as a client-provided world. */
+export interface GameCreationOptions {
+  rate?: number;
+  settings?: UmpireSettings;
+  pin?: NativeScenarioPinV1;
+  creationReceiptId?: string;
+}
 
 /** Each side's deputy settings (the last set) and the account of its turns, from a game's whole input log (D6f). */
 export function deputiesFromLog(
@@ -160,11 +176,7 @@ export class GameHost {
   }
 
   /** Start a new game from a loaded scenario. The clock starts running at game time 0. */
-  create(
-    id: string,
-    world: GameState,
-    clock: { rate?: number; settings?: UmpireSettings } = {},
-  ): Promise<GameActor> {
+  create(id: string, world: GameState, clock: GameCreationOptions = {}): Promise<GameActor> {
     if (this.games.has(id) || this.pending.has(id)) {
       return Promise.reject(new Error(`game already exists: ${id}`));
     }
@@ -173,7 +185,16 @@ export class GameHost {
 
   /** Run `build` as the one in-flight start for `id`; the id is claimed before the first await. */
   private register(id: string, build: () => Promise<GameActor>): Promise<GameActor> {
-    const promise = build().finally(() => this.pending.delete(id));
+    const promise = build()
+      .catch((error: unknown) => {
+        try {
+          this.options.onClose?.(id);
+        } catch (cleanupError) {
+          throw new AggregateError([error, cleanupError], 'Game resource cleanup failed');
+        }
+        throw error;
+      })
+      .finally(() => this.pending.delete(id));
     this.pending.set(id, promise);
     return promise;
   }
@@ -181,35 +202,67 @@ export class GameHost {
   private async doCreate(
     id: string,
     scenario: GameState,
-    clock: { rate?: number; settings?: UmpireSettings },
+    clock: GameCreationOptions,
   ): Promise<GameActor> {
-    if (await this.options.store.loadSnapshot(id)) {
-      throw new Error(`game already exists: ${id}`);
+    const pin = clock.pin !== undefined ? decodeNativeScenarioPin(clock.pin) : undefined;
+    if (pin) {
+      assertBattlefieldBudget(scenario, 1024 * 1024);
+      if (nativeCanonicalJson(scenario) !== nativeCanonicalJson(pin.initialWorld))
+        throw new Error('Creation world contradicts native pin');
+      scenario = structuredClone(pin.initialWorld);
     }
-    // The dial is part of the world (it sets the judgment cap); the persona is only prose.
-    const { settings } = clock;
+    const settings = clock.settings ? structuredClone(clock.settings) : undefined;
+    const rate = clock.rate;
+    const header = detachedInputHeader({
+      gameId: id,
+      scenarioId: scenario.scenarioId,
+      seed: scenario.seed,
+      ...(settings ? { settings } : {}),
+      ...(pin ? { battlefieldFormat: 1 as const, battlefieldPin: pin } : {}),
+      ...(clock.creationReceiptId !== undefined
+        ? { creationReceiptId: clock.creationReceiptId }
+        : {}),
+    });
+    if (await this.options.store.loadSnapshot(id)) throw new Error(`game already exists: ${id}`);
+    // A crash after header acceptance but before the first snapshot may resume
+    // only the same native allocation, with no prior inputs to overwrite.
+    const previous = pin ? await this.options.store.logHeader(id) : undefined;
+    if (previous) {
+      if (
+        nativeCanonicalJson(previous) !== nativeCanonicalJson(header) ||
+        (await this.options.store.inputLog(id)).length !== 0
+      )
+        throw new Error('Existing input header conflicts with native allocation');
+    } else await this.options.store.saveLogHeader(header);
+    // Dial/settings are runtime choices applied after the retained initial pin.
     const world: GameState = settings ? { ...scenario, dial: settings.dial } : scenario;
     const state0 = createState(world.seed, world, 0);
     const state = this.options.init?.(state0) ?? state0;
-    await this.options.store.saveLogHeader({
-      gameId: id,
-      scenarioId: world.scenarioId,
-      seed: world.seed,
-      ...(settings ? { settings } : {}),
-    });
     // Turn mode (D39): the clock is manual for the game's whole life, there is no pause vote, and
     // the rate is ignored.
     const turns = this.turnsFor(id, settings);
+    const battlefield = header ? snapshotBinding(header) : undefined;
     const actor = new GameActor({
       ...this.actorOptions(id),
+      ...(battlefield ? { battlefield } : {}),
       state,
       agents: this.agentsFor(id, world),
       ...(turns ? { turns } : { pause: this.options.pause?.(id, world) }),
       persona: settings?.persona,
-      clock: new GameClock(this.options.wallNow, turns ? { mode: 'manual' } : { rate: clock.rate }),
+      clock: new GameClock(this.options.wallNow, turns ? { mode: 'manual' } : { rate }),
     });
+    try {
+      await actor.start();
+    } catch (error) {
+      try {
+        await actor.close();
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], 'Game activation cleanup failed');
+      }
+      throw error;
+    }
+    // Only fully activated actors are visible to callers or duplicate opens.
     this.games.set(id, actor);
-    await actor.start();
     return actor;
   }
 
@@ -227,11 +280,14 @@ export class GameHost {
     const { store } = this.options;
     const snap = await store.loadSnapshot(id);
     if (!snap) throw new Error(`no such game: ${id}`);
+    const header = await store.logHeader(id);
+    assertSnapshotHeader(snap, header, id);
     // Recovery: the latest snapshot, then the inputs logged after it, then the game time the
     // scheduler had reached since the last input. Replay is the same code the live game ran,
     // and chunking `advanceTo` never changes a result, so the state equals the one before the stop.
     const tail = await store.inputLog(id, snap.seq);
     let state = deserialize<GameState>(snap.engine);
+    if (header) assertPinnedWorld(header, state.world, id);
     state = replayFrom(state, id, tail, this.options.registry).state;
     const progress = await store.loadProgress(id);
     const lastAlive = await store.loadHeartbeat(id);
@@ -247,7 +303,8 @@ export class GameHost {
       else if (e.command.kind === 'setMode') mode = e.command.mode;
       for (const t of e.ratio ?? []) if (t.outcome === 'passed') rate = t.rate;
     }
-    const settings = (await store.logHeader(id))?.settings;
+    if (header) assertPinnedWorld(header, state.world, id);
+    const settings = header?.settings;
     const turnOptions = this.turnsFor(id, settings);
     // A turn-mode game has nothing to pause: game time does not run while it is down.
     const clock = new GameClock(this.options.wallNow, {
@@ -290,8 +347,10 @@ export class GameHost {
       ...(open ? { open } : {}),
       sentIds: sentTurnIdsFromLog(log),
     };
+    const battlefield = header ? snapshotBinding(header) : undefined;
     const actor = new GameActor({
       ...this.actorOptions(id),
+      ...(battlefield ? { battlefield } : {}),
       state,
       staffHistory,
       deputies,
@@ -306,12 +365,24 @@ export class GameHost {
       // The log is in insertion order, which is not always seq order (see D14b).
       seq: tail.reduce((max, e) => Math.max(max, e.seq), snap.seq),
     });
+    try {
+      await actor.start();
+    } catch (error) {
+      try {
+        await actor.close();
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], 'Game activation cleanup failed');
+      }
+      throw error;
+    }
+    // Only fully activated actors are visible to callers or duplicate opens.
     this.games.set(id, actor);
-    await actor.start();
     return actor;
   }
 
   async close(id: string): Promise<void> {
+    // A concurrent account removal/shutdown must also retire an activation in flight.
+    await this.pending.get(id)?.catch(() => undefined);
     const actor = this.games.get(id);
     this.games.delete(id);
     await actor?.close();
@@ -320,7 +391,7 @@ export class GameHost {
 
   /** Close every game: no timers are left running. */
   async shutdown(): Promise<void> {
-    const all = [...this.games.keys()];
+    const all = [...new Set([...this.games.keys(), ...this.pending.keys()])];
     await Promise.all(all.map((id) => this.close(id)));
   }
 }

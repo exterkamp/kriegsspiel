@@ -1,3 +1,4 @@
+import { decodeSnapshotBinding } from './snapshot-binding.js';
 /**
  * SqliteGameStore: the durable `GameStore`. See docs/architecture.md (Persistence).
  *
@@ -92,6 +93,7 @@ export const MIGRATIONS: readonly string[] = [
   `ALTER TABLE games ADD COLUMN battlefield_format INTEGER;
    ALTER TABLE games ADD COLUMN battlefield_pin TEXT;
    ALTER TABLE games ADD COLUMN creation_receipt_id TEXT;`,
+  `ALTER TABLE snapshots ADD COLUMN battlefield TEXT;`,
 ];
 
 /** Older snapshots kept besides the newest (not yet used as a fallback: recovery reads the newest). */
@@ -234,9 +236,17 @@ export class SqliteGameStore implements GameStore {
     this.transaction(() => {
       this.db
         .prepare(
-          'INSERT OR REPLACE INTO snapshots (game_id, seq, engine, clock) VALUES (?, ?, ?, ?)',
+          'INSERT OR REPLACE INTO snapshots (game_id, seq, engine, clock, battlefield) VALUES (?, ?, ?, ?, ?)',
         )
-        .run(gameId, snapshot.seq, snapshot.engine, JSON.stringify(snapshot.clock));
+        .run(
+          gameId,
+          snapshot.seq,
+          snapshot.engine,
+          JSON.stringify(snapshot.clock),
+          Object.hasOwn(snapshot, 'battlefield')
+            ? JSON.stringify(decodeSnapshotBinding(snapshot.battlefield))
+            : null,
+        );
       this.db
         .prepare(
           `DELETE FROM snapshots WHERE game_id = ? AND seq NOT IN
@@ -249,10 +259,27 @@ export class SqliteGameStore implements GameStore {
   async loadSnapshot(gameId: string): Promise<GameSnapshot | undefined> {
     const r = this.db
       .prepare(
-        'SELECT seq, engine, clock FROM snapshots WHERE game_id = ? ORDER BY seq DESC LIMIT 1',
+        `SELECT seq, engine, clock, length(CAST(battlefield AS BLOB)) AS battlefield_bytes, CASE WHEN length(CAST(battlefield AS BLOB)) <= 1024 THEN battlefield ELSE NULL END AS battlefield FROM snapshots WHERE game_id = ? ORDER BY seq DESC LIMIT 1`,
       )
-      .get(gameId) as { seq: number; engine: string; clock: string } | undefined;
-    return r && { seq: r.seq, engine: r.engine, clock: JSON.parse(r.clock) };
+      .get(gameId) as
+      | {
+          seq: number;
+          engine: string;
+          clock: string;
+          battlefield: string | null;
+          battlefield_bytes: number | null;
+        }
+      | undefined;
+    if (!r) return undefined;
+    if ((r.battlefield_bytes ?? 0) > 1024) throw new Error('Snapshot binding exceeds byte limit');
+    return {
+      seq: r.seq,
+      engine: r.engine,
+      clock: JSON.parse(r.clock),
+      ...(r.battlefield !== null
+        ? { battlefield: decodeSnapshotBinding(JSON.parse(r.battlefield)) }
+        : {}),
+    };
   }
 
   async saveProgress(gameId: string, gameMs: number): Promise<void> {
