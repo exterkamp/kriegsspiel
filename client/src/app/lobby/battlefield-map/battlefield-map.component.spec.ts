@@ -1,6 +1,13 @@
 import { Component, provideZonelessChangeDetection, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import type { BattlefieldFeature, ScenarioBattlefield } from '@kriegsspiel/protocol';
+import {
+  decodeApprovedBattlefield,
+  decodeBattlefieldCatalog,
+  type ApprovedBattlefield,
+  type BattlefieldCatalog,
+  type BattlefieldFeature,
+  type ScenarioBattlefield,
+} from '@kriegsspiel/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BattlefieldMapComponent } from './battlefield-map.component';
 
@@ -95,6 +102,51 @@ function battlefield(): ScenarioBattlefield {
   };
 }
 
+function catalog(): BattlefieldCatalog {
+  const legacy = battlefield();
+  const defaultEntry = decodeApprovedBattlefield(
+    {
+      map: legacy.map,
+      pairing: {
+        ...legacy.pairing,
+        revision: `engine-pairing-v1:sha256:${'c'.repeat(64)}`,
+        resolvedScenarioId: 'hold-the-bridge',
+        assemblyVersion: 'engine-native-v1',
+      },
+      isDefault: true,
+    },
+    legacy.pairing.scenarioId,
+  );
+  const terrainIdentity = `engine-terrain-v1:sha256:${'d'.repeat(64)}`;
+  const included = decodeApprovedBattlefield(
+    {
+      map: {
+        ...defaultEntry.map,
+        id: 'hold-the-bridge:open',
+        name: 'Open bridge approaches',
+        source: 'included',
+        terrainIdentity,
+        preview: defaultEntry.map.preview.filter((feature) => feature.kind !== 'wood'),
+      },
+      pairing: {
+        ...defaultEntry.pairing,
+        id: 'hold-the-bridge:open',
+        revision: `engine-pairing-v1:sha256:${'e'.repeat(64)}`,
+        scenarioRevision: `engine-scenario-v1:sha256:${'f'.repeat(64)}`,
+        resolvedScenarioId: 'hold-the-bridge-open-v1',
+        terrainIdentity,
+      },
+      isDefault: false,
+    },
+    legacy.pairing.scenarioId,
+  );
+  return { schemaVersion: 1, scenarioId: 'hold-the-bridge', entries: [defaultEntry, included] };
+}
+
+function selection(entry: ApprovedBattlefield) {
+  return { pairingId: entry.pairing.id, revision: entry.pairing.revision };
+}
+
 @Component({
   imports: [BattlefieldMapComponent],
   template: `
@@ -103,8 +155,12 @@ function battlefield(): ScenarioBattlefield {
       <ks-battlefield-map
         [battlefield]="data()!"
         [scenarioName]="name()"
+        [scenarioId]="parentId()"
+        [catalog]="maps()"
+        [selection]="selected()"
         [canOpen]="allowMapEntry"
         (activeChange)="gate($event)"
+        (selectionChange)="select($event)"
       />
       <button type="submit">Start game</button>
     </form>
@@ -113,6 +169,11 @@ function battlefield(): ScenarioBattlefield {
 class Host {
   readonly data = signal<ScenarioBattlefield | undefined>(battlefield());
   readonly name = signal('Hold the Bridge');
+  readonly parentId = signal<string | undefined>(undefined);
+  readonly maps = signal<BattlefieldCatalog | undefined>(undefined);
+  readonly selected = signal<{ pairingId: string; revision: string } | undefined>(undefined);
+  readonly selections: ApprovedBattlefield[] = [];
+  onSelection: ((entry: ApprovedBattlefield) => void) | undefined;
   readonly pending = signal(false);
   readonly allowMapEntry = () => !this.pending();
   readonly transitions: boolean[] = [];
@@ -120,6 +181,10 @@ class Host {
   active = false;
   starts = 0;
   blockedStarts = 0;
+  select(entry: ApprovedBattlefield): void {
+    this.selections.push(entry);
+    this.onSelection?.(entry);
+  }
   gate(active: boolean): void {
     this.active = active;
     this.transitions.push(active);
@@ -778,7 +843,7 @@ describe('capability and input lifetime boundaries', () => {
     fixture.detectChanges();
     const summary = root.querySelector('fieldset')!;
     expect(summary.querySelector('[role=alert]')?.textContent).toContain(
-      'It cannot be used for a game.',
+      "This battlefield map preview could not be checked. The scenario's default game settings are unchanged.",
     );
     expect(summary.textContent).not.toContain('Ready for');
     expect(summary.querySelector('svg')).toBeNull();
@@ -845,7 +910,9 @@ describe('capability and input lifetime boundaries', () => {
     expect(host.transitions).toEqual([true, false]);
     expect(modal.open).toBe(false);
     expect(window.history.state).toEqual({ parent: 'retained' });
-    expect(root.querySelector('fieldset [role=alert]')?.textContent).toContain('cannot be used');
+    expect(root.querySelector('fieldset [role=alert]')?.textContent).toContain(
+      'default game settings are unchanged',
+    );
   });
 
   it('settles in-flight internal Back on destruction without duplicate close or stranded history', async () => {
@@ -861,5 +928,492 @@ describe('capability and input lifetime boundaries', () => {
     expect(window.history.state).toEqual({ parent: 'retained' });
     window.dispatchEvent(new PopStateEvent('popstate', { state: { unrelated: true } }));
     expect(host.transitions).toEqual([true, false]);
+  });
+});
+
+function modern(selectionValue?: { pairingId: string; revision: string }): BattlefieldCatalog {
+  const value = catalog();
+  decodeBattlefieldCatalog(value, value.scenarioId);
+  host.parentId.set(value.scenarioId);
+  host.maps.set(value);
+  host.selected.set(selectionValue);
+  fixture.detectChanges();
+  return value;
+}
+
+function radios(): HTMLInputElement[] {
+  return [...modal.querySelectorAll<HTMLInputElement>('input[type=radio]')];
+}
+
+function pick(id: string): void {
+  const radio = radios().find((input) => input.value === id);
+  if (!radio) throw new Error(`Missing candidate ${id}`);
+  radio.click();
+  fixture.detectChanges();
+}
+
+describe('approved native map choices', () => {
+  it('uses the catalog default and shows only server-approved rows with actual candidate geography', async () => {
+    const value = modern();
+    const summary = root.querySelector('fieldset')!;
+    expect(summary.textContent).toContain('Scenario default · Ready for Hold the Bridge');
+    click('Choose map');
+    expect(radios().map((input) => [input.value, input.checked])).toEqual([
+      ['hold-the-bridge:default', true],
+      ['hold-the-bridge:open', false],
+    ]);
+    expect(radios().map((input) => input.closest('label')?.textContent)).toEqual([
+      expect.stringContaining('Scenario default'),
+      expect.stringContaining('Included map'),
+    ]);
+    for (const radio of radios())
+      expect(radio.closest('label')?.textContent).toContain('Ready for Hold the Bridge');
+    expect(modal.textContent).not.toContain('Only the scenario');
+    expect(modal.textContent).not.toContain('One map is available');
+    pick(value.entries[1]!.pairing.id);
+    expect(modal.querySelector('section[aria-label="Map preview"] h3')?.textContent).toContain(
+      'Open bridge approaches',
+    );
+    expect(modal.querySelector('[data-feature-id="north-wood"]')).toBeNull();
+    expect(feature('bridge', 'circle', modal).getAttribute('cx')).toBe('2050');
+    expect(feature('river', 'polyline', modal).getAttribute('stroke-width')).toBe('200');
+    expect(summary.textContent).toContain('The bridge battlefield');
+    expect(summary.querySelector('[data-feature-id="north-wood"]')).not.toBeNull();
+    expect(host.selections).toEqual([]);
+    await close();
+  });
+
+  it('keeps candidate changes out of summary and View, and discards them on Cancel/reopen', async () => {
+    const value = modern();
+    click('Choose map');
+    pick(value.entries[1]!.pairing.id);
+    click('Zoom in', true);
+    pick(value.entries[0]!.pairing.id);
+    expect(modal.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 4000 3000');
+    pick(value.entries[1]!.pairing.id);
+    await close();
+    click('View map');
+    expect(modal.textContent).toContain('The bridge battlefield');
+    expect(modal.querySelector('[data-feature-id="north-wood"]')).not.toBeNull();
+    expect(radios()).toEqual([]);
+    expect(modal.textContent).not.toContain('Use map');
+    await close('Close');
+    click('Choose map');
+    expect(radios().find((input) => input.checked)?.value).toBe(value.entries[0]!.pairing.id);
+    await close();
+    expect(host.selections).toEqual([]);
+  });
+
+  it('commits one detached checked entry only on Use, then reopens and Views that committed choice', async () => {
+    const value = modern();
+    const original = structuredClone(value);
+    const opener = button('Choose map');
+    click('Choose map');
+    pick(value.entries[1]!.pairing.id);
+    await close('Use map');
+    expect(host.selections).toEqual([value.entries[1]]);
+    expect(host.selections[0]).not.toBe(value.entries[1]);
+    expect(root.querySelector('fieldset')?.textContent).toContain(
+      'Included map · Ready for Hold the Bridge',
+    );
+    expect(root.querySelector('fieldset [role=status]')?.textContent).toContain(
+      'Map selected: Open bridge approaches.',
+    );
+    expect(document.activeElement).toBe(opener);
+    host.selections[0]!.map.name = 'Mutated output';
+    host.selections[0]!.map.preview.length = 0;
+    fixture.detectChanges();
+    expect(root.querySelector('fieldset')?.textContent).toContain('Open bridge approaches');
+    expect(root.querySelector('fieldset [data-feature-id="bridge"]')).not.toBeNull();
+    expect(value).toEqual(original);
+    click('View map');
+    expect(modal.textContent).toContain('Open bridge approaches');
+    expect(modal.querySelector('[data-feature-id="north-wood"]')).toBeNull();
+    await close('Close');
+    click('Choose map');
+    expect(radios().find((input) => input.checked)?.value).toBe(value.entries[1]!.pairing.id);
+    await close();
+    expect(host.selections).toHaveLength(1);
+    expect(host.starts).toBe(0);
+  });
+
+  it.each(['Back to maps', 'browser Back'])(
+    'retains an uncommitted candidate through nested Add and %s',
+    async (action) => {
+      const value = modern();
+      click('Choose map');
+      pick(value.entries[1]!.pairing.id);
+      click('Add map', true);
+      expect(modal.textContent).toContain('Adding maps to live games is not available yet.');
+      expect(modal.textContent).not.toContain("keep playing on the scenario's default");
+      expect(modal.querySelector('input, textarea, select, a')).toBeNull();
+      if (action === 'browser Back') await back();
+      else {
+        const pop = nextPop();
+        click(action, true);
+        await pop;
+        fixture.detectChanges();
+      }
+      expect(radios().find((input) => input.checked)?.value).toBe(value.entries[1]!.pairing.id);
+      expect(modal.querySelector('[data-feature-id="north-wood"]')).toBeNull();
+      expect(root.querySelector('fieldset')?.textContent).toContain('The bridge battlefield');
+      expect(host.selections).toEqual([]);
+      await close();
+    },
+  );
+
+  it.each(['Escape', 'browser Back'])(
+    '%s preserves the committed native choice and complete parent draft',
+    async (action) => {
+      const value = catalog();
+      modern(selection(value.entries[1]!));
+      const draft = root.querySelector<HTMLInputElement>('input[aria-label="Parent draft"]')!;
+      draft.value = 'Blue, Red, turns, 4:1 and umpire draft';
+      click('Choose map');
+      pick(value.entries[0]!.pairing.id);
+      if (action === 'browser Back') await back();
+      else {
+        const pop = nextPop();
+        key(modal.querySelector('h2')!, 'Escape');
+        await pop;
+        fixture.detectChanges();
+        await fixture.whenStable();
+      }
+      expect(document.activeElement).toBe(button('Choose map'));
+      expect(root.querySelector('fieldset')?.textContent).toContain('Open bridge approaches');
+      expect(host.selected()).toEqual(selection(value.entries[1]!));
+      expect(draft.value).toBe('Blue, Red, turns, 4:1 and umpire draft');
+      expect(host.selections).toEqual([]);
+    },
+  );
+
+  it.each(['before history', 'after history'])(
+    'accepts parent selection feedback %s without duplicate output, traversal or lost focus/announcement',
+    async (timing) => {
+      const value = modern();
+      const go = vi.spyOn(window.history, 'go');
+      const acknowledgeClose = deferNativeClose();
+      if (timing === 'before history')
+        host.onSelection = (entry) => {
+          expect(host.active).toBe(true);
+          host.selected.set(selection(entry));
+          fixture.detectChanges();
+          root.querySelector('form')!.requestSubmit();
+        };
+      click('Choose map');
+      pick(value.entries[1]!.pairing.id);
+      const pop = nextPop();
+      const use = button('Use map', true);
+      use.click();
+      use.click();
+      fixture.detectChanges();
+      expect(host.active).toBe(true);
+      expect(modal.open).toBe(true);
+      expect(host.selections).toEqual([value.entries[1]]);
+      await pop;
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(modal.open).toBe(false);
+      expect(document.activeElement).toBe(document.body);
+      if (timing === 'after history') {
+        host.selected.set(selection(host.selections[0]!));
+        fixture.detectChanges();
+      }
+      // A repeated immutable parent acknowledgement is still the same selection.
+      host.selected.set(selection(host.selections[0]!));
+      fixture.detectChanges();
+      acknowledgeClose();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(go.mock.calls).toEqual([[-1]]);
+      expect(host.transitions).toEqual([true, false]);
+      expect(document.activeElement).toBe(button('Choose map'));
+      expect(root.querySelector('fieldset [role=status]')?.textContent).toContain(
+        'Map selected: Open bridge approaches.',
+      );
+      expect(host.selections).toHaveLength(1);
+      expect(host.starts).toBe(0);
+      expect(host.blockedStarts).toBe(timing === 'before history' ? 1 : 0);
+    },
+  );
+
+  it('contains the native radio group at its checked member and suppresses Enter submission', async () => {
+    const value = modern(selection(catalog().entries[1]!));
+    click('Choose map');
+    const checked = radios()[1]!;
+    expect(checked.checked).toBe(true);
+    const title = modal.querySelector('h2')!;
+    key(title, 'Tab', true);
+    expect(document.activeElement).toBe(button('Use map', true));
+    key(button('Use map', true), 'Tab');
+    expect(document.activeElement).toBe(checked);
+    key(checked, 'Tab', true);
+    expect(document.activeElement).toBe(button('Use map', true));
+    expect(key(checked, 'Enter').defaultPrevented).toBe(true);
+    expect(key(checked, 'ArrowLeft').defaultPrevented).toBe(false);
+    expect(host.keys).toEqual([]);
+    pick(value.entries[0]!.pairing.id);
+    expect(host.selections).toEqual([]);
+    expect(host.starts).toBe(0);
+    for (const action of root.querySelectorAll<HTMLButtonElement>('ks-battlefield-map button'))
+      expect(action.type).toBe('button');
+    await close();
+  });
+
+  it('blocks all modern entries synchronously before the starting signal is rendered, then resumes', async () => {
+    modern();
+    const entries = ['Choose map', 'Add map', 'View map'].map((label) => button(label));
+    const push = vi.spyOn(window.history, 'pushState');
+    host.pending.set(true);
+    for (const entry of entries) {
+      expect(entry.disabled).toBe(false);
+      entry.click();
+    }
+    expect(push).not.toHaveBeenCalled();
+    expect(modal.open).toBe(false);
+    expect(host.transitions).toEqual([]);
+    expect(host.selections).toEqual([]);
+    fixture.detectChanges();
+    expect(entries.every((entry) => entry.disabled)).toBe(true);
+    host.pending.set(false);
+    fixture.detectChanges();
+    for (const label of ['Choose map', 'Add map', 'View map']) {
+      click(label);
+      expect(modal.open).toBe(true);
+      await close(label === 'View map' ? 'Close' : 'Cancel');
+    }
+  });
+
+  it('cannot commit a candidate through stale enabled Use DOM once the starting callback becomes false', async () => {
+    const value = modern();
+    click('Choose map');
+    pick(value.entries[1]!.pairing.id);
+    const use = button('Use map', true);
+    host.pending.set(true);
+    expect(use.disabled).toBe(false);
+    use.click();
+    expect(host.selections).toEqual([]);
+    expect(modal.open).toBe(true);
+    host.pending.set(false);
+    fixture.detectChanges();
+    await close();
+  });
+});
+
+describe('modern approval and replacement boundaries', () => {
+  it('honors invalid parent feedback during Use without a second unwind or false readiness', async () => {
+    const value = modern();
+    host.onSelection = (entry) => {
+      host.selected.set({ ...selection(entry), revision: 'stale' });
+      fixture.detectChanges();
+    };
+    const go = vi.spyOn(window.history, 'go');
+    click('Choose map');
+    pick(value.entries[1]!.pairing.id);
+    await close('Use map');
+    expect(go.mock.calls).toEqual([[-1]]);
+    expect(host.selections).toEqual([value.entries[1]]);
+    expect(host.transitions).toEqual([true, false]);
+    expect(root.querySelector('fieldset')?.textContent).not.toContain('Ready for');
+    expect(root.querySelector('fieldset [role=status]')?.textContent).not.toContain('Map selected');
+    expect(button('View map').disabled).toBe(true);
+    expect(document.activeElement).toBe(button('Choose map'));
+  });
+
+  it('rejects selection accessors and inherited identity without reading or trusting them', () => {
+    const value = modern();
+    const read = vi.fn(() => {
+      throw new Error('Selection getter must not run');
+    });
+    const accessor = { revision: value.entries[0]!.pairing.revision };
+    Object.defineProperty(accessor, 'pairingId', { enumerable: true, get: read });
+    host.selected.set(accessor as { pairingId: string; revision: string });
+    expect(() => fixture.detectChanges()).not.toThrow();
+    expect(read).not.toHaveBeenCalled();
+    expect(root.querySelector('fieldset')?.textContent).not.toContain('Ready for');
+    const inherited = Object.create(selection(value.entries[0]!)) as {
+      pairingId: string;
+      revision: string;
+    };
+    Object.assign(inherited, { unrelated: true, alsoUnrelated: true });
+    host.selected.set(inherited);
+    fixture.detectChanges();
+    expect(root.querySelector('fieldset')?.textContent).not.toContain('Ready for');
+  });
+
+  it.each([
+    [
+      'unknown pairing',
+      { pairingId: 'foreign:default', revision: catalog().entries[0]!.pairing.revision },
+    ],
+    [
+      'stale revision',
+      { pairingId: 'hold-the-bridge:open', revision: `engine-pairing-v1:sha256:${'0'.repeat(64)}` },
+    ],
+    [
+      'legacy revision',
+      { pairingId: 'hold-the-bridge:default', revision: battlefield().pairing.revision },
+    ],
+    ['missing revision', { pairingId: 'hold-the-bridge:default' }],
+    ['null selection', null],
+    ['extra selection fields', { ...selection(catalog().entries[0]!), approved: true }],
+  ])(
+    'keeps a present %s unavailable until explicit Use of a valid choice',
+    async (_label, invalid) => {
+      modern(invalid as { pairingId: string; revision: string });
+      const summary = root.querySelector('fieldset')!;
+      expect(summary.textContent).not.toContain('Ready for');
+      expect(summary.querySelector('svg')).toBeNull();
+      expect(summary.querySelector('[role=alert]')?.textContent).toContain('unavailable');
+      expect(button('Choose map').disabled).toBe(false);
+      expect(button('View map').disabled).toBe(true);
+      click('Choose map');
+      await close();
+      expect(summary.textContent).not.toContain('Ready for');
+      expect(host.selections).toEqual([]);
+      click('Choose map');
+      await close('Use map');
+      expect(host.selections).toEqual([catalog().entries[0]]);
+      expect(summary.textContent).toContain('Scenario default · Ready for Hold the Bridge');
+      expect(host.starts).toBe(0);
+    },
+  );
+
+  it.each([
+    ['null catalog', () => null],
+    ['missing catalog', () => undefined],
+    ['foreign catalog parent', () => ({ ...catalog(), scenarioId: 'another-scenario' })],
+    [
+      'foreign pairing parent',
+      () => {
+        const value = catalog();
+        value.entries[1]!.pairing.scenarioId = 'another-scenario';
+        return value;
+      },
+    ],
+    [
+      'unpaired map with approved-looking name/source',
+      () => {
+        const value = catalog();
+        return { ...value, entries: [{ map: value.entries[1]!.map }] };
+      },
+    ],
+    ['private field', () => ({ ...catalog(), initialWorld: { units: [] } })],
+    ['legacy format', () => ({ ...catalog(), entries: [battlefield()] })],
+    [
+      'off-grid preview',
+      () => {
+        const value = catalog();
+        value.entries[1]!.map.preview[0]!.geometry = {
+          shape: 'point',
+          at: { x: 0.0001, y: 1 },
+          radiusM: 1,
+        };
+        return value;
+      },
+    ],
+  ])('rejects %s without falling back to a valid legacy battlefield', async (_label, invalid) => {
+    modern();
+    host.maps.set(invalid() as BattlefieldCatalog);
+    fixture.detectChanges();
+    const summary = root.querySelector('fieldset')!;
+    expect(summary.textContent).not.toContain('Ready for');
+    expect(summary.querySelector('svg')).toBeNull();
+    expect(summary.querySelector('[role=alert]')?.textContent).toContain('could not be checked');
+    expect(button('Choose map').disabled).toBe(true);
+    expect(button('View map').disabled).toBe(true);
+    click('Add map');
+    click('Back to maps', true);
+    expect(radios()).toEqual([]);
+    expect(button('Use map', true).disabled).toBe(true);
+    expect(modal.textContent).not.toContain('Ready for');
+    await close();
+    expect(host.selections).toEqual([]);
+  });
+
+  it.each([undefined, 'another-scenario', 'a'.repeat(129), 'hold-the-bridge\n'])(
+    'requires independent bounded parent scenarioId=%s',
+    async (parent) => {
+      modern();
+      host.parentId.set(parent);
+      fixture.detectChanges();
+      expect(root.querySelector('fieldset')?.textContent).not.toContain('Ready for');
+      expect(button('Choose map').disabled).toBe(true);
+      expect(button('View map').disabled).toBe(true);
+      expect(host.selections).toEqual([]);
+    },
+  );
+
+  it('checks a detached bounded catalog without invoking transport accessors', () => {
+    const value = modern();
+    value.entries[0]!.map.name = 'Mutated transport';
+    fixture.detectChanges();
+    expect(root.querySelector('fieldset')?.textContent).toContain('The bridge battlefield');
+    const accessor = catalog();
+    const read = vi.fn(() => {
+      throw new Error('Getter must not run');
+    });
+    Object.defineProperty(accessor, 'entries', { enumerable: true, get: read });
+    host.maps.set(accessor);
+    fixture.detectChanges();
+    expect(read).not.toHaveBeenCalled();
+    expect(button('Choose map').disabled).toBe(true);
+    expect(root.querySelector('fieldset')?.textContent).not.toContain('Ready for');
+  });
+
+  it.each(['catalog', 'scenario', 'selection'])(
+    'invalidates an open candidate on %s replacement without committing or losing the draft',
+    async (replacement) => {
+      const value = modern();
+      click('Choose map');
+      pick(value.entries[1]!.pairing.id);
+      const pop = nextPop();
+      if (replacement === 'catalog') {
+        const changed = catalog();
+        changed.entries[1]!.map.name = 'Updated included name';
+        host.maps.set(changed);
+      } else if (replacement === 'scenario') host.parentId.set('another-scenario');
+      else host.selected.set({ pairingId: 'stale', revision: 'stale' });
+      fixture.detectChanges();
+      expect(modal.open).toBe(true);
+      expect(host.active).toBe(true);
+      expect(button('Use map', true).disabled).toBe(true);
+      await pop;
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(modal.open).toBe(false);
+      expect(host.transitions).toEqual([true, false]);
+      expect(host.selections).toEqual([]);
+      expect(root.querySelector<HTMLInputElement>('input[aria-label="Parent draft"]')?.value).toBe(
+        'unchanged timing and side draft',
+      );
+      expect(window.history.state).toEqual({ parent: 'retained' });
+      expect(root.querySelector('fieldset [role=status]')?.textContent).not.toContain(
+        'Map selected',
+      );
+    },
+  );
+
+  it('ignores an earlier native-close acknowledgement during a newer native selection lifetime', async () => {
+    const value = modern();
+    const acknowledgeClose = deferNativeClose();
+    click('Choose map');
+    pick(value.entries[1]!.pairing.id);
+    await close('Use map');
+    click('Choose map');
+    pick(value.entries[0]!.pairing.id);
+    acknowledgeClose();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(modal.open).toBe(true);
+    expect(document.activeElement).toBe(modal.querySelector('h2'));
+    expect(host.selections).toHaveLength(1);
+    await close();
+    acknowledgeClose();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(document.activeElement).toBe(button('Choose map'));
+    expect(root.querySelector('fieldset')?.textContent).toContain('Open bridge approaches');
+    expect(host.selections).toHaveLength(1);
   });
 });

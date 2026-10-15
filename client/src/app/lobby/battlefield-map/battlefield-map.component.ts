@@ -7,6 +7,7 @@ import {
   Injector,
   OnChanges,
   OnDestroy,
+  SimpleChanges,
   computed,
   afterNextRender,
   input,
@@ -15,7 +16,13 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import type { ScenarioBattlefield } from '@kriegsspiel/protocol';
+import {
+  decodeApprovedBattlefield,
+  decodeBattlefieldCatalog,
+  type ApprovedBattlefield,
+  type BattlefieldCatalog,
+  type ScenarioBattlefield,
+} from '@kriegsspiel/protocol';
 import { BattlefieldPreviewComponent } from './battlefield-preview.component';
 
 const KINDS = new Set([
@@ -35,6 +42,8 @@ const SCENARIO_ID = /^engine-scenario-v1:sha256:[a-f0-9]{64}$/;
 const HISTORY_KEY = '__ksBattlefield';
 let nextOwner = 0;
 type View = 'choose' | 'add' | 'view';
+type Selection = { pairingId: string; revision: string };
+type DisplayEntry = ScenarioBattlefield | ApprovedBattlefield;
 type Entry = { owner: string; visit: number; view: View; depth: number };
 type FocusReturn = {
   visit: number;
@@ -50,6 +59,21 @@ const text = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 const positive = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0;
+function selected(entry: DisplayEntry, value: unknown): boolean {
+  const selection = record(value);
+  const id = selection && Object.getOwnPropertyDescriptor(selection, 'pairingId');
+  const revision = selection && Object.getOwnPropertyDescriptor(selection, 'revision');
+  return (
+    !!selection &&
+    Object.keys(selection).length === 2 &&
+    !!id &&
+    'value' in id &&
+    id.value === entry.pairing.id &&
+    !!revision &&
+    'value' in revision &&
+    revision.value === entry.pairing.revision
+  );
+}
 
 /** Check the public boundary before displaying readiness; never derive approval from terrain. */
 function checked(value: unknown, name: unknown): ScenarioBattlefield | null {
@@ -126,7 +150,7 @@ function checked(value: unknown, name: unknown): ScenarioBattlefield | null {
   return value as ScenarioBattlefield;
 }
 
-/** Default-only lobby presentation. No requests, game mutations, library or master state. */
+/** Checked public map choices only. No requests, game mutations, library or master state. */
 @Component({
   selector: 'ks-battlefield-map',
   standalone: true,
@@ -139,16 +163,65 @@ function checked(value: unknown, name: unknown): ScenarioBattlefield | null {
 export class BattlefieldMapComponent implements OnChanges, OnDestroy {
   readonly battlefield = input.required<ScenarioBattlefield>();
   readonly scenarioName = input.required<string>();
+  readonly scenarioId = input<string>();
+  readonly catalog = input<BattlefieldCatalog>();
+  readonly selection = input<Selection>();
   readonly canOpen = input<() => boolean>(() => true);
   readonly activeChange = output<boolean>();
+  readonly selectionChange = output<ApprovedBattlefield>();
   protected readonly entryEnabled = computed(() => this.canOpen()());
+  protected readonly modern = computed(
+    () =>
+      this.catalog() !== undefined ||
+      this.scenarioId() !== undefined ||
+      this.selection() !== undefined,
+  );
+  private readonly committed = signal<Selection | undefined>(undefined);
+  private readonly candidateSelection = signal<Selection | undefined>(undefined);
+  private readonly approvedCatalog = computed(() => {
+    try {
+      const parent = this.scenarioId();
+      if (
+        !text(this.scenarioName()) ||
+        !text(parent) ||
+        parent.length > 128 ||
+        parent.trim() !== parent ||
+        !/^[a-zA-Z0-9][a-zA-Z0-9:._-]*$/.test(parent)
+      )
+        return null;
+      return decodeBattlefieldCatalog(this.catalog(), parent);
+    } catch {
+      return null;
+    }
+  });
   protected readonly data = computed(() => {
     // A malformed/older caller can omit even a required input at runtime.
     try {
+      if (this.modern()) {
+        const catalog = this.approvedCatalog();
+        const selection = this.committed() ?? this.selection();
+        return (
+          catalog?.entries.find((entry) =>
+            selection === undefined ? entry.isDefault : selected(entry, selection),
+          ) ?? null
+        );
+      }
       return checked(this.battlefield(), this.scenarioName());
     } catch {
       return null;
     }
+  });
+  protected readonly choices = computed<readonly DisplayEntry[]>(() => {
+    if (this.modern()) return this.approvedCatalog()?.entries ?? [];
+    const entry = this.data();
+    return entry ? [entry] : [];
+  });
+  protected readonly candidate = computed(
+    () => this.choices().find((entry) => selected(entry, this.candidateSelection())) ?? null,
+  );
+  protected readonly displayed = computed(() => {
+    const entry = this.view() === 'choose' ? this.candidate() : this.data();
+    return entry ? [entry] : [];
   });
   protected readonly active = signal(false);
   protected readonly view = signal<View>('choose');
@@ -163,10 +236,16 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
         ? 'View battlefield map'
         : 'Choose battlefield map',
   );
-  protected readonly extent = computed(() => {
-    const map = this.data()?.map;
-    return map ? `${map.widthM / 1000} × ${map.heightM / 1000} km` : '';
-  });
+  protected extent(entry: DisplayEntry): string {
+    return `${entry.map.widthM / 1000} × ${entry.map.heightM / 1000} km`;
+  }
+  protected source(entry: DisplayEntry): string {
+    return entry.map.source === 'scenario-default'
+      ? 'Scenario default'
+      : entry.map.source === 'included'
+        ? 'Included map'
+        : 'Your map';
+  }
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly injector = inject(Injector);
@@ -184,6 +263,7 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
   private depth = 0;
   private closing = false;
   private pendingAnnouncement = '';
+  private lastUse: Selection | undefined;
   private destroyed = false;
   private readonly onPop = (event: PopStateEvent): void => {
     const entry = this.ownEntry(event.state);
@@ -213,7 +293,19 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
     window.addEventListener('popstate', this.onPop);
   }
 
-  ngOnChanges(): void {
+  ngOnChanges(changes: SimpleChanges): void {
+    const selectionChange = changes['selection'];
+    const feedback =
+      !!this.lastUse &&
+      this.choices().some(
+        (entry) => selected(entry, this.lastUse) && selected(entry, this.selection()),
+      );
+    // A parent acknowledging Use is not a new picker lifetime. In particular it
+    // must not clear the pending announcement or start a second history unwind.
+    if (selectionChange) this.committed.set(undefined);
+    if (Object.keys(changes).every((key) => key === 'selection') && feedback) return;
+    this.committed.set(undefined);
+    this.lastUse = undefined;
     // A replacement invalidates the entire picker lifetime, even if IDs are reused.
     if (this.active()) this.finish(true);
     this.pendingAnnouncement = '';
@@ -235,7 +327,8 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
       this.active() ||
       this.waiting() ||
       !this.entryEnabled() ||
-      (view !== 'add' && !this.data())
+      (view === 'choose' && !this.choices().length) ||
+      (view === 'view' && !this.data())
     )
       return;
     this.focusRequest?.destroy();
@@ -247,6 +340,11 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
     this.visit++;
     this.depth = 1;
     this.closing = false;
+    const initial =
+      this.data() ?? this.choices().find((entry) => 'isDefault' in entry && entry.isDefault);
+    this.candidateSelection.set(
+      initial ? { pairingId: initial.pairing.id, revision: initial.pairing.revision } : undefined,
+    );
     this.view.set(view);
     this.announcement.set('');
     this.pendingAnnouncement = '';
@@ -285,9 +383,36 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
   }
 
   protected use(): void {
-    if (!this.active() || this.waiting() || this.view() !== 'choose' || !this.data()) return;
-    this.pendingAnnouncement = `Map selected: ${this.data()!.map.name}.`;
+    const candidate = this.candidate();
+    if (
+      !this.active() ||
+      this.waiting() ||
+      this.closing ||
+      !this.entryEnabled() ||
+      this.view() !== 'choose' ||
+      !candidate
+    )
+      return;
+    const entry = this.modern() ? decodeApprovedBattlefield(candidate, this.scenarioId()!) : null;
+    if (entry) {
+      this.lastUse = { pairingId: entry.pairing.id, revision: entry.pairing.revision };
+      this.committed.set(this.lastUse);
+    }
+    this.pendingAnnouncement = `Map selected: ${candidate.map.name}.`;
     this.finish(true);
+    if (entry) this.selectionChange.emit(entry);
+  }
+
+  protected choose(entry: DisplayEntry): void {
+    if (
+      !this.active() ||
+      this.waiting() ||
+      this.closing ||
+      !this.entryEnabled() ||
+      this.view() !== 'choose'
+    )
+      return;
+    this.candidateSelection.set({ pairingId: entry.pairing.id, revision: entry.pairing.revision });
   }
 
   protected cancel(event?: Event): void {
@@ -315,7 +440,7 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
       const panel = this.dialog().nativeElement;
       const items = [
         ...panel.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex]:not([tabindex="-1"])',
+          'button:not(:disabled), input:not([type="radio"]):not(:disabled), input[type="radio"]:checked:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex]:not([tabindex="-1"])',
         ),
       ].filter((item) => !item.closest('[hidden], [inert]'));
       const first = items[0];
