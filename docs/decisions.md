@@ -830,3 +830,13 @@ The benchmark in [umpire-benchmark.md](umpire-benchmark.md) (12 turn cases on "H
 **Delivery boundary.** This first metadata prerequisite does not add an accepted map parameter to game creation, enable arbitrary map/scenario conversion, or supply an owned map library. `addMaps` is false until durable storage and the corresponding user flow are implemented. Existing scenario-only creation, replay and the development local board retain their semantics. The accepted design's remaining picker, curated selection and owned-library work is tracked separately; this metadata is not completion of that flow.
 
 **See.** [Lobby map selection design](lobby-map-selection-ux-design.md), [execution log](lobby-map-selection-execution-log.md), [map-to-gameplay boundary](map-gameplay-handoff.md).
+
+## D44: Native lobby pairings retain exact private initial worlds
+
+**Decision.** The approved lobby map work introduces a versioned native public catalog alongside the unchanged legacy default descriptor. Modern pairing identity binds the public scenario, resolved engine scenario, complete initial-world revision, terrain identity, logical IDs and native assembly semantics. Public geometry remains an explicit allowlist. Shared transport decoders enforce parent-scenario binding, exact millimetre geometry and structural/byte limits before expensive processing.
+
+**Private assembly.** A native pin retains strict bounded authored input and its complete loaded time-zero world. Durable decoding calls the real raw scenario loader and requires exact world/public descriptor/digest agreement; serialized GameState is never passed to that loader as raw input or trusted by a type assertion. Pins precede runtime initialization, dial application and RNG advancement. This is an internal prerequisite; actual lobby/header persistence, idempotent creation and all replay/render consumers are separate integration work.
+
+**Curated content and readiness.** Retain the original bridge definition and one explicitly authored Open bridge approaches variant. The variant keeps the original armies, seed, HQs and bridge objective, omitting only the two named woods. It remains unavailable in the default registry and is not added to the live API by this prerequisite. Headless completion/replay tests are functioning-scenario evidence, not balance certification. Canonical included/generated maps remain unpaired geography; no terrain conversion or automatic army/objective placement is implied.
+
+**See.** [Accepted pairing contract](lobby-map-selection-pairing-contract.md), [design](lobby-map-selection-ux-design.md), [execution log](lobby-map-selection-execution-log.md).
