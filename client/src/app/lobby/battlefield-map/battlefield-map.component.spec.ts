@@ -161,6 +161,7 @@ async function close(label = 'Cancel'): Promise<void> {
   expect(modal.open).toBe(true);
   await pop;
   fixture.detectChanges();
+  await fixture.whenStable();
   expect(modal.open).toBe(false);
   expect(host.active).toBe(false);
 }
@@ -169,6 +170,7 @@ async function back(): Promise<void> {
   window.history.back();
   await pop;
   fixture.detectChanges();
+  await fixture.whenStable();
 }
 function key(target: Element, key: string, shiftKey = false): KeyboardEvent {
   const event = new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true });
@@ -184,6 +186,25 @@ function feature(
   const result = scope.querySelector(`[data-feature-id="${id}"] ${selector}`);
   if (!result) throw new Error(`Missing rendered feature ${id}`);
   return result;
+}
+
+/** Hold the browser's queued close event without replacing real history or clocks. */
+function deferNativeClose(): () => void {
+  let queued = 0;
+  Object.defineProperty(modal, 'close', {
+    configurable: true,
+    value: () => {
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement) focused.blur();
+      modal.removeAttribute('open');
+      queued++;
+    },
+  });
+  return () => {
+    expect(queued).toBeGreaterThan(0);
+    queued--;
+    modal.dispatchEvent(new Event('close'));
+  };
 }
 
 beforeEach(() => {
@@ -339,6 +360,132 @@ describe('public battlefield geography', () => {
 });
 
 describe('dialog ownership and parent isolation', () => {
+  it.each([true, false])(
+    'ignores an old close event when the next visit is open=%s',
+    async (acknowledgeWhileOpen) => {
+      const acknowledge = deferNativeClose();
+      click('Choose map');
+      await close();
+      click('Add map');
+      const title = modal.querySelector<HTMLElement>('h2')!;
+      expect(document.activeElement).toBe(title);
+      if (acknowledgeWhileOpen) {
+        acknowledge();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(modal.open).toBe(true);
+        expect(document.activeElement).toBe(title);
+      }
+      await close();
+      if (!acknowledgeWhileOpen) {
+        acknowledge();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        // The old close must not acknowledge the new visit's pending close.
+        expect(document.activeElement).toBe(document.body);
+      }
+      acknowledge();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(button('Add map'));
+      expect(host.transitions).toEqual([true, false, true, false]);
+      expect(window.history.state).toEqual({ parent: 'retained' });
+    },
+  );
+
+  it('does not steal focus into map entries if creation becomes pending before the close render callback', async () => {
+    const acknowledge = deferNativeClose();
+    click('Choose map');
+    await close();
+    acknowledge();
+    host.pending.set(true);
+    const start = root.querySelector<HTMLButtonElement>('button[type=submit]')!;
+    start.focus();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(document.activeElement).toBe(start);
+    expect(button('Choose map').disabled).toBe(true);
+    expect(host.transitions).toEqual([true, false]);
+    expect(window.history.state).toEqual({ parent: 'retained' });
+  });
+
+  it('cancels the pending focus render callback on destruction', async () => {
+    const acknowledge = deferNativeClose();
+    click('Choose map');
+    await close();
+    acknowledge();
+    const outside = document.createElement('button');
+    outside.textContent = 'Another view';
+    document.body.append(outside);
+    try {
+      outside.focus();
+      fixture.destroy();
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(outside);
+      expect(host.transitions).toEqual([true, false]);
+    } finally {
+      outside.remove();
+    }
+  });
+
+  it.each([
+    ['Choose map', 'Use map'],
+    ['Choose map', 'Cancel'],
+    ['Choose map', 'browser Back'],
+    ['Add map', 'Use map'],
+  ])(
+    'restores the %s opener after %s history, queued native close and rendering settle',
+    async (entry, action) => {
+      const opener = button(entry);
+      click(entry);
+      if (entry === 'Add map') click('Back to maps', true);
+      let acknowledgeNativeClose: (() => void) | undefined;
+      const enabledDuringNativeClose: boolean[] = [];
+      Object.defineProperty(modal, 'close', {
+        configurable: true,
+        value: () => {
+          // Native close attempts its built-in focus restoration before queuing
+          // the close event. An AX activation need not have focused the opener,
+          // so that built-in fallback can leave BODY as the active element.
+          enabledDuringNativeClose.push(!opener.matches(':disabled'));
+          const focused = document.activeElement;
+          if (focused instanceof HTMLElement) focused.blur();
+          // Clear focus before hiding: jsdom's blur() is a no-op once its
+          // dialog ancestor has display:none, unlike native dialog closure.
+          modal.removeAttribute('open');
+          acknowledgeNativeClose = () => modal.dispatchEvent(new Event('close'));
+        },
+      });
+
+      const pop = nextPop();
+      if (action === 'browser Back') window.history.back();
+      else {
+        button(action, true).focus();
+        button(action, true).click();
+        fixture.detectChanges();
+        expect(opener.disabled).toBe(true);
+      }
+      expect(host.active).toBe(true);
+      expect(modal.open).toBe(true);
+      await pop;
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(enabledDuringNativeClose).toEqual([true]);
+      expect(modal.open).toBe(false);
+      expect(host.transitions).toEqual([true, false]);
+      expect(window.history.state).toEqual({ parent: 'retained' });
+      expect(document.activeElement).toBe(document.body);
+
+      expect(acknowledgeNativeClose).toBeTypeOf('function');
+      acknowledgeNativeClose!();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(document.activeElement).toBe(opener);
+      expect(opener.disabled).toBe(false);
+      expect(host.transitions).toEqual([true, false]);
+    },
+  );
+
   it('blocks all three entries before rendering a changed pending signal and resumes when it clears', async () => {
     const entries = ['Choose map', 'Add map', 'View map'].map((label) => button(label));
     const historyLength = window.history.length;

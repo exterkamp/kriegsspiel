@@ -1,11 +1,14 @@
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
+  AfterRenderRef,
   Component,
   ElementRef,
+  Injector,
   OnChanges,
   OnDestroy,
   computed,
+  afterNextRender,
   input,
   inject,
   output,
@@ -33,6 +36,12 @@ const HISTORY_KEY = '__ksBattlefield';
 let nextOwner = 0;
 type View = 'choose' | 'add' | 'view';
 type Entry = { owner: string; visit: number; view: View; depth: number };
+type FocusReturn = {
+  visit: number;
+  opener: HTMLElement | null;
+  url: string;
+  scroll: { x: number; y: number };
+};
 const record = (value: unknown): Record<string, unknown> | null =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -160,10 +169,15 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
   });
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
   private readonly changeDetector = inject(ChangeDetectorRef);
+  private readonly injector = inject(Injector);
   private readonly title = viewChild.required<ElementRef<HTMLElement>>('title');
   private readonly summaryTitle = viewChild.required<ElementRef<HTMLElement>>('summaryTitle');
   private readonly historyOwner = crypto.randomUUID();
   private opener: HTMLElement | null = null;
+  private focusReturn: FocusReturn | undefined;
+  private focusRequest: AfterRenderRef | undefined;
+  private awaitingNativeClose = false;
+  private readonly nativeCloseVisits: number[] = [];
   private openedUrl = '';
   private scroll = { x: 0, y: 0 };
   private visit = 0;
@@ -208,6 +222,8 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
 
   ngOnDestroy(): void {
     this.destroyed = true;
+    this.focusRequest?.destroy();
+    this.focusReturn = undefined;
     if (this.active()) this.finish(true);
     if (!this.waiting()) window.removeEventListener('popstate', this.onPop);
   }
@@ -222,6 +238,9 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
       (view !== 'add' && !this.data())
     )
       return;
+    this.focusRequest?.destroy();
+    this.focusReturn = undefined;
+    this.awaitingNativeClose = false;
     this.opener = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
     this.openedUrl = window.location.href;
     this.scroll = { x: window.scrollX, y: window.scrollY };
@@ -278,7 +297,16 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
   }
 
   protected nativeClose(): void {
-    if (!this.dialog().nativeElement.open && this.active()) this.finish(true);
+    const closedVisit = this.nativeCloseVisits.shift();
+    if (
+      this.destroyed ||
+      this.dialog().nativeElement.open ||
+      (closedVisit !== undefined && closedVisit !== this.visit)
+    )
+      return;
+    this.awaitingNativeClose = false;
+    if (this.active()) this.finish(true);
+    else this.restoreFocusAfterRender();
   }
 
   protected key(event: KeyboardEvent): void {
@@ -363,20 +391,57 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
     this.closing = false;
     this.active.set(false);
     const dialog = this.dialog().nativeElement;
-    if (dialog.open) dialog.close();
+    if (!this.destroyed) {
+      this.focusReturn = {
+        visit: this.visit,
+        opener: this.opener,
+        url: this.openedUrl,
+        scroll: this.scroll,
+      };
+      // Clear waiting's disabled attributes before native close attempts its own
+      // focus restoration. History has already acknowledged this transition.
+      this.changeDetector.detectChanges();
+    }
+    this.opener = null;
+    if (dialog.open) {
+      this.awaitingNativeClose = true;
+      this.nativeCloseVisits.push(this.visit);
+      dialog.close();
+    }
     // Announce only after the background live region is no longer inert.
     if (!this.destroyed) this.announcement.set(this.pendingAnnouncement);
     this.pendingAnnouncement = '';
     this.activeChange.emit(false);
-    // Traversal clears waiting synchronously, but its disabled attributes must be
-    // removed before focus can return to the trigger.
-    if (!this.destroyed) this.changeDetector.detectChanges();
-    if (this.openedUrl === window.location.href && !this.destroyed) {
-      const target = this.opener?.isConnected ? this.opener : this.summaryTitle().nativeElement;
-      target.focus({ preventScroll: true });
-      if (window.scrollX !== this.scroll.x || window.scrollY !== this.scroll.y)
-        window.scrollTo(this.scroll.x, this.scroll.y);
-    }
-    this.opener = null;
+    this.restoreFocusAfterRender();
+  }
+
+  private restoreFocusAfterRender(): void {
+    const destination = this.focusReturn;
+    if (!destination || this.destroyed || this.awaitingNativeClose) return;
+    this.focusRequest?.destroy();
+    this.focusRequest = afterNextRender(
+      () => {
+        this.focusRequest = undefined;
+        if (this.focusReturn !== destination) return;
+        this.focusReturn = undefined;
+        if (
+          this.destroyed ||
+          this.active() ||
+          this.waiting() ||
+          this.visit !== destination.visit ||
+          window.location.href !== destination.url ||
+          !this.entryEnabled()
+        )
+          return;
+        const target =
+          destination.opener?.isConnected && !destination.opener.matches(':disabled')
+            ? destination.opener
+            : this.summaryTitle().nativeElement;
+        target.focus({ preventScroll: true });
+        if (window.scrollX !== destination.scroll.x || window.scrollY !== destination.scroll.y)
+          window.scrollTo(destination.scroll.x, destination.scroll.y);
+      },
+      { injector: this.injector },
+    );
   }
 }
