@@ -1,12 +1,7 @@
 import { computed, signal } from '@angular/core';
-import {
-  assetIdentity,
-  battlefieldPreset,
-  canonicalizeAsset,
-  importAsset,
-  parseAsset,
-  type BattlefieldPreset,
-} from '@kriegsspiel/maps';
+import { battlefieldPreset, type BattlefieldPreset, type MapAsset } from '@kriegsspiel/maps';
+import { verifyLibraryAsset } from '../../../shared/lobby-map-library/asset-check';
+import type { LibraryAssetVerifier } from './asset-verifier';
 import {
   parseReplayParameters,
   type ReplayParameters,
@@ -131,6 +126,7 @@ export class MapLibraryState {
       cancelled(): void;
       dirty(value: boolean): void;
     },
+    private readonly verifier: LibraryAssetVerifier = verifyLibraryAsset,
   ) {}
 
   configure(
@@ -283,10 +279,28 @@ export class MapLibraryState {
       );
       if (!this.current(operation)) return;
       const result = structuredClone(received);
-      const asset = parseAsset(result.asset);
       if (
         result.summary.ref !== null ||
-        canonicalizeAsset(asset) !== result.canonicalJson ||
+        result.bounds.minX !== 0 ||
+        result.bounds.minY !== 0 ||
+        result.bounds.maxX !== result.summary.widthM ||
+        result.bounds.maxY !== result.summary.heightM
+      )
+        throw new Error('Candidate metadata mismatch');
+      const asset = await this.verifier(
+        {
+          canonicalJson: result.canonicalJson,
+          assetIdentity: result.assetIdentity,
+          widthM: result.summary.widthM,
+          heightM: result.summary.heightM,
+          // structuredClone detached the port's readonly view; the worker checks its actual data.
+          candidate: result.asset as MapAsset,
+        },
+        operation.abort.signal,
+      );
+      if (!this.current(operation)) return;
+      if (
+        result.summary.ref !== null ||
         JSON.stringify(
           parseReplayParameters({
             seed: asset.provenance.seed,
@@ -301,8 +315,7 @@ export class MapLibraryState {
         result.bounds.maxX !== asset.bounds.maxX ||
         result.bounds.maxY !== asset.bounds.maxY ||
         result.summary.widthM !== asset.bounds.maxX ||
-        result.summary.heightM !== asset.bounds.maxY ||
-        (await assetIdentity(asset, 'asset')) !== result.assetIdentity
+        result.summary.heightM !== asset.bounds.maxY
       )
         throw new Error('Candidate mismatch');
       if (!this.current(operation)) return;
@@ -360,14 +373,15 @@ export class MapLibraryState {
         readback.canonicalJson !== intent.canonicalJson
       )
         throw new Error('Readback mismatch');
-      const asset = importAsset(readback.canonicalJson);
-      if (
-        canonicalizeAsset(asset) !== intent.canonicalJson ||
-        (await assetIdentity(asset, 'asset')) !== intent.assetIdentity ||
-        asset.bounds.maxX !== saved.widthM ||
-        asset.bounds.maxY !== saved.heightM
-      )
-        throw new Error('Identity mismatch');
+      await this.verifier(
+        {
+          canonicalJson: readback.canonicalJson,
+          assetIdentity: intent.assetIdentity,
+          widthM: saved.widthM,
+          heightM: saved.heightM,
+        },
+        operation.abort.signal,
+      );
       if (!this.current(operation)) return;
       this.completed.set(saved);
       this.pending.set(false);

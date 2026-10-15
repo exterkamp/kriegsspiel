@@ -24,6 +24,7 @@ import type {
   MapLibraryPort,
 } from '../../../shared/lobby-map-library/contracts';
 import { LANDSCAPES, MapLibraryState } from './map-library-state';
+import { MAP_LIBRARY_ASSET_VERIFIER } from './asset-verifier';
 
 export type LibraryPreview = Pick<MapPreview, 'loadAsset' | 'dispose'>;
 export const MAP_LIBRARY_PREVIEW_FACTORY = new InjectionToken<
@@ -47,11 +48,14 @@ export class MapLibraryComponent implements OnChanges {
   readonly saved = output<LibraryMapSummary>();
   readonly cancelled = output<void>();
   readonly dirtyChange = output<boolean>();
-  readonly state = new MapLibraryState({
-    saved: (value) => this.saved.emit(value),
-    cancelled: () => this.cancelled.emit(),
-    dirty: (value) => this.dirtyChange.emit(value),
-  });
+  readonly state = new MapLibraryState(
+    {
+      saved: (value) => this.saved.emit(value),
+      cancelled: () => this.cancelled.emit(),
+      dirty: (value) => this.dirtyChange.emit(value),
+    },
+    inject(MAP_LIBRARY_ASSET_VERIFIER),
+  );
   protected readonly landscapes = LANDSCAPES;
   protected readonly previewError = signal('');
   protected readonly id = `ks-library-${crypto.randomUUID()}`;

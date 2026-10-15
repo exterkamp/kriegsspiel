@@ -18,6 +18,8 @@ import {
   MapLibraryComponent,
 } from '../map-library/map-library.component';
 import { LibraryBrowserComponent } from '../map-library/library-browser.component';
+import { MAP_LIBRARY_ASSET_VERIFIER } from '../map-library/asset-verifier';
+import { checkLibraryAssetForTest } from '../map-library/asset-verifier.testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import {
   decodeApprovedBattlefield,
@@ -318,6 +320,7 @@ beforeEach(() => {
     imports: [Host],
     providers: [
       provideZonelessChangeDetection(),
+      { provide: MAP_LIBRARY_ASSET_VERIFIER, useValue: checkLibraryAssetForTest },
       {
         provide: MAP_LIBRARY_PREVIEW_FACTORY,
         useValue: () => ({ loadAsset: () => ({ ok: true }), dispose: vi.fn() }),
