@@ -23,6 +23,9 @@ class MapFixture {
   readonly selection = input<{ pairingId: string; revision: string }>();
   readonly selectionChange = output<import('@kriegsspiel/protocol').ApprovedBattlefield>();
   readonly canOpen = input<() => boolean>(() => true);
+  readonly library = input<import('../../shared/lobby-map-library/contracts').MapLibraryPort>();
+  readonly preparationFactory =
+    input<() => import('../../shared/game-setup/contracts').BoardPreparation>();
   readonly activeChange = output<boolean>();
 }
 
@@ -430,4 +433,63 @@ it('recovers a retained intent even when the current scenario request fails', as
   await page.fixture.whenStable();
   expect(create.mock.calls[1]![0]).toEqual(first);
   expect(create).toHaveBeenCalledTimes(2);
+});
+
+describe('reviewed library capability attachment', () => {
+  it('attaches only with an authenticated owner and the explicit server capability', async () => {
+    const loaded = modernOptions();
+    loaded.mapLibrary = true;
+    const page = await open(loaded, false, undefined, 'library-owner');
+    const child = page.fixture.debugElement.query(By.directive(MapFixture))
+      .componentInstance as MapFixture;
+    expect(child.library()).toBeDefined();
+    const factory = child.preparationFactory()!;
+    const first = factory();
+    const second = factory();
+    expect(first).not.toBe(second);
+    first.dispose();
+    second.dispose();
+    const old = child.library();
+    page.fixture.componentRef.setInput('ownerId', 'another-owner');
+    await page.fixture.whenStable();
+    const current = page.fixture.debugElement.query(By.directive(MapFixture))
+      .componentInstance as MapFixture;
+    expect(current.library()).toBeDefined();
+    expect(current.library()).not.toBe(old);
+  });
+  it.each([false, undefined])('does not attach library for capability %s', async (mapLibrary) => {
+    const loaded = modernOptions();
+    loaded.mapLibrary = mapLibrary;
+    const page = await open(loaded, false, undefined, 'library-owner');
+    const child = page.fixture.debugElement.query(By.directive(MapFixture))
+      .componentInstance as MapFixture;
+    expect(child.library()).toBeUndefined();
+    expect(child.preparationFactory()).toBeUndefined();
+  });
+  it('keeps the real library unavailable without an authenticated owner', async () => {
+    const loaded = modernOptions();
+    loaded.mapLibrary = true;
+    const page = await open(loaded);
+    const child = page.fixture.debugElement.query(By.directive(MapFixture))
+      .componentInstance as MapFixture;
+    expect(child.library()).toBeUndefined();
+    expect(child.preparationFactory()).toBeUndefined();
+  });
+});
+
+it('blocks stale rendered map and Start controls before acknowledging an owner replacement', async () => {
+  const loaded = modernOptions();
+  loaded.mapLibrary = true;
+  const create = vi.fn(async () => 'must-not-create');
+  const page = await open(loaded, false, create, 'first-owner');
+  const child = page.fixture.debugElement.query(By.directive(MapFixture))
+    .componentInstance as MapFixture;
+  expect(child.canOpen()()).toBe(true);
+  page.fixture.componentRef.setInput('ownerId', 'second-owner');
+  expect(child.canOpen()()).toBe(false);
+  click(page.element, 'Start game');
+  expect(create).not.toHaveBeenCalled();
+  await page.fixture.whenStable();
+  expect(sessionStorage.getItem('ks:lobby-creation:first-owner')).toBeNull();
+  expect(sessionStorage.getItem('ks:lobby-creation:second-owner')).toBeNull();
 });
