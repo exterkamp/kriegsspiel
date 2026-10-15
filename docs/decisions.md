@@ -822,3 +822,11 @@ The benchmark in [umpire-benchmark.md](umpire-benchmark.md) (12 turn cases on "H
 **Guard.** The bridge spends the host's subscription: it binds the docker0 gateway by default, refuses `0.0.0.0` and `::` (in any spelling), and needs a shared secret (`CLAUDE_BRIDGE_SECRET`, a bearer token) on any address but the loopback.
 **Open.** `--json-schema` (native structured output) works through the bridge but is not the default until it is measured on the umpire's schemas. Each call starts a CLI process (about 1 to 2 s of overhead). The bridge is a host process the operator keeps running; compose does not manage it.
 **See.** [llm-providers.md](llm-providers.md#claude-code-bridge), [deployment.md](deployment.md#claude-code-models-through-the-host-bridge).
+
+## D43: Lobby battlefield descriptions distinguish terrain from approved scenarios
+
+**Decision.** Following owner approval of the lobby map-selection design, `GET /scenarios` describes each registered scenario's default battlefield with an explicit public-geography DTO. Its geometry comes from the actual validated initial scenario terrain, in north-west-origin metres, rather than the standalone local-board default. The DTO includes a versioned full terrain identity, an exact initial-scenario revision and their default pairing. Rendering data is allowlisted: no units, HQs, observations, private objectives or terrain gameplay attributes are serialized into the preview.
+
+**Delivery boundary.** This first metadata prerequisite does not add an accepted map parameter to game creation, enable arbitrary map/scenario conversion, or supply an owned map library. `addMaps` is false until durable storage and the corresponding user flow are implemented. Existing scenario-only creation, replay and the development local board retain their semantics. The accepted design's remaining picker, curated selection and owned-library work is tracked separately; this metadata is not completion of that flow.
+
+**See.** [Lobby map selection design](lobby-map-selection-ux-design.md), [execution log](lobby-map-selection-execution-log.md), [map-to-gameplay boundary](map-gameplay-handoff.md).
