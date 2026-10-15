@@ -1,4 +1,8 @@
-import { assertSnapshotHeader, snapshotBinding } from './snapshot-binding.js';
+import {
+  assertSnapshotHeader,
+  assertHistoricalWorld,
+  snapshotBinding,
+} from './snapshot-binding.js';
 /** GameHost: many games in one process, one `GameActor` each. */
 import {
   advanceTo,
@@ -226,9 +230,10 @@ export class GameHost {
     if (await this.options.store.loadSnapshot(id)) throw new Error(`game already exists: ${id}`);
     // A crash after header acceptance but before the first snapshot may resume
     // only the same native allocation, with no prior inputs to overwrite.
-    const previous = pin ? await this.options.store.logHeader(id) : undefined;
+    const previous = await this.options.store.logHeader(id);
     if (previous) {
       if (
+        !pin ||
         nativeCanonicalJson(previous) !== nativeCanonicalJson(header) ||
         (await this.options.store.inputLog(id)).length !== 0
       )
@@ -287,7 +292,8 @@ export class GameHost {
     // and chunking `advanceTo` never changes a result, so the state equals the one before the stop.
     const tail = await store.inputLog(id, snap.seq);
     let state = deserialize<GameState>(snap.engine);
-    if (header) assertPinnedWorld(header, state.world, id);
+    if (header && header.battlefieldFormat === 1) assertPinnedWorld(header, state.world, id);
+    else assertHistoricalWorld(header, state.world, id);
     state = replayFrom(state, id, tail, this.options.registry).state;
     const progress = await store.loadProgress(id);
     const lastAlive = await store.loadHeartbeat(id);
@@ -303,7 +309,8 @@ export class GameHost {
       else if (e.command.kind === 'setMode') mode = e.command.mode;
       for (const t of e.ratio ?? []) if (t.outcome === 'passed') rate = t.rate;
     }
-    if (header) assertPinnedWorld(header, state.world, id);
+    if (header && header.battlefieldFormat === 1) assertPinnedWorld(header, state.world, id);
+    else assertHistoricalWorld(header, state.world, id);
     const settings = header?.settings;
     const turnOptions = this.turnsFor(id, settings);
     // A turn-mode game has nothing to pause: game time does not run while it is down.

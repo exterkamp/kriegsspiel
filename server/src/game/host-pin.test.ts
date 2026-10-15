@@ -202,6 +202,49 @@ describe('native pinned actor activation and recovery', () => {
     },
   );
 
+  it('preserves an existing native header when a retry omits its pin', async () => {
+    const store = new MemoryGameStore();
+    const native = pin();
+    const host = createHost(store);
+    const existing = {
+      gameId: 'native-only',
+      scenarioId: native.initialWorld.scenarioId,
+      seed: native.initialWorld.seed,
+      battlefieldFormat: 1 as const,
+      battlefieldPin: native,
+    };
+    await store.saveLogHeader(existing);
+    await expect(
+      host.create('native-only', registry.resolve('hold-the-bridge').initialWorld),
+    ).rejects.toThrow(/conflicts/);
+    expect(await store.logHeader('native-only')).toEqual(existing);
+    expect(await store.loadSnapshot('native-only')).toBeUndefined();
+    expect(host.get('native-only')).toBeUndefined();
+  });
+  it.each(['missing', 'contradictory legacy'])(
+    'does not infer a historical world after combined marker loss and %s header',
+    async (change) => {
+      const store = new MemoryGameStore();
+      const first = createHost(store);
+      const native = pin();
+      await first.create('lost-markers', native.initialWorld, { pin: native });
+      await first.shutdown();
+      const saved = (await store.loadSnapshot('lost-markers'))!;
+      delete saved.battlefield;
+      await store.saveSnapshot('lost-markers', saved);
+      if (change === 'missing') vi.spyOn(store, 'logHeader').mockResolvedValue(undefined);
+      else
+        await store.saveLogHeader({
+          gameId: 'lost-markers',
+          scenarioId: 'hold-the-bridge',
+          seed: 17,
+        });
+      const second = createHost(store);
+      await expect(second.open('lost-markers')).rejects.toThrow(/historical|contradicts/);
+      expect(second.get('lost-markers')).toBeUndefined();
+    },
+  );
+
   it('waits for in-flight activation before shutdown and retires its scheduler', async () => {
     const store = new MemoryGameStore();
     const time = new FakeTime();
