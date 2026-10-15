@@ -40,6 +40,8 @@ export interface CreationReceipt {
   fingerprint: string;
   pin: NativeScenarioPinV1;
   activationError?: string;
+  retiredOwnerId?: string;
+  retiredOwnerGuest?: boolean;
 }
 export interface PinnedCreationLobby extends LobbyGame {
   creationFormat: 1;
@@ -70,12 +72,21 @@ const envelope = z
     fingerprint: z.string().regex(/^game-creation-intent-v1:sha256:[a-f0-9]{64}$/),
     pin: z.unknown(),
     activationError: z.string().min(1).max(128).optional(),
+    retiredOwnerId: ownerId.optional(),
+    retiredOwnerGuest: z.boolean().optional(),
   })
   .strict();
 
 function decodeReceipt(value: unknown): CreationReceipt {
   assertBattlefieldBudget(value, RECEIPT_BYTES);
   const row = envelope.parse(value);
+  if (
+    (row.state === 'tombstone') !==
+      (row.retiredOwnerId !== undefined && row.retiredOwnerGuest !== undefined) ||
+    (row.state !== 'tombstone' &&
+      (row.retiredOwnerId !== undefined || row.retiredOwnerGuest !== undefined))
+  )
+    throw new CreationStoreError('corrupt_creation_receipt');
   const originalRequest = decodeCreationRequest(row.originalRequest);
   if (originalRequest.requestId !== row.requestId)
     throw new CreationStoreError('corrupt_creation_receipt');
@@ -104,7 +115,7 @@ export function creationLobby(receipt: CreationReceipt): PinnedCreationLobby {
     scenario: intent.scenario,
     rate: intent.rate,
     sessionType: intent.sessionType,
-    creator: receipt.ownerId,
+    creator: receipt.state === 'tombstone' ? receipt.retiredOwnerId! : receipt.ownerId,
     status: 'lobby',
     ready: [],
     createdAtMs: receipt.createdAtMs,
@@ -201,12 +212,15 @@ export class SqliteCreationStore {
           this.updateReceipt({ ...receipt, ownerId: to });
       },
       deleteUser: (id) => {
+        const retiredOwnerGuest = this.auth.getUser(id)?.guest ?? true;
         this.lobby.forgetUser(id);
         for (const receipt of this.ownedReceipts(id))
           this.updateReceipt({
             ...receipt,
             ownerId: `removed:${receipt.receiptId}`,
             state: 'tombstone',
+            retiredOwnerId: id,
+            retiredOwnerGuest,
           });
       },
     });

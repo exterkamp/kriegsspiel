@@ -366,4 +366,223 @@ describe('native battlefield allocation API', () => {
     expect(read.json()).not.toHaveProperty('battlefield');
     expect(creations.lobby.get(id)).toBeUndefined();
   });
+  it.each(['read', 'join'])(
+    'rechecks current guest allocation after a delayed %s lookup and account deletion',
+    async (action) => {
+      const { app, creations, request, login, time, store } = await open();
+      const guest = creations.auth.createGuest(time.now());
+      const owner = login(guest.id);
+      const made = await app.server.inject({
+        method: 'POST',
+        url: '/games',
+        headers: owner,
+        payload: request({ lobby: true, sessionType: 'team_vs_team' }),
+      });
+      const id = made.json().id;
+      const peer = creations.auth.upsertUser('race-peer@example.test', time.now());
+      const headers = login(peer.id);
+      let release!: () => void;
+      const blocked = new Promise<void>((resolve) => (release = resolve));
+      const entered = vi.fn();
+      const original = store.logHeader.bind(store);
+      vi.spyOn(store, 'logHeader').mockImplementationOnce(async (game) => {
+        entered();
+        await blocked;
+        return original(game);
+      });
+      const pending = app.server.inject({
+        method: action === 'read' ? 'GET' : 'POST',
+        url: `/games/${id}${action === 'join' ? '/join' : ''}?battlefieldVersion=1`,
+        headers,
+        ...(action === 'join' ? { payload: { side: 'red' } } : {}),
+      });
+      void pending.then(() => {});
+      await vi.waitFor(() => expect(entered).toHaveBeenCalled());
+      expect(
+        (await app.server.inject({ method: 'DELETE', url: '/auth/account', headers: owner }))
+          .statusCode,
+      ).toBe(204);
+      release();
+      const result = await pending;
+      expect(result.statusCode).toBe(404);
+      expect(result.json()).not.toHaveProperty('battlefield');
+      expect(creations.auth.seatOf(id, peer.id)).toBeUndefined();
+      expect(creations.lobby.get(id)).toBeUndefined();
+    },
+  );
+  it.each(['co_op_vs_ai', 'hot_seat'])(
+    'retires pending %s activation after account deletion',
+    async (sessionType) => {
+      const { app, creations, request, login, time, store } = await open();
+      const guest = creations.auth.createGuest(time.now());
+      const headers = login(guest.id);
+      const payload = request({ sessionType });
+      let release!: () => void;
+      const blocked = new Promise<void>((resolve) => (release = resolve));
+      const entered = vi.fn();
+      const save = store.saveSnapshot.bind(store);
+      vi.spyOn(store, 'saveSnapshot').mockImplementationOnce(async (id, snapshot) => {
+        entered();
+        await blocked;
+        return save(id, snapshot);
+      });
+      const pending = app.server.inject({ method: 'POST', url: '/games', headers, payload });
+      void pending.then(() => {});
+      await vi.waitFor(() => expect(entered).toHaveBeenCalled());
+      const id = creations.lookup(guest.id, payload.requestId as string)!.gameId;
+      expect(
+        (await app.server.inject({ method: 'DELETE', url: '/auth/account', headers })).statusCode,
+      ).toBe(204);
+      release();
+      const result = await pending;
+      expect(result.statusCode).toBeGreaterThanOrEqual(400);
+      expect(creations.forGame(id)!.state).toBe('tombstone');
+      expect(app.host.get(id)).toBeUndefined();
+      expect(time.pendingTimers).toBe(0);
+    },
+  );
+  it('enforces actual16KiB creation wire bytes before any reservation', async () => {
+    const { app, headers, creations, user } = await open();
+    const body = JSON.stringify({ lobby: true, sessionType: 'hot_seat' });
+    const response = await app.server.inject({
+      method: 'POST',
+      url: '/games',
+      headers: { ...headers, 'content-type': 'application/json' },
+      payload: ' '.repeat(16385) + body,
+    });
+    expect(response.statusCode).toBe(413);
+    expect(creations.lobby.byCreator(user.id)).toHaveLength(0);
+  });
+  it('retains an already-started regular host game for its remaining players after owner deletion', async () => {
+    const { app, headers, request, creations, login, time } = await open();
+    const made = await app.server.inject({
+      method: 'POST',
+      url: '/games',
+      headers,
+      payload: request({ lobby: true, sessionType: 'team_vs_team' }),
+    });
+    const id = made.json().id;
+    const peer = creations.auth.upsertUser('remaining@example.test', time.now());
+    const other = login(peer.id);
+    await app.server.inject({
+      method: 'POST',
+      url: `/games/${id}/join?battlefieldVersion=1`,
+      headers: other,
+      payload: { side: 'red' },
+    });
+    await app.server.inject({
+      method: 'POST',
+      url: `/games/${id}/ready`,
+      headers: other,
+      payload: { ready: true },
+    });
+    expect(
+      (await app.server.inject({ method: 'POST', url: `/games/${id}/start`, headers, payload: {} }))
+        .statusCode,
+    ).toBe(200);
+    const actor = app.host.get(id);
+    expect(
+      (await app.server.inject({ method: 'DELETE', url: '/auth/account', headers })).statusCode,
+    ).toBe(204);
+    expect(creations.forGame(id)).toMatchObject({ state: 'tombstone', retiredOwnerGuest: false });
+    const read = await app.server.inject({
+      url: `/games/${id}?battlefieldVersion=1`,
+      headers: other,
+    });
+    expect(read.statusCode).toBe(200);
+    expect(read.json().you).toBe('red');
+    expect(app.host.get(id)).toBe(actor);
+    const stream = await app.server.injectWS(`/games/${id}/ws?battlefieldVersion=1`, {
+      headers: { ...other, host: 'localhost', origin: 'http://localhost' },
+    });
+    expect(stream.readyState).toBe(1);
+    stream.terminate();
+  });
+  it('does not reveal a deleted guest started game through a surviving invite', async () => {
+    const { app, request, creations, login, time, headers: other } = await open();
+    const guest = creations.auth.createGuest(time.now());
+    const headers = login(guest.id);
+    const made = await app.server.inject({
+      method: 'POST',
+      url: '/games',
+      headers,
+      payload: request(),
+    });
+    const id = made.json().id;
+    expect(
+      (await app.server.inject({ method: 'DELETE', url: '/auth/account', headers })).statusCode,
+    ).toBe(204);
+    await vi.waitFor(() => expect(app.host.get(id)).toBeUndefined());
+    expect(
+      (await app.server.inject({ url: `/games/${id}?battlefieldVersion=1`, headers: other }))
+        .statusCode,
+    ).toBe(404);
+    expect(creations.forGame(id)).toMatchObject({ state: 'tombstone', retiredOwnerGuest: true });
+    expect(time.pendingTimers).toBe(0);
+  });
+  it('keeps a still-owned actor recoverable after only the activation-status transaction fails', async () => {
+    const { app, headers, request, creations } = await open();
+    const payload = request();
+    creations.database.exec(
+      "CREATE TRIGGER fail_started BEFORE UPDATE OF state ON creation_receipts WHEN NEW.state='started' BEGIN SELECT RAISE(ABORT,'status unavailable'); END;",
+    );
+    const failed = await app.server.inject({ method: 'POST', url: '/games', headers, payload });
+    expect(failed.statusCode).toBe(503);
+    const id = failed.json().id;
+    const actor = app.host.get(id);
+    expect(actor).toBeDefined();
+    expect(creations.forGame(id)!.state).toBe('reserved');
+    creations.database.exec('DROP TRIGGER fail_started');
+    const retry = await app.server.inject({ method: 'POST', url: '/games', headers, payload });
+    expect(retry.statusCode).toBe(201);
+    expect(retry.json().id).toBe(id);
+    expect(app.host.get(id)).toBe(actor);
+  });
+  it.each(['co_op_vs_ai', 'hot_seat'])(
+    'retires pending %s activation through the actual idle-guest sweep',
+    async (sessionType) => {
+      let sweep: (() => void) | undefined;
+      const interval = globalThis.setInterval;
+      const spy = vi
+        .spyOn(globalThis, 'setInterval')
+        .mockImplementation((callback, delay, ...args) => {
+          if (delay === 600000) sweep = () => callback(...args);
+          return interval(callback, delay, ...args);
+        });
+      try {
+        const { app, creations, request, login, time, store } = await open();
+        const guest = creations.auth.createGuest(time.now());
+        const headers = login(guest.id);
+        const payload = request({ sessionType });
+        let release!: () => void;
+        const blocked = new Promise<void>((resolve) => (release = resolve));
+        const entered = vi.fn();
+        const save = store.saveSnapshot.bind(store);
+        vi.spyOn(store, 'saveSnapshot').mockImplementationOnce(async (id, snapshot) => {
+          entered();
+          await blocked;
+          return save(id, snapshot);
+        });
+        const pending = app.server.inject({ method: 'POST', url: '/games', headers, payload });
+        void pending.then(() => {});
+        await vi.waitFor(() => expect(entered).toHaveBeenCalled());
+        const id = creations.lookup(guest.id, payload.requestId as string)!.gameId;
+        creations.auth.putSession(
+          hashToken(headers.cookie.slice('ks_session='.length)),
+          guest.id,
+          time.now() - 1,
+        );
+        expect(sweep).toBeTypeOf('function');
+        sweep!();
+        expect(creations.auth.getUser(guest.id)).toBeUndefined();
+        release();
+        expect((await pending).statusCode).toBeGreaterThanOrEqual(400);
+        expect(app.host.get(id)).toBeUndefined();
+        expect(creations.forGame(id)!.state).toBe('tombstone');
+        expect(time.pendingTimers).toBe(0);
+      } finally {
+        spy.mockRestore();
+      }
+    },
+  );
 });

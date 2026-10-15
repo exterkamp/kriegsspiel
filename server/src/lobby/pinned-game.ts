@@ -48,10 +48,12 @@ export function assertLobbyAllocation(
   const identity = record as LobbyGame & { creationReceiptId: string };
   if (
     !receipt ||
-    receipt.state === 'tombstone' ||
-    (record.status === 'started') !== (receipt.state === 'started') ||
+    (receipt.state === 'tombstone' &&
+      (record.status !== 'started' || receipt.retiredOwnerGuest !== false)) ||
+    (record.status === 'started') !==
+      (receipt.state === 'started' || receipt.state === 'tombstone') ||
     receipt.gameId !== record.id ||
-    receipt.ownerId !== record.creator ||
+    (receipt.state === 'tombstone' ? receipt.retiredOwnerId : receipt.ownerId) !== record.creator ||
     receipt.receiptId !== identity.creationReceiptId ||
     receipt.pin.pinIdentity !== pin.pinIdentity ||
     receipt.intent.scenario !== record.scenario ||
