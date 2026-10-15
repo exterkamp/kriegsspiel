@@ -36,7 +36,14 @@ import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
-import { holdTheBridge, loadScenario, type Seat, type SideId } from '@kriegsspiel/engine';
+import {
+  holdTheBridge,
+  loadScenario,
+  deserialize,
+  type GameState,
+  type Seat,
+  type SideId,
+} from '@kriegsspiel/engine';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { spaFallback } from './spaFallback.js';
 import {
@@ -96,6 +103,20 @@ import { CritiqueService } from './critiqueService.js';
 import { windowAt, windowTimeline } from './umpireWindow.js';
 import { dissentNotes } from '../critique.js';
 import { seatKey } from './sideView.js';
+
+import {
+  NativeBattlefieldRegistry,
+  NativePairingError,
+} from '../game/native-battlefield-registry.js';
+import { assertHistoricalWorld } from '../game/snapshot-binding.js';
+import { headerPin, assertPinnedWorld } from '../game/pinned-header.js';
+import { lobbyPin, lobbyWorld, assertLobbyAllocation } from '../lobby/pinned-game.js';
+import {
+  CreationStoreError,
+  type SqliteCreationStore,
+  type CreationReceipt,
+} from '../lobby/creation-store.js';
+import { decodeCreationRequest } from '../lobby/creation-intent.js';
 
 /** Fastest clock a client may ask for: 1 game day per wall second. */
 export const MAX_RATE = 86_400;
@@ -186,6 +207,10 @@ export interface AppOptions {
   /** One parser for every game, or one per game. See `GameHostOptions.parser`. */
   parser: GameHostOptions['parser'];
   store?: GameStore;
+  /** Shared account/receipt/lobby transaction owner. Required before native alternatives are offered. */
+  creations?: SqliteCreationStore;
+  /** Trusted reviewed native availability, never request supplied. Default remains default-only. */
+  battlefields?: NativeBattlefieldRegistry;
   /** A game ended or was closed: drop per-game resources such as its umpire client. May be called more than once. */
   onGameDone?: (gameId: string) => void;
   /** Lobby records. Defaults to memory; `main.ts` supplies the SQLite store. */
@@ -389,19 +414,73 @@ export async function buildApp(options: AppOptions): Promise<App> {
     trace ?? NOOP_TRACE,
     (id, userId) => lobby.get(id)?.roles?.find((r) => r.userId === userId)?.succeeds,
   );
-  const lobby = options.lobby ?? new MemoryLobbyStore();
+  const creations = options.creations;
+  if (
+    (creations && options.lobby && options.lobby !== creations.lobby) ||
+    (creations && options.auth?.store && options.auth.store !== creations.auth)
+  )
+    throw new Error('Creation receipts require the same auth/lobby connection');
+  const battlefields = options.battlefields ?? new NativeBattlefieldRegistry();
+  const lobby = creations?.lobby ?? options.lobby ?? new MemoryLobbyStore();
   const limits: GameLimits = { ...DEFAULT_GAME_LIMITS, ...options.limits };
   /** Wall time each open game was last started, reopened or connected to; the sweep reads it for idleness. */
   const lastActive = new Map<string, number>();
-  const authStore = options.auth?.store ?? new MemoryAuthStore();
+  const authStore = creations?.auth ?? options.auth?.store ?? new MemoryAuthStore();
   /**
    * The lobby record for a game. A game made before lobby records existed has seats and a stored
    * game but no record: it is a started team game on the one scenario of that time, and the record
    * is written back so it is only synthesised once.
    */
-  const recordOf = (id: string): LobbyGame | undefined => {
+  const recordOf = async (id: string): Promise<LobbyGame | undefined> => {
     const rec = lobby.get(id);
-    if (rec) return rec;
+    const receipt = creations?.forGame(id);
+    if (rec) {
+      try {
+        const header = await store.logHeader(id);
+        assertLobbyAllocation(rec, receipt, header);
+        if (!lobbyPin(rec) && rec.status === 'started') {
+          const saved = await store.loadSnapshot(id);
+          const world =
+            host.get(id)?.state.world ?? (saved && deserialize<GameState>(saved.engine).world);
+          if (!world) throw new Error('Missing historical world');
+          assertHistoricalWorld(header, world, id);
+        }
+        return rec;
+      } catch {
+        throw Object.assign(new Error('Battlefield recovery is required.'), {
+          statusCode: 503,
+          code: 'battlefield_recovery_required',
+        });
+      }
+    }
+    // Any retained native evidence forbids synthesizing a historical bridge record.
+    const header = await store.logHeader(id);
+    const snapshot = await store.loadSnapshot(id);
+    if (
+      receipt ||
+      (header && headerPin(header, id)) ||
+      (snapshot && Object.hasOwn(snapshot, 'battlefield'))
+    )
+      throw Object.assign(new Error('Battlefield recovery is required.'), {
+        statusCode: 503,
+        code: 'battlefield_recovery_required',
+      });
+    if (!header || !snapshot) {
+      if (header || snapshot)
+        throw Object.assign(new Error('Battlefield recovery is required.'), {
+          statusCode: 503,
+          code: 'battlefield_recovery_required',
+        });
+      return undefined;
+    }
+    try {
+      assertHistoricalWorld(header, deserialize<GameState>(snapshot.engine).world, id);
+    } catch {
+      throw Object.assign(new Error('Battlefield recovery is required.'), {
+        statusCode: 503,
+        code: 'battlefield_recovery_required',
+      });
+    }
     const seats = authStore.seatsOf(id);
     if (seats.length === 0) return undefined;
     const legacy: LobbyGame = {
@@ -436,13 +515,13 @@ export async function buildApp(options: AppOptions): Promise<App> {
     timers: options.timers,
     init: startingState,
     pause: (id): PauseConfig | undefined => {
-      const rec = recordOf(id);
+      const rec = lobby.get(id);
       if (!rec?.pause) return undefined;
       return { voters: votersOf(rec), ...rec.pause };
     },
     // Only a co-op game has the built-in opponent; the other shapes leave every side to people.
     scriptedOpponents: (id) =>
-      options.scriptedOpponents === true && recordOf(id)?.sessionType === 'co_op_vs_ai',
+      options.scriptedOpponents === true && lobby.get(id)?.sessionType === 'co_op_vs_ai',
     aiAgents: options.aiAgents,
     narrator: options.narrator,
     // The dial picks the adjudicator (D39): `rigid` is the engine alone, `standard` and `free` the umpire.
@@ -542,7 +621,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
 
   /** Sides people play in a game of this shape: all of them, unless the scenario hands a side to the AI. */
   const humanSides = (rec: LobbyGame): SideId[] =>
-    loadScenarioById(rec.scenario)
+    lobbyWorld(rec)
       .sides.filter((s) => rec.sessionType !== 'co_op_vs_ai' || s.controller !== 'scripted')
       .map((s) => s.id);
 
@@ -607,7 +686,10 @@ export async function buildApp(options: AppOptions): Promise<App> {
   });
 
   server.get('/scenarios', async () => ({
-    scenarios: scenarioList(),
+    scenarios: scenarioList().map((scenario) => ({
+      ...scenario,
+      ...(creations ? { battlefields: battlefields.publicCatalog(scenario.id) } : {}),
+    })),
     // Who plays a side nobody sits at: absent when this server has no computer opponent.
     ...(options.scriptedOpponents === true
       ? { opponent: options.aiAgents ? 'ai_commander' : 'scripted' }
@@ -623,6 +705,96 @@ export async function buildApp(options: AppOptions): Promise<App> {
     // a trace row under the would-be id, or the admin picker fills with phantom games.
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+    const raw = req.body as Record<string, unknown> | null;
+    const modern =
+      !!raw &&
+      ['requestId', 'pairing', 'battlefieldVersion'].some((key) => Object.hasOwn(raw, key));
+    if (creations || modern) {
+      if (!creations) return reply.code(503).send({ error: 'battlefield_unavailable' });
+      let request;
+      try {
+        request = decodeCreationRequest(req.body ?? {});
+      } catch {
+        return reply.code(400).send({ error: 'bad_request' });
+      }
+      let receipt: CreationReceipt;
+      try {
+        receipt = creations.reserve(
+          user.id,
+          { ...request, requestId: request.requestId ?? randomUUID() },
+          (accepted) => {
+            const scenario = accepted.scenario ?? scenarioList()[0]!.id;
+            return {
+              defaultPin: battlefields.resolve(scenario),
+              selectedPin: battlefields.resolve(scenario, accepted.pairing),
+              aiAvailable: aiPlays,
+            };
+          },
+          () => {
+            const cap = user.guest ? limits.perGuest : limits.perUser;
+            const unfinished = lobby
+              .byCreator(user.id)
+              .filter(
+                (record) =>
+                  record.status === 'lobby' ||
+                  (record.status === 'started' &&
+                    host.get(record.id) &&
+                    !host.get(record.id)?.state.world.outcome),
+              );
+            if (unfinished.length >= cap) throw new CreationStoreError('too_many_games');
+          },
+        );
+      } catch (error) {
+        const code =
+          error instanceof CreationStoreError || error instanceof NativePairingError
+            ? error.code
+            : error instanceof Error &&
+                ['bad_scenario', 'no_ai_opponent', 'bad_session', 'bad_side'].includes(
+                  error.message,
+                )
+              ? error.message
+              : 'creation_recovery_required';
+        const status =
+          code === 'too_many_games'
+            ? 429
+            : code === 'not_signed_in'
+              ? 401
+              : ['request_conflict', 'request_ambiguous', 'request_removed'].includes(code)
+                ? 409
+                : ['corrupt_creation_receipt', 'creation_recovery_required'].includes(code)
+                  ? 503
+                  : 400;
+        return reply.code(status).send({
+          error: code,
+          ...(error instanceof CreationStoreError && error.gameIds.length
+            ? { gameIds: error.gameIds }
+            : {}),
+        });
+      }
+      return tracedHttp(receipt.gameId, req, reply, async () => {
+        const rec = await recordOf(receipt.gameId);
+        if (!rec)
+          return reply.code(503).send({ error: 'creation_recovery_required', id: receipt.gameId });
+        if (!receipt.intent.lobby && rec.status !== 'started') {
+          const error = await startGame(rec);
+          if (error)
+            return reply
+              .code(503)
+              .send({ error: 'creation_recovery_required', id: receipt.gameId });
+        }
+        const current = lobby.get(rec.id)!;
+        return reply.code(201).send({
+          id: rec.id,
+          scenario: rec.scenario,
+          rate: rec.rate,
+          sessionType: rec.sessionType,
+          umpire: rec.umpire,
+          side: receipt.intent.side,
+          ws: `/games/${rec.id}/ws`,
+          status: current.status,
+        });
+      });
+    }
     const body = CreateGame.safeParse(req.body ?? {});
     if (!body.success) {
       return reply.code(400).send({ error: 'bad_request', message: body.error.message });
@@ -712,21 +884,98 @@ export async function buildApp(options: AppOptions): Promise<App> {
   const starting = new Set<string>();
 
   /** Create the game's actor and mark the record started. Returns an error code on failure. */
-  const startGame = async (rec: LobbyGame): Promise<string | undefined> => {
-    try {
-      await host.create(rec.id, loadScenarioById(rec.scenario), {
-        rate: rec.rate,
-        settings: rec.umpire,
-      });
-    } catch (e) {
-      server.log.error({ err: e, gameId: rec.id }, 'could not start game');
-      return 'start_failed';
-    }
-    lastActive.set(rec.id, wallNow());
-    // Re-read: a /ready that landed during the await must not be overwritten.
-    lobby.put({ ...(lobby.get(rec.id) ?? rec), status: 'started' });
-    return undefined;
+  const activating = new Map<string, Promise<string | undefined>>();
+  const startGame = (rec: LobbyGame): Promise<string | undefined> => {
+    const pending = activating.get(rec.id);
+    if (pending) return pending;
+    const start = async (): Promise<string | undefined> => {
+      const pin = lobbyPin(rec);
+      try {
+        if (pin) {
+          assertLobbyAllocation(rec, creations?.forGame(rec.id), await store.logHeader(rec.id));
+          const existing = host.get(rec.id);
+          if (existing) {
+            const header = await store.logHeader(rec.id);
+            if (!header) throw new Error('Missing native header');
+            assertPinnedWorld(header, existing.state.world, rec.id);
+          } else if (await store.loadSnapshot(rec.id)) await host.open(rec.id);
+          else
+            await host.create(rec.id, pin.initialWorld, {
+              rate: rec.rate,
+              settings: rec.umpire,
+              pin,
+              creationReceiptId: (rec as LobbyGame & { creationReceiptId: string })
+                .creationReceiptId,
+            });
+          creations!.activationResult(rec.id, true);
+        } else {
+          await host.create(rec.id, loadScenarioById(rec.scenario), {
+            rate: rec.rate,
+            settings: rec.umpire,
+          });
+          lobby.put({ ...(lobby.get(rec.id) ?? rec), status: 'started' });
+        }
+        lastActive.set(rec.id, wallNow());
+        return undefined;
+      } catch (error) {
+        if (pin) {
+          try {
+            creations!.activationResult(rec.id, false);
+          } catch (receiptError) {
+            server.log.error(
+              { err: receiptError, gameId: rec.id },
+              'could not record activation result',
+            );
+          }
+        }
+        server.log.error({ err: error, gameId: rec.id }, 'could not start game');
+        return 'start_failed';
+      }
+    };
+    const promise = start().finally(() => activating.delete(rec.id));
+    activating.set(rec.id, promise);
+    return promise;
   };
+
+  server.get<{ Params: { requestId: string } }>(
+    '/game-creations/:requestId',
+    async (req, reply) => {
+      const user = auth.userOf(req);
+      if (!user) return reply.code(401).send({ error: 'not_signed_in' });
+      if (!creations) return reply.code(404).send({ error: 'no_such_creation' });
+      if (!z.uuid().safeParse(req.params.requestId).success)
+        return reply.code(400).send({ error: 'bad_request' });
+      try {
+        const receipt = creations.lookup(user.id, req.params.requestId);
+        if (!receipt) return reply.code(404).send({ error: 'no_such_creation' });
+        if (receipt.state === 'tombstone')
+          return reply.code(410).send({ error: 'request_removed', gameId: receipt.gameId });
+        // Reconciliation reports durable acceptance; retrying POST with the same key resumes activation.
+        const rec = await recordOf(receipt.gameId);
+        if (!rec) throw new Error('Missing allocation');
+        return {
+          requestId: receipt.requestId,
+          gameId: receipt.gameId,
+          status: receipt.activationError
+            ? 'recovery_required'
+            : receipt.state === 'reserved'
+              ? 'pending'
+              : receipt.state,
+        };
+      } catch (error) {
+        return reply
+          .code(
+            error instanceof CreationStoreError && error.code === 'request_ambiguous' ? 409 : 503,
+          )
+          .send({
+            error: error instanceof CreationStoreError ? error.code : 'creation_recovery_required',
+            ...(error instanceof CreationStoreError && error.gameIds.length
+              ? { gameIds: error.gameIds }
+              : {}),
+          });
+      }
+    },
+  );
 
   /** Where a started game stands: over or not, its game time and when it was last played (wall time). */
   const progressOf = async (
@@ -785,7 +1034,9 @@ export async function buildApp(options: AppOptions): Promise<App> {
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const mine = new Set(authStore.gamesOf(user.id));
     const recs = [
-      ...[...mine].map(recordOf).filter((r): r is LobbyGame => r !== undefined),
+      ...(await Promise.all([...mine].map(recordOf))).filter(
+        (r): r is LobbyGame => r !== undefined,
+      ),
       ...lobby.byCreator(user.id).filter((r) => !mine.has(r.id)),
       ...lobby.byRoleHolder(user.id).filter((r) => !mine.has(r.id) && r.creator !== user.id),
     ];
@@ -800,17 +1051,33 @@ export async function buildApp(options: AppOptions): Promise<App> {
   const isPrivateTo = (rec: LobbyGame, userId: string): boolean =>
     rec.creator !== userId && authStore.getUser(rec.creator)?.guest === true;
 
+  const requiresUpgrade = (record: LobbyGame, query: unknown): boolean => {
+    const pin = lobbyPin(record);
+    return (
+      !!pin &&
+      !pin.battlefield.isDefault &&
+      (!query ||
+        typeof query !== 'object' ||
+        (query as Record<string, unknown>).battlefieldVersion !== '1')
+    );
+  };
+
   server.get<{ Params: { id: string } }>('/games/:id', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const { id } = req.params;
-    const rec = recordOf(id);
+    const rec = await recordOf(id);
     if (!rec || isPrivateTo(rec, user.id)) return reply.code(404).send({ error: 'no_such_game' });
+    if (requiresUpgrade(rec, req.query))
+      return reply.code(426).send({ error: 'battlefield_client_upgrade_required' });
     return tracedHttp(id, req, reply, async () => {
       const seats = authStore.seatsOf(id);
       const hotSeat = rec.sessionType === 'hot_seat';
       return {
         ...summary(rec, user.id),
+        battlefield: structuredClone(
+          lobbyPin(rec)?.battlefield ?? battlefields.resolve(rec.scenario).battlefield,
+        ),
         you: sideFor(rec, user.id) ?? null,
         removed: rec.removed?.includes(user.id) ?? false,
         ready: rec.ready.includes(user.id) || (rec.creator === user.id && !hotSeat),
@@ -868,7 +1135,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     let mine: string[] | undefined;
     if (role === 'subordinate') {
       const own = new Set(
-        loadScenarioById(rec.scenario)
+        lobbyWorld(rec)
           .units.filter((u) => u.side === side)
           .map((u) => u.id),
       );
@@ -917,7 +1184,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   server.post<{ Params: { id: string } }>('/games/:id/leave-role', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-    const rec = recordOf(req.params.id);
+    const rec = await recordOf(req.params.id);
     if (!rec) return reply.code(404).send({ error: 'no_such_game' });
     return tracedHttp(req.params.id, req, reply, async () => {
       if (starting.has(rec.id)) return reply.code(409).send({ error: 'already_started' });
@@ -972,7 +1239,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   server.post<{ Params: { id: string } }>('/games/:id/leave', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-    const rec = recordOf(req.params.id);
+    const rec = await recordOf(req.params.id);
     if (!rec) return reply.code(404).send({ error: 'no_such_game' });
     return tracedHttp(req.params.id, req, reply, async () => {
       if (rec.status !== 'lobby' || starting.has(rec.id))
@@ -988,7 +1255,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   server.post<{ Params: { id: string } }>('/games/:id/kick', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-    const rec = recordOf(req.params.id);
+    const rec = await recordOf(req.params.id);
     if (!rec) return reply.code(404).send({ error: 'no_such_game' });
     return tracedHttp(req.params.id, req, reply, async () => {
       if (rec.creator !== user.id) return reply.code(403).send({ error: 'not_creator' });
@@ -1026,8 +1293,10 @@ export async function buildApp(options: AppOptions): Promise<App> {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
     const { id } = req.params;
-    const rec = recordOf(id);
+    const rec = await recordOf(id);
     if (!rec || isPrivateTo(rec, user.id)) return reply.code(404).send({ error: 'no_such_game' });
+    if (requiresUpgrade(rec, req.query))
+      return reply.code(426).send({ error: 'battlefield_client_upgrade_required' });
     return tracedHttp(id, req, reply, async () => {
       const body = JoinGame.safeParse(req.body);
       if (!body.success) {
@@ -1051,7 +1320,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   server.post<{ Params: { id: string } }>('/games/:id/ready', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-    const rec = recordOf(req.params.id);
+    const rec = await recordOf(req.params.id);
     if (!rec) return reply.code(404).send({ error: 'no_such_game' });
     return tracedHttp(req.params.id, req, reply, async () => {
       const body = Ready.safeParse(req.body);
@@ -1072,7 +1341,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   server.post<{ Params: { id: string } }>('/games/:id/start', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-    const rec = recordOf(req.params.id);
+    const rec = await recordOf(req.params.id);
     if (!rec) return reply.code(404).send({ error: 'no_such_game' });
     return tracedHttp(req.params.id, req, reply, async () => {
       if (rec.creator !== user.id) return reply.code(403).send({ error: 'not_creator' });
@@ -1116,7 +1385,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
         timeline: NonNullable<ReturnType<typeof windowTimeline>>;
       }
   > => {
-    const rec = recordOf(id);
+    const rec = await recordOf(id);
     if (!rec) return { status: 404, error: 'no_such_game' };
     if (!sideFor(rec, userId, want)) return { status: 403, error: 'no_seat' };
     if (rec.status !== 'started') return { status: 403, error: 'game_not_over' };
@@ -1133,7 +1402,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   server.get<{ Params: { id: string } }>('/games/:id/window', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-    if (!recordOf(req.params.id)) return reply.code(404).send({ error: 'no_such_game' });
+    if (!(await recordOf(req.params.id))) return reply.code(404).send({ error: 'no_such_game' });
     return tracedHttp(req.params.id, req, reply, async () => {
       const w = await windowFor(req.params.id, user.id, undefined);
       if ('error' in w) return reply.code(w.status).send({ error: w.error });
@@ -1152,7 +1421,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   server.get<{ Params: { id: string } }>('/games/:id/window/dissents', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-    if (!recordOf(req.params.id)) return reply.code(404).send({ error: 'no_such_game' });
+    if (!(await recordOf(req.params.id))) return reply.code(404).send({ error: 'no_such_game' });
     return tracedHttp(req.params.id, req, reply, async () => {
       const w = await windowFor(req.params.id, user.id, undefined);
       if ('error' in w) return reply.code(w.status).send({ error: w.error });
@@ -1163,7 +1432,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   server.get<{ Params: { id: string } }>('/games/:id/critique', async (req, reply) => {
     const user = auth.userOf(req);
     if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-    if (!recordOf(req.params.id)) return reply.code(404).send({ error: 'no_such_game' });
+    if (!(await recordOf(req.params.id))) return reply.code(404).send({ error: 'no_such_game' });
     return tracedHttp(req.params.id, req, reply, async () => {
       const w = await windowFor(req.params.id, user.id, undefined);
       if ('error' in w) return reply.code(w.status).send({ error: w.error });
@@ -1176,7 +1445,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     async (req, reply) => {
       const user = auth.userOf(req);
       if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-      if (!recordOf(req.params.id)) return reply.code(404).send({ error: 'no_such_game' });
+      if (!(await recordOf(req.params.id))) return reply.code(404).send({ error: 'no_such_game' });
       return tracedHttp(req.params.id, req, reply, async () => {
         const q = WindowQuery.safeParse(req.query);
         if (!q.success)
@@ -1207,8 +1476,10 @@ export async function buildApp(options: AppOptions): Promise<App> {
         }
         const user = auth.userOf(req);
         if (!user) return reply.code(401).send({ error: 'not_signed_in' });
-        const rec = recordOf(id);
+        const rec = await recordOf(id);
         if (!rec) return reply.code(404).send({ error: 'no_such_game' });
+        if (requiresUpgrade(rec, req.query))
+          return reply.code(426).send({ error: 'battlefield_client_upgrade_required' });
         const query = WsQuery.safeParse(req.query);
         if (!query.success) return reply.code(400).send({ error: 'bad_side' });
         if (!sideFor(rec, user.id, query.data.side)) {
@@ -1220,7 +1491,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
     },
     (socket, req) => {
       const user = auth.userOf(req);
-      const rec = recordOf(req.params.id);
+      const rec = lobby.get(req.params.id);
       const want = WsQuery.safeParse(req.query);
       const side = user && rec && want.success && sideFor(rec, user.id, want.data.side);
       if (!user || !side) return socket.close(1008, 'no seat');
@@ -1269,8 +1540,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
     await trace?.close();
     await host.shutdown();
     await notifier.flush();
-    if (!options.auth?.store) authStore.close();
-    if (!options.lobby) lobby.close();
+    if (!options.auth?.store && !creations) authStore.close();
+    if (!options.lobby && !creations) lobby.close();
     if (!options.notify?.store) notifyStore.close();
   });
 

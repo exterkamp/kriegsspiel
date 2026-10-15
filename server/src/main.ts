@@ -21,8 +21,8 @@ import { buildApp } from './api/app.js';
 import { ADMIN_OPEN_WARNING, adminFromEnv } from './admin/adminApi.js';
 import { SqliteNotifyStore, pushFromEnv } from './notify/index.js';
 import { allowedOriginsFromEnv } from './auth/origin.js';
-import { SqliteAuthStore } from './auth/store.js';
-import { SqliteLobbyStore } from './lobby/store.js';
+import { SqliteCreationStore } from './lobby/creation-store.js';
+
 import {
   aiCommanderBudgetWarning,
   aiCommanderFromEnv,
@@ -56,10 +56,11 @@ const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? '127.0.0.1';
 const store = process.env.DB_PATH ? new SqliteGameStore(process.env.DB_PATH) : undefined;
 
-const authStore = process.env.DB_PATH ? new SqliteAuthStore(process.env.DB_PATH) : undefined;
+const creations = new SqliteCreationStore(process.env.DB_PATH ?? ':memory:');
+const authStore = creations.auth;
 
 const notifyStore = process.env.DB_PATH ? new SqliteNotifyStore(process.env.DB_PATH) : undefined;
-const lobby = process.env.DB_PATH ? new SqliteLobbyStore(process.env.DB_PATH) : undefined;
+const lobby = creations.lobby;
 
 // The LLM umpire, when a provider is configured or the LLM commander is asked for: one capped
 // client per game over the shared one, used by both the order parser and the commander.
@@ -124,6 +125,7 @@ const { server } = await buildApp({
   },
   store,
   lobby,
+  creations,
   staticDir: process.env.STATIC_DIR,
   spaFallback: !/^(0|false|off)$/i.test(process.env.SPA_FALLBACK ?? ''),
   logger: true,
@@ -182,7 +184,8 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
         store?.close();
         authStore?.close();
         notifyStore?.close();
-        lobby?.close();
+        lobby.close();
+        creations.close();
         process.exit(0);
       }),
   );
