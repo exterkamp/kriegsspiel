@@ -81,6 +81,7 @@ type Prep =
           <ks-new-game
             [load]="api.fetchScenarioOptions"
             [create]="api.createGame"
+            [ownerId]="me()?.id"
             (started)="go({ name: 'game', game: $event })"
             (back)="go({ name: 'menu' })"
           />
