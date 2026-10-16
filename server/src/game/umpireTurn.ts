@@ -12,6 +12,9 @@
  *   courier pass again (it must give the logged couriers), the held turn's start, and the
  *   `umpire.turn` event at its end with the logged proposal and the validator's context. No model
  *   call: replay needs only the log.
+ * - Dice (11.7): the rolls the umpire asked for are made on the umpire's own stream, seeded from
+ *   the world's RNG at `T0` (`rollTurnDice`), and logged in the context; applying the turn draws
+ *   them again from the same state and refuses a turn whose rolls differ.
  */
 import {
   canSee,
@@ -20,6 +23,7 @@ import {
   issueTurn,
   metres,
   positionAt,
+  rollTurnDice,
   type EngineState,
   type EventRegistry,
   type GameState,
@@ -72,6 +76,8 @@ export interface UmpireTurnOutput {
   projection: ProjectionSummary;
   /** The problems sent back with the resend, if there was one. */
   resent?: string[];
+  /** Roll requests the engine refused (11.7), as the umpire was told; the rolls made are `context.rolls`. */
+  refusedRolls?: string[];
 }
 
 export interface UmpireTurnResolverOptions {
@@ -279,6 +285,7 @@ export class UmpireTurnResolver implements TurnResolver {
     try {
       r = await adjudicateTurn(client, state.world, turn, {
         context: turnContext,
+        rngAtStart: state.rng,
         signal: ctrl.signal,
         ...(this.opts.persona ? { persona: this.opts.persona } : {}),
       });
@@ -295,9 +302,10 @@ export class UmpireTurnResolver implements TurnResolver {
         orders: p.orders,
         couriers: p.couriers,
         proposal: r.proposal,
-        context: turnContext,
+        context: r.rolls ? { ...turnContext, rolls: r.rolls } : turnContext,
         projection: p.summary,
         ...(r.resent ? { resent: r.resent } : {}),
+        ...(r.refusedRolls ? { refusedRolls: r.refusedRolls } : {}),
       };
       return { adjudicator: UMPIRE_ADJUDICATOR, output, calls: r.calls };
     }
@@ -307,7 +315,8 @@ export class UmpireTurnResolver implements TurnResolver {
 
 /**
  * Apply a logged umpire turn at its start: the courier pass again (it must give the logged
- * couriers), the held turn's start on the real world (couriers ride from `T0`, units stand), and
+ * couriers), the umpire's dice again (they must give the logged rolls), the held turn's start on
+ * the real world (couriers ride from `T0`, units stand), and
  * `umpire.turn` at `T1`, which validates and applies the proposal. The caller's advance to `T1`
  * runs it. Pure.
  */
@@ -324,6 +333,13 @@ export function umpireAdjudicator(
   const pass = courierPass(state, orders, turn, context.registry);
   if (JSON.stringify(pass.couriers) !== JSON.stringify(out.couriers)) {
     throw new Error(`turn ${turn.n}: the courier pass differs from the logged couriers`);
+  }
+  const rolls = out.context?.rolls;
+  if (rolls && rolls.length > 0) {
+    const asked = rolls.map(({ id, why, chance }) => ({ id, why, chance }));
+    if (JSON.stringify(rollTurnDice(state.rng, turn.n, asked)) !== JSON.stringify(rolls)) {
+      throw new Error(`turn ${turn.n}: the umpire's dice differ from the logged rolls`);
+    }
   }
   const held = heldTurnStart(state, orders, turn);
   return issueTurn(held, { proposal: out.proposal, context: out.context });
