@@ -146,10 +146,15 @@ describe('realistic generated battlefields', () => {
       downstream.surfaceProfileM = downstream.surfaceProfileM.map(
         () => upstream.surfaceProfileM[0]! + 5,
       );
-    // Detach another reach so it ends in open country.
-    const last = rivers.find((r) => r.id !== upstream.id && r.id !== downstream.id)!;
+    // Detach another reach so it ends in open country: cut the longest other
+    // reach at its middle vertex, well away from any other water.
+    const last = rivers
+      .filter((r) => r.id !== upstream.id && r.id !== downstream.id)
+      .reduce((a, b) => (b.centreline.length > a.centreline.length ? b : a));
     if (last.kind === 'river')
-      last.centreline = last.centreline.slice(0, 2).map((p) => [p[0], p[1]]);
+      last.centreline = last.centreline
+        .slice(0, Math.ceil(last.centreline.length / 2))
+        .map((p) => [p[0], p[1]]);
     // Send a road straight up the steepest pair of neighbouring samples.
     const e = broken.elevation;
     let steepest = { grade: 0, path: [] as Point[] };

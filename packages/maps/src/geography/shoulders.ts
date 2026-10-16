@@ -1,7 +1,7 @@
 import type { Elevation, MapSettings } from '../contract.js';
 import { decimal6 } from '../terrain/precision.js';
 import { Budget, GeographyFailure } from './budget.js';
-export const SHOULDER_POLICY = 'banded-lipschitz-cut-v2' as const;
+export const SHOULDER_POLICY = 'banded-lipschitz-cut-v3' as const;
 export interface ShoulderPolicy {
   axisGradeCap: number;
   guaranteedBandSteps: number;
@@ -106,6 +106,7 @@ export function gradeShoulders(
   policy: ShoulderPolicy,
   budget: Budget,
   bandSteps: number | Int32Array = policy.guaranteedBandSteps,
+  dryCaps?: Float64Array,
 ): ShoulderEvidence {
   const n = samples.length,
     c = elevation.columns,
@@ -167,6 +168,10 @@ export function gradeShoulders(
   for (let i = 0; i < n; i++)
     if (!Number.isNaN(anchors[i]!)) {
       key[i] = level[i] = anchors[i]!;
+      heap.push(i);
+    } else if (dryCaps && !Number.isNaN(dryCaps[i]!) && dryCaps[i]! < Infinity) {
+      // A dry cap starts its own gentle cone (v3: Euclidean caps from the centreline).
+      key[i] = level[i] = dryCaps[i]!;
       heap.push(i);
     }
   while (heap.size) {

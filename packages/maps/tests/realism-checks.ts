@@ -1,6 +1,6 @@
 import { expect } from 'vitest';
 import { MAX_FIELD_SLOPE } from '../src/geography/cover/index.js';
-import type { RealismReport } from '../src/realism.js';
+import type { GrainSummary, RealismReport } from '../src/realism.js';
 import { SHALLOW_WATER } from '../src/geography/shallow.js';
 
 /** Land cover that follows the ground (#500); shared with the full representative assets. */
@@ -43,4 +43,20 @@ export function expectPlausibleCrossings(
   expect(c.fordMaxBankM).toBeLessThanOrEqual(SHALLOW_WATER.maxBankM + 1e-6);
   expect(c.fordMaxRampGrade).toBeLessThanOrEqual(settings.roads.maxGrade + 1e-9);
   expect(c.fordMaxApproachGrade).toBeLessThanOrEqual(settings.roads.maxGrade + 1e-9);
+}
+
+/**
+ * Ground and water without one combed angle (#540), over a corpus of maps:
+ * mild mean elongation and no strongly grained map, slope aspect and river
+ * banks not gathered on the lattice axes, and rivers not following the grain.
+ */
+export function expectUnbiasedGrain(summary: GrainSummary): void {
+  expect(summary.maps).toBeGreaterThanOrEqual(40);
+  expect(summary.meanAnisotropy).toBeLessThanOrEqual(1.5);
+  // No recipe asks for grain, so no map may exceed the strong-grain limit.
+  expect(summary.maxAnisotropy).toBeLessThanOrEqual(2.2);
+  for (const share of summary.aspectLatticeShare) expect(share).toBeLessThanOrEqual(0.1);
+  expect(summary.riverBankLengthM).toBeGreaterThan(0);
+  expect(summary.riverGrainAlignment).toBeLessThanOrEqual(0.7);
+  expect(summary.riverGridTotal).toBeLessThanOrEqual(0.16);
 }

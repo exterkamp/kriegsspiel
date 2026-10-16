@@ -157,7 +157,7 @@ describe('versioned bounded bank and shoulder cuts', () => {
       r = value(generateGeography(source, bounds, s, 97)),
       q = createElevationQueries({ elevation: r.elevation, bounds });
     expect(r.evidence.shoulder).toMatchObject({
-      policy: 'banded-lipschitz-cut-v2',
+      policy: 'banded-lipschitz-cut-v3',
       fullGradientCap: 0.05,
       guaranteedManhattanBandM: 100,
     });
