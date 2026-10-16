@@ -95,6 +95,14 @@ describe('SqliteGameStore', () => {
     expect(await store.logHeader('b')).not.toHaveProperty('settings');
   });
 
+  it('keeps the rules version in the log header, and none for a game made before it (#432)', async () => {
+    const store = open(':memory:');
+    await store.saveLogHeader({ gameId: 'new', scenarioId: 's', seed: 1, rules: 2 });
+    await store.saveLogHeader({ gameId: 'old', scenarioId: 's', seed: 2 });
+    expect((await store.logHeader('new'))?.rules).toBe(2);
+    expect(await store.logHeader('old')).not.toHaveProperty('rules');
+  });
+
   it('stores header, log, progress, clock history and views', async () => {
     const store = open(':memory:');
     await store.saveLogHeader({ gameId: 'g', scenarioId: 's', seed: 7 });

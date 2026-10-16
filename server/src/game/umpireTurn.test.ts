@@ -104,6 +104,8 @@ async function play(opts: {
   dial: UmpireSettings['dial'];
   client: UmpireClient;
   seed?: number;
+  /** The engine rules to play under (#432); absent: the current ones. */
+  rules?: number;
   turnMinutes?: number;
   /** The scenario's time limit, in game minutes (Hold the Bridge's own is 50). */
   holdMinutes?: number;
@@ -136,6 +138,7 @@ async function play(opts: {
   const scenario = {
     ...base,
     seed: opts.seed ?? 1815,
+    ...(opts.rules === undefined ? {} : { rules: opts.rules }),
     ...(opts.holdMinutes
       ? { victory: { ...base.victory, holdMs: opts.holdMinutes * MINUTE } }
       : {}),
@@ -979,6 +982,9 @@ describe("the umpire's journal (D39, 11.8)", () => {
       client: model,
       turnMinutes: 5,
       holdMinutes: 60,
+      // Seed 1815 lasts the 12 turns with couriers on the world's dice (rules 1); under rules 2 it
+      // ends sooner, as most seeds do under either rules (#432).
+      rules: 1,
       afterTurn: (game) => {
         const clock = game.gameClock.snapshot();
         for (const side of ['blue', 'red'] as const) {

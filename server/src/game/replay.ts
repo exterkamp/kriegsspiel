@@ -95,6 +95,9 @@ export function replayLog(
   // The dial chosen at creation is part of the starting world, as the host built it.
   const start = structuredClone(world);
   if (header.settings) start.dial = header.settings.dial;
+  // So are the rules it was made under (#432): an older log has none and replays under rules 1.
+  if (header.rules !== undefined) start.rules = header.rules;
+  else delete start.rules;
   const state0 = createState(header.seed, start, 0);
   return replayFrom(init?.(state0) ?? state0, header.gameId, entries, registry, untilGameMs);
 }
