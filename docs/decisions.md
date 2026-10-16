@@ -1078,3 +1078,45 @@ As a last line of defence, composition turns any exception no stage expected int
 **Measured.** All 150 maps now generate and certify. In CI, `tests/generation-sweep.test.ts` runs the seeds that failed (one or more per cause) plus seed 1 of each preset. After `npm run build -w packages/maps`, `node scripts/maps-render/sweep.mjs` runs the full sweep. `tests/realism-roads.test.ts` now requires all 40 of its maps to plan.
 
 **See.** [Geography](../packages/maps/docs/geography.md), [planning](../packages/maps/docs/planning.md), [composition](../packages/maps/docs/composition.md).
+
+## D50: Villages and farms turn to their ground and approach (#545)
+
+**Decision.** Planning stage `rotated-sites-any-angle-network-v5` replaces `sited-graded-any-angle-network-v4`. Under D48 every site was an axis-aligned square laid out with rotation 0, so 99% of settlement street length, and 34% of all road length, ran within 2.5° of 0°, 45°, 90° or 135°. Each site square now turns by a whole degree in [0, 90) (`SITE_ORIENTATION`, `src/planning/sites.ts`), and the settlement layout, its streets, access tracks and building footprints turn with it through the existing settlement frame. The turn sums three directions as quarter-turn vectors (a square is the same under quarter turns):
+
+- **terrain**: the gradient at the anchor and on rings of half and one extent, each weighted by its size, so the sides run along the contour and fall line; it counts in full once the mean aligned gradient reaches 3%;
+- **valley**: the nearest river reach within 400 m, fading with distance, so the sides run along the valley;
+- **approach**: the direction to the nearest site already placed (else the nearest requested boundary exit), at weight 0.5, so a site on flat ground turns square to the road that will reach it.
+
+The best whole degree is read from a literal table of correctly rounded sines (`src/rotation.ts`). Directions combine by double-angle identities, so there is no runtime trigonometry, randomness or clock; with no direction at all the turn comes from the seed. Candidates are ranked and certified as turned squares. When a slot takes one, the approach is recomputed toward the placed sites, and a turn that then fails the footprint certificate or overlaps falls back to the certified one.
+
+A turned square grows 1.5 µm on each side, so rounding never takes its area or frame extent below the recorded size, and carries each side's midpoint as a ring vertex: the entrance lies exactly on the boundary in world and local coordinates. Its connector leaves along the side's normal for one lattice spacing with that normal's whole-degree bearing, and a second graded connector joins the lattice, replaceable by the any-angle pass. Road search blocks lattice nodes in each site's own frame.
+
+A turned frame rounds each mapped point on its own, so assembly keeps every join exact. An entrance the fork kept as supplied maps back to its planned world point and bearing. Each vertex of its lead goes back onto the entrance bearing's line. Each access join goes back onto its world street, and each doorway onto its world footprint edge. Each of these is the decimal6 point, of the nine around the projection, nearest the line. Reconciliation can put a displaced join on a slanted side by making it a ring vertex.
+
+**Contract.** The `kriegsspiel/local-map` v1 schema is unchanged; `rotationDeg` was always recorded. Two generator-independent checks change, and both are unchanged for unturned sites:
+
+- Site extents are measured in each site's own frame (`siteFrameExtents`). A site turned by a whole number of quarter turns, or by no whole degree, is still measured on the world axes, exactly as before.
+- The saved validator's entrance mouth runs along the street it excuses, which must still lie on the entrance bearing within a micrometre, and is 10 µm wider than the street, as the fork's own mouth is. A polygonal mouth turned against the street by that micrometre's angle left slivers at any bearing that is not a quarter turn, and coincident capsule edges broke polygon clipping's sweep line.
+
+`LEGACY_GENERATORS` gains the D48/D49 identity (any-angle roads with unturned sites). A saved map of the D46 fixture's recipe from that generator (`packages/maps/tests/fixtures/d48-saved-map.json`) is tested to certify but not replay, and the D44–D46 fixtures and `data/maps` still certify. `data/maps` is not regenerated.
+
+**Measured.** Over seeds 1–20 of `river-valley` and `wooded-hills` (40 complete maps, `scripts/maps-render/streets.mjs`), all 40 generate:
+
+| 40 maps | D48/D49 (main) | D50 |
+|---|---|---|
+| streets within 2.5° of the grid angles | 99.3% | 10.9% |
+| tracks (site connectors, access) | 49.1% | 11.3% |
+| regional roads | 13.7% | 14.8% |
+| all roads | 33.9% | 13.8% |
+
+Uniformly random bearings give 11%. Site anchors keep their slope, summit and river-flat results (largest anchor slope 0.021, no summits, no low river flats), and every site still has its full population. All default presets for seeds 1–50 still generate and certify. In CI:
+
+- `tests/generation-sweep.test.ts` holds its 10 maps to at most 25% grid-aligned street length and 20% of all road length, with sound settlement realism;
+- `tests/realism-roads.test.ts` holds the 40 planned maps to at most 20% of sites turned within 2.5° of a grid angle (12.7% measured);
+- `tests/rotation.test.ts` checks the table, the quarter-turn maths and turned squares.
+
+Generation of the 40 maps took 460 s against main's 423 s, run interleaved on two workers. Renders, metrics and fresh-process benchmarks are in `docs/map-realism/settlements/`.
+
+**Not done.** On flat ground, sites on the candidate lattice turn toward each other along lattice directions, so some turn by exactly 0° or 45°. The fork still lays streets out on its own local lattice, so a site's streets keep right angles to each other. Villages do not bend along a curved road or valley.
+
+**See.** [Planning](../packages/maps/docs/planning.md), [composition](../packages/maps/docs/composition.md).
