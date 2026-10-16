@@ -374,34 +374,34 @@
  ],
  "orders": [
   {
-   "orderId": "r1-2",
-   "side": "red",
-   "to": "red-1",
-   "text": "Advance to the bridge. Drive off any pickets on this bank.",
-   "courier": "fast",
-   "sentTurn": 2,
-   "status": "arrived",
-   "arrivedAtMinuteOfTurn": 4
-  },
-  {
-   "orderId": "r3-2",
-   "side": "red",
-   "to": "red-3",
-   "text": "Ride on the Vanguard's right and cut off the enemy horse if it tries to stand.",
-   "courier": "fast",
-   "sentTurn": 2,
-   "status": "arrived",
-   "arrivedAtMinuteOfTurn": 3
-  },
-  {
-   "orderId": "b3-1",
+   "orderId": "blue-b3-1",
    "side": "blue",
    "to": "blue-3",
    "text": "Hold the north end of the bridge as a picket. Watch the road. If pressed by infantry, fall back over the bridge and re-form behind the 1st Battalion.",
    "courier": "safe",
-   "sentTurn": 1,
+   "sentAtMinute": 0,
    "status": "arrived",
    "arrivedAtMinuteOfTurn": 0
+  },
+  {
+   "orderId": "red-r1-2",
+   "side": "red",
+   "to": "red-1",
+   "text": "Advance to the bridge. Drive off any pickets on this bank.",
+   "courier": "fast",
+   "sentAtMinute": 20,
+   "status": "arrived",
+   "arrivedAtMinuteOfTurn": 4
+  },
+  {
+   "orderId": "red-r3-2",
+   "side": "red",
+   "to": "red-3",
+   "text": "Ride on the Vanguard's right and cut off the enemy horse if it tries to stand.",
+   "courier": "fast",
+   "sentAtMinute": 20,
+   "status": "arrived",
+   "arrivedAtMinuteOfTurn": 3
   }
  ],
  "projection": {
@@ -418,8 +418,9 @@
     "ammo": 100,
     "status": "active",
     "continuing": {
-     "kind": "hold"
-    }
+     "kind": "idle"
+    },
+    "at": "near the bridge, west of the High road"
    },
    {
     "unitId": "blue-2",
@@ -433,38 +434,61 @@
     "ammo": 100,
     "status": "active",
     "continuing": {
-     "kind": "hold"
-    }
+     "kind": "idle"
+    },
+    "at": "near the bridge, east of the High road"
    },
    {
     "unitId": "blue-3",
     "x": 2050,
     "y": 1250,
-    "facingDeg": 180,
+    "facingDeg": 0,
     "formation": "line",
-    "strength": 162,
-    "morale": 29,
-    "fatigue": 21,
-    "ammo": 65,
+    "strength": 200,
+    "morale": 85,
+    "fatigue": 0,
+    "ammo": 100,
     "status": "active",
     "continuing": {
-     "kind": "hold"
-    }
+     "kind": "idle"
+    },
+    "at": "near the bridge, on the High road",
+    "contacts": [
+     "red-1"
+    ]
    },
    {
     "unitId": "red-1",
     "x": 2050,
-    "y": 1350,
-    "facingDeg": 0,
+    "y": 1500,
+    "facingDeg": 180,
     "formation": "column",
-    "strength": 627,
-    "morale": 72,
-    "fatigue": 37,
-    "ammo": 30,
+    "strength": 650,
+    "morale": 80,
+    "fatigue": 12,
+    "ammo": 100,
     "status": "active",
     "continuing": {
      "kind": "idle"
-    }
+    },
+    "at": "at the bridge, on the High road",
+    "path": [
+     [
+      2050,
+      850
+     ],
+     [
+      2050,
+      1100
+     ],
+     [
+      2050,
+      1500
+     ]
+    ],
+    "contacts": [
+     "blue-3"
+    ]
    },
    {
     "unitId": "red-2",
@@ -474,50 +498,113 @@
     "formation": "column",
     "strength": 650,
     "morale": 70,
-    "fatigue": 7,
-    "ammo": 100,
-    "status": "active",
-    "continuing": {
-     "kind": "hold"
-    }
-   },
-   {
-    "unitId": "red-3",
-    "x": 1950,
-    "y": 1300,
-    "facingDeg": 160,
-    "formation": "line",
-    "strength": 220,
-    "morale": 85,
-    "fatigue": 2,
+    "fatigue": 11,
     "ammo": 100,
     "status": "active",
     "continuing": {
      "kind": "idle"
-    }
+    },
+    "at": "on the High road"
+   },
+   {
+    "unitId": "red-3",
+    "x": 1800,
+    "y": 900,
+    "facingDeg": 160,
+    "formation": "line",
+    "strength": 220,
+    "morale": 85,
+    "fatigue": 6,
+    "ammo": 100,
+    "status": "active",
+    "continuing": {
+     "kind": "idle"
+    },
+    "at": "west of the High road"
+   }
+  ],
+  "observations": [
+   {
+    "side": "blue",
+    "unitId": "red-1",
+    "by": "blue-3",
+    "when": "start"
+   },
+   {
+    "side": "blue",
+    "unitId": "red-2",
+    "by": "blue-3",
+    "when": "start"
+   },
+   {
+    "side": "blue",
+    "unitId": "red-3",
+    "by": "blue-3",
+    "when": "start"
+   },
+   {
+    "side": "red",
+    "unitId": "blue-1",
+    "by": "red-3",
+    "when": "start"
+   },
+   {
+    "side": "red",
+    "unitId": "blue-3",
+    "by": "red-1",
+    "when": "start"
+   },
+   {
+    "side": "blue",
+    "unitId": "red-1",
+    "by": "blue-1",
+    "when": "end"
+   },
+   {
+    "side": "blue",
+    "unitId": "red-2",
+    "by": "blue-3",
+    "when": "end"
+   },
+   {
+    "side": "blue",
+    "unitId": "red-3",
+    "by": "blue-3",
+    "when": "end"
+   },
+   {
+    "side": "red",
+    "unitId": "blue-1",
+    "by": "red-1",
+    "when": "end"
+   },
+   {
+    "side": "red",
+    "unitId": "blue-2",
+    "by": "red-1",
+    "when": "end"
+   },
+   {
+    "side": "red",
+    "unitId": "blue-3",
+    "by": "red-1",
+    "when": "end"
    }
   ],
   "events": [
-   "minute 0: unit.arrived {\"unitId\":\"blue-3\",\"at\":[2050,1250]}",
-   "minute 4: unit.arrived {\"unitId\":\"red-3\",\"at\":[1950,1300]}",
-   "minute 6: unit.arrived {\"unitId\":\"red-1\",\"at\":[2050,1350]}",
-   "minute 7: combat.morale {\"unitId\":\"blue-3\",\"lossPercent\":7.5,\"roll\":8,\"needed\":7,\"passed\":false,\"morale\":58.4}",
-   "minute 7: combat.fire {\"attacker\":\"blue-3\",\"target\":\"red-1\",\"distance\":100,\"cover\":1,\"aspect\":\"rear\",\"melee\":false,\"die\":2,\"casualties\":4.4,\"targetStrength\":645.6,\"targetMorale\":78}",
-   "minute 7: combat.fire {\"attacker\":\"red-1\",\"target\":\"blue-3\",\"distance\":100,\"cover\":1,\"aspect\":\"rear\",\"melee\":false,\"die\":6,\"casualties\":15,\"targetStrength\":185,\"targetMorale\":58.4}",
-   "minute 9: combat.fire {\"attacker\":\"blue-3\",\"target\":\"red-1\",\"distance\":100,\"cover\":1,\"aspect\":\"front\",\"melee\":false,\"die\":6,\"casualties\":5.3,\"targetStrength\":640.3,\"targetMorale\":76.3}",
-   "minute 9: combat.fire {\"attacker\":\"red-1\",\"target\":\"blue-3\",\"distance\":100,\"cover\":1,\"aspect\":\"front\",\"melee\":false,\"die\":6,\"casualties\":7.4,\"targetStrength\":177.6,\"targetMorale\":50.5}",
-   "minute 11: combat.fire {\"attacker\":\"blue-3\",\"target\":\"red-1\",\"distance\":100,\"cover\":1,\"aspect\":\"front\",\"melee\":false,\"die\":5,\"casualties\":4,\"targetStrength\":636.3,\"targetMorale\":75.1}",
-   "minute 11: combat.fire {\"attacker\":\"red-1\",\"target\":\"blue-3\",\"distance\":100,\"cover\":1,\"aspect\":\"front\",\"melee\":false,\"die\":2,\"casualties\":2.4,\"targetStrength\":175.2,\"targetMorale\":47.7}",
-   "minute 13: combat.fire {\"attacker\":\"blue-3\",\"target\":\"red-1\",\"distance\":100,\"cover\":1,\"aspect\":\"front\",\"melee\":false,\"die\":2,\"casualties\":1.6,\"targetStrength\":634.7,\"targetMorale\":74.6}",
-   "minute 13: combat.fire {\"attacker\":\"red-1\",\"target\":\"blue-3\",\"distance\":100,\"cover\":1,\"aspect\":\"front\",\"melee\":false,\"die\":1,\"casualties\":1.2,\"targetStrength\":174,\"targetMorale\":46.4}",
-   "minute 15: combat.fire {\"attacker\":\"blue-3\",\"target\":\"red-1\",\"distance\":100,\"cover\":1,\"aspect\":\"front\",\"melee\":false,\"die\":3,\"casualties\":2.3,\"targetStrength\":632.4,\"targetMorale\":73.9}",
-   "minute 15: combat.fire {\"attacker\":\"red-1\",\"target\":\"blue-3\",\"distance\":100,\"cover\":1,\"aspect\":\"front\",\"melee\":false,\"die\":1,\"casualties\":1.2,\"targetStrength\":172.8,\"targetMorale\":45}",
-   "minute 17: combat.morale {\"unitId\":\"blue-3\",\"lossPercent\":4.1,\"roll\":11,\"needed\":4,\"passed\":false,\"morale\":32.8}",
-   "minute 17: combat.fire {\"attacker\":\"blue-3\",\"target\":\"red-1\",\"distance\":100,\"cover\":1,\"aspect\":\"front\",\"melee\":false,\"die\":5,\"casualties\":3.8,\"targetStrength\":628.7,\"targetMorale\":72.7}",
-   "minute 17: combat.fire {\"attacker\":\"red-1\",\"target\":\"blue-3\",\"distance\":100,\"cover\":1,\"aspect\":\"front\",\"melee\":false,\"die\":6,\"casualties\":7.1,\"targetStrength\":165.7,\"targetMorale\":32.8}",
-   "minute 19: combat.fire {\"attacker\":\"blue-3\",\"target\":\"red-1\",\"distance\":100,\"cover\":1,\"aspect\":\"front\",\"melee\":false,\"die\":3,\"casualties\":2,\"targetStrength\":626.7,\"targetMorale\":72}",
-   "minute 19: combat.fire {\"attacker\":\"red-1\",\"target\":\"blue-3\",\"distance\":100,\"cover\":1,\"aspect\":\"front\",\"melee\":false,\"die\":3,\"casualties\":3.5,\"targetStrength\":162.2,\"targetMorale\":28.6}"
-  ]
+   "20: order_delivered blue-3, orderId blue-b3-1",
+   "23: order_delivered red-3, orderId red-r3-2",
+   "24: order_delivered red-1, orderId red-r1-2",
+   "25: contact.begin blue-3 v red-1",
+   "27: unit.arrived red-1",
+   "27: contact.end",
+   "37: game.end reason objective-taken, winner red"
+  ],
+  "outcome": {
+   "winner": "red",
+   "reason": "objective-taken",
+   "atMin": 37
+  }
  }
 }
 ```
@@ -536,17 +623,14 @@
    "formation": "line",
    "strength": 600,
    "morale": 80,
+   "fatigue": 0,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
-   "orders": [
-    {
-     "orderId": "b3-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Aubry holds his position, maintaining the line and watching the road. He is cautious about committing his reserves."
+   "orders": [],
+   "account": "Col. Aubry kept his battalion in line south of the river, facing the bridge. He saw the enemy column come down the road to the north bank and held fire, the range being too long. He awaits further orders."
   },
   {
    "unitId": "blue-2",
@@ -556,57 +640,61 @@
    "formation": "line",
    "strength": 550,
    "morale": 75,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Col. Delacroix stayed in line east of the road with the reserve in hand. He saw the enemy column on the north bank and committed nothing. He has the bridge under his eye."
+  },
+  {
+   "unitId": "blue-3",
+   "x": 2000,
+   "y": 1760,
+   "facingDeg": 0,
+   "formation": "line",
+   "strength": 200,
+   "morale": 85,
+   "fatigue": 5,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
    "orders": [
     {
-     "orderId": "b3-1",
-     "result": "partly"
+     "orderId": "blue-b3-1",
+     "result": "carried-out"
     }
    ],
-   "account": "Col. Delacroix is hesitant to move his battalion, preferring to wait for further orders."
-  },
-  {
-   "unitId": "blue-3",
-   "x": 2050,
-   "y": 1250,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 162,
-   "morale": 29,
-   "status": "active",
-   "continuing": {
-    "kind": "idle"
-   },
-   "orders": [
-    {
-     "orderId": "b3-1",
-     "result": "misread"
-    }
-   ],
-   "account": "Maj. Verneuil, eager to act, misinterprets the order and moves his squadron to the bridge, where he is engaged in combat."
+   "account": "Maj. Verneuil watched the road from the north end of the bridge. When the enemy infantry column came down on him with hussars on the west flank, he fell back over the bridge as ordered and re-formed behind the 1st Battalion. He did not charge, though it galled him.",
+   "departure": "The projection leaves the cavalry on the north bank in contact with a column. His order says to fall back over the bridge if pressed by infantry. He is a picket against a battalion, so he withdraws to the south bank, 500 m from the projected position."
   },
   {
    "unitId": "red-1",
    "x": 2050,
-   "y": 1350,
-   "facingDeg": 0,
+   "y": 1420,
+   "facingDeg": 180,
    "formation": "column",
-   "strength": 627,
-   "morale": 72,
+   "strength": 650,
+   "morale": 80,
+   "fatigue": 13,
+   "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "idle"
+    "kind": "move",
+    "x": 2050,
+    "y": 1500
    },
    "orders": [
     {
-     "orderId": "r1-2",
+     "orderId": "red-r1-2",
      "result": "carried-out"
     }
    ],
-   "account": "Col. Brandt advances his battalion towards the bridge, engaging the blue picket."
+   "account": "Col. Brandt got his order at about the fourth minute and moved down the High road in column. The enemy picket fell back over the bridge. He halted at the north end, short of the span. Two enemy battalions in line lie 200 m beyond it. He is closing up and will take the bridge next."
   },
   {
    "unitId": "red-2",
@@ -616,78 +704,124 @@
    "formation": "column",
    "strength": 650,
    "morale": 70,
+   "fatigue": 5,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Col. Hartmann had no new order and stayed on the High road, waiting for instructions."
+  },
+  {
+   "unitId": "red-3",
+   "x": 1960,
+   "y": 1340,
+   "facingDeg": 180,
+   "formation": "line",
+   "strength": 220,
+   "morale": 85,
+   "fatigue": 12,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
    "orders": [
     {
-     "orderId": "r1-2",
-     "result": "not-arrived"
+     "orderId": "red-r3-2",
+     "result": "carried-out"
     }
    ],
-   "account": "Col. Hartmann waits for further orders, maintaining his position."
-  },
-  {
-   "unitId": "red-3",
-   "x": 1950,
-   "y": 1300,
-   "facingDeg": 160,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "idle"
-   },
-   "orders": [
-    {
-     "orderId": "r3-2",
-     "result": "partly"
-    }
-   ],
-   "account": "Maj. von Reiter rides to the left of the Vanguard, but does not engage the enemy as planned."
+   "account": "Maj. von Reiter rode down on the Vanguard's right to the river bank. The enemy horse withdrew over the bridge before he could cut it off. He halted on the bank, since the river stops him and the enemy infantry is near.",
+   "departure": "The projection leaves the hussars idle at 1800,900. His order is to ride on the Vanguard's right, so he moves with the column to the north bank, 450 m from the projected position."
   }
  ],
  "observations": [
   {
    "side": "blue",
+   "unitId": "red-1",
+   "by": "blue-3",
+   "when": "start"
+  },
+  {
+   "side": "blue",
+   "unitId": "red-2",
+   "by": "blue-3",
+   "when": "start"
+  },
+  {
+   "side": "blue",
+   "unitId": "red-3",
+   "by": "blue-3",
+   "when": "start"
+  },
+  {
+   "side": "red",
    "unitId": "blue-1",
+   "by": "red-3",
+   "when": "start"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-3",
+   "by": "red-1",
+   "when": "start"
+  },
+  {
+   "side": "blue",
+   "unitId": "red-1",
    "by": "blue-1",
    "when": "end"
   },
   {
    "side": "blue",
-   "unitId": "blue-2",
-   "by": "blue-2",
+   "unitId": "red-3",
+   "by": "blue-1",
    "when": "end"
   },
   {
    "side": "blue",
-   "unitId": "blue-3",
+   "unitId": "red-1",
+   "by": "blue-3",
+   "when": "end"
+  },
+  {
+   "side": "blue",
+   "unitId": "red-3",
    "by": "blue-3",
    "when": "end"
   },
   {
    "side": "red",
-   "unitId": "red-1",
+   "unitId": "blue-1",
    "by": "red-1",
    "when": "end"
   },
   {
    "side": "red",
-   "unitId": "red-2",
-   "by": "red-2",
+   "unitId": "blue-2",
+   "by": "red-1",
    "when": "end"
   },
   {
    "side": "red",
-   "unitId": "red-3",
+   "unitId": "blue-1",
+   "by": "red-3",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-2",
    "by": "red-3",
    "when": "end"
   }
  ],
- "summary": "In turn 2, the red vanguard battalion advances towards the bridge, engaging the blue picket. The blue cavalry squadron, misinterpreting its orders, moves to the bridge and is engaged in combat. The red line battalion waits for further orders, while the red hussar squadron rides to the left of the vanguard but does not engage the enemy. The blue line battalions hold their positions, maintaining their formation and morale. Combat between the red vanguard and the blue picket is intense, with significant losses on both sides."
+ "summary": "The Red Vanguard (red-1) came down the High road and halted on the north bank at about y=1420, short of the bridge. Blue's cavalry picket (blue-3) fell back over the bridge to the south bank, as its order directed, and stands behind blue-1. The Red hussars (red-3) are on the river bank west of the road. Red's second battalion (red-2) stays at 2050,550 with no order. Blue's two battalions hold in line at y=1680. No fire was exchanged, since the range was over 200 m. I did not accept the engine's finding that the objective was taken at minute 37. No Red unit has crossed the bridge or stood on the objective, and Blue's infantry cover it at 180 m. Next turn: red-1 will try to take the bridge in column under fire from blue-1 and blue-2.",
+ "precedents": [
+  "A picket cavalry ordered to fall back if pressed by infantry withdraws once a formed battalion closes within about 400 m.",
+  "The objective is not taken merely because a unit is projected onto it; it must get there against formed infantry covering it."
+ ]
 }
 ```
 
@@ -705,18 +839,15 @@
    "formation": "line",
    "strength": 600,
    "morale": 80,
+   "fatigue": 0,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
-   "orders": [
-    {
-     "orderId": "b1-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Held position as ordered. Saw enemy cavalry approaching from the north.",
-   "departure": ""
+   "orders": [],
+   "account": "Col. Aubry held his line south of the bridge as ordered. Our horse came back over the bridge and formed in his rear. An enemy column halted at the far bridgehead with hussars on its flank. They were beyond effective musket range, so he held his fire.",
+   "departure": "Continues to hold rather than going idle; same position."
   },
   {
    "unitId": "blue-2",
@@ -726,60 +857,61 @@
    "formation": "line",
    "strength": 550,
    "morale": 75,
+   "fatigue": 0,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
-   "orders": [
-    {
-     "orderId": "b2-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Held position as ordered. Saw enemy infantry approaching from the south.",
-   "departure": ""
+   "orders": [],
+   "account": "Col. Delacroix kept his battalion in line east of the road and watched the enemy column come up to the far end of the bridge. With no new orders and the enemy out of range, he stayed where he was.",
+   "departure": "Continues to hold rather than going idle; same position."
   },
   {
    "unitId": "blue-3",
-   "x": 2050,
-   "y": 1250,
-   "facingDeg": 180,
+   "x": 1960,
+   "y": 1800,
+   "facingDeg": 0,
    "formation": "line",
-   "strength": 162,
-   "morale": 29,
+   "strength": 196,
+   "morale": 82,
+   "fatigue": 6,
+   "ammo": 98,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
    "orders": [
     {
-     "orderId": "b3-1",
+     "orderId": "blue-b3-1",
      "result": "carried-out"
     }
    ],
-   "account": "Held position as ordered. Saw enemy infantry approaching from the south.",
-   "departure": "Departed from projected position due to combat losses."
+   "account": "Maj. Verneuil picketed the road north of the bridge. A strong enemy column came down the road with hussars on its right. He was pressed by infantry, and his orders said what to do, so he exchanged a few carbine shots and took the squadron back over the bridge before the hussars could close. He re-formed behind the 1st Battalion. A handful of men were hit.",
+   "departure": "The projection left the picket standing on the road while the enemy column marched through it. Its order said to fall back over the bridge if pressed by infantry, so it did; it ends 550 m south."
   },
   {
    "unitId": "red-1",
    "x": 2050,
-   "y": 1350,
-   "facingDeg": 0,
+   "y": 1410,
+   "facingDeg": 180,
    "formation": "column",
-   "strength": 627,
-   "morale": 72,
+   "strength": 648,
+   "morale": 80,
+   "fatigue": 17,
+   "ammo": 98,
    "status": "active",
    "continuing": {
-    "kind": "idle"
+    "kind": "hold"
    },
    "orders": [
     {
-     "orderId": "r1-2",
+     "orderId": "red-r1-2",
      "result": "carried-out"
     }
    ],
-   "account": "Advanced to the bridge as ordered. Engaged enemy cavalry.",
-   "departure": ""
+   "account": "Col. Brandt marched at once down the road. His skirmishers pushed the enemy horse picket off this bank, and it withdrew over the bridge. He halted at the north end of the bridge. Two enemy battalions stood in line on the far bank, so he did not file his column across under their muskets.",
+   "departure": "The order was to advance to the bridge and clear this bank. Brandt reached the north bridgehead and did not carry a column onto the span against two formed battalions without orders. He ends 90 m short of the projected position, off the objective."
   },
   {
    "unitId": "red-2",
@@ -789,80 +921,154 @@
    "formation": "column",
    "strength": 650,
    "morale": 70,
+   "fatigue": 11,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Col. Hartmann had no new orders, so he kept his column halted on the road and let the men rest."
+  },
+  {
+   "unitId": "red-3",
+   "x": 1920,
+   "y": 1340,
+   "facingDeg": 170,
+   "formation": "line",
+   "strength": 220,
+   "morale": 85,
+   "fatigue": 14,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
    "orders": [
     {
-     "orderId": "r2-1",
+     "orderId": "red-r3-2",
      "result": "carried-out"
     }
    ],
-   "account": "Held position as ordered.",
-   "departure": ""
-  },
-  {
-   "unitId": "red-3",
-   "x": 1950,
-   "y": 1300,
-   "facingDeg": 160,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "idle"
-   },
-   "orders": [
-    {
-     "orderId": "r3-2",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Rode on the Vanguard's right as ordered. Saw enemy cavalry approaching from the north.",
-   "departure": ""
+   "account": "Maj. von Reiter rode down on the right of the vanguard to cut off the enemy horse. It did not stand but went back over the bridge before he could reach it. He halted at the river bank west of the road; the river is impassable there and the column held the bridge.",
+   "departure": "The projection left the squadron idle at its start. Its order had arrived and it rode with the vanguard as ordered, ending about 460 m south-east at the river bank."
   }
  ],
  "observations": [
   {
    "side": "blue",
-   "unitId": "blue-1",
-   "by": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "blue-2",
-   "by": "blue-2",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "blue-3",
    "by": "blue-3",
-   "when": "end"
-  },
-  {
-   "side": "red",
    "unitId": "red-1",
-   "by": "red-1",
-   "when": "end"
+   "when": "start"
   },
   {
-   "side": "red",
+   "side": "blue",
+   "by": "blue-3",
    "unitId": "red-2",
-   "by": "red-2",
+   "when": "start"
+  },
+  {
+   "side": "blue",
+   "by": "blue-3",
+   "unitId": "red-3",
+   "when": "start"
+  },
+  {
+   "side": "red",
+   "by": "red-3",
+   "unitId": "blue-1",
+   "when": "start"
+  },
+  {
+   "side": "red",
+   "by": "red-3",
+   "unitId": "blue-3",
+   "when": "start"
+  },
+  {
+   "side": "red",
+   "by": "red-1",
+   "unitId": "blue-3",
+   "when": "start"
+  },
+  {
+   "side": "blue",
+   "by": "blue-1",
+   "unitId": "red-1",
+   "when": "end"
+  },
+  {
+   "side": "blue",
+   "by": "blue-1",
+   "unitId": "red-3",
+   "when": "end"
+  },
+  {
+   "side": "blue",
+   "by": "blue-2",
+   "unitId": "red-1",
+   "when": "end"
+  },
+  {
+   "side": "blue",
+   "by": "blue-2",
+   "unitId": "red-3",
+   "when": "end"
+  },
+  {
+   "side": "blue",
+   "by": "blue-3",
+   "unitId": "red-1",
+   "when": "end"
+  },
+  {
+   "side": "blue",
+   "by": "blue-3",
+   "unitId": "red-3",
    "when": "end"
   },
   {
    "side": "red",
-   "unitId": "red-3",
+   "by": "red-1",
+   "unitId": "blue-1",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "by": "red-1",
+   "unitId": "blue-2",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "by": "red-1",
+   "unitId": "blue-3",
+   "when": "end"
+  },
+  {
+   "side": "red",
    "by": "red-3",
+   "unitId": "blue-1",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "by": "red-3",
+   "unitId": "blue-2",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "by": "red-3",
+   "unitId": "blue-3",
    "when": "end"
   }
  ],
- "summary": "The battle continues with both sides engaging each other. The Blue cavalry unit, led by Maj. Verneuil, holds its position at the north end of the bridge. The Red infantry units, led by Col. Brandt and Col. Hartmann, advance towards the bridge and engage the Blue cavalry. The Red cavalry unit, led by Maj. von Reiter, rides on the Vanguard's right and cuts off the enemy horse if it tries to stand. The Blue infantry units, led by Col. Aubry and Col. Delacroix, hold their positions and engage the Red infantry. The combat is intense, with both sides suffering losses."
+ "summary": "The Blue cavalry picket was pressed by the Red vanguard column; following its order, it fell back over the bridge with trifling loss and re-formed behind blue-1 at 1960,1800. Red-1 cleared the north bank and halted in column at the north bridgehead (2050,1410), off the objective; Col. Brandt was ordered only to advance to the bridge and clear this bank, and did not carry his column across under two formed Blue battalions. Red-3 rode on the vanguard's right to the river bank at 1920,1340 but could not cut off the Blue horse, which did not stand. Blue-1 and blue-2 hold in line at y=1680, about 280 m from the bridgehead and out of effective range; no fire was exchanged. Red-2 stands rested on the road at y=550 without orders. I overrode the projection's capture of the objective at minute 37: it rested on a column marching through a standing picket and halting on the span unopposed.",
+ "precedents": [
+  "A unit ordered to advance 'to the bridge' halts at the near bridgehead; it does not cross onto the span under formed enemy fire without an explicit order to cross.",
+  "A column marching into a standing picket does not pass through it: the picket retires or fights as its orders say."
+ ]
 }
 ```
 
@@ -880,619 +1086,11 @@
    "formation": "line",
    "strength": 600,
    "morale": 80,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "The battalion maintained its position, holding the line as ordered. The enemy's advance was not yet a direct threat to our position.",
-   "departure": ""
-  },
-  {
-   "unitId": "blue-2",
-   "x": 2140,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 550,
-   "morale": 75,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "The battalion remained in reserve, maintaining its defensive posture. The commander was cautious, waiting for the main thrust of the enemy to materialize before committing.",
-   "departure": ""
-  },
-  {
-   "unitId": "blue-3",
-   "x": 2050,
-   "y": 1250,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 162,
-   "morale": 32,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "b3-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Following the order, the squadron held its position near the bridge, acting as a picket. When the enemy column advanced, the squadron engaged, suffering heavy losses in the skirmish.",
-   "departure": "The unit engaged in combat, resulting in significant morale and strength losses, consistent with the projection."
-  },
-  {
-   "unitId": "red-1",
-   "x": 2050,
-   "y": 1150,
-   "facingDeg": 0,
-   "formation": "column",
-   "strength": 627,
-   "morale": 72,
-   "status": "active",
-   "continuing": {
-    "kind": "move",
-    "x": 2050,
-    "y": 1150
-   },
-   "orders": [
-    {
-     "orderId": "r1-2",
-     "result": "carried-out"
-    }
-   ],
-   "account": "The aggressive commander pressed the advance towards the bridge as ordered. The column engaged the enemy cavalry, taking heavy casualties but maintaining momentum.",
-   "departure": "The unit advanced significantly towards the bridge, engaging the enemy cavalry in combat."
-  },
-  {
-   "unitId": "red-2",
-   "x": 2050,
-   "y": 550,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 70,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "The battalion remained in its assigned position, awaiting further orders from command.",
-   "departure": ""
-  },
-  {
-   "unitId": "red-3",
-   "x": 2150,
-   "y": 1100,
-   "facingDeg": 160,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "move",
-    "x": 2150,
-    "y": 1100
-   },
-   "orders": [
-    {
-     "orderId": "r3-2",
-     "result": "carried-out"
-    }
-   ],
-   "account": "The hussars executed the order, riding to the right flank of the vanguard column to screen and cut off any enemy cavalry attempting to exploit the advance.",
-   "departure": "The unit moved to flank the advancing vanguard, fulfilling the order."
-  }
- ],
- "observations": [
-  {
-   "side": "red",
-   "unitId": "red-1",
-   "by": "red-3",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "unitId": "red-1",
-   "by": "red-2",
-   "when": "end"
-  }
- ],
- "summary": "The Red forces initiated a strong advance. The Vanguard Battalion (red-1) moved aggressively towards the bridge, supported by the Hussars (red-3) who took up a flanking position. The Blue cavalry squadron (blue-3), positioned as a picket, met the advancing column. A fierce engagement ensued, with the cavalry suffering heavy losses while attempting to halt the column's momentum. The infantry units (blue-1 and blue-2) held their defensive lines, observing the action at the bridge. The Red Line Battalion (red-2) remained static, awaiting further orders."
-}
-```
-
-## Proposal D
-
-```json
-{
- "turn": 2,
- "units": [
-  {
-   "unitId": "blue-1",
-   "x": 1960,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 600,
-   "morale": 80,
    "fatigue": 0,
    "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Aubry held his line on the south bank as ordered, opened files to let the returning squadron pass to his rear, and watched the enemy column come down to the far end of the bridge, out of musket range."
-  },
-  {
-   "unitId": "blue-2",
-   "x": 2140,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 550,
-   "morale": 75,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Delacroix kept his battalion in line covering the bridge exit, not stirring a man, and watched enemy infantry and horse arrive on the far bank."
-  },
-  {
-   "unitId": "blue-3",
-   "x": 1980,
-   "y": 1850,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 189,
-   "morale": 76,
-   "fatigue": 18,
-   "ammo": 90,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "b3-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Maj. Verneuil held the picket and fired carbines at the enemy column as it came down the road, itching to charge. When the infantry pressed on and hussars swung round his left to cut him off, he did as written: fell back over the bridge at the trot, losing a few men to musketry and a brush with the hussars, and re-formed behind the 1st Battalion.",
-   "departure": "The engine left the squadron standing in front of a battalion column for 13 minutes of fire until morale fell to 29. Its order says to fall back over the bridge if pressed by infantry, so it withdrew early with light losses (11 men, not 38) to behind the 1st Battalion, about 600 m from the projected spot."
-  },
-  {
-   "unitId": "red-1",
-   "x": 2050,
-   "y": 1370,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 645,
-   "morale": 79,
-   "fatigue": 27,
-   "ammo": 92,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r1-2",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Brandt marched the moment the order came, column down the high road. The enemy horse picket at the bridge fired carbines and then gave way before his leading companies' volleys, retiring over the bridge. He halted at the north end of the bridge, master of this bank, with enemy lines in sight beyond.",
-   "departure": "Ammunition: the column fired only a few volleys at a picket that gave way, not 13 minutes of fire, so ammo stays at 92, not 30."
-  },
-  {
-   "unitId": "red-2",
-   "x": 2050,
-   "y": 550,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 70,
-   "fatigue": 10,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Hartmann, with no new orders, held his column on the road and rested his men."
-  },
-  {
-   "unitId": "red-3",
-   "x": 1950,
-   "y": 1330,
-   "facingDeg": 160,
-   "formation": "line",
-   "strength": 217,
-   "morale": 85,
-   "fatigue": 20,
-   "ammo": 98,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r3-2",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Maj. von Reiter rode on the column's right to get between the enemy horse and the bridge. The enemy did not stand: his leading troop caught their rear in a brief scuffle before they crossed. He drew rein at the river bank rather than follow onto a bridge covered by enemy infantry."
-  }
- ],
- "observations": [
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-1",
-   "when": "start"
-  },
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-2",
-   "when": "start"
-  },
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-3",
-   "when": "start"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-3",
-   "when": "start"
-  },
-  {
-   "side": "red",
-   "by": "red-3",
-   "unitId": "blue-3",
-   "when": "start"
-  },
-  {
-   "side": "red",
-   "by": "red-3",
-   "unitId": "blue-1",
-   "when": "start"
-  },
-  {
-   "side": "blue",
-   "by": "blue-1",
-   "unitId": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-1",
-   "unitId": "red-3",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-2",
-   "unitId": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-2",
-   "unitId": "red-3",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-3",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-2",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-3",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-3",
-   "unitId": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-3",
-   "unitId": "blue-2",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-3",
-   "unitId": "blue-3",
-   "when": "end"
-  }
- ],
- "summary": "Turn 2 (20-40). Red's Vanguard Battalion marched down the high road on receiving its order at minute 4, with the hussars riding on its right. The Blue cavalry picket at the north end of the bridge fired carbines at the column, then, pressed by infantry and with hussars working round its flank, followed its standing order and fell back over the bridge, losing 11 men in the exchange and a brief brush with the hussars. It re-formed behind the 1st Battalion. By minute 40 the Vanguard holds the north end of the bridge in column, with the hussars beside it on the bank. Red's Line Battalion stayed in reserve on the road. Blue's two battalions hold their line on the south bank, about 320 m from the bridge's north end, so no fire was exchanged across the river. The bridge itself is uncontested."
-}
-```
-
-## Proposal E
-
-```json
-{
- "turn": 2,
- "units": [
-  {
-   "unitId": "blue-1",
-   "x": 1960,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 600,
-   "morale": 80,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Aubry keeps his battalion in line south of the river, facing the bridge, as before. He sees the enemy column come down to the far end of the bridge and the horse fall back through to his rear, and holds his fire since nothing is yet within 200 m."
-  },
-  {
-   "unitId": "blue-2",
-   "x": 2140,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 550,
-   "morale": 75,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Delacroix stays in line beside the 1st Battalion and does not commit his reserve. He watches the enemy halt at the far end of the bridge and waits for them to make the first move."
-  },
-  {
-   "unitId": "blue-3",
-   "x": 2050,
-   "y": 1760,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 188,
-   "morale": 68,
-   "fatigue": 15,
-   "ammo": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "b3-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Maj. Verneuil held the north end of the bridge as ordered and watched the road. When the enemy column came within carbine range and hussars appeared on its flank, he exchanged a few shots, then, being pressed by infantry as his orders foresaw, drew off over the bridge and re-formed behind the 1st Battalion. He would rather have charged, but obeyed.",
-   "departure": "Projection has the squadron stand at 100 m from a formed column and be shot down to 162 men and morale 29. Verneuil's orders say to fall back over the bridge if pressed by infantry, and the fast horse can cross 500 m in a couple of minutes, so he disengages after a brief exchange instead. Position, losses and morale therefore differ."
-  },
-  {
-   "unitId": "red-1",
-   "x": 2050,
-   "y": 1400,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 638,
-   "morale": 78,
-   "fatigue": 28,
-   "ammo": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r1-2",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Brandt marched down the high road at once, brushed the enemy picket of horse off the road with a few volleys so that it fell back over the bridge, and halted his column at the north end of the bridge. He holds there, deploying his front companies, rather than throw the column onto the bridge under the fire of the line beyond.",
-   "departure": "Projection puts the column at (2050,1350) with 627 men and 30% ammo after a long fight with the cavalry; here the cavalry withdraws, so the fight is short, losses are 12, ammo is higher, and the column halts at the bridge head (about 50 m from the projection)."
-  },
-  {
-   "unitId": "red-2",
-   "x": 2050,
-   "y": 550,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 70,
-   "fatigue": 7,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Hartmann has no new orders and stays where he was, by the book, with his column on the road."
-  },
-  {
-   "unitId": "red-3",
-   "x": 1960,
-   "y": 1380,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "fatigue": 8,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r3-2",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Maj. von Reiter rode down on the right of the Vanguard as ordered. The enemy horse drew back over the bridge before he could cut it off. He halts on the river bank and does not follow onto the bridge against the infantry beyond."
-  }
- ],
- "observations": [
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-1",
-   "when": "start"
-  },
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-3",
-   "when": "start"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-3",
-   "when": "start"
-  },
-  {
-   "side": "red",
-   "by": "red-3",
-   "unitId": "blue-3",
-   "when": "start"
-  },
-  {
-   "side": "blue",
-   "by": "blue-1",
-   "unitId": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-1",
-   "unitId": "red-3",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-2",
-   "unitId": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-2",
-   "unitId": "red-3",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-3",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-2",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-3",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-3",
-   "unitId": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-3",
-   "unitId": "blue-2",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-3",
-   "unitId": "blue-3",
-   "when": "end"
-  }
- ],
- "summary": "The Red vanguard column came down the high road and met the Blue cavalry picket at the north end of the bridge. After a short exchange of fire the picket, pressed by infantry as its orders foresaw, fell back over the bridge and re-formed behind the 1st Battalion. Red hussars rode on the column's right but could not cut it off. Red-1 halted at the bridge head and Red-3 on the river bank. Blue infantry held their line south of the river, out of range. Losses were light: about 12 Red infantry and about 12 Blue horse. The projection kept the cavalry standing and destroyed it; the umpire let it obey its orders to withdraw."
-}
-```
-
-## Proposal F
-
-```json
-{
- "turn": 2,
- "units": [
-  {
-   "unitId": "blue-1",
-   "x": 1960,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 600,
-   "morale": 80,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
+    "kind": "idle"
    },
    "orders": [],
    "account": "The 1st Battalion acted as the staff tables direct."
@@ -1509,7 +1107,7 @@
    "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "hold"
+    "kind": "idle"
    },
    "orders": [],
    "account": "The 2nd Battalion acted as the staff tables direct."
@@ -1518,19 +1116,19 @@
    "unitId": "blue-3",
    "x": 2050,
    "y": 1250,
-   "facingDeg": 180,
+   "facingDeg": 0,
    "formation": "line",
-   "strength": 162,
-   "morale": 29,
-   "fatigue": 21,
-   "ammo": 65,
+   "strength": 200,
+   "morale": 85,
+   "fatigue": 0,
+   "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "hold"
+    "kind": "idle"
    },
    "orders": [
     {
-     "orderId": "b3-1",
+     "orderId": "blue-b3-1",
      "result": "carried-out"
     }
    ],
@@ -1539,20 +1137,20 @@
   {
    "unitId": "red-1",
    "x": 2050,
-   "y": 1350,
-   "facingDeg": 0,
+   "y": 1500,
+   "facingDeg": 180,
    "formation": "column",
-   "strength": 627,
-   "morale": 72,
-   "fatigue": 37,
-   "ammo": 30,
+   "strength": 650,
+   "morale": 80,
+   "fatigue": 12,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "idle"
    },
    "orders": [
     {
-     "orderId": "r1-2",
+     "orderId": "red-r1-2",
      "result": "carried-out"
     }
    ],
@@ -1566,24 +1164,24 @@
    "formation": "column",
    "strength": 650,
    "morale": 70,
-   "fatigue": 7,
+   "fatigue": 11,
    "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "hold"
+    "kind": "idle"
    },
    "orders": [],
    "account": "The Line Battalion acted as the staff tables direct."
   },
   {
    "unitId": "red-3",
-   "x": 1950,
-   "y": 1300,
+   "x": 1800,
+   "y": 900,
    "facingDeg": 160,
    "formation": "line",
    "strength": 220,
    "morale": 85,
-   "fatigue": 2,
+   "fatigue": 6,
    "ammo": 100,
    "status": "active",
    "continuing": {
@@ -1591,14 +1189,81 @@
    },
    "orders": [
     {
-     "orderId": "r3-2",
+     "orderId": "red-r3-2",
      "result": "carried-out"
     }
    ],
    "account": "The Hussar Squadron acted as the staff tables direct."
   }
  ],
- "observations": [],
+ "observations": [
+  {
+   "side": "blue",
+   "unitId": "red-1",
+   "by": "blue-3",
+   "when": "start"
+  },
+  {
+   "side": "blue",
+   "unitId": "red-2",
+   "by": "blue-3",
+   "when": "start"
+  },
+  {
+   "side": "blue",
+   "unitId": "red-3",
+   "by": "blue-3",
+   "when": "start"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-1",
+   "by": "red-3",
+   "when": "start"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-3",
+   "by": "red-1",
+   "when": "start"
+  },
+  {
+   "side": "blue",
+   "unitId": "red-1",
+   "by": "blue-1",
+   "when": "end"
+  },
+  {
+   "side": "blue",
+   "unitId": "red-2",
+   "by": "blue-3",
+   "when": "end"
+  },
+  {
+   "side": "blue",
+   "unitId": "red-3",
+   "by": "blue-3",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-1",
+   "by": "red-1",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-2",
+   "by": "red-1",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-3",
+   "by": "red-1",
+   "when": "end"
+  }
+ ],
  "summary": "The turn was resolved by the tables."
 }
 ```

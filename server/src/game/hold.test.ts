@@ -49,9 +49,16 @@ afterEach(async () => {
 });
 
 async function newGame(
-  opts: { rate?: number; holdsPerPlayer?: number; holdsPerGame?: number } = {},
+  opts: { rate?: number; holdsPerPlayer?: number; holdsPerGame?: number; earlyMs?: number } = {},
 ) {
   const time = new FakeTime();
+  // Real timers run on the monotonic clock and can wake a millisecond before Date.now() reaches
+  // the deadline they were set for: `earlyMs` makes every timer longer than that wake so early.
+  const early = opts.earlyMs ?? 0;
+  const timers = {
+    setTimeout: (fn: () => void, ms: number) => time.setTimeout(fn, ms > early ? ms - early : ms),
+    clearTimeout: (handle: unknown) => time.clearTimeout(handle),
+  };
   const store = new MemoryGameStore();
   const parser = new GateParser();
   host = new GameHost({
@@ -59,7 +66,7 @@ async function newGame(
     parser,
     registry: registry(),
     wallNow: time.now,
-    timers: time,
+    timers,
     snapshotEvery: 100,
     pause: () => ({
       voters: VOTERS,
@@ -100,6 +107,20 @@ describe('emergency hold in a game', () => {
     expect(log.map((e) => e.command.kind)).toEqual(['proposeHold', 'pauseExpire']);
     expect(log[0]!.pause).toMatchObject([{ to: 'pause_proposed', cause: 'proposed', hold: true }]);
     expect(log[1]!.pause).toMatchObject([{ to: 'running', cause: 'timeout', hold: true }]);
+    expect(log[1]!.wallMs - log[0]!.wallMs).toBe(HOLD_MS);
+  });
+
+  it('still lapses when its timer wakes just before the wall clock reaches the deadline (#503)', async () => {
+    const { time, game, store } = await newGame({ earlyMs: 1 });
+    await hold(game);
+    await time.advance(HOLD_MS - 1);
+    // The timer has fired, a millisecond early: nothing was due yet, so it must sleep again.
+    expect(game.pauseState!.phase).toBe('pause_proposed');
+    await time.advance(1);
+    expect(game.pauseState!.phase).toBe('running');
+    expect(game.gameClock.status).toBe('running');
+    const log = await store.inputLog('g1');
+    expect(log.map((e) => e.command.kind)).toEqual(['proposeHold', 'pauseExpire']);
     expect(log[1]!.wallMs - log[0]!.wallMs).toBe(HOLD_MS);
   });
 
@@ -237,7 +258,12 @@ describe('a hold does not change outcomes', () => {
         await game.submit({ kind: 'advanceTo', gameMs: 900_000 });
         const log = await store.inputLog('g1');
         const replayed = replayLog(
-          { gameId: 'g1', scenarioId: 'hold-the-bridge', seed: game.state.world.seed },
+          {
+            gameId: 'g1',
+            scenarioId: 'hold-the-bridge',
+            seed: game.state.world.seed,
+            rules: game.state.world.rules,
+          },
           loadScenario(holdTheBridge),
           log,
           registry(),

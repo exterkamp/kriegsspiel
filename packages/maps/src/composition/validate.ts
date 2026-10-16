@@ -25,11 +25,12 @@ import {
 } from '../geometry.js';
 import { placeId, resolveOverrides } from '../overrides.js';
 import { createPlanningCertificates, type PlanningCertificates } from '../planning/index.js';
-import { CROSSING_VERSION, validateWaterPhysics } from '../geography/index.js';
+import { validateWaterPhysics } from '../geography/index.js';
 import { validateContourHeights } from '../terrain/index.js';
 import { accessId, isLocalRoad, occupiedEnvelope } from './assemble.js';
 import { bounded, compositionLimits, CompositionFailure, Meter, requireValue } from './budget.js';
-import { supportsReplay } from './identity.js';
+import { crossingPolicyFor, supportsValidation } from './identity.js';
+import { isMinorRoute } from '../geography/shallow.js';
 import {
   COMPLETE_VALIDATION_VERSION,
   type CompositionLimits,
@@ -360,7 +361,7 @@ export function validateBattlefield(
     // complete hard ceiling rather than allowing hidden work outside this meter.
     meter.take(HARD_LIMITS.maxTopologyChecks);
     const asset = parseAsset(raw);
-    if (!supportsReplay(asset))
+    if (!supportsValidation(asset))
       stop(
         'UNSUPPORTED_REPLAY',
         'Generator/stage/fork identities are unsupported by this complete validator.',
@@ -602,20 +603,35 @@ export function validateBattlefield(
       }
     for (const crossing of asset.layers.crossings) {
       meter.take(crossing.roadIds.length + 1);
-      if (crossing.kind !== 'bridge')
-        stop(
-          'UNSUPPORTED_CROSSING',
-          'Composition v1 certifies explicit linear bridges only.',
-          crossing.id,
+      if (crossing.kind === 'ford') {
+        // Fords (D46): wadeable modelled depth, low banks, gentle ramps, minor roads only.
+        requireValue(
+          cert.ford({
+            ...crossing,
+            policy: crossingPolicyFor(asset),
+            minimumAbutmentM: s.roads.minimumAbutmentM,
+          }),
         );
-      requireValue(
-        cert.bridge({
-          ...crossing,
-          kind: 'bridge',
-          policy: CROSSING_VERSION,
-          minimumAbutmentM: s.roads.minimumAbutmentM,
-        }),
-      );
+        meter.take(crossing.roadIds.length * (sites.length + 4));
+        if (
+          crossing.roadIds.some((id) =>
+            roads.get(id)?.routeIds.some((r) => !isMinorRoute(r, asset.layers.sites)),
+          )
+        )
+          stop(
+            'FORD_MAIN_ROAD',
+            'Only minor (farm) roads may ford; main roads cross water by bridge.',
+            crossing.id,
+          );
+      } else
+        requireValue(
+          cert.bridge({
+            ...crossing,
+            kind: 'bridge',
+            policy: crossingPolicyFor(asset),
+            minimumAbutmentM: s.roads.minimumAbutmentM,
+          }),
+        );
       if (
         !crossing.roadIds.some((id) => {
           const r = roads.get(id);
@@ -628,7 +644,7 @@ export function validateBattlefield(
           crossing.id,
         );
     }
-    if (s.hydrology.requireRiver && !asset.layers.crossings.length)
+    if (s.hydrology.requireRiver && !asset.layers.crossings.some((c) => c.kind === 'bridge'))
       stop('BRIDGE_REQUIRED', 'Required river map has no used bridge.');
     for (const road of asset.layers.roads) {
       meter.take();

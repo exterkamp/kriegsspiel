@@ -51,8 +51,12 @@ it.each(recipes)(
         })
       : geo;
     expect(again).toEqual(plan);
+    // Stream networks now reach the boundary even on these 1 km extents, so a
+    // requested exit can be blocked as well as a region, site or bridge.
     if (!plan.ok)
-      expect(plan.diagnostics[0]!.code).toMatch(/REGION|SITE|CONNECTIVITY|BRIDGE|RESOURCE/);
+      expect(plan.diagnostics[0]!.code).toMatch(
+        /REGION|SITE|CONNECTIVITY|BRIDGE|RESOURCE|BOUNDARY_EXIT/,
+      );
   },
   20000,
 );

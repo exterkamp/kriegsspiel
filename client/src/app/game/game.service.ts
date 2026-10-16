@@ -9,12 +9,14 @@ import {
   withMarkPut,
   withPendingOrder,
   withRead,
+  withModeKnown,
+  withModePending,
   withTurnSettings,
   type ClientState,
   type PendingOrder,
 } from '@legacy/net/state';
 import type { Mark, TurnOrder } from '@kriegsspiel/protocol';
-import { fetchGame } from '@legacy/lobby/api';
+import { fetchGame, fetchScenarios } from '@legacy/lobby/api';
 import { fixtureView } from '@legacy/table/fixture';
 import { parseSession, wsUrl } from '@legacy/session';
 
@@ -50,6 +52,8 @@ export class GameService {
     }
     this._gameId.set(params.game);
     this._sides.set([]);
+    // Neither dress until the game's settings (or its first turn) say how it is played (#427).
+    this._state.update(withModePending);
     const game = params.game;
     fetchGame(game).then(
       (info) => {
@@ -57,8 +61,23 @@ export class GameService {
         this._sides.set(info.sides.map((x) => x.side));
         // The mode comes with the game, so a finished turn game reloads in turn dress (#429, #427).
         this._state.update((s) => withTurnSettings(s, info.umpire));
+        // The battle's length, so the turn desk can count its turns (#439).
+        fetchScenarios().then(
+          (list) => {
+            // An odd answer only costs the count.
+            const minutes = Array.isArray(list)
+              ? list.find((x) => x.id === info.scenario)?.lengthMinutes
+              : undefined;
+            if (this._gameId() !== game || minutes === undefined) return;
+            this._state.update((s) => ({ ...s, battleMinutes: minutes }));
+          },
+          () => undefined,
+        );
       },
-      () => undefined,
+      // Unreadable settings: play it as the socket says (a turn game still sends its turn).
+      () => {
+        if (this._gameId() === game) this._state.update(withModeKnown);
+      },
     );
     this.conn = new GameConnection({
       url: wsUrl(loc, params.game, params.side),

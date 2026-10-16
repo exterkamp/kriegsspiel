@@ -18,9 +18,24 @@ import { preflightAsset } from '../resources.js';
 import { placeId, resolveOverrides } from '../overrides.js';
 import { bounded, PlanningFailure } from './budget.js';
 import { bridge } from './bridges.js';
+import { ford } from './fords.js';
+import { isMinorRoute } from '../geography/shallow.js';
 import { footprint, corridor, requireFinitePoint } from './certificates.js';
 import { Context, box, touches } from './context.js';
 import type { PlanningInput, RegionalPlanningOutput } from './types.js';
+import { CROSSING_VERSION } from '../geography/types.js';
+
+const same = (p: Point, q: Point) => p[0] === q[0] && p[1] === q[1];
+/** Segments sharing exactly one endpoint and leaving it on opposite sides (negative dot). */
+function opposite(a: Point, b: Point, c: Point, d: Point): boolean {
+  const away = (n: Point, u: Point, v: Point) =>
+    (u[0] - n[0]) * (v[0] - n[0]) + (u[1] - n[1]) * (v[1] - n[1]) < 0;
+  if (same(a, c)) return away(a, b, d);
+  if (same(a, d)) return away(a, b, c);
+  if (same(b, c)) return away(b, a, d);
+  if (same(b, d)) return away(b, a, c);
+  return false;
+}
 export function validate(c: Context, plan: RegionalPlanningOutput): void {
   preflightAsset(
     { layers: plan },
@@ -78,7 +93,8 @@ export function validate(c: Context, plan: RegionalPlanningOutput): void {
   const nodes = new Map(plan.roadNodes.map((n) => [n.id, n])),
     roads = new Map(plan.roads.map((r) => [r.id, r])),
     crossings = new Map(plan.crossings.map((b) => [b.id, b])),
-    decks = new Map(plan.decks.map((d) => [d.crossingId, d]));
+    decks = new Map(plan.decks.map((d) => [d.crossingId, d])),
+    fords = new Map((plan.fords ?? []).map((f) => [f.crossingId, f]));
   const ids = new Set<string>();
   for (const obj of [
     ...plan.roadNodes,
@@ -275,7 +291,6 @@ export function validate(c: Context, plan: RegionalPlanningOutput): void {
       const bridge = crossings.get(road.crossingIds[0]!);
       if (
         !bridge ||
-        bridge.kind !== 'bridge' ||
         !bridge.roadIds.includes(road.id) ||
         road.path.length !== 2 ||
         road.widthM > bridge.widthM ||
@@ -320,28 +335,60 @@ export function validate(c: Context, plan: RegionalPlanningOutput): void {
     }
   }
   for (const crossing of plan.crossings) {
-    if (crossing.kind !== 'bridge')
-      throw new PlanningFailure('CROSSING_KIND', crossing.id, 'Planning v1 emits bridges only.');
-    const profile = decks.get(crossing.id);
+    if (crossing.kind === 'ford') {
+      const recorded = fords.get(crossing.id);
+      if (
+        !recorded ||
+        crossing.traversableWidthM !== crossing.widthM ||
+        !crossing.roadIds.length ||
+        crossing.roadIds.some((id) => !roads.get(id)?.crossingIds.includes(crossing.id))
+      )
+        throw new PlanningFailure(
+          'ORPHAN_CROSSING',
+          crossing.id,
+          'Ford requires reciprocal road links and an explicit ford certificate.',
+        );
+      const actual = ford(c, {
+        ...crossing,
+        minimumAbutmentM: c.settings.roads.minimumAbutmentM,
+        policy: CROSSING_VERSION,
+      });
+      if (JSON.stringify(actual) !== JSON.stringify(recorded))
+        throw new PlanningFailure('FORD_PROFILE', crossing.id, 'Ford certificate disagrees.');
+      c.validation.take(crossing.roadIds.length * plan.sites.length);
+      if (
+        crossing.roadIds.some((id) =>
+          roads.get(id)!.routeIds.some((r) => !isMinorRoute(r, plan.sites)),
+        )
+      )
+        throw new PlanningFailure(
+          'FORD_MAIN_ROAD',
+          crossing.id,
+          'Only minor (farm) roads may ford; main roads cross water by bridge.',
+        );
+    }
+    const profile = crossing.kind === 'bridge' ? decks.get(crossing.id) : undefined;
     if (
-      !profile ||
-      !crossing.roadIds.length ||
-      crossing.roadIds.some((id) => !roads.get(id)?.crossingIds.includes(crossing.id))
+      crossing.kind === 'bridge' &&
+      (!profile ||
+        !crossing.roadIds.length ||
+        crossing.roadIds.some((id) => !roads.get(id)?.crossingIds.includes(crossing.id)))
     )
       throw new PlanningFailure(
         'ORPHAN_CROSSING',
         crossing.id,
         'Crossing requires reciprocal road links and an explicit deck certificate.',
       );
-    bridge(
-      c,
-      {
-        ...crossing,
-        minimumAbutmentM: c.settings.roads.minimumAbutmentM,
-        policy: 'reserved-dry-disks-v1',
-      },
-      profile,
-    );
+    if (crossing.kind === 'bridge')
+      bridge(
+        c,
+        {
+          ...crossing,
+          minimumAbutmentM: c.settings.roads.minimumAbutmentM,
+          policy: CROSSING_VERSION,
+        },
+        profile,
+      );
     for (const endpoint of crossing.endpoints) {
       const node = plan.roadNodes.find((n) => distance(n.position, endpoint) <= 1e-6);
       if (
@@ -503,7 +550,7 @@ export function validate(c: Context, plan: RegionalPlanningOutput): void {
       'validated graph',
       'Required site approaches, boundary exits and all deck nodes must share one traversable graph component.',
     );
-  if (c.input.requireBridge && !plan.crossings.length)
+  if (c.input.requireBridge && !plan.crossings.some((x) => x.kind === 'bridge'))
     throw new PlanningFailure(
       'REQUIRED_BRIDGE_INFEASIBLE',
       'used bridge',
@@ -544,6 +591,11 @@ export function validate(c: Context, plan: RegionalPlanningOutput): void {
           s.road.id,
           'Geometrically intersecting edges require an explicit common endpoint node.',
         );
+      // Two straight edges meeting end to end at one point, running away from
+      // it on opposite sides, meet only there. Nearly collinear, the line
+      // intersection is ill-conditioned and lands micrometres inside an edge,
+      // a false overlap (#542); the shared point itself is the join.
+      if (opposite(s.a, s.b, t.a, t.b)) continue;
       const cuts = segmentCuts(s.a, s.b, [[t.a, t.b]], c.meter, '$.roads');
       if (cuts.some((v) => v > 1e-8 && v < 1 - 1e-8))
         throw new PlanningFailure(

@@ -1,8 +1,11 @@
 import type { ShoulderEvidence } from './shoulders.js';
 import type { Bounds, Cover, Drainage, Elevation, Point, Polygon, Water } from '../contract.js';
 
-export const GEOGRAPHY_VERSION = 'flood-carved-graded-backwater-v1' as const;
-export const CROSSING_VERSION = 'reserved-dry-disks-v1' as const;
+export const GEOGRAPHY_VERSION = 'flood-carved-flowline-network-v3' as const;
+export const CROSSING_VERSION = 'reserved-dry-disks-v2' as const;
+/** v1 decks (no rounding margin) remain certifiable for maps saved by the v1 stages. */
+export const LEGACY_CROSSING_VERSION = 'reserved-dry-disks-v1' as const;
+export type CrossingPolicy = typeof CROSSING_VERSION | typeof LEGACY_CROSSING_VERSION;
 /** Resource overrides affect success/failure, never successful geometry. */
 export interface GeographyLimits {
   maxFloodWork?: number;
@@ -25,14 +28,17 @@ export interface DrainageOutput {
 /** A suitability proposal; #137 supplies final road IDs and linked edges. */
 export interface CrossingCandidate {
   id: string;
-  kind: 'bridge';
+  /** A bridge deck over the water, or a ford through shallow water (D46). */
+  kind: 'bridge' | 'ford';
   waterId: string;
   endpoints: [Point, Point];
   spanM: number;
   widthM: number;
   deck: Polygon;
   minimumAbutmentM: number;
-  policy: typeof CROSSING_VERSION;
+  policy: CrossingPolicy;
+  /** Fords only: the reach's recorded riffle depth under `shallow-riffle-v1`. */
+  depthM?: number;
 }
 export interface GeographyOutput {
   version: typeof GEOGRAPHY_VERSION;

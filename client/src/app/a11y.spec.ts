@@ -68,7 +68,8 @@ for (const high of [false, true]) {
       });
     }
 
-    // Turn mode (D39, 11.10): the turn panel in the dock and the held orders on the orders desk.
+    // Turn mode (D39, 11.10, #439): the turn panel in the dock, the held orders and unit status on the orders
+    // desk, and the in-tray by turn.
     const turn = {
       turn: 2,
       startsAt: 1_200_000,
@@ -79,12 +80,24 @@ for (const high of [false, true]) {
     for (const [name, resolving, view] of [
       ['writing, orders desk', false, 'orders'],
       ['writing, table', false, 'table'],
+      ['writing, in-tray by turn', false, 'inTray'],
       ['resolving', true, 'table'],
     ] as const) {
       it(`the turn-mode desk (${name}) has no violations`, async () => {
         setHighContrast(high);
         const { f, el, desk } = await mount(DeskComponent, {
           turnMode: true,
+          // The turn desk for a first-time player (#439): turn count, unit strip, earlier orders, papers by turn.
+          turnMinutes: 20,
+          battleMinutes: 50,
+          pending: [
+            {
+              orderId: 't-0',
+              text: 'March.',
+              sentAtGame: 0,
+              toName: fixtureView.ownUnits[0]!.name,
+            },
+          ],
           turn: { ...turn, resolving, ...(resolving ? { sent: ['red', 'blue'] } : {}) },
         });
         desk.activeView.set(view);

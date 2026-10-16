@@ -8,11 +8,19 @@
  *
  * Facts are master truth (true positions, both sides' reports), which is why the critique is
  * served only once the game is over, as the umpire's window is.
+ *
+ * A turn-mode game (D39) adds each turn's record, replayed from its `resolveTurn` entry as the
+ * admin Turn panel and the window read it (`replayTurns`): the orders each side sent for the turn,
+ * who decided it (the umpire, with its account, or the tables), the fallback and its reason, each
+ * correction the engine made (`TurnRuling`) with the limit it broke, the dice the umpire asked
+ * for, and the precedents in its journal. A real-time game's facts are unchanged.
  */
 import { MS_PER_MINUTE, positionAt } from '@kriegsspiel/engine';
-import type { GameState, Report, SideId } from '@kriegsspiel/engine';
+import type { GameState, Report, SideId, TurnRuling } from '@kriegsspiel/engine';
 import type { ReplayInput } from '../admin/replayView.js';
+import { replayTurns } from '../admin/turnView.js';
 import { replayLog } from '../game/replay.js';
+import type { UmpireTurnOutput } from '../game/umpireTurn.js';
 
 export type FactKind =
   | 'outcome'
@@ -25,7 +33,13 @@ export type FactKind =
   | 'loss'
   | 'fire'
   | 'ruling'
-  | 'pause';
+  | 'pause'
+  // Turn mode only (D39):
+  | 'turn'
+  | 'fallback'
+  | 'clamp'
+  | 'roll'
+  | 'precedent';
 
 export interface CritiqueFact {
   /** `fact-N`, in order of game time. */
@@ -61,13 +75,24 @@ const CAPS: Partial<Record<FactKind, number>> = {
   fire: 12,
   ruling: 16,
   pause: 16,
+  turn: 24,
+  fallback: 8,
+  clamp: 16,
+  roll: 12,
+  precedent: 12,
 };
+/** Longest umpire's account, fallback reason, correction reason or roll question quoted, in characters. */
+const TURN_TEXT_MAX = 200;
 /** Casualties are summed over this many game minutes. */
 const FIRE_BUCKET_MIN = 10;
 
 const minuteOf = (ms: number) => Math.floor(ms / MS_PER_MINUTE);
 const clip = (s: string, n: number) => (s.length <= n ? s : `${s.slice(0, n - 1).trimEnd()}…`);
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const squash = (s: string) => s.replace(/\s+/g, ' ').trim();
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const isTurnRuling = (r: GameState['rulings'][number]): r is TurnRuling =>
+  'kind' in r && r.kind === 'turn';
 
 /** What a report is about, in words that follow "a report of". */
 const REPORT_THING: Record<Report['kind'], string> = {
@@ -83,6 +108,8 @@ const REPORT_THING: Record<Report['kind'], string> = {
   heavyLosses: 'heavy losses',
   broke: 'a unit breaking',
   battle: 'the battle',
+  turn: "a unit's turn",
+  notice: 'a turn resolved by the tables',
 };
 
 type Draft = Omit<CritiqueFact, 'id'> & { ms: number };
@@ -254,14 +281,97 @@ export function critiqueFacts(input: ReplayInput): CritiqueDigest {
     });
   }
 
-  // The umpire's rulings, as the window lists them.
+  // The umpire's rulings, as the window lists them. A turn's corrections are cited with their
+  // turn below; a real-time game has none.
   for (const r of world.rulings) {
+    if (isTurnRuling(r)) continue;
     add({
       ms: r.time,
       minute: minuteOf(r.time),
       kind: 'ruling',
       text: `The umpire ruled: ${clip(r.narrative, 200)}`,
     });
+  }
+
+  if (input.header.settings?.mode === 'turns') {
+    // Each turn's record, as the Turn panel and the window replay it.
+    const turnEnd = new Map<number, number>();
+    for (const r of replayTurns(input)) {
+      const t = r.turn;
+      const end = r.entry.endGameMs ?? t.endMs;
+      turnEnd.set(t.n, end);
+      const span = `Turn ${t.n} (minutes ${minuteOf(t.startMs)} to ${minuteOf(t.endMs)})`;
+      for (const o of t.orders) {
+        add({
+          ms: t.startMs,
+          minute: minuteOf(t.startMs),
+          kind: 'order',
+          side: o.side,
+          text: `${cap(o.side)} sent the order "${clip(squash(o.text), ORDER_TEXT_MAX)}" to ${label(o.to)} for turn ${t.n}.`,
+        });
+      }
+      const at = { ms: end, minute: minuteOf(end) };
+      const corrections = r.after.world.rulings.filter(
+        (x): x is TurnRuling => isTurnRuling(x) && x.turn === t.n,
+      );
+      const out = t.output as Partial<UmpireTurnOutput> | undefined;
+      const umpire = t.adjudicator === 'umpire' && !r.entry.error ? out : undefined;
+      if (r.entry.error) {
+        add({ ...at, kind: 'turn', text: `${span} could not be applied, and the clock moved on.` });
+      } else if (t.fallback) {
+        const reason = clip(
+          squash(t.fallback.error.replace(/^umpire fell back to the engine:\s*/, '')),
+          TURN_TEXT_MAX,
+        );
+        add({
+          ...at,
+          kind: 'fallback',
+          text: `${span} was worked out by the tables: the umpire could not decide it after ${plural(t.fallback.attempts, 'attempt', 'attempts')} (${reason}).`,
+        });
+      } else if (umpire) {
+        const summary = clip(squash(String(umpire.proposal?.summary ?? '')), TURN_TEXT_MAX);
+        const fixed =
+          corrections.length > 0
+            ? `, and the engine made ${plural(corrections.length, 'correction', 'corrections')} to its proposal`
+            : '';
+        add({
+          ...at,
+          kind: 'turn',
+          text: `${span} was decided by the umpire${fixed}.${summary ? ` Its account: "${summary}"` : ''}`,
+        });
+      } else if (t.adjudicator === 'engine') {
+        add({ ...at, kind: 'turn', text: `${span} was worked out by the tables.` });
+      } else {
+        add({ ...at, kind: 'turn', text: `${span} closed with no adjudicator.` });
+      }
+      for (const c of corrections) {
+        add({
+          ms: c.time,
+          minute: minuteOf(c.time),
+          kind: 'clamp',
+          side: sideOf(c.unitId),
+          text: `In turn ${t.n} the engine corrected the umpire's ${c.field} for ${label(c.unitId)}: ${clip(squash(c.reason), TURN_TEXT_MAX)}.`,
+        });
+      }
+      for (const roll of umpire?.context?.rolls ?? []) {
+        add({
+          ...at,
+          kind: 'roll',
+          text: `In turn ${t.n} the umpire asked the dice "${clip(squash(roll.why), TURN_TEXT_MAX)}" at a ${Math.round(roll.chance * 100)} in 100 chance, and the roll ${roll.success ? 'succeeded' : 'failed'}.`,
+        });
+      }
+    }
+    // The precedents the umpire's journal kept, dated at the end of the turn that set them.
+    for (const p of world.journal?.precedents ?? []) {
+      const ms = turnEnd.get(p.turn);
+      if (ms === undefined) continue;
+      add({
+        ms,
+        minute: minuteOf(ms),
+        kind: 'precedent',
+        text: `In turn ${p.turn} the umpire set a precedent: ${clip(squash(p.ruling), TURN_TEXT_MAX)}`,
+      });
+    }
   }
 
   // What each side was told and when, and how far a contact report was from the truth.

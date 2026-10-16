@@ -2,17 +2,20 @@ import type { Point, Site } from '../contract.js';
 import { distance, polygonEdges, segmentDistance, polygonLocation } from '../geometry.js';
 import { decimal6 } from '../terrain/precision.js';
 import { bridge, outward } from './bridges.js';
+import { ford } from './fords.js';
+import { SHALLOW_WATER } from '../geography/shallow.js';
 import { PlanningFailure } from './budget.js';
-import { corridor } from './certificates.js';
+import { corridor, segmentGrade } from './certificates.js';
 import { box, type Context, touches } from './context.js';
 import type { CrossingCandidate } from '../geography/types.js';
-import type { DeckProfile } from './types.js';
+import type { DeckProfile, FordProfile } from './types.js';
 export interface Edge {
   a: number;
   b: number;
   cost: number;
   candidate?: CrossingCandidate;
   profile?: DeckProfile;
+  ford?: FordProfile;
   exit?: 'north' | 'east' | 'south' | 'west';
   siteId?: string;
 }
@@ -23,12 +26,61 @@ export interface Terminal {
   entry?: number;
   edge?: Edge;
 }
-type QueueItem = { node: number; g: number; f: number };
+/** `exact` entries carry certified edge costs; others carry an optimistic estimate. */
+type QueueItem = {
+  node: number;
+  g: number;
+  f: number;
+  from: number;
+  edge: Edge | null;
+  exact: boolean;
+};
+/**
+ * Frozen route costs (`sited-graded-network-v2`, kept by `-fording-network-v3`;
+ * fords cost `SHALLOW_WATER.routeSpanFactor` per metre plus `routeFixedM`; D48 adds knight moves). Lattice moves
+ * avoid staircase roads; the grade penalty grows quadratically so roads wind
+ * along contours, valleys and spurs instead of climbing straight; bridges carry
+ * a fixed cost so routes share crossings; existing road edges are discounted so
+ * later routes join the network at junctions rather than running in parallel;
+ * and the map margin is avoided.
+ */
+export const ROUTE_COSTS = Object.freeze({
+  gradeLinear: 6,
+  gradeQuadratic: 120,
+  bridgeSpanFactor: 2,
+  bridgeFixedM: 250,
+  reuse: 0.55,
+  /** Heuristic metres per straight-line metre (weighted A*). */
+  heuristic: 1,
+  marginM: 150,
+  margin: 0.6,
+});
+/**
+ * Boundary exit retries (#542): an exit no route reaches moves along its side
+ * to the next certified position at least `spacingM` from every exit already
+ * tried, at most `attempts` times per side.
+ */
+export const EXIT_RETRY = Object.freeze({ spacingM: 400, attempts: 4 });
+/** Knight moves (column, row) added to the lattice by `sited-graded-any-angle-network-v4`. */
+const KNIGHT_MOVES: readonly (readonly [number, number])[] = Object.freeze([
+  [-2, -1],
+  [-1, -2],
+  [1, -2],
+  [2, -1],
+  [2, 1],
+  [1, 2],
+  [-1, 2],
+  [-2, 1],
+]);
 class Heap {
   data: QueueItem[] = [];
   constructor(readonly c: Context) {}
   less(a: QueueItem, b: QueueItem): boolean {
-    return a.f < b.f || (a.f === b.f && (a.g < b.g || (a.g === b.g && a.node < b.node)));
+    return (
+      a.f < b.f ||
+      (a.f === b.f &&
+        (a.g < b.g || (a.g === b.g && (a.node < b.node || (a.node === b.node && a.from < b.from)))))
+    );
   }
   push(v: QueueItem): void {
     const a = this.data;
@@ -70,13 +122,23 @@ export class Router {
   readonly blocked: Int8Array;
   readonly terminals: Terminal[] = [];
   readonly profiles = new Map<string, DeckProfile>();
+  readonly fords = new Map<string, FordProfile>();
   readonly bridgeFailures: string[] = [];
+  /** Lattice positions along each side, middle first (frozen exit order). */
+  private readonly exitOrders = new Map<string, number[]>();
+  /** Per side: the order index of the current exit and the exits given up (#542). */
+  private readonly exitState = new Map<string, { index: number; failed: Point[] }>();
   readonly sites: Site[];
+  /** Placement-area boxes, computed once; sites never move during routing. */
+  readonly siteBoxes: [number, number, number, number][];
+  /** Undirected edge keys already emitted by earlier routes. */
+  readonly used = new Set<string>();
   constructor(
     readonly c: Context,
     sites: Site[],
   ) {
     this.sites = sites;
+    this.siteBoxes = sites.map((s) => box(s.placementArea.outer));
     c.candidates.take(c.cells * 2);
     this.points = Array.from({ length: c.cells }, (_, i) => c.point(i));
     this.wet = new Int8Array(c.cells);
@@ -110,10 +172,9 @@ export class Router {
       this.c.candidates.take(this.sites.length + 1);
       this.blocked[id] =
         this.c.inBounds(p, r) &&
-        !this.sites.some((s) => {
-          const b = box(s.placementArea.outer);
-          return p[0] >= b[0] - r && p[0] <= b[2] + r && p[1] >= b[1] - r && p[1] <= b[3] + r;
-        })
+        !this.siteBoxes.some(
+          (b) => p[0] >= b[0] - r && p[0] <= b[2] + r && p[1] >= b[1] - r && p[1] <= b[3] + r,
+        )
           ? 0
           : 1;
     }
@@ -121,14 +182,19 @@ export class Router {
     if (this.wet[id] === -1) this.wet[id] = this.c.wet(this.points[id]!) ? 1 : 0;
     return !this.wet[id];
   }
-  clearSites(a: Point, b: Point, ignore?: string): boolean {
-    const r = this.c.settings.roads.maxReservedWidthM / 2,
-      rect = box([a, b]);
-    for (const s of this.sites) {
+  clearSites(a: Point, b: Point, ignore?: string, margin = 0): boolean {
+    const r = this.c.settings.roads.maxReservedWidthM / 2 + margin,
+      rect: [number, number, number, number] = [
+        Math.min(a[0], b[0]),
+        Math.min(a[1], b[1]),
+        Math.max(a[0], b[0]),
+        Math.max(a[1], b[1]),
+      ];
+    for (const [i, s] of this.sites.entries()) {
       this.c.candidates.take();
       if (s.id === ignore) continue;
       const p = s.placementArea,
-        q = box(p.outer),
+        q = this.siteBoxes[i]!,
         expanded: [number, number, number, number] = [
           rect[0] - r,
           rect[1] - r,
@@ -164,7 +230,7 @@ export class Router {
     }
     const cert = corridor(this.c, p, q, this.c.settings.roads.maxReservedWidthM, undefined, true);
     const e = cert.traversable
-      ? { a, b, cost: distance(p, q) * (1 + 4 * cert.maxDirectionalGrade) }
+      ? { a, b, cost: distance(p, q) * this.factor(p, q, cert.maxDirectionalGrade) }
       : null;
     this.cached.set(key, e);
     return e;
@@ -228,40 +294,74 @@ export class Router {
     )
       throw new RangeError('Unique supported boundary sides required');
     for (const side of sides) {
-      let attached = false;
       const horizontal = side === 'north' || side === 'south',
         count = horizontal ? this.c.columns : this.c.rows;
       const order = Array.from({ length: Math.max(0, count - 2) }, (_, i) => i + 1).sort(
         (a, b) => Math.abs(a - count / 2) - Math.abs(b - count / 2) || a - b,
       );
       this.c.candidates.take(order.length * Math.ceil(Math.log2(order.length + 1)));
-      for (const k of order) {
-        this.c.candidates.take();
-        const p: Point = horizontal
-          ? [k * this.c.spacing, side === 'north' ? 0 : this.c.bounds.maxY]
-          : [side === 'west' ? 0 : this.c.bounds.maxX, k * this.c.spacing];
-        const inside: Point = horizontal
-          ? [p[0], side === 'north' ? this.c.spacing : this.c.bounds.maxY - this.c.spacing]
-          : [side === 'west' ? this.c.spacing : this.c.bounds.maxX - this.c.spacing, p[1]];
-        const n = this.c.node(inside),
-          a = this.points[n];
-        if (!a || !this.open(n) || !this.clearSites(a, p)) continue;
-        const cert = corridor(this.c, a, p, this.c.settings.roads.maxReservedWidthM, side);
-        if (!cert.traversable) continue;
-        const exit = this.addPoint(p),
-          e: Edge = { a: n, b: exit, cost: distance(a, p), exit: side };
-        this.addEdge(e);
-        this.terminals.push({ id: `boundary:${side}`, node: exit, edge: e });
-        attached = true;
-        break;
-      }
-      if (!attached)
+      this.exitOrders.set(side, order);
+      const exit = this.exitFrom(side, 0, []);
+      if (!exit)
         throw new PlanningFailure(
           'BOUNDARY_EXIT_INFEASIBLE',
           side,
           'No certified road reaches the requested boundary side.',
         );
+      this.terminals.push({ id: `boundary:${side}`, node: exit.node, edge: exit.edge });
     }
+  }
+  /**
+   * The first certified exit on `side` at or after order index `from`, at
+   * least `EXIT_RETRY.spacingM` from every exit in `avoid`.
+   */
+  private exitFrom(
+    side: 'north' | 'east' | 'south' | 'west',
+    from: number,
+    avoid: Point[],
+  ): { node: number; edge: Edge } | undefined {
+    const order = this.exitOrders.get(side)!,
+      horizontal = side === 'north' || side === 'south';
+    for (let i = from; i < order.length; i++) {
+      const k = order[i]!;
+      this.c.candidates.take();
+      const p: Point = horizontal
+        ? [k * this.c.spacing, side === 'north' ? 0 : this.c.bounds.maxY]
+        : [side === 'west' ? 0 : this.c.bounds.maxX, k * this.c.spacing];
+      if (avoid.some((q) => distance(p, q) < EXIT_RETRY.spacingM)) continue;
+      const inside: Point = horizontal
+        ? [p[0], side === 'north' ? this.c.spacing : this.c.bounds.maxY - this.c.spacing]
+        : [side === 'west' ? this.c.spacing : this.c.bounds.maxX - this.c.spacing, p[1]];
+      const n = this.c.node(inside),
+        a = this.points[n];
+      if (!a || !this.open(n) || !this.clearSites(a, p)) continue;
+      const cert = corridor(this.c, a, p, this.c.settings.roads.maxReservedWidthM, side);
+      if (!cert.traversable) continue;
+      const exit = this.addPoint(p),
+        edge: Edge = { a: n, b: exit, cost: distance(a, p), exit: side };
+      this.addEdge(edge);
+      this.exitState.set(side, { index: i, failed: avoid });
+      return { node: exit, edge };
+    }
+    return undefined;
+  }
+  /**
+   * Move a boundary exit no route reaches (a pocket cut off by water or steep
+   * ground) to the next certified position on its side, well away from the
+   * exits already tried (#542). Returns false when the side has no other
+   * position or the bounded retries are spent. The abandoned exit's edge stays
+   * a dead-end leaf that no route selects.
+   */
+  retryExit(t: Terminal): boolean {
+    const side = t.edge?.exit;
+    if (!side) return false;
+    const state = this.exitState.get(side)!;
+    if (state.failed.length >= EXIT_RETRY.attempts) return false;
+    const exit = this.exitFrom(side, state.index + 1, [...state.failed, this.points[t.node]!]);
+    if (!exit) return false;
+    t.node = exit.node;
+    t.edge = exit.edge;
+    return true;
   }
   attachBridges(): void {
     const candidates = [...(this.c.input.crossingCandidates ?? [])].sort((a, b) =>
@@ -274,13 +374,20 @@ export class Router {
       seen.add(candidate.id);
       this.c.candidates.take();
       try {
-        const profile = bridge(this.c, candidate),
+        const isFord = candidate.kind === 'ford',
+          profile = isFord ? undefined : bridge(this.c, candidate),
+          fordProfile = isFord ? ford(this.c, candidate) : undefined,
           [a, b] = candidate.endpoints,
-          paths: Point[][] = [];
+          paths: Point[][] = [],
+          connectors: number[][] = [];
         for (const [p, opposite] of [
           [a, b],
           [b, a],
         ] as [Point, Point][]) {
+          if (isFord) {
+            connectors.push(this.fordConnectors(candidate, p, opposite));
+            continue;
+          }
           const out = outward(p, opposite, this.c.spacing),
             n = this.c.node(out),
             snap = this.points[n];
@@ -306,6 +413,19 @@ export class Router {
           paths.push(path);
         }
         const endpointNodes: number[] = [];
+        for (const [j, nodes] of connectors.entries()) {
+          const from = this.addPoint(candidate.endpoints[j]!),
+            p = this.points[from]!;
+          endpointNodes.push(from);
+          for (const n of nodes) {
+            const q = this.points[n]!;
+            this.addEdge({
+              a: from,
+              b: n,
+              cost: distance(p, q) * this.factor(p, q, segmentGrade(this.c, p, q)),
+            });
+          }
+        }
         for (const path of paths) {
           let from = this.addPoint(path[0]!);
           endpointNodes.push(from);
@@ -319,12 +439,16 @@ export class Router {
         const e: Edge = {
           a: endpointNodes[0]!,
           b: endpointNodes[1]!,
-          cost: candidate.spanM,
+          cost: fordProfile
+            ? candidate.spanM * SHALLOW_WATER.routeSpanFactor + SHALLOW_WATER.routeFixedM
+            : candidate.spanM * ROUTE_COSTS.bridgeSpanFactor + ROUTE_COSTS.bridgeFixedM,
           candidate,
-          profile,
+          ...(profile ? { profile } : {}),
+          ...(fordProfile ? { ford: fordProfile } : {}),
         };
         this.addEdge(e);
-        this.profiles.set(candidate.id, profile);
+        if (profile) this.profiles.set(candidate.id, profile);
+        if (fordProfile) this.fords.set(candidate.id, fordProfile);
       } catch (e) {
         if (e instanceof PlanningFailure && e.code !== 'PLANNING_RESOURCE_LIMIT') {
           this.bridgeFailures.push(`${candidate.id}:${e.code}`);
@@ -334,47 +458,157 @@ export class Router {
       }
     }
   }
-  neighbours(id: number): Edge[] {
-    const result = [...(this.special.get(id) ?? [])];
-    if (id < this.c.cells) {
-      const x = id % this.c.columns,
-        y = Math.floor(id / this.c.columns);
-      for (const n of [
-        x > 0 ? id - 1 : -1,
-        x + 1 < this.c.columns ? id + 1 : -1,
-        y > 0 ? id - this.c.columns : -1,
-        y + 1 < this.c.rows ? id + this.c.columns : -1,
-      ])
-        if (n >= 0) {
-          const e = this.edge(id, n);
-          if (e) result.push(e);
-        }
-    }
+  /**
+   * Ford approaches (D46): every certified straight connector from a ford end
+   * to a lattice node within two lattice spacings that lies ahead of the bank.
+   * Each becomes a graded edge, so a ford road can slant up a valley side
+   * toward where it is going instead of climbing straight out.
+   */
+  fordConnectors(candidate: CrossingCandidate, p: Point, opposite: Point): number[] {
+    const d = distance(p, opposite),
+      ux = (p[0] - opposite[0]) / d,
+      uy = (p[1] - opposite[1]) / d,
+      sp = this.c.spacing,
+      cx = Math.round(p[0] / sp),
+      cy = Math.round(p[1] / sp),
+      result: number[] = [];
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        const x = cx + dx,
+          y = cy + dy;
+        this.c.candidates.take();
+        if (x < 0 || y < 0 || x >= this.c.columns || y >= this.c.rows) continue;
+        const n = y * this.c.columns + x,
+          q = this.points[n]!,
+          length = distance(p, q),
+          ahead = (q[0] - p[0]) * ux + (q[1] - p[1]) * uy;
+        if (length < sp / 2 || length > 2.5 * sp || ahead < sp / 4 || !this.open(n)) continue;
+        if (this.clearSites(p, q) && corridor(this.c, p, q, candidate.widthM).traversable)
+          result.push(n);
+      }
+    if (!result.length)
+      throw new PlanningFailure(
+        'BRIDGE_APPROACH',
+        candidate.id,
+        'No dry, grade-certified approach joins this ford end to the planning lattice.',
+      );
     return result;
   }
-  route(start: number, end: number, forbiddenCrossingId?: string): Edge[] | null {
+  /** Lattice neighbours in fixed order: four axes, four diagonals, then eight knight moves. */
+  latticeNeighbours(id: number): number[] {
+    if (id >= this.c.cells) return [];
+    const cols = this.c.columns,
+      x = id % cols,
+      y = Math.floor(id / cols),
+      west = x > 0,
+      east = x + 1 < cols,
+      north = y > 0,
+      south = y + 1 < this.c.rows;
+    return [
+      west ? id - 1 : -1,
+      east ? id + 1 : -1,
+      north ? id - cols : -1,
+      south ? id + cols : -1,
+      north && west ? id - cols - 1 : -1,
+      north && east ? id - cols + 1 : -1,
+      south && west ? id + cols - 1 : -1,
+      south && east ? id + cols + 1 : -1,
+      // Knight moves (D48): sixteen directions weaken the lattice's pull toward
+      // axis and diagonal runs (and anchors placed on them) before the any-angle pass.
+      ...KNIGHT_MOVES.map(([dx, dy]) =>
+        x + dx >= 0 && x + dx < cols && y + dy >= 0 && y + dy < this.c.rows
+          ? id + dy * cols + dx
+          : -1,
+      ),
+    ].filter((n) => n >= 0);
+  }
+  /**
+   * Optimistic lattice edge cost: the endpoint height difference never exceeds
+   * the certified maximum directional grade, so this is a lower bound.
+   */
+  private estimate(a: number, b: number): number | null {
+    if (!this.open(a) || !this.open(b)) return null;
+    const p = this.points[a]!,
+      q = this.points[b]!,
+      length = distance(p, q),
+      g = Math.abs(this.c.q.heightAt(...q) - this.c.q.heightAt(...p)) / length;
+    this.c.validation.take(2);
+    return length * this.factor(p, q, g);
+  }
+  factor(p: Point, q: Point, g: number): number {
+    const mid: Point = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2],
+      margin = Math.min(
+        mid[0] - this.c.bounds.minX,
+        mid[1] - this.c.bounds.minY,
+        this.c.bounds.maxX - mid[0],
+        this.c.bounds.maxY - mid[1],
+      );
+    return (
+      1 +
+      ROUTE_COSTS.gradeLinear * g +
+      ROUTE_COSTS.gradeQuadratic * g * g +
+      ROUTE_COSTS.margin * Math.max(0, (ROUTE_COSTS.marginM - margin) / ROUTE_COSTS.marginM)
+    );
+  }
+  private cost(e: Edge): number {
+    return this.used.has(e.a < e.b ? `${e.a}:${e.b}` : `${e.b}:${e.a}`)
+      ? e.cost * ROUTE_COSTS.reuse
+      : e.cost;
+  }
+  /**
+   * Lazy A*: lattice edges enter the queue with an optimistic estimate and are
+   * certified only when popped; a dearer certified cost is re-queued, an
+   * uncertifiable edge is dropped. Every emitted edge is certified exactly as
+   * by eager search; only edges never reached are left uncertified.
+   */
+  /** Main roads (`allowFords` false) never use a ford edge; minor roads may. */
+  route(
+    start: number,
+    end: number,
+    forbiddenCrossingId?: string,
+    allowFords = false,
+  ): Edge[] | null {
     // Allocation is bounded before arrays; stale heap entries still consume heap work.
     const count = this.points.length;
-    this.c.heap.take(count * 2);
-    const costs = new Float64Array(count);
-    costs.fill(Infinity);
-    const previous = new Int32Array(count);
-    previous.fill(-1);
-    const byNode = new Map<number, Edge>(),
+    this.c.heap.take(count * 3);
+    const closed = new Uint8Array(count),
+      settled = new Float64Array(count),
+      queued = new Float64Array(count).fill(Infinity),
+      previous = new Int32Array(count).fill(-1),
+      byNode = new Map<number, Edge>(),
       heap = new Heap(this.c);
-    costs[start] = 0;
-    heap.push({ node: start, g: 0, f: distance(this.points[start]!, this.points[end]!) });
+    // Weighted A*: the straight-line metre exceeds a reused road's cost, so routes
+    // can be at most 1/reuse longer in cost than optimal, for far fewer expansions.
+    const h = (n: number) => ROUTE_COSTS.heuristic * distance(this.points[n]!, this.points[end]!);
+    heap.push({ node: start, g: 0, f: h(start), from: -1, edge: null, exact: true });
     let expansions = 0;
     while (heap.data.length) {
       this.c.heap.take();
       const item = heap.pop();
-      if (item.g !== costs[item.node]) continue;
+      if (closed[item.node]) continue;
+      if (!item.exact) {
+        const e = this.edge(item.from, item.node);
+        if (!e) continue;
+        const g = settled[item.from]! + this.cost(e);
+        if (g > item.g + 1e-9) {
+          if (g < queued[item.node]! - 1e-12) {
+            queued[item.node] = g;
+            heap.push({ ...item, g, f: g + h(item.node), edge: e, exact: true });
+          }
+          continue;
+        }
+        item.edge = e;
+        item.g = g;
+      }
+      closed[item.node] = 1;
+      settled[item.node] = item.g;
+      previous[item.node] = item.from;
+      if (item.edge) byNode.set(item.node, item.edge);
       if (item.node === end) {
         const result: Edge[] = [];
         let n = end;
         while (n !== start) {
-          const e = byNode.get(n)!;
-          result.push(e);
+          result.push(byNode.get(n)!);
           n = previous[n]!;
         }
         return result.reverse();
@@ -391,16 +625,30 @@ export class Router {
           'global expansions',
           'A* exhausted the recorded global expansion cap.',
         );
-      for (const e of this.neighbours(item.node)) {
-        if (forbiddenCrossingId && e.candidate?.id === forbiddenCrossingId) continue;
+      const exact = (e: Edge) => {
+        if (forbiddenCrossingId && e.candidate?.id === forbiddenCrossingId) return;
+        if (e.ford && !allowFords) return;
         const n = e.a === item.node ? e.b : e.a,
-          g = item.g + e.cost;
-        if (g < costs[n]! - 1e-12) {
-          costs[n] = g;
-          previous[n] = item.node;
-          byNode.set(n, e);
-          heap.push({ node: n, g, f: g + distance(this.points[n]!, this.points[end]!) });
+          g = item.g + this.cost(e);
+        if (closed[n] || g >= queued[n]! - 1e-12) return;
+        queued[n] = g;
+        heap.push({ node: n, g, f: g + h(n), from: item.node, edge: e, exact: true });
+      };
+      for (const e of this.special.get(item.node) ?? []) exact(e);
+      for (const n of this.latticeNeighbours(item.node)) {
+        if (closed[n]) continue;
+        const key = item.node < n ? `${item.node}:${n}` : `${n}:${item.node}`,
+          known = this.cached.get(key);
+        if (known === null) continue;
+        if (known) {
+          exact(known);
+          continue;
         }
+        const estimate = this.estimate(item.node, n);
+        if (estimate === null) continue;
+        const g = item.g + (this.used.has(key) ? estimate * ROUTE_COSTS.reuse : estimate);
+        if (g >= queued[n]! - 1e-12) continue;
+        heap.push({ node: n, g, f: g + h(n), from: item.node, edge: null, exact: false });
       }
     }
     return null;

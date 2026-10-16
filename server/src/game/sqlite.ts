@@ -87,6 +87,8 @@ export const MIGRATIONS: readonly string[] = [
    ALTER TABLE games ADD COLUMN summarized INTEGER NOT NULL DEFAULT 0;`,
   // Umpire settings chosen at creation (3.11), as JSON; null for a game made before they existed.
   `ALTER TABLE games ADD COLUMN settings TEXT;`,
+  // The engine rules version the game is played under (#432); null for a game made before it: 1.
+  `ALTER TABLE games ADD COLUMN rules INTEGER;`,
 ];
 
 /** Older snapshots kept besides the newest (not yet used as a fallback: recovery reads the newest). */
@@ -148,40 +150,47 @@ export class SqliteGameStore implements GameStore {
     // Plain INSERT: never overwrite the record of an existing game.
     this.db
       .prepare(
-        'INSERT INTO games (game_id, scenario_id, seed, summarized, settings) VALUES (?, ?, ?, 1, ?)',
+        'INSERT INTO games (game_id, scenario_id, seed, summarized, settings, rules) VALUES (?, ?, ?, 1, ?, ?)',
       )
       .run(
         header.gameId,
         header.scenarioId,
         header.seed,
         header.settings ? JSON.stringify(header.settings) : null,
+        header.rules ?? null,
       );
   }
 
   async logHeader(gameId: string): Promise<InputLogHeader | undefined> {
     const r = this.db
-      .prepare('SELECT scenario_id, seed, settings FROM games WHERE game_id = ?')
-      .get(gameId) as { scenario_id: string; seed: number; settings: string | null } | undefined;
+      .prepare('SELECT scenario_id, seed, settings, rules FROM games WHERE game_id = ?')
+      .get(gameId) as
+      | { scenario_id: string; seed: number; settings: string | null; rules: number | null }
+      | undefined;
     return (
       r && {
         gameId,
         scenarioId: r.scenario_id,
         seed: r.seed,
         ...(r.settings ? { settings: JSON.parse(r.settings) as UmpireSettings } : {}),
+        ...(r.rules === null ? {} : { rules: r.rules }),
       }
     );
   }
 
   async appendInput(gameId: string, entry: InputLogEntry): Promise<void> {
-    this.db
-      .prepare('INSERT INTO input_log (game_id, seq, entry) VALUES (?, ?, ?)')
-      .run(gameId, entry.seq, JSON.stringify(entry));
-    // Only a game with a known standing keeps it current; an older one is backfilled by replay.
-    this.db
-      .prepare(
-        'UPDATE games SET last_played_ms = max(coalesce(last_played_ms, ?1), ?1) WHERE game_id = ?2 AND summarized = 1',
-      )
-      .run(entry.wallMs, gameId);
+    // One transaction, so an append that fails wrote nothing and the actor may offer it again (#416).
+    this.transaction(() => {
+      this.db
+        .prepare('INSERT INTO input_log (game_id, seq, entry) VALUES (?, ?, ?)')
+        .run(gameId, entry.seq, JSON.stringify(entry));
+      // Only a game with a known standing keeps it current; an older one is backfilled by replay.
+      this.db
+        .prepare(
+          'UPDATE games SET last_played_ms = max(coalesce(last_played_ms, ?1), ?1) WHERE game_id = ?2 AND summarized = 1',
+        )
+        .run(entry.wallMs, gameId);
+    });
   }
 
   async inputLog(gameId: string, afterSeq = 0): Promise<readonly InputLogEntry[]> {

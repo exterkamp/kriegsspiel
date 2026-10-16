@@ -382,7 +382,13 @@ describe('the rules parse in turn mode', () => {
     expect(rulesParseTurnOrder(world, sent('red-1', 'march to the bridge')).none).toBe(
       'no such unit of this side',
     );
-    expect(rulesParseTurnOrder(world, sent('blue-1', 'attack the bridge')).none).toMatch(/attack/);
+    // An attack on enemy troops is not modelled; one on a place is a march to it (#536).
+    expect(
+      rulesParseTurnOrder(world, sent('blue-1', 'charge the enemy column on the bridge')).none,
+    ).toMatch(/attack/);
+    expect(rulesParseTurnOrder(world, sent('blue-1', 'attack the bridge')).intents).toEqual([
+      { kind: 'move', to: { x: 2_050_000, y: 1_500_000 } },
+    ]);
     expect(rulesParseTurnOrder(world, sent('blue-1', 'sing a song')).none).toBeDefined();
   });
 });

@@ -1,9 +1,11 @@
 /**
  * The engine adjudicator (D39, story 11.4): a turn resolved by the rigid rules, with no model.
  *
- * The turn's orders are read by the rules parser (`testParse`, the canned rules of #389) with two
- * turn-mode changes: the addressee is the one chosen on the desk, never guessed from the text, and
- * an order with a condition or a time is "no new order" rather than its plain verb. Its couriers
+ * The turn's orders are read by the rules parser (`rulesParse`, the canned rules of #389) with
+ * turn-mode changes: the addressee is the one chosen on the desk, never guessed from the text; only
+ * the plain sentences before a condition, a time or an injection are read, and an order that opens
+ * with one is "no new order" rather than its plain verb; and where at a place the order means is put
+ * on the map (`rulesPlace.ts`, #522). Its couriers
  * are rolled once by the engine's courier pass; the turn then runs from its start under the
  * ordinary handlers (movement, contact, combat, morale, rally, supply, visibility, victory) to its
  * end, with each ride forced to the pass's outcome, and the scripted sides thinking at their
@@ -20,6 +22,7 @@ import {
   courierPass,
   describePlace,
   engineTurnStart,
+  issueTurnNotice,
   metres,
   positionAt,
   type CourierPass,
@@ -33,8 +36,15 @@ import {
   type Unit,
   type UnitStatus,
 } from '@kriegsspiel/engine';
-import { parseOrdersInput, placeIntents } from '../orders/llmParser.js';
-import { hasConditionOrTime, testParse } from '../umpire/providers/testParse.js';
+import { parseOrdersInput } from '../orders/llmParser.js';
+import {
+  hasConditionOrTime,
+  hasDuration,
+  isInjection,
+  rulesParse,
+  sentencesOf,
+} from '../umpire/providers/testParse.js';
+import { placeRulesIntents } from './rulesPlace.js';
 import { parseContextOf } from './parseContext.js';
 import { advanceUntilOver } from './advance.js';
 import type { SentTurnOrder, TurnRecord } from './store.js';
@@ -74,8 +84,9 @@ type Bounds = Pick<TurnInput, 'n' | 'startMs' | 'endMs'>;
 
 /**
  * Read one turn order with the rules, in turn mode (D39, "Orders in turn mode"): only the addressee
- * is offered as the unit, so it is never guessed; a conditional or timed order, or one the rules
- * cannot read, is "no new order".
+ * is offered as the unit, so it is never guessed (the side's other units are points of reference
+ * only); the sentences after a condition, a time or an injection are left to the umpire; an order
+ * that opens with one, or that the rules cannot read, is "no new order".
  */
 export function rulesParseTurnOrder(world: GameState, order: SentTurnOrder): RulesOrder {
   const base = {
@@ -86,13 +97,16 @@ export function rulesParseTurnOrder(world: GameState, order: SentTurnOrder): Rul
   };
   const unit = world.units.find((u) => u.id === order.to && u.side === order.side);
   if (!unit) return { ...base, none: 'no such unit of this side' };
-  if (hasConditionOrTime(order.text)) {
-    return { ...base, none: 'a condition or a time the rules cannot carry out' };
-  }
+  const kept = plainSentences(order.text);
+  if (typeof kept !== 'string') return { ...base, none: kept.none };
   const ctx = parseContextOf(world, order.side);
-  // An order that names no unit ("hold here") is for the addressee: the desk already chose it.
-  const parsed = testParse({
-    ...parseOrdersInput(order.text, { ...ctx, units: ctx.units.filter((u) => u.id === unit.id) }),
+  const input = parseOrdersInput(kept, ctx);
+  // An order that names no unit ("hold here") is for the addressee: the desk already chose it. The
+  // side's other units are only points of reference ("behind the 1st Battalion").
+  const parsed = rulesParse({
+    ...input,
+    units: input.units.filter((u) => u.id === unit.id),
+    refs: input.units.filter((u) => u.id !== unit.id),
     addressee: unit.id,
   });
   if (parsed.result === 'rejection') return { ...base, none: parsed.reason ?? 'not understood' };
@@ -100,12 +114,40 @@ export function rulesParseTurnOrder(world: GameState, order: SentTurnOrder): Rul
   if (parsed.unitId !== unit.id || !parsed.intents?.length) {
     return { ...base, none: 'not understood' };
   }
-  if (parsed.intents.some((i) => i.kind === 'attack')) {
+  // An attack on enemy troops is not modelled; one on a place ("storm the bridge") is a march to it.
+  if (parsed.intents.some((i) => i.kind === 'attack' && i.target === 'unit')) {
     return { ...base, none: 'attack orders are not modelled yet' };
   }
-  const intents = placeIntents(parsed.intents, unit, ctx);
+  const read = parsed.intents.map((i) =>
+    i.kind === 'attack' ? { ...i, kind: 'move' as const } : i,
+  );
+  const intents = placeRulesIntents(read, unit, world);
   if (typeof intents === 'string') return { ...base, none: intents };
-  return { ...base, intents: intents as OrderIntent[] };
+  return { ...base, intents };
+}
+
+/**
+ * The part of an order the rules carry out in turn mode (D39, #522): its sentences up to the first
+ * with a condition or a time ("If pressed, fall back"), or with words addressed to the umpire
+ * rather than the unit, and none after one that says how long ("fire for ten minutes", #536). What follows is left to the umpire; the rules never act on half a sentence
+ * or on a sentence after a condition. When the first sentence is such, it is "no new order".
+ */
+export function plainSentences(text: string): string | { none: string } {
+  const kept: string[] = [];
+  for (const s of sentencesOf(text)) {
+    if (hasConditionOrTime(s)) {
+      if (kept.length === 0) return { none: 'a condition or a time the rules cannot carry out' };
+      break;
+    }
+    if (isInjection(s)) {
+      if (kept.length === 0) return { none: 'not an order for any unit' };
+      break;
+    }
+    kept.push(s);
+    // "Fire for ten minutes. Then storm the bridge": what follows is timed.
+    if (hasDuration(s)) break;
+  }
+  return kept.length > 0 ? kept.join(' ') : { none: 'not understood' };
 }
 
 /** The engine orders a turn's rules-read orders become: every one rides, "no new order" too. */
@@ -336,16 +378,28 @@ function runEngineTurn(
  * The engine's projection of a turn (D39, 11.4): `input`'s orders read by the rules, their couriers
  * rolled by the courier pass, and the turn run on a copy of `state` to its end. Pure and
  * deterministic; it never touches the live world.
+ *
+ * `forcePass`, when given, replaces the courier pass with a pass of its own built from the turn's
+ * engine orders (the umpire benchmark fixes each case's courier results this way, #440). A game
+ * never passes it.
  */
 export function projectTurn(
   state: EngineState<GameState>,
   input: Pick<TurnInput, 'n' | 'startMs' | 'endMs' | 'orders'>,
   registry: EventRegistry<GameState>,
   context: TurnResolveContext = {},
+  forcePass?: (orders: readonly Order[]) => CourierPass,
 ): Projection {
   const parsed = input.orders.map((o) => rulesParseTurnOrder(state.world, o));
   const orders = engineOrdersOf(parsed, input.orders, input.startMs);
-  const run = runEngineTurn(state, orders, input, registry, context.agents?.());
+  const run = runEngineTurn(
+    state,
+    orders,
+    input,
+    registry,
+    context.agents?.(),
+    forcePass ? forcePass(orders) : undefined,
+  );
   return {
     state: run.state,
     resupply: run.resupply,
@@ -394,5 +448,11 @@ export function engineAdjudicator(
   if (JSON.stringify(pass.couriers) !== JSON.stringify(out.couriers)) {
     throw new Error(`turn ${turn.n}: the courier pass differs from the logged couriers`);
   }
-  return engineTurnStart(state, orders, pass, turn);
+  const started = engineTurnStart(state, orders, pass, turn);
+  // An umpire turn that fell back to the engine says so in every in-tray, in-fiction (D39, 11.9).
+  return turn.fallback ? issueTurnNotice(started, turn.endMs, TABLES_NOTICE) : started;
 }
+
+/** The umpire's staff's word, at the end of a turn the umpire could not decide (D39, "Fallback"). */
+export const TABLES_NOTICE =
+  "Sir, the umpire's staff could not give a ruling on this turn in time, so it has been worked out by the book of tables. The units' own papers follow.";

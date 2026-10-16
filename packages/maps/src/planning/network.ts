@@ -3,7 +3,8 @@ import { bearingDegrees, distance, interpolate, segmentCuts } from '../geometry.
 import { decimal6 } from '../terrain/precision.js';
 import { PlanningFailure, Work } from './budget.js';
 import { box, touches, type Context } from './context.js';
-import { type Edge, Router } from './router.js';
+import { type Edge, Router, type Terminal } from './router.js';
+import { anyAngle } from './smooth.js';
 import {
   PLANNING_VERSION,
   type RegionalPlanningOutput,
@@ -29,6 +30,7 @@ export function assemble(
         old = selected.get(k);
       if (old) old.routes.add(id);
       else selected.set(k, { edge, routes: new Set([id]) });
+      r.used.add(k);
     }
   };
   if (r.terminals.length === 1)
@@ -39,8 +41,11 @@ export function assemble(
     );
   const terms = r.terminals,
     joined = new Set<number>();
+  // Routes with a farm at either end are minor roads, which may ford (D46).
+  const minor = (a: Terminal, b: Terminal) => a.site?.kind === 'farm' || b.site?.kind === 'farm';
   if (terms.length) joined.add(0);
-  let attempts = 0;
+  let attempts = 0,
+    attemptLimit = terms.length * terms.length;
   const failed = new Set<string>();
   while (joined.size < terms.length) {
     let best: { i: number; j: number; d: number } | undefined;
@@ -53,13 +58,21 @@ export function assemble(
           if (!best || d < best.d || (d === best.d && (i < best.i || (i === best.i && j < best.j))))
             best = { i, j, d };
         }
-    if (!best)
+    if (!best) {
+      // No route reaches a boundary exit: try it further along its side.
+      const exit = terms.findIndex((t, j) => !joined.has(j) && t.edge?.exit && r.retryExit(t));
+      if (exit >= 0) {
+        for (const i of joined) failed.delete(`${i}:${exit}`);
+        attemptLimit += terms.length;
+        continue;
+      }
       throw new PlanningFailure(
         'REGIONAL_CONNECTIVITY',
         'required terminals',
         'Required sites and boundary exits cannot all connect through certified ground/deck edges.',
       );
-    if (++attempts > terms.length * terms.length)
+    }
+    if (++attempts > attemptLimit)
       throw new PlanningFailure(
         'NETWORK_RETRY_LIMIT',
         'route attempts',
@@ -67,7 +80,7 @@ export function assemble(
       );
     const a = terms[best.i]!,
       b = terms[best.j]!,
-      path = r.route(a.node, b.node);
+      path = r.route(a.node, b.node, undefined, minor(a, b));
     if (!path) {
       failed.add(`${best.i}:${best.j}`);
       continue;
@@ -75,10 +88,13 @@ export function assemble(
     add(`route:${a.id}:${b.id}`, a.id, b.id, path);
     joined.add(best.j);
   }
-  if (c.input.requireBridge && !Array.from(selected.values()).some((s) => s.edge.candidate)) {
+  if (
+    c.input.requireBridge &&
+    !Array.from(selected.values()).some((s) => s.edge.candidate?.kind === 'bridge')
+  ) {
     const e = Array.from(r.special.values())
       .flat()
-      .find((e) => e.candidate);
+      .find((e) => e.candidate?.kind === 'bridge');
     if (!e)
       throw new PlanningFailure(
         'REQUIRED_BRIDGE_INFEASIBLE',
@@ -134,7 +150,7 @@ export function assemble(
     if (extra >= c.settings.roads.extraLinks) break;
     const a = terms[p.i]!,
       b = terms[p.j]!,
-      path = r.route(a.node, b.node);
+      path = r.route(a.node, b.node, undefined, minor(a, b));
     if (!path) continue;
     add(`route:extra:${a.id}:${b.id}`, a.id, b.id, path);
     extra++;
@@ -145,11 +161,8 @@ export function assemble(
       'redundant links',
       'Requested bounded redundant site links could not be routed.',
     );
-  const segments = [...selected.values()].map((v) => ({
-    ...v,
-    a: r.points[v.edge.a]!,
-    b: r.points[v.edge.b]!,
-  }));
+  // Any-angle geometry (D48): lattice chains become pulled, curved polylines.
+  const segments = anyAngle(c, r, selected);
   // Planarize actual emitted edges, including off-lattice bridge/site connectors.
   // Local spatial bins bound pair discovery; collinear overlaps split and merge.
   const bins = new Map<string, number[]>(),
@@ -210,7 +223,8 @@ export function assemble(
   const nodes = new Map<string, RoadNode>(),
     roads = new Map<string, Road>(),
     crossings = new Map<string, Crossing>(),
-    decks = new Map<string, NonNullable<Edge['profile']>>();
+    decks = new Map<string, NonNullable<Edge['profile']>>(),
+    fords = new Map<string, NonNullable<Edge['ford']>>();
   const terminalSide = new Map<string, 'north' | 'east' | 'south' | 'west'>();
   for (const t of terms)
     if (t.edge?.exit) terminalSide.set(coordinateId(r.points[t.node]!), t.edge.exit);
@@ -270,9 +284,8 @@ export function assemble(
         if (!crossing) {
           output.take();
           vertices.take(cand.deck.outer.length + 2);
-          crossing = {
+          const base = {
             id: cand.id,
-            kind: 'bridge',
             waterId: cand.waterId,
             roadIds: [],
             endpoints: cand.endpoints,
@@ -280,8 +293,19 @@ export function assemble(
             widthM: cand.widthM,
             deck: cand.deck,
           };
+          if (s.edge.ford) {
+            crossing = {
+              ...base,
+              kind: 'ford',
+              depthM: s.edge.ford.depthM,
+              traversableWidthM: cand.widthM,
+            };
+            fords.set(cand.id, s.edge.ford);
+          } else {
+            crossing = { ...base, kind: 'bridge' };
+            decks.set(cand.id, s.edge.profile!);
+          }
           crossings.set(cand.id, crossing);
-          decks.set(cand.id, s.edge.profile!);
         }
         if (!crossing.roadIds.includes(road.id)) crossing.roadIds.push(road.id);
       }
@@ -344,6 +368,7 @@ export function assemble(
     routes,
     sizes,
     decks: [...decks.values()].sort((a, b) => (a.crossingId < b.crossingId ? -1 : 1)),
+    fords: [...fords.values()].sort((a, b) => (a.crossingId < b.crossingId ? -1 : 1)),
     evidence: {
       candidateWork: c.candidates.used,
       validationWork: c.validation.used,
