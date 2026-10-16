@@ -391,6 +391,19 @@ describe('automatic checks', () => {
         'fog',
       ),
     ).toEqual(['blue-1 account names the other side ("Vanguard Battalion")']);
+    // describing the enemy by arm and size is not naming it (#524): red-3 is "Hussar Squadron"
+    expect(
+      checkProposal(
+        c,
+        edited(c, (p) => (unit(p, 'blue-1').account = 'A hussar squadron was seen on the road.')),
+      ).problems.fog,
+    ).toEqual([]);
+    expect(
+      fails(
+        edited(c, (p) => (unit(p, 'blue-1').account = 'Maj. von Reiter led his hussars at us.')),
+        'fog',
+      ),
+    ).toEqual(['blue-1 account names the other side ("Maj. von Reiter")']);
     expect(
       fails(
         edited(c, (p) => (p.summary = 'huzzah-77')),
