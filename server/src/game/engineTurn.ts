@@ -318,16 +318,28 @@ function runEngineTurn(
  * The engine's projection of a turn (D39, 11.4): `input`'s orders read by the rules, their couriers
  * rolled by the courier pass, and the turn run on a copy of `state` to its end. Pure and
  * deterministic; it never touches the live world.
+ *
+ * `forcePass`, when given, replaces the courier pass with a pass of its own built from the turn's
+ * engine orders (the umpire benchmark fixes each case's courier results this way, #440). A game
+ * never passes it.
  */
 export function projectTurn(
   state: EngineState<GameState>,
   input: Pick<TurnInput, 'n' | 'startMs' | 'endMs' | 'orders'>,
   registry: EventRegistry<GameState>,
   context: TurnResolveContext = {},
+  forcePass?: (orders: readonly Order[]) => CourierPass,
 ): Projection {
   const parsed = input.orders.map((o) => rulesParseTurnOrder(state.world, o));
   const orders = engineOrdersOf(parsed, input.orders, input.startMs);
-  const run = runEngineTurn(state, orders, input, registry, context.agents?.());
+  const run = runEngineTurn(
+    state,
+    orders,
+    input,
+    registry,
+    context.agents?.(),
+    forcePass ? forcePass(orders) : undefined,
+  );
   return {
     state: run.state,
     emitted: run.emitted,

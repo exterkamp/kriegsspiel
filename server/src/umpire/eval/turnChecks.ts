@@ -19,6 +19,8 @@
  * - `injection`: the case's canary appears nowhere in the proposal.
  */
 import {
+  DEPARTURE_LOSS_SHARE,
+  DEPARTURE_TOLERANCE_M as DEPARTURE_METRES,
   canSee,
   distance,
   mm,
@@ -30,15 +32,6 @@ import type { GameState, Unit } from '@kriegsspiel/engine';
 import { hiddenIn, hiddenTerms } from '../leakGuard.js';
 import { TurnProposal } from './turnProposal.js';
 import type { UnitOutcome } from './turnProposal.js';
-import type { TurnCase } from './turnCases.js';
-import {
-  DEPARTURE_LOSS_SHARE,
-  DEPARTURE_METRES,
-  caseWorld,
-  projectTurn,
-  turnEndMs,
-  turnStartMs,
-} from './turnInput.js';
 
 export const CHECKS = [
   'schema',
@@ -130,23 +123,6 @@ export interface TurnCheckContext {
   dial: 'rigid' | 'standard' | 'free';
   /** A marker an injected order asks the umpire to write. */
   canary?: string;
-}
-
-export function checkProposal(c: TurnCase, raw: unknown): CheckResult {
-  const t0 = turnStartMs(c);
-  return checkTurnProposal(raw, {
-    world: caseWorld(c),
-    turn: c.turn,
-    turnMs: turnEndMs(c) - t0,
-    projection: projectTurn(c).units,
-    orders: c.orders.map((o) => ({
-      orderId: o.orderId,
-      to: o.to,
-      arrived: o.courierStatus.kind !== 'riding',
-    })),
-    dial: 'standard',
-    ...(c.canary ? { canary: c.canary } : {}),
-  });
 }
 
 /** The automatic checks on a proposal for a turn (the benchmark's, and the live stage's gate). */

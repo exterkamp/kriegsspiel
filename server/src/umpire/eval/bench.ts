@@ -8,12 +8,16 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import type { LlmProvider } from '../provider.js';
-import { CHECKS, checkProposal, type CheckName, type CheckResult } from './turnChecks.js';
-import { TURN_CASES, type TurnCase } from './turnCases.js';
+import { TestProvider } from '../providers/test.js';
+import { adjudicateTurn } from '../adjudicate.js';
+import { UmpireError, type UmpireClient, type UmpireRequest } from '../umpireClient.js';
+import { CHECKS, type CheckName, type CheckResult } from './turnChecks.js';
+import { CASE_RULES_VERSION, TURN_CASES, type TurnCase } from './turnCases.js';
 import {
   ADJUDICATE_PROMPT_VERSION,
   ADJUDICATE_SYSTEM,
-  cannedProposal,
+  caseTurn,
+  checkProposal,
   turnInput,
 } from './turnInput.js';
 import { TURN_PROPOSAL_JSON_SCHEMA } from './turnProposal.js';
@@ -24,7 +28,9 @@ export interface CaseRun {
   model: string;
   provider: string;
   promptVersion: string;
-  /** Wall-clock ms of the call; null when unknown (imported answers). */
+  /** The engine rules version the case was played under (`CASE_RULES_VERSION`). */
+  rules?: number;
+  /** Wall-clock ms of the call (both calls, when the umpire asked for rolls); null when unknown. */
   latencyMs: number | null;
   usage?: { inputTokens: number; outputTokens: number };
   truncated?: boolean;
@@ -32,6 +38,18 @@ export interface CaseRun {
   error?: string;
   raw: string;
   checks: CheckResult;
+  /**
+   * What the live stage made of the reply (`adjudicateTurn` with one call and no resend): the
+   * model calls made (two when it asked for rolls), the rolls, whether the gate would use the
+   * proposal (and how many units the validator would clamp) or the turn would fall back.
+   */
+  live?: {
+    calls: number;
+    rolls?: { id: string; chance: number; success: boolean }[];
+    used: boolean;
+    clampedUnits?: number;
+    error?: string;
+  };
 }
 
 /** A model name as a directory name. */
@@ -70,6 +88,83 @@ export function scoreRaw(c: TurnCase, raw: string): Pick<CaseRun, 'checks' | 'er
 /** The user message: the case input as JSON (the same for every provider and the export). */
 export const userMessage = (c: TurnCase) => JSON.stringify(turnInput(c));
 
+/**
+ * The system prompt as `ProviderUmpireClient` sends it: a provider without native structured
+ * output (Ollama in JSON mode, the Claude Code bridge) gets the schema in the prompt.
+ */
+export const withSchema = (
+  system: string,
+  schema: UmpireRequest['schema'],
+  structured: LlmProvider['capabilities']['structuredOutput'],
+) =>
+  structured === 'native'
+    ? system
+    : `${system}\n\nReply with a single JSON object and nothing else (no prose, no code fences) that validates against this JSON Schema:\n${JSON.stringify(schema)}`;
+
+/**
+ * An `UmpireClient` over a bare provider: the request sent as a game's client sends it (the input
+ * as one JSON user message, the schema in the prompt when the provider cannot enforce it), every
+ * reply kept raw, with none of the client's retries or repair messages, so the first answer is
+ * what is scored.
+ */
+class BenchClient implements UmpireClient {
+  readonly replies: string[] = [];
+  readonly usage = { inputTokens: 0, outputTokens: 0 };
+  truncated = false;
+
+  constructor(
+    private readonly provider: LlmProvider,
+    private readonly model: string,
+    private readonly opts: { maxTokens?: number; timeoutMs?: number; temperature?: number },
+  ) {}
+
+  async call<T>(request: UmpireRequest) {
+    const structured = this.provider.capabilities.structuredOutput;
+    const res = await this.provider.generate(
+      {
+        model: this.model,
+        system: withSchema(request.system, request.schema, structured),
+        messages: [{ role: 'user', content: JSON.stringify(request.input) }],
+        schema: request.schema,
+        structured,
+        maxTokens: this.opts.maxTokens ?? request.maxTokens ?? 8000,
+        temperature: this.opts.temperature ?? 0,
+      },
+      AbortSignal.timeout(this.opts.timeoutMs ?? 60 * 60 * 1000),
+    );
+    this.replies.push(res.text);
+    this.usage.inputTokens += res.usage.inputTokens;
+    this.usage.outputTokens += res.usage.outputTokens;
+    if (res.truncated) this.truncated = true;
+    let output: T;
+    try {
+      output = parseJson(res.text) as T;
+    } catch (e) {
+      throw new UmpireError(`not JSON: ${(e as Error).message}`, 'schema', 1);
+    }
+    return {
+      output,
+      record: {
+        stage: request.stage,
+        provider: this.provider.id,
+        model: this.model,
+        promptVersion: request.promptVersion,
+        system: request.system,
+        input: request.input,
+        rawOutput: res.text,
+        usage: { ...res.usage },
+        costUsd: null,
+        attempts: 1,
+      },
+    };
+  }
+}
+
+/**
+ * One case through the live `adjudicate` stage (`adjudicateTurn`) with one call and no resend, so
+ * the first answer is what is scored. A reply that asks for rolls has them rolled and gets the
+ * second call, as in a game, and the final reply is scored.
+ */
 export async function runCase(
   provider: LlmProvider,
   model: string,
@@ -81,54 +176,45 @@ export async function runCase(
     model,
     provider: provider.id,
     promptVersion: ADJUDICATE_PROMPT_VERSION,
+    rules: CASE_RULES_VERSION,
   };
+  const { state, turn, context } = caseTurn(c);
+  const client = new BenchClient(provider, model, opts);
   const t = performance.now();
-  try {
-    const res = await provider.generate(
-      {
-        model,
-        system: ADJUDICATE_SYSTEM,
-        messages: [{ role: 'user', content: userMessage(c) }],
-        schema: TURN_PROPOSAL_JSON_SCHEMA,
-        structured: provider.capabilities.structuredOutput,
-        maxTokens: opts.maxTokens ?? 8000,
-        temperature: opts.temperature ?? 0,
-      },
-      AbortSignal.timeout(opts.timeoutMs ?? 60 * 60 * 1000),
-    );
-    const latencyMs = Math.round(performance.now() - t);
-    return {
-      ...base,
-      latencyMs,
-      usage: { inputTokens: res.usage.inputTokens, outputTokens: res.usage.outputTokens },
-      ...(res.truncated ? { truncated: true } : {}),
-      raw: res.text,
-      ...scoreRaw(c, res.text),
-    };
-  } catch (e) {
-    const error = `call failed: ${(e as Error).message}`;
-    return {
-      ...base,
-      latencyMs: Math.round(performance.now() - t),
-      error,
-      raw: '',
-      checks: failedChecks(error),
-    };
+  const r = await adjudicateTurn(client, state.world, turn, {
+    context,
+    rngAtStart: state.rng,
+    maxCalls: 1,
+  });
+  const latencyMs = Math.round(performance.now() - t);
+  const live: NonNullable<CaseRun['live']> = {
+    calls: client.replies.length,
+    ...(r.rolls?.length
+      ? { rolls: r.rolls.map((x) => ({ id: x.id, chance: x.chance, success: x.success })) }
+      : {}),
+    used: r.proposal !== undefined,
+    ...(r.validation ? { clampedUnits: r.validation.clampedUnits } : {}),
+    ...(r.error && !r.proposal ? { error: r.error } : {}),
+  };
+  const raw = client.replies.at(-1);
+  if (raw === undefined) {
+    const error = `call failed: ${r.error ?? 'no reply'}`;
+    return { ...base, latencyMs, error, raw: '', checks: failedChecks(error), live };
   }
-}
-
-/** The canned adjudicator's run (the `test` provider): the projection as the proposal, no model. */
-export function runCanned(c: TurnCase): CaseRun {
-  const raw = JSON.stringify(cannedProposal(c));
   return {
-    caseId: c.id,
-    model: 'test',
-    provider: 'test',
-    promptVersion: ADJUDICATE_PROMPT_VERSION,
-    latencyMs: 0,
+    ...base,
+    latencyMs,
+    usage: { ...client.usage },
+    ...(client.truncated ? { truncated: true } : {}),
     raw,
     ...scoreRaw(c, raw),
+    live,
   };
+}
+
+/** The canned adjudicator's run (the `test` provider, D39 "Keyless demo"): the projection as the proposal. */
+export function runCanned(c: TurnCase): Promise<CaseRun> {
+  return runCase(new TestProvider(), 'test', c);
 }
 
 export function saveRun(outDir: string, run: CaseRun): void {
@@ -163,7 +249,7 @@ export function exportCases(dir: string, cases: TurnCase[] = TURN_CASES): void {
       [
         `# Umpire turn: ${c.id}`,
         '',
-        `Prompt version: ${ADJUDICATE_PROMPT_VERSION}. Answer with one JSON object that matches the schema below, and write it, and nothing else, to \`${c.id}.json\` in this directory.`,
+        `Prompt version: ${ADJUDICATE_PROMPT_VERSION} (rules ${CASE_RULES_VERSION}). Answer with one JSON object that matches the schema below, and write it, and nothing else, to \`${c.id}.json\` in this directory.`,
         '',
         '## System',
         '',
@@ -204,6 +290,7 @@ export function importAnswers(
       model,
       provider: 'claude-code',
       promptVersion: ADJUDICATE_PROMPT_VERSION,
+      rules: CASE_RULES_VERSION,
       latencyMs: timings[c.id] ?? null,
       raw,
       ...(raw ? scoreRaw(c, raw) : { error: 'no answer', checks: failedChecks('no answer') }),
@@ -234,7 +321,7 @@ export function blindPacket(dir: string, keyFile: string, runs: Map<string, Case
   if (resolve(keyFile).startsWith(resolve(dir) + sep))
     throw new Error(`the key ${keyFile} must be outside the packet directory ${dir}`);
   mkdirSync(dir, { recursive: true });
-  const models = shuffled([...runs.keys()].sort(), 'umpire-bench-v0');
+  const models = shuffled([...runs.keys()].sort(), 'umpire-bench-v1');
   const letters = new Map(models.map((m, i) => [m, String.fromCharCode(65 + i)]));
   writeFileSync(
     keyFile,

@@ -374,22 +374,22 @@
  ],
  "orders": [
   {
-   "orderId": "b1-8",
+   "orderId": "blue-b1-8",
    "side": "blue",
    "to": "blue-1",
    "text": "Take up a good position near the river and deal with them as you see fit.",
    "courier": "safe",
-   "sentTurn": 1,
+   "sentAtMinute": 0,
    "status": "arrived",
    "arrivedAtMinuteOfTurn": 2
   },
   {
-   "orderId": "r2-8",
+   "orderId": "red-r2-8",
    "side": "red",
    "to": "red-2",
    "text": "Push on.",
    "courier": "safe",
-   "sentTurn": 1,
+   "sentAtMinute": 0,
    "status": "arrived",
    "arrivedAtMinuteOfTurn": 3
   }
@@ -409,7 +409,8 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the bridge, west of the High road"
    },
    {
     "unitId": "blue-2",
@@ -424,7 +425,8 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the bridge, east of the High road"
    },
    {
     "unitId": "blue-3",
@@ -439,7 +441,8 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the bridge, on the High road"
    },
    {
     "unitId": "red-1",
@@ -454,7 +457,8 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "west of the High road"
    },
    {
     "unitId": "red-2",
@@ -469,7 +473,8 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "east of the High road"
    },
    {
     "unitId": "red-3",
@@ -484,10 +489,15 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the Northern wood"
    }
   ],
-  "events": []
+  "observations": [],
+  "events": [
+   "2: order_delivered blue-1, orderId blue-b1-8",
+   "3: order_delivered red-2, orderId red-r2-8"
+  ]
  }
 }
 ```
@@ -495,36 +505,18 @@
 ## Proposal A
 
 ```json
-(no answer)
-```
-
-## Proposal B
-
-```json
-(no answer)
-```
-
-## Proposal C
-
-```json
-(no answer)
-```
-
-## Proposal D
-
-```json
 {
  "turn": 1,
  "units": [
   {
    "unitId": "blue-1",
-   "x": 2000,
-   "y": 1650,
+   "x": 1960,
+   "y": 1635,
    "facingDeg": 0,
    "formation": "line",
    "strength": 600,
    "morale": 80,
-   "fatigue": 3,
+   "fatigue": 1,
    "ammo": 100,
    "status": "active",
    "continuing": {
@@ -532,11 +524,11 @@
    },
    "orders": [
     {
-     "orderId": "b1-8",
+     "orderId": "blue-b1-8",
      "result": "carried-out"
     }
    ],
-   "account": "Col. Aubry read the order as written: a good position near the river. He moved his line about 50 m forward and towards the road, so his right covers the south end of the bridge at musket range. He halted there to receive whatever comes over it. No enemy was in sight."
+   "account": "Col. Aubry took the order literally. He stepped the battalion forward to the south bank, just short of the water, and halted in line facing north. He holds there and will fire on whatever shows itself across the river."
   },
   {
    "unitId": "blue-2",
@@ -553,7 +545,7 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Col. Delacroix had no new orders, so he held his line east of the road and watched the far bank."
+   "account": "No new orders. Col. Delacroix stays in line east of the High road, keeping his battalion in hand as reserve."
   },
   {
    "unitId": "blue-3",
@@ -570,7 +562,7 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Maj. Verneuil had no orders, so he held his squadron behind the infantry, watching the road across the river for enemy movement."
+   "account": "No orders. Maj. Verneuil waits with his squadron on the High road behind the infantry. He sees nothing to charge."
   },
   {
    "unitId": "red-1",
@@ -587,32 +579,32 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Col. Brandt had no orders this turn, so he held his line and waited impatiently."
+   "account": "No orders reached Col. Brandt. He stands in line facing south and chafes at the delay."
   },
   {
    "unitId": "red-2",
-   "x": 2100,
-   "y": 1100,
+   "x": 2090,
+   "y": 1050,
    "facingDeg": 180,
    "formation": "column",
    "strength": 650,
    "morale": 70,
-   "fatigue": 12,
+   "fatigue": 8,
    "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "move",
     "x": 2050,
-    "y": 1380
+    "y": 1400
    },
    "orders": [
     {
-     "orderId": "r2-8",
+     "orderId": "red-r2-8",
      "result": "carried-out"
     }
    ],
-   "account": "Col. Hartmann read 'Push on' as an order to advance along the line of march towards the bridge, the army's objective. He formed column of march, gained the high road and went south about 950 m. By the end he could see enemy lines across the river, and he keeps marching on the bridge.",
-   "departure": "The engine left the battalion holding. The order arrived at minute 3 and plainly asks for an advance, so it marched about 960 m south in column towards the bridge."
+   "account": "The order reached Col. Hartmann at the third minute. 'Push on' gave him no objective, so he took it to mean the High road south. He formed column and advanced about nine hundred metres, then stopped to dress his ranks. He continues toward the river along the road.",
+   "departure": "The projection kept red-2 stationary, which ignores the 'Push on' order that arrived at minute 3. He advances about 900 m in column toward the river, the plain reading of the order."
   },
   {
    "unitId": "red-3",
@@ -629,46 +621,15 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Maj. von Reiter had no orders, so he held his squadron west of the road."
+   "account": "No orders. Maj. von Reiter holds his hussars by the Northern wood and keeps a lookout to the south."
   }
  ],
- "observations": [
-  {
-   "side": "blue",
-   "by": "blue-1",
-   "unitId": "red-2",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-2",
-   "unitId": "red-2",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-2",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-2",
-   "unitId": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-2",
-   "unitId": "blue-2",
-   "when": "end"
-  }
- ],
- "summary": "Turn 1 (0-20). Two loose orders were issued. Blue's 1st Battalion was told to take a good position near the river. Its literal colonel shifted the line a short way forward and towards the road, so it covers the bridge's south exit at musket range, then halted. Red's Line Battalion was told only 'Push on'. Its by-the-book colonel took that as an advance on the bridge, formed column, took the high road and marched about 950 m south, ending at about (2100,1100), ahead of the rest of its side. At the end it and the Blue infantry and cavalry south of the river can see each other at 550-750 m. No shots were fired. Every other unit held its ground without orders."
+ "observations": [],
+ "summary": "Armies still apart, no contact. Blue-1 moved to the south bank near the river, as ordered, and holds. Red-2 'Push on' was read as an advance down the High road: about 900 m in column to (2090,1050), now more than 600 m from Blue and unseen. All other units hold on no new orders. Under way: Red-2 continues south toward the river and the bridge, and contact is likely next turn."
 }
 ```
 
-## Proposal E
+## Proposal B
 
 ```json
 {
@@ -676,13 +637,13 @@
  "units": [
   {
    "unitId": "blue-1",
-   "x": 1960,
-   "y": 1680,
+   "x": 1980,
+   "y": 1650,
    "facingDeg": 0,
    "formation": "line",
    "strength": 600,
    "morale": 80,
-   "fatigue": 0,
+   "fatigue": 2,
    "ammo": 100,
    "status": "active",
    "continuing": {
@@ -690,11 +651,12 @@
    },
    "orders": [
     {
-     "orderId": "b1-8",
+     "orderId": "blue-b1-8",
      "result": "carried-out"
     }
    ],
-   "account": "Col. Aubry reads his order literally: he is already drawn up in line a short way south of the river, facing the bridge, which is a good position near the river, so he stays put and dresses his line. About the enemy, he will deal with them as he sees fit once they appear. He sights a column on the road at the end of the turn but it is still beyond range."
+   "account": "Col. Aubry read 'a good position near the river' and took it as written. He was already close, so he dressed the battalion forward some thirty paces to the bank west of the road. The line now covers the southern end of the bridge at musket range. He halted there to await the enemy, as the order leaves the dealing to him.",
+   "departure": null
   },
   {
    "unitId": "blue-2",
@@ -711,7 +673,7 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Col. Delacroix has no new order and keeps his line beside the 1st Battalion, watching the far bank. He sees an enemy column approach on the road and waits to see what it does."
+   "account": "Col. Delacroix had no new order. He held his line east of the road, facing the river."
   },
   {
    "unitId": "blue-3",
@@ -728,7 +690,7 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Maj. Verneuil has no new order and stays behind the infantry. He sees an enemy column come down the road at the end of the turn, and champs at the bit but does not move without orders."
+   "account": "Maj. Verneuil had no orders and nothing in sight. He kept the squadron on the road behind the infantry, impatient but in place."
   },
   {
    "unitId": "red-1",
@@ -745,86 +707,43 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Col. Brandt has no new order and holds his position, though he would like to advance. He sees nothing of the enemy."
+   "account": "Col. Brandt had no new order. He held where he stood, facing south."
   },
   {
    "unitId": "red-2",
-   "x": 2100,
-   "y": 1150,
+   "x": 2060,
+   "y": 1050,
    "facingDeg": 180,
    "formation": "column",
    "strength": 650,
    "morale": 70,
-   "fatigue": 12,
+   "fatigue": 10,
    "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "hold"
+    "kind": "move",
+    "x": 2050,
+    "y": 1450
    },
    "orders": [
     {
-     "orderId": "r2-8",
-     "result": "partly"
+     "orderId": "red-r2-8",
+     "result": "carried-out"
     }
    ],
-   "account": "Col. Hartmann gets 'Push on' at about the third minute. It names no place, so he does the plain thing by the book: forms column and advances south, bearing towards the high road, in the direction he was already facing. He moves about a kilometre and, with no objective and an enemy line in sight, halts short of the river and awaits further orders.",
-   "departure": "Projection holds red-2 at (2250,150), having no order but 'hold'. The order 'Push on' arrived at minute 3 and is read as an instruction to advance south, so the unit marches about 1000 m, well over the 100 m tolerance."
-  },
-  {
-   "unitId": "red-3",
-   "x": 1550,
-   "y": 400,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. von Reiter has no new order and stays where he is, though he is restless. He sees nothing of the enemy."
+   "account": "Col. Hartmann received 'Push on' a few minutes in. By the book that means advance on the axis of march. He formed column, closed on the high road and marched south toward the bridge at the regulation pace. He is still short of the river and still pressing on.",
+   "departure": "The projection left the battalion halted. 'Push on' is a plain order to advance, and a by-the-book colonel advances down the road toward the enemy and the bridge. He marched about 1,100 m in the 17 minutes after the order arrived, after time to form column."
   }
  ],
- "observations": [
-  {
-   "side": "blue",
-   "by": "blue-1",
-   "unitId": "red-2",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-2",
-   "unitId": "red-2",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-2",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-2",
-   "unitId": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-2",
-   "unitId": "blue-2",
-   "when": "end"
-  }
- ],
- "summary": "Turn 1 was quiet. Blue-1 was told to take a good position near the river; being already in line a short way south of it, he stayed where he was. Red-2 received the order 'Push on', which names no objective, and Col. Hartmann advanced about a kilometre south in column towards the high road, halting short of the river. The other Red units had no orders and held. At the end of the turn the Red column was in sight of the Blue infantry and cavalry, but no fire was exchanged. This differs from the projection only in the movement of red-2."
+ "observations": [],
+ "summary": "Turn 1 (0-20). Red-2 (Hartmann) read 'Push on' as advance on the bridge: he formed column and marched down the high road to about 2060,1050, and continues toward the bridge (move 2050,1450). Blue-1 (Aubry, literal) took up a position on the south bank at 1980,1650, covering the bridge exit at musket range, and holds there. All other units held. No contact and no sightings: red-2 ended just beyond sight of the Blue line. Red-2 will likely come into view and close on the bridge next turn.",
+ "precedents": [
+  "A bare 'push on' or 'advance' order is read as an advance along the high road toward the bridge."
+ ]
 }
 ```
 
-## Proposal F
+## Proposal C
 
 ```json
 {
@@ -846,7 +765,7 @@
    },
    "orders": [
     {
-     "orderId": "b1-8",
+     "orderId": "blue-b1-8",
      "result": "carried-out"
     }
    ],
@@ -919,7 +838,7 @@
    },
    "orders": [
     {
-     "orderId": "r2-8",
+     "orderId": "red-r2-8",
      "result": "carried-out"
     }
    ],

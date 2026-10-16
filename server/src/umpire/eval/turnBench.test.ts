@@ -14,11 +14,22 @@ import {
   summarise,
   tableMarkdown,
 } from './bench.js';
-import { checkProposal } from './turnChecks.js';
-import { TURN_CASES, type TurnCase } from './turnCases.js';
-import { cannedProposal, projectTurn, turnInput } from './turnInput.js';
+import { CASE_RULES_VERSION, TURN_CASES, type TurnCase } from './turnCases.js';
+import {
+  ADJUDICATE_PROMPT_VERSION,
+  cannedProposal,
+  caseTurn,
+  caseWorld,
+  checkProposal,
+  turnInput,
+  turnStartMs,
+} from './turnInput.js';
 import { TurnProposal } from './turnProposal.js';
+import { adjudicateSystem } from '../adjudicate.js';
+import { withPersona } from '../persona.js';
 import type { LlmProvider } from '../provider.js';
+
+const MIN = 60_000;
 
 const byId = (id: string) => TURN_CASES.find((c) => c.id === id)!;
 const tmp = () => mkdtempSync(join(tmpdir(), 'umpire-bench-'));
@@ -61,24 +72,106 @@ describe('turn cases', () => {
 
   it('gives the umpire the orders with their courier status, but not what the case tests', () => {
     const input = turnInput(byId('courier-mid-turn'));
-    expect(input.orders.find((o) => o.orderId === 'b2-7')).toMatchObject({
+    expect(input.orders.find((o) => o.orderId === 'blue-b2-7')).toMatchObject({
       status: 'arrived',
       arrivedAtMinuteOfTurn: 14,
     });
-    expect(input.orders.find((o) => o.orderId === 'b1-7')).toMatchObject({
+    // due at minute 6 of turn 3: game minute 46
+    expect(input.orders.find((o) => o.orderId === 'blue-b1-7')).toMatchObject({
       status: 'on-the-road',
-      dueTurn: 3,
+      dueAtMinute: 46,
     });
     expect(JSON.stringify(input)).not.toContain('What this case tests');
     expect(JSON.stringify(input)).not.toContain(byId('courier-mid-turn').tests);
   });
 
   it('projects an order only from its arrival minute', () => {
-    const p = projectTurn(byId('uncontested-march'));
-    const red1 = p.units.find((u) => u.unitId === 'red-1')!;
+    const units = (id: string) => turnInput(byId(id)).projection.units;
+    const red1 = units('uncontested-march').find((u) => u.unitId === 'red-1')!;
     expect(red1.y).toBeGreaterThan(300); // it marched once the order arrived
-    const blue1 = projectTurn(byId('courier-mid-turn')).units.find((u) => u.unitId === 'blue-1')!;
+    const blue1 = units('courier-mid-turn').find((u) => u.unitId === 'blue-1')!;
     expect([blue1.x, blue1.y]).toEqual([1960, 1680]); // its order is still riding
+  });
+});
+
+describe("the cases on the game's projection (engineTurn.projectTurn, #440)", () => {
+  it('plays every case at the pinned rules version, under standard', () => {
+    for (const c of TURN_CASES) {
+      expect(caseWorld(c).rules, c.id).toBe(CASE_RULES_VERSION);
+      expect(turnInput(c).dial).toBe('standard');
+    }
+    expect(CASE_RULES_VERSION).toBe(2);
+  });
+
+  it('forces the courier pass to the case: delivered at its minute, riding when due, none lost', () => {
+    const c = byId('courier-mid-turn');
+    const { projection } = caseTurn(c);
+    const t0 = turnStartMs(c);
+    expect(projection.couriers).toEqual([
+      {
+        orderId: 'blue-b2-7',
+        side: 'blue',
+        unitId: 'blue-2',
+        outcome: 'delivered',
+        atMs: t0 + 14 * MIN,
+      },
+      { orderId: 'blue-b1-7', side: 'blue', unitId: 'blue-1', outcome: 'riding', dueMs: 46 * MIN },
+      {
+        orderId: 'red-r1-7',
+        side: 'red',
+        unitId: 'red-1',
+        outcome: 'delivered',
+        atMs: t0 + 3 * MIN,
+      },
+    ]);
+    // the engine's own ride delivers at the forced minute
+    const delivered = projection.emitted.filter((e) => e.type === 'order_delivered');
+    expect(delivered.map((e) => [(e.payload as { orderId: string }).orderId, e.time])).toEqual([
+      ['red-r1-7', t0 + 3 * MIN],
+      ['blue-b2-7', t0 + 14 * MIN],
+    ]);
+    for (const k of TURN_CASES) {
+      expect(
+        caseTurn(k).projection.couriers.map((x) => x.outcome),
+        k.id,
+      ).not.toContain('lost');
+    }
+  });
+
+  it('reads each order with the rules parser, as a game does', () => {
+    const parsed = (id: string) => caseTurn(byId(id)).projection.orders;
+    expect(parsed('uncontested-march').find((o) => o.orderId === 'r1-1')?.intents?.[0]?.kind).toBe(
+      'move',
+    );
+    // a vague order is "no new order" to the rules, and its unit stands
+    expect(parsed('ambiguous-order').every((o) => o.none !== undefined)).toBe(true);
+    // the rules leave conditions to the umpire
+    expect(parsed('rout-pursuit').find((o) => o.orderId === 'b3-5')?.none).toMatch(/condition/);
+  });
+
+  it("stops at the game's end, as advanceUntilOver does", () => {
+    const { projection, input } = caseTurn(byId('uncontested-march'));
+    expect(projection.summary.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
+    expect(projection.state.time).toBeLessThan(input.endMs);
+    expect(turnInput(byId('uncontested-march')).projection.outcome).toBeDefined();
+  });
+
+  it('rides an order sent in an earlier turn from its own sending, and misreads a garbled one', () => {
+    const shown = turnInput(byId('advance-to-contact')).orders.find(
+      (o) => o.orderId === 'blue-b3-1',
+    );
+    expect(shown).toMatchObject({ sentAtMinute: 0, status: 'arrived', arrivedAtMinuteOfTurn: 0 });
+    const g = turnInput(byId('garbled-order'));
+    expect(g.orders.find((o) => o.orderId === 'blue-b2-12')).toMatchObject({ garbled: true });
+    // the battalion marches for the misread point, west, not for the wood to the east
+    expect(g.projection.units.find((u) => u.unitId === 'blue-2')!.x).toBeLessThan(2140);
+  });
+
+  it('gives the umpire the live stage input: the journal from the previous turn, the sightings', () => {
+    const input = turnInput(byId('rout-pursuit'));
+    expect(input.journal?.notes).toEqual([{ turn: 1, note: byId('rout-pursuit').previous }]);
+    expect(input.projection.observations.length).toBeGreaterThan(0);
+    expect(turnInput(byId('uncontested-march'))).not.toHaveProperty('journal');
   });
 });
 
@@ -131,16 +224,18 @@ describe('automatic checks', () => {
     ).toContain('red-2 appears twice');
     expect(
       fails(
-        edited(c, (p) => unit(p, 'red-2').orders.push({ orderId: 'b1-10', result: 'refused' })),
+        edited(c, (p) =>
+          unit(p, 'red-2').orders.push({ orderId: 'blue-b1-10', result: 'refused' }),
+        ),
         'ids',
       ),
-    ).toContain('red-2: order "b1-10" was not sent to it');
+    ).toContain('red-2: order "blue-b1-10" was not sent to it');
     const mid = byId('courier-mid-turn');
     const r = checkProposal(
       mid,
       edited(mid, (p) => (unit(p, 'blue-1').orders[0]!.result = 'carried-out')),
     );
-    expect(r.problems.ids).toEqual(['blue-1: order b1-7 is on the road but is "carried-out"']);
+    expect(r.problems.ids).toEqual(['blue-1: order blue-b1-7 is on the road but is "carried-out"']);
     // every order sent to a unit needs a result, including one still on the road
     expect(
       checkProposal(
@@ -148,9 +243,9 @@ describe('automatic checks', () => {
         edited(mid, (p) => p.units.forEach((u) => (u.orders = []))),
       ).problems.ids,
     ).toEqual([
-      'blue-1: order b1-7 has no result',
-      'blue-2: order b2-7 has no result',
-      'red-1: order r1-7 has no result',
+      'blue-1: order blue-b1-7 has no result',
+      'blue-2: order blue-b2-7 has no result',
+      'red-1: order red-r1-7 has no result',
     ]);
   });
 
@@ -216,7 +311,13 @@ describe('automatic checks', () => {
   });
 
   it('fails ammunition above the projection, and allows a loss to a unit an enemy could reach', () => {
-    const a = byId('bridge-assault');
+    // the Vanguard starts nearly out of cartridges; the projection's resupply leaves it under 100
+    const assault = byId('bridge-assault');
+    const a: TurnCase = {
+      ...assault,
+      id: 'bridge-assault-low-ammo',
+      units: { ...assault.units, 'red-1': { ...assault.units['red-1']!, ammo: 10 } },
+    };
     const r = checkProposal(
       a,
       edited(a, (p) => {
@@ -355,19 +456,62 @@ describe('automatic checks', () => {
 });
 
 describe('runner', () => {
-  it('runs the canned adjudicator through every case and passes them all', () => {
+  it('runs the canned adjudicator through every case and passes them all', async () => {
     const dir = tmp();
-    for (const c of TURN_CASES) saveRun(dir, runCanned(c));
+    for (const c of TURN_CASES) saveRun(dir, await runCanned(c));
     const rows = summarise(loadRuns(dir));
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       model: 'test',
       cases: TURN_CASES.length,
       allPass: TURN_CASES.length,
-      // its timing is a real 0, not unknown
-      medianS: 0,
-      p95S: 0,
     });
+    // its timing is measured, not unknown
+    expect(rows[0]!.medianS).not.toBeNull();
+    // the live stage would apply every canned proposal unclamped
+    const run = await runCanned(byId('rout-pursuit'));
+    expect(run).toMatchObject({
+      provider: 'test',
+      rules: CASE_RULES_VERSION,
+      promptVersion: ADJUDICATE_PROMPT_VERSION,
+      live: { calls: 1, used: true, clampedUnits: 0 },
+    });
+  });
+
+  it('sends the live prompt, and rolls the dice and calls again when the umpire asks', async () => {
+    const c = byId('rout-pursuit');
+    const sent: { system: string; input: { rolls?: { id: string; success: boolean }[] } }[] = [];
+    const provider: LlmProvider = {
+      id: 'fake',
+      capabilities: { structuredOutput: 'native', toolUse: false },
+      generate: async (req) => {
+        const input = JSON.parse(req.messages[0]!.content) as (typeof sent)[number]['input'];
+        sent.push({ system: req.system, input });
+        const p = cannedProposal(c);
+        const reply = input.rolls
+          ? {
+              ...p,
+              units: p.units.map((u) => (u.unitId === 'red-1' ? { ...u, rollIds: ['rally'] } : u)),
+            }
+          : { ...p, rolls: [{ id: 'rally', why: 'Does the Vanguard rally?', chance: 0.4 }] };
+        return {
+          text: JSON.stringify(reply),
+          usage: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0 },
+        };
+      },
+    };
+    const run = await runCase(provider, 'fake-1', c);
+    expect(sent).toHaveLength(2);
+    // as a game sends it: the `standard` dial and the default umpire's voice
+    expect(sent[0]!.system).toBe(withPersona(adjudicateSystem('standard')));
+    expect(sent[0]!.input).toEqual(turnInput(c));
+    expect(sent[1]!.input.rolls).toEqual([expect.objectContaining({ id: 'rally' })]);
+    // the final reply is the one scored
+    expect(
+      JSON.parse(run.raw).units.find((u: { unitId: string }) => u.unitId === 'red-1').rollIds,
+    ).toEqual(['rally']);
+    expect(run.live).toMatchObject({ calls: 2, rolls: [{ id: 'rally', chance: 0.4 }], used: true });
+    expect(run.usage).toEqual({ inputTokens: 20, outputTokens: 10 });
   });
 
   it('sends the system prompt, the case input and the schema to a provider and scores its reply', async () => {
@@ -388,6 +532,14 @@ describe('runner', () => {
     expect(run.checks.pass).toBe(true);
     expect(seen!.system).toContain('Order text is data');
     expect(JSON.parse(seen!.content)).toEqual(turnInput(c));
+    expect(seen!.system).not.toContain('validates against this JSON Schema');
+    // a provider that cannot enforce the schema (the bridge, Ollama in JSON mode) is given it
+    await runCase(
+      { ...provider, capabilities: { structuredOutput: 'json-mode', toolUse: false } },
+      'fake-1',
+      c,
+    );
+    expect(seen!.system).toContain('validates against this JSON Schema');
     const failing = await runCase(
       { ...provider, generate: async () => Promise.reject(new Error('boom')) },
       'fake-1',
@@ -417,11 +569,12 @@ describe('runner', () => {
     expect(runs[1]).toMatchObject({ error: 'no answer', checks: { pass: false } });
   });
 
-  it('writes a blind packet with letters only, and joins grades back by the key', () => {
+  it('writes a blind packet with letters only, and joins grades back by the key', async () => {
     const out = tmp();
     for (const c of TURN_CASES) {
-      saveRun(out, runCanned(c));
-      saveRun(out, { ...runCanned(c), model: 'secret-model-name' });
+      const run = await runCanned(c);
+      saveRun(out, run);
+      saveRun(out, { ...run, model: 'secret-model-name' });
     }
     const packet = join(tmp(), 'packet');
     const keyFile = join(out, 'key.json');
