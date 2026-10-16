@@ -4,10 +4,11 @@
 planner. It consumes **accepted decimal6 authoritative ground**, bounds, water,
 optional independent cover, D crossing proposals, recorded settings and a seed.
 It changes none of those inputs. It does not import or execute SettleMaker.
-`PLANNING_VERSION = sited-graded-any-angle-network-v4` (D48). For saved maps,
-`sited-graded-fording-network-v3` (D46, lattice roads with fords) remains
-`FORDING_PLANNING_VERSION`, and `sited-graded-network-v2` (bridges only)
-remains `LEGACY_PLANNING_VERSION`. `DECK_POLICY =
+`PLANNING_VERSION = rotated-sites-any-angle-network-v5` (D50). For saved maps,
+`sited-graded-any-angle-network-v4` (D48, unturned sites) remains
+`ANY_ANGLE_PLANNING_VERSION`, `sited-graded-fording-network-v3` (D46, lattice
+roads with fords) remains `FORDING_PLANNING_VERSION`, and
+`sited-graded-network-v2` (bridges only) remains `LEGACY_PLANNING_VERSION`. `DECK_POLICY =
 linear-ground-endpoints-v1`. Changing geometry, sizing, tie breaks or cost policies
 requires a planning version change. Local sizing/deck certificates retain full precision analytic metadata; frozen
 asset geometry remains decimal6. When assembling a canonical asset, retain or
@@ -100,9 +101,41 @@ clipped boundary vertices and hole boundaries are checked; an interior raised
 node cannot hide behind a flat anchor/outer ring. A hole excludes its interior;
 its boundary remains authoritative. Complete bounds and closed water contact
 checks preserve dry islands. Area and extent, measured from actual polygon area
-and world-axis bounds, are independently recomputed at validation and compared
-to configuration and sizing evidence. A point query is never a footprint
-certificate.
+and its extents in the site's own frame (`siteFrameExtents`), are independently
+recomputed at validation and compared to configuration and sizing evidence. A
+point query is never a footprint certificate.
+
+### Turned sites (D50)
+
+Since v5 each site square is turned by a whole degree `rotationDeg` in
+[0, 90) (`SITE_ORIENTATION`, `src/planning/sites.ts`), so its streets and
+buildings follow the ground instead of the map axes. The turn sums three
+directions as quarter-turn vectors (a square is the same under quarter turns):
+
+- **terrain**: the gradient at the anchor and at eight points on rings of half
+  and one extent, each weighted by its size, so the sides run along the
+  contour and the fall line. It counts in full once the mean aligned gradient
+  reaches 3%.
+- **valley**: the nearest river reach within 400 m, fading linearly with
+  distance, so the sides run along the valley.
+- **approach**: the direction to the nearest site already placed (else the
+  nearest requested boundary exit), at weight 0.5, where the main road through
+  it comes from. On flat ground this alone turns the square to its road.
+
+The whole degree with the best match is read from a literal table of sines
+(`src/rotation.ts`); there is no runtime trigonometry. Candidates are ranked
+with their ground-and-exit turn and certified as turned squares. When a slot
+takes a candidate, the approach is recomputed toward the sites already placed;
+a turn that then fails the footprint certificate or overlaps falls back to the
+certified candidate turn. With no direction at all, the turn comes from the
+seed.
+
+A turned square (`orientedSquare`) grows by 1.5 µm on each side, so rounding
+its corners to decimal6 never takes its area or frame extent below the recorded
+size, and carries each side's midpoint as a ring vertex. Its sizing records the
+measured frame extent. An unturned square is exactly the v4 square. Road search
+blocks lattice nodes within a road half-width of a site in the site's own
+frame.
 
 Each site has one real regional entrance: a boundary midpoint with an outward
 certified connector to an external planning node. The network therefore connects
@@ -110,7 +143,11 @@ required approaches without depending on a future internal street graph. Other
 site regions block road search. The terminal approach has permission to meet its
 own permissible boundary; no occupied footprint exists yet. Entrance width is
 reserved width, bearing is clockwise from north toward the external tangent,
-and node/path endpoint/route provenance is explicit.
+and node/path endpoint/route provenance is explicit. A turned site's entrance
+is a side midpoint vertex; its connector leaves exactly along the side's normal
+for one lattice spacing, its bearing is that normal's whole degree, and a
+second graded connector joins the nearest lattice node (replaceable by the
+any-angle pass, like a bridge's).
 
 ## Terrain-cost routing, crossings and normalization
 

@@ -52,6 +52,11 @@ export interface RealismReport {
     gridAlignedShare: number;
     /** The same share for settlement streets (laid out in each site's frame). */
     streetGridAlignedShare: number;
+    /**
+     * The same share over every road of every kind (#545): regional roads, site
+     * connectors, settlement streets and building access tracks, decks included.
+     */
+    totalGridAlignedShare: number;
   };
   settlements: {
     sites: number;
@@ -623,8 +628,13 @@ export function realismReport(asset: MapAsset): RealismReport {
     maxGrade = 0,
     margin = 0;
   const degree = new Map<string, number>(),
-    aligned = { regional: 0, street: 0, streetLength: 0 };
+    aligned = { regional: 0, street: 0, streetLength: 0, total: 0, totalLength: 0 };
   for (const road of asset.layers.roads) {
+    for (let i = 1; i < road.path.length; i++) {
+      const len = distance(road.path[i - 1]!, road.path[i]!);
+      aligned.totalLength += len;
+      if (gridAligned(road.path[i - 1]!, road.path[i]!)) aligned.total += len;
+    }
     if (road.kind === 'street')
       for (let i = 1; i < road.path.length; i++) {
         const len = distance(road.path[i - 1]!, road.path[i]!);
@@ -704,6 +714,7 @@ export function realismReport(asset: MapAsset): RealismReport {
       bridges: asset.layers.crossings.filter((c) => c.kind === 'bridge').length,
       gridAlignedShare: length ? aligned.regional / length : 0,
       streetGridAlignedShare: aligned.streetLength ? aligned.street / aligned.streetLength : 0,
+      totalGridAlignedShare: aligned.totalLength ? aligned.total / aligned.totalLength : 0,
     },
     settlements: {
       sites: asset.layers.sites.length,

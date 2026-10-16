@@ -20,6 +20,7 @@ import {
   PLANNING_VERSION,
   LEGACY_PLANNING_VERSION,
   FORDING_PLANNING_VERSION,
+  ANY_ANGLE_PLANNING_VERSION,
 } from '../planning/index.js';
 import { preflightAsset } from '../resources.js';
 import { CONSUMED_FORK } from './source.js';
@@ -94,6 +95,11 @@ export const LEGACY_GENERATORS: readonly MapAsset['provenance']['generator'][] =
   Object.freeze({
     ...CURRENT_GENERATOR,
     stages: Object.freeze({ ...CURRENT_GENERATOR.stages, roads: FORDING_PLANNING_VERSION }),
+  }),
+  // D48/D49 any-angle roads with unturned, axis-aligned sites (before D50 turned sites).
+  Object.freeze({
+    ...CURRENT_GENERATOR,
+    stages: Object.freeze({ ...CURRENT_GENERATOR.stages, roads: ANY_ANGLE_PLANNING_VERSION }),
   }),
 ]);
 function recordedIdentity(asset: unknown): MapAsset['provenance']['generator'] | undefined {
