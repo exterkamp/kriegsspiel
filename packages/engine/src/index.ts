@@ -105,6 +105,8 @@ export type { Dial, JudgmentProposal, JudgmentRequest } from './judgment.js';
 export {
   BREAK_MORALE,
   COMBAT_TICK_MS,
+  CONTEST_RADIUS_M,
+  contesters,
   coverFactor,
   FIRE_RATE,
   issueAttack,

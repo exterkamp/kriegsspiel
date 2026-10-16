@@ -215,9 +215,11 @@ describe('pacing of a first game (#178)', () => {
     60_000,
   );
 
-  // Red takes the bridge in 34 of seeds 1 to 40, under rules 1 and under rules 2 (#432), but not
-  // in the same 34: these are the first 12 it takes under rules 2 (seeds 8 and 11 are Blue wins).
-  it.each([1, 2, 3, 4, 5, 6, 7, 9, 10, 12, 13, 14])(
+  // Red takes the bridge in 34 of seeds 1 to 40 under rules 1 and under rules 2 (#432), and in 29
+  // under rules 3 (#528), where Blue's idle battalions firing from the south bank contest the hold:
+  // these are the first 12 it takes under rules 3 (seeds 8 and 11 are Blue wins, and seed 12, a Red
+  // win under rules 2, is now Blue's: Red's attack is broken under Blue's fire).
+  it.each([1, 2, 3, 4, 5, 6, 7, 9, 10, 13, 14, 15])(
     'with no player orders Red takes the bridge in most seeds (seed %i)',
     async (seed) => {
       const run = await play('fast-forward', HORIZON_MS, [], seed);

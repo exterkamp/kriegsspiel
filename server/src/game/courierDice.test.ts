@@ -72,11 +72,11 @@ describe('courier dice on their own stream, versioned (#432)', () => {
   it('would part from it under rules 2, which is why the log header carries the rules', () => {
     // Real time: the same inputs, other dice, another battle.
     const rt = before432.realtime;
-    const under2 = replay(rt, { ...rt.header, rules: RULES_VERSION }).state;
+    const under2 = replay(rt, { ...rt.header, rules: 2 }).state;
     expect(summary(under2).worldSha256).not.toBe(rt.final.worldSha256);
     // A turn game: its logged couriers no longer match the pass, and replay refuses the turn.
     const turns = before432.turns;
-    expect(() => replay(turns, { ...turns.header, rules: RULES_VERSION })).toThrow(
+    expect(() => replay(turns, { ...turns.header, rules: 2 })).toThrow(
       /the courier pass differs from the logged couriers/,
     );
   });

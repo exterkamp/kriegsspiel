@@ -18,7 +18,7 @@ import {
   type Aspect,
 } from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
-import { mm, polygonCentroid } from './geometry.js';
+import { mm, polygonCentroid, polygonIntersectsCircle } from './geometry.js';
 import { FIELD_REPORT_DELAY_MS, fileReport } from './visibility.js';
 import { describePlace } from './place.js';
 import { positionAt, rejectOrder, startMarch } from './movement.js';
@@ -39,6 +39,7 @@ import { FORMATION_RULES, unitTypeOf } from './unitTypes.js';
 import {
   DEFAULT_TAKE_MS,
   MS_PER_MINUTE,
+  contestedHolds,
   type BattleRuling,
   type GameTime,
   type GameState,
@@ -197,16 +198,44 @@ export function pursuitEndsAt(world: GameState): GameTime | undefined {
   return world.battle && timerFrom(world, world.battle.declaredAt) + BATTLE_CLOSE_MS;
 }
 
-/** True while only the attacker's active units have their centres on the objective. */
+/**
+ * An enemy standing this close (metres) to the objective's edge contests it (rules 3, #528):
+ * the ends of the bridge in Hold the Bridge, 80 m from the 60 m square.
+ */
+export const CONTEST_RADIUS_M = 100;
+
+/**
+ * The enemy units that contest the attacker's hold (rules 3, #528): standing (active, not
+ * withdrawing under orders) and either in contact (D13) with a unit on the objective or within
+ * `CONTEST_RADIUS_M` of it. Broken, withdrawn and destroyed units never contest.
+ */
+export function contesters(world: GameState, holders: readonly Unit[]): Unit[] {
+  const { attacker, objective } = world.victory;
+  const radius = mm(CONTEST_RADIUS_M);
+  return activeUnits(world).filter(
+    (e) =>
+      e.side !== attacker &&
+      e.intent.kind !== 'withdraw' &&
+      (polygonIntersectsCircle(objective, e.center, radius) ||
+        holders.some((h) => canReach(e, h) || canReach(h, e))),
+  );
+}
+
+/**
+ * True while only the attacker's active units have their centres on the objective and, under
+ * rules 3, no enemy contests it (#528).
+ */
 function attackerHolds(world: GameState): boolean {
   const { attacker, objective } = world.victory;
   const holders = activeUnits(world).filter((u) => onObjective(u, objective));
-  return holders.length > 0 && holders.every((u) => u.side === attacker);
+  if (holders.length === 0 || !holders.every((u) => u.side === attacker)) return false;
+  return !contestedHolds(world) || contesters(world, holders).length === 0;
 }
 
 /**
  * Start or reset the hold timer as of `time`. When the attacker has just taken the ground,
- * a check is queued for the moment the hold would be complete.
+ * a check is queued for the moment the hold would be complete. A contested hold (rules 3)
+ * resets: the attacker needs `takeMs` uncontested from the moment the contest ends (#528).
  */
 function trackHold(world: GameState, time: number): { world: GameState; schedule: NewEvent[] } {
   const holds = attackerHolds(world);
