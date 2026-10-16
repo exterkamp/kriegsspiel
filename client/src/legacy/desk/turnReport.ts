@@ -187,8 +187,10 @@ function doingOf(
     if (last.turn.rallied) return 'Rallied';
     if (last.turn.lost > 0) return 'In action';
   }
-  // An enemy in sight within fire, as the table marks a fight.
-  if (enemies.some((e) => dist(e.position, unit.position) <= ENGAGE_RANGE_M)) return 'In action';
+  // An enemy in sight within fire, with no fight reported: say that, not "in action", so the status
+  // agrees with the summary's "no fighting reported" (#439).
+  if (enemies.some((e) => dist(e.position, unit.position) <= ENGAGE_RANGE_M))
+    return 'Enemy within range';
   if (last?.kind === 'destroyed') return 'Has beaten the enemy before it';
   if (marching) return 'On the march';
   if (last?.kind === 'lowAmmo') return 'Short of ammunition';

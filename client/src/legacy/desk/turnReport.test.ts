@@ -243,7 +243,7 @@ describe('unit status (#439)', () => {
     expect(riding[0]).toMatchObject({ orderState: 'Sent at 00:00; with the courier' });
   });
 
-  it('reads a planned route as on the march, and an enemy within fire as in action', () => {
+  it('reads a planned route as on the march, and an enemy within fire as within range, not in action', () => {
     const v = view({
       orderRoutes: [
         {
@@ -275,7 +275,7 @@ describe('unit status (#439)', () => {
       sent: false,
     });
     expect(b1!.doing).toBe('On the march');
-    expect(b2!.doing).toBe('In action');
+    expect(b2!.doing).toBe('Enemy within range');
   });
 });
 
