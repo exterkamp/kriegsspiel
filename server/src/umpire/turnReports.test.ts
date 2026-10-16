@@ -88,7 +88,6 @@ describe('the turn reports input (11.9)', () => {
           place: 'at the bridge, on the High road',
           minutesAgo: 0,
           confidence: 'high',
-          radiusM: 0,
           commander: 'Col. Hartmann',
           trait: 'cautious; slow to commit his reserve',
           condition: 'steady, fresh, well supplied',
@@ -273,6 +272,94 @@ describe('a turn note’s checks (11.9)', () => {
         }
       }
     }
+  });
+});
+
+describe('papers written before the outcome, and the place radius (#532)', () => {
+  const ack = report({
+    id: 'blue-r2',
+    kind: 'orderDelivered',
+    observedAt: 2 * MS_PER_MINUTE,
+    text: 'Sir, we have your orders.',
+    turn: undefined,
+  });
+  const sighting = report({
+    id: 'blue-r8',
+    kind: 'contact',
+    sizeEstimate: 'about a battalion',
+    uncertaintyRadius: 20,
+    text: 'Sir, we have sighted about a battalion.',
+    turn: undefined,
+  });
+  // At the turn's end the 1st is shaken and nearly out of powder; at its start it was neither.
+  const end = ctx({ ownUnits: [unit({ morale: 50, ammo: 10 }), second] });
+  const timed = { ...end, before: { at: T1, ownUnits: [unit(), second] } };
+
+  it('gives a paper written before the outcome the condition its unit had then', () => {
+    const { input } = turnReportsInput('blue', 1, [ack, report()], timed);
+    const [early, late] = input.reports;
+    expect(early!.condition).toBe('steady, fresh, well supplied');
+    expect(late!.condition).toBe('shaken, fresh, ammunition nearly gone');
+    // Without the start, every paper has the end's condition, as before.
+    expect(turnReportsInput('blue', 1, [ack], end).input.reports[0]!.condition).toBe(
+      'shaken, fresh, ammunition nearly gone',
+    );
+  });
+
+  it('refuses an acknowledgement that reports losses, morale or ammunition its unit did not have', () => {
+    const entry = turnReportsInput('blue', 1, [ack], timed).input.reports[0]!;
+    expect(
+      checkTurnNote('Sir, your orders are in my hands at the bridge. We hold.', entry),
+    ).toEqual([]);
+    expect(
+      checkTurnNote('Sir, your orders are in my hands. The battalion is shaken.', entry).join(),
+    ).toMatch(/condition "shaken" is not the unit’s/);
+    expect(
+      checkTurnNote('Sir, your orders are in my hands, but we are short of powder.', entry).join(),
+    ).toMatch(/ammunition "short of powder" is not the unit’s when it wrote/);
+    expect(
+      checkTurnNote('Sir, your orders are in my hands; we have lost many men.', entry).join(),
+    ).toMatch(/speaks of losses/);
+    // The same words in a turn note, from the unit's end-of-turn condition and losses, stand.
+    const turn = turnReportsInput('blue', 1, [report()], timed).input.reports[0]!;
+    expect(
+      checkTurnNote(
+        'Sir, I kept my men back in the wood and watched the road. We lost 43 men and are short of powder.',
+        turn,
+      ),
+    ).toEqual([]);
+  });
+
+  it('words the radius as how sure the place is, and refuses a note that makes it a range', () => {
+    const entry = turnReportsInput('blue', 1, [sighting], ctx()).input.reports[0]!;
+    expect(entry).not.toHaveProperty('radiusM');
+    expect(entry.placeAccuracy).toBe('good to about 20 m');
+    const sight = 'Sir, we have sighted about a battalion at the bridge, on the High road.';
+    for (const ok of [
+      `${sight} The place is good to about 20 m.`,
+      `${sight} The position may be out by some 20 metres.`,
+      `${sight} It stands within some twenty metres of that spot.`,
+      sight,
+    ]) {
+      expect(checkTurnNote(ok, entry), ok).toEqual([]);
+    }
+    for (const wrong of [
+      `${sight} It lies within twenty metres of us.`,
+      `${sight} I put them within about 20 metres of the bridge.`,
+      `${sight} They are 20 m off.`,
+    ]) {
+      expect(checkTurnNote(wrong, entry).join(), wrong).toMatch(/states a distance/);
+    }
+    // A distance the report's own words give stands: an order's paces in a turn note.
+    const own = turnReportsInput(
+      'blue',
+      1,
+      [report()],
+      ctx({ orderTexts: new Map([['o1', 'Close to about 80 paces of the bridge and hold']]) }),
+    ).input.reports[0]!;
+    expect(
+      checkTurnNote('Sir, I kept my men back in the wood, 80 paces from the bridge.', own),
+    ).toEqual([]);
   });
 });
 

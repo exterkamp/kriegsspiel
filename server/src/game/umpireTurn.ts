@@ -357,7 +357,10 @@ export class UmpireTurnResolver implements TurnResolver {
           side,
           input.n,
           due,
-          turnReportsContext(world, view, input, output.proposal, places),
+          turnReportsContext(world, view, input, output.proposal, places, {
+            world: state.world,
+            time: state.time,
+          }),
           {
             signal: ctrl.signal,
             ...(this.opts.persona ? { persona: this.opts.persona } : {}),
@@ -444,7 +447,9 @@ export class UmpireTurnResolver implements TurnResolver {
  * What side `view.side`'s papers of umpire turn `input.n` may be written from (11.9): its own
  * units, their accounts in `proposal`, its own words for its orders, the map's places, the names it
  * must not read, and what its units saw as the sight check let it stand (#533: the proposal's
- * observations less this turn's observation rulings in `world`, the turn's applied end).
+ * observations less this turn's observation rulings in `world`, the turn's applied end). With
+ * `start`, the world at the turn's start, a paper written before the turn's end (`view.time`) gives
+ * the condition its unit had before the outcome (#532).
  */
 export function turnReportsContext(
   world: GameState,
@@ -452,6 +457,7 @@ export function turnReportsContext(
   input: Pick<TurnInput, 'n' | 'orders'>,
   proposal: TurnProposal,
   places: readonly string[],
+  start?: { world: GameState; time: number },
 ): TurnReportsContext {
   const side = view.side;
   const own = new Set(view.ownUnits.map((u) => u.id));
@@ -478,6 +484,9 @@ export function turnReportsContext(
       proposal.observations.filter((o) => !refused.has(observationKey(o))),
       view.visibleEnemies.length > 0 || view.lastKnownContacts.length > 0,
     ),
+    ...(start
+      ? { before: { at: view.time, ownUnits: viewFor(start.world, side, start.time).ownUnits } }
+      : {}),
   };
 }
 
