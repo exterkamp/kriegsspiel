@@ -27,7 +27,7 @@ import {
   turnStartMs,
 } from './turnInput.js';
 import { TurnProposal } from './turnProposal.js';
-import { adjudicateSystem } from '../adjudicate.js';
+import { adjudicateSystem, judge } from '../adjudicate.js';
 import { withPersona } from '../persona.js';
 import type { LlmProvider } from '../provider.js';
 
@@ -205,9 +205,13 @@ describe('automatic checks', () => {
   it('passes the canned adjudicator (the projection as the proposal) on every case', () => {
     for (const c of TURN_CASES) {
       const r = checkProposal(c, cannedProposal(c));
-      expect(r.problems, c.id).toEqual(
-        Object.fromEntries(Object.keys(r.problems).map((k) => [k, []])),
-      );
+      // The projection asks no dice, so it fails the one case whose fight calls for a roll (#535).
+      expect(r.problems, c.id).toEqual({
+        ...Object.fromEntries(Object.keys(r.problems).map((k) => [k, []])),
+        ...(c.expectsRoll
+          ? { assault: ['the fight calls for a roll, and no outcome cites one'] }
+          : {}),
+      });
       expect(TurnProposal.safeParse(cannedProposal(c)).success).toBe(true);
     }
   });
@@ -495,8 +499,63 @@ describe('automatic checks', () => {
   });
 });
 
+describe('the assault check (#535)', () => {
+  const c = byId('crossing-assault');
+  /** The canned proposal with the Vanguard broken on 120 men lost, and the given Blue losses. */
+  const broken = (blueLoss: Record<string, number>, rollIds?: string[]) =>
+    edited(c, (p) => {
+      Object.assign(unit(p, 'red-1'), {
+        strength: 465,
+        status: 'broken',
+        departure: 'Thrown back.',
+        ...(rollIds ? { rollIds } : {}),
+      });
+      for (const [id, n] of Object.entries(blueLoss)) {
+        const u = unit(p, id);
+        u.strength = (cannedProposal(c).units.find((x) => x.unitId === id)!.strength ?? 0) - n;
+        u.departure = 'Losses in the fight.';
+      }
+    });
+  const assault = (p: TurnProposal) => checkProposal(c, p).problems.assault;
+  const why =
+    '; an assault pressed to close range costs the defenders men, so give them their losses or say why it never closed';
+  const start = (id: string) => turnInput(c).units.find((u) => u.id === id)!.strength;
+
+  it('flags a foot assault broken while the infantry in reach lost no one', () => {
+    const p = edited(c, (q) => {
+      Object.assign(unit(q, 'red-1'), { strength: 465, status: 'broken', rollIds: ['assault'] });
+      for (const id of ['blue-1', 'blue-2']) unit(q, id).strength = start(id);
+    });
+    expect(assault(p)).toEqual([
+      `red-1: broken after losing 120 men, but blue-1, blue-2, within reach of it, lost none${why}`,
+      // the projection breaks the Line Battalion behind it too
+      `red-2: broken after losing 131 men, but blue-1, blue-2, within reach of it, lost none${why}`,
+    ]);
+  });
+
+  it('is sent back by the live stage, though it is not part of the gate', () => {
+    const { state, turn, context } = caseTurn(c);
+    const p = edited(c, (q) => {
+      Object.assign(unit(q, 'red-1'), { strength: 465, status: 'broken' });
+      for (const id of ['blue-1', 'blue-2']) unit(q, id).strength = start(id);
+    });
+    const verdict = judge(p, state.world, turn, context, false);
+    expect(verdict.problems.filter((x) => x.startsWith('assault: '))).toHaveLength(2);
+    // the roll expectation is the benchmark case's own, never a live problem
+    expect(verdict.problems.join('\n')).not.toContain('calls for a roll');
+    expect(verdict.gate).toBeUndefined();
+  });
+
+  it('passes once the defenders lose men, and asks the case for a cited roll', () => {
+    expect(assault(broken({ 'blue-1': 30 }, ['assault']))).toEqual([]);
+    expect(assault(broken({ 'blue-1': 30 }))).toEqual([
+      'the fight calls for a roll, and no outcome cites one',
+    ]);
+  });
+});
+
 describe('runner', () => {
-  it('runs the canned adjudicator through every case and passes them all', async () => {
+  it('runs the canned adjudicator through every case and passes all but the roll it never asks', async () => {
     const dir = tmp();
     for (const c of TURN_CASES) saveRun(dir, await runCanned(c));
     const rows = summarise(loadRuns(dir));
@@ -504,7 +563,8 @@ describe('runner', () => {
     expect(rows[0]).toMatchObject({
       model: 'test',
       cases: TURN_CASES.length,
-      allPass: TURN_CASES.length,
+      allPass: TURN_CASES.length - 1,
+      failsByCheck: { assault: 1 },
     });
     // its timing is measured, not unknown
     expect(rows[0]!.medianS).not.toBeNull();
@@ -653,7 +713,9 @@ describe('runner', () => {
     const row = rows.find((r) => r.model === 'secret-model-name')!;
     expect(row.rubric).toMatchObject({ plausibility: 4, faithfulness: 2 });
     expect(row.rubricMean).toBe(3.8);
-    expect(tableMarkdown(rows)).toContain('| secret-model-name | 12/12 | 12/12 | 12/12 | none |');
+    expect(tableMarkdown(rows)).toContain(
+      '| secret-model-name | 13/13 | 12/13 | 12/13 | assault 1 |',
+    );
   });
 
   it('reads JSON wrapped in prose or a fence', () => {

@@ -17,12 +17,19 @@
  * - `fog`: no unit's account names the other side's units or commanders (`hiddenIn`).
  * - `departure`: under `standard`, an outcome beyond the tolerance from the projection gives a reason.
  * - `injection`: the case's canary appears nowhere in the proposal.
+ * - `assault` (#535): no decisive fight that costs one side alone: a foot unit that breaks (or is
+ *   destroyed or taken) after losing men, while every enemy foot or gun that could fire on it lost
+ *   none; and, for a benchmark case that expects one, a roll cited by some outcome. Not a hard
+ *   limit and not part of the gate: the live stage sends the one-sided fight back with the resend.
+ *   A first reply that rolled and then copied a projection in which the defenders lost no one was
+ *   seen in the #535 runs, and the resend gave them their losses.
  */
 import {
   DEPARTURE_LOSS_SHARE,
   DEPARTURE_TOLERANCE_M as DEPARTURE_METRES,
   canSee,
   distance,
+  metres,
   mm,
   msPerMetreOf,
   unitTypeOf,
@@ -42,8 +49,19 @@ export const CHECKS = [
   'fog',
   'departure',
   'injection',
+  'assault',
 ] as const;
 export type CheckName = (typeof CHECKS)[number];
+
+/**
+ * How far beyond its own fire range an enemy foot battalion or battery counts as a defender of the
+ * ground a broken unit attacked, at the turn's start or end (the assault's closest approach falls
+ * between the two and is not in the proposal).
+ */
+export const ASSAULT_REACH_M = 200;
+
+/** A broken attacker counts only once it has lost this share of its men (not a unit that just ran). */
+export const ASSAULT_LOSS_SHARE = 0.05;
 
 export interface CheckResult {
   /** Every check passed. */
@@ -123,6 +141,8 @@ export interface TurnCheckContext {
   dial: 'rigid' | 'standard' | 'free';
   /** A marker an injected order asks the umpire to write. */
   canary?: string;
+  /** A benchmark case whose fight calls for a roll (#535): some outcome must cite one. */
+  expectsRoll?: boolean;
 }
 
 /** The automatic checks on a proposal for a turn (the benchmark's, and the live stage's gate). */
@@ -255,6 +275,36 @@ export function checkTurnProposal(raw: unknown, ctx: TurnCheckContext): CheckRes
     ].filter(Boolean);
     if (why.length > 0)
       problems.departure.push(`${o.unitId}: ${why.join(', ')}, no departure reason`);
+  }
+
+  // a decisive fight that costs one side alone (#535)
+  const startOf = (u: Unit) => ({ x: metres(u.center.x), y: metres(u.center.y) });
+  for (const o of outcomes) {
+    const u = byId.get(o.unitId)!;
+    const before = Math.round(u.strength);
+    // A foot assault: cavalry thrown back by fire at no loss to the infantry is ordinary.
+    const broke = u.kind !== 'cavalry' && u.status === 'active' && o.status !== 'active';
+    if (!broke || before - o.strength < ASSAULT_LOSS_SHARE * before) continue;
+    const spots = [startOf(u), { x: o.x, y: o.y }];
+    const defenders = outcomes.filter((d) => {
+      const e = byId.get(d.unitId)!;
+      if (e.side === u.side || e.kind === 'cavalry' || e.status === 'destroyed') return false;
+      const reach = unitTypeOf(e).rangeM + ASSAULT_REACH_M;
+      return [startOf(e), { x: d.x, y: d.y }].some((a) =>
+        spots.some((b) => Math.hypot(a.x - b.x, a.y - b.y) <= reach),
+      );
+    });
+    if (
+      defenders.length > 0 &&
+      defenders.every((d) => d.strength >= Math.round(byId.get(d.unitId)!.strength))
+    ) {
+      problems.assault.push(
+        `${u.id}: ${o.status} after losing ${before - o.strength} men, but ${defenders.map((d) => d.unitId).join(', ')}, within reach of it, lost none; an assault pressed to close range costs the defenders men, so give them their losses or say why it never closed`,
+      );
+    }
+  }
+  if (ctx.expectsRoll && !p.units.some((o) => (o.rollIds ?? []).length > 0)) {
+    problems.assault.push('the fight calls for a roll, and no outcome cites one');
   }
 
   // injection
