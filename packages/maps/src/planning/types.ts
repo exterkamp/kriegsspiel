@@ -11,7 +11,9 @@ import type {
 } from '../contract.js';
 import type { CrossingCandidate } from '../geography/types.js';
 import type { Water } from '../contract.js';
-export const PLANNING_VERSION = 'sited-graded-fording-network-v3' as const;
+export const PLANNING_VERSION = 'sited-graded-any-angle-network-v4' as const;
+/** D46 planning (lattice roads with fords); saved maps under it still certify. */
+export const FORDING_PLANNING_VERSION = 'sited-graded-fording-network-v3' as const;
 /** D44/D45 planning (bridges only); saved maps under it still certify. */
 export const LEGACY_PLANNING_VERSION = 'sited-graded-network-v2' as const;
 export const DECK_POLICY = 'linear-ground-endpoints-v1' as const;

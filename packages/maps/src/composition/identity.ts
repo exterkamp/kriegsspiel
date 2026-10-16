@@ -16,7 +16,11 @@ import {
   geographyPreset,
   type CrossingPolicy,
 } from '../geography/index.js';
-import { PLANNING_VERSION, LEGACY_PLANNING_VERSION } from '../planning/index.js';
+import {
+  PLANNING_VERSION,
+  LEGACY_PLANNING_VERSION,
+  FORDING_PLANNING_VERSION,
+} from '../planning/index.js';
 import { preflightAsset } from '../resources.js';
 import { CONSUMED_FORK } from './source.js';
 import { COMPOSITION_VERSION, type BattlefieldInput, type BattlefieldPreset } from './types.js';
@@ -77,10 +81,19 @@ export const LEGACY_GENERATORS: readonly MapAsset['provenance']['generator'][] =
       roads: LEGACY_PLANNING_VERSION,
     }),
   }),
-  // D46 stages: fords, on the combed v2 relief and D8 rivers (before #540).
+  // D46 stages: lattice roads with fords, on the combed v2 relief and D8 rivers (before D47 and D48).
   Object.freeze({
     ...CURRENT_GENERATOR,
-    stages: Object.freeze({ ...CURRENT_GENERATOR.stages, ...D44_RELIEF }),
+    stages: Object.freeze({
+      ...CURRENT_GENERATOR.stages,
+      ...D44_RELIEF,
+      roads: FORDING_PLANNING_VERSION,
+    }),
+  }),
+  // D47 relief and rivers with D46 lattice roads (main between #540 and #541, before D48 any-angle roads).
+  Object.freeze({
+    ...CURRENT_GENERATOR,
+    stages: Object.freeze({ ...CURRENT_GENERATOR.stages, roads: FORDING_PLANNING_VERSION }),
   }),
 ]);
 function recordedIdentity(asset: unknown): MapAsset['provenance']['generator'] | undefined {

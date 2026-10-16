@@ -153,17 +153,22 @@ function factsOf(entry: TurnReportEntry, extraWords: readonly string[] = []): Pr
 /**
  * Why the umpire's `account` may not be shown to the side, or nothing when it may: it names the
  * other side (`hidden`), cites a figure, name or id the side's own report and order texts do not
- * have (the map's places excepted), or speaks of dice. Free prose, so any word may open a sentence.
+ * have, or speaks of dice. The map's places and the side's own units' names and commanders (`own`:
+ * "behind the 1st Battalion", "the 1st Battalion's line") are the side's to read. Free prose
+ * (#530): any word may open a sentence, a distance ("at about 200 paces") is the umpire's estimate
+ * and not a figure to withhold, and a compound word ("bridge-head", "re-forming") is not an id.
+ * An enemy's strength or any other figure is still checked.
  */
 export function screenAccount(
   account: string,
   entry: TurnReportEntry,
   places: readonly string[] = [],
   hidden: readonly string[] = [],
+  own: readonly string[] = [],
 ): string[] {
-  const facts = factsOf(entry, places);
+  const facts = factsOf(entry, [...places, ...own]);
   return [
-    ...checkProseAgainst(account, { ...facts, lenientOpeners: true }),
+    ...checkProseAgainst(account, { ...facts, lenientOpeners: true, freeProse: true }),
     ...hiddenIn(account, hidden),
     ...(DICE_WORDS.test(account) ? ['speaks of dice or odds'] : []),
   ];
@@ -301,6 +306,7 @@ export function turnReportsInput(
   const atEnd = narrateInput(side, reports, ctx.ownUnits).reports;
   // A paper written before the outcome speaks for its unit as it stood then (#532).
   const before = ctx.before && narrateInput(side, reports, ctx.before.ownUnits).reports;
+  const ownNames = ctx.ownUnits.flatMap((u) => [u.name, ...(u.commander ? [u.commander] : [])]);
   const entries = reports.map((r, i): TurnReportEntry => {
     const early = before !== undefined && r.observedAt < ctx.before!.at;
     const { radiusM, ...base } = (early ? before : atEnd)[i]!;
@@ -326,7 +332,7 @@ export function turnReportsInput(
     const unit = ctx.ownUnits.find((u) => u.name === r.from);
     const account = unit && ctx.accounts.find((a) => a.unitId === unit.id)?.account.trim();
     if (account) {
-      const problems = screenAccount(account, entry, ctx.places, ctx.hidden);
+      const problems = screenAccount(account, entry, ctx.places, ctx.hidden, ownNames);
       const unseen =
         ctx.sight && accountSightProblem(account, unit.id, ctx.sight, ownTermsOf(ctx.ownUnits));
       if (unseen) problems.push(unseen);

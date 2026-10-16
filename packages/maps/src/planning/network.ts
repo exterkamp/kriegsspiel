@@ -4,6 +4,7 @@ import { decimal6 } from '../terrain/precision.js';
 import { PlanningFailure, Work } from './budget.js';
 import { box, touches, type Context } from './context.js';
 import { type Edge, Router, type Terminal } from './router.js';
+import { anyAngle } from './smooth.js';
 import {
   PLANNING_VERSION,
   type RegionalPlanningOutput,
@@ -151,11 +152,8 @@ export function assemble(
       'redundant links',
       'Requested bounded redundant site links could not be routed.',
     );
-  const segments = [...selected.values()].map((v) => ({
-    ...v,
-    a: r.points[v.edge.a]!,
-    b: r.points[v.edge.b]!,
-  }));
+  // Any-angle geometry (D48): lattice chains become pulled, curved polylines.
+  const segments = anyAngle(c, r, selected);
   // Planarize actual emitted edges, including off-lattice bridge/site connectors.
   // Local spatial bins bound pair discovery; collinear overlaps split and merge.
   const bins = new Map<string, number[]>(),
