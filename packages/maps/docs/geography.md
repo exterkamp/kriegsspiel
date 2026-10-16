@@ -17,13 +17,13 @@ findCrossingCandidates(water, bounds, settings, limits?): GenerationResult<Cross
 crossingCandidate(id, waterId, endpoints, settings): CrossingCandidate
 validateCrossingCandidate(candidate, water, bounds, settings, limits?): GenerationResult<CrossingCandidate>
 createGeographyQueries(elevation, bounds, water, settings, limits?): GenerationResult<GeographyQueries>
-generateCover(elevation, bounds, water, settings, seed): GenerationResult<Cover[]>
+generateCover(elevation, bounds, water, settings, seed, context?): GenerationResult<Cover[]>
 geographyPreset('flat-countryside' | 'wooded-hills' | 'river-valley'): MapSettings
 ```
 
 Inputs use the frozen types. `GeographyOutput` adds `version`, `sourceElevation`, authoritative `elevation`, `groundChanged`, `drainage`, independent `water`/`cover`, `crossingCandidates`, and deterministic work evidence, including optional shoulder policy/band/cut counts. The existing `HydrologyOutput` lacks cover and source-ground/changed-ground information; `HydrologyStageOutput` is the geography output without cover/candidates. Local `CrossingCandidate` has no final road references: it carries ID, river identity, bridge kind, endpoints/span, reserved width, conservative deck polygon, minimum abutment and policy version. #137 creates final `Crossing` links and road edges. No ford is emitted without a model of depth/traversability.
 
-`GEOGRAPHY_VERSION = 'flood-carved-stepped-network-v2'`, `CROSSING_VERSION = 'reserved-dry-disks-v2'`, and `GEOGRAPHY_PRESET_VERSION = 'geography-presets-v1'` freeze the policies below. Cover has its independent `COVER_VERSION = 'coherent-dry-runs-v1'`; see [cover documentation](geography-cover.md). Composition records these in generator stage provenance and materializes preset settings. Changing content rules requires a stage version change. Budgets can cause success/failure but never alter a successful result by truncation or seed substitution.
+`GEOGRAPHY_VERSION = 'flood-carved-stepped-network-v2'`, `CROSSING_VERSION = 'reserved-dry-disks-v2'`, and `GEOGRAPHY_PRESET_VERSION = 'geography-presets-v1'` freeze the policies below. Cover has its independent `COVER_VERSION = 'terrain-parcels-v2'` (D45; rectangle cover `coherent-dry-runs-v1` before it); see [cover documentation](geography-cover.md). `generateGeography(..., limits, { cover: false })` leaves cover empty; composition then lays it out around the final roads and settlements. Composition records these in generator stage provenance and materializes preset settings. Changing content rules requires a stage version change. Budgets can cause success/failure but never alter a successful result by truncation or seed substitution.
 
 ## Ground, priority flood and drainage
 
@@ -62,7 +62,7 @@ Drainage is recomputed on the carved authoritative field; remaining depression l
 
 ## Cover and suitability queries
 
-Composition passes authoritative original/carved ground, never filled ground, to the independent [cover module](geography-cover.md). Wood/field/open remain separate from water/infrastructure. Coherence, conservative water masking, dry islands, slope restrictions, achieved area fractions and raster/rectangle limitations are documented there. Cover settings or unrelated settlement-stream draws cannot change ground, water, drainage or crossing candidates.
+Composition passes authoritative original/carved ground, never filled ground, to the [cover module](geography-cover.md), together with the final roads and sites. Woods follow steep ground, ridges, poor soil and distance from settlements; fields, gentle ground near villages, farms and roads; river flats stay open meadow. Conservative water masking, slope rules, parcels, smoothed shared outlines and achieved shares are documented there. Cover settings or unrelated settlement-stream draws cannot change ground, water, drainage or crossing candidates.
 
 `createGeographyQueries` snapshots ground, water and numeric bounds. It delegates `heightAt`, analytic `gradientAt` and `slopeAt` to **existing** `createElevationQueries`; no competing interpolation is introduced. Exact maximum bounds and seam ownership are the accepted terrain-query rules; nonfinite/out-of-bounds inputs throw. `waterAt(x,y)` returns sorted IDs of bodies covering the point, including boundaries while respecting hole interiors. `isDry(x,y,radiusM=0)` checks a closed disk is in bounds and separated from every water boundary; contact within1e−9 m counts wet. Both return bounded `GenerationResult`s with a fresh per-call work allowance. Negative/nonfinite radii are errors. Caller mutations after construction cannot alter any query.
 
@@ -86,7 +86,7 @@ Frozen sample/feature/vertex/ring/descriptor caps are applied before expensive w
 | Water construction               | min(100M,8×topology cap)  | Source/authoritative copies, complete corner scans, bounded cropped masks, queues/edges, network decomposition, level windows, reach clipping and cell carving,56N shoulder work, ring topology and exact contact partitions. |
 | Water physics/query construction | min(100M,8×topology cap)  | **N samples before Float64 query snapshot**, polygon topology, edge/grid cuts, scanline visits/sorts and interior nodes.                                                   |
 | Crossing search/checks           | topology cap              | Actual metered frozen geometry checks, strip/edge scans, interval ordering and bounded output.                                                                             |
-| Cover                            | topology cap              | Independently documented complete phase reservations.                                                                                                                      |
+| Cover                            | 8×topology cap            | Independently documented complete phase reservations (input/water topology within the topology cap).                                                                     |
 
 A carved map performs two separately bounded flood passes; evidence `flood` describes the final authoritative pass, not their sum. No sample is marked/popped twice **within a pass**. Flood neighbour checks are8N; the separately charged receiver scan is additional. Worst-case source plus final flood work is twice the per-pass limit. Reported work units are deterministic visits/comparisons/staging operations, not CPU instructions. Geometry loops, sorting and allocations have independent caps; timings/timestamps are absent from outputs.
 
@@ -94,7 +94,7 @@ Water output has shared vertex reservation across rivers/lakes. Composition rese
 
 ## Presets and fixed corpus
 
-`geographyPreset` materializes5 km-square settings using existing terrain generation. Flat countryside has zero relief, wood.15/field.6. Wooded hills has120 m relief,1000 m feature scale, wood.65/field.1. River valley has60 m relief, roughness.35,1000 m feature scale, threshold100, required river, min20/max100 m river width, reserved8 m, abutment3 m, max span150 m, wood.3/field.4 and **1000 m cover coherence**. The coarser river cover policy bounds masking work for its long channel; it does not reduce elevation resolution or alter sample counts. Other defaults remain the plan/contract settings.
+`geographyPreset` materializes5 km-square settings using existing terrain generation. Flat countryside has zero relief, wood.15/field.6. Wooded hills has120 m relief,1000 m feature scale, wood.65/field.1. River valley has60 m relief, roughness.35,1000 m feature scale, threshold100, required river, min20/max100 m river width, reserved8 m, abutment3 m, max span150 m, wood.3/field.4 and **1000 m cover coherence**. Since cover v2 the coherence only sets the soil/woodland noise scale (broad 1 km soil patterns); the cover lattice is 50 m on every preset. Other defaults remain the plan/contract settings.
 
 Representative seeds remain flat17/hills31/river97. Under v2, flat17 has no water; hills31 and river97 have brook and river networks with confluences, no lakes, and bridge candidates whose abutments clear the water (see the realism report in `src/realism.ts` and `tests/realism.test.ts`). The v1 evidence below (a 271-point river97 trunk, 123 candidates) describes the superseded stage. These are component fixtures, not accepted connected settlements/roads.
 

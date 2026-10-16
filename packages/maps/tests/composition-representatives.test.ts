@@ -11,6 +11,7 @@ import {
 import { canonicalGeometry, canonicalizeAsset } from '../src/canonical.js';
 import { importAsset } from '../src/import.js';
 import { realismReport } from '../src/realism.js';
+import { expectRealisticCover } from './realism-checks.js';
 import type { GenerationResult, MapAsset } from '../src/contract.js';
 const value = <T>(r: GenerationResult<T>): T => {
   if (!r.ok) throw Error(JSON.stringify(r));
@@ -78,6 +79,7 @@ for (const name of ['flat-countryside', 'wooded-hills', 'river-valley'] as const
     );
     expect(realism.settlements.summits).toBe(0);
     expect(realism.settlements.lowRiverFlats).toBe(0);
+    expectRealisticCover(realism, asset.settings);
     const exported = value(exportBattlefield(asset));
     await timerYield();
     const loaded = importAsset(exported.json);

@@ -1,4 +1,4 @@
-import type { MapAsset, Point } from './contract.js';
+import type { MapAsset, Point, Polygon } from './contract.js';
 import { distance, pointSegmentDistance, polygonLocation } from './geometry.js';
 import { createElevationQueries } from './queries.js';
 import { TopologyBudget } from './errors.js';
@@ -48,6 +48,210 @@ export interface RealismReport {
     lowRiverFlats: number;
     /** Villages within 800 m of a river, as a share of villages (rivers present). */
     villagesNearRiver: number;
+  };
+  cover: CoverRealism;
+}
+
+/**
+ * Land cover measured on the elevation sample-cell centres (each point takes
+ * the cover feature containing it) and on the cover outlines.
+ */
+export interface CoverRealism {
+  features: number;
+  /** Shares of covered area (sampled), comparable with the recipe's fractions. */
+  woodShare: number;
+  fieldShare: number;
+  openShare: number;
+  /** Mean ground slope (rise/run) under woods and under fields. */
+  woodMeanSlope: number;
+  fieldMeanSlope: number;
+  /** Steepest sampled ground under any field. */
+  fieldMaxSlope: number;
+  /** Mean distance to the nearest site anchor, metres (0 without sites). */
+  woodMeanSettlementDistanceM: number;
+  fieldMeanSettlementDistanceM: number;
+  /** River flats: covered points within 150 m of a river and under 2 m above its surface. */
+  riverFlatPoints: number;
+  riverFlatOpenShare: number;
+  riverFlatWoodShare: number;
+  /** Outline length away from the map edge, metres. */
+  boundaryLengthM: number;
+  /** Share of that length on axis-aligned (lattice-like) segments. */
+  axisAlignedShare: number;
+  /** The same share, only on edges two cover features share (land boundaries). */
+  sharedAxisAlignedShare: number;
+  /** Mean number of outline vertices per feature. */
+  meanVertices: number;
+}
+
+/** Even-odd scanline fill of a polygon over row/column centre coordinates. */
+function scanPolygon(
+  polygon: Polygon,
+  columns: number,
+  rows: number,
+  spacing: number,
+  visit: (i: number, j: number) => void,
+): void {
+  const rings = [polygon.outer, ...polygon.holes];
+  let minY = Infinity,
+    maxY = -Infinity;
+  for (const [, y] of polygon.outer) {
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  const j0 = Math.max(0, Math.ceil(minY / spacing - 0.5)),
+    j1 = Math.min(rows - 1, Math.floor(maxY / spacing - 0.5));
+  for (let j = j0; j <= j1; j++) {
+    const y = (j + 0.5) * spacing,
+      cuts: number[] = [];
+    for (const ring of rings)
+      for (let k = 1; k < ring.length; k++) {
+        const a = ring[k - 1]!,
+          b = ring[k]!;
+        if (a[1] > y !== b[1] > y) cuts.push(a[0] + ((y - a[1]) * (b[0] - a[0])) / (b[1] - a[1]));
+      }
+    cuts.sort((p, q) => p - q);
+    for (let k = 0; k + 1 < cuts.length; k += 2) {
+      const i0 = Math.max(0, Math.ceil(cuts[k]! / spacing - 0.5)),
+        i1 = Math.min(columns - 1, Math.floor(cuts[k + 1]! / spacing - 0.5));
+      for (let i = i0; i <= i1; i++) visit(i, j);
+    }
+  }
+}
+
+export function coverRealism(asset: MapAsset): CoverRealism {
+  const q = createElevationQueries(asset),
+    b = asset.bounds,
+    spacing = asset.elevation.spacingM,
+    columns = asset.elevation.columns - 1,
+    rows = asset.elevation.rows - 1,
+    cover = asset.layers.cover ?? [],
+    kinds = ['open', 'wood', 'field'] as const;
+  const kindAt = new Int8Array(columns * rows).fill(-1);
+  for (const f of cover)
+    for (const p of f.polygons)
+      scanPolygon(p, columns, rows, spacing, (i, j) => {
+        kindAt[j * columns + i] = kinds.indexOf(f.kind);
+      });
+  // River segments with their surface level, binned for nearest-segment lookup.
+  const bin = 200,
+    binColumns = Math.ceil(b.maxX / bin) + 1,
+    bins = new Map<number, { a: Point; b: Point; level: number }[]>();
+  for (const w of asset.layers.water ?? [])
+    if (w.kind === 'river')
+      for (let k = 1; k < w.centreline.length; k++) {
+        const a = w.centreline[k - 1]!,
+          c = w.centreline[k]!,
+          level = w.surfaceProfileM[k]!;
+        for (
+          let by = Math.floor(Math.min(a[1], c[1]) / bin);
+          by <= Math.floor(Math.max(a[1], c[1]) / bin);
+          by++
+        )
+          for (
+            let bx = Math.floor(Math.min(a[0], c[0]) / bin);
+            bx <= Math.floor(Math.max(a[0], c[0]) / bin);
+            bx++
+          ) {
+            const key = by * binColumns + bx;
+            bins.set(key, [...(bins.get(key) ?? []), { a, b: c, level }]);
+          }
+      }
+  const sites = asset.layers.sites ?? [];
+  const area = [0, 0, 0],
+    slope = [0, 0, 0],
+    settlement = [0, 0, 0];
+  let fieldMaxSlope = 0,
+    flat = 0,
+    flatOpen = 0,
+    flatWood = 0;
+  for (let j = 0; j < rows; j++)
+    for (let i = 0; i < columns; i++) {
+      const k = kindAt[j * columns + i]!;
+      if (k < 0) continue;
+      const x = (i + 0.5) * spacing,
+        y = (j + 0.5) * spacing,
+        g = q.slopeAt(x, y);
+      area[k]!++;
+      slope[k]! += g;
+      if (k === 2) fieldMaxSlope = Math.max(fieldMaxSlope, g);
+      let near = Infinity;
+      for (const site of sites) near = Math.min(near, distance([x, y], site.anchor));
+      if (near < Infinity) settlement[k]! += near;
+      let river = Infinity,
+        level = 0;
+      const bx = Math.floor(x / bin),
+        by = Math.floor(y / bin);
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          for (const seg of bins.get((by + dy) * binColumns + bx + dx) ?? []) {
+            const d = pointSegmentDistance([x, y], seg.a, seg.b);
+            if (d < river) {
+              river = d;
+              level = seg.level;
+            }
+          }
+      if (river <= 150 && q.heightAt(x, y) - level < 2) {
+        flat++;
+        if (k === 0) flatOpen++;
+        if (k === 1) flatWood++;
+      }
+    }
+  const covered = area[0]! + area[1]! + area[2]!;
+  // Outline segments: length on the map edge is excluded; shared segments are
+  // those two features both use (cover features never overlap).
+  const onEdge = (p: Point, c: Point) =>
+    (p[0] === c[0] && (p[0] <= b.minX || p[0] >= b.maxX)) ||
+    (p[1] === c[1] && (p[1] <= b.minY || p[1] >= b.maxY));
+  const segments = new Map<string, number>();
+  const key = (p: Point, c: Point) =>
+    p[0] < c[0] || (p[0] === c[0] && p[1] < c[1])
+      ? `${p[0]},${p[1]},${c[0]},${c[1]}`
+      : `${c[0]},${c[1]},${p[0]},${p[1]}`;
+  let vertices = 0;
+  for (const f of cover)
+    for (const p of f.polygons)
+      for (const ring of [p.outer, ...p.holes]) {
+        vertices += ring.length - 1;
+        for (let k = 1; k < ring.length; k++) {
+          const id = key(ring[k - 1]!, ring[k]!);
+          segments.set(id, (segments.get(id) ?? 0) + 1);
+        }
+      }
+  let length = 0,
+    axis = 0,
+    shared = 0,
+    sharedAxis = 0;
+  for (const [id, uses] of segments) {
+    const [x0, y0, x1, y1] = id.split(',').map(Number) as [number, number, number, number];
+    if (onEdge([x0, y0], [x1, y1])) continue;
+    const len = Math.hypot(x1 - x0, y1 - y0),
+      aligned = Math.abs(x1 - x0) < 1e-6 || Math.abs(y1 - y0) < 1e-6;
+    length += len;
+    if (aligned) axis += len;
+    if (uses > 1) {
+      shared += len;
+      if (aligned) sharedAxis += len;
+    }
+  }
+  const mean = (values: number[], k: number) => (area[k] ? values[k]! / area[k]! : 0);
+  return {
+    features: cover.length,
+    woodShare: covered ? area[1]! / covered : 0,
+    fieldShare: covered ? area[2]! / covered : 0,
+    openShare: covered ? area[0]! / covered : 0,
+    woodMeanSlope: mean(slope, 1),
+    fieldMeanSlope: mean(slope, 2),
+    fieldMaxSlope,
+    woodMeanSettlementDistanceM: mean(settlement, 1),
+    fieldMeanSettlementDistanceM: mean(settlement, 2),
+    riverFlatPoints: flat,
+    riverFlatOpenShare: flat ? flatOpen / flat : 0,
+    riverFlatWoodShare: flat ? flatWood / flat : 0,
+    boundaryLengthM: length,
+    axisAlignedShare: length ? axis / length : 0,
+    sharedAxisAlignedShare: shared ? sharedAxis / shared : 0,
+    meanVertices: cover.length ? vertices / cover.length : 0,
   };
 }
 
@@ -274,5 +478,6 @@ export function realismReport(asset: MapAsset): RealismReport {
       lowRiverFlats,
       villagesNearRiver: villages && segments.length ? nearVillages / villages : 0,
     },
+    cover: coverRealism(asset),
   };
 }

@@ -32,4 +32,10 @@ export {
 export * from './geography/index.js';
 export * from './planning/index.js';
 export * from './composition/index.js';
-export { realismReport, segmentGradeOnSurface, type RealismReport } from './realism.js';
+export {
+  coverRealism,
+  realismReport,
+  segmentGradeOnSurface,
+  type CoverRealism,
+  type RealismReport,
+} from './realism.js';

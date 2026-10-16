@@ -13,13 +13,18 @@ import { generateHydrology } from './hydrology.js';
 import { bounded } from './budget.js';
 import type { GeographyLimits, GeographyOutput } from './types.js';
 
-/** Composes geography only; #139 must regenerate contours before infrastructure. */
+/**
+ * Composes geography only; #139 must regenerate contours before infrastructure.
+ * With `cover: false` the cover layer is left empty so a caller can lay cover
+ * out later around roads and settlements (composition does, see D45).
+ */
 export function generateGeography(
   elevation: Elevation,
   bounds: Bounds,
   settings: MapSettings,
   seed: number,
   limits: GeographyLimits = {},
+  options: { cover?: boolean } = {},
 ): GenerationResult<GeographyOutput> {
   return bounded<GeographyOutput>(() => {
     const hydro = generateHydrology(elevation, bounds, settings, seed, limits);
@@ -56,13 +61,10 @@ export function generateGeography(
     const coverSettings = structuredClone(settings);
     coverSettings.limits.maxFeatures = remainingFeatures;
     coverSettings.limits.maxVertices = remainingVertices;
-    const cover = generateCover(
-      hydro.value.elevation,
-      bounds,
-      hydro.value.water,
-      coverSettings,
-      seed,
-    );
+    const cover =
+      options.cover === false
+        ? { ok: true as const, value: [], diagnostics: [] }
+        : generateCover(hydro.value.elevation, bounds, hydro.value.water, coverSettings, seed);
     if (!cover.ok) return cover;
     const output: GeographyOutput = {
       ...hydro.value,

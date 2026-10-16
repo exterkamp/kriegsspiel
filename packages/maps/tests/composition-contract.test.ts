@@ -121,6 +121,25 @@ it('still certifies maps saved by the v1 stages, which can no longer be regenera
     diagnostics: [{ code: 'UNSUPPORTED_REPLAY' }],
   });
 }, 60_000);
+it('still certifies maps saved with rectangle cover by the D44 stages (D45)', () => {
+  // A small map saved by the D44 generator (cover 'coherent-dry-runs-v1').
+  const saved = importAsset(
+    readFileSync(new URL('./fixtures/d44-saved-map.json', import.meta.url), 'utf8'),
+  );
+  expect(saved.provenance.generator.stages.cover).toBe('coherent-dry-runs-v1');
+  expect(saved.provenance.generator.stages.terrain).toBe('structured-relief-eroded-v2');
+  expect(saved.layers.cover.length).toBeGreaterThan(0);
+  expect(supportsReplay(saved)).toBe(false);
+  expect(supportsValidation(saved)).toBe(true);
+  expect(validateBattlefield(saved).ok).toBe(true);
+  // The current generator records the new cover version and replays exactly.
+  expect(asset.provenance.generator.stages.cover).toBe('terrain-parcels-v2');
+  expect(supportsReplay(asset)).toBe(true);
+  // Rectangle cover mixed with the v1 terrain stage is not a recorded identity.
+  const mixed = structuredClone(saved);
+  mixed.provenance.generator.stages.terrain = 'value-noise-ridges-v1';
+  expect(supportsValidation(mixed)).toBe(false);
+}, 60_000);
 it('rejects one-sided local entrance provenance while the regional graph survives', () => {
   const changed = structuredClone(asset),
     e = changed.layers.sites[0]!.entrances[0]!;

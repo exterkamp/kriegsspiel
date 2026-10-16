@@ -3,7 +3,9 @@ import type { GenerationResult, MapAsset, Point } from '../src/contract.js';
 import { createElevationQueries } from '../src/queries.js';
 import { realismReport } from '../src/realism.js';
 import { generateElevation } from '../src/terrain/index.js';
-import { generateGeography, geographyPreset } from '../src/geography/index.js';
+import { generateCover, generateGeography, geographyPreset } from '../src/geography/index.js';
+import { MAX_FIELD_SLOPE } from '../src/geography/cover/index.js';
+import { expectRealisticCover } from './realism-checks.js';
 import { generatePlanning } from '../src/planning/index.js';
 
 /**
@@ -34,6 +36,13 @@ function regional(preset: 'wooded-hills' | 'river-valley', seed: number) {
         preferredSiteExtentM: { farm: 50 },
       }),
     );
+  // Cover is laid out around the planned roads and sites, as composition does.
+  const cover = value(
+    generateCover(geo.elevation, bounds, geo.water, settings, seed, {
+      roads: plan.roads,
+      sites: plan.sites,
+    }),
+  );
   // Only the public layers the report reads; this is not a certified asset.
   const asset = {
     settings,
@@ -41,6 +50,7 @@ function regional(preset: 'wooded-hills' | 'river-valley', seed: number) {
     elevation: geo.elevation,
     drainage: geo.drainage,
     layers: {
+      cover,
       water: geo.water,
       roads: plan.roads,
       roadNodes: plan.roadNodes,
@@ -108,9 +118,10 @@ describe('realistic generated battlefields', () => {
       expect(report.settlements.lowRiverFlats).toBe(0);
       if (preset === 'river-valley')
         expect(report.settlements.villagesNearRiver).toBeGreaterThanOrEqual(0.5);
+      expectRealisticCover(report, settings);
     }, 60_000);
 
-  it('detects uphill steps, dead ends and over-steep roads in a falsified layout', () => {
+  it('detects uphill steps, dead ends, over-steep roads and lattice cover in a falsified layout', () => {
     const { asset } = regional('river-valley', 97);
     const broken = structuredClone(asset);
     const rivers = broken.layers.water.filter((w) => w.kind === 'river');
@@ -161,7 +172,39 @@ describe('realistic generated battlefields', () => {
       crossingIds: [],
       path: steepest.path,
     });
+    // Replace the cover with lattice blocks (v1 style): woods on the flattest
+    // ground, fields on the steepest, ignoring the slope limit.
+    const e2 = broken.elevation,
+      heights = createElevationQueries(broken),
+      blocks: typeof broken.layers.cover = [];
+    for (let y = 0; y < broken.bounds.maxY; y += 250)
+      for (let x = 0; x < broken.bounds.maxX; x += 250) {
+        let slope = 0;
+        for (let j = y; j <= y + 250; j += e2.spacingM)
+          for (let i = x; i <= x + 250; i += e2.spacingM)
+            slope = Math.max(slope, heights.slopeAt(i, j));
+        blocks.push({
+          id: `cover:${blocks.length}`,
+          kind: slope > MAX_FIELD_SLOPE ? 'field' : 'wood',
+          polygons: [
+            {
+              outer: [
+                [x, y],
+                [x + 250, y],
+                [x + 250, y + 250],
+                [x, y + 250],
+                [x, y],
+              ],
+              holes: [],
+            },
+          ],
+        });
+      }
+    broken.layers.cover = blocks;
     const report = realismReport(broken);
+    expect(report.cover.axisAlignedShare).toBe(1);
+    expect(report.cover.fieldMaxSlope).toBeGreaterThan(MAX_FIELD_SLOPE);
+    expect(report.cover.woodMeanSlope).toBeLessThan(report.cover.fieldMeanSlope);
     expect(report.rivers.uphillSteps).toBeGreaterThan(0);
     expect(report.rivers.deadEnds).toBeGreaterThan(0);
     expect(report.roads.maxGrade).toBeGreaterThan(asset.settings.roads.maxGrade);
