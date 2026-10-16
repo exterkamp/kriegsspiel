@@ -53,6 +53,21 @@
         }
       ],
       "stops": [5399991, 10799982, 10799991, 10800000]
+    },
+    {
+      "name": "checker read positions on the handler-stamped world clock (#409)",
+      "scenario": "hold-the-bridge-far-start",
+      "hours": 3,
+      "note": "found by the property test (seed 668353332): blue-1 arrives at 10740066, but the world clock sat at 10740000 until the intel.scan at 10800000 stamped it forward, so the checker divided 110mm of ordinary marching (the leg's last 66ms at 600 ms/m) by a 2ms engine advance and called it a teleport. The engine never moved the unit faster than its leg rate; the checker now samples positions at the engine stop times.",
+      "cmds": [
+        {
+          "kind": "attack",
+          "at": 10680066,
+          "unit": "blue-1",
+          "target": "red-2"
+        }
+      ],
+      "stops": [10799996, 10799998, 10800000]
     }
   ]
 }
