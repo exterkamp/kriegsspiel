@@ -27,8 +27,10 @@
   <main class="map-panel" aria-label="Top-down map preview">
     <nav aria-label="Viewport controls">
       <button id="fit">Fit map</button><button id="detail" disabled>Site detail</button
-      ><span class="spacer"></span><button id="zoom-out" aria-label="Zoom out">−</button
-      ><button id="zoom-in" aria-label="Zoom in">+</button>
+      ><span class="zoom" role="group" aria-label="Zoom"
+        ><button id="zoom-out" aria-label="Zoom out">−</button
+        ><button id="zoom-in" aria-label="Zoom in">+</button></span
+      >
     </nav>
     <div class="canvas-wrap">
       <canvas

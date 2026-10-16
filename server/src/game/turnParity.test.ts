@@ -29,10 +29,11 @@ const ORDERS: TurnOrder[] = [
   { orderId: 'b2', to: 'blue-2', text: 'March to the bridge' },
 ];
 /**
- * Until then (or the first turn's end, if later) the two modes agree to the metre and the man in
- * every seed tried: no courier has yet ridden near an enemy, where the dice part (see D39).
+ * How far apart the two modes may end: turn mode counts the objective's hold and a battle's close
+ * from the game minute they start in (#429), real time from the instant, so a game decided by one
+ * of them can end up to a minute earlier in turns.
  */
-const QUIET_UNTIL_MS = 20 * MIN;
+const MINUTE_RULE_MS = MIN;
 
 let host: GameHost | undefined;
 afterEach(async () => {
@@ -149,29 +150,33 @@ async function playRealTime(seed: number, times: number[]) {
   return { snaps, world };
 }
 
-const CASES = [1815, 7, 42, 4].flatMap((seed) =>
+/** D39's 30 parity games: seeds 1 to 8, 42 and 1815, in turns of 10, 20 and 30 minutes. */
+const CASES = [1, 2, 3, 4, 5, 6, 7, 8, 42, 1815].flatMap((seed) =>
   [10, 20, 30].map((turnMinutes) => ({ seed, turnMinutes })),
 );
 
 describe('rigid turns against real time (#430)', () => {
   it.each(CASES)(
-    'gives the same field at each quiet turn end and the same winner (seed $seed, $turnMinutes-minute turns)',
+    'gives the same field at every turn end and the same outcome (seed $seed, $turnMinutes-minute turns)',
     async ({ seed, turnMinutes }) => {
       const turns = await playTurns(seed, turnMinutes);
       const real = await playRealTime(
         seed,
         turns.ends.map((e) => e.t),
       );
-      // Until the first fight the field is the same at every turn end. A turn whose game was decided
-      // in the minute after it ends there (#434: seed 42's 20-minute turn 1 ends at 00:20:42).
-      const quiet = turns.ends.filter(
-        (e) => Math.floor(e.t / MIN) * MIN <= Math.max(QUIET_UNTIL_MS, turnMinutes * MIN),
-      );
-      expect(quiet.length).toBeGreaterThan(0);
-      for (const [i, end] of quiet.entries()) expect(end).toEqual(real.snaps[i]);
-      // After it the dice part (D39: couriers are rolled against held units), but the battle is the same.
-      expect(turns.world.outcome?.winner).toBeDefined();
-      expect(turns.world.outcome?.winner).toBe(real.world.outcome?.winner);
+      // The field is the same to the metre and the man at every turn end, the fights included: the
+      // couriers roll on dice of their own (#432), so the pass draws the world's dice as real time does.
+      expect(turns.ends.length).toBeGreaterThan(0);
+      expect(turns.ends).toEqual(real.snaps);
+      // The same result, at the same time up to the minute rule.
+      const [t, r] = [turns.world.outcome, real.world.outcome];
+      expect(t?.winner).toBeDefined();
+      expect({ winner: t?.winner, reason: t?.reason }).toEqual({
+        winner: r?.winner,
+        reason: r?.reason,
+      });
+      expect(r!.time - t!.time).toBeGreaterThanOrEqual(0);
+      expect(r!.time - t!.time).toBeLessThan(MINUTE_RULE_MS);
       // The scripted side thought inside the turns, and replay repeats the game with no agent.
       const opens = new Set(
         turns.log.filter((e) => e.command.kind === 'openTurn').map((e) => e.gameMs),

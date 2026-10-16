@@ -146,6 +146,46 @@ describe("the desk's dress follows the game's mode (#427)", () => {
   });
 });
 
+describe('the paper and the dock (#455)', () => {
+  it("measures the dock into --dock-h, so a paper ends above it, and follows the dock's changes", async () => {
+    let fire: () => void = () => undefined;
+    const observed: Element[] = [];
+    const disconnect = vi.fn();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(cb: () => void) {
+          fire = cb;
+        }
+        observe(el: Element): void {
+          observed.push(el);
+        }
+        disconnect = disconnect;
+      },
+    );
+    let height = 276.4;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      () => ({ height }) as DOMRect,
+    );
+    const { f, el, tick } = mount({ view: fixtureView });
+    await tick();
+    expect(observed).toEqual([el.querySelector('.dock')]);
+    expect(el.style.getPropertyValue('--dock-h')).toBe('277px');
+    height = 120;
+    fire();
+    expect(el.style.getPropertyValue('--dock-h')).toBe('120px');
+    f.destroy();
+    expect(disconnect).toHaveBeenCalled();
+  });
+
+  it('leaves the paper its default room where there is no ResizeObserver', async () => {
+    vi.stubGlobal('ResizeObserver', undefined);
+    const { el, tick } = mount();
+    await tick();
+    expect(el.style.getPropertyValue('--dock-h')).toBe('');
+  });
+});
+
 describe('game over screen (held PR #266)', () => {
   it('appears on game over whatever view was open, and not before', async () => {
     const { el, g, desk, tick } = mount();

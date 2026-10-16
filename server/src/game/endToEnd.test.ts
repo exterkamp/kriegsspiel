@@ -215,8 +215,10 @@ describe('pacing of a first game (#178)', () => {
     60_000,
   );
 
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])(
-    'with no player orders Red takes the bridge in seeds 1 to 12 (seed %i)',
+  // Red takes the bridge in 34 of seeds 1 to 40, under rules 1 and under rules 2 (#432), but not
+  // in the same 34: these are the first 12 it takes under rules 2 (seeds 8 and 11 are Blue wins).
+  it.each([1, 2, 3, 4, 5, 6, 7, 9, 10, 12, 13, 14])(
+    'with no player orders Red takes the bridge in most seeds (seed %i)',
     async (seed) => {
       const run = await play('fast-forward', HORIZON_MS, [], seed);
       expect(run.state.world.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
@@ -237,10 +239,14 @@ describe('pacing of a first game (#178)', () => {
 });
 
 describe('a battle is decided (#315)', () => {
+  // A seed whose battle is ruled and then closed after its pursuit. Under rules 1 the scenario's
+  // own seed (1815) did; under rules 2 (#432) its battle closes at the ruling, Red having nobody
+  // left, so seed 6 stands in.
+  const BATTLE_SEED = 6;
   it.each([1, 4, 12] as const)(
     'with both battalions at the bridge the game ends with a declared result at rate %i',
     async (rate) => {
-      const run = await play(rate, HORIZON_MS);
+      const run = await play(rate, HORIZON_MS, SCRIPT, BATTLE_SEED);
       const w = run.state.world;
       const end = w.outcome!;
       expect(end).toMatchObject({ winner: 'blue', reason: 'attack-broken' });
@@ -360,11 +366,12 @@ describe('a decided battle against the time limit (#417)', () => {
   const RATES = [1, 4, 12, 'fast-forward'] as const;
 
   it('a defence ruled broken after minute 30 wins for Red at the time limit, not objective-held, at every rate and in replay', async () => {
-    // Seed 117: Blue's defence is ruled broken at about game minute 31.5, so the pursuit would
-    // close after the 50-minute limit. Before #417 the limit gave Blue "objective-held".
+    // Seed 128: Blue's defence is ruled broken at about game minute 35, so the pursuit would
+    // close after the 50-minute limit. Before #417 the limit gave Blue "objective-held". (Seed 117
+    // showed it under rules 1; courier dice on their own stream, #432, changed the fight.)
     const runs = [];
     for (const rate of RATES) {
-      const run = await play(rate, HORIZON_MS, HOLD_BOTH, 117);
+      const run = await play(rate, HORIZON_MS, HOLD_BOTH, 128);
       const { battle, outcome } = run.state.world;
       expect(battle, `rate ${rate}`).toMatchObject({ winner: 'red', reason: 'defence-broken' });
       expect(battle!.declaredAt).toBeGreaterThan(30 * MIN);
@@ -373,7 +380,7 @@ describe('a decided battle against the time limit (#417)', () => {
         reason: 'defence-broken',
         time: holdTheBridge.victory.holdMinutes * MIN,
       });
-      const replayed = await replayOf(run, HORIZON_MS, 117);
+      const replayed = await replayOf(run, HORIZON_MS, 128);
       expect(worldDivergence(replayed.state.world, run.state.world), `replay ${rate}`).toBeNull();
       runs.push(run);
     }

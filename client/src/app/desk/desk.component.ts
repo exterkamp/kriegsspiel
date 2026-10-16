@@ -1,6 +1,8 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
+  ElementRef,
   Injector,
   afterNextRender,
   computed,
@@ -119,10 +121,33 @@ export class DeskComponent {
       });
     });
     afterNextRender(() => (first = false), { injector: this.injector });
+    this.measureDock();
     // The game ending brings up the result whatever view was open.
     effect(() => {
       if (this.ended()) untracked(() => this.desk.activeView.set('table'));
     });
+  }
+
+  /**
+   * The dock's height as `--dock-h` on the desk, so an open paper ends above it rather than under it (#455). The dock
+   * grows with the turn panel and wraps to two rows of buttons on a phone, so it is measured, not assumed.
+   */
+  private measureDock(): void {
+    const host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(
+      () => {
+        const dock = host.querySelector<HTMLElement>('.dock');
+        if (!dock || typeof ResizeObserver === 'undefined') return;
+        const set = (): void =>
+          host.style.setProperty('--dock-h', `${Math.ceil(dock.getBoundingClientRect().height)}px`);
+        const watch = new ResizeObserver(set);
+        watch.observe(dock);
+        set();
+        destroyRef.onDestroy(() => watch.disconnect());
+      },
+      { injector: this.injector },
+    );
   }
 
   protected go(v: ViewId): void {

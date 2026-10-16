@@ -3,6 +3,7 @@ import {
   advanceTo,
   createState,
   deserialize,
+  RULES_VERSION,
   type EmittedEvent,
   type EngineState,
   type EventRegistry,
@@ -193,7 +194,16 @@ export class GameHost {
     }
     // The dial is part of the world (it sets the judgment cap); the persona is only prose.
     const { settings } = clock;
-    const world: GameState = settings ? { ...scenario, dial: settings.dial } : scenario;
+    // A new game is played under the current rules, kept in the world and the log header (#432).
+    // A world that names its rules keeps them (a test pinned to a seed's story under rules 1).
+    // The keys are in the order replay sets them (the dial, then the rules), so the two compare equal.
+    const { rules: pinned, ...base } = scenario;
+    const rules = pinned ?? RULES_VERSION;
+    const world: GameState = {
+      ...base,
+      ...(settings ? { dial: settings.dial } : {}),
+      rules,
+    };
     const state0 = createState(world.seed, world, 0);
     const state = this.options.init?.(state0) ?? state0;
     await this.options.store.saveLogHeader({
@@ -201,6 +211,7 @@ export class GameHost {
       scenarioId: world.scenarioId,
       seed: world.seed,
       ...(settings ? { settings } : {}),
+      rules,
     });
     // Turn mode (D39): the clock is manual for the game's whole life, there is no pause vote, and
     // the rate is ignored.

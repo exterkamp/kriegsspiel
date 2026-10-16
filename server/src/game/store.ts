@@ -196,6 +196,11 @@ export interface InputLogHeader {
   seed: number;
   /** Umpire settings chosen at creation (3.11). Absent on older games: the defaults. Replay applies the dial. */
   settings?: UmpireSettings;
+  /**
+   * The engine rules version the game was made under (`RULES_VERSION`, #432). Absent on a game
+   * made before it, which replays under rules 1 (couriers on the world's RNG), as it was played.
+   */
+  rules?: number;
 }
 
 export interface InputLogEntry {

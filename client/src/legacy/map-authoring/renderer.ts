@@ -2,9 +2,10 @@ import { createElevationQueries, type ElevationQueries } from '@kriegsspiel/maps
 import type { PreviewAsset } from './asset.js';
 import {
   geometryBounds,
-  outerBoundary,
   traceLine,
   tracePolygon,
+  traceUnionPolygon,
+  weldedBoundary,
   type PolygonShape,
   type Position,
 } from './geometry.js';
@@ -76,10 +77,24 @@ export const BASE_TILES_PER_FRAME = 6;
 /** Least-recently-used base tiles beyond this count are dropped (about 42 MB at most). */
 const TILE_CACHE = 160;
 const ROAD_ORDER: readonly RoadClass[] = ['track', 'street', 'regional'];
+/**
+ * Water polygons whose outlines lie within this distance of each other draw as one body. River reaches
+ * (D44) are simplified one by one, so where two meet their outlines part by up to a few centimetres;
+ * the shore probes this far across before calling an edge shore, and the gap is filled over.
+ */
+const WATER_WELD_M = 0.5;
+/** Water edges are tested for shore in pieces of at most this length, so a gap's mouth stays short. */
+const WATER_PIECE_M = 2.5;
 
 function polygonShape(polygon: PolygonShape, kind: string): Shape {
   const path = new Path2D();
   tracePolygon(path, polygon);
+  return { path, kind, bounds: geometryBounds(polygon.outer) };
+}
+/** A polygon wound for a nonzero union fill with its neighbours (see `traceUnionPolygon`). */
+function unionShape(polygon: PolygonShape, kind: string): Shape {
+  const path = new Path2D();
+  traceUnionPolygon(path, polygon);
   return { path, kind, bounds: geometryBounds(polygon.outer) };
 }
 function lineShape(points: readonly Position[], kind: string, width = 0): Shape {
@@ -115,7 +130,7 @@ export class MapRenderer {
   private readonly shade: HTMLCanvasElement;
   private ground?: ElevationQueries;
   private readonly woods: Shape[];
-  private shore?: Shape[];
+  private outline?: { body: Shape[]; shore: Shape[]; welds: Shape[] };
   private readonly tiles = new Map<string, Tile>();
   private readonly patterns = new Map<string, CanvasPattern | null>();
 
@@ -605,23 +620,18 @@ export class MapRenderer {
     for (const s of this.rivers)
       if (s.width! < w.minRiverPx * px && intersects(s.bounds, area, w.minRiverPx * px))
         ctx.stroke(s.path);
-    const water = new Path2D();
-    let any = false;
-    for (const s of this.water)
-      if (intersects(s.bounds, area, reach)) {
-        water.addPath(s.path);
-        any = true;
-      }
-    if (!any) return;
+    const water = this.waterBody(area, reach);
+    if (!water) return;
     const shore = new Path2D();
-    for (const s of this.shoreLines()) if (intersects(s.bounds, area, reach)) shore.addPath(s.path);
+    for (const s of this.waterOutline().shore)
+      if (intersects(s.bounds, area, reach)) shore.addPath(s.path);
     ctx.fillStyle = p.water;
-    ctx.fill(water, 'evenodd');
+    ctx.fill(water, 'nonzero');
     if (w.liningPx.length) {
       // Water lining: parallel lines inside the true shore, fading outward, as nested strokes under a
       // clip to the water. Each ring is a wide line stroke cut back by a slightly narrower water stroke.
       ctx.save();
-      ctx.clip(water, 'evenodd');
+      ctx.clip(water, 'nonzero');
       const rings = w.liningPx.length;
       for (let i = rings - 1; i >= 0; i--) {
         const d = w.liningPx[i]!;
@@ -641,12 +651,50 @@ export class MapRenderer {
     ctx.stroke(shore);
   }
 
-  /** The water's true shore as polylines: edges shared between water polygons are left out. */
-  private shoreLines(): Shape[] {
-    this.shore ??= outerBoundary(this.asset.layers.water.flatMap((f) => f.polygons)).map((line) =>
-      lineShape(line, 'shore'),
+  /**
+   * The water's true shore as polylines, leaving out edges between water polygons (strip lakes, river
+   * reaches) that adjoin within `WATER_WELD_M`; the welds that fill the gaps along those edges,
+   * grouped by 250 m cell; and the water polygons wound for a union fill. Computed once per renderer.
+   */
+  private waterOutline(): { body: Shape[]; shore: Shape[]; welds: Shape[] } {
+    if (this.outline) return this.outline;
+    const water = this.asset.layers.water;
+    const { shore, welds } = weldedBoundary(
+      water.flatMap((f) => f.polygons),
+      { pieceM: WATER_PIECE_M, weldM: WATER_WELD_M },
     );
-    return this.shore;
+    const cells = new Map<string, Position[][]>();
+    for (const quad of welds) {
+      const key = `${Math.floor(quad[0]![0] / 250)}:${Math.floor(quad[0]![1] / 250)}`;
+      const list = cells.get(key);
+      if (list) list.push(quad);
+      else cells.set(key, [quad]);
+    }
+    this.outline = {
+      body: water.flatMap((f) => f.polygons.map((p) => unionShape(p, f.kind))),
+      shore: shore.map((line) => lineShape(line, 'shore')),
+      welds: [...cells.values()].map((quads) => {
+        const path = new Path2D();
+        for (const quad of quads) traceUnionPolygon(path, { outer: quad, holes: [] });
+        return { path, kind: 'weld', bounds: geometryBounds(quads.flat()) };
+      }),
+    };
+    return this.outline;
+  }
+
+  /** All water meeting the area as one path for a nonzero fill: the union of polygons and welds. */
+  private waterBody(area: ViewBounds, margin: number): Path2D | null {
+    const { body, welds } = this.waterOutline();
+    const path = new Path2D();
+    let any = false;
+    for (const s of body)
+      if (intersects(s.bounds, area, margin)) {
+        path.addPath(s.path);
+        any = true;
+      }
+    if (!any) return null;
+    for (const s of welds) if (intersects(s.bounds, area, margin)) path.addPath(s.path);
+    return path;
   }
 
   private drawRoads(ctx: CanvasRenderingContext2D, visible: ViewBounds, p: MapPalette, px: number) {

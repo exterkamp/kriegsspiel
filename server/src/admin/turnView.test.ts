@@ -125,7 +125,9 @@ async function playGame() {
   };
   const game = await host.create(
     'g1',
-    { ...loadScenario(holdTheBridge), seed: 1815 },
+    // Rules 1 (#432): the story below is told for seed 1815's fight with couriers on the world's
+    // dice; under rules 2 the fight ends a turn sooner.
+    { ...loadScenario(holdTheBridge), seed: 1815, rules: 1 },
     { settings },
   );
   /** The live world when each turn opened (its start) and once it was resolved (its end). */

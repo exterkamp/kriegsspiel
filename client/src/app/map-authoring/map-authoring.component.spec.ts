@@ -70,6 +70,16 @@ describe('map authoring page frame (#308)', () => {
     for (const h2 of el.querySelectorAll('aside h2'))
       expect(h2.classList).toContain('ks-section-h');
   });
+
+  it('keeps the zoom buttons together in one labelled group at the end of the viewport bar (#496)', async () => {
+    const el = await render();
+    const nav = el.querySelector('nav[aria-label="Viewport controls"]')!;
+    const zoom = nav.querySelector<HTMLElement>('.zoom[role="group"]')!;
+    expect(zoom.getAttribute('aria-label')).toBe('Zoom');
+    expect([...zoom.children].map((c) => c.id)).toEqual(['zoom-out', 'zoom-in']);
+    expect(nav.lastElementChild).toBe(zoom);
+    expect(nav.querySelector('.spacer')).toBeNull();
+  });
 });
 
 describe('matchAppContrast', () => {
