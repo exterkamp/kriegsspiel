@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fieldNote, temperOf } from './fieldNotes.js';
+import { clockTime, fieldNote, temperOf } from './fieldNotes.js';
 import type { Report } from './types.js';
 
 const KINDS = [
@@ -171,6 +171,31 @@ describe('a broken unit in its notes (#438)', () => {
       const text = fieldNote({ ...report('engaged', id), rallied: true }, 0, false, {}, 7);
       expect(text).toMatch(/^Sir, we have rallied\. [A-Z]/);
     }
+  });
+});
+
+describe('clock times in turn mode (#439)', () => {
+  it('names the clock time the report was made, not its age', () => {
+    // The opening situation and a lost courier give no time in either mode.
+    for (const kind of KINDS.filter((k) => k !== 'situation' && k !== 'courierLost')) {
+      for (const id of ids.slice(0, 20)) {
+        const r = { ...report(kind, id), observedAt: 12 * 60_000, deliverAt: 20 * 60_000 };
+        const text = fieldNote(r, 8 * 60_000, false, {}, 7, true);
+        expect(text, text).not.toMatch(/\bago\b|just now/);
+        expect(text, text).toContain('at 00:12');
+      }
+    }
+  });
+
+  it('keeps the age in real time', () => {
+    const r = { ...report('engaged'), observedAt: 12 * 60_000, deliverAt: 15 * 60_000 };
+    expect(fieldNote(r, 3 * 60_000)).toMatch(/about 3 minutes ago\.$/);
+  });
+
+  it('gives the day only after the first', () => {
+    expect(clockTime(0)).toBe('00:00');
+    expect(clockTime(65 * 60_000)).toBe('01:05');
+    expect(clockTime((24 * 60 + 7) * 60_000)).toBe('Day 2 00:07');
   });
 });
 

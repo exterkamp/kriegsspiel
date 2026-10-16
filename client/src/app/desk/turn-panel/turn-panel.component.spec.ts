@@ -126,4 +126,22 @@ describe('TurnPanelComponent', () => {
     await t.tick();
     expect(t.panel()).toBeNull();
   });
+
+  it('explains how turns work, and a short last turn (#439)', async () => {
+    const t = await mount(turn({ turn: 3, startsAt: 40 * MIN, endsAt: 50 * MIN }));
+    t.g.fake.set({ turnMinutes: 20, battleMinutes: 50 });
+    await t.tick();
+    const how = t.panel()!.querySelector<HTMLDetailsElement>('[data-testid=turn-how]')!;
+    expect(how.open).toBe(false);
+    expect(how.querySelector('summary')!.textContent).toBe('How turns work');
+    expect(how.textContent).toContain('send them once for your whole side');
+    expect(t.panel()!.querySelector('[data-testid=turn-last]')!.textContent).toContain(
+      'it is 10 minutes, not 20',
+    );
+    expect(t.el.querySelector('#clock')!.textContent).toContain('Turn 3 of 3: 00:40 to 00:50');
+    // Over a desk view the dock stays short; the orders desk explains turns itself.
+    t.desk.activeView.set('orders');
+    await t.tick();
+    expect(t.panel()!.querySelector('[data-testid=turn-how]')).toBeNull();
+  });
 });

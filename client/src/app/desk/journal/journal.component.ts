@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { formatGameTime, gameNowMs } from '@legacy/net/state';
-import { deliveryStatus } from '@legacy/desk/orders';
+import { deliveryStatus, orderProgress } from '@legacy/desk/orders';
 import {
   JOURNAL_KINDS,
   TURN_KIND,
@@ -46,15 +46,20 @@ export class JournalComponent {
     return c ? gameNowMs(c, this.wall()) : 0;
   });
 
-  /** Entries to show, each with the delivery progress of an order still riding. */
+  /**
+   * Entries to show, each order with where it stands: its delivery progress while riding, then what word came
+   * back (delivered, acted on, lost), in place of "awaiting word" once it has (#439).
+   */
   protected readonly shown = computed(() => {
-    const pending = this.game.state().pending;
+    const { pending, dispatches } = this.game.state();
     const nowGame = this.nowGame();
     return chronological(
       filterEntries(this.desk.journal(), { query: this.query(), kinds: this.kinds() }),
     ).map((j) => {
       const p = j.kind === 'order' ? pending.find((o) => `order:${o.orderId}` === j.id) : undefined;
       if (!p) return { j, ride: undefined };
+      const word = orderProgress(p, dispatches);
+      if (word) return { j, ride: { progress: undefined, label: word.label } };
       const s = deliveryStatus(p, nowGame);
       return {
         j,

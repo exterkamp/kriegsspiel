@@ -339,6 +339,15 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
+/** `00:12`, or `Day 2 00:12` after the first day: a game instant as a clock on the wall would give it. */
+export function clockTime(ms: number): string {
+  const total = Math.floor(Math.max(0, ms) / 60_000);
+  const day = Math.floor(total / 1440);
+  const hh = String(Math.floor((total % 1440) / 60)).padStart(2, '0');
+  const mm = String(total % 60).padStart(2, '0');
+  return `${day > 0 ? `Day ${day + 1} ` : ''}${hh}:${mm}`;
+}
+
 /** The generator for one report's wording: fixed by the game seed and the report id. */
 function wordingRng(seed: number, reportId: string): Rng {
   return new Rng(seedRng((seed ^ hash(reportId)) | 0));
@@ -348,6 +357,8 @@ function wordingRng(seed: number, reportId: string): Rng {
  * The field note for report `r`, which reached HQ `leadMs` after it happened. `seed` (the game's) picks
  * the wording; `sender` gives the manner; without either the first wording and the plain manner are used.
  * Every note opens "Sir, " (#323) and gives its age one way, "about N minutes ago" or "just now" (#325).
+ * In a turn-mode game (`clock` set, D39) it gives the clock time instead, "at 00:12": its papers come in
+ * at the turn's end, where "3 minutes ago" says nothing about when in the turn it happened (#439).
  */
 export function fieldNote(
   r: Report,
@@ -355,12 +366,17 @@ export function fieldNote(
   heardSince = false,
   sender: NoteSender = {},
   seed?: number,
+  clock = false,
 ): string {
   const mins = Math.round(leadMs / 60_000);
   const parts: NoteParts = {
     from: r.from,
     where: r.place,
-    when: mins === 0 ? 'just now' : `about ${mins} ${mins === 1 ? 'minute' : 'minutes'} ago`,
+    when: clock
+      ? `at ${clockTime(r.observedAt)}`
+      : mins === 0
+        ? 'just now'
+        : `about ${mins} ${mins === 1 ? 'minute' : 'minutes'} ago`,
     size: r.sizeEstimate ?? (r.kind === 'situation' ? 'the formations' : 'enemy troops'),
     hedge: HEDGES[r.confidence],
     doubt: DOUBTS[r.confidence],

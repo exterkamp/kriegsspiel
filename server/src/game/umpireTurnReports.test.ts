@@ -164,6 +164,9 @@ describe('turn reports (D39, 11.9)', () => {
           expect(own).toContain(d.from);
           expect(d.receivedAtGame).toBe(t.turn!.endMs);
           expect(d.text).toContain(`${d.from} here:`);
+          // The unit's own facts ride with its paper, for the desk's status and order states (#439).
+          expect(d.turn?.n).toBeGreaterThan(0);
+          expect(d.turn?.lost).toBeGreaterThanOrEqual(0);
         }
       }
     }
