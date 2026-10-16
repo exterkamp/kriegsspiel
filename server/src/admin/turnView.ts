@@ -204,6 +204,8 @@ export function adminTurns(input: ReplayInput): AdminTurns {
       ...(Array.isArray(out?.orders) ? { read: out.orders } : {}),
       ...(Array.isArray(out?.couriers) ? { couriers: out.couriers } : {}),
       ...(out?.projection ? { projection: out.projection } : {}),
+      // Hook for 11.9 (#405, PR #504): the per-side report calls are logged on that turn's
+      // `turnReports { side, turn }` entries, not here; add them beside these once it lands.
       calls: entry.calls ?? [],
       ...(umpire ? { proposal: umpire.proposal as unknown as TurnProposal } : {}),
       ...(umpire?.resent ? { resent: umpire.resent } : {}),

@@ -168,6 +168,9 @@ export function replayAt(input: ReplayInput, gameMs: number): ReplayAt {
     input.init,
   );
   const views: Record<string, SideView> = {};
+  // Hook for 11.9 (#405, PR #504): once `turnReports` entries exist, pass each side's restored
+  // narration (`turnNarrationsFromLog(input.entries).get(side)`) so a replayed view shows the
+  // turn's papers as the players read them.
   for (const side of state.world.sides) {
     views[side.id] = toSideView(viewFor(state.world, side.id as SideId, state.time), {
       gameMsAtAnchor: state.time,
