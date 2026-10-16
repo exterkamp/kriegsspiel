@@ -46,6 +46,87 @@ describe('what describes the enemy (#533)', () => {
   });
 });
 
+/** Red's units with their ids, as the umpire's stage and the papers pass them. */
+const RED_UNITS = ownTermsOf([
+  { id: 'red-1', name: 'Vanguard Battalion', commander: 'Col. Brandt', kind: 'infantry' },
+  { id: 'red-2', name: 'Line Battalion', commander: 'Col. Hartmann', kind: 'infantry' },
+  { id: 'red-3', name: 'Hussar Squadron', commander: 'Maj. von Reiter', kind: 'cavalry' },
+]);
+
+describe('a unit describing itself, and the enemy in passing (#558)', () => {
+  const blind = sideSight('red', [], [], false);
+  const refused = sideSight(
+    'red',
+    [{ side: 'red', by: 'red-3', unitId: 'blue-1', when: 'end' }],
+    [],
+    true,
+  );
+
+  it.each([
+    // #523's garbled-order, Opus: the Hussars' own account, flagged for "hussars".
+    'No orders. Maj. von Reiter keeps the hussars at the edge of the northern wood. Vedettes are out, but there is nothing to report.',
+    'Hussars watered at the brook and stood to their horses.',
+    'The squadron and its cavalry pickets stood in the wood.',
+    'Squadron vedettes watched the road.',
+  ])('the Hussars may speak of themselves: %s', (account) => {
+    expect(enemyDescribed(account, RED_UNITS, 'red-3')).toBeUndefined();
+    expect(accountSightProblem(account, 'red-3', blind, RED_UNITS)).toBeUndefined();
+    expect(accountSightProblem(account, 'red-3', refused, RED_UNITS)).toBeUndefined();
+  });
+
+  it.each([
+    // #523's flank-march-woods, Sonnet: red-1's account, flagged for "enemy".
+    'Stood where we were, drawn up in line beside the High road, to hold the enemy’s eye as ordered.',
+    'He met no enemy on the road.',
+    'Held the bridge-end, on our side of the river; the enemy’s bank was quiet.',
+    'He posted pickets to deny the enemy the bridge.',
+    'He pushed on to the bridge before the enemy can cross it.',
+    'Kept to the wood, in case the enemy should come down the road.',
+    'He will hold the ford if the enemy comes on.',
+    'The enemy headquarters lies more than a league off, not to be reached in a quarter hour.',
+    'He sees nothing of the enemy across the water yet.',
+    'He saw nothing of an enemy from where he stood.',
+    'He kept his horses in hand and waited for the enemy to come over.',
+  ])('the enemy in passing: %s', (account) => {
+    expect(enemyDescribed(account, RED_UNITS, 'red-1')).toBeUndefined();
+    expect(accountSightProblem(account, 'red-1', blind, RED_UNITS)).toBeUndefined();
+  });
+
+  it.each([
+    ['He saw infantry in line at the south end of the bridge.', 'red-3', 'infantry'],
+    // An arm both sides have is no unit's own word when bare: an infantry unit may see infantry.
+    ['He saw infantry in line at the south end of the bridge.', 'red-1', 'infantry'],
+    ['Cavalry showed on the ridge.', 'red-3', 'cavalry'],
+    ['There was some cavalry behind it.', 'red-3', 'cavalry'],
+    ['He found two squadrons of hussars on the far bank.', 'red-3', 'squadrons'],
+    ['Other hussars came down to the north bank.', 'red-3', 'hussars'],
+    ['He saw the enemy column on the bridge.', 'red-1', 'enemy'],
+    ['The enemy in the wood opened fire.', 'red-1', 'enemy'],
+    ['Late in the quarter enemy hussars appear on the far bank.', 'red-3', 'enemy'],
+    ['He found the enemy’s line drawn up behind the hedge.', 'red-2', 'line'],
+    ['He kept the enemy in view all morning.', 'red-1', 'enemy'],
+    ['He rode down to the river and found two battalions in line.', 'red-3', 'battalions'],
+  ])('still caught: %s', (account, unitId, word) => {
+    expect(enemyDescribed(account, RED_UNITS, unitId)).toBe(word);
+    expect(accountSightProblem(account, unitId, blind, RED_UNITS)).toMatch(
+      new RegExp(`^describes the enemy \\("${word}"\\) though no unit of the side could see one$`),
+    );
+  });
+
+  it('screens the Hussars’ sightings when they were refused', () => {
+    expect(
+      accountSightProblem(
+        'Maj. von Reiter rode to the bridge and saw infantry in line beyond it.',
+        'red-3',
+        refused,
+        RED_UNITS,
+      ),
+    ).toBe(
+      'describes the enemy ("infantry") though the sight check refused every sighting of this unit',
+    );
+  });
+});
+
 describe('an account against what its side saw (#533)', () => {
   const obs = (by: string, unitId: string): SightObservation => ({
     side: 'red',
