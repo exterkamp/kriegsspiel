@@ -23,12 +23,43 @@ export interface Terminal {
   entry?: number;
   edge?: Edge;
 }
-type QueueItem = { node: number; g: number; f: number };
+/** `exact` entries carry certified edge costs; others carry an optimistic estimate. */
+type QueueItem = {
+  node: number;
+  g: number;
+  f: number;
+  from: number;
+  edge: Edge | null;
+  exact: boolean;
+};
+/**
+ * Frozen `sited-graded-network-v2` route costs. Eight-neighbour lattice moves
+ * avoid staircase roads; the grade penalty grows quadratically so roads wind
+ * along contours, valleys and spurs instead of climbing straight; bridges carry
+ * a fixed cost so routes share crossings; existing road edges are discounted so
+ * later routes join the network at junctions rather than running in parallel;
+ * and the map margin is avoided.
+ */
+export const ROUTE_COSTS = Object.freeze({
+  gradeLinear: 6,
+  gradeQuadratic: 120,
+  bridgeSpanFactor: 2,
+  bridgeFixedM: 250,
+  reuse: 0.55,
+  /** Heuristic metres per straight-line metre (weighted A*). */
+  heuristic: 1,
+  marginM: 150,
+  margin: 0.6,
+});
 class Heap {
   data: QueueItem[] = [];
   constructor(readonly c: Context) {}
   less(a: QueueItem, b: QueueItem): boolean {
-    return a.f < b.f || (a.f === b.f && (a.g < b.g || (a.g === b.g && a.node < b.node)));
+    return (
+      a.f < b.f ||
+      (a.f === b.f &&
+        (a.g < b.g || (a.g === b.g && (a.node < b.node || (a.node === b.node && a.from < b.from)))))
+    );
   }
   push(v: QueueItem): void {
     const a = this.data;
@@ -72,11 +103,16 @@ export class Router {
   readonly profiles = new Map<string, DeckProfile>();
   readonly bridgeFailures: string[] = [];
   readonly sites: Site[];
+  /** Placement-area boxes, computed once; sites never move during routing. */
+  readonly siteBoxes: [number, number, number, number][];
+  /** Undirected edge keys already emitted by earlier routes. */
+  readonly used = new Set<string>();
   constructor(
     readonly c: Context,
     sites: Site[],
   ) {
     this.sites = sites;
+    this.siteBoxes = sites.map((s) => box(s.placementArea.outer));
     c.candidates.take(c.cells * 2);
     this.points = Array.from({ length: c.cells }, (_, i) => c.point(i));
     this.wet = new Int8Array(c.cells);
@@ -110,10 +146,9 @@ export class Router {
       this.c.candidates.take(this.sites.length + 1);
       this.blocked[id] =
         this.c.inBounds(p, r) &&
-        !this.sites.some((s) => {
-          const b = box(s.placementArea.outer);
-          return p[0] >= b[0] - r && p[0] <= b[2] + r && p[1] >= b[1] - r && p[1] <= b[3] + r;
-        })
+        !this.siteBoxes.some(
+          (b) => p[0] >= b[0] - r && p[0] <= b[2] + r && p[1] >= b[1] - r && p[1] <= b[3] + r,
+        )
           ? 0
           : 1;
     }
@@ -123,12 +158,17 @@ export class Router {
   }
   clearSites(a: Point, b: Point, ignore?: string): boolean {
     const r = this.c.settings.roads.maxReservedWidthM / 2,
-      rect = box([a, b]);
-    for (const s of this.sites) {
+      rect: [number, number, number, number] = [
+        Math.min(a[0], b[0]),
+        Math.min(a[1], b[1]),
+        Math.max(a[0], b[0]),
+        Math.max(a[1], b[1]),
+      ];
+    for (const [i, s] of this.sites.entries()) {
       this.c.candidates.take();
       if (s.id === ignore) continue;
       const p = s.placementArea,
-        q = box(p.outer),
+        q = this.siteBoxes[i]!,
         expanded: [number, number, number, number] = [
           rect[0] - r,
           rect[1] - r,
@@ -164,7 +204,7 @@ export class Router {
     }
     const cert = corridor(this.c, p, q, this.c.settings.roads.maxReservedWidthM, undefined, true);
     const e = cert.traversable
-      ? { a, b, cost: distance(p, q) * (1 + 4 * cert.maxDirectionalGrade) }
+      ? { a, b, cost: distance(p, q) * this.factor(p, q, cert.maxDirectionalGrade) }
       : null;
     this.cached.set(key, e);
     return e;
@@ -319,7 +359,7 @@ export class Router {
         const e: Edge = {
           a: endpointNodes[0]!,
           b: endpointNodes[1]!,
-          cost: candidate.spanM,
+          cost: candidate.spanM * ROUTE_COSTS.bridgeSpanFactor + ROUTE_COSTS.bridgeFixedM,
           candidate,
           profile,
         };
@@ -334,47 +374,108 @@ export class Router {
       }
     }
   }
-  neighbours(id: number): Edge[] {
-    const result = [...(this.special.get(id) ?? [])];
-    if (id < this.c.cells) {
-      const x = id % this.c.columns,
-        y = Math.floor(id / this.c.columns);
-      for (const n of [
-        x > 0 ? id - 1 : -1,
-        x + 1 < this.c.columns ? id + 1 : -1,
-        y > 0 ? id - this.c.columns : -1,
-        y + 1 < this.c.rows ? id + this.c.columns : -1,
-      ])
-        if (n >= 0) {
-          const e = this.edge(id, n);
-          if (e) result.push(e);
-        }
-    }
-    return result;
+  /** Lattice neighbours in fixed order: four axes, then four diagonals. */
+  latticeNeighbours(id: number): number[] {
+    if (id >= this.c.cells) return [];
+    const cols = this.c.columns,
+      x = id % cols,
+      y = Math.floor(id / cols),
+      west = x > 0,
+      east = x + 1 < cols,
+      north = y > 0,
+      south = y + 1 < this.c.rows;
+    return [
+      west ? id - 1 : -1,
+      east ? id + 1 : -1,
+      north ? id - cols : -1,
+      south ? id + cols : -1,
+      north && west ? id - cols - 1 : -1,
+      north && east ? id - cols + 1 : -1,
+      south && west ? id + cols - 1 : -1,
+      south && east ? id + cols + 1 : -1,
+    ].filter((n) => n >= 0);
   }
+  /**
+   * Optimistic lattice edge cost: the endpoint height difference never exceeds
+   * the certified maximum directional grade, so this is a lower bound.
+   */
+  private estimate(a: number, b: number): number | null {
+    if (!this.open(a) || !this.open(b)) return null;
+    const p = this.points[a]!,
+      q = this.points[b]!,
+      length = distance(p, q),
+      g = Math.abs(this.c.q.heightAt(...q) - this.c.q.heightAt(...p)) / length;
+    this.c.validation.take(2);
+    return length * this.factor(p, q, g);
+  }
+  private factor(p: Point, q: Point, g: number): number {
+    const mid: Point = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2],
+      margin = Math.min(
+        mid[0] - this.c.bounds.minX,
+        mid[1] - this.c.bounds.minY,
+        this.c.bounds.maxX - mid[0],
+        this.c.bounds.maxY - mid[1],
+      );
+    return (
+      1 +
+      ROUTE_COSTS.gradeLinear * g +
+      ROUTE_COSTS.gradeQuadratic * g * g +
+      ROUTE_COSTS.margin * Math.max(0, (ROUTE_COSTS.marginM - margin) / ROUTE_COSTS.marginM)
+    );
+  }
+  private cost(e: Edge): number {
+    return this.used.has(e.a < e.b ? `${e.a}:${e.b}` : `${e.b}:${e.a}`)
+      ? e.cost * ROUTE_COSTS.reuse
+      : e.cost;
+  }
+  /**
+   * Lazy A*: lattice edges enter the queue with an optimistic estimate and are
+   * certified only when popped; a dearer certified cost is re-queued, an
+   * uncertifiable edge is dropped. Every emitted edge is certified exactly as
+   * by eager search; only edges never reached are left uncertified.
+   */
   route(start: number, end: number, forbiddenCrossingId?: string): Edge[] | null {
     // Allocation is bounded before arrays; stale heap entries still consume heap work.
     const count = this.points.length;
-    this.c.heap.take(count * 2);
-    const costs = new Float64Array(count);
-    costs.fill(Infinity);
-    const previous = new Int32Array(count);
-    previous.fill(-1);
-    const byNode = new Map<number, Edge>(),
+    this.c.heap.take(count * 3);
+    const closed = new Uint8Array(count),
+      settled = new Float64Array(count),
+      queued = new Float64Array(count).fill(Infinity),
+      previous = new Int32Array(count).fill(-1),
+      byNode = new Map<number, Edge>(),
       heap = new Heap(this.c);
-    costs[start] = 0;
-    heap.push({ node: start, g: 0, f: distance(this.points[start]!, this.points[end]!) });
+    // Weighted A*: the straight-line metre exceeds a reused road's cost, so routes
+    // can be at most 1/reuse longer in cost than optimal, for far fewer expansions.
+    const h = (n: number) => ROUTE_COSTS.heuristic * distance(this.points[n]!, this.points[end]!);
+    heap.push({ node: start, g: 0, f: h(start), from: -1, edge: null, exact: true });
     let expansions = 0;
     while (heap.data.length) {
       this.c.heap.take();
       const item = heap.pop();
-      if (item.g !== costs[item.node]) continue;
+      if (closed[item.node]) continue;
+      if (!item.exact) {
+        const e = this.edge(item.from, item.node);
+        if (!e) continue;
+        const g = settled[item.from]! + this.cost(e);
+        if (g > item.g + 1e-9) {
+          if (g < queued[item.node]! - 1e-12) {
+            queued[item.node] = g;
+            heap.push({ ...item, g, f: g + h(item.node), edge: e, exact: true });
+          }
+          continue;
+        }
+        item.edge = e;
+        item.g = g;
+      }
+      closed[item.node] = 1;
+      settled[item.node] = item.g;
+      previous[item.node] = item.from;
+      if (item.edge) byNode.set(item.node, item.edge);
       if (item.node === end) {
         const result: Edge[] = [];
         let n = end;
         while (n !== start) {
-          const e = byNode.get(n)!;
-          result.push(e);
+          result.push(byNode.get(n)!);
           n = previous[n]!;
         }
         return result.reverse();
@@ -391,16 +492,29 @@ export class Router {
           'global expansions',
           'A* exhausted the recorded global expansion cap.',
         );
-      for (const e of this.neighbours(item.node)) {
-        if (forbiddenCrossingId && e.candidate?.id === forbiddenCrossingId) continue;
+      const exact = (e: Edge) => {
+        if (forbiddenCrossingId && e.candidate?.id === forbiddenCrossingId) return;
         const n = e.a === item.node ? e.b : e.a,
-          g = item.g + e.cost;
-        if (g < costs[n]! - 1e-12) {
-          costs[n] = g;
-          previous[n] = item.node;
-          byNode.set(n, e);
-          heap.push({ node: n, g, f: g + distance(this.points[n]!, this.points[end]!) });
+          g = item.g + this.cost(e);
+        if (closed[n] || g >= queued[n]! - 1e-12) return;
+        queued[n] = g;
+        heap.push({ node: n, g, f: g + h(n), from: item.node, edge: e, exact: true });
+      };
+      for (const e of this.special.get(item.node) ?? []) exact(e);
+      for (const n of this.latticeNeighbours(item.node)) {
+        if (closed[n]) continue;
+        const key = item.node < n ? `${item.node}:${n}` : `${n}:${item.node}`,
+          known = this.cached.get(key);
+        if (known === null) continue;
+        if (known) {
+          exact(known);
+          continue;
         }
+        const estimate = this.estimate(item.node, n);
+        if (estimate === null) continue;
+        const g = item.g + (this.used.has(key) ? estimate * ROUTE_COSTS.reuse : estimate);
+        if (g >= queued[n]! - 1e-12) continue;
+        heap.push({ node: n, g, f: g + h(n), from: item.node, edge: null, exact: false });
       }
     }
     return null;

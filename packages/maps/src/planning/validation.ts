@@ -21,6 +21,7 @@ import { bridge } from './bridges.js';
 import { footprint, corridor, requireFinitePoint } from './certificates.js';
 import { Context, box, touches } from './context.js';
 import type { PlanningInput, RegionalPlanningOutput } from './types.js';
+import { CROSSING_VERSION } from '../geography/types.js';
 export function validate(c: Context, plan: RegionalPlanningOutput): void {
   preflightAsset(
     { layers: plan },
@@ -338,7 +339,7 @@ export function validate(c: Context, plan: RegionalPlanningOutput): void {
       {
         ...crossing,
         minimumAbutmentM: c.settings.roads.minimumAbutmentM,
-        policy: 'reserved-dry-disks-v1',
+        policy: CROSSING_VERSION,
       },
       profile,
     );
