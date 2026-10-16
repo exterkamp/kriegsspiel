@@ -18,11 +18,16 @@ export const MS_PER_MINUTE = 60 * MS_PER_SECOND;
  * - 1 (absent): every die on the world's RNG.
  * - 2 (#432): each courier rolls its loss, garbling and interceptions on a stream of its own
  *   (`Courier.dice`), seeded by one draw from the world's RNG as it sets out.
+ * - 3 (#528): the objective's hold counts only while it is uncontested: no standing enemy in
+ *   contact with a holder or within `CONTEST_RADIUS_M` of the objective (D13).
  */
-export const RULES_VERSION = 2;
+export const RULES_VERSION = 3;
 
 /** True when couriers roll on their own stream (rules 2, #432). */
 export const courierStreams = (world: { rules?: number }): boolean => (world.rules ?? 1) >= 2;
+
+/** True when an enemy contesting the objective stops the attacker's hold (rules 3, #528). */
+export const contestedHolds = (world: { rules?: number }): boolean => (world.rules ?? 1) >= 3;
 
 export type SideId = 'blue' | 'red';
 
@@ -447,7 +452,7 @@ export interface GameState {
   combatActive: boolean;
   /** Set once, when the game ends. Nothing happens in combat or victory handlers after that. */
   outcome: Outcome | null;
-  /** Since when the attacker alone has held the objective, or null (D13). Absent counts as null. */
+  /** Since when the attacker alone has held the objective (uncontested under rules 3, #528), or null (D13). Absent counts as null. */
   heldSince?: GameTime | null;
   intel: Record<SideId, SideIntel>;
   /** Couriers riding now, both sides. Master state only: never sent to a client. */

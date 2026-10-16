@@ -26,10 +26,12 @@ import {
   type EngineState,
   type GameState,
 } from './index.js';
-import { COMBAT_CHECK_EVENT, RALLY_EVENT } from './contact.js';
+import { COMBAT_CHECK_EVENT, RALLY_EVENT, onObjective } from './contact.js';
 import { schedule } from './queue.js';
 import {
   BATTLE_CLOSE_MS,
+  CONTEST_RADIUS_M,
+  contesters,
   forceBroken,
   evaluateVictory,
   standing,
@@ -37,7 +39,7 @@ import {
   turnVictory,
 } from './combat.js';
 import { viewFor } from './index.js';
-import type { BattleRuling, Report } from './types.js';
+import type { BattleRuling, Report, Unit } from './types.js';
 import { fileReport } from './visibility.js';
 import { polygonCentroid } from './geometry.js';
 import { river, wood } from './scenario.testkit.js';
@@ -121,6 +123,8 @@ function run(state: EngineState<GameState>, minutes: number) {
 
 const ofType = (events: EmittedEvent[], type: string) => events.filter((e) => e.type === type);
 const unit = (s: EngineState<GameState>, id: string) => s.world.units.find((u) => u.id === id)!;
+const onObjectiveNow = (s: EngineState<GameState>, id: string) =>
+  onObjective(unit(s, id), s.world.victory.objective);
 
 /** Two battalions facing off within infantry range, away from the objective. */
 const duel: RawUnit[] = [
@@ -903,6 +907,139 @@ describe('objective area', () => {
       units: w.units.map((u) => (u.id === 'blue-1' ? { ...u, center: pointMm(560, 250) } : u)),
     };
     expect(evaluateVictory(both, TAKEN)).toBeNull();
+  });
+});
+
+describe('a contested objective (rules 3, #528)', () => {
+  const TAKEN = 10 * MS_PER_MINUTE;
+  /** Red holds the square's centre since 0; Blue's battalion stands at (x, y). Rules 3 unless given. */
+  const contested = (x: number, y: number, edit: Partial<Unit> = {}, rules = 3): GameState => {
+    const s = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'red-1', side: 'red', x: 0, y: 0 },
+    ]);
+    const w = place(place(s, 'red-1', 550, 250), 'blue-1', x, y).world;
+    return {
+      ...w,
+      rules,
+      heldSince: 0,
+      units: w.units.map((u) => (u.id === 'blue-1' ? { ...u, ...edit } : u)),
+    };
+  };
+  const reds = (w: GameState) => w.units.filter((u) => u.id === 'red-1');
+
+  it('is gated on rules 3: rules 1 and 2 count a hold under fire as before', () => {
+    expect(evaluateVictory(contested(550, 360, {}, 1), TAKEN)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(contested(550, 360, {}, 2), TAKEN)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(contested(550, 360), TAKEN)).toBeNull();
+  });
+
+  it('still counts an uncontested hold', () => {
+    expect(evaluateVictory(contested(950, 450), TAKEN)).toMatchObject({
+      winner: 'red',
+      reason: 'objective-taken',
+    });
+  });
+
+  it('is contested by an enemy in contact with a holder, or within the contest radius', () => {
+    const w = contested(550, 360);
+    expect(contesters(w, reds(w)).map((u) => u.id)).toEqual(['blue-1']);
+    // 190 m south of the holder: out of the radius, but in an infantry battalion's reach.
+    const far = contested(550, 440);
+    expect(contesters(far, reds(far))).toHaveLength(1);
+    // Hussars on both sides, 120 m apart: out of reach both ways, but 90 m from the square's edge.
+    const hussars = { kind: 'cavalry' as const, type: 'cavalry' };
+    const horse = contested(550, 370, hussars);
+    const holders = reds(horse).map((u) => ({ ...u, ...hussars }));
+    const blue = horse.units.find((u) => u.id === 'blue-1')!;
+    expect(canReach(holders[0]!, blue) || canReach(blue, holders[0]!)).toBe(false);
+    expect(contesters(horse, holders).map((u) => u.id)).toEqual(['blue-1']);
+    expect(CONTEST_RADIUS_M).toBe(100);
+  });
+
+  it('is not contested by an enemy that is broken, withdrawing, destroyed or out of reach', () => {
+    for (const status of ['withdrawn', 'destroyed'] as const) {
+      expect(evaluateVictory(contested(550, 360, { status }), TAKEN)).toMatchObject({
+        winner: 'red',
+      });
+    }
+    const leaving = contested(550, 360, {
+      intent: { kind: 'withdraw', toward: pointMm(950, 450), startedAt: 0 },
+    });
+    expect(evaluateVictory(leaving, TAKEN)).toMatchObject({ winner: 'red' });
+    expect(evaluateVictory(contested(550, 460), TAKEN)).toMatchObject({ winner: 'red' });
+  });
+
+  /** Red marches onto the bridge while Blue's battalion fights it from the south end. */
+  const southEnd = (rules: number) => {
+    // Blue's 2nd battalion stands far off, so Blue's force is not broken when the 1st breaks.
+    let s = field([
+      { id: 'blue-1', side: 'blue', x: 9, y: 4 },
+      { id: 'blue-2', side: 'blue', x: 0, y: 4 },
+      { id: 'red-1', side: 'red', x: 3, y: 2 },
+    ]);
+    s = place(s, 'blue-1', 550, 360);
+    s = { ...s, world: { ...s.world, rules } };
+    return issueMove(s, 'red-1', T(5, 2));
+  };
+
+  it('does not complete a hold while the enemy fights from just outside the square', () => {
+    expect(run(southEnd(2), 30).state.world.outcome).toMatchObject({
+      winner: 'red',
+      reason: 'objective-taken',
+      time: 12 * MS_PER_MINUTE,
+    });
+    const s = run(southEnd(3), 20).state;
+    expect(s.world.outcome).toBeNull();
+    expect(unit(s, 'red-1').status).toBe('active');
+    expect(onObjectiveNow(s, 'red-1')).toBe(true);
+    expect(unit(s, 'blue-1').status).toBe('active');
+    expect(s.world.heldSince ?? null).toBeNull();
+  });
+
+  it('resets the hold while contested and counts it again once the enemy leaves', () => {
+    let s = run(southEnd(3), 8).state;
+    expect(s.world.heldSince ?? null).toBeNull();
+    s = issueMove(s, 'blue-1', T(9, 4));
+    const left = run(s, 40).state;
+    const since = left.world.heldSince!;
+    expect(since).toBeGreaterThan(8 * MS_PER_MINUTE);
+    expect(left.world.outcome).toMatchObject({
+      winner: 'red',
+      reason: 'objective-taken',
+      time: since + TAKEN,
+    });
+  });
+
+  it('applies at the end of an umpire turn, the hold counted from the game minute (#429)', () => {
+    const turn = { n: 2, startMs: 0, endMs: 20 * MS_PER_MINUTE, adjudicator: 'umpire' };
+    const at = 20 * MS_PER_MINUTE + 500;
+    const open = { ...contested(950, 450), heldSince: null, turn } as GameState;
+    expect(turnVictory(open, at).world.heldSince).toBe(20 * MS_PER_MINUTE);
+    const fought = { ...contested(550, 360), heldSince: null, turn } as GameState;
+    expect(turnVictory(fought, at).world.heldSince ?? null).toBeNull();
+    // A hold already running is reset by the contest.
+    const reset = { ...contested(550, 360), turn } as GameState;
+    expect(turnVictory(reset, at).world).toMatchObject({ heldSince: null, outcome: null });
+  });
+
+  it('counts the hold again once the contesting enemy breaks', () => {
+    const s = run(southEnd(3), 4).state;
+    expect(s.world.heldSince ?? null).toBeNull();
+    // The battalion breaks (D13): withdrawn, walking home, out of the fight.
+    const broken = {
+      ...s,
+      world: {
+        ...s.world,
+        units: s.world.units.map((u) =>
+          u.id === 'blue-1' ? { ...u, status: 'withdrawn' as const, brokenAt: s.time } : u,
+        ),
+      },
+    };
+    const check = schedule(broken, [{ time: broken.time, type: COMBAT_CHECK_EVENT }]);
+    const end = run(check, 30).state.world;
+    expect(end.heldSince).toBe(4 * MS_PER_MINUTE);
+    expect(end.outcome).toMatchObject({ reason: 'objective-taken', time: 14 * MS_PER_MINUTE });
   });
 });
 
