@@ -11,7 +11,10 @@ import type {
 } from '../contract.js';
 import type { CrossingCandidate } from '../geography/types.js';
 import type { Water } from '../contract.js';
-export const PLANNING_VERSION = 'sited-graded-any-angle-network-v4' as const;
+/** D50 planning: any-angle roads to sites turned to their ground and approach (#545). */
+export const PLANNING_VERSION = 'rotated-sites-any-angle-network-v5' as const;
+/** D48 planning (any-angle roads, unturned sites); saved maps under it still certify. */
+export const ANY_ANGLE_PLANNING_VERSION = 'sited-graded-any-angle-network-v4' as const;
 /** D46 planning (lattice roads with fords); saved maps under it still certify. */
 export const FORDING_PLANNING_VERSION = 'sited-graded-fording-network-v3' as const;
 /** D44/D45 planning (bridges only); saved maps under it still certify. */

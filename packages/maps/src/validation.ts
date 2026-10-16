@@ -30,6 +30,7 @@ import { preflightAsset } from './resources.js';
 import { createElevationQueries, validateElevationShape } from './queries.js';
 import { WaterPolygonIndex, boxesMeet, segmentBox } from './validation-water.js';
 import { roadIntersectionCandidates } from './validation-roads.js';
+import { siteFrameExtents } from './rotation.js';
 
 export function validateSettings(s: MapSettings): void {
   const columns = s.widthM / s.sampleSpacingM + 1,
@@ -476,11 +477,9 @@ export function validateAssetTopology(asset: MapAsset, maxChecks: number): void 
     if (site.kind === 'village') villages++;
     else farms++;
     totalPopulation += site.population.requested;
+    // Extents in the site's own frame (#545): the world axes for an unturned site.
     const area = polygonArea(site.placementArea),
-      xs = site.placementArea.outer.map((v) => v[0]),
-      ys = site.placementArea.outer.map((v) => v[1]);
-    const width = Math.max(...xs) - Math.min(...xs),
-      height = Math.max(...ys) - Math.min(...ys);
+      [width, height] = siteFrameExtents(site);
     if (
       area < size.minAreaM2 ||
       area > size.maxAreaM2 ||

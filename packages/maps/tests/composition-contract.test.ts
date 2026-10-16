@@ -14,6 +14,7 @@ import {
   CONSUMED_FORK,
 } from '../src/composition/index.js';
 import { readFileSync } from 'node:fs';
+import { gridAligned } from '../src/realism.js';
 
 function value<T>(r: GenerationResult<T>): T {
   if (!r.ok) throw Error(JSON.stringify(r));
@@ -173,7 +174,7 @@ it('still certifies maps saved by the D46 stages, before unbiased relief and any
   // The current generator records the new relief, hydrology and any-angle roads and replays exactly.
   expect(asset.provenance.generator.stages.terrain).toBe('gradient-relief-eroded-v3');
   expect(asset.provenance.generator.stages.hydrology).toBe('flood-carved-flowline-network-v3');
-  expect(asset.provenance.generator.stages.roads).toBe('sited-graded-any-angle-network-v4');
+  expect(asset.provenance.generator.stages.roads).toBe('rotated-sites-any-angle-network-v5');
   expect(supportsReplay(asset)).toBe(true);
   // New relief with the old rivers, or the reverse, is not a recorded identity.
   for (const stage of ['terrain', 'hydrology'] as const) {
@@ -190,6 +191,64 @@ it('still certifies maps saved by the D46 stages, before unbiased relief and any
   const mixed = structuredClone(saved);
   mixed.provenance.generator.stages.cover = 'coherent-dry-runs-v1';
   expect(supportsValidation(mixed)).toBe(false);
+}, 60_000);
+let turned: MapAsset;
+it('still certifies maps saved by the D48/D49 stages, with unturned sites (D50)', () => {
+  // The same small recipe saved by main after #542: any-angle roads, axis-aligned sites.
+  const saved = importAsset(
+    readFileSync(new URL('./fixtures/d48-saved-map.json', import.meta.url), 'utf8'),
+  );
+  expect(saved.provenance.generator.stages.roads).toBe('sited-graded-any-angle-network-v4');
+  expect(saved.layers.sites.every((s) => s.rotationDeg === 0)).toBe(true);
+  expect(supportsReplay(saved)).toBe(false);
+  expect(supportsValidation(saved)).toBe(true);
+  expect(validateBattlefield(saved).ok).toBe(true);
+  // The current generator turns the same recipe's sites to its ground and replays exactly.
+  turned = value(
+    generateBattlefield({
+      seed: saved.provenance.seed,
+      settings: saved.settings,
+      overrides: saved.overrides,
+    }),
+  );
+  expect(turned.provenance.generator.stages.roads).toBe('rotated-sites-any-angle-network-v5');
+  expect(turned.layers.sites.map((s) => s.rotationDeg)).toEqual([50, 4]);
+  expect(supportsReplay(turned)).toBe(true);
+  expect(validateBattlefield(turned).ok).toBe(true);
+  // Turned sites under the v4 identity, or v4 roads with D46 relief, were never generated.
+  const mixed = structuredClone(saved);
+  mixed.provenance.generator.stages.terrain = 'structured-relief-eroded-v2';
+  expect(supportsValidation(mixed)).toBe(false);
+}, 60_000);
+it('certifies turned sites by their own frame and rejects a stretched one', () => {
+  const site = turned.layers.sites.find((s) => s.rotationDeg === 50)!;
+  // Streets follow the site's own frame: on its axes and diagonals, not the map's.
+  const frame = settlementFrame(site);
+  let local = 0,
+    world = 0,
+    total = 0;
+  for (const road of turned.layers.roads.filter((r) => r.kind === 'street' && r.siteId === site.id))
+    for (let i = 1; i < road.path.length; i++) {
+      const [p, q] = [road.path[i - 1]!, road.path[i]!],
+        a = frame.local(p),
+        b = frame.local(q),
+        len = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      total += len;
+      if (gridAligned([a.x, a.y], [b.x, b.y])) local += len;
+      if (gridAligned(p, q)) world += len;
+    }
+  expect(total).toBeGreaterThan(0);
+  expect(local / total).toBeGreaterThan(0.9);
+  expect(world / total).toBeLessThan(0.1);
+  // Extents are measured in the site's frame: a 50 m farm turned by 50° spans
+  // 70 m on the world axes, yet fits a 60 m limit; stretched to 75 m it does not.
+  const limited = structuredClone(turned);
+  limited.settings.settlements.farmSite.maxExtentM = 60;
+  expect(() => importAsset(canonicalizeAsset(limited))).not.toThrow();
+  const area = limited.layers.sites.find((s) => s.id === site.id)!.placementArea,
+    [ax, ay] = site.anchor;
+  area.outer = area.outer.map(([x, y]) => [ax + (x - ax) * 1.5, ay + (y - ay) * 1.5]);
+  expect(() => importAsset(canonicalizeAsset(limited))).toThrow(/site-size/);
 }, 60_000);
 it('rejects one-sided local entrance provenance while the regional graph survives', () => {
   const changed = structuredClone(asset),
