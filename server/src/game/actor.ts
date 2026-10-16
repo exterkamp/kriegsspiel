@@ -19,6 +19,7 @@ import {
   deserialize,
   heldTurn,
   mayDraft,
+  MS_PER_MINUTE,
   maySign,
   pursuitEndsAt,
   serialize,
@@ -2048,6 +2049,7 @@ export class GameActor {
       }
       if (this.clock.status !== 'stopped') this.clock.skipTo(t.endMs);
       this.sync();
+      this.settleTurnMinute(t.endMs);
       entry.endGameMs = this.engine.time;
     } finally {
       this.openTurn = undefined;
@@ -2067,6 +2069,27 @@ export class GameActor {
       // snapshot is saved meanwhile, so a restart before then resolves the turn again from the log.
       await this.openNextTurn(t.n);
     }
+  }
+
+  /**
+   * The general guard against a phantom turn (#434): a turn that ends at `endMs` settles the rest
+   * of that game minute before the next turn opens. If the game is decided in it (a combat tick or a
+   * rout that runs on a cadence from first contact, say 0.3 s past the turn's end), it ends there
+   * and no turn opens; otherwise nothing moves and the next turn opens at `endMs`. The look ahead
+   * is on a copy and stops short of the next scripted decision, so only the ordinary handlers run
+   * in it, as they would in real time with no new order; when it finds an outcome the live world is
+   * advanced to it (the turn's `endGameMs`, which replay settles to). #431 already counts the hold
+   * and a battle's close from the minute; this covers every other decider.
+   */
+  private settleTurnMinute(endMs: number): void {
+    if (this.engine.world.outcome || this.engine.time !== endMs) return;
+    let until = Math.floor(endMs / MS_PER_MINUTE) * MS_PER_MINUTE + MS_PER_MINUTE - 1;
+    for (const a of this.agents) if (!a.retired) until = Math.min(until, a.nextAt - 1);
+    if (until <= endMs) return;
+    const outcome = advanceUntilOver(this.engine, until, this.registry).state.world.outcome;
+    if (!outcome) return;
+    if (this.clock.status !== 'stopped') this.clock.skipTo(outcome.time);
+    this.sync();
   }
 
   /**

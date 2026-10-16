@@ -55,6 +55,7 @@ async function play(
 ): Promise<{
   game: Awaited<ReturnType<GameHost['create']>>;
   log: readonly InputLogEntry[];
+  store: MemoryGameStore;
   heldSince: (number | null | undefined)[];
 }> {
   await host?.shutdown();
@@ -90,7 +91,7 @@ async function play(
     }
     heldSince.push(game.state.world.heldSince);
   }
-  return { game, log: await store.inputLog('g1'), heldSince };
+  return { game, log: await store.inputLog('g1'), heldSince, store };
 }
 
 const opened = (log: readonly InputLogEntry[]) =>
@@ -213,4 +214,49 @@ describe('turn mode: the game ends in the turn that decides it (#429)', () => {
     expect(tl.endMs).toBe(40 * MINUTE);
     expect(replayAt(input, tl.endMs).views.blue).toBeDefined();
   });
+});
+
+/**
+ * Hold the Bridge with Blue's 2nd Battalion alone at its post by the bridge, seed 2: scripted Red
+ * attacks it, and the combat tick that runs every two minutes from first contact breaks it at
+ * 00:30:11, so Blue has nobody left standing and the declared battle closes at once. Every turn
+ * length here decides the game at that instant, a fraction of a minute after a turn ends at 00:30.
+ */
+function loneBattalion(): Scenario {
+  const units = holdTheBridge.units.filter((u) => u.side === 'red' || u.id === 'blue-2');
+  return { ...loadScenario({ ...holdTheBridge, units }), seed: 2 };
+}
+
+describe('turn mode: no phantom turn from a decider just past a turn end (#434)', () => {
+  it.each([5, 10, 30])(
+    'ends the game in the %i-minute turn that ends at 00:30 when a combat tick decides it at 00:30:11',
+    async (turnMinutes) => {
+      const scenario = loneBattalion();
+      const { game, log, store } = await play(scenario, turnMinutes);
+      const outcome = game.state.world.outcome!;
+      expect(outcome).toMatchObject({
+        winner: 'red',
+        reason: 'defence-broken',
+        loserOut: 'withdrawn',
+      });
+      // A fractional time just past the turn's end, which #431's minute rule does not floor.
+      expect(outcome.time).toBeGreaterThan(30 * MINUTE);
+      expect(outcome.time).toBeLessThan(31 * MINUTE);
+      expect(outcome.time % 1000).not.toBe(0);
+      // The turn that ended at 00:30 was the last: no turn was opened for the rest of the minute.
+      expect(opened(log).at(-1)).toMatchObject({ endMs: 30 * MINUTE });
+      expect(opened(log)).toHaveLength(30 / turnMinutes);
+      // That turn's record ends where the game did, and the clock, views and papers agree.
+      expect(resolved(log).at(-1)?.endGameMs).toBe(outcome.time);
+      expectOver(game, outcome.time);
+      // Replay of the log ends at the same outcome, with no model and no agent.
+      const input = { ...(await loadReplayInput(store, 'g1'))!, world: scenario };
+      const tl = replayTimeline(input);
+      expect(tl.outcome).toEqual(outcome);
+      expect(tl.endMs).toBe(outcome.time);
+      expect(JSON.stringify(replayAt(input, outcome.time).engine.world)).toBe(
+        JSON.stringify(game.state.world),
+      );
+    },
+  );
 });
