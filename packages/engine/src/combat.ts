@@ -491,7 +491,10 @@ function outcomePapers(world: GameState, outcome: Outcome): GameState['intel'] {
   });
 }
 
-/** The objective's centre and how it reads in a paper: `where` carries its own preposition. */
+/**
+ * The objective's centre and how it reads in a paper: `where` carries its own preposition and ends a
+ * sentence; `closed` is for the middle of one, closed by a comma when it has a clause in it.
+ */
 function objectivePlace(world: GameState): { centre: Point; where: string; closed: string } {
   const centre = polygonCentroid(world.victory.objective);
   const where = describePlace(world.map, centre);
@@ -531,7 +534,7 @@ function fileToAll(
 export function outcomeText(
   world: GameState,
   outcome: Outcome,
-  { closed } = objectivePlace(world),
+  { where, closed } = objectivePlace(world),
 ): string {
   const name = sideName(world);
   const winner = outcome.winner === null ? null : name(outcome.winner);
@@ -542,7 +545,8 @@ export function outcomeText(
       return `${winner} has taken the objective ${closed} and held it. The game is over: ${winner} wins.`;
     case 'objective-held':
       // Also the outcome when the attacker stands on it with the take not complete: say only what is true.
-      return `The time limit is reached and ${loser} has not taken the objective ${closed}. The game is over: ${winner} wins.`;
+      // The place ends the sentence, so it takes no closing comma (#538: "on the High road,.").
+      return `The time limit is reached and ${loser} has not taken the objective ${where}. The game is over: ${winner} wins.`;
     case 'attack-broken':
     case 'defence-broken': {
       const what = outcome.reason === 'attack-broken' ? 'attack' : 'defence';
