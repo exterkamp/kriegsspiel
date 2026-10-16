@@ -91,6 +91,7 @@ import {
   type OpenTurn,
   type TurnAgent,
   type TurnInput,
+  type TurnReports,
   type TurnResolution,
   type TurnResolver,
 } from './turns.js';
@@ -210,6 +211,8 @@ export interface GameActorOptions {
   persona?: UmpirePersona;
   /** The narration circuit breaker of a reopened game, from its input log (#419). Default closed. */
   narrateBreaker?: NarrateBreakerState;
+  /** Narrated text by side and report id of a reopened game (its turn reports, 11.9). */
+  narrations?: ReadonlyMap<string, ReadonlyMap<string, string | null>>;
   /** Server-side agents that play scripted sides (see `opponent/`). */
   agents?: SideAgent[];
   /** Pause voting: who votes and the host's rules. Unset: the vote commands are refused. */
@@ -399,6 +402,7 @@ export class GameActor {
     this.umpire = options.umpire;
     this.persona = options.persona;
     this.narrateBreaker = options.narrateBreaker ?? closedBreaker();
+    for (const [side, text] of options.narrations ?? []) this.narrations.set(side, new Map(text));
     for (const [side, list] of options.staffHistory ?? []) {
       this.staffHistory.set(side, [...list]);
       // Asked before a stop and not yet answered: answered when due, as if the game had not stopped.
@@ -1870,6 +1874,8 @@ export class GameActor {
         throw new Error('orders go through submitOrder');
       case 'narrate':
         throw new Error('narration is logged by the scheduler');
+      case 'turnReports':
+        throw new Error('turn reports are logged with their turn');
       case 'staffAnswer':
         throw new Error('staff answers are logged by answerStaff');
       case 'critique':
@@ -1988,6 +1994,8 @@ export class GameActor {
       try {
         return await turns.resolver.resolve(state, input, {
           agents: () => this.turnAgents(t.n),
+          // Nobody reads a scripted side's papers (#419), so none are written for it (11.9).
+          reportSides: turns.humans,
         });
       } catch (e) {
         // A resolver must always answer; one that throws leaves the units on their last orders.
@@ -2045,15 +2053,72 @@ export class GameActor {
       this.openTurn = undefined;
       this.onStaffAtWork?.({ working: false });
     }
+    // Each side's papers of the turn (11.9), only if the turn was applied as resolved. Shown before
+    // the turn's entry is committed, so a side is first sent its papers in their narrated words.
+    const reports = entry.error ? [] : this.showTurnReports(res.reports ?? []);
     if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
     try {
       await this.commit(entry);
+      await this.logTurnReports(reports);
     } finally {
       // The turn is resolved in memory whether or not the store took it; a failed commit must not
       // leave the live game with no turn open. The entry is not lost (#416): `append` retried it
       // and keeps it, ahead of the next turn's `openTurn`, until the store takes it, and no
       // snapshot is saved meanwhile, so a restart before then resolves the turn again from the log.
       await this.openNextTurn(t.n);
+    }
+  }
+
+  /**
+   * Put each side's narrated papers of a turn in place of their template text (11.9). A note is kept
+   * only for a report the applied turn really filed for that side, so it can never land on another.
+   */
+  private showTurnReports(reports: readonly TurnReports[]): TurnReports[] {
+    return reports.map((r) => {
+      const filed = new Set(
+        (this.engine.world.intel[r.side as SideId]?.reports ?? []).map((x) => x.id),
+      );
+      const narrated = r.narrated.filter((n) => filed.has(n.reportId));
+      const text = this.narrations.get(r.side) ?? new Map<string, string | null>();
+      for (const n of narrated) text.set(n.reportId, n.text);
+      this.narrations.set(r.side, text);
+      return { ...r, narrated };
+    });
+  }
+
+  /**
+   * Journal each side's papers of a turn (11.9) as a `turnReports` entry per side, with its calls
+   * and the notes that replaced template text. Display text only: nothing in the engine changes,
+   * and a reopened game takes the notes from these entries.
+   */
+  private async logTurnReports(reports: readonly TurnReports[]): Promise<void> {
+    for (const r of reports) {
+      if (this.trace.enabled) {
+        // One admin LLM row per side whose papers kept any template text, with the reasons.
+        if (r.error) {
+          this.trace.record(this.id, 'llm', {
+            mode: 'fallback',
+            stage: 'narrate',
+            provider: 'turn report checks',
+            ok: false,
+            errorKind: 'template text used',
+            error: `${r.side}: ${r.error}`,
+            fallbackFor: { reason: r.error },
+          });
+        }
+      }
+      const entry: InputLogEntry = {
+        seq: ++this.seq,
+        wallMs: this.wallNow(),
+        gameMs: this.engine.time,
+        endGameMs: this.engine.time,
+        command: { kind: 'turnReports', side: r.side, turn: r.turn },
+        calls: r.calls,
+        narrated: r.narrated,
+        ...(r.error ? { error: r.error } : {}),
+      };
+      if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+      await this.commit(entry);
     }
   }
 

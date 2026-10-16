@@ -18,6 +18,7 @@ import type { SideView } from '@kriegsspiel/protocol';
 import { toSideView } from '../api/sideView.js';
 import { createRegistry, loadScenarioById, startingState } from '../game/registry.js';
 import { replayLog } from '../game/replay.js';
+import { turnNarrationsFromLog } from '../game/turns.js';
 import type { GameStore, InputLogEntry, InputLogHeader } from '../game/store.js';
 
 export type MarkKind = 'input' | 'event' | 'contact' | 'order' | 'llm' | 'turn';
@@ -168,16 +169,19 @@ export function replayAt(input: ReplayInput, gameMs: number): ReplayAt {
     input.init,
   );
   const views: Record<string, SideView> = {};
-  // Hook for 11.9 (#405, PR #504): once `turnReports` entries exist, pass each side's restored
-  // narration (`turnNarrationsFromLog(input.entries).get(side)`) so a replayed view shows the
-  // turn's papers as the players read them.
+  // Turn mode (11.9, 11.11): each turn's papers in the words the players read them (`turnReports`).
+  const narrations = turnNarrationsFromLog(input.entries);
   for (const side of state.world.sides) {
-    views[side.id] = toSideView(viewFor(state.world, side.id as SideId, state.time), {
-      gameMsAtAnchor: state.time,
-      wallMsAtAnchor: 0,
-      rate: 1,
-      status: 'stopped',
-    });
+    views[side.id] = toSideView(
+      viewFor(state.world, side.id as SideId, state.time),
+      {
+        gameMsAtAnchor: state.time,
+        wallMsAtAnchor: 0,
+        rate: 1,
+        status: 'stopped',
+      },
+      narrations.get(side.id),
+    );
   }
   return { gameMs: state.time, engine: state, views, events: emitted, llmCalls: 0 };
 }

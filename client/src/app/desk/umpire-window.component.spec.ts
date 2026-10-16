@@ -340,7 +340,7 @@ describe('UmpireWindowComponent', () => {
     expect(turn).toContain('Decided by the umpire.');
     expect(turn).toContain('Red pressed the bridge and was held.');
     expect(turn).toContain('Blue lost 40 men, Red lost 12 men.');
-    expect(turn).toContain('1st Battalion (blue)');
+    expect(turn).toContain('1st Battalion (blue): lost 40 men, active → withdrawn');
     expect(turn).toContain('corrected 2 outcomes');
     expect(turn).toContain('Does the charge go home? (40%)');
     // The log is shown only when asked for.

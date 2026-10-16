@@ -68,6 +68,13 @@ export interface AdminTurn {
   }[];
   projection?: { events: string[]; units: Rec[]; outcome?: Rec };
   calls: Call[];
+  /** Each side's turn reports (11.9): its report call(s) and the notes that replaced the templates. */
+  reports?: {
+    side: string;
+    calls: Call[];
+    narrated: { reportId: string; text: string }[];
+    error?: string;
+  }[];
   proposal?: Rec;
   resent?: string[];
   rolls?: { id: string; why: string; chance: number; roll: number; success: boolean }[];
@@ -161,6 +168,28 @@ function details(title: string, body: string, key: string): HTMLDetailsElement {
   const d = el('details');
   d.dataset.key = key;
   d.append(el('summary', undefined, title), el('pre', undefined, body));
+  return d;
+}
+
+/** One model call, collapsed: stage and cost in the summary, its input and raw output inside. */
+function callDetails(c: Call, i: number, key: string): HTMLDetailsElement {
+  const cost = c.costUsd === null ? 'price unknown' : `$${c.costUsd.toFixed(4)}`;
+  const tags = [
+    c.provider,
+    c.model,
+    c.promptVersion,
+    `${c.attempts} attempt${c.attempts === 1 ? '' : 's'}`,
+    cost,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const d = el('details', 'turn-call');
+  d.dataset.key = key;
+  const sum = el('summary', undefined, `${i + 1}. ${c.stage} · ${tags}`);
+  if (c.canned) sum.append(badge('canned', 'badge playback'));
+  if (c.fallbackFor) sum.append(badge(`fallback: ${c.fallbackFor.reason}`, 'badge fallback'));
+  d.append(sum, el('h3', undefined, 'Input'), el('pre', undefined, json(c.input)));
+  d.append(el('h3', undefined, 'Output'), el('pre', undefined, pretty(c.rawOutput)));
   return d;
 }
 
@@ -372,26 +401,7 @@ export class TurnsPanel {
 
     const calls = block('Adjudicate input and output');
     if (t.calls.length === 0) calls.append(el('p', 'empty', 'No model call: the tables decided.'));
-    t.calls.forEach((c, i) => {
-      const cost = c.costUsd === null ? 'price unknown' : `$${c.costUsd.toFixed(4)}`;
-      const tags = [
-        c.provider,
-        c.model,
-        c.promptVersion,
-        `${c.attempts} attempt${c.attempts === 1 ? '' : 's'}`,
-        cost,
-      ]
-        .filter(Boolean)
-        .join(' · ');
-      const d = el('details', 'turn-call');
-      d.dataset.key = key(`call${i}`);
-      const sum = el('summary', undefined, `${i + 1}. ${c.stage} · ${tags}`);
-      if (c.canned) sum.append(badge('canned', 'badge playback'));
-      if (c.fallbackFor) sum.append(badge(`fallback: ${c.fallbackFor.reason}`, 'badge fallback'));
-      d.append(sum, el('h3', undefined, 'Input'), el('pre', undefined, json(c.input)));
-      d.append(el('h3', undefined, 'Output'), el('pre', undefined, pretty(c.rawOutput)));
-      calls.append(d);
-    });
+    t.calls.forEach((c, i) => calls.append(callDetails(c, i, key(`call${i}`))));
     if (t.proposal)
       calls.append(details('Final proposal (as applied)', json(t.proposal), key('proposal')));
     if (t.resent?.length) {
@@ -401,6 +411,22 @@ export class TurnsPanel {
       );
     }
     out.push(calls);
+
+    const reports = block('Turn reports');
+    reports.classList.add('turn-reports');
+    if (!t.reports?.length)
+      reports.append(el('p', 'empty', 'No report call: the papers are the engine’s own.'));
+    for (const r of t.reports ?? []) {
+      reports.append(el('h3', undefined, `${r.side}${r.error ? ` (failed: ${r.error})` : ''}`));
+      r.calls.forEach((c, i) => reports.append(callDetails(c, i, key(`report:${r.side}:${i}`))));
+      reports.append(
+        list(
+          r.narrated.map((x) => `${x.reportId}: ${x.text}`),
+          'No note: the template text stood.',
+        ),
+      );
+    }
+    out.push(reports);
 
     const rolls = (t.rolls ?? []).map(
       (r) =>

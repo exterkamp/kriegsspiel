@@ -24,9 +24,11 @@ import {
   metres,
   positionAt,
   rollTurnDice,
+  viewFor,
   type EngineState,
   type EventRegistry,
   type GameState,
+  type SideId,
   type TurnContext,
   type TurnCourier,
   type Unit,
@@ -40,7 +42,10 @@ import {
   type UmpireDial,
 } from '../umpire/adjudicate.js';
 import { deg } from '../umpire/eval/turnInput.js';
-import type { UmpireCallRecord, UmpireClient } from '../umpire/umpireClient.js';
+import { hiddenTerms } from '../umpire/leakGuard.js';
+import { reportsOfTurn, writeTurnReports } from '../umpire/turnReports.js';
+import type { UmpireCallRecord, UmpireClient, UmpireRequest } from '../umpire/umpireClient.js';
+import { advanceUntilOver } from './advance.js';
 import {
   ENGINE_ADJUDICATOR,
   engineOrdersOf,
@@ -51,7 +56,13 @@ import {
   type RulesOrder,
 } from './engineTurn.js';
 import type { TurnRecord } from './store.js';
-import type { TurnInput, TurnResolution, TurnResolveContext, TurnResolver } from './turns.js';
+import type {
+  TurnInput,
+  TurnReports,
+  TurnResolution,
+  TurnResolveContext,
+  TurnResolver,
+} from './turns.js';
 
 /** The name a resolver logs for a turn the umpire decided. */
 export const UMPIRE_ADJUDICATOR = 'umpire';
@@ -90,7 +101,18 @@ export interface UmpireTurnResolverOptions {
   turnTimeoutMs?: number;
   /** Told each time a turn falls back to the engine, with the reason. */
   onFallback?: (turn: number, reason: string) => void;
+  /**
+   * The client that writes each side's papers after an umpire turn (11.9, the `narrate` stage
+   * route; the app passes the game's client, so its caps apply). Unset: the papers keep the
+   * engine's template text and no report call is made.
+   */
+  reporter?: UmpireClient;
+  /** Wall-clock limit on writing all the sides' papers of one turn. Default 5 minutes. */
+  reportTimeoutMs?: number;
 }
+
+/** How long the papers of one turn may take to write before the rest keep their template text. */
+export const TURN_REPORTS_TIMEOUT_MS = 5 * 60_000;
 
 const m = (millimetres: number) => Math.round(metres(millimetres));
 
@@ -234,10 +256,100 @@ export class UmpireTurnResolver implements TurnResolver {
     // Anything that throws from here on (building the input, checking an odd reply) falls back to
     // the engine's turn, already computed, rather than failing the turn and dropping its orders.
     try {
-      return await this.adjudicate(state, input, p, engine, fallBack);
+      return await this.adjudicate(state, input, p, engine, fallBack, context);
     } catch (e) {
       return fallBack(e instanceof Error ? e.message : String(e), 0);
     }
+  }
+
+  /**
+   * Each side's papers of the turn (11.9): the turn applied on a copy exactly as the actor will
+   * apply it (an umpire turn holds the units and runs no agent, so the copy's end is the live
+   * end), then one call per side from that side's own view at the turn's end and its own units'
+   * accounts. Never the summary, the journal, the rolls or another side's accounts. Any failure
+   * leaves the papers their template text; it never fails the turn.
+   */
+  private async writeReports(
+    state: EngineState<GameState>,
+    input: TurnInput,
+    output: UmpireTurnOutput,
+    context?: TurnResolveContext,
+  ): Promise<TurnReports[]> {
+    const reporter = this.opts.reporter;
+    if (!reporter) return [];
+    const { registry } = this.opts;
+    let end: EngineState<GameState>;
+    try {
+      const start = umpireAdjudicator(state, umpireRecord(input, output), { registry });
+      end = advanceUntilOver(start, input.endMs, registry).state;
+    } catch {
+      // The actor's apply will fail the same way and log why; there are no papers to write.
+      return [];
+    }
+    const world = end.world;
+    const sides = context?.reportSides ?? world.sides.map((s) => s.id);
+    const places = [...new Set(world.map.features.flatMap((f) => (f.name ? [f.name] : [])))];
+    const ctrl = new AbortController();
+    const timer = setTimeout(
+      () => ctrl.abort(),
+      this.opts.reportTimeoutMs ?? TURN_REPORTS_TIMEOUT_MS,
+    );
+    const out: TurnReports[] = [];
+    try {
+      for (const sideId of sides) {
+        const side = sideId as SideId;
+        if (!world.sides.some((s) => s.id === side)) continue;
+        const view = viewFor(world, side, end.time);
+        const due = reportsOfTurn(view.reports, input.startMs, end.time);
+        if (due.length === 0) continue;
+        const own = new Set(view.ownUnits.map((u) => u.id));
+        const calls: UmpireCallRecord[] = [];
+        const client: UmpireClient = {
+          call: async <T>(request: UmpireRequest) => {
+            const res = await reporter.call<T>(request);
+            calls.push(res.record);
+            return res;
+          },
+        };
+        const result = await writeTurnReports(
+          client,
+          side,
+          input.n,
+          due,
+          {
+            ownUnits: view.ownUnits,
+            accounts: output.proposal.units
+              .filter((u) => own.has(u.unitId) && typeof u.account === 'string')
+              .map((u) => ({ unitId: u.unitId, account: u.account })),
+            orderTexts: new Map(
+              input.orders.filter((o) => o.side === side).map((o) => [o.orderId, o.text]),
+            ),
+            places,
+            hidden: hiddenTerms(world, side),
+          },
+          {
+            signal: ctrl.signal,
+            ...(this.opts.persona ? { persona: this.opts.persona } : {}),
+          },
+        );
+        const notes = [
+          ...result.withheld.map((w) => `${w.reportId}: ${w.reason}`),
+          ...result.fallbacks.map((f) => `${f.reportId}: ${f.reason}`),
+        ];
+        out.push({
+          side,
+          turn: input.n,
+          narrated: result.dispatches.map((d) => ({ reportId: d.reportIds[0]!, text: d.text })),
+          calls,
+          ...(notes.length > 0
+            ? { error: `turn reports kept template text: ${notes.join('; ')}` }
+            : {}),
+        });
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+    return out;
   }
 
   private async adjudicate(
@@ -246,6 +358,7 @@ export class UmpireTurnResolver implements TurnResolver {
     p: Projection,
     engine: EngineTurnOutput,
     fallBack: (reason: string, attempts: number, calls?: UmpireCallRecord[]) => TurnResolution,
+    context?: TurnResolveContext,
   ): Promise<TurnResolution> {
     const { client, dial } = this.opts;
     const live = new Set(
@@ -307,10 +420,32 @@ export class UmpireTurnResolver implements TurnResolver {
         ...(r.resent ? { resent: r.resent } : {}),
         ...(r.refusedRolls ? { refusedRolls: r.refusedRolls } : {}),
       };
-      return { adjudicator: UMPIRE_ADJUDICATOR, output, calls: r.calls };
+      const reports = await this.writeReports(state, input, output, context);
+      return {
+        adjudicator: UMPIRE_ADJUDICATOR,
+        output,
+        calls: r.calls,
+        ...(reports.length > 0 ? { reports } : {}),
+      };
     }
     return fallBack(r.error ?? 'no proposal', r.attempts, r.calls);
   }
+}
+
+/**
+ * The turn as the actor will log it: what `umpireAdjudicator` applies.
+ */
+function umpireRecord(input: TurnInput, output: UmpireTurnOutput): TurnRecord {
+  return {
+    n: input.n,
+    startMs: input.startMs,
+    endMs: input.endMs,
+    cause: input.cause,
+    orders: [...input.orders],
+    sent: [...input.sent],
+    adjudicator: UMPIRE_ADJUDICATOR,
+    output,
+  };
 }
 
 /**

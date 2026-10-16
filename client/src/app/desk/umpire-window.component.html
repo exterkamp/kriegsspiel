@@ -41,15 +41,7 @@
             @if (t.units.length > 0) {
               <ul class="changed">
                 @for (u of t.units; track u.id) {
-                  <li>
-                    {{ u.name }} ({{ u.side }}):
-                    @if (u.lost > 0) {
-                      lost {{ u.lost }} men
-                    }
-                    @if (u.from !== u.to) {
-                      {{ u.lost > 0 ? ', ' : '' }}{{ u.from }} → {{ u.to }}
-                    }
-                  </li>
+                  <li>{{ u.name }} ({{ u.side }}): {{ unitChange(u) }}</li>
                 }
               </ul>
             }

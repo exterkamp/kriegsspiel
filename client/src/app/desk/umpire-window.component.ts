@@ -11,6 +11,7 @@ import { fetchCritique, fetchWindowAt, fetchWindowTimeline } from '@legacy/windo
 import {
   decidedBy,
   lossesText,
+  unitChange,
   stepMark,
   stepTurn,
   turnAt,
@@ -81,6 +82,7 @@ export class UmpireWindowComponent {
   protected readonly showLog = signal(false);
   protected readonly decidedBy = decidedBy;
   protected readonly lossesText = lossesText;
+  protected readonly unitChange = unitChange;
   protected readonly errorText = computed(() =>
     this.error() === 'game_not_over' ? 'Available once the game has ended.' : this.error(),
   );

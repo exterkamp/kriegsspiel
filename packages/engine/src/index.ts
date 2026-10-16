@@ -186,7 +186,7 @@ export type {
   ViewUnit,
 } from './visibility.js';
 export * from './fatigue.js';
-export { fieldNote, temperOf } from './fieldNotes.js';
+export { TURN_MOVED_M, fieldNote, temperOf } from './fieldNotes.js';
 export type { NoteSender, Temper } from './fieldNotes.js';
 export {
   AMMO_PER_FIRE_TICK,
@@ -237,6 +237,9 @@ export {
   DEPARTURE_LOSS_SHARE,
   DEPARTURE_TOLERANCE_M,
   TURN_EVENT,
+  TURN_NOTICE_EVENT,
+  TURN_NOTICE_FROM,
+  issueTurnNotice,
   beginTurn,
   issueTurn,
   registerTurn,

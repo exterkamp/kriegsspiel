@@ -455,6 +455,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
         client,
         dial: settings.dial,
         persona: settings.persona,
+        // Each side's papers of an umpire turn, on the same capped client (11.9).
+        reporter: client,
         onFallback: (turn, reason) => {
           server.log.warn({ gameId: id, turn, reason }, 'turn umpire fallback');
           if (trace?.enabled) trace.record(id, 'error', { source: 'adjudicate', turn, reason });

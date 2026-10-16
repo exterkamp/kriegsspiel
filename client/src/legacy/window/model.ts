@@ -118,6 +118,15 @@ export function lossesText(t: WindowTurn): string {
   return parts.length ? `${parts.join(', ')}.` : '';
 }
 
+/** What a turn did to one unit, e.g. "lost 172 men, active → withdrawn". */
+export function unitChange(u: WindowTurn['units'][number]): string {
+  const parts = [
+    ...(u.lost > 0 ? [`lost ${u.lost} men`] : []),
+    ...(u.from !== u.to ? [`${u.from} → ${u.to}`] : []),
+  ];
+  return parts.join(', ');
+}
+
 /** The index of the next (or previous) turn mark from `ms`, or -1: the scrubber's turn steps. */
 export function stepTurn(marks: readonly WindowMark[], ms: number, dir: 1 | -1): number {
   const turns = marks.filter((m) => m.kind === 'turn');

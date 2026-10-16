@@ -8,6 +8,7 @@ import {
   stepMark,
   stepTurn,
   turnAt,
+  unitChange,
   unitNotes,
 } from './model.js';
 
@@ -185,6 +186,20 @@ describe("the window's turns (D39, 11.11)", () => {
     expect(lossesText(turn(1, { losses: { blue: 40, red: 0 } }))).toBe(
       'Blue lost 40 men, Red none.',
     );
+  });
+
+  it('says what a turn did to a unit', () => {
+    const u = {
+      id: 'r1',
+      side: 'red' as const,
+      name: 'Vanguard',
+      lost: 172,
+      from: 'active',
+      to: 'withdrawn',
+    };
+    expect(unitChange(u)).toBe('lost 172 men, active → withdrawn');
+    expect(unitChange({ ...u, lost: 0 })).toBe('active → withdrawn');
+    expect(unitChange({ ...u, to: 'active' })).toBe('lost 172 men');
   });
 
   it('steps between turn marks only', () => {

@@ -19,6 +19,7 @@ import {
   courierPass,
   describePlace,
   engineTurnStart,
+  issueTurnNotice,
   metres,
   positionAt,
   type CourierPass,
@@ -374,5 +375,11 @@ export function engineAdjudicator(
   if (JSON.stringify(pass.couriers) !== JSON.stringify(out.couriers)) {
     throw new Error(`turn ${turn.n}: the courier pass differs from the logged couriers`);
   }
-  return engineTurnStart(state, orders, pass, turn);
+  const started = engineTurnStart(state, orders, pass, turn);
+  // An umpire turn that fell back to the engine says so in every in-tray, in-fiction (D39, 11.9).
+  return turn.fallback ? issueTurnNotice(started, turn.endMs, TABLES_NOTICE) : started;
 }
+
+/** The umpire's staff's word, at the end of a turn the umpire could not decide (D39, "Fallback"). */
+export const TABLES_NOTICE =
+  "Sir, the umpire's staff could not give a ruling on this turn in time, so it has been worked out by the book of tables. The units' own papers follow.";

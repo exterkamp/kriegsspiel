@@ -14,6 +14,7 @@ const KINDS = [
   'engaged',
   'heavyLosses',
   'broke',
+  'turn',
 ] as const;
 
 function report(kind: Report['kind'], id = 'blue-r1'): Report {
@@ -169,6 +170,54 @@ describe('a broken unit in its notes (#438)', () => {
     for (const id of ids.slice(0, 20)) {
       const text = fieldNote({ ...report('engaged', id), rallied: true }, 0, false, {}, 7);
       expect(text).toMatch(/^Sir, we have rallied\. [A-Z]/);
+    }
+  });
+});
+
+describe('a unit’s note on an umpire turn (11.9)', () => {
+  const turn = (facts: NonNullable<Report['turn']>, id: string): Report => ({
+    ...report('turn', id),
+    deliverAt: 0,
+    turn: facts,
+  });
+  const base = { n: 2, lost: 0, movedM: 0, orders: [] };
+
+  it('says where it stands, what became of its orders and what it lost, from the facts alone', () => {
+    for (const id of ids.slice(0, 40)) {
+      const stayed = fieldNote(turn(base, id), 0, false, {}, 3);
+      expect(stayed).toMatch(/^Sir, we (stand|have kept|are still|remain|have not moved)/);
+      expect(stayed).toMatch(/— 1st Battalion, just now\.$/);
+      const moved = fieldNote(
+        turn({ ...base, movedM: 600, lost: 123, orders: [{ result: 'refused' }] }, id),
+        0,
+        false,
+        {},
+        3,
+      );
+      expect(moved).toMatch(/marched|moved|now in position|come up|after our march/);
+      expect(moved).toMatch(/not carry out my orders|not done as ordered/);
+      expect(moved).toContain('We lost about 120 men.');
+      const misread = fieldNote(
+        turn({ ...base, orders: [{ result: 'carried-out' }, { result: 'misread' }] }, id),
+        0,
+        false,
+        {},
+        3,
+      );
+      expect(misread).toMatch(/as I understood them|took my orders to mean/);
+    }
+  });
+
+  it('never says it holds when it broke, and says first that it rallied', () => {
+    const HOLDS = /\bwe (hold|stand|remain)\b|kept our ground|in good order/i;
+    for (const trait of [undefined, 'bold', 'cautious', 'steady']) {
+      for (const id of ids.slice(0, 40)) {
+        const broke = fieldNote(turn({ ...base, broke: true }, id), 0, false, { trait }, 5);
+        expect(broke).not.toMatch(HOLDS);
+        expect(broke).toMatch(/back/);
+        const rallied = fieldNote(turn({ ...base, rallied: true }, id), 0, false, { trait }, 5);
+        expect(rallied).toMatch(/^Sir, we have rallied\. [A-Z]/);
+      }
     }
   });
 });

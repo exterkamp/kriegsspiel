@@ -26,6 +26,23 @@ const umpireTurn: AdminTurn = {
       costUsd: 0.0123,
     },
   ],
+  reports: [
+    {
+      side: 'blue',
+      calls: [
+        {
+          stage: 'narrate',
+          model: 'claude-x',
+          promptVersion: 'turn-reports-v1',
+          input: { side: 'blue' },
+          rawOutput: '{"notes":[]}',
+          attempts: 1,
+          costUsd: 0.001,
+        },
+      ],
+      narrated: [{ reportId: 'blue-r4', text: '1st Battalion here: we hold the bridge.' }],
+    },
+  ],
   proposal: { turn: 1, summary: 'The umpire saw it' },
   resent: ['limits: blue-3: end position fails the march check'],
   rolls: [{ id: 'r1', why: 'Does the charge go home?', chance: 0.4, roll: 0.25, success: true }],
@@ -59,6 +76,7 @@ const fallbackTurn: AdminTurn = {
   orders: [],
   unsent: { blue: [{ orderId: 'b2', to: 'blue-2', text: 'Hold the wood' }] },
   calls: [],
+  reports: [],
   proposal: undefined,
   resent: undefined,
   rolls: undefined,
@@ -119,6 +137,7 @@ describe('TurnsPanel', () => {
     expect(fb.textContent).toContain('the model is down');
     expect(text(root)).toContain('blue b2 → blue-2: Hold the wood (held, not sent)');
     expect(text(root)).toContain('No model call: the tables decided.');
+    expect(text(root)).toContain('No report call: the papers are the engine’s own.');
   });
 
   it('shows an umpire turn whole: orders, projection, calls, rolls, every clamp and the journal', async () => {
@@ -139,6 +158,12 @@ describe('TurnsPanel', () => {
     expect(JSON.parse(input!)).toEqual(umpireTurn.calls[0]!.input);
     expect(JSON.parse(output!)).toEqual({ turn: 1, summary: 'The umpire saw it' });
     expect(t).toContain('limits: blue-3: end position fails the march check');
+    // Each side's turn reports: the report call and the notes it wrote.
+    const reports = root.querySelector<HTMLElement>('.turn-reports')!;
+    expect(reports.querySelector('summary')!.textContent).toContain(
+      '1. narrate · claude-x · turn-reports-v1',
+    );
+    expect(reports.textContent).toContain('blue-r4: 1st Battalion here: we hold the bridge.');
     // Rolls made and refused.
     expect(t).toContain('r1: Does the charge go home? — 40% asked, drew 0.250: success');
     expect(t).toContain('r9: chance 0.99 is outside 0.05..0.95');

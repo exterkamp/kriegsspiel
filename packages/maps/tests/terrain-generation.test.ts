@@ -34,7 +34,7 @@ describe('independently seeded multiscale ground', () => {
     for (let i = 0; i < 100; i++) deriveSeed(17, 'settlements:v1', `building:${i}`);
     expect(value(generateTerrain(s, 17))).toEqual(a);
     expect(value(generateElevation(s, 31)).samples).not.toEqual(a.elevation.samples);
-    expect(TERRAIN_VERSION).toBe('value-noise-ridges-v1');
+    expect(TERRAIN_VERSION).toBe('structured-relief-eroded-v2');
     expect(CONTOUR_VERSION).toBe('bilinear-graph-v1');
   });
   it('contour interval/tolerance/index changes leave elevation bit-for-bit unchanged', () => {

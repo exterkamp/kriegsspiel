@@ -15,6 +15,7 @@ import {
   issueOrder,
   issuePlacement,
   issueTurn,
+  issueTurnNotice,
   metres,
   overlapsBeyondTolerance,
   positionAt,
@@ -1045,6 +1046,105 @@ describe("umpire.turn and the umpire's journal (11.8)", () => {
     expect(JSON.stringify(emitted)).not.toContain(SECRET);
     for (const side of state.world.sides) {
       expect(JSON.stringify(viewFor(state.world, side.id, T1))).not.toContain(SECRET);
+    }
+  });
+});
+
+describe('umpire.turn and the turn reports (11.9)', () => {
+  const SECRET = 'REPORT-CANARY';
+  const turnReports = (w: GameState, side: 'blue' | 'red') =>
+    viewFor(w, side, T1).reports.filter((r) => r.observedAt === T1);
+
+  it('files one paper per own unit at the turn end, handed in at once, from the applied outcome', () => {
+    const w = world();
+    const a = unit(w, 'a');
+    const p = proposal(
+      w,
+      {
+        a: {
+          x: metres(a.center.x) + 400,
+          strength: a.strength - 37,
+          account: `I went forward ${SECRET}.`,
+        },
+      },
+      { summary: `The umpire's own record ${SECRET}.` },
+    );
+    const end = play(w, p).state.world;
+    const blue = turnReports(end, 'blue');
+    expect(blue.map((r) => [r.kind, r.from])).toEqual([
+      ['turn', unit(w, 'a').name],
+      ['turn', unit(w, 'b').name],
+    ]);
+    for (const r of blue) {
+      expect(r.deliveredAt).toBe(T1);
+      expect(r.text).toMatch(/^Sir, /);
+    }
+    expect(blue[0]!.turn).toMatchObject({ n: 1, lost: 37, movedM: 400, orders: [] });
+    expect(blue[0]!.text).toContain('We lost about 40 men.');
+    expect(blue[1]!.turn).toMatchObject({ n: 1, lost: 0, movedM: 0 });
+    // Red's own paper; the umpire's words (account, summary) are in no side's papers or view.
+    expect(turnReports(end, 'red').map((r) => r.from)).toEqual([unit(w, 'c').name]);
+    for (const side of ['blue', 'red'] as const) {
+      expect(JSON.stringify(viewFor(end, side, T1))).not.toContain(SECRET);
+    }
+  });
+
+  it('says how the unit took its orders, by the desk id of each', () => {
+    const w = world();
+    let s: EngineState<GameState> = startGame(startVisibility(createState(w.seed, w, 0)));
+    s = issueOrder(s, {
+      id: 'blue-o7',
+      side: 'blue',
+      to: 'a',
+      issuedAt: 0,
+      text: 'Take the bridge',
+      intents: [],
+      ref: 'o7',
+    });
+    const c = ctx({ orders: [{ orderId: 'blue-o7', unitId: 'a', deliveredAt: 0 }] });
+    s = beginTurn(s, { ...c.turn, adjudicator: 'umpire' });
+    const p = proposal(s.world, { a: { orders: [{ orderId: 'blue-o7', result: 'misread' }] } });
+    s = issueTurn(s, { proposal: p, context: c });
+    const end = advanceTo(s, T1, registry()).state.world;
+    const paper = turnReports(end, 'blue').find((r) => r.from === unit(w, 'a').name)!;
+    expect(paper.turn!.orders).toEqual([{ ref: 'o7', result: 'misread' }]);
+    expect(paper.text).toMatch(/as I understood them|took my orders to mean/);
+  });
+
+  it('reports a unit lost from headquarters, and an enemy newly in sight', () => {
+    const w = miniWorld({
+      units: [
+        { id: 'a', x: 500, y: 500 },
+        { id: 'b', x: 800, y: 500 },
+        { id: 'c', side: 'red', x: 1000, y: 500 },
+      ],
+    });
+    const p = proposal(
+      w,
+      { b: { strength: 0, status: 'destroyed' } },
+      { observations: [{ side: 'blue', unitId: 'c', by: 'a', when: 'end' }] },
+    );
+    const end = play(w, p).state.world;
+    const kinds = turnReports(end, 'blue').map((r) => [r.kind, r.from]);
+    expect(kinds).toContainEqual(['unitLost', unit(w, 'b').name]);
+    expect(kinds).toContainEqual(['turn', unit(w, 'a').name]);
+    expect(kinds).toContainEqual(['contact', unit(w, 'a').name]);
+    expect(kinds.filter(([k]) => k === 'turn')).toHaveLength(1);
+  });
+
+  it('files a notice to every side from the umpire’s staff', () => {
+    const w = world();
+    let s: EngineState<GameState> = startGame(startVisibility(createState(w.seed, w, 0)));
+    s = issueTurnNotice(s, T1, 'Sir, the turn was worked out by the book.');
+    const end = advanceTo(s, T1, registry()).state.world;
+    for (const side of ['blue', 'red'] as const) {
+      const notice = viewFor(end, side, T1).reports.filter((r) => r.kind === 'notice');
+      expect(notice).toHaveLength(1);
+      expect(notice[0]).toMatchObject({
+        from: "The umpire's staff",
+        deliveredAt: T1,
+        text: 'Sir, the turn was worked out by the book.',
+      });
     }
   });
 });

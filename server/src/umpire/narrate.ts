@@ -155,7 +155,8 @@ export function narrateInput(
   };
 }
 
-type Input = ReturnType<typeof narrateInput>;
+export type NarrateInput = ReturnType<typeof narrateInput>;
+type Input = NarrateInput;
 
 const NUMBER_WORDS: Record<string, number> = {
   ...Object.fromEntries(
@@ -533,7 +534,7 @@ const KIND_CONDITION: Partial<Record<ViewReport['kind'], readonly string[]>> = {
  * Words of which a note on a report of this kind must use one, so it is about the reported event and
  * not about something the model made up (#419). Generous on purpose: any fair way of saying it passes.
  */
-const EVENT_WORDS: Record<Exclude<ViewReport['kind'], 'battle'>, RegExp> = {
+const EVENT_WORDS: Record<Exclude<ViewReport['kind'], 'battle' | 'notice'>, RegExp> = {
   situation:
     /\b(position|posted|placed|in place|in line|line|ready|deployed|formed|stand|standing|quiet|no enemy|nothing)\b/i,
   contact:
@@ -553,6 +554,7 @@ const EVENT_WORDS: Record<Exclude<ViewReport['kind'], 'battle'>, RegExp> = {
     /\b(broke|broken|break|fall back|falling back|fell back|retreat|retreating|rout|routed|flee|fled|fleeing|withdraw|withdrawing|gave way|give way|given way|rally|driven back|ran)\b/i,
   unitLost: /\b(lost|gone|destroyed|no word|silent|silence|missing|no more|cut off|perished)\b/i,
   courierLost: /\b(courier|rider|messenger|orders?|overdue|lost|no word)\b/i,
+  turn: /\b(stand|standing|stood|stayed|stay|position|posted|ground|held|hold|holding|kept|keep|march|marched|marching|moved|move|went|advanced|advance|pushed|crossed|took|came up|come up|reached|occupied|formed|deployed|remain|remained|waited|watched|orders?|ordered|fall back|falling back|fell back|back|broken|broke|rallied|engaged|attacked|charged|fight|fought|halted|halt|retired|withdrew|withdrawn|lost)\b/i,
 };
 
 const FIRST_PERSON =
@@ -605,19 +607,26 @@ function conditionWordsIn(text: string): string[] {
  *   the note does not recite the whole condition list instead of judging it;
  * - it says what happened (a word for the report's kind), and it is short.
  */
-export function checkFieldNote(text: string, report: Input['reports'][number]): string[] {
+export function checkFieldNote(
+  text: string,
+  report: Input['reports'][number],
+  limits: { chars: number; sentences: number } = {
+    chars: NARRATE_MAX_CHARS,
+    sentences: NARRATE_MAX_SENTENCES,
+  },
+): string[] {
   const problems: string[] = [];
   const kind = report.kind as ViewReport['kind'];
-  if (text.length > NARRATE_MAX_CHARS) {
-    problems.push(`too long (${text.length} characters, at most ${NARRATE_MAX_CHARS})`);
+  if (text.length > limits.chars) {
+    problems.push(`too long (${text.length} characters, at most ${limits.chars})`);
   }
   // "Lt. Col. Aubry" is one name, not three sentences.
   const sentences = text
     .replace(/\b(Lt|Col|Maj|Gen|Capt|Sgt|Brig|St)\./g, '$1')
     .split(/[.!?]+(?:\s|$)/)
     .filter((x) => x.trim() !== '').length;
-  if (sentences > NARRATE_MAX_SENTENCES) {
-    problems.push(`too long (${sentences} sentences, at most ${NARRATE_MAX_SENTENCES})`);
+  if (sentences > limits.sentences) {
+    problems.push(`too long (${sentences} sentences, at most ${limits.sentences})`);
   }
   const lower = text.toLowerCase();
   if (!STAFF_KINDS.has(kind) && !FIRST_PERSON.test(text)) {
@@ -649,7 +658,7 @@ export function checkFieldNote(text: string, report: Input['reports'][number]): 
       problems.push('recites the unit’s condition instead of judging it');
     }
   }
-  if (kind !== 'battle' && !EVENT_WORDS[kind].test(text)) {
+  if (kind !== 'battle' && kind !== 'notice' && !EVENT_WORDS[kind].test(text)) {
     problems.push(`does not say what happened (${kind})`);
   }
   return problems;
@@ -746,7 +755,7 @@ export async function narrateReports(
   opts: NarrateOptions = {},
 ): Promise<NarrateResult> {
   // The umpire's ruling is already in its own words; a rewrite could lose what it decided.
-  const reports = allReports.filter((r) => r.kind !== 'battle');
+  const reports = allReports.filter((r) => r.kind !== 'battle' && r.kind !== 'notice');
   const maxCalls = opts.maxCalls ?? 2;
   const maxReports = opts.maxReports ?? NARRATE_MAX_REPORTS;
   const result: NarrateResult = {

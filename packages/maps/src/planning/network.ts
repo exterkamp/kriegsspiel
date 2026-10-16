@@ -29,6 +29,7 @@ export function assemble(
         old = selected.get(k);
       if (old) old.routes.add(id);
       else selected.set(k, { edge, routes: new Set([id]) });
+      r.used.add(k);
     }
   };
   if (r.terminals.length === 1)

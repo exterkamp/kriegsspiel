@@ -1,5 +1,12 @@
-import { holdTheBridge, loadScenario, type EngineState, type GameState } from '@kriegsspiel/engine';
-import type { TurnOrder, TurnProposal, UmpireSettings } from '@kriegsspiel/protocol';
+import {
+  holdTheBridge,
+  loadScenario,
+  type EngineState,
+  type GameState,
+  type SideId,
+} from '@kriegsspiel/engine';
+import type { Dispatch, TurnOrder, TurnProposal, UmpireSettings } from '@kriegsspiel/protocol';
+import { sideViewOf } from '../api/sideView.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import { windowTurns, withTurns, windowTimeline } from '../api/umpireWindow.js';
 import { GameHost, MemoryGameStore, createRegistry, startingState } from '../game/index.js';
@@ -46,6 +53,7 @@ const charge = { id: 'r1', why: 'Does the Red hussars’ charge go home?', chanc
  */
 function storyUmpire(): ScriptedModel {
   return new ScriptedModel({
+    narrate: (req) => testReply(req.schema as Record<string, unknown>, req.input as never),
     adjudicate: (req) => {
       const base = testReply(
         req.schema as Record<string, unknown>,
@@ -102,7 +110,12 @@ async function playGame() {
     timers: time,
     init: startingState,
     turnResolver: (_id, settings) =>
-      new UmpireTurnResolver({ registry, client, dial: settings.dial as 'standard' }),
+      new UmpireTurnResolver({
+        registry,
+        client,
+        reporter: client,
+        dial: settings.dial as 'standard',
+      }),
   });
   const settings: UmpireSettings = {
     dial: 'standard',
@@ -118,6 +131,8 @@ async function playGame() {
   /** The live world when each turn opened (its start) and once it was resolved (its end). */
   const atStart = new Map<number, EngineState<GameState>>();
   const atEnd = new Map<number, EngineState<GameState>>();
+  /** Each side's in-tray as the hub sent it once each turn was resolved: narrated words in place. */
+  const traysAtEnd = new Map<number, Record<string, Dispatch[]>>();
   for (let guard = 0; guard < 20 && !game.state.world.outcome; guard++) {
     const turn = game.turnStateFor('blue')!.turn;
     atStart.set(turn, structuredClone(game.state));
@@ -129,10 +144,21 @@ async function playGame() {
     }
     await time.flush();
     atEnd.set(turn, structuredClone(game.state));
+    const clock = game.gameClock.snapshot();
+    traysAtEnd.set(
+      turn,
+      Object.fromEntries(
+        ['blue', 'red'].map((side) => [
+          side,
+          sideViewOf(game.state, side as SideId, clock, undefined, [], game.narrationFor(side))
+            .dispatches,
+        ]),
+      ),
+    );
   }
   expect(game.state.world.outcome).toBeTruthy();
   const input = (await loadReplayInput(store, 'g1'))!;
-  return { game, input, atStart, atEnd, client };
+  return { game, input, atStart, atEnd, traysAtEnd, client };
 }
 
 describe('turns in the admin replay (D39, 11.11)', () => {
@@ -188,6 +214,24 @@ describe('turns in the admin replay (D39, 11.11)', () => {
   });
 });
 
+describe('turn reports in replay (11.9, 11.11)', () => {
+  it('shows each side the narrated papers it read live, at every turn end', async () => {
+    const { input, traysAtEnd, client } = await playGame();
+    expect(client.requests.some((r) => r.stage === 'narrate')).toBe(true);
+    let narrated = 0;
+    for (const e of input.entries.filter((x) => x.command.kind === 'resolveTurn')) {
+      const at = replayAt(input, e.endGameMs!);
+      for (const side of ['blue', 'red']) {
+        const live = traysAtEnd.get(e.turn!.n)![side]!;
+        expect(at.views[side]!.dispatches).toEqual(live);
+        narrated += live.filter((d) => / here: /.test(d.text)).length;
+      }
+    }
+    // The canned narrator's words ("... here: ...") did reach the trays, and replay shows them.
+    expect(narrated).toBeGreaterThan(0);
+  });
+});
+
 describe('the admin Turn panel (D39, 11.11)', () => {
   it('shows each turn’s orders, projection, calls, proposal, rolls, clamps, fallback and journal', async () => {
     const { input, client } = await playGame();
@@ -239,6 +283,14 @@ describe('the admin Turn panel (D39, 11.11)', () => {
     expect(t3!.journal!.notes.map((n) => n.turn)).toEqual([1, 2]);
     expect(t4!.journal!.notes.map((n) => n.turn)).toEqual([1, 2, 4]);
     expect(t1!.journal!.precedents[0]!.ruling).toContain(CANARY);
+
+    // Each side's turn reports: the report call and the notes it wrote; none for the tables' turn.
+    expect(t1!.reports.map((r) => r.side).sort()).toEqual(['blue', 'red']);
+    for (const r of t1!.reports) {
+      expect(r.calls.map((c) => c.stage)).toEqual(['narrate']);
+      expect(r.narrated.length).toBeGreaterThan(0);
+    }
+    expect(t3!.reports.flatMap((r) => r.calls)).toEqual([]);
   });
 
   it('lists the open turn’s held orders while the game is played', async () => {

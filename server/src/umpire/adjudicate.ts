@@ -326,7 +326,7 @@ export const shownRolls = (rolls: readonly TurnRoll[]) =>
  * "odds of": casualty prose ("lost 20% of the battalion", "against all odds") is how
  * commanders report, and flagging it would resend a sound proposal for one more call.
  */
-const DICE_WORDS =
+export const DICE_WORDS =
   /\b(dice|die roll|the roll|a roll|the odds|odds of)\b|\d\s*(%|per ?cent)\s+chance\b/i;
 
 /** At most this many problems are listed in a resend, so a hopeless reply does not grow the prompt. */

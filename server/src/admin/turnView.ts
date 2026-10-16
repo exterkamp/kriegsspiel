@@ -112,6 +112,11 @@ export interface AdminTurn {
   projection?: ProjectionSummary;
   /** Every model call of the turn (adjudicate, roll answer, resend), with input and raw output. */
   calls: UmpireCallRecord[];
+  /**
+   * Each side's turn reports (11.9): the report call(s) and the notes that replaced the template
+   * text, from the turn's `turnReports` entries. Empty for a turn the tables decided.
+   */
+  reports: TurnReportsRecord[];
   /** The umpire's final proposal, raw. */
   proposal?: TurnProposal;
   /** The problems sent back with the one resend. */
@@ -167,6 +172,30 @@ function heldOf(entries: readonly InputLogEntry[], n: number): Map<string, TurnO
   return t.held;
 }
 
+/** One side's turn reports as logged (11.9). */
+export interface TurnReportsRecord {
+  side: string;
+  calls: UmpireCallRecord[];
+  narrated: Array<{ reportId: string; text: string }>;
+  error?: string;
+}
+
+/** The `turnReports` entries of turn `n`, one per side. */
+function reportsOf(entries: readonly InputLogEntry[], n: number): TurnReportsRecord[] {
+  return entries.flatMap((e) => {
+    const c = e.command;
+    if (c.kind !== 'turnReports' || c.turn !== n) return [];
+    return [
+      {
+        side: c.side,
+        calls: e.calls ?? [],
+        narrated: e.narrated ?? [],
+        ...(e.error ? { error: e.error } : {}),
+      },
+    ];
+  });
+}
+
 const isUmpireOutput = (o: unknown): o is UmpireTurnOutput =>
   typeof o === 'object' && o !== null && 'proposal' in o && 'context' in o;
 
@@ -204,9 +233,8 @@ export function adminTurns(input: ReplayInput): AdminTurns {
       ...(Array.isArray(out?.orders) ? { read: out.orders } : {}),
       ...(Array.isArray(out?.couriers) ? { couriers: out.couriers } : {}),
       ...(out?.projection ? { projection: out.projection } : {}),
-      // Hook for 11.9 (#405, PR #504): the per-side report calls are logged on that turn's
-      // `turnReports { side, turn }` entries, not here; add them beside these once it lands.
       calls: entry.calls ?? [],
+      reports: reportsOf(input.entries, t.n),
       ...(umpire ? { proposal: umpire.proposal as unknown as TurnProposal } : {}),
       ...(umpire?.resent ? { resent: umpire.resent } : {}),
       ...(umpire?.context.rolls?.length ? { rolls: umpire.context.rolls } : {}),
