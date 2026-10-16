@@ -321,7 +321,10 @@ export class Battle {
       if (u.strength <= 0) continue;
       const speed = SPEED[u.arm] * (u.stage === 'broken' ? 1.3 : 1);
       if (u.stage === 'broken') {
-        this.moveTowards(u, u.home, speed);
+        // Fall back along the withdraw order `fight()` gave, which goes over the bridge, then home.
+        const w = u.order.waypoints;
+        if (this.moveTowards(u, w[0] ?? u.home, speed) && w.length > 0)
+          u.order.waypoints = w.slice(1);
         continue;
       }
       const o = u.order;
