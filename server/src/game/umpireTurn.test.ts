@@ -634,8 +634,33 @@ describe('the adjudicate pipeline: checks, one resend, clamp or fall back', () =
     const out = r.output as UmpireTurnOutput;
     expect(out.proposal.units.every((u) => u.departure === undefined)).toBe(true);
     const problems = JSON.stringify(model.requests[1]?.input ?? {});
-    expect(problems).toMatch(/blue-2: .*no departure reason/);
+    expect(problems).toMatch(/departure: blue-2 \(strength .*\) differs from the projection/);
     expect(problems).not.toMatch(/departure.*(null|expected string)/i);
+  });
+
+  it('asks for the missing departures in one line that names the units (#523)', async () => {
+    const { state, input } = firstTurn();
+    // blue-1 and blue-2 each lose 100 men with no reason; the first answer also gives a
+    // reason in the summary only, which does not count.
+    const model = editing((p) => ({
+      ...p,
+      summary: 'Blue lost 100 men in each battalion, because the fire was hot.',
+      units: p.units.map((u) =>
+        u.unitId === 'blue-1' || u.unitId === 'blue-2' ? { ...u, strength: u.strength - 100 } : u,
+      ),
+    }));
+    await resolver(model, 'standard').resolve(state, input);
+    expect(model.requests).toHaveLength(2);
+    const shown = (model.requests[1]!.input as { rejected: { problems: string[] } }).rejected
+      .problems;
+    // First, one line for both units, naming each and how far it departs.
+    expect(shown[0]).toMatch(
+      /^departure: blue-1 \(strength \d+ vs projected \d+\); blue-2 \(strength \d+ vs projected \d+\) differ from the projection beyond the tolerance and their outcomes have no "departure"\. Inside each of those units' own outcome objects, before its "account", write "departure"/,
+    );
+    // The per-unit lines it replaces are not repeated.
+    expect(shown.filter((p) => p.includes('blue-1')).length).toBe(1);
+    expect(shown.some((p) => p.includes('departs from the projection with no reason'))).toBe(false);
+    expect(shown.some((p) => p.endsWith('no departure reason'))).toBe(false);
   });
 });
 
