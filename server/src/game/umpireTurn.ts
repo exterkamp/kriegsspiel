@@ -307,8 +307,8 @@ export class UmpireTurnResolver implements TurnResolver {
   /**
    * Each side's papers of the turn (11.9): the turn applied on a copy exactly as the actor will
    * apply it (an umpire turn holds the units and runs no agent, so the copy's end is the live
-   * end), then one call per side from that side's own view at the turn's end and its own units'
-   * accounts. Never the summary, the journal, the rolls or another side's accounts. Any failure
+   * end), then one call per side, all sides at once, from that side's own view at the turn's end
+   * and its own units' accounts. Never the summary, the journal, the rolls or another side's accounts. Any failure
    * leaves the papers their template text; it never fails the turn.
    */
   private async writeReports(
@@ -336,54 +336,59 @@ export class UmpireTurnResolver implements TurnResolver {
       () => ctrl.abort(),
       this.opts.reportTimeoutMs ?? TURN_REPORTS_TIMEOUT_MS,
     );
-    const out: TurnReports[] = [];
+    // The sides share nothing, so their calls run at once (#537): the reports take as long as the
+    // slowest side's, not the sum. The client's own limits (`UMPIRE_MAX_CONCURRENT`, the bridge's
+    // queue, the game's caps) still apply to each call. The entries are logged in side order,
+    // whichever side finishes first, so the log and its replay do not depend on timing.
+    const writeSide = async (sideId: string): Promise<TurnReports | undefined> => {
+      const side = sideId as SideId;
+      if (!world.sides.some((s) => s.id === side)) return undefined;
+      const view = viewFor(world, side, end.time);
+      const due = reportsOfTurn(view.reports, input.startMs, end.time);
+      if (due.length === 0) return undefined;
+      const calls: UmpireCallRecord[] = [];
+      const client: UmpireClient = {
+        call: async <T>(request: UmpireRequest) => {
+          const res = await reporter.call<T>(request);
+          calls.push(res.record);
+          return res;
+        },
+      };
+      const result = await writeTurnReports(
+        client,
+        side,
+        input.n,
+        due,
+        turnReportsContext(world, view, input, output.proposal, places, {
+          world: state.world,
+          time: state.time,
+        }),
+        {
+          signal: ctrl.signal,
+          ...(this.opts.persona ? { persona: this.opts.persona } : {}),
+        },
+      );
+      const notes = [
+        ...result.withheld.map((w) => `${w.reportId}: ${w.reason}`),
+        ...result.fallbacks.map((f) => `${f.reportId}: ${f.reason}`),
+      ];
+      return {
+        side,
+        turn: input.n,
+        narrated: result.dispatches.map((d) => ({ reportId: d.reportIds[0]!, text: d.text })),
+        calls,
+        ...(notes.length > 0
+          ? { error: `turn reports kept template text: ${notes.join('; ')}` }
+          : {}),
+      };
+    };
     try {
-      for (const sideId of sides) {
-        const side = sideId as SideId;
-        if (!world.sides.some((s) => s.id === side)) continue;
-        const view = viewFor(world, side, end.time);
-        const due = reportsOfTurn(view.reports, input.startMs, end.time);
-        if (due.length === 0) continue;
-        const calls: UmpireCallRecord[] = [];
-        const client: UmpireClient = {
-          call: async <T>(request: UmpireRequest) => {
-            const res = await reporter.call<T>(request);
-            calls.push(res.record);
-            return res;
-          },
-        };
-        const result = await writeTurnReports(
-          client,
-          side,
-          input.n,
-          due,
-          turnReportsContext(world, view, input, output.proposal, places, {
-            world: state.world,
-            time: state.time,
-          }),
-          {
-            signal: ctrl.signal,
-            ...(this.opts.persona ? { persona: this.opts.persona } : {}),
-          },
-        );
-        const notes = [
-          ...result.withheld.map((w) => `${w.reportId}: ${w.reason}`),
-          ...result.fallbacks.map((f) => `${f.reportId}: ${f.reason}`),
-        ];
-        out.push({
-          side,
-          turn: input.n,
-          narrated: result.dispatches.map((d) => ({ reportId: d.reportIds[0]!, text: d.text })),
-          calls,
-          ...(notes.length > 0
-            ? { error: `turn reports kept template text: ${notes.join('; ')}` }
-            : {}),
-        });
-      }
+      // `writeTurnReports` never throws, so every side's result comes back.
+      const written = await Promise.all(sides.map(writeSide));
+      return written.filter((r): r is TurnReports => r !== undefined);
     } finally {
       clearTimeout(timer);
     }
-    return out;
   }
 
   private async adjudicate(
