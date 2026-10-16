@@ -704,9 +704,11 @@ function rallyRefused(
   projectedRally: boolean,
 ): string | undefined {
   const rolls = ctx.rolls ?? [];
-  const cited = !!w.rollIds?.length && w.rollIds.every((id) => rolls.some((r) => r.id === id));
-  if (!cited && !projectedRally) {
-    return 'a rally must rest on a roll';
+  const cited = (w.rollIds ?? []).map((id) => rolls.find((r) => r.id === id));
+  if (!projectedRally) {
+    if (!cited.length || cited.some((r) => !r)) return 'a rally must rest on a roll';
+    // The validator cannot read what a roll's question meant, so a rally needs a cited success.
+    if (!cited.some((r) => r!.success)) return 'the roll it rests on failed';
   }
   const start = world.startStrength?.[u.id] ?? u.strength;
   if (strength < RALLY_RULES.minStrengthShare * start) return 'too few men left';

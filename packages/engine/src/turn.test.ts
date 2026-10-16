@@ -381,6 +381,27 @@ describe('validateProposal', () => {
       status: 'active',
       rallied: true,
     });
+    expect(ok.corrections).toEqual([]);
+    // A failed roll cited is no rally (#494).
+    const lost = { ...roll, id: 'r2', roll: 0.8, success: false };
+    const failed = validateProposal(
+      broken,
+      proposal(broken, { a: { status: 'active', rollIds: ['r2'] } }),
+      ctx({ rolls: [roll, lost] }),
+    );
+    expect(failed.outcomes.find((o) => o.unitId === 'a')).toMatchObject({
+      status: 'withdrawn',
+      rallied: false,
+    });
+    expect(failed.corrections).toMatchObject([{ unitId: 'a', field: 'status', clamp: true }]);
+    expect(failed.corrections[0]!.reason).toMatch(/no rally: the roll it rests on failed/);
+    // One success among the cited rolls is enough.
+    const mixed = validateProposal(
+      broken,
+      proposal(broken, { a: { status: 'active', rollIds: ['r2', 'r1'] } }),
+      ctx({ rolls: [roll, lost] }),
+    );
+    expect(mixed.outcomes.find((o) => o.unitId === 'a')!.status).toBe('active');
     // Too late: past the give-up time.
     const late = {
       ...broken,
