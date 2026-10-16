@@ -23,6 +23,7 @@ Import from `@kriegsspiel/maps` after building the package. Breaking geometry, n
 | `GenerationResult<T>`, `Diagnostic`, `infeasible(diagnostics)` | Typed bounded infeasibility, distinct from import errors and programmer exceptions. Infeasibility requires an error diagnostic. |
 | `DEFAULT_SETTINGS`, `HARD_LIMITS`, `COORDINATES`, `SCHEMA_VERSION`, `PRECISION_POLICY`, `VALIDATION_SCOPE` | Frozen constants; `structuredClone(DEFAULT_SETTINGS)` before editing. |
 | `createReferenceAsset()` | Fresh generation-independent positive oracle. |
+| `realismReport(asset)`, `segmentGradeOnSurface(heightAt,a,b,spacing)` | Measured realism of public geometry (#490): lakes and drainage, river uphill steps/dead ends/confluences, regional road grades and margin share, site slope, summits and river flats. A diagnostic, not a certificate; `validateBattlefield` remains the authority. |
 
 Exported Zod schemas describe shape only. Use the parsing functions at import boundaries for resource and topology checks. `validateSettings` is a relational helper for already schema-validated settings. Geometry helpers operate on parsed geometry; they are not substitute parsers.
 
