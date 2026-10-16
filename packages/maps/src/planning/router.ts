@@ -2,17 +2,20 @@ import type { Point, Site } from '../contract.js';
 import { distance, polygonEdges, segmentDistance, polygonLocation } from '../geometry.js';
 import { decimal6 } from '../terrain/precision.js';
 import { bridge, outward } from './bridges.js';
+import { ford } from './fords.js';
+import { SHALLOW_WATER } from '../geography/shallow.js';
 import { PlanningFailure } from './budget.js';
-import { corridor } from './certificates.js';
+import { corridor, segmentGrade } from './certificates.js';
 import { box, type Context, touches } from './context.js';
 import type { CrossingCandidate } from '../geography/types.js';
-import type { DeckProfile } from './types.js';
+import type { DeckProfile, FordProfile } from './types.js';
 export interface Edge {
   a: number;
   b: number;
   cost: number;
   candidate?: CrossingCandidate;
   profile?: DeckProfile;
+  ford?: FordProfile;
   exit?: 'north' | 'east' | 'south' | 'west';
   siteId?: string;
 }
@@ -33,7 +36,8 @@ type QueueItem = {
   exact: boolean;
 };
 /**
- * Frozen `sited-graded-network-v2` route costs. Eight-neighbour lattice moves
+ * Frozen route costs (`sited-graded-network-v2`, kept by `-fording-network-v3`;
+ * fords cost `SHALLOW_WATER.routeSpanFactor` per metre plus `routeFixedM`). Eight-neighbour lattice moves
  * avoid staircase roads; the grade penalty grows quadratically so roads wind
  * along contours, valleys and spurs instead of climbing straight; bridges carry
  * a fixed cost so routes share crossings; existing road edges are discounted so
@@ -101,6 +105,7 @@ export class Router {
   readonly blocked: Int8Array;
   readonly terminals: Terminal[] = [];
   readonly profiles = new Map<string, DeckProfile>();
+  readonly fords = new Map<string, FordProfile>();
   readonly bridgeFailures: string[] = [];
   readonly sites: Site[];
   /** Placement-area boxes, computed once; sites never move during routing. */
@@ -314,13 +319,20 @@ export class Router {
       seen.add(candidate.id);
       this.c.candidates.take();
       try {
-        const profile = bridge(this.c, candidate),
+        const isFord = candidate.kind === 'ford',
+          profile = isFord ? undefined : bridge(this.c, candidate),
+          fordProfile = isFord ? ford(this.c, candidate) : undefined,
           [a, b] = candidate.endpoints,
-          paths: Point[][] = [];
+          paths: Point[][] = [],
+          connectors: number[][] = [];
         for (const [p, opposite] of [
           [a, b],
           [b, a],
         ] as [Point, Point][]) {
+          if (isFord) {
+            connectors.push(this.fordConnectors(candidate, p, opposite));
+            continue;
+          }
           const out = outward(p, opposite, this.c.spacing),
             n = this.c.node(out),
             snap = this.points[n];
@@ -346,6 +358,19 @@ export class Router {
           paths.push(path);
         }
         const endpointNodes: number[] = [];
+        for (const [j, nodes] of connectors.entries()) {
+          const from = this.addPoint(candidate.endpoints[j]!),
+            p = this.points[from]!;
+          endpointNodes.push(from);
+          for (const n of nodes) {
+            const q = this.points[n]!;
+            this.addEdge({
+              a: from,
+              b: n,
+              cost: distance(p, q) * this.factor(p, q, segmentGrade(this.c, p, q)),
+            });
+          }
+        }
         for (const path of paths) {
           let from = this.addPoint(path[0]!);
           endpointNodes.push(from);
@@ -359,12 +384,16 @@ export class Router {
         const e: Edge = {
           a: endpointNodes[0]!,
           b: endpointNodes[1]!,
-          cost: candidate.spanM * ROUTE_COSTS.bridgeSpanFactor + ROUTE_COSTS.bridgeFixedM,
+          cost: fordProfile
+            ? candidate.spanM * SHALLOW_WATER.routeSpanFactor + SHALLOW_WATER.routeFixedM
+            : candidate.spanM * ROUTE_COSTS.bridgeSpanFactor + ROUTE_COSTS.bridgeFixedM,
           candidate,
-          profile,
+          ...(profile ? { profile } : {}),
+          ...(fordProfile ? { ford: fordProfile } : {}),
         };
         this.addEdge(e);
-        this.profiles.set(candidate.id, profile);
+        if (profile) this.profiles.set(candidate.id, profile);
+        if (fordProfile) this.fords.set(candidate.id, fordProfile);
       } catch (e) {
         if (e instanceof PlanningFailure && e.code !== 'PLANNING_RESOURCE_LIMIT') {
           this.bridgeFailures.push(`${candidate.id}:${e.code}`);
@@ -373,6 +402,42 @@ export class Router {
         throw e;
       }
     }
+  }
+  /**
+   * Ford approaches (D46): every certified straight connector from a ford end
+   * to a lattice node within two lattice spacings that lies ahead of the bank.
+   * Each becomes a graded edge, so a ford road can slant up a valley side
+   * toward where it is going instead of climbing straight out.
+   */
+  fordConnectors(candidate: CrossingCandidate, p: Point, opposite: Point): number[] {
+    const d = distance(p, opposite),
+      ux = (p[0] - opposite[0]) / d,
+      uy = (p[1] - opposite[1]) / d,
+      sp = this.c.spacing,
+      cx = Math.round(p[0] / sp),
+      cy = Math.round(p[1] / sp),
+      result: number[] = [];
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        const x = cx + dx,
+          y = cy + dy;
+        this.c.candidates.take();
+        if (x < 0 || y < 0 || x >= this.c.columns || y >= this.c.rows) continue;
+        const n = y * this.c.columns + x,
+          q = this.points[n]!,
+          length = distance(p, q),
+          ahead = (q[0] - p[0]) * ux + (q[1] - p[1]) * uy;
+        if (length < sp / 2 || length > 2.5 * sp || ahead < sp / 4 || !this.open(n)) continue;
+        if (this.clearSites(p, q) && corridor(this.c, p, q, candidate.widthM).traversable)
+          result.push(n);
+      }
+    if (!result.length)
+      throw new PlanningFailure(
+        'BRIDGE_APPROACH',
+        candidate.id,
+        'No dry, grade-certified approach joins this ford end to the planning lattice.',
+      );
+    return result;
   }
   /** Lattice neighbours in fixed order: four axes, then four diagonals. */
   latticeNeighbours(id: number): number[] {
@@ -408,7 +473,7 @@ export class Router {
     this.c.validation.take(2);
     return length * this.factor(p, q, g);
   }
-  private factor(p: Point, q: Point, g: number): number {
+  factor(p: Point, q: Point, g: number): number {
     const mid: Point = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2],
       margin = Math.min(
         mid[0] - this.c.bounds.minX,
@@ -434,7 +499,13 @@ export class Router {
    * uncertifiable edge is dropped. Every emitted edge is certified exactly as
    * by eager search; only edges never reached are left uncertified.
    */
-  route(start: number, end: number, forbiddenCrossingId?: string): Edge[] | null {
+  /** Main roads (`allowFords` false) never use a ford edge; minor roads may. */
+  route(
+    start: number,
+    end: number,
+    forbiddenCrossingId?: string,
+    allowFords = false,
+  ): Edge[] | null {
     // Allocation is bounded before arrays; stale heap entries still consume heap work.
     const count = this.points.length;
     this.c.heap.take(count * 3);
@@ -494,6 +565,7 @@ export class Router {
         );
       const exact = (e: Edge) => {
         if (forbiddenCrossingId && e.candidate?.id === forbiddenCrossingId) return;
+        if (e.ford && !allowFords) return;
         const n = e.a === item.node ? e.b : e.a,
           g = item.g + this.cost(e);
         if (closed[n] || g >= queued[n]! - 1e-12) return;

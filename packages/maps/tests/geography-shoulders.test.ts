@@ -161,9 +161,11 @@ describe('versioned bounded bank and shoulder cuts', () => {
       fullGradientCap: 0.05,
       guaranteedManhattanBandM: 100,
     });
-    expect(r.crossingCandidates.length).toBeGreaterThan(0);
+    // Bridge abutments only; fords (D46) end on low banks by design.
+    const bridges = r.crossingCandidates.filter((c) => c.kind === 'bridge');
+    expect(bridges.length).toBeGreaterThan(0);
     let certified = 0;
-    for (const c of r.crossingCandidates) {
+    for (const c of bridges) {
       const [a, b] = c.endpoints,
         w = r.water.find((x) => x.id === c.waterId)!,
         length = Math.hypot(b[0] - a[0], b[1] - a[1]),
@@ -184,7 +186,7 @@ describe('versioned bounded bank and shoulder cuts', () => {
         far = certifyRoadSegment(input, b, after, c.widthM);
       if (near.ok && far.ok && near.value.traversable && far.value.traversable) certified++;
     }
-    expect(certified / r.crossingCandidates.length).toBeGreaterThan(0.5);
+    expect(certified / bridges.length).toBeGreaterThan(0.5);
     expect(value(validateWaterPhysics(r.elevation, bounds, r.water, s)).maxGroundExcessM).toBe(0);
     expect(r.sourceElevation).toEqual(source);
     expect(r.elevation.samples.every((h, i) => h <= source.samples[i]!)).toBe(true);

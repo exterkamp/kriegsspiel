@@ -28,7 +28,8 @@ export interface DrainageOutput {
 /** A suitability proposal; #137 supplies final road IDs and linked edges. */
 export interface CrossingCandidate {
   id: string;
-  kind: 'bridge';
+  /** A bridge deck over the water, or a ford through shallow water (D46). */
+  kind: 'bridge' | 'ford';
   waterId: string;
   endpoints: [Point, Point];
   spanM: number;
@@ -36,6 +37,8 @@ export interface CrossingCandidate {
   deck: Polygon;
   minimumAbutmentM: number;
   policy: CrossingPolicy;
+  /** Fords only: the reach's recorded riffle depth under `shallow-riffle-v1`. */
+  depthM?: number;
 }
 export interface GeographyOutput {
   version: typeof GEOGRAPHY_VERSION;

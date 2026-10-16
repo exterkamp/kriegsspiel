@@ -1,6 +1,7 @@
 import { expect } from 'vitest';
 import { MAX_FIELD_SLOPE } from '../src/geography/cover/index.js';
 import type { RealismReport } from '../src/realism.js';
+import { SHALLOW_WATER } from '../src/geography/shallow.js';
 
 /** Land cover that follows the ground (#500); shared with the full representative assets. */
 export function expectRealisticCover(
@@ -25,4 +26,21 @@ export function expectRealisticCover(
     expect(c.riverFlatOpenShare).toBeGreaterThan(0.6);
     expect(c.riverFlatWoodShare).toBeLessThan(0.3);
   }
+}
+
+/**
+ * Fords only on shallow water and minor roads, with low banks and road-grade
+ * ramps and approaches; main roads cross water by bridge only (#501, D46).
+ */
+export function expectPlausibleCrossings(
+  report: RealismReport,
+  settings: { roads: { maxGrade: number } },
+): void {
+  const c = report.crossings;
+  expect(c.fordsOnMainRoads).toBe(0);
+  if (!c.fords) return;
+  expect(c.fordMaxDepthM).toBeLessThanOrEqual(SHALLOW_WATER.maxFordDepthM);
+  expect(c.fordMaxBankM).toBeLessThanOrEqual(SHALLOW_WATER.maxBankM + 1e-6);
+  expect(c.fordMaxRampGrade).toBeLessThanOrEqual(settings.roads.maxGrade + 1e-9);
+  expect(c.fordMaxApproachGrade).toBeLessThanOrEqual(settings.roads.maxGrade + 1e-9);
 }

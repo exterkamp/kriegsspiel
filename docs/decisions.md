@@ -929,3 +929,32 @@ Renders, metrics and interleaved benchmarks are in `docs/map-realism/land-cover/
 **Not done.** Outlines against water follow the conservative cell mask with cut corners, so a thin uncovered margin and some axis-aligned steps remain along rivers. Hedgerows are not separate features, and the renderer (D43) does not outline parcels, so they show only as faint seams.
 
 **See.** [Cover](../packages/maps/docs/geography-cover.md), [geography](../packages/maps/docs/geography.md), [composition](../packages/maps/docs/composition.md).
+
+## D46: Minor roads ford shallow water; main roads and deep water keep bridges (#501)
+
+**Decision.** Planning stage `sited-graded-fording-network-v3` replaces `sited-graded-network-v2`. A shallow-water model, `shallow-riffle-v1` (`packages/maps/src/geography/shallow.ts`), gives each river reach a riffle depth at ordinary water from public geometry only:
+
+```
+depth = 0.3 m × (width / 10 m)^0.75 × (0.003 / slope)^0.25,   slope clamped to [0.0005, 0.03]
+```
+
+Width already follows catchment (D44), and downstream hydraulic geometry makes depth grow as width^0.75. Slope is the fall to the downstream reach over the reach's centreline length; steeper reaches are shallower. A reach ending at the map edge counts as still water, so it gets the deepest value. Both powers are products of square roots. A reach is fordable at 0.8 m or less, the period wagon and field-gun wading limit.
+
+- **Where fords go.** Geography searches fordable reaches for ford candidates, about 100 m apart. Each end must sit just beyond the dry abutment disk, on a bank at most 1.5 m above the water, with a ramp to the water no steeper than 80% of the road maximum. Within 25 m, the ground straight out or slanting up or down the valley must also be under 80% of that maximum. A ford keeps the bridge geometry rules: one reach, two straight banks, a dry reserved corridor. It stays clear of every other candidate. Bridge candidates are unchanged.
+- **How roads use them.** A ford edge costs `3 × span + 120 m`; a bridge costs `2 × span + 250 m`. Each ford end joins the lattice by every certified straight connector within two lattice spacings, costed by grade, so a farm road can slant up the valley side.
+- **Main and minor roads.** A route with a farm at one end is a minor road and may ford. A route joining only villages and boundary exits, or the required-bridge route, is a main road and never uses a ford edge. A required river map still needs a linked bridge.
+
+**Contract.** The `kriegsspiel/local-map` v1 schema is unchanged. Fords are the existing `ford` crossings: the recorded `depthM` is the reach's riffle depth (decimal6), `traversableWidthM` is the reserved width, and the deck is the same conservative rectangle as a bridge's. The renderer already draws them (D43). The checks run from the saved asset alone: the planning and composition validators recompute the depth and require it to be wadeable and equal to the recorded value (`FORD_DEPTH`). They also check low banks (`FORD_BANK`) and road-grade ramps (`FORD_RAMP_GRADE`). Each ford's roads must carry only minor routes, read from road route IDs (`FORD_MAIN_ROAD`). `LEGACY_GENERATORS` gains the D45 identity (roads `sited-graded-network-v2`), and the D44 identity now pins that roads version too. A saved D45 map (`packages/maps/tests/fixtures/d45-saved-map.json`) is tested to certify but not replay. `data/maps` is not regenerated.
+
+**Measured.** `realismReport` gains `crossings`: bridges, fords, deepest ford, fords on main roads, highest ford bank, steepest ramp and approach, main-road crossings, and the shallowest water under a bridge. The realism corpus and the full preset assets require:
+
+- no ford on a main road;
+- every ford at most 0.8 m deep;
+- banks at most 1.5 m;
+- ramps and approaches within the road grade.
+
+Wooded hills must ford somewhere. A falsified map with every bridge turned into a ford is flagged. Renders, metrics and interleaved benchmarks are in `docs/map-realism/fords/`.
+
+**Not done.** Depth is a single ordinary-water value per reach: there are no seasons or floods, and no per-ford bed survey. The gameplay engine's ford `risk` is not derived from depth. Bridge connectors keep the single straight outward approach of D44.
+
+**See.** [Geography](../packages/maps/docs/geography.md), [planning](../packages/maps/docs/planning.md), [composition](../packages/maps/docs/composition.md).

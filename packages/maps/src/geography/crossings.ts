@@ -18,6 +18,7 @@ import {
   polygonLocation,
   pointSegmentDistance,
   segmentCuts,
+  segmentDistance,
   validatePolygon,
 } from '../geometry.js';
 import { preflightAsset } from '../resources.js';
@@ -26,6 +27,7 @@ import { segmentGradeOnSurface } from '../realism.js';
 import { decimal6 } from '../terrain/precision.js';
 import { parseSettings } from '../validation.js';
 import { Budget, bounded, GeographyFailure } from './budget.js';
+import { SHALLOW_WATER, fordDepthM, isShallow } from './shallow.js';
 import {
   CROSSING_VERSION,
   LEGACY_CROSSING_VERSION,
@@ -106,16 +108,23 @@ function validate(
 ): void {
   if (
     (candidate.policy !== CROSSING_VERSION && candidate.policy !== LEGACY_CROSSING_VERSION) ||
-    candidate.kind !== 'bridge'
+    (candidate.kind !== 'bridge' && candidate.kind !== 'ford') ||
+    (candidate.kind === 'ford') !== (candidate.depthM !== undefined)
   )
     fail('$.candidate', 'Unsupported crossing policy/kind');
   const [a, b] = candidate.endpoints,
     span = distance(a, b),
     width = candidate.widthM;
   if (
-    ![...a, ...b, span, width, candidate.spanM, candidate.minimumAbutmentM].every(
-      Number.isFinite,
-    ) ||
+    ![
+      ...a,
+      ...b,
+      span,
+      width,
+      candidate.spanM,
+      candidate.minimumAbutmentM,
+      candidate.depthM ?? 0,
+    ].every(Number.isFinite) ||
     width <= 0 ||
     span <= 0
   )
@@ -409,14 +418,17 @@ export function crossingCandidate(
   waterId: string,
   endpoints: [Point, Point],
   settings: MapSettings,
+  ford?: { depthM: number },
 ): CrossingCandidate {
   const s = parseSettings(settings),
     [a, b] = endpoints;
   if (![...a, ...b].every(Number.isFinite) || distance(a, b) <= 0)
     throw new RangeError('Crossing needs distinct finite endpoints');
+  if (ford && !(Number.isFinite(ford.depthM) && ford.depthM >= 0))
+    throw new RangeError('Ford needs a finite non-negative depth');
   return {
     id,
-    kind: 'bridge',
+    kind: ford ? 'ford' : 'bridge',
     waterId,
     endpoints,
     spanM: decimal6(distance(a, b)),
@@ -424,6 +436,7 @@ export function crossingCandidate(
     minimumAbutmentM: s.roads.minimumAbutmentM,
     deck: deckFor(a, b, s.roads.maxReservedWidthM),
     policy: CROSSING_VERSION,
+    ...(ford ? { depthM: ford.depthM } : {}),
   };
 }
 /**
@@ -552,6 +565,147 @@ export function findCrossingCandidates(
         accepted = along - length / 2;
       }
     }
+    if (heightAt)
+      findFords(
+        water,
+        bounds,
+        s,
+        elevation!,
+        heightAt,
+        budget,
+        output,
+        result,
+        () => (boxes ??= polygonBoxes(water, budget)),
+      );
     return { ok: true, value: result, diagnostics: [] };
   });
+}
+
+/**
+ * Ford sites (`shallow-riffle-v1`, D46) on reaches whose riffle depth is
+ * wadeable: transverse lines along straight centreline segments, at least
+ * `SHALLOW_WATER.spacingM` apart along a reach, whose two ends sit just beyond
+ * the dry abutment disks on low banks (at most `maxBankM` above the water) with
+ * a gentle ramp down to the water and a gentle outward approach. Fords keep
+ * clear of every other candidate so decks never overlap.
+ */
+function findFords(
+  water: Water[],
+  bounds: Bounds,
+  s: MapSettings,
+  elevation: Elevation,
+  heightAt: (x: number, y: number) => number,
+  budget: Budget,
+  output: Budget,
+  result: CrossingCandidate[],
+  boxes: () => Map<Polygon, Box>,
+): void {
+  const p = SHALLOW_WATER,
+    topology = new MeteredTopology(budget),
+    width = s.roads.maxReservedWidthM,
+    radius = width / 2 + s.roads.minimumAbutmentM + 0.000002,
+    half = s.roads.maxCrossingSpanM / 2,
+    inside = (pt: Point) =>
+      pt[0] >= 0 && pt[1] >= 0 && pt[0] <= bounds.maxX && pt[1] <= bounds.maxY,
+    grade = (a: Point, b: Point) => segmentGradeOnSurface(heightAt, a, b, elevation.spacingM).max;
+  for (const river of water) {
+    if (river.kind !== 'river') continue;
+    budget.take(water.length + river.centreline.length);
+    const depthM = fordDepthM(river, water, topology);
+    if (!isShallow(depthM)) continue;
+    const surface = river.surfaceProfileM[0]!,
+      edges = river.polygons.flatMap((poly) => polygonEdges(poly));
+    let along = 0,
+      accepted = -Infinity;
+    for (let i = 1; i < river.centreline.length; i++) {
+      const a = river.centreline[i - 1]!,
+        b = river.centreline[i]!,
+        length = distance(a, b),
+        start = along;
+      along += length;
+      if (length < CANDIDATE_MIN_SEGMENT * width) continue;
+      const count = Math.max(1, Math.floor(length / p.spacingM));
+      for (let k = 0; k < count; k++) {
+        const f = (k + 0.5) / count;
+        if (start + f * length < accepted + p.spacingM) continue;
+        budget.take(edges.length + 8);
+        const middle = interpolate(a, b, f),
+          normal: Point = [-(b[1] - a[1]) / length, (b[0] - a[0]) / length];
+        const from: Point = [middle[0] - normal[0] * half, middle[1] - normal[1] * half],
+          to: Point = [middle[0] + normal[0] * half, middle[1] + normal[1] * half];
+        const cuts = segmentCuts(from, to, edges, topology, '$.ford.search');
+        const intervals: [number, number][] = [];
+        for (let j = 1; j < cuts.length; j++)
+          if (
+            river.polygons.some(
+              (poly) =>
+                polygonLocation(
+                  interpolate(from, to, (cuts[j - 1]! + cuts[j]!) / 2),
+                  poly,
+                  topology,
+                  '$.ford.search',
+                ) === 'inside',
+            )
+          )
+            intervals.push([cuts[j - 1]!, cuts[j]!]);
+        if (intervals.length !== 1) continue;
+        const [w0, w1] = intervals[0]!,
+          t0 = w0 - radius / (2 * half),
+          t1 = w1 + radius / (2 * half);
+        if (t0 < 0 || t1 > 1) continue;
+        const ends = [interpolate(from, to, t0), interpolate(from, to, t1)] as const,
+          banks = [interpolate(from, to, w0), interpolate(from, to, w1)] as const,
+          tangent: Point = [(b[0] - a[0]) / length, (b[1] - a[1]) / length];
+        // A ford road may leave the bank straight out or slant up the valley
+        // side (eighth turns, no trigonometry); one of the three must be gentle.
+        const gentle = (e: Point, sign: number) =>
+          [0, -1, 1].some((turn) => {
+            const ox = (sign * normal[0] + turn * tangent[0]) / (turn ? Math.SQRT2 : 1),
+              oy = (sign * normal[1] + turn * tangent[1]) / (turn ? Math.SQRT2 : 1),
+              out: Point = [e[0] + ox * APPROACH_LENGTH_M, e[1] + oy * APPROACH_LENGTH_M];
+            return inside(out) && grade(e, out) <= s.roads.maxGrade * p.approachGradeShare;
+          });
+        budget.take(24 * Math.ceil(APPROACH_LENGTH_M + radius));
+        if (
+          ends.some((e) => heightAt(...e) - surface > p.maxBankM) ||
+          ends.some((e, j) => grade(e, banks[j]!) > s.roads.maxGrade * p.rampGradeShare) ||
+          !gentle(ends[0], -1) ||
+          !gentle(ends[1], 1)
+        )
+          continue;
+        const endpoints = ends.map((e) => e.map(decimal6) as Point) as [Point, Point];
+        budget.take(result.length);
+        if (
+          result.some(
+            (c) =>
+              segmentDistance(endpoints[0], endpoints[1], c.endpoints[0], c.endpoints[1]) <=
+              (width + c.widthM) / 2 + p.clearanceM,
+          )
+        )
+          continue;
+        const proposal = crossingCandidate(
+          `ford-candidate:${river.id}:${i.toString().padStart(6, '0')}:${k.toString().padStart(2, '0')}`,
+          river.id,
+          endpoints,
+          s,
+          { depthM },
+        );
+        try {
+          validate(proposal, water, bounds, s, budget, boxes());
+        } catch (e) {
+          if (e instanceof GeographyFailure && e.code !== 'GEOGRAPHY_RESOURCE_LIMIT') continue;
+          throw e;
+        }
+        if (result.length >= s.limits.maxFeatures)
+          throw new GeographyFailure(
+            'GEOGRAPHY_RESOURCE_LIMIT',
+            'crossing candidates',
+            'Crossing output cap exceeded.',
+          );
+        output.take(7);
+        result.push(proposal);
+        accepted = start + f * length;
+      }
+    }
+  }
 }

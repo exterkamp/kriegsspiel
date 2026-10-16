@@ -16,7 +16,7 @@ import {
   geographyPreset,
   type CrossingPolicy,
 } from '../geography/index.js';
-import { PLANNING_VERSION } from '../planning/index.js';
+import { PLANNING_VERSION, LEGACY_PLANNING_VERSION } from '../planning/index.js';
 import { preflightAsset } from '../resources.js';
 import { CONSUMED_FORK } from './source.js';
 import { COMPOSITION_VERSION, type BattlefieldInput, type BattlefieldPreset } from './types.js';
@@ -56,7 +56,16 @@ export const LEGACY_GENERATORS: readonly MapAsset['provenance']['generator'][] =
   // D44 stages with rectangle cover (before D45).
   Object.freeze({
     ...CURRENT_GENERATOR,
-    stages: Object.freeze({ ...CURRENT_GENERATOR.stages, cover: LEGACY_COVER_VERSION }),
+    stages: Object.freeze({
+      ...CURRENT_GENERATOR.stages,
+      cover: LEGACY_COVER_VERSION,
+      roads: LEGACY_PLANNING_VERSION,
+    }),
+  }),
+  // D45 stages: terrain-following cover, bridges only (before D46 fords).
+  Object.freeze({
+    ...CURRENT_GENERATOR,
+    stages: Object.freeze({ ...CURRENT_GENERATOR.stages, roads: LEGACY_PLANNING_VERSION }),
   }),
 ]);
 function recordedIdentity(asset: unknown): MapAsset['provenance']['generator'] | undefined {

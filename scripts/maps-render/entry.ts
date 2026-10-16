@@ -7,6 +7,8 @@ import { loadPreviewAsset } from '../../client/src/legacy/map-authoring/asset.js
 declare const ASSETS: unknown[];
 declare const CAPTIONS: string[];
 declare const SIZE: number;
+/** Optional close-up per asset: [x, y, sizeM] in local metres, or null for the whole map. */
+declare const FOCUS: ([number, number, number] | null)[];
 const canvas = document.createElement('canvas');
 canvas.width = SIZE * ASSETS.length;
 canvas.height = SIZE;
@@ -17,7 +19,19 @@ ASSETS.forEach((raw, i) => {
   // MapRenderer resets the transform, so each map draws on its own canvas first.
   const panel = document.createElement('canvas');
   panel.width = panel.height = SIZE;
-  const view = fitViewport(loaded.asset.bounds, SIZE, SIZE);
+  const focus = typeof FOCUS === 'undefined' ? null : FOCUS[i];
+  const view = fitViewport(
+    focus
+      ? {
+          minX: focus[0] - focus[2] / 2,
+          minY: focus[1] - focus[2] / 2,
+          maxX: focus[0] + focus[2] / 2,
+          maxY: focus[1] + focus[2] / 2,
+        }
+      : loaded.asset.bounds,
+    SIZE,
+    SIZE,
+  );
   new MapRenderer(loaded.asset).render(panel.getContext('2d')!, view, { ...DEFAULT_LAYERS }, false);
   ctx.drawImage(panel, i * SIZE, 0);
   ctx.save();

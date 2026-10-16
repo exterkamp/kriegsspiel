@@ -13,15 +13,19 @@ deriveDrainage(elevation, bounds, settings, limits?): GenerationResult<DrainageO
 accumulateFlow(receivers, maxWork?): number[]
 streamSamples(accumulation, threshold): number[]
 validateWaterPhysics(elevation, bounds, water, settings, limits?): GenerationResult<PhysicsEvidence>
-findCrossingCandidates(water, bounds, settings, limits?): GenerationResult<CrossingCandidate[]>
-crossingCandidate(id, waterId, endpoints, settings): CrossingCandidate
+findCrossingCandidates(water, bounds, settings, limits?, elevation?): GenerationResult<CrossingCandidate[]>
+crossingCandidate(id, waterId, endpoints, settings, ford?: { depthM }): CrossingCandidate
+riffleDepthM(widthM, slope): number
+reachSlope(river, water, budget?): number
+fordDepthM(river, water, budget?): number
+isMinorRoute(routeId, sites): boolean
 validateCrossingCandidate(candidate, water, bounds, settings, limits?): GenerationResult<CrossingCandidate>
 createGeographyQueries(elevation, bounds, water, settings, limits?): GenerationResult<GeographyQueries>
 generateCover(elevation, bounds, water, settings, seed, context?): GenerationResult<Cover[]>
 geographyPreset('flat-countryside' | 'wooded-hills' | 'river-valley'): MapSettings
 ```
 
-Inputs use the frozen types. `GeographyOutput` adds `version`, `sourceElevation`, authoritative `elevation`, `groundChanged`, `drainage`, independent `water`/`cover`, `crossingCandidates`, and deterministic work evidence, including optional shoulder policy/band/cut counts. The existing `HydrologyOutput` lacks cover and source-ground/changed-ground information; `HydrologyStageOutput` is the geography output without cover/candidates. Local `CrossingCandidate` has no final road references: it carries ID, river identity, bridge kind, endpoints/span, reserved width, conservative deck polygon, minimum abutment and policy version. #137 creates final `Crossing` links and road edges. No ford is emitted without a model of depth/traversability.
+Inputs use the frozen types. `GeographyOutput` adds `version`, `sourceElevation`, authoritative `elevation`, `groundChanged`, `drainage`, independent `water`/`cover`, `crossingCandidates`, and deterministic work evidence, including optional shoulder policy/band/cut counts. The existing `HydrologyOutput` lacks cover and source-ground/changed-ground information; `HydrologyStageOutput` is the geography output without cover/candidates. Local `CrossingCandidate` has no final road references: it carries ID, river identity, kind (`bridge` or `ford`), endpoints/span, reserved width, conservative deck polygon, minimum abutment, policy version and, for fords, the reach's recorded riffle depth. #137 creates final `Crossing` links and road edges. Fords come from the shallow-water model below (D46).
 
 `GEOGRAPHY_VERSION = 'flood-carved-stepped-network-v2'`, `CROSSING_VERSION = 'reserved-dry-disks-v2'`, and `GEOGRAPHY_PRESET_VERSION = 'geography-presets-v1'` freeze the policies below. Cover has its independent `COVER_VERSION = 'terrain-parcels-v2'` (D45; rectangle cover `coherent-dry-runs-v1` before it); see [cover documentation](geography-cover.md). `generateGeography(..., limits, { cover: false })` leaves cover empty; composition then lays it out around the final roads and settlements. Composition records these in generator stage provenance and materializes preset settings. Changing content rules requires a stage version change. Budgets can cause success/failure but never alter a successful result by truncation or seed substitution.
 
@@ -75,6 +79,26 @@ Candidates are bridges over one identified river. Reserved width is `settings.ro
 The centreline must intersect one contiguous wet reach with actual width at least `minRiverWidthM`. Dry holes touching the entire reserved capsule are rejected, including holes missed by centre and side traces. A full transverse-strip certificate requires exactly two straight opposing banks covering every lateral offset in the reserved width; bank notches, bends, wet caps and oblique banks are conservatively rejected. Crossings of another water identity in the reserved corridor are rejected as confluences. This deliberately admits fewer crossings than a general polygon/bridge solver. Malformed geometry/parameters remain errors; ordinary unsuitability is typed infeasibility. Candidate search tests reach-segment midpoints in order, skipping segments shorter than two reserved widths and keeping accepted candidates on one reach at least 150 m apart; it returns all feasible candidates within the output/work caps, or failure with **no partial value**. It never returns a truncated successful list.
 
 `reserved-dry-disks-v2` adds two rules. With carved ground supplied (geography always supplies it), each abutment moves outward in 1 m steps, within the span limit, until its ground stands `ABUTMENT_CLEARANCE_M = 0.25` above the river surface and the straight 25 m outward approach has a directional grade within 90% of `maxGrade`; banks cut through the cell a water edge crosses are otherwise at water level, and a linear deck would touch the water. Decks are also inflated by 2 µm before decimal-6 rounding so oblique decks still contain the whole round-capped corridor after their corners are rounded. Planning still certifies every approach corridor and deck independently.
+
+## Shallow water and fords (`shallow-riffle-v1`, D46)
+
+`src/geography/shallow.ts` models the depth over a reach's riffles at ordinary water from public geometry only, so saved maps are checked with the same numbers. Downstream hydraulic geometry gives width ∝ Q^0.5 and depth ∝ Q^0.4; the reach width already follows catchment (D44), so depth grows as width^0.75. At a given discharge a steeper reach is shallower (Manning: depth ∝ slope^-0.3, taken as slope^-0.25):
+
+```
+depth = 0.3 m × (width / 10 m)^0.75 × (0.003 / slope)^0.25,   slope clamped to [0.0005, 0.03]
+```
+
+Both powers are products of square roots, so the result is exact binary64 and rounded to decimal6 when recorded. The reach slope is the fall from its surface to the downstream neighbour's (the reach starting where it ends, else the water containing its end) over its centreline length; a reach that ends at the map edge or in nothing counts as still water (the clamp floor, so deepest). A 10 m brook falling 3 m/km has 0.3 m, a 30 m river about 0.7 m and a 60 m river over 1.1 m. A reach is **fordable** at `SHALLOW_WATER.maxFordDepthM` = 0.8 m or less (the period wagon and field-gun wading limit is 0.6–0.9 m).
+
+With ground supplied, the search adds ford candidates (`ford-candidate:<water>:<segment>:<k>`) on fordable reaches after the bridge search. Along each straight centreline segment at least two reserved widths long it tries transverse lines about 100 m apart (`spacingM`, also the minimum spacing along a reach). The ends sit just beyond the dry abutment disks (no outward search, unlike bridge abutments) and must satisfy:
+
+- **low bank**: ground at each end at most `maxBankM` = 1.5 m above the water;
+- **gentle ramp**: the ground between each end and the water no steeper than `rampGradeShare` (0.8) of the road maximum;
+- **gentle approach**: within 25 m of each end, straight out or slanting an eighth turn up or down the valley, one direction no steeper than `approachGradeShare` (0.8) of the road maximum;
+- the same dry-disk, single-reach and straight-bank geometry as a bridge (`validateCrossingCandidate` accepts both kinds);
+- clearance: the ford's span stays more than a reserved width plus 25 m from every earlier bridge or ford candidate, so decks never overlap.
+
+Bridge candidates are unchanged; a deep reach gets only bridges. Planning certifies and routes fords (see [planning](planning.md)). `isMinorRoute` classifies a regional route from its identity: a route with a farm at one end is a minor road, one joining only villages and boundary exits (or a required-bridge route) is a main road.
 
 ## Deterministic work and allocation limits
 

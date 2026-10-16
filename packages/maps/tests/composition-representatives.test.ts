@@ -11,7 +11,7 @@ import {
 import { canonicalGeometry, canonicalizeAsset } from '../src/canonical.js';
 import { importAsset } from '../src/import.js';
 import { realismReport } from '../src/realism.js';
-import { expectRealisticCover } from './realism-checks.js';
+import { expectPlausibleCrossings, expectRealisticCover } from './realism-checks.js';
 import type { GenerationResult, MapAsset } from '../src/contract.js';
 const value = <T>(r: GenerationResult<T>): T => {
   if (!r.ok) throw Error(JSON.stringify(r));
@@ -80,6 +80,7 @@ for (const name of ['flat-countryside', 'wooded-hills', 'river-valley'] as const
     expect(realism.settlements.summits).toBe(0);
     expect(realism.settlements.lowRiverFlats).toBe(0);
     expectRealisticCover(realism, asset.settings);
+    expectPlausibleCrossings(realism, asset.settings);
     const exported = value(exportBattlefield(asset));
     await timerYield();
     const loaded = importAsset(exported.json);
@@ -105,6 +106,29 @@ for (const name of ['flat-countryside', 'wooded-hills', 'river-valley'] as const
       // Recanonicalization may reject earlier than complete validation; neither path may accept.
       changed.layers.roads.find((r) => r.id === crossing.roadIds[0])!.crossingIds = [];
       expect(() => canonicalizeAsset(changed)).toThrow(/reciprocal/);
+    }
+    if (name === 'wooded-hills') {
+      // A farm road fords a brook (D46); complete validation certifies the ford
+      // and rejects one put on a main road or recorded at another depth.
+      const ford = asset.layers.crossings.find((c) => c.kind === 'ford')!;
+      expect(ford).toBeDefined();
+      const onMain = structuredClone(asset),
+        road = onMain.layers.roads.find((r) => r.id === ford.roadIds[0])!;
+      const mainRoute = asset.layers.roads
+        .flatMap((r) => r.routeIds)
+        .find((id) => id.startsWith('route:site:village:') && id.includes(':boundary:'))!;
+      road.routeIds = [...road.routeIds, mainRoute].sort();
+      expect(validateBattlefield(onMain)).toMatchObject({
+        ok: false,
+        diagnostics: [{ code: 'FORD_MAIN_ROAD' }],
+      });
+      const deeper = structuredClone(asset),
+        forged = deeper.layers.crossings.find((c) => c.id === ford.id)!;
+      if (forged.kind === 'ford') forged.depthM = Math.min(2, forged.depthM + 0.2);
+      expect(validateBattlefield(deeper)).toMatchObject({
+        ok: false,
+        diagnostics: [{ code: 'FORD_DEPTH' }],
+      });
     }
   }, 90000);
 it('replays canonical assets in fresh processes without ambient random/clock/name draw coupling', () => {
