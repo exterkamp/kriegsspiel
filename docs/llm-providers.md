@@ -126,6 +126,23 @@ Without Docker (`npm run dev -w server` on the host), set `CLAUDE_BRIDGE_HOST=12
 
 Story 11.2 (#398): can a model adjudicate a whole turn (D39)? The cases, checks, rubric and procedure are in [umpire-benchmark.md](umpire-benchmark.md); raw outputs, grades and the joined table are in `server/bench/umpire/`.
 
+### Rolls and river placements (#535), 2026-10-16
+
+The 11.12 playtest's umpire (#408, Sonnet, `adjudicate-v4`) never asked for a roll, decided the free game's last assault with no loss to Blue's infantry, and in 5 of 6 turns needed the resend, mostly for units placed in the river or overlapping. Prompt **`adjudicate-v6`** (`v5` was #523's unshipped trial) changes the input and the dice paragraph; see D39, "As built (#535)". Measured through the Claude Code bridge on Sonnet, one call at a time, 54 calls in all, on the playtest's six umpire-turn inputs (the logged `calls` input, rebuilt with `adjudicateInput` from the replayed world at each turn's start; the rebuild equals the logged input exactly but for the new fields, and the v4 prompt was checked equal to the logged one) and on the benchmark's new `crossing-assault` case. Each run is the first reply, with the roll call when it asked and the dice rolled on the turn's own stream, judged by the live stage's `judge`; the resend itself was not made, except where noted.
+
+| Arm | Runs (calls) | Assault turns asking a roll (std 2, std 3, free 2, free 3) | `crossing-assault` asking | River or overlap in the reply | Any problem (would resend) | Schema failures | Median s per turn (first call) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| v4, as played | 14 (14) | 0 of 8 | 0 of 2 | 4 of 14 (std 1, free 2: river; std 2 twice: overlap) | 8 of 14 | 0 | 31 (31) |
+| v6 input, v4 dice wording | 6 (6) | 0 of 4 | 0 of 2 | 0 of 6 | 5 of 6 | 0 | 31 (31) |
+| v6, first wording | 14 (19) | 5 of 8 (none on free 3) | 0 of 2 | 0 of 14 | 5 of 14 | 0 | 40 (29) |
+| **v6, shipped wording** | 7 (13) | 5 of 5 | 1 of 2 | 0 of 7 | 1 of 7, plus 2 one-sided (below) | 0 | 50 (34) |
+
+- **Rolls.** Every roll asked was for the assault on the bridge ("Does Red's column force the south end of the bridge against ...?"), at 0.15 to 0.25, and one for Blue's charge in `crossing-assault` (0.6). The first v6 wording ("do not decide these yourself: an assault on a defended crossing, a charge, a broken unit's rally; for each, state the odds and ask for a roll") asked wherever the outcome was open, but never in free 3 or `crossing-assault`, whose projections already break the attack: the umpire read the projection as settling it. The shipped wording adds "even where the projection already settles it"; it then asked in both free 3 runs and one of two `crossing-assault` runs.
+- **Defender losses in broken assaults.** v4: std 2 79 and 79, free 3 68 (Blue's cavalry broke too). First v6 wording: std 2 48 and 48, free 3 32, `crossing-assault` 13 and 19; the infantry always lost men. Shipped wording: in both free 3 runs the umpire rolled (failed) and then copied the projection, in which Blue's two battalions lose no one (the cavalry 43). The `assault` check, now sent back with the resend, caught both; the two resend calls (28 s each) gave Blue's battalions 22 and 26 men lost between them, kept the break, and passed every check but one ammunition ceiling (#436). They dropped the outcomes' `rollIds`, which a failed roll's outcome does not need.
+- **River and overlap.** None in 34 replies on the new input (4 of 14 on v4). What still sends replies back is the ammunition ceiling (#436) in most turns, and a departure with no reason once.
+- **Latency.** An asked roll costs a second call of 20 to 33 s, so an assault turn takes about 50 to 70 s of adjudication instead of 30. It replaces a river or overlap resend of 25 to 45 s in the turns that had one.
+- Small samples (1 to 2 runs per input and arm) and one model. Raw replies were kept outside the repo.
+
 ### Run 2 (#440): the live stage on the game's projection, 2026-10-16
 
 Since #440 every case goes through what a game sends: `engineTurn.projectTurn` (the rules parse, the server's registry, `advanceUntilOver`) with a courier pass forced to the case's courier results, the `adjudicate` stage's own input and prompt (`adjudicate-v4`, `standard`, the default voice), rules version 2, one call through `adjudicateTurn` and no resend (a second call if the umpire asks for rolls). Sonnet and Opus ran through the host's Claude Code bridge (`UMPIRE_PROVIDER=claude-bridge`, models `sonnet` and `opus`, schema in the prompt as the bridge is `json-mode`), each case once, in order. A fresh Opus subagent graded the three umpires blind (letters A to C, the key withheld until it was done).

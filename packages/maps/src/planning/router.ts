@@ -55,6 +55,12 @@ export const ROUTE_COSTS = Object.freeze({
   marginM: 150,
   margin: 0.6,
 });
+/**
+ * Boundary exit retries (#542): an exit no route reaches moves along its side
+ * to the next certified position at least `spacingM` from every exit already
+ * tried, at most `attempts` times per side.
+ */
+export const EXIT_RETRY = Object.freeze({ spacingM: 400, attempts: 4 });
 /** Knight moves (column, row) added to the lattice by `sited-graded-any-angle-network-v4`. */
 const KNIGHT_MOVES: readonly (readonly [number, number])[] = Object.freeze([
   [-2, -1],
@@ -118,6 +124,10 @@ export class Router {
   readonly profiles = new Map<string, DeckProfile>();
   readonly fords = new Map<string, FordProfile>();
   readonly bridgeFailures: string[] = [];
+  /** Lattice positions along each side, middle first (frozen exit order). */
+  private readonly exitOrders = new Map<string, number[]>();
+  /** Per side: the order index of the current exit and the exits given up (#542). */
+  private readonly exitState = new Map<string, { index: number; failed: Point[] }>();
   readonly sites: Site[];
   /** Placement-area boxes, computed once; sites never move during routing. */
   readonly siteBoxes: [number, number, number, number][];
@@ -284,40 +294,74 @@ export class Router {
     )
       throw new RangeError('Unique supported boundary sides required');
     for (const side of sides) {
-      let attached = false;
       const horizontal = side === 'north' || side === 'south',
         count = horizontal ? this.c.columns : this.c.rows;
       const order = Array.from({ length: Math.max(0, count - 2) }, (_, i) => i + 1).sort(
         (a, b) => Math.abs(a - count / 2) - Math.abs(b - count / 2) || a - b,
       );
       this.c.candidates.take(order.length * Math.ceil(Math.log2(order.length + 1)));
-      for (const k of order) {
-        this.c.candidates.take();
-        const p: Point = horizontal
-          ? [k * this.c.spacing, side === 'north' ? 0 : this.c.bounds.maxY]
-          : [side === 'west' ? 0 : this.c.bounds.maxX, k * this.c.spacing];
-        const inside: Point = horizontal
-          ? [p[0], side === 'north' ? this.c.spacing : this.c.bounds.maxY - this.c.spacing]
-          : [side === 'west' ? this.c.spacing : this.c.bounds.maxX - this.c.spacing, p[1]];
-        const n = this.c.node(inside),
-          a = this.points[n];
-        if (!a || !this.open(n) || !this.clearSites(a, p)) continue;
-        const cert = corridor(this.c, a, p, this.c.settings.roads.maxReservedWidthM, side);
-        if (!cert.traversable) continue;
-        const exit = this.addPoint(p),
-          e: Edge = { a: n, b: exit, cost: distance(a, p), exit: side };
-        this.addEdge(e);
-        this.terminals.push({ id: `boundary:${side}`, node: exit, edge: e });
-        attached = true;
-        break;
-      }
-      if (!attached)
+      this.exitOrders.set(side, order);
+      const exit = this.exitFrom(side, 0, []);
+      if (!exit)
         throw new PlanningFailure(
           'BOUNDARY_EXIT_INFEASIBLE',
           side,
           'No certified road reaches the requested boundary side.',
         );
+      this.terminals.push({ id: `boundary:${side}`, node: exit.node, edge: exit.edge });
     }
+  }
+  /**
+   * The first certified exit on `side` at or after order index `from`, at
+   * least `EXIT_RETRY.spacingM` from every exit in `avoid`.
+   */
+  private exitFrom(
+    side: 'north' | 'east' | 'south' | 'west',
+    from: number,
+    avoid: Point[],
+  ): { node: number; edge: Edge } | undefined {
+    const order = this.exitOrders.get(side)!,
+      horizontal = side === 'north' || side === 'south';
+    for (let i = from; i < order.length; i++) {
+      const k = order[i]!;
+      this.c.candidates.take();
+      const p: Point = horizontal
+        ? [k * this.c.spacing, side === 'north' ? 0 : this.c.bounds.maxY]
+        : [side === 'west' ? 0 : this.c.bounds.maxX, k * this.c.spacing];
+      if (avoid.some((q) => distance(p, q) < EXIT_RETRY.spacingM)) continue;
+      const inside: Point = horizontal
+        ? [p[0], side === 'north' ? this.c.spacing : this.c.bounds.maxY - this.c.spacing]
+        : [side === 'west' ? this.c.spacing : this.c.bounds.maxX - this.c.spacing, p[1]];
+      const n = this.c.node(inside),
+        a = this.points[n];
+      if (!a || !this.open(n) || !this.clearSites(a, p)) continue;
+      const cert = corridor(this.c, a, p, this.c.settings.roads.maxReservedWidthM, side);
+      if (!cert.traversable) continue;
+      const exit = this.addPoint(p),
+        edge: Edge = { a: n, b: exit, cost: distance(a, p), exit: side };
+      this.addEdge(edge);
+      this.exitState.set(side, { index: i, failed: avoid });
+      return { node: exit, edge };
+    }
+    return undefined;
+  }
+  /**
+   * Move a boundary exit no route reaches (a pocket cut off by water or steep
+   * ground) to the next certified position on its side, well away from the
+   * exits already tried (#542). Returns false when the side has no other
+   * position or the bounded retries are spent. The abandoned exit's edge stays
+   * a dead-end leaf that no route selects.
+   */
+  retryExit(t: Terminal): boolean {
+    const side = t.edge?.exit;
+    if (!side) return false;
+    const state = this.exitState.get(side)!;
+    if (state.failed.length >= EXIT_RETRY.attempts) return false;
+    const exit = this.exitFrom(side, state.index + 1, [...state.failed, this.points[t.node]!]);
+    if (!exit) return false;
+    t.node = exit.node;
+    t.edge = exit.edge;
+    return true;
   }
   attachBridges(): void {
     const candidates = [...(this.c.input.crossingCandidates ?? [])].sort((a, b) =>
