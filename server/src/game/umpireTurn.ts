@@ -25,6 +25,7 @@ import {
   positionAt,
   rollTurnDice,
   viewFor,
+  type EngineSideView,
   type EngineState,
   type EventRegistry,
   type GameState,
@@ -42,8 +43,9 @@ import {
   type UmpireDial,
 } from '../umpire/adjudicate.js';
 import { deg } from '../umpire/eval/turnProposal.js';
+import { observationKey, sideSight } from '../umpire/accountSight.js';
 import { hiddenTerms } from '../umpire/leakGuard.js';
-import { reportsOfTurn, writeTurnReports } from '../umpire/turnReports.js';
+import { reportsOfTurn, writeTurnReports, type TurnReportsContext } from '../umpire/turnReports.js';
 import type { UmpireCallRecord, UmpireClient, UmpireRequest } from '../umpire/umpireClient.js';
 import { advanceUntilOver } from './advance.js';
 import {
@@ -342,7 +344,6 @@ export class UmpireTurnResolver implements TurnResolver {
         const view = viewFor(world, side, end.time);
         const due = reportsOfTurn(view.reports, input.startMs, end.time);
         if (due.length === 0) continue;
-        const own = new Set(view.ownUnits.map((u) => u.id));
         const calls: UmpireCallRecord[] = [];
         const client: UmpireClient = {
           call: async <T>(request: UmpireRequest) => {
@@ -356,17 +357,7 @@ export class UmpireTurnResolver implements TurnResolver {
           side,
           input.n,
           due,
-          {
-            ownUnits: view.ownUnits,
-            accounts: output.proposal.units
-              .filter((u) => own.has(u.unitId) && typeof u.account === 'string')
-              .map((u) => ({ unitId: u.unitId, account: u.account })),
-            orderTexts: new Map(
-              input.orders.filter((o) => o.side === side).map((o) => [o.orderId, o.text]),
-            ),
-            places,
-            hidden: hiddenTerms(world, side),
-          },
+          turnReportsContext(world, view, input, output.proposal, places),
           {
             signal: ctrl.signal,
             ...(this.opts.persona ? { persona: this.opts.persona } : {}),
@@ -449,6 +440,47 @@ export class UmpireTurnResolver implements TurnResolver {
 /**
  * The turn as the actor will log it: what `umpireAdjudicator` applies.
  */
+/**
+ * What side `view.side`'s papers of umpire turn `input.n` may be written from (11.9): its own
+ * units, their accounts in `proposal`, its own words for its orders, the map's places, the names it
+ * must not read, and what its units saw as the sight check let it stand (#533: the proposal's
+ * observations less this turn's observation rulings in `world`, the turn's applied end).
+ */
+export function turnReportsContext(
+  world: GameState,
+  view: EngineSideView,
+  input: Pick<TurnInput, 'n' | 'orders'>,
+  proposal: TurnProposal,
+  places: readonly string[],
+): TurnReportsContext {
+  const side = view.side;
+  const own = new Set(view.ownUnits.map((u) => u.id));
+  const refused = new Set(
+    world.rulings.flatMap((r) =>
+      'kind' in r && r.kind === 'turn' && r.turn === input.n && r.field === 'observation'
+        ? [observationKey(r.proposed as unknown as TurnObservation)]
+        : [],
+    ),
+  );
+  return {
+    ownUnits: view.ownUnits,
+    accounts: proposal.units
+      .filter((u) => own.has(u.unitId) && typeof u.account === 'string')
+      .map((u) => ({ unitId: u.unitId, account: u.account })),
+    orderTexts: new Map(
+      input.orders.filter((o) => o.side === side).map((o) => [o.orderId, o.text]),
+    ),
+    places,
+    hidden: hiddenTerms(world, side),
+    sight: sideSight(
+      side,
+      proposal.observations,
+      proposal.observations.filter((o) => !refused.has(observationKey(o))),
+      view.visibleEnemies.length > 0 || view.lastKnownContacts.length > 0,
+    ),
+  };
+}
+
 function umpireRecord(input: TurnInput, output: UmpireTurnOutput): TurnRecord {
   return {
     n: input.n,

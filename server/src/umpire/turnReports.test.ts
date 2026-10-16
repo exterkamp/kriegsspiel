@@ -145,6 +145,44 @@ describe('the turn reports input (11.9)', () => {
     expect(withheld[0]!.reason).toMatch(/account withheld/);
   });
 
+  it('withholds an account that describes enemies its unit could not see, and only that (#533)', () => {
+    const seen =
+      'I judged the bridge too exposed: infantry in line held it, so I kept my men back.';
+    const withSight = (sight: TurnReportsContext['sight'], account = seen) =>
+      turnReportsInput(
+        'blue',
+        1,
+        [report()],
+        ctx({ accounts: [{ unitId: 'blue-1', account }], sight }),
+      );
+    const none = { refused: new Set<string>(), stood: new Set<string>(), knowsEnemy: false };
+    // No unit of the side could see an enemy, and it holds no contact: withheld.
+    const out = withSight(none);
+    expect(out.input.reports[0]!.account).toBeUndefined();
+    expect(out.withheld).toEqual([
+      {
+        reportId: 'blue-r9',
+        reason:
+          'account withheld (describes the enemy ("infantry") though no unit of the side could see one)',
+      },
+    ]);
+    // The unit's every sighting was refused: withheld, whatever the side knows.
+    expect(
+      withSight({ ...none, refused: new Set(['blue-1']), knowsEnemy: true }).withheld[0]!.reason,
+    ).toMatch(/sight check refused every sighting of this unit/);
+    // Its sighting stood, or the side knows the enemy and it proposed none refused: unchanged.
+    expect(
+      withSight({ ...none, stood: new Set(['blue-1']), knowsEnemy: true }).input.reports[0]!
+        .account,
+    ).toBe(seen);
+    expect(withSight({ ...none, knowsEnemy: true }).input.reports[0]!.account).toBe(seen);
+    // An account that describes no enemy is shown even to a side that saw none ("under the guns"
+    // would describe one).
+    const quiet = 'I kept my men back in the wood and watched the road.';
+    expect(withSight(none, quiet).input.reports[0]!.account).toBe(quiet);
+    expect(withSight(none, ACCOUNT).input.reports[0]!.account).toBeUndefined();
+  });
+
   it('takes the turn’s papers only, never the umpire’s ruling or notice', () => {
     const papers = [
       report({ id: 'a', deliveredAt: 0 }),
