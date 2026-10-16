@@ -21,6 +21,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { TurnProposal } from '@kriegsspiel/protocol';
 import { replayTurns } from '../admin/turnView.js';
+import { windowAt } from '../api/umpireWindow.js';
 import { accountSightProblem, ownTermsOf, sideSight } from '../umpire/accountSight.js';
 import { sightProblems } from '../umpire/adjudicate.js';
 import { umpireConfigFromEnv } from '../umpire/config.js';
@@ -55,6 +56,29 @@ const GAMES = {
   free: { adjudicators: ['umpire', 'umpire', 'umpire'], reason: 'attack-broken' },
 } as const;
 
+/**
+ * The world as it was played: the closing time-limit paper then read "on the High road,." (#538), a
+ * stray comma the engine no longer writes. The hash is of that text, so a replay that differs from
+ * the logged game anywhere else still fails.
+ */
+const PLAYED_COMMA = /(has not taken the objective [^.]*, on [^.,]*)(\. The game is over)/;
+const asPlayed = (world: GameState): GameState => ({
+  ...world,
+  intel: Object.fromEntries(
+    Object.entries(world.intel).map(([side, intel]) => [
+      side,
+      {
+        ...intel,
+        reports: intel.reports.map((r) =>
+          r.from === "The umpire's ruling" && r.text && PLAYED_COMMA.test(r.text)
+            ? { ...r, text: r.text.replace(PLAYED_COMMA, '$1,$2') }
+            : r,
+        ),
+      },
+    ]),
+  ) as GameState['intel'],
+});
+
 const summary = (state: { time: number; rng: number; world: GameState }): Final => ({
   time: state.time,
   rng: state.rng,
@@ -66,7 +90,9 @@ const summary = (state: { time: number; rng: number; world: GameState }): Final 
     strength: u.strength,
     status: u.status,
   })),
-  worldSha256: createHash('sha256').update(JSON.stringify(state.world)).digest('hex'),
+  worldSha256: createHash('sha256')
+    .update(JSON.stringify(asPlayed(state.world)))
+    .digest('hex'),
 });
 
 /** What would make a turn's end state invalid: the hard limits of D39, checked from outside. */
@@ -115,6 +141,10 @@ describe('the 11.12 playtest games (#408) replay with no model', () => {
         startingState,
       );
       expect(summary(state)).toEqual(game.final);
+      // No paper the game ends with has the stray comma (#538).
+      for (const intel of Object.values(state.world.intel)) {
+        for (const r of intel.reports) expect(r.text ?? '').not.toMatch(/,\s*\./);
+      }
       expect(state.world.outcome).toMatchObject({
         winner: 'blue',
         reason: GAMES[name].reason,
@@ -328,4 +358,38 @@ describe('the playtest accounts and the screen (#530)', () => {
     expect(cavalry).toMatch(/recrossed in good time/);
     expect(cavalry).not.toMatch(/\b(?:are crossing|mean to be back)\b/);
   });
+});
+
+describe("the playtest's umpire's window reads as a player would (#538)", () => {
+  it.each(['standard', 'free'] as const)(
+    '%s: the rulings name units, not ids, and no text has ",."',
+    (name) => {
+      const game = load(name);
+      const world = loadScenarioById(game.header.scenarioId);
+      const input = {
+        header: game.header,
+        world,
+        entries: game.entries,
+        registry: createRegistry(),
+        init: startingState,
+      };
+      const frame = windowAt(input, game.final.time);
+      const ids = world.units.map((u) => u.id);
+      const turnRulings = frame.rulings.filter((r) => r.narrative.startsWith("The umpire's turn"));
+      if (name === 'standard') expect(turnRulings.length).toBeGreaterThan(0);
+      for (const r of frame.rulings) {
+        for (const id of ids) {
+          const token = new RegExp(`(?<![\\w-])${id}(?![\\w-])`);
+          expect(r.narrative).not.toMatch(token);
+          expect(r.rationale).not.toMatch(token);
+        }
+        expect(r.narrative).not.toMatch(/,\s*\./);
+      }
+      // The ruling keeps its id for the scene; only the words change.
+      for (const r of turnRulings) {
+        const unit = world.units.find((u) => u.id === r.unitId)!;
+        expect(r.narrative).toContain(`corrected for ${unit.name} (`);
+      }
+    },
+  );
 });

@@ -1316,6 +1316,23 @@ describe('a decided battle against the time limit (#417)', () => {
     expect(text).not.toMatch(/holding/);
   });
 
+  it('no outcome text closes a place with a comma before a full stop (#538)', () => {
+    const g = loadScenario(holdTheBridge);
+    const world = createState(g.seed, g, 0).world;
+    const reasons = [
+      'objective-taken',
+      'objective-held',
+      'attack-broken',
+      'defence-broken',
+      'eliminated',
+      'withdrawn',
+    ] as const;
+    const texts = reasons.map((reason) => outcomeText(world, { winner: 'blue', reason, time: 0 }));
+    // Hold the Bridge's objective reads with a clause, "at the bridge, on the High road".
+    expect(texts[1]).toMatch(/has not taken the objective at [^.]*, on [^.,]*\. The game is over/);
+    for (const text of texts) expect(text).not.toMatch(/,\s*\./);
+  });
+
   it("a defence broken by the combat tick on the time limit's own minute goes to the ruling", () => {
     // Two weak Blue battalions in contact with two strong Red ones from the start, no orders.
     const fight = (holdMinutes: number) =>
