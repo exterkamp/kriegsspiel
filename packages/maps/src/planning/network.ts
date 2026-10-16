@@ -44,7 +44,8 @@ export function assemble(
   // Routes with a farm at either end are minor roads, which may ford (D46).
   const minor = (a: Terminal, b: Terminal) => a.site?.kind === 'farm' || b.site?.kind === 'farm';
   if (terms.length) joined.add(0);
-  let attempts = 0;
+  let attempts = 0,
+    attemptLimit = terms.length * terms.length;
   const failed = new Set<string>();
   while (joined.size < terms.length) {
     let best: { i: number; j: number; d: number } | undefined;
@@ -57,13 +58,21 @@ export function assemble(
           if (!best || d < best.d || (d === best.d && (i < best.i || (i === best.i && j < best.j))))
             best = { i, j, d };
         }
-    if (!best)
+    if (!best) {
+      // No route reaches a boundary exit: try it further along its side.
+      const exit = terms.findIndex((t, j) => !joined.has(j) && t.edge?.exit && r.retryExit(t));
+      if (exit >= 0) {
+        for (const i of joined) failed.delete(`${i}:${exit}`);
+        attemptLimit += terms.length;
+        continue;
+      }
       throw new PlanningFailure(
         'REGIONAL_CONNECTIVITY',
         'required terminals',
         'Required sites and boundary exits cannot all connect through certified ground/deck edges.',
       );
-    if (++attempts > terms.length * terms.length)
+    }
+    if (++attempts > attemptLimit)
       throw new PlanningFailure(
         'NETWORK_RETRY_LIMIT',
         'route attempts',

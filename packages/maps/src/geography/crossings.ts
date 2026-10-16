@@ -656,6 +656,11 @@ function findFords(
         const ends = [interpolate(from, to, t0), interpolate(from, to, t1)] as const,
           banks = [interpolate(from, to, w0), interpolate(from, to, w1)] as const,
           tangent: Point = [(b[0] - a[0]) / length, (b[1] - a[1]) / length];
+        // A reach running along the map edge puts the transverse line, and so
+        // an end, outside the map (#542). Such a ford could never certify (its
+        // abutment disks must fit the bounds), and the ground there has no
+        // height to probe, so skip it before any height query.
+        if (!inside(ends[0]) || !inside(ends[1])) continue;
         // A ford road may leave the bank straight out or slant up the valley
         // side (eighth turns, no trigonometry); one of the three must be gentle.
         const gentle = (e: Point, sign: number) =>
