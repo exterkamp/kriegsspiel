@@ -359,6 +359,35 @@ export const DICE_WORDS =
 /** At most this many problems are listed in a resend, so a hopeless reply does not grow the prompt. */
 const MAX_LISTED = 40;
 
+/** The validator's problem for a departure with no reason (`validateProposal`, the engine). */
+const VALIDATOR_DEPARTURE =
+  ': departs from the projection with no reason given; the projection stands';
+
+/**
+ * The resend's one line for every unit that departs with no reason (#523), in place of the
+ * validator's and the `departure` check's line per unit: it names those units and asks for exactly
+ * their `departure` fields, inside each unit's own outcome. Opus tended to give the reason in the
+ * `summary`, or to append it after the unit's closing brace (not JSON). `checks` is the `departure`
+ * check's problems (`<unitId>: <how far>, no departure reason`).
+ */
+export function departureRequest(checks: readonly string[]): string | undefined {
+  const units = checks.map((p) => {
+    const at = p.indexOf(': ');
+    const id = at < 0 ? p : p.slice(0, at);
+    const why = at < 0 ? '' : p.slice(at + 2).replace(/, no departure reason$/, '');
+    return why ? `${id} (${why})` : id;
+  });
+  if (units.length === 0) return undefined;
+  const one = units.length === 1;
+  return (
+    `departure: ${units.join('; ')} ${one ? 'differs' : 'differ'} from the projection beyond the ` +
+    `tolerance and ${one ? 'its outcome has' : 'their outcomes have'} no "departure". Inside ` +
+    `${one ? "that unit's own outcome object" : "each of those units' own outcome objects"}, ` +
+    `before its "account", write "departure": "<why it differs>" (a reason in the "summary" or ` +
+    `another unit does not count), or put the unit back where the projection has it.`
+  );
+}
+
 /** The check context the benchmark's checks need, from the stage's input (the benchmark's too, #440). */
 export function checkContext(world: GameState, turn: AdjudicateTurn): TurnCheckContext {
   return {
@@ -465,11 +494,19 @@ export function judge(
   const checks = checkTurnProposal(proposal, checkContext(world, turn));
   const validation = validateProposal(world, proposal, context);
   extra.push(...sightProblems(world, proposal, validation));
+  // Departures with no reason are asked for in one line, first, naming the units (#523).
+  const departures = departureRequest(checks.problems.departure);
+  const departing = new Set(checks.problems.departure.map((p) => p.split(':')[0]));
   const problems = [
+    ...(departures ? [departures] : []),
     ...extra,
-    // The validator's own wording comes first: it is what will be clamped.
-    ...validation.problems,
-    ...CHECKS.flatMap((k) => checks.problems[k].map((p) => `${k}: ${p}`)),
+    // Then the validator's own wording: it is what will be clamped.
+    ...validation.problems.filter(
+      (p) => !(departures && p.endsWith(VALIDATOR_DEPARTURE) && departing.has(p.split(':')[0]!)),
+    ),
+    ...CHECKS.filter((k) => !departures || k !== 'departure').flatMap((k) =>
+      checks.problems[k].map((p) => `${k}: ${p}`),
+    ),
   ];
   // The benchmark's injected-marker check needs a case's canary; a live turn has none, so it is
   // not part of the gate (an obeyed injection shows as clamps, a fog leak or a resend's problems).

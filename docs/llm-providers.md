@@ -126,6 +126,31 @@ Without Docker (`npm run dev -w server` on the host), set `CLAUDE_BRIDGE_HOST=12
 
 Story 11.2 (#398): can a model adjudicate a whole turn (D39)? The cases, checks, rubric and procedure are in [umpire-benchmark.md](umpire-benchmark.md); raw outputs, grades and the joined table are in `server/bench/umpire/`.
 
+### Departure reasons (#523), 2026-10-16
+
+In #440 Opus failed the `departure` check in 4 of 12 cases (`uncontested-march`, `cavalry-screen`, `injected-order`, `impossible-order`), giving its reasons in the `summary`; that run scored the first reply only, on `adjudicate-v4`. Here each case went through the live stage itself, `adjudicateTurn` with its one resend, on the current prompt `adjudicate-v6` (`standard`), through the Claude Code bridge (`opus`, `sonnet`), one call at a time, 38 calls in all. The four cases plus two controls Opus had passed (`flank-march-woods`, `garbled-order`); Opus ran the four cases twice. The new resend (one line naming the units with no reason and asking for exactly their `departure`, inside each unit's own outcome, before its `account`; D39, "As built (#523)") changes only the resend, so the arms are paired: each first reply that lacked a reason was resent twice under the old wording and twice under the new. Replies are kept outside the repo.
+
+First replies (the same in both arms):
+
+| Model | Runs | Departure failures | Schema failures | Resent (any problem) | Median s (first call) |
+| --- | --- | --- | --- | --- | --- |
+| Opus | 10 (6 cases, the four twice) | 2 (`uncontested-march` red-2 760 m, `impossible-order` red-3 943 m, both in the second runs) | 0 | 5 (the 2 departures, observations twice, an account's sight once) | 26 |
+| Sonnet | 6 | 2 (`uncontested-march` red-2 800 m, `cavalry-screen` blue-3 402 m) | 0 | 3 (the 2 departures, an account's sight once) | 20 |
+
+`injected-order` asked for a roll in both Opus runs (one more call, 28 to 31 s). The controls never lacked a reason.
+
+The resend of those four first replies, twice each:
+
+| Resend | Replies | Still no reason | Schema failures | Reason given | Put back on the projection | Other problems left | Median s |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Old (the check's and the validator's line per unit) | 8 (Opus 4, Sonnet 4) | 1 (Opus) | 1 (Opus) | 4 | 3 | 0 | 20 |
+| **New (one line naming the units)** | 8 (Opus 4, Sonnet 4) | 0 | 0 | 5 | 3 | 0 | 19 |
+
+- The one failure of the old resend was Opus on `uncontested-march`: it closed red-2's outcome after its `account` and then wrote `,"departure":"..."}` inside `units`, which is not JSON, so the game would have used the first reply with red-2 put back on its projection (or, in a game, spent a repair call). It is the shape #523's v5 trial ran into (a stray `"departure_placeholder"` in `units`, `units` closed early): Opus writes the reason after the account it has already closed. The new line asks for the field before the `account`.
+- Sonnet met both arms the same way: it gave red-2 its reason and moved blue-3 back each time.
+- On v6 the first reply already gives a reason far more often than on v4 in #440 (Opus 2 of 8 runs of the four cases lacked one, against 4 of 4), so most of #523 is now caught by the live gate's resend; the benchmark still scores the first reply.
+- Small samples: 8 resends per arm, a difference of one reply. The new wording made no reply worse on either model, and it is shorter (one line for all the units, not two per unit).
+
 ### Rolls and river placements (#535), 2026-10-16
 
 The 11.12 playtest's umpire (#408, Sonnet, `adjudicate-v4`) never asked for a roll, decided the free game's last assault with no loss to Blue's infantry, and in 5 of 6 turns needed the resend, mostly for units placed in the river or overlapping. Prompt **`adjudicate-v6`** (`v5` was #523's unshipped trial) changes the input and the dice paragraph; see D39, "As built (#535)". Measured through the Claude Code bridge on Sonnet, one call at a time, 54 calls in all, on the playtest's six umpire-turn inputs (the logged `calls` input, rebuilt with `adjudicateInput` from the replayed world at each turn's start; the rebuild equals the logged input exactly but for the new fields, and the v4 prompt was checked equal to the logged one) and on the benchmark's new `crossing-assault` case. Each run is the first reply, with the roll call when it asked and the dice rolled on the turn's own stream, judged by the live stage's `judge`; the resend itself was not made, except where noted.
