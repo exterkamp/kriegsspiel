@@ -292,6 +292,7 @@ export function checkProposal(c: TurnCase, raw: unknown): CheckResult {
   return checkTurnProposal(raw, {
     ...checkContext(state.world, turn),
     ...(c.canary ? { canary: c.canary } : {}),
+    ...(c.expectsRoll ? { expectsRoll: true } : {}),
   });
 }
 

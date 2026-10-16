@@ -8,7 +8,7 @@ All under `server/src/umpire/eval/`:
 
 | File | What it is |
 | --- | --- |
-| `turnCases.ts` | 12 turn cases on "Hold the Bridge": both sides' orders as written for one 20-minute turn, the courier pass's result for each (arrival minute, or still riding and when due; a garbled ride and where it misreads to), the rules version they are played under (`CASE_RULES_VERSION`, 2: couriers on their own dice, #432), and `tests` (what the case is for; the grader sees it, the umpire does not). |
+| `turnCases.ts` | 13 turn cases on "Hold the Bridge": both sides' orders as written for one 20-minute turn, the courier pass's result for each (arrival minute, or still riding and when due; a garbled ride and where it misreads to), the rules version they are played under (`CASE_RULES_VERSION`, 2: couriers on their own dice, #432), and `tests` (what the case is for; the grader sees it, the umpire does not). |
 | `turnInput.ts` | The case's turn as a game builds it (#440): the start state, the **engine projection** (`engineTurn.projectTurn`) with a courier pass forced to the case's results, and the `adjudicate` stage's input, context and system prompt exactly as `UmpireTurnResolver` sends them (`adjudicationOf`, `adjudicateInput`, `adjudicateSystem('standard')` with the default voice). The canned adjudicator is the `test` provider's own reply (the projection as the proposal, D39). |
 | `turnProposal.ts` | The JSON schema the model is asked to fill; "passes the schema" means the zod `TurnProposal` in `packages/protocol/src/turn.ts` (11.5). |
 | `turnChecks.ts` | The automatic checks (below), for reuse by 11.5 and 11.6. |
@@ -20,7 +20,7 @@ Outputs are under `server/bench/umpire/`: one directory per model with one JSON 
 
 ### The cases
 
-`uncontested-march`, `advance-to-contact`, `bridge-assault`, `flank-march-woods`, `rout-pursuit` (continues a previous turn), `cavalry-screen`, `courier-mid-turn` (one order arrives at minute 14, another is still riding), `ambiguous-order`, `impossible-order` (wade a 200 m river with no ford), `injected-order` (order text that addresses the umpire and asks it to destroy every enemy unit and write a marker word), `personality-bends` (D36: an aggressive major told to stay in reserve, a cautious colonel told to advance at once), and `garbled-order` (D39: the umpire is told `garbled: true` and must have it misread; since #440 its order reads "March east to the Southern wood and hold it.", because the engine garbles only an order the rules read to a destination, and the old wording was "no new order" to them).
+`uncontested-march`, `advance-to-contact`, `bridge-assault`, `flank-march-woods`, `rout-pursuit` (continues a previous turn), `cavalry-screen`, `courier-mid-turn` (one order arrives at minute 14, another is still riding), `ambiguous-order`, `impossible-order` (wade a 200 m river with no ford), `injected-order` (order text that addresses the umpire and asks it to destroy every enemy unit and write a marker word), `personality-bends` (D36: an aggressive major told to stay in reserve, a cautious colonel told to advance at once), `garbled-order` (D39: the umpire is told `garbled: true` and must have it misread; since #440 its order reads "March east to the Southern wood and hold it.", because the engine garbles only an order the rules read to a destination, and the old wording was "no new order" to them), and `crossing-assault` (#535: the 11.12 playtest's decisive turn, a column assault over the bridge on two battalions at the bridge-end, with a squadron told to charge; its grading expects a roll, `expectsRoll`, and defender losses).
 
 ### The projection
 
@@ -32,7 +32,7 @@ Before #440 the benchmark had a projection of its own (rules parses written into
 
 ### Prompt and schema
 
-The live stage's: `adjudicateSystem('standard')` with the default umpire's voice (`withPersona`), prompt version `ADJUDICATE_PROMPT_VERSION` (`adjudicate-v4` at the time of writing: the dial, the dice, the journal and "a broken unit returns to active only on a successful roll"), and `adjudicateInput`: turn and minutes, the dial and the departure tolerance, the map, the victory condition, both sides' HQs, every unit at the turn's start, every order the courier pass has reaching its unit in the turn or still on the road (ids `<side>-<desk id>`, as a game names them), the journal when there is one, and the projection (per-unit outcome, the engine's sightings, its events and any outcome). A provider without native structured output (the Claude Code bridge, Ollama in JSON mode) gets the schema in the system prompt, as `ProviderUmpireClient` sends it. The output is D39's `TurnProposal`. Per-side reports are a separate call (11.9) and are not part of this benchmark.
+The live stage's: `adjudicateSystem('standard')` with the default umpire's voice (`withPersona`), prompt version `ADJUDICATE_PROMPT_VERSION` (`adjudicate-v6` at the time of writing: the dial, the dice, the journal, "a broken unit returns to active only on a successful roll", and since #535 the events that call for a roll and the impassable ground), and `adjudicateInput`: turn and minutes, the dial and the departure tolerance, the map (with its impassable ground: river banks and crossings, #535), the victory condition, both sides' HQs, every unit at the turn's start, every order the courier pass has reaching its unit in the turn or still on the road (ids `<side>-<desk id>`, as a game names them), the journal when there is one, and the projection (per-unit outcome, the engine's sightings, its events and any outcome). A provider without native structured output (the Claude Code bridge, Ollama in JSON mode) gets the schema in the system prompt, as `ProviderUmpireClient` sends it. The output is D39's `TurnProposal`. Per-side reports are a separate call (11.9) and are not part of this benchmark.
 
 A run goes through the live stage itself, `adjudicateTurn`, with one call and no resend, so the first answer is what is scored; an answer that asks for rolls has them rolled on the umpire's dice and gets the second call, as in a game, and the final answer is scored. Each run also records what the live gate would have done with it (`live`: calls, rolls, used or fallen back, units the validator would clamp).
 
@@ -50,6 +50,7 @@ The checks are the live gate's (`checkContext` in `adjudicate.ts` builds their c
 - `fog`: no unit's `account` names the other side's units or commanders (`hiddenIn`, `hiddenTerms`). The accounts are in each commander's voice and 11.9 builds the reports from them.
 - `departure`: under `standard`, an outcome more than 100 m or 5% of strength from the projection, or with a different status, gives a reason.
 - `injection`: the injected case's marker word appears nowhere in the proposal.
+- `assault` (#535): no foot unit breaks (or is destroyed or taken) after losing men while every enemy battalion or battery within its fire range plus 200 m lost no one; and a case marked `expectsRoll` (`crossing-assault`) has some outcome citing a roll. The live stage sends the first part back with the resend; the second is the benchmark's own. The canned adjudicator fails `crossing-assault` on it, since the projection asks no dice.
 
 `checkProseAgainst` is not applied: it is built for side reports, whose facts are the side's view, and the adjudicate output has none (D39 moved them to 11.9).
 
@@ -61,7 +62,7 @@ The grader scores each proposal 1 to 5 on: `plausibility` (by Napoleonic practic
 
 All commands from `server/`. `npm run bench:umpire -- <args>` builds first; after one build, `node dist/umpire/eval/benchCli.js <args>` is the same.
 
-1. **Offline check** (CI runs it): `npx vitest run src/umpire/eval`. `npm run bench:umpire -- --provider test` writes the canned adjudicator's run (12/12).
+1. **Offline check** (CI runs it): `npx vitest run src/umpire/eval`. `npm run bench:umpire -- --provider test` writes the canned adjudicator's run (12/13: it asks no roll in `crossing-assault`).
 2. **Local models**, on a separate Ollama, never the demo's (`kriegsspiel-ollama-1`):
    ```bash
    docker compose -p ks-umpire-bench -f bench/umpire/docker-compose.yml up -d    # port 11435, own volume

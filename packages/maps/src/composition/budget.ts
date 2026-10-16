@@ -1,4 +1,4 @@
-import { infeasible, type GenerationResult } from '../contract.js';
+import { infeasible, type Diagnostic, type GenerationResult } from '../contract.js';
 import { MapValidationError } from '../errors.js';
 import { DEFAULT_COMPOSITION_LIMITS, type CompositionLimits } from './types.js';
 
@@ -99,6 +99,41 @@ export function bounded<T>(run: () => T | GenerationResult<T>): GenerationResult
         })),
       );
     throw e;
+  }
+}
+/**
+ * Composition's last line of defence (#542): an exception no stage expected,
+ * thrown while generating from already validated input, becomes a failure
+ * result instead of escaping to the editor's worker or the lobby. The
+ * diagnostic names the stage and keeps the error's own name and message, so
+ * the cause stays visible; it is never a routine infeasibility code, and the
+ * cause must still be fixed where it was thrown. Bounded failures pass
+ * through to `bounded` unchanged.
+ */
+export function guarded<T>(
+  stage: () => Diagnostic['stage'],
+  run: () => GenerationResult<T>,
+): GenerationResult<T> {
+  try {
+    return run();
+  } catch (e) {
+    if (
+      e instanceof CompositionFailure ||
+      (e instanceof MapValidationError && e.issues.every((i) => i.code === 'RESOURCE_LIMIT'))
+    )
+      throw e;
+    const error = e instanceof Error ? e : new Error(String(e));
+    return infeasible([
+      {
+        severity: 'error',
+        stage: stage(),
+        code: 'GENERATION_INTERNAL_ERROR',
+        constraint: 'unexpected exception',
+        message: `${error.name}: ${error.message}`.slice(0, 512),
+        remediation:
+          'An internal generator fault, not a property of the recipe: report the seed and settings.',
+      },
+    ]);
   }
 }
 export function requireValue<T>(r: GenerationResult<T>): T {
