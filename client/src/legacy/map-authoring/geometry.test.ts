@@ -1,7 +1,15 @@
 import { createReferenceAsset } from '@kriegsspiel/maps';
 import { describe, expect, it } from 'vitest';
 import { loadPreviewAsset } from './asset.js';
-import { geometryBounds, traceLine, tracePolygon, type PathSink } from './geometry.js';
+import {
+  geometryBounds,
+  insidePolygon,
+  outerBoundary,
+  traceLine,
+  tracePolygon,
+  type PathSink,
+  type Position,
+} from './geometry.js';
 
 function recorder() {
   const commands: (string | number)[][] = [];
@@ -97,5 +105,46 @@ describe('preview asset and geometry boundary', () => {
     });
     expect(loadPreviewAsset(unsafe).ok).toBe(false);
     expect(called).toBe(false);
+  });
+});
+
+describe('outer boundary of adjoining polygons', () => {
+  const rect = (x0: number, y0: number, x1: number, y1: number) => ({
+    outer: [
+      [x0, y0],
+      [x1, y0],
+      [x1, y1],
+      [x0, y1],
+      [x0, y0],
+    ] as Position[],
+    holes: [] as Position[][],
+  });
+  const length = (lines: Position[][]) =>
+    lines.reduce(
+      (sum, line) =>
+        sum +
+        line.slice(1).reduce((s, [x, y], i) => s + Math.hypot(x - line[i]![0], y - line[i]![1]), 0),
+      0,
+    );
+
+  it('keeps the whole ring of a lone polygon, holes included', () => {
+    const square = rect(0, 0, 50, 50);
+    square.holes.push(rect(20, 20, 30, 30).outer);
+    expect(length(outerBoundary([square]))).toBeCloseTo(240);
+    expect(insidePolygon(square, 10, 10)).toBe(true);
+    expect(insidePolygon(square, 25, 25)).toBe(false);
+  });
+
+  it('drops edges shared by strips, keeping the open part of a partly shared edge', () => {
+    // Two 25 m strips, the lower one wider: the stretch y = 25, 0 <= x <= 100 is shared.
+    const lines = outerBoundary([rect(0, 0, 100, 25), rect(-25, 25, 125, 50)]);
+    expect(length(lines)).toBeCloseTo(100 + 25 + 25 + 50 + 25 + 150 + 25);
+    for (const line of lines)
+      for (let i = 1; i < line.length; i++) {
+        const [ax, ay] = line[i - 1]!;
+        const [bx, by] = line[i]!;
+        const shared = ay === 25 && by === 25 && Math.min(ax, bx) >= 0 && Math.max(ax, bx) <= 100;
+        expect(shared).toBe(false);
+      }
   });
 });

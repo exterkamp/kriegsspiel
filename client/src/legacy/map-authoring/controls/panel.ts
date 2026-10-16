@@ -16,6 +16,14 @@ import {
 } from '../generation/index.js';
 import { defaultParameters, editOverrides, type OverrideEdit } from './recipe.js';
 
+/** Shared design-system classes (`ks-status` plus its severity) for one diagnostic line (#308). */
+export function statusClass(severity: string): string {
+  return severity === 'error'
+    ? 'ks-status ks-error'
+    : severity === 'warning'
+      ? 'ks-status ks-warn'
+      : 'ks-status';
+}
 export interface AuthoringPreset {
   id: string;
   label: string;
@@ -139,6 +147,7 @@ export function createAuthoringPanel(
   element.setAttribute('aria-label', 'Map authoring controls');
   const heading = document.createElement('h2');
   heading.textContent = 'Map authoring';
+  heading.className = 'ks-section-h';
   element.append(heading);
   const note = document.createElement('p');
   note.textContent = 'Generate a map or load a saved file. Only validated maps can be exported.';
@@ -150,7 +159,14 @@ export function createAuthoringPanel(
     const label = document.createElement('label');
     const span = document.createElement('span');
     span.textContent = text;
-    label.append(span, input);
+    // Shared field layouts (#308): a checkbox sits before its label, other inputs under theirs.
+    if (input.tagName === 'INPUT' && (input as HTMLInputElement).type === 'checkbox') {
+      label.className = 'ks-choice';
+      label.append(input, span);
+    } else {
+      label.className = 'ks-field';
+      label.append(span, input);
+    }
     parent.append(label);
   };
   const seed = document.createElement('input');
@@ -201,6 +217,7 @@ export function createAuthoringPanel(
   const tablist = document.createElement('div');
   tablist.setAttribute('role', 'tablist');
   tablist.setAttribute('aria-label', 'Authoring settings');
+  tablist.className = 'ks-tabs';
   form.before(tablist);
   const simple = document.createElement('div');
   const advanced = document.createElement('div');
@@ -361,6 +378,7 @@ export function createAuthoringPanel(
   let problem: { kind: 'input' | 'file' | 'programming'; message: string } | null = null;
   const status = document.createElement('p');
   status.dataset.role = 'status';
+  status.className = 'ks-status';
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   const progress = document.createElement('progress');
@@ -726,11 +744,12 @@ export function createAuthoringPanel(
     }
   }
   const actions = document.createElement('div');
-  actions.className = 'authoring-actions';
+  actions.className = 'authoring-actions ks-cluster';
   heading.after(actions);
   const generateButton = button(actions, 'Generate map', 'generate', () => {
     generate();
   });
+  generateButton.classList.add('ks-primary');
   const cancelButton = button(actions, 'Cancel', 'cancel', cancel);
   const file = document.createElement('input');
   file.type = 'file';
@@ -866,9 +885,17 @@ export function createAuthoringPanel(
                   ? 'Controller disposed.'
                   : 'Draft settings; no generated map.';
     status.textContent = `${reading ? 'Reading saved file; export disabled. ' : ''}${message}${state.progress ? ` ${state.progress.stage}: ${state.progress.message}` : ''}${problem ? ` ${problem.kind} error: ${problem.message}` : validationMessage ? ` Settings/replay: ${validationMessage}` : ''}${asset && (state.status !== 'ready' || fileReadFailed || draftDiffers) ? ' Last validated map retained for preview.' : ''}`;
+    // The status line's tone (#308): red for a failure, amber for a draft that cannot be exported yet, green when ready.
+    const failed =
+      fileReadFailed || state.status === 'failed' || (!!problem && problem.kind !== 'input');
+    const unfinished = !!problem || !!validationMessage || draftDiffers;
+    status.classList.toggle('ks-error', failed);
+    status.classList.toggle('ks-warn', !failed && unfinished);
+    status.classList.toggle('ks-ok', !failed && !unfinished && state.status === 'ready');
     diagnosticList.replaceChildren();
     for (const diagnostic of state.candidateDiagnostics) {
       const row = document.createElement('li');
+      row.className = statusClass(diagnostic.severity);
       row.textContent = `${diagnostic.severity} ${diagnostic.stage} [${diagnostic.code}]: ${diagnostic.message}${diagnostic.featureId ? ` (${diagnostic.featureId})` : ''}${diagnostic.remediation ? ` — ${diagnostic.remediation}` : ''}`;
       diagnosticList.append(row);
     }

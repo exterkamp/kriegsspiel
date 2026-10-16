@@ -81,6 +81,7 @@ export const TURN_PROPOSAL_JSON_SCHEMA: JsonSchema = obj(
       items: obj({ id: str, why: str, chance: num }, ['id', 'why', 'chance']),
     },
     summary: str,
+    precedents: { type: 'array', items: str },
   },
   ['turn', 'units', 'observations', 'summary'],
 );
