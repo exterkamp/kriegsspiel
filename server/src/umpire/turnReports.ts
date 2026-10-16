@@ -35,7 +35,7 @@ import {
 import { withPersona } from './persona.js';
 import { UmpireError, type UmpireClient } from './umpireClient.js';
 
-export const TURN_REPORTS_PROMPT_VERSION = 'turn-reports-v2';
+export const TURN_REPORTS_PROMPT_VERSION = 'turn-reports-v3';
 
 /** A turn's reports narrated in one call; the rest keep their template text. */
 export const TURN_REPORTS_MAX = 12;
@@ -54,6 +54,8 @@ Write one note per report:
 - In the first person, as the officer: "Sir, we ..." or "Sir, my men ...". Never call the unit or the commander "he", "it" or by name in the third person.
 - For a "turn" report, say what the unit did and why, from the "account" and in the commander's manner. If he misread or refused his orders, say plainly what he did instead and why, as he sees it.
 - Use only the report's own words and figures: no other name, place, number or enemy unit. Say nothing of dice, rolls, odds or chances.
+- "condition" is for you to judge, not to repeat: never list it back ("we are steady, fresh and well supplied"). Say in a few words of your own what it means for the men, using at most two of its words, or leave it out.
+- Use no word for the men's morale, fatigue or ammunition that the "condition" does not give, and never two that disagree ("fresh" and "tiring").
 - Never say how long something lasted.
 - "placeAccuracy" is how sure the place is, never a distance to the enemy or to you: if you give it, say "the place is good to about 40 m". Never say how far off the enemy is unless the report says so.
 - Speak of losses only in a "turn" report.

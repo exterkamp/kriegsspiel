@@ -24,6 +24,18 @@ import { footprint, corridor, requireFinitePoint } from './certificates.js';
 import { Context, box, touches } from './context.js';
 import type { PlanningInput, RegionalPlanningOutput } from './types.js';
 import { CROSSING_VERSION } from '../geography/types.js';
+
+const same = (p: Point, q: Point) => p[0] === q[0] && p[1] === q[1];
+/** Segments sharing exactly one endpoint and leaving it on opposite sides (negative dot). */
+function opposite(a: Point, b: Point, c: Point, d: Point): boolean {
+  const away = (n: Point, u: Point, v: Point) =>
+    (u[0] - n[0]) * (v[0] - n[0]) + (u[1] - n[1]) * (v[1] - n[1]) < 0;
+  if (same(a, c)) return away(a, b, d);
+  if (same(a, d)) return away(a, b, c);
+  if (same(b, c)) return away(b, a, d);
+  if (same(b, d)) return away(b, a, c);
+  return false;
+}
 export function validate(c: Context, plan: RegionalPlanningOutput): void {
   preflightAsset(
     { layers: plan },
@@ -579,6 +591,11 @@ export function validate(c: Context, plan: RegionalPlanningOutput): void {
           s.road.id,
           'Geometrically intersecting edges require an explicit common endpoint node.',
         );
+      // Two straight edges meeting end to end at one point, running away from
+      // it on opposite sides, meet only there. Nearly collinear, the line
+      // intersection is ill-conditioned and lands micrometres inside an edge,
+      // a false overlap (#542); the shared point itself is the join.
+      if (opposite(s.a, s.b, t.a, t.b)) continue;
       const cuts = segmentCuts(s.a, s.b, [[t.a, t.b]], c.meter, '$.roads');
       if (cuts.some((v) => v > 1e-8 && v < 1 - 1e-8))
         throw new PlanningFailure(

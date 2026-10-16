@@ -32,7 +32,7 @@
  * before the WebSocket upgrade.
  */
 import { Buffer } from 'node:buffer';
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
@@ -143,6 +143,16 @@ const CreateGame = z
       .optional(),
     hierarchy: z.enum(['shared', 'chain']).optional(),
     lobby: z.boolean().optional(),
+    /**
+     * The game's dice (#534): absent, each game draws its own; given, the game rolls those dice
+     * (a test, or the same game again). Never sent back to a player.
+     */
+    seed: z
+      .number()
+      .int()
+      .min(0)
+      .max(2 ** 32 - 1)
+      .optional(),
   })
   .strict();
 
@@ -192,6 +202,11 @@ export interface AppOptions {
   lobby?: LobbyStore;
   wallNow?: WallClock;
   timers?: Timers;
+  /**
+   * The seed a new game gets when its request names none (#534): by default a random 32-bit value,
+   * drawn once when the game is made, kept on its lobby record and logged in its header.
+   */
+  newSeed?: () => number;
   /** Log lines from Fastify; off by default so tests stay quiet. */
   logger?: boolean;
   /** Play sides the scenario marks `scripted` with the built-in opponent. Off unless set; `main.ts` sets it from the environment. */
@@ -481,6 +496,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   const mailer = options.auth?.mailer ?? new LogMailer((line) => server.log.info(line));
   const publicUrl = options.auth?.publicUrl ?? 'http://localhost:3000';
   const wallNow = options.wallNow ?? Date.now;
+  const newSeed = options.newSeed ?? (() => randomInt(0, 2 ** 32));
   const notifier = new Notifier({
     auth: authStore,
     store: notifyStore,
@@ -675,6 +691,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
           : {}),
       },
       ...(body.data.hierarchy ? { hierarchy: body.data.hierarchy } : {}),
+      // Drawn once, here, so a game started later from the lobby rolls the dice it was made with.
+      seed: body.data.seed ?? newSeed(),
       creator: user.id,
       status: 'lobby',
       ready: [],
@@ -716,10 +734,15 @@ export async function buildApp(options: AppOptions): Promise<App> {
   /** Create the game's actor and mark the record started. Returns an error code on failure. */
   const startGame = async (rec: LobbyGame): Promise<string | undefined> => {
     try {
-      await host.create(rec.id, loadScenarioById(rec.scenario), {
-        rate: rec.rate,
-        settings: rec.umpire,
-      });
+      // Each game its own dice (#534); a lobby record made before them draws its seed now.
+      await host.create(
+        rec.id,
+        { ...loadScenarioById(rec.scenario), seed: rec.seed ?? newSeed() },
+        {
+          rate: rec.rate,
+          settings: rec.umpire,
+        },
+      );
     } catch (e) {
       server.log.error({ err: e, gameId: rec.id }, 'could not start game');
       return 'start_failed';

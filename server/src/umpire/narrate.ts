@@ -573,7 +573,7 @@ const EVENT_WORDS: Record<Exclude<ViewReport['kind'], 'battle' | 'notice'>, RegE
   situation:
     /\b(position|posted|placed|in place|in line|line|ready|deployed|formed|stand|standing|quiet|no enemy|nothing)\b/i,
   contact:
-    /\b(see|seen|saw|sight|sighted|sighting|spotted|spied|observed|watch|watching|enemy|enemies|troops|column|columns|men|horse|foot|force|battalions?|squadrons?|regiments?|companies|company|brigades?|infantry|cavalry|guns|artillery|before us)\b/i,
+    /\b(see|seen|saw|sight|sighted|sighting|spotted|spied|observed|made out|make out|watch|watching|enemy|enemies|troops|column|columns|men|horse|foot|force|detachments?|party|parties|body|bodies|battalions?|squadrons?|regiments?|companies|company|brigades?|infantry|cavalry|guns|artillery|before us)\b/i,
   orderDelivered:
     /\b(order|orders|instructions|your note|your letter|despatch|dispatch|received|in hand|have them|obey)\b/i,
   lowAmmo: /\b(ammunition|cartridges?|powder|ball|shot|rounds|supply|supplies|resupply)\b/i,
@@ -589,7 +589,7 @@ const EVENT_WORDS: Record<Exclude<ViewReport['kind'], 'battle' | 'notice'>, RegE
     /\b(broke|broken|break|fall back|falling back|fell back|retreat|retreating|rout|routed|flee|fled|fleeing|withdraw|withdrawing|gave way|give way|given way|rally|driven back|ran)\b/i,
   unitLost: /\b(lost|gone|destroyed|no word|silent|silence|missing|no more|cut off|perished)\b/i,
   courierLost: /\b(courier|rider|messenger|orders?|overdue|lost|no word)\b/i,
-  turn: /\b(stand|standing|stood|stayed|stay|position|posted|ground|held|hold|holding|kept|keep|march|marched|marching|moved|move|went|advanced|advance|pushed|crossed|took|came up|come up|reached|occupied|formed|deployed|remain|remained|waited|watched|orders?|ordered|fall back|falling back|fell back|back|broken|broke|rallied|engaged|attacked|charged|fight|fought|halted|halt|retired|withdrew|withdrawn|lost)\b/i,
+  turn: /\b(stand|standing|stood|stayed|stay|position|posted|ground|held|hold|holding|kept|keep|march|marched|marching|moved|move|went|advanced|advance|pushed|crossed|took|came up|come up|reached|occupied|formed|deployed|remain|remained|waited|watched|rode|ride|riding|scouted|searched|found|met|orders?|ordered|fall back|falling back|fell back|back|broken|broke|rallied|engaged|attacked|charged|fight|fought|halted|halt|retired|withdrew|withdrawn|lost)\b/i,
 };
 
 const FIRST_PERSON =
@@ -617,7 +617,7 @@ const COMBAT_KINDS: ReadonlySet<ViewReport['kind']> = new Set([
  */
 const NOT_THE_MEN: Readonly<Record<string, string>> = {
   fresh:
-    '(?:troops|regiments?|battalions?|columns?|reserves?|enemy|horses|supply|supplies|ammunition|cartridges)',
+    '(?:troops|regiments?|battalions?|columns?|reserves?|enemy|horses|supply|supplies|ammunition|cartridges|orders?|instructions|news|word|despatch(?:es)?|dispatch(?:es)?)',
   steady: '(?:fire|volleys?|rain|advance|pace|march)',
   spent: '(?:balls?|shot|cartridges)',
 };

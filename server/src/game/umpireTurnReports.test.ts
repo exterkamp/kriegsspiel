@@ -76,6 +76,8 @@ function trays(game: Awaited<ReturnType<GameHost['create']>>) {
 
 async function play(opts: {
   client: UmpireClient;
+  /** The client for the report calls; the umpire's own by default. */
+  reporter?: UmpireClient;
   world?: GameState;
   turns?: number;
   afterTurn?: (game: Awaited<ReturnType<GameHost['create']>>) => void;
@@ -94,7 +96,8 @@ async function play(opts: {
       new UmpireTurnResolver({
         registry,
         client: opts.client,
-        reporter: opts.client,
+        reporter: opts.reporter ?? opts.client,
+        reportTimeoutMs: 5_000,
         dial: 'standard',
         persona: settings.persona,
       }),
@@ -170,6 +173,62 @@ describe('turn reports (D39, 11.9)', () => {
         }
       }
     }
+  });
+
+  it('runs the sides’ report calls at once, and logs them in side order whichever ends first (#537)', async () => {
+    const m = model();
+    // Blue's call waits for Red's to start and then to end: it can finish only if both are in
+    // flight together, and it always finishes last.
+    let inFlight = 0;
+    let most = 0;
+    let redStarted: () => void = () => {};
+    let redDone: () => void = () => {};
+    let started = new Promise<void>((r) => (redStarted = r));
+    let ended = new Promise<void>((r) => (redDone = r));
+    const finished: string[] = [];
+    const reporter: UmpireClient = {
+      call: async (req) => {
+        const side = (req.input as TurnReportsInput).side;
+        inFlight++;
+        most = Math.max(most, inFlight);
+        try {
+          if (side === 'red') {
+            redStarted();
+            const res = await m.call(req);
+            redDone();
+            return res as never;
+          }
+          await started;
+          await ended;
+          return (await m.call(req)) as never;
+        } finally {
+          inFlight--;
+          finished.push(side);
+        }
+      },
+    };
+    const { log } = await play({
+      client: m,
+      reporter,
+      turns: 2,
+      afterTurn: () => {
+        started = new Promise<void>((r) => (redStarted = r));
+        ended = new Promise<void>((r) => (redDone = r));
+      },
+    });
+    expect(most).toBe(2);
+    expect(finished.slice(0, 2)).toEqual(['red', 'blue']);
+    const reported = log.filter((e) => e.command.kind === 'turnReports');
+    expect(reported).toHaveLength(4);
+    // Every side's papers were written by the model, none kept the template for a timeout.
+    for (const e of reported) expect(e.error ?? '').not.toMatch(/timed out/);
+    // Logged in side order, Blue first, though Red's call ended first: replay is the same.
+    expect(
+      reported.map((e) => {
+        const c = e.command as { side: string; turn: number };
+        return `${c.turn} ${c.side}`;
+      }),
+    ).toEqual(['1 blue', '1 red', '2 blue', '2 red']);
   });
 
   it('has a commander whose manner bent the order say what he did instead, and why', async () => {
