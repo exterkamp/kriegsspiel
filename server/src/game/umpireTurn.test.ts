@@ -614,6 +614,27 @@ describe('the adjudicate pipeline: checks, one resend, clamp or fall back', () =
     expect(await callsAt('free')).toBe(1);
     expect(await callsAt('standard')).toBe(2);
   });
+
+  it('reads a null departure as none, not as a schema failure (#523)', async () => {
+    const { state, input } = firstTurn();
+    // Every unit says `departure: null`; blue-2 also loses 100 men, so under `standard` it departs
+    // with no reason and is put back, exactly as if the key were left out.
+    const model = editing((p) => ({
+      ...p,
+      units: p.units.map((u) => ({
+        ...u,
+        departure: null,
+        ...(u.unitId === 'blue-2' ? { strength: u.strength - 100 } : {}),
+      })),
+    }));
+    const r = await resolver(model, 'standard').resolve(state, input);
+    expect(r.adjudicator).toBe('umpire');
+    const out = r.output as UmpireTurnOutput;
+    expect(out.proposal.units.every((u) => u.departure === undefined)).toBe(true);
+    const problems = JSON.stringify(model.requests[1]?.input ?? {});
+    expect(problems).toMatch(/blue-2: .*no departure reason/);
+    expect(problems).not.toMatch(/departure.*(null|expected string)/i);
+  });
 });
 
 describe('applying a logged umpire turn', () => {
@@ -650,6 +671,15 @@ describe('the umpire’s prompt', () => {
     expect(model.requests[0]!.system).toContain('"free"');
     const shown = model.requests[0]!.input as { orders: { orderId: string; text: string }[] };
     expect(shown.orders.map((o) => o.orderId)).toEqual(['blue-b1', 'blue-b2', 'red-r1', 'red-r2']);
+  });
+
+  it('asks under standard for each departing unit’s own reason, in that unit’s outcome (#523)', () => {
+    expect(ADJUDICATE_PROMPT_VERSION).toBe('adjudicate-v5');
+    const standard = adjudicateSystem('standard');
+    expect(standard).toContain('give the reason in that unit\'s own "departure"');
+    expect(standard).toContain('a reason given only in the "summary"');
+    expect(standard).toContain('never of the proposal itself');
+    expect(standard).toContain('left out, not null');
   });
 });
 

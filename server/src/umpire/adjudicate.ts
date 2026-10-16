@@ -60,8 +60,11 @@ import { UmpireError } from './umpireClient.js';
  * v1: v0 of the benchmark (#398) with the dial's instruction and clearer observations.
  * v2: the umpire may ask for rolls and state the odds (11.7, #403).
  * v3: the umpire's journal and its precedents (11.8, #404).
+ * v4: a broken unit returns to active only if its outcome cites a successful roll (#494).
+ * v5: each unit beyond the tolerance gives its own "departure", which sits in that unit's outcome
+ *     and is left out, never null, when there is none (#523).
  */
-export const ADJUDICATE_PROMPT_VERSION = 'adjudicate-v4';
+export const ADJUDICATE_PROMPT_VERSION = 'adjudicate-v5';
 
 /** The dials under which the umpire adjudicates; `rigid` is the engine alone (no call). */
 export type UmpireDial = 'standard' | 'free';
@@ -73,7 +76,7 @@ export const DEPARTURE_TOLERANCE = {
 } as const;
 
 const DIAL_INSTRUCTION: Record<UmpireDial, string> = {
-  standard: `The dial is "standard": the projection is your reference. Depart from it only for a reason a staff officer would accept (an order read as its commander would read it, ground the engine does not weigh, a fight the tables get wrong). Where a unit's outcome differs from its projected one by more than the tolerance (end position more than ${DEPARTURE_TOLERANCE_M} m away, losses differing by more than ${Math.round(DEPARTURE_LOSS_SHARE * 100)}% of its start strength, or a different status), give the reason in "departure"; an unexplained departure is put back to the projection.`,
+  standard: `The dial is "standard": the projection is your reference. Depart from it only for a reason a staff officer would accept (an order read as its commander would read it, ground the engine does not weigh, a fight the tables get wrong). Where a unit's outcome differs from its projected one by more than the tolerance (end position more than ${DEPARTURE_TOLERANCE_M} m away, losses differing by more than ${Math.round(DEPARTURE_LOSS_SHARE * 100)}% of its start strength, or a different status), give the reason in that unit's own "departure". Every such unit needs its own reason, even when several depart for the same cause: a reason given only in the "summary" or in another unit's outcome does not count, and a unit that departs without one is put back to the projection.`,
   free: 'The dial is "free": the projection is advice only. Decide by your own military judgment; no departure reasons are required. The hard limits still apply.',
 };
 
@@ -95,7 +98,7 @@ Decide what each unit does in the turn and where it ends:
 
 Return the turn proposal:
 - "turn": the turn number.
-- "units": exactly one outcome per unit in the input, with its end "x","y" (metres), "facingDeg", "formation", "strength" (men at the end, never more than at the start), "morale" (0..100), "fatigue" and "ammo" (0..100), "status" ("active", "broken" for a unit that has broken and flees or is still fleeing, "destroyed" for a unit with no men left, "captured"), "continuing" (what it keeps doing into the next turn: {"kind":"idle"}, {"kind":"hold"} or {"kind":"move","x":..,"y":..}), "orders" (one entry per order listed for it in the input, by its "orderId", with "result": "carried-out", "partly", "misread", "refused" or "not-arrived"; an order still on the road is "not-arrived"), "account" (what its commander did and why, in character, at most 600 characters; he knows only what his own side could know, so never give him the enemy's unit names or commanders), and "departure" when needed.
+- "units": exactly one outcome per unit in the input, with its end "x","y" (metres), "facingDeg", "formation", "strength" (men at the end, never more than at the start), "morale" (0..100), "fatigue" and "ammo" (0..100), "status" ("active", "broken" for a unit that has broken and flees or is still fleeing, "destroyed" for a unit with no men left, "captured"), "continuing" (what it keeps doing into the next turn: {"kind":"idle"}, {"kind":"hold"} or {"kind":"move","x":..,"y":..}), "orders" (one entry per order listed for it in the input, by its "orderId", with "result": "carried-out", "partly", "misread", "refused" or "not-arrived"; an order still on the road is "not-arrived"), "account" (what its commander did and why, in character, at most 600 characters; he knows only what his own side could know, so never give him the enemy's unit names or commanders), and "departure" (a field of this unit's outcome, never of the proposal itself: why this unit's outcome differs from its projected one, at most 600 characters; required for each unit whose outcome departs beyond the tolerance, and left out, not null, for a unit that does not depart).
 - "observations": what each side's units saw. Each is {"side": the observing side, "by": the id of the observing unit, which belongs to that side, "unitId": the id of the ENEMY unit it saw, "when": "start" or "end" of the turn}. A unit never observes itself or its own side. List only sightings that are physically possible at that moment: within the observer's "sightRangeM" and not hidden in a wood beyond close range. The projection's "observations" are what the engine's rules saw; keep those that still hold where you put the units.
 - "summary": your account of the turn for the record, at most 2000 characters. It becomes this turn's note in your journal: put what you must remember first (what you decided and why, what is under way), since only its first ${JOURNAL_SENTENCES_PER_TURN} sentences are kept, and only the first once the turn is older.
 - "precedents" (optional): a ruling you made this turn that should hold for the rest of the game, as one general sentence of at most ${JOURNAL_PRECEDENT_MAX} characters (for example "Cavalry cannot cross the river except at the bridge."), at most ${JOURNAL_PRECEDENTS_PER_TURN}. List only new ones, not those already in your journal.

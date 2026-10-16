@@ -66,8 +66,16 @@ export const UnitOutcome = z
     ),
     /** What its commander did and why, in character. Master state; 11.9 filters it. */
     account: z.string().max(TURN_ACCOUNT_MAX),
-    /** Why it differs from the projection; required under `standard` beyond the tolerance. */
-    departure: z.string().max(TURN_ACCOUNT_MAX).optional(),
+    /**
+     * Why it differs from the projection; required under `standard` beyond the tolerance. A `null`
+     * is read as no reason, as models write it for "none" (#523).
+     */
+    departure: z
+      .string()
+      .max(TURN_ACCOUNT_MAX)
+      .nullish()
+      .transform((v) => v ?? undefined)
+      .optional(),
     /** The rolls this outcome rests on. */
     rollIds: z.array(z.string().min(1)).optional(),
   })
