@@ -1,7 +1,7 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it, vi } from 'vitest';
-import type { TurnOrder } from '@kriegsspiel/protocol';
+import type { Role, TurnOrder } from '@kriegsspiel/protocol';
 import { fixtureView } from '@legacy/table/fixture';
 import type { ClientState, TurnInfo } from '@legacy/net/state';
 import { ORDER_SENDER, TURN_ACTIONS, type TurnActions } from '../game/ports';
@@ -383,5 +383,58 @@ describe('the turn desk for a first-time player (#439)', () => {
       ['To Someone, sent at 00:00', 'Scout the wood.', 'With the courier; no word yet'],
       [`To ${unit.name}, sent at 00:00`, 'March to the bridge.', 'Delivered at 00:04'],
     ]);
+  });
+});
+
+describe('the turn desk by seat (#428)', () => {
+  const as = (role: Role | undefined, t: TurnInfo = turn({ held: [held] })) =>
+    open(t, () => true, {
+      view: { ...fixtureView, hq: { x: 0, y: 0 }, ...(role ? { role } : {}) },
+    });
+
+  for (const role of [undefined, 'commander', 'subordinate'] as const) {
+    it(`offers Send to ${role ?? 'shared HQ'}`, async () => {
+      const t = await as(role);
+      expect(t.el.querySelector('#turn-send')).not.toBeNull();
+      expect(t.el.querySelector('[data-testid="turn-sender"]')).toBeNull();
+      expect(t.q<HTMLButtonElement>('#order-sign').hidden).toBe(false);
+    });
+  }
+
+  for (const role of ['chiefOfStaff', 'quartermaster'] as const) {
+    it(`gives the ${role} Hold but not Send, and says who sends`, async () => {
+      const t = await as(role);
+      expect(t.el.querySelector('#turn-send')).toBeNull();
+      expect(t.q('[data-testid="turn-sender"]').textContent).toContain(
+        "Your commander sends the turn's orders",
+      );
+      expect(t.q<HTMLButtonElement>('#order-sign').hidden).toBe(false);
+      expect(t.button('Edit')).toBeDefined();
+      expect(t.button('Withdraw')).toBeDefined();
+      await t.fill();
+      t.q('#order-sign').click();
+      await t.settle();
+      expect(t.actions.hold).toHaveBeenCalled();
+      expect(t.actions.send).not.toHaveBeenCalled();
+    });
+  }
+
+  it('gives the intelligence officer neither Hold nor Send, nor Edit and Withdraw', async () => {
+    const t = await as('intelligence');
+    expect(t.el.querySelector('#turn-send')).toBeNull();
+    expect(t.q('[data-testid="turn-sender"]').textContent).toContain(
+      'The intelligence officer writes no orders',
+    );
+    expect(t.q<HTMLButtonElement>('#order-sign').hidden).toBe(true);
+    expect(t.button('Edit')).toBeUndefined();
+    expect(t.button('Withdraw')).toBeUndefined();
+    // The held orders are still there to read.
+    expect(t.q('[data-testid="turn-held"]').textContent).toContain('Hold the bridge.');
+    // Ctrl+Enter in the box holds nothing either.
+    t.q('#desk-order-text').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }),
+    );
+    await t.settle();
+    expect(t.actions.hold).not.toHaveBeenCalled();
   });
 });

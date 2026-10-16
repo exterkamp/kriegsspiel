@@ -19,6 +19,8 @@ import {
   timeOfDay,
   turnLine,
   turnPhase,
+  turnRights,
+  turnSenderText,
   turnsInBattle,
 } from '@legacy/desk/turn';
 import { orderProgress } from '@legacy/desk/orders';
@@ -97,6 +99,9 @@ export class TurnOrdersComponent {
       .reverse();
   });
   protected readonly held = computed(() => this.turn()?.held ?? []);
+  /** Only a seat that signs may send; intelligence may not hold or withdraw either (#428). */
+  protected readonly rights = computed(() => turnRights(this.game.state().view?.role));
+  protected readonly senderText = computed(() => turnSenderText(this.rights()));
   private readonly names = computed(
     () => new Map((this.game.state().view?.ownUnits ?? []).map((u) => [u.id, u.name])),
   );
@@ -145,6 +150,7 @@ export class TurnOrdersComponent {
   }
 
   protected send(): void {
+    if (this.rights() !== 'send') return;
     if (!this.confirming()) {
       this.confirming.set(true);
       return;

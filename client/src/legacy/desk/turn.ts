@@ -1,5 +1,5 @@
 /** Turn mode on the desk (D39, story 11.10): pure rules for the clock line, the send panel and the diary. */
-import type { TurnOrder } from '@kriegsspiel/protocol';
+import type { Role, TurnOrder } from '@kriegsspiel/protocol';
 import { formatGameTime, type ClientState, type TurnInfo } from '../net/state.js';
 import type { JournalEntry } from './journal.js';
 
@@ -118,6 +118,35 @@ export function deadlineText(deadline: number | undefined, nowWall: number): str
   if (h < 48) return `Orders due in ${h} h${min % 60 ? ` ${min % 60} min` : ''}.`;
   // Whole days left, rounded down: a deadline must never seem further off than it is.
   return `Orders due in ${Math.floor(h / 24)} days.`;
+}
+
+/**
+ * What a seat may do with the turn's orders, as the hub allows it (D39, #428): a commander or subordinate holds
+ * and sends; the chief of staff and quartermaster hold for the commander to send; the intelligence officer does
+ * neither. Shared-HQ play has no role, and everyone there may send.
+ */
+export type TurnRights = 'send' | 'hold' | 'none';
+
+export function turnRights(role: Role | undefined): TurnRights {
+  if (role === undefined || role === 'commander' || role === 'subordinate') return 'send';
+  return role === 'intelligence' ? 'none' : 'hold';
+}
+
+/** Said in place of the Send button to a seat that cannot send. */
+export function turnSenderText(rights: TurnRights): string | undefined {
+  if (rights === 'hold') {
+    return "Your commander sends the turn's orders. Orders you hold here go with them.";
+  }
+  if (rights === 'none') {
+    return "The intelligence officer writes no orders. Your commander holds and sends the turn's orders.";
+  }
+  return undefined;
+}
+
+/** The turn panel's way to the orders desk: it offers to send only to a seat that can (#428). */
+export function ordersButtonText(held: number, rights: TurnRights): string {
+  if (held === 0) return rights === 'none' ? 'See the orders' : 'Write orders';
+  return rights === 'send' ? `Send orders (${held} held)` : `Orders (${held} held)`;
 }
 
 /** One line of the held list: `To 1st Battalion, by steady courier`. */

@@ -103,7 +103,13 @@
       @if (turnMode() && editing()) {
         <button type="button" id="order-cancel-edit" (click)="cancelEdit()">Cancel edit</button>
       }
-      <button type="button" id="order-sign" (click)="sign()" [disabled]="closed()">
+      <button
+        type="button"
+        id="order-sign"
+        (click)="sign()"
+        [disabled]="closed()"
+        [hidden]="barred()"
+      >
         {{
           !turnMode()
             ? 'Sign and send'

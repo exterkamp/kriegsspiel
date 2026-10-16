@@ -7,6 +7,7 @@ import {
   heldLine,
   howTurnsWork,
   lastTurnText,
+  ordersButtonText,
   pursuitText,
   resolvedText,
   sidesSent,
@@ -14,8 +15,36 @@ import {
   turnEntry,
   turnLine,
   turnPhase,
+  turnRights,
+  turnSenderText,
   turnsInBattle,
 } from './turn.js';
+
+describe('who may hold and send the turn (#428)', () => {
+  it('lets a commander, a subordinate and shared HQ send; staff hold; intelligence neither', () => {
+    expect(turnRights(undefined)).toBe('send');
+    expect(turnRights('commander')).toBe('send');
+    expect(turnRights('subordinate')).toBe('send');
+    expect(turnRights('chiefOfStaff')).toBe('hold');
+    expect(turnRights('quartermaster')).toBe('hold');
+    expect(turnRights('intelligence')).toBe('none');
+  });
+
+  it('says who sends to a seat that cannot, and nothing to one that can', () => {
+    expect(turnSenderText('send')).toBeUndefined();
+    expect(turnSenderText('hold')).toMatch(/Your commander sends/);
+    expect(turnSenderText('none')).toMatch(/intelligence officer writes no orders/);
+  });
+
+  it('offers Send on the turn panel only to a seat that can send', () => {
+    expect(ordersButtonText(0, 'send')).toBe('Write orders');
+    expect(ordersButtonText(2, 'send')).toBe('Send orders (2 held)');
+    expect(ordersButtonText(0, 'hold')).toBe('Write orders');
+    expect(ordersButtonText(2, 'hold')).toBe('Orders (2 held)');
+    expect(ordersButtonText(0, 'none')).toBe('See the orders');
+    expect(ordersButtonText(1, 'none')).toBe('Orders (1 held)');
+  });
+});
 
 const v = PROTOCOL_VERSION;
 const MIN = 60_000;
