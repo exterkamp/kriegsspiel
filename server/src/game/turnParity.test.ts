@@ -155,6 +155,19 @@ const CASES = [1, 2, 3, 4, 5, 6, 7, 8, 42, 1815].flatMap((seed) =>
   [10, 20, 30].map((turnMinutes) => ({ seed, turnMinutes })),
 );
 
+/**
+ * Cases where the modes part over a courier's interception (rules 4, #531), keyed `seed/turnMinutes`,
+ * with the game minute (ms) of the turn end the field first differs at or after. Seed 1815: a
+ * courier Red sends at minute 20 rides north of the bridge at minute 21. The courier pass judges
+ * Blue's cavalry where it stood at the turn's start (D39: interception against `T0` positions), south
+ * of the bridge Red holds, so out of reach and the order is delivered; in real time the cavalry has
+ * crossed by minute 21 and takes it. Under rules 3 both took it, as reach ignored the river.
+ */
+const T0_REACH = new Map<string, number>([
+  ['1815/10', 21 * MIN],
+  ['1815/20', 21 * MIN],
+]);
+
 describe('rigid turns against real time (#430)', () => {
   it.each(CASES)(
     'gives the same field at every turn end and the same outcome (seed $seed, $turnMinutes-minute turns)',
@@ -167,7 +180,16 @@ describe('rigid turns against real time (#430)', () => {
       // The field is the same to the metre and the man at every turn end, the fights included: the
       // couriers roll on dice of their own (#432), so the pass draws the world's dice as real time does.
       expect(turns.ends.length).toBeGreaterThan(0);
-      expect(turns.ends).toEqual(real.snaps);
+      const parts = T0_REACH.get(`${seed}/${turnMinutes}`);
+      if (parts !== undefined) {
+        // Up to the turn the courier rides in, then the games part (see `T0_REACH`).
+        const same = turns.ends.filter((e) => e.t < parts);
+        expect(same.length).toBeGreaterThan(0);
+        expect(same).toEqual(real.snaps.slice(0, same.length));
+        expect(turns.ends).not.toEqual(real.snaps);
+      } else {
+        expect(turns.ends).toEqual(real.snaps);
+      }
       // The same result, at the same time up to the minute rule.
       const [t, r] = [turns.world.outcome, real.world.outcome];
       expect(t?.winner).toBeDefined();

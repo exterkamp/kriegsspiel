@@ -150,6 +150,8 @@ export {
   INTERCEPT_CHECK_MS,
   MAX_GARBLE,
   MAX_LOSS,
+  CROSSING_HOLD_M,
+  canReachCourier,
   courierPosition,
   interceptChance,
   rideRisk,
