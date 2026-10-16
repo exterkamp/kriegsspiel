@@ -2,6 +2,8 @@ import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { mm } from '@kriegsspiel/engine';
+import { rulesParseTurnOrder } from '../../game/engineTurn.js';
 import {
   blindPacket,
   exportCases,
@@ -145,15 +147,39 @@ describe("the cases on the game's projection (engineTurn.projectTurn, #440)", ()
     );
     // a vague order is "no new order" to the rules, and its unit stands
     expect(parsed('ambiguous-order').every((o) => o.none !== undefined)).toBe(true);
-    // the rules leave conditions to the umpire
-    expect(parsed('rout-pursuit').find((o) => o.orderId === 'b3-5')?.none).toMatch(/condition/);
+    // the rules leave conditions to the umpire: a conditional order is no new order, and a
+    // sentence after the plain ones ("If pressed by infantry, fall back ...") is not carried out
+    expect(parsed('advance-to-contact').find((o) => o.orderId === 'r3-2')?.none).toMatch(
+      /condition/,
+    );
+    const contact = byId('advance-to-contact');
+    const picket = contact.orders.find((o) => o.orderId === 'b3-1')!;
+    expect(rulesParseTurnOrder(caseWorld(contact), picket).intents).toEqual([
+      { kind: 'hold', at: { x: mm(2050), y: mm(1390) } },
+    ]);
+    // the march halts short of the river, so the Vanguard does not walk onto the bridge (#522)
+    const march = caseTurn(byId('uncontested-march')).projection;
+    expect(march.orders.find((o) => o.orderId === 'r1-1')?.intents).toEqual([
+      { kind: 'move', to: { x: mm(2050), y: mm(1060) } },
+      { kind: 'hold', at: { x: mm(2050), y: mm(1060) } },
+    ]);
+    expect(march.summary.outcome).toBeUndefined();
   });
 
   it("stops at the game's end, as advanceUntilOver does", () => {
-    const { projection, input } = caseTurn(byId('uncontested-march'));
+    // the uncontested march sent on to the bridge itself: Red takes it before the turn is out
+    const base = byId('uncontested-march');
+    const c: TurnCase = {
+      ...base,
+      id: 'uncontested-march-to-bridge',
+      orders: base.orders.map((o) =>
+        o.orderId === 'r1-1' ? { ...o, text: 'Advance south down the road to the bridge.' } : o,
+      ),
+    };
+    const { projection, input } = caseTurn(c);
     expect(projection.summary.outcome).toMatchObject({ winner: 'red', reason: 'objective-taken' });
     expect(projection.state.time).toBeLessThan(input.endMs);
-    expect(turnInput(byId('uncontested-march')).projection.outcome).toBeDefined();
+    expect(turnInput(c).projection.outcome).toBeDefined();
   });
 
   it('rides an order sent in an earlier turn from its own sending, and misreads a garbled one', () => {
@@ -414,7 +440,7 @@ describe('automatic checks', () => {
         edited(c, (p) => Object.assign(unit(p, 'blue-1'), { x: 1800 })),
         'departure',
       )[0],
-    ).toMatch(/blue-1: 160 m from the projection/);
+    ).toMatch(/blue-1: 250 m from the projection/); // it holds the bridge's south end (#522)
     expect(
       checkProposal(
         c,
@@ -424,13 +450,14 @@ describe('automatic checks', () => {
       ).problems.departure,
     ).toEqual([]);
     // more than 5% of 600 men lost, or a status the projection does not have, needs a reason too
+    // (the projection has it lose 33 men holding the bridge's south end against the Vanguard)
     expect(
       fails(
-        edited(c, (p) => (unit(p, 'blue-1').strength = 560)),
+        edited(c, (p) => (unit(p, 'blue-1').strength = 520)),
         'departure',
       ),
     ).toEqual([
-      expect.stringMatching(/^blue-1: strength 560 vs projected 600, no departure reason$/),
+      expect.stringMatching(/^blue-1: strength 520 vs projected 567, no departure reason$/),
     ]);
     expect(
       fails(
@@ -439,7 +466,7 @@ describe('automatic checks', () => {
       ),
     ).toEqual(['blue-1: status broken vs projected active, no departure reason']);
     for (const edit of [
-      (o: TurnProposal['units'][number]) => (o.strength = 560),
+      (o: TurnProposal['units'][number]) => (o.strength = 520),
       (o: TurnProposal['units'][number]) => (o.status = 'broken'),
     ]) {
       expect(

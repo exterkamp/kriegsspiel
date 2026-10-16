@@ -4,7 +4,7 @@
   "provider": "test",
   "promptVersion": "adjudicate-v4",
   "rules": 2,
-  "latencyMs": 3,
+  "latencyMs": 5,
   "usage": {
     "inputTokens": 0,
     "outputTokens": 0
