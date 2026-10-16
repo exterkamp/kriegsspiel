@@ -18,7 +18,7 @@ import { overlapsBeyondTolerance, proposedArrangement, validatePlacement } from 
 import { schedule } from './queue.js';
 import { ROAD_CLASS_COST } from './terrain.js';
 import { FORMATION_RULES, unitTypeOf } from './unitTypes.js';
-import { canSee, coarseFacing, sizeEstimate } from './visibility.js';
+import { canSee, coarseFacing, contactReport, fileReport, sizeEstimate } from './visibility.js';
 import { FORCED_PACE_FACTOR } from './fatigue.js';
 import { recordInJournal } from './journal.js';
 import type {
@@ -28,6 +28,7 @@ import type {
   GameTime,
   Intent,
   Point,
+  Report,
   SideId,
   TurnFlag,
   TurnRuling,
@@ -36,6 +37,10 @@ import type {
 } from './types.js';
 
 export const TURN_EVENT = 'umpire.turn';
+/** A paper from the umpire's staff to every side about the turn itself (D39, 11.9): see `issueTurnNotice`. */
+export const TURN_NOTICE_EVENT = 'turn.notice';
+/** Who signs a `notice`. */
+export const TURN_NOTICE_FROM = "The umpire's staff";
 
 /** Under `standard`, an outcome further than this from the projection's end position must say why. */
 export const DEPARTURE_TOLERANCE_M = 100;
@@ -780,6 +785,91 @@ function contactOf(target: Unit, at: Point, time: GameTime): Contact {
 }
 
 /**
+ * Each side's papers on an umpire turn (D39, 11.9, #405), filed at the turn's end and handed in
+ * at once, in unit-id order: one `turn` report from each of its units that came through (where it
+ * stands, what became of its orders, what it lost), a `unitLost` from headquarters for each one
+ * destroyed or taken, and a `contact` for each enemy its units saw at the end that it did not
+ * have in sight before, from the first of its units that saw it. Built from the applied outcome
+ * only; the umpire's words (`account`) are added by the server when it narrates them, never here.
+ */
+function turnReports(
+  before: GameState,
+  after: GameState,
+  check: TurnValidation,
+  startMs: GameTime,
+  endMs: GameTime,
+  n: number,
+): GameState {
+  let world = after;
+  const startOf = new Map(before.units.map((u) => [u.id, u]));
+  const startAt = new Map(before.units.map((u) => [u.id, positionAt(before.map, u, startMs)]));
+  for (const side of world.sides) {
+    for (const o of check.outcomes) {
+      const u = world.units.find((x) => x.id === o.unitId);
+      const was = startOf.get(o.unitId);
+      if (!u || !was || u.side !== side.id) continue;
+      if (u.status === 'destroyed') {
+        world = fileReport(world, 'unitLost', u, endMs, 0);
+        continue;
+      }
+      const at = startAt.get(u.id) ?? was.center;
+      const prefix = `${side.id}-`;
+      const facts: NonNullable<Report['turn']> = {
+        n,
+        lost: Math.max(0, Math.round(was.strength - u.strength)),
+        movedM: Math.round(metres(distanceMm(at, u.center))),
+        ...(o.broke ? { broke: true as const } : {}),
+        ...(o.rallied ? { rallied: true as const } : {}),
+        orders: o.orders.map((r) => ({
+          ...(r.orderId.startsWith(prefix) ? { ref: r.orderId.slice(prefix.length) } : {}),
+          result: r.result,
+        })),
+      };
+      world = fileReport(world, 'turn', u, endMs, 0, { turn: facts });
+    }
+    const wasInSight = new Set(before.intel[side.id].inSight);
+    const reported = new Set<string>();
+    for (const o of check.observations) {
+      if (o.side !== side.id || o.when !== 'end' || wasInSight.has(o.unitId)) continue;
+      if (reported.has(o.unitId)) continue;
+      const observer = world.units.find((x) => x.id === o.by);
+      const target = world.units.find((x) => x.id === o.unitId);
+      if (!observer || !target || target.status === 'destroyed') continue;
+      reported.add(o.unitId);
+      const reports = world.intel[side.id].reports;
+      const report = contactReport(
+        world,
+        `${side.id}-r${reports.length + 1}`,
+        observer,
+        target,
+        endMs,
+        endMs,
+      );
+      world = {
+        ...world,
+        intel: {
+          ...world.intel,
+          [side.id]: { ...world.intel[side.id], reports: [...reports, report] },
+        },
+      };
+    }
+  }
+  return world;
+}
+
+/**
+ * Queue a `notice` to every side at `time`, from the umpire's staff, in `text` (D39, 11.9): the
+ * in-fiction word that a turn the umpire could not decide was resolved by the tables. Pure.
+ */
+export function issueTurnNotice(
+  state: EngineState<GameState>,
+  time: GameTime,
+  text: string,
+): EngineState<GameState> {
+  return schedule(state, [{ time, type: TURN_NOTICE_EVENT, payload: { text } }]);
+}
+
+/**
  * Register `umpire.turn`. At the turn's end it validates the proposal (the same check the
  * pipeline ran) and applies it in one step: each unit's outcome, its standing intent, the end of
  * every march leg, the sightings that stood, a `TurnRuling` per correction, rally tries for units
@@ -787,6 +877,40 @@ function contactOf(target: Unit, at: Point, time: GameTime): Contact {
  * back before issuing one, so meeting one here means the log and the world disagree.
  */
 export function registerTurn(registry: EventRegistry<GameState>): void {
+  registry.register(TURN_NOTICE_EVENT, (w, ev) => {
+    const text = (ev.payload as { text?: unknown } | undefined)?.text;
+    if (typeof text !== 'string' || text.trim() === '') {
+      throw new Error(`${TURN_NOTICE_EVENT}: no text`);
+    }
+    // Nothing is written after the game (#438).
+    if (w.outcome) return { world: w };
+    let world = w;
+    for (const side of w.sides) {
+      const reports = world.intel[side.id].reports;
+      const at = side.hq ?? world.units.find((u) => u.side === side.id)?.center ?? { x: 0, y: 0 };
+      const report: Report = {
+        id: `${side.id}-r${reports.length + 1}`,
+        kind: 'notice',
+        observedAt: ev.time,
+        deliverAt: ev.time,
+        from: TURN_NOTICE_FROM,
+        location: { ...at },
+        place: '',
+        uncertainty: 0,
+        confidence: 'high',
+        text,
+      };
+      world = {
+        ...world,
+        intel: {
+          ...world.intel,
+          [side.id]: { ...world.intel[side.id], reports: [...reports, report] },
+        },
+      };
+    }
+    return { world };
+  });
+
   registry.register(TURN_EVENT, (w, ev) => {
     if (w.outcome) return { world: w };
     const { proposal, context } = ev.payload as unknown as TurnPayload;
@@ -827,6 +951,7 @@ export function registerTurn(registry: EventRegistry<GameState>): void {
       intel[s.id] = { ...intel[s.id], inSight };
     }
     world = { ...world, intel };
+    world = turnReports(w, world, check, startMs, endMs, n);
 
     const rulings: TurnRuling[] = check.corrections.map((c, i) => {
       return {

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { PROTOCOL_VERSION, parseServerMessage, type ServerMessage } from '@kriegsspiel/protocol';
+import { holdTheBridge, loadScenario } from '@kriegsspiel/engine';
+import {
+  PROTOCOL_VERSION,
+  parseServerMessage,
+  type Dispatch,
+  type ServerMessage,
+} from '@kriegsspiel/protocol';
 import { MemoryGameStore } from '../game/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { buildApp, type App } from './app.js';
@@ -357,18 +363,48 @@ describe('the turn umpire in the app (D39, 11.6)', () => {
     return { log, lead, red };
   };
 
-  it('adjudicates a standard turn with the umpire, and sends a side none of its words', async () => {
+  it('adjudicates a standard turn with the umpire, and sends each side its own papers (11.9)', async () => {
     const { requests, client } = counting();
     const t = await startedTable({ adjudicator: () => client });
     const { log, red, lead } = await playOneTurn(t);
-    expect(requests.map((r) => r.stage)).toEqual(['adjudicate']);
+    // One adjudicate call, then one report call per side.
+    expect(requests.map((r) => r.stage)).toEqual(['adjudicate', 'narrate', 'narrate']);
     const turn = log.find((e) => e.command.kind === 'resolveTurn')!;
     expect(turn.turn!.adjudicator).toBe('umpire');
     expect(turn.calls).toHaveLength(1);
-    // The proposal is master state: its accounts and summary go to no side.
-    for (const tap of [red, lead]) {
-      expect(JSON.stringify(tap.messages)).not.toContain('staff tables');
-      expect(JSON.stringify(tap.messages)).not.toContain('resolved by the tables');
+    const reported = log.filter((e) => e.command.kind === 'turnReports');
+    expect(reported.map((e) => (e.command as { side: string }).side).sort()).toEqual([
+      'blue',
+      'red',
+    ]);
+    for (const e of reported) {
+      expect(e.calls).toHaveLength(1);
+      expect(e.narrated!.length).toBeGreaterThan(0);
+    }
+    // The turn's papers reach each in-tray at the turn's end, in the units' own narrated words:
+    // the canned umpire's account of each of the side's own units ("... staff tables direct").
+    const { units } = loadScenario(holdTheBridge);
+    for (const [tap, side] of [
+      [lead, 'blue'],
+      [red, 'red'],
+    ] as const) {
+      const papers = await tap.until((m) => {
+        const got = m.flatMap((x) =>
+          x.kind === 'dispatch' && x.dispatch.kind === 'turn' ? [x.dispatch] : [],
+        );
+        return got.length > 0 ? got : undefined;
+      });
+      const own = units.filter((u) => u.side === side).map((u) => u.name);
+      for (const d of papers as Dispatch[]) {
+        expect(own).toContain(d.from);
+        expect(d.writtenAtGame).toBe(turn.turn!.endMs);
+        expect(d.receivedAtGame).toBe(turn.turn!.endMs);
+        expect(d.text).toContain('staff tables');
+      }
+      // The proposal's summary is master state, and no paper names the other side's units.
+      const sent = JSON.stringify(tap.messages);
+      expect(sent).not.toContain('resolved by the tables');
+      for (const u of units.filter((x) => x.side !== side)) expect(sent).not.toContain(u.name);
     }
     app!.hub.closeAll();
   });

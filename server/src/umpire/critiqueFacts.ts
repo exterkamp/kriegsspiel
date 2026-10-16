@@ -83,6 +83,8 @@ const REPORT_THING: Record<Report['kind'], string> = {
   heavyLosses: 'heavy losses',
   broke: 'a unit breaking',
   battle: 'the battle',
+  turn: "a unit's turn",
+  notice: 'a turn resolved by the tables',
 };
 
 type Draft = Omit<CritiqueFact, 'id'> & { ms: number };
