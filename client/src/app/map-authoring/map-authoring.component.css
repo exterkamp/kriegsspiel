@@ -93,7 +93,16 @@ ks-map-authoring {
     border-bottom: 1px solid var(--ks-rule);
   }
   nav button {
+    flex: none;
     min-height: 36px;
+    white-space: nowrap;
+  }
+  /* Zoom out and in stay together at the far end, so they never wrap apart. */
+  nav .zoom {
+    display: flex;
+    flex: none;
+    gap: var(--ks-space-2);
+    margin-left: auto;
   }
   #zoom-in,
   #zoom-out {
@@ -103,9 +112,6 @@ ks-map-authoring {
   nav .site-selector {
     min-width: 170px;
     max-width: 280px;
-  }
-  .spacer {
-    flex: 1;
   }
   .canvas-wrap {
     position: relative;
@@ -300,13 +306,22 @@ ks-map-authoring {
     #layers {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+    /* One row at phone width (#496): the site select takes what the buttons leave and shrinks first. */
     nav {
+      flex-wrap: nowrap;
       padding: var(--ks-space-2);
       gap: var(--ks-space-1);
     }
+    nav button {
+      padding-inline: var(--ks-space-2);
+    }
+    nav .zoom {
+      gap: var(--ks-space-1);
+    }
     nav .site-selector {
-      max-width: 100%;
-      flex: 1;
+      flex: 1 1 0;
+      min-width: 0;
+      max-width: none;
     }
   }
 }
