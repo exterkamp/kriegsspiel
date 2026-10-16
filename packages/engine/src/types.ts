@@ -20,14 +20,20 @@ export const MS_PER_MINUTE = 60 * MS_PER_SECOND;
  *   (`Courier.dice`), seeded by one draw from the world's RNG as it sets out.
  * - 3 (#528): the objective's hold counts only while it is uncontested: no standing enemy in
  *   contact with a holder or within `CONTEST_RADIUS_M` of the objective (D13).
+ * - 4 (#531): an enemy takes a courier only if it could reach it: by a straight ride over passable
+ *   ground, or by its cheapest route within its arm's reach, never over a crossing the courier's
+ *   side holds (`CROSSING_HOLD_M`; D11).
  */
-export const RULES_VERSION = 3;
+export const RULES_VERSION = 4;
 
 /** True when couriers roll on their own stream (rules 2, #432). */
 export const courierStreams = (world: { rules?: number }): boolean => (world.rules ?? 1) >= 2;
 
 /** True when an enemy contesting the objective stops the attacker's hold (rules 3, #528). */
 export const contestedHolds = (world: { rules?: number }): boolean => (world.rules ?? 1) >= 3;
+
+/** True when an enemy must be able to reach a courier to take it (rules 4, #531). */
+export const interceptReach = (world: { rules?: number }): boolean => (world.rules ?? 1) >= 4;
 
 export type SideId = 'blue' | 'red';
 

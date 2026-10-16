@@ -51,8 +51,8 @@ const replay = (game: Logged, header: InputLogHeader = game.header) =>
   );
 
 describe('a contested objective, versioned (#528)', () => {
-  it('is rules 3', () => {
-    expect(RULES_VERSION).toBe(3);
+  it('is rules 3 or later', () => {
+    expect(RULES_VERSION).toBeGreaterThanOrEqual(3);
   });
 
   it.each(['realtime', 'turns'] as const)(
