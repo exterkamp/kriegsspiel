@@ -1,4 +1,10 @@
-import { holdTheBridge, loadScenario, type EngineState, type GameState } from '@kriegsspiel/engine';
+import {
+  createState,
+  holdTheBridge,
+  loadScenario,
+  type EngineState,
+  type GameState,
+} from '@kriegsspiel/engine';
 import type { TurnOrder, UmpireSettings } from '@kriegsspiel/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser } from '../orders/index.js';
@@ -274,6 +280,33 @@ describe('the engine adjudicator: rigid turn mode (D39, 11.4)', () => {
     expect(b1.from.at).toEqual(expect.any(String));
     expect(b1.path!.length).toBeGreaterThan(1);
     expect(first.events.some((e) => e.includes('order_delivered'))).toBe(true);
+  });
+
+  it('measures the resupply the projection gave, for the ammunition ceiling (#436)', () => {
+    const world = loadScenario(holdTheBridge);
+    // Blue's cavalry stands on the high road in wagon reach of Blue HQ and gets no orders, so
+    // it rests the whole turn. At 30 it takes two wagon ticks of 25 in 20 minutes.
+    const start = startingState(
+      createState(world.seed, {
+        ...world,
+        units: world.units.map((u) => (u.id === 'blue-3' ? { ...u, ammo: 30 } : u)),
+      }),
+    );
+    const p = projectTurn(
+      start,
+      { n: 1, startMs: 0, endMs: 20 * MINUTE, orders: [] },
+      createRegistry(),
+    );
+    expect(p.resupply).toEqual({ 'blue-3': 50 });
+    expect(p.state.world.units.find((u) => u.id === 'blue-3')!.ammo).toBe(80);
+    // The projection still ends where the caller's own registry would run it: measuring
+    // changed nothing.
+    const plain = projectTurn(
+      start,
+      { n: 1, startMs: 0, endMs: 20 * MINUTE, orders: [] },
+      createRegistry(),
+    );
+    expect(JSON.stringify(plain.state.world)).toBe(JSON.stringify(p.state.world));
   });
 });
 

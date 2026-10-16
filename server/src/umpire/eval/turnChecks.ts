@@ -10,8 +10,10 @@
  *   the `T0` position over the whole turn, whatever minute the unit's orders arrived: deliberately
  *   coarse, as D39 words it), `0 <= strength <= T0 strength` with 0 meaning destroyed,
  *   morale, fatigue and ammunition in 0..100, and no loss for a unit no enemy could reach in the turn.
- * - `ammo`: D39's ceiling, ammunition no higher than the projection's. Kept apart from `limits`
- *   because it also fails an umpire that has a unit fire less than the engine did (see the docs).
+ * - `ammo`: D39's ceiling: where the context carries the projection's resupply (#436), no
+ *   higher than the start-of-turn value plus that resupply (the validator's ceiling); otherwise
+ *   no higher than the projection's end value. Kept apart from `limits` because the old form
+ *   also fails an umpire that has a unit fire less than the engine did (see the docs).
  * - `observations`: the observer is the side's own unit and the engine's sight test passes at the
  *   end the observation names.
  * - `fog`: no unit's account names the other side's units or commanders (`hiddenIn`).
@@ -135,6 +137,15 @@ export interface TurnCheckContext {
   turn: number;
   turnMs: number;
   projection: readonly ProjectedOutcome[];
+  /**
+   * Ammunition the projection's supply rule gave each unit, by unit id (#436), as the engine's
+   * `TurnContext` carries it. When present, the `ammo` check uses the validator's ceiling (the
+   * start-of-turn value plus this, capped at 100) instead of the projection's end value. The
+   * live adjudicate stage passes the turn's measured resupply, and so does the benchmark, which
+   * runs the game's projection (#440). Absent (a caller with no measured resupply), the check
+   * keeps the end-value form.
+   */
+  resupply?: Record<string, number>;
   /** Every order the umpire was shown, by the id it was shown with: arrived by the turn's end, or on the road. */
   orders: readonly { orderId: string; to: string; arrived: boolean }[];
   /** Departure reasons are checked under `standard` only. */
@@ -223,7 +234,14 @@ export function checkTurnProposal(raw: unknown, ctx: TurnCheckContext): CheckRes
         problems.limits.push(`${u.id}: ${k} ${v} outside 0..100`);
     }
     const proj = projection.find((x) => x.unitId === u.id);
-    if (proj && o.ammo !== undefined && o.ammo > proj.ammo + 0.5)
+    if (o.ammo !== undefined && ctx.resupply !== undefined) {
+      // The validator's ceiling (#436): the start value plus what supply gave the unit, so a
+      // proposal that fired less than the projection is not sent back for keeping the
+      // difference, as the projection's end value alone would have it.
+      const ceiling = Math.min(100, u.ammo + (ctx.resupply[u.id] ?? 0));
+      if (o.ammo > ceiling + 0.5)
+        problems.ammo.push(`${u.id}: ammo ${o.ammo} above the ceiling ${ceiling}`);
+    } else if (proj && o.ammo !== undefined && o.ammo > proj.ammo + 0.5)
       problems.ammo.push(`${u.id}: ammo ${o.ammo} above the projected ${proj.ammo}`);
     const loss = Math.round(u.strength) - o.strength;
     const projLoss = proj ? Math.round(u.strength) - proj.strength : 0;
