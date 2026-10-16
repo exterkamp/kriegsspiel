@@ -388,13 +388,24 @@ export function departureRequest(checks: readonly string[]): string | undefined 
   );
 }
 
-/** The check context the benchmark's checks need, from the stage's input (the benchmark's too, #440). */
-export function checkContext(world: GameState, turn: AdjudicateTurn): TurnCheckContext {
+/**
+ * The check context the live stage's checks need, from the stage's input (the benchmark's too,
+ * #440), with the validator context's measured resupply (#436) where it carries one.
+ */
+export function checkContext(
+  world: GameState,
+  turn: AdjudicateTurn,
+  resupply?: Record<string, number>,
+): TurnCheckContext {
   return {
     // The checks measure the march from where each unit stands at the turn's start.
     world: standingAt(world, turn.startMs),
     turn: turn.n,
     turnMs: turn.endMs - turn.startMs,
+    // The validator's context carries the projection's measured resupply (#436), so the
+    // checks' ammo ceiling is the validator's (start plus resupply), not the projection's
+    // end value: a sound proposal is not sent back for ammunition it legitimately kept.
+    ...(resupply !== undefined ? { resupply } : {}),
     projection: turn.projection.units.map((u) => ({
       unitId: u.unitId,
       x: u.x,
@@ -491,7 +502,7 @@ export function judge(
       extra.push(`${u.unitId}: the account speaks of dice or odds; a commander knows only events`);
     }
   }
-  const checks = checkTurnProposal(proposal, checkContext(world, turn));
+  const checks = checkTurnProposal(proposal, checkContext(world, turn, context.resupply));
   const validation = validateProposal(world, proposal, context);
   extra.push(...sightProblems(world, proposal, validation));
   // Departures with no reason are asked for in one line, first, naming the units (#523).

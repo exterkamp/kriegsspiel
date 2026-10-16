@@ -16,6 +16,7 @@ import {
   summarise,
   tableMarkdown,
 } from './bench.js';
+import { checkTurnProposal, type TurnCheckContext } from './turnChecks.js';
 import { CASE_RULES_VERSION, TURN_CASES, type TurnCase } from './turnCases.js';
 import {
   ADJUDICATE_PROMPT_VERSION,
@@ -27,7 +28,7 @@ import {
   turnStartMs,
 } from './turnInput.js';
 import { TurnProposal } from './turnProposal.js';
-import { adjudicateSystem, judge } from '../adjudicate.js';
+import { adjudicateSystem, checkContext, judge } from '../adjudicate.js';
 import { withPersona } from '../persona.js';
 import type { LlmProvider } from '../provider.js';
 
@@ -340,8 +341,9 @@ describe('automatic checks', () => {
     ).toEqual(['blue-3 was destroyed']);
   });
 
-  it('fails ammunition above the projection, and allows a loss to a unit an enemy could reach', () => {
-    // the Vanguard starts nearly out of cartridges; the projection's resupply leaves it under 100
+  it('fails ammunition above the ceiling, and allows a loss to a unit an enemy could reach', () => {
+    // the Vanguard starts nearly out of cartridges and the projection resupplies it nothing, so
+    // its ceiling is the start value (#436: the start plus the projection's resupply)
     const assault = byId('bridge-assault');
     const a: TurnCase = {
       ...assault,
@@ -356,8 +358,33 @@ describe('automatic checks', () => {
       }),
     );
     expect(r.problems.limits).toEqual([]);
-    expect(r.problems.ammo).toEqual([
-      expect.stringMatching(/^red-1: ammo 100 above the projected/),
+    expect(r.problems.ammo).toEqual(['red-1: ammo 100 above the ceiling 10']);
+  });
+
+  it('uses the start value plus the resupply as the ammo ceiling when the context carries it (#436)', () => {
+    // The live adjudicate stage's context: a unit that started at 50, was resupplied 25 in
+    // the projection and ended there at 25, because the projection fired the rest away.
+    const a = byId('bridge-assault');
+    const { state, turn } = caseTurn(a);
+    const base = checkContext(state.world, turn);
+    const ctx: TurnCheckContext = {
+      ...base,
+      world: {
+        ...base.world,
+        units: base.world.units.map((u) => (u.id === 'red-1' ? { ...u, ammo: 50 } : u)),
+      },
+      projection: base.projection.map((u) => (u.unitId === 'red-1' ? { ...u, ammo: 25 } : u)),
+    };
+    const at = (ammo: number) => edited(a, (p) => (unit(p, 'red-1').ammo = ammo));
+    // Without the resupply the end-value form sends the sound proposal back, as before.
+    expect(checkTurnProposal(at(70), ctx).problems.ammo).toEqual([
+      'red-1: ammo 70 above the projected 25',
+    ]);
+    // With it, 70 (no more than 50 + 25) passes, and past the ceiling it still fails.
+    const live: TurnCheckContext = { ...ctx, resupply: { 'red-1': 25 } };
+    expect(checkTurnProposal(at(70), live).problems.ammo).toEqual([]);
+    expect(checkTurnProposal(at(80), live).problems.ammo).toEqual([
+      'red-1: ammo 80 above the ceiling 75',
     ]);
   });
 

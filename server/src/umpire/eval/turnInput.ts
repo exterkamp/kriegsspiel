@@ -288,9 +288,9 @@ export function turnInput(c: TurnCase) {
 
 /** The automatic checks on a reply, with the context the live stage's gate uses. */
 export function checkProposal(c: TurnCase, raw: unknown): CheckResult {
-  const { state, turn } = caseTurn(c);
+  const { state, turn, context } = caseTurn(c);
   return checkTurnProposal(raw, {
-    ...checkContext(state.world, turn),
+    ...checkContext(state.world, turn, context.resupply),
     ...(c.canary ? { canary: c.canary } : {}),
     ...(c.expectsRoll ? { expectsRoll: true } : {}),
   });

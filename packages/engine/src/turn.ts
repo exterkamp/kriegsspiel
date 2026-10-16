@@ -110,10 +110,20 @@ export interface TurnContext {
   dial: Dial;
   /**
    * The engine's projection of the turn (11.4): its units at `endMs`. It sets the ceilings an
-   * outcome may not pass (ammunition, losses out of reach) and, under `standard`, the outcome a
-   * departure must explain. Without it the start-of-turn values stand in.
+   * outcome may not pass (losses out of reach; ammunition's ceiling is the start-of-turn value
+   * plus `resupply`) and, under `standard`, the outcome a departure must explain. Without it the
+   * start-of-turn values stand in.
    */
   projection?: Unit[];
+  /**
+   * Ammunition the projection's supply rule gave each unit in the turn, by unit id (#436). The
+   * ammunition ceiling is the start-of-turn value plus this: a unit the umpire had fire less
+   * than the projection keeps the difference, which the projection's end value alone would
+   * wrongly clamp away. Absent with a projection: the context was logged before #436, so the
+   * old ceiling (the projection's end value) stands, and replay matches what was applied live.
+   * Absent with no projection: no resupply is known, so the start-of-turn value is the ceiling.
+   */
+  resupply?: Record<string, number>;
   /** Every order sent to a unit so far, with whether it had arrived. Absent: orders unchecked. */
   orders?: TurnOrderStatus[];
   /** The rolls the engine made for this turn on the umpire's dice (11.7, `turnDice.ts`). */
@@ -533,7 +543,19 @@ export function validateProposal(
     };
     const morale = bounded('morale', finite(w.morale, u.morale));
     const fatigue = bounded('fatigue', finite(w.fatigue, p?.fatigue ?? u.fatigue));
-    const ammoCeiling = Math.min(100, p?.ammo ?? u.ammo);
+    // The ceiling is what the unit started with plus what the supply rule gave it in the
+    // projection (#436): a proposal that fired less than the projection keeps the difference,
+    // rather than being corrected down to the projection's end value. A context with a
+    // projection but no resupply was logged before #436: it keeps the old ceiling (the
+    // projection's end value), so replaying it validates as it did live instead of clamping
+    // outcomes that were applied, including ones that omitted ammunition (whose fallback is
+    // the projection's value). Only with neither does the start-of-turn value stand in.
+    const ammoCeiling =
+      ctx.resupply !== undefined
+        ? Math.min(100, u.ammo + (ctx.resupply[u.id] ?? 0))
+        : p
+          ? Math.min(100, p.ammo)
+          : Math.min(100, u.ammo);
     const ammo = bounded('ammo', finite(w.ammo, p?.ammo ?? u.ammo), ammoCeiling);
 
     // Status: destroyed and captured are final; broken is stored withdrawn; a rally needs a roll.

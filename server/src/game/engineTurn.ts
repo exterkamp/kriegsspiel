@@ -18,6 +18,7 @@
  *   actor's advance to the turn's end then reproduces the projection exactly.
  */
 import {
+  SUPPLY_TICK_EVENT,
   courierPass,
   describePlace,
   engineTurnStart,
@@ -206,6 +207,8 @@ export interface ProjectionSummary {
 /** The engine's projection of a turn: the state it ends in, what happened, and its summary. */
 export interface Projection {
   state: EngineState<GameState>;
+  /** Ammunition the supply rule gave each unit in the turn, by unit id (#436). */
+  resupply: Record<string, number>;
   emitted: EmittedEvent[];
   couriers: TurnCourier[];
   orders: RulesOrder[];
@@ -314,6 +317,22 @@ function runEngineTurn(
   agents: TurnAgent[] = [],
   pass: CourierPass = courierPass(state, orders, turn, registry),
 ) {
+  // What the supply rule gives each unit in the run, for the validator's ammunition ceiling
+  // (#436). The end values alone cannot say it (they mix the resupply with what the unit fired
+  // away), so the run watches the supply tick's own work through a registry that differs from
+  // the caller's only in that handler. The courier pass above already ran on the caller's
+  // registry, and its held world takes no resupply anyway.
+  const resupply = new Map<string, number>();
+  const supplyTick = registry.get(SUPPLY_TICK_EVENT);
+  const measured = registry.replaced(SUPPLY_TICK_EVENT, (world, ev, rng) => {
+    const before = new Map(world.units.map((u) => [u.id, u.ammo]));
+    const res = supplyTick(world, ev, rng);
+    for (const u of res.world.units) {
+      const gained = u.ammo - (before.get(u.id) ?? u.ammo);
+      if (gained > 0) resupply.set(u.id, (resupply.get(u.id) ?? 0) + gained);
+    }
+    return res;
+  });
   let s = engineTurnStart(state, orders, pass, turn);
   const emitted: EmittedEvent[] = [];
   const paths = new Map<string, [number, number][]>();
@@ -324,7 +343,7 @@ function runEngineTurn(
     }
   };
   const step = (to: number) => {
-    const res = advanceUntilOver(s, to, registry);
+    const res = advanceUntilOver(s, to, measured);
     s = res.state;
     emitted.push(...res.emitted);
     if (res.emitted.length > 0) for (const a of agents) a.idle = false;
@@ -352,7 +371,7 @@ function runEngineTurn(
     sample();
     if (t >= turn.endMs || s.world.outcome) break;
   }
-  return { state: s, emitted, paths, pass };
+  return { state: s, emitted, paths, pass, resupply: Object.fromEntries(resupply) };
 }
 
 /**
@@ -383,6 +402,7 @@ export function projectTurn(
   );
   return {
     state: run.state,
+    resupply: run.resupply,
     emitted: run.emitted,
     couriers: run.pass.couriers,
     orders: parsed,
