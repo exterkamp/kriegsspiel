@@ -10,6 +10,7 @@ import { TERRAIN_VERSION, CONTOUR_VERSION } from '../terrain/index.js';
 import {
   GEOGRAPHY_VERSION,
   COVER_VERSION,
+  LEGACY_COVER_VERSION,
   CROSSING_VERSION,
   LEGACY_CROSSING_VERSION,
   geographyPreset,
@@ -41,14 +42,21 @@ export const CURRENT_GENERATOR: MapAsset['provenance']['generator'] = Object.fre
  * same generator-independent rules, with the crossing deck policy they recorded.
  */
 export const LEGACY_GENERATORS: readonly MapAsset['provenance']['generator'][] = Object.freeze([
+  // v1 stages (before D44), with rectangle cover.
   Object.freeze({
     ...CURRENT_GENERATOR,
     stages: Object.freeze({
       ...CURRENT_GENERATOR.stages,
       terrain: 'value-noise-ridges-v1',
       hydrology: 'flood-carved-graded-backwater-v1',
+      cover: LEGACY_COVER_VERSION,
       roads: 'sites-lattice-decks-v1',
     }),
+  }),
+  // D44 stages with rectangle cover (before D45).
+  Object.freeze({
+    ...CURRENT_GENERATOR,
+    stages: Object.freeze({ ...CURRENT_GENERATOR.stages, cover: LEGACY_COVER_VERSION }),
   }),
 ]);
 function recordedIdentity(asset: unknown): MapAsset['provenance']['generator'] | undefined {

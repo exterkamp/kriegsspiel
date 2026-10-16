@@ -14,3 +14,6 @@ server/baselines/*.recording.json
 # Preserve certified canonical map bytes.
 data/maps/*.json
 server/bench/
+
+# Saved generator fixtures (canonical bytes).
+packages/maps/tests/fixtures/*.json

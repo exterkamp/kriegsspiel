@@ -11,7 +11,7 @@ import { deriveSeed } from '../overrides.js';
 import { canonicalizeAsset } from '../canonical.js';
 import { importAsset } from '../import.js';
 import { generateElevation, extractContours } from '../terrain/index.js';
-import { generateGeography } from '../geography/index.js';
+import { generateCover, generateGeography } from '../geography/index.js';
 import {
   createPlanningCertificates,
   generatePlanning,
@@ -51,7 +51,7 @@ export function generateBattlefield(raw: BattlefieldInput): BattlefieldResult {
         maxY: settings.heightM,
       };
     const source = requireValue(generateElevation(settings, seed)),
-      geo = requireValue(generateGeography(source, bounds, settings, seed));
+      geo = requireValue(generateGeography(source, bounds, settings, seed, {}, { cover: false }));
     const contours = requireValue(extractContours(geo.elevation, bounds, settings));
     const size = settings.settlements.farmSite;
     const preferredFarm = Math.max(
@@ -138,6 +138,25 @@ export function generateBattlefield(raw: BattlefieldInput): BattlefieldResult {
     };
     assembleLayouts(asset.layers, layouts, settings, meter);
     compactLocalStreets(asset.layers, meter);
+    // Cover is laid out last, around the final roads and settlements (D45),
+    // within the feature/coordinate capacity the other layers leave.
+    const usage = preflightAsset(
+      { layers: asset.layers },
+      {
+        ...HARD_LIMITS,
+        maxFeatures: settings.limits.maxFeatures,
+        maxVertices: settings.limits.maxVertices,
+      },
+    );
+    const coverSettings = structuredClone(settings);
+    coverSettings.limits.maxFeatures = Math.max(1, settings.limits.maxFeatures - usage.features);
+    coverSettings.limits.maxVertices = Math.max(1, settings.limits.maxVertices - usage.vertices);
+    asset.layers.cover = requireValue(
+      generateCover(geo.elevation, bounds, geo.water, coverSettings, seed, {
+        roads: asset.layers.roads,
+        sites: asset.layers.sites,
+      }),
+    );
     // Canonical geometry, rather than an unrounded trial, is the acceptance surface.
     const normalized = importAsset(canonicalizeAsset(asset));
     const validation = validateBattlefield(normalized, {
