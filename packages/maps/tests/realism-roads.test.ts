@@ -22,26 +22,12 @@ const MAX_GRID_ALIGNED_SHARE = 0.2;
 function plan(preset: (typeof PRESETS)[number], seed: number) {
   const settings = geographyPreset(preset),
     bounds = { minX: 0 as const, minY: 0 as const, maxX: settings.widthM, maxY: settings.heightM };
-  let geo;
-  try {
-    const elevation = generateElevation(settings, seed);
-    if (!elevation.ok) return undefined;
-    const g = generateGeography(
-      elevation.value,
-      bounds,
-      settings,
-      seed,
-      {},
-      {
-        cover: false,
-      },
-    );
-    if (!g.ok) return undefined;
-    geo = g.value;
-  } catch {
-    // Geography failures on some seeds are tracked separately (#542).
-    return undefined;
-  }
+  // Every seed plans since #542: a failure here is a regression.
+  const elevation = generateElevation(settings, seed);
+  if (!elevation.ok) throw new Error(JSON.stringify(elevation.diagnostics));
+  const g = generateGeography(elevation.value, bounds, settings, seed, {}, { cover: false });
+  if (!g.ok) throw new Error(JSON.stringify(g.diagnostics));
+  const geo = g.value;
   const result: GenerationResult<RegionalPlanningOutput> = generatePlanning({
     settings,
     seed,
@@ -52,9 +38,7 @@ function plan(preset: (typeof PRESETS)[number], seed: number) {
     requireBridge: settings.hydrology.requireRiver,
     preferredSiteExtentM: { farm: 50 },
   });
-  // A few seeds fail on main as well (on D47 relief, wooded-hills 2 and 11 throw
-  // in geography; #542); the corpus allows four failed maps in all.
-  if (!result.ok) return undefined;
+  if (!result.ok) throw new Error(`${preset} ${seed}: ${JSON.stringify(result.diagnostics)}`);
   const p = result.value;
   // Only the public layers the report reads; this is not a certified asset.
   const asset = {
@@ -96,7 +80,6 @@ describe('any-angle regional roads (#541)', () => {
     for (const preset of PRESETS)
       for (const seed of SEEDS) {
         const run = plan(preset, seed);
-        if (!run) continue;
         maps++;
         const { settings, plan: p, report } = run;
         // Grade, edge avoidance and crossings still pass the realism checks.
@@ -111,7 +94,7 @@ describe('any-angle regional roads (#541)', () => {
     console.info(
       `grid-aligned road length: ${((100 * aligned) / length).toFixed(1)}% of ${(length / 1000).toFixed(0)} km over ${maps} maps`,
     );
-    expect(maps).toBeGreaterThanOrEqual(PRESETS.length * SEEDS.length - 4);
+    expect(maps).toBe(PRESETS.length * SEEDS.length);
     expect(aligned / length).toBeLessThanOrEqual(MAX_GRID_ALIGNED_SHARE);
   }, 900_000);
 });

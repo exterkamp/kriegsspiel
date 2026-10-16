@@ -113,6 +113,21 @@ const BENCH: Record<string, M[] | RegExp> = {
     ['hold', 3051, 2193],
   ],
   'r1-12': [['hold', 1950, 300]], // "stand fast"
+  // crossing-assault (#535), the free game's decisive turn: storm the bridge, clear its south
+  // end, and form line across the road on the far bank
+  'r1-13': [
+    ['move', 2050, 1500],
+    ['move', 2050, 1610],
+    ['hold', 2050, 1640],
+  ],
+  // over the bridge behind the Vanguard, deployed on its left (east, facing south) on the far bank
+  'r2-13': [
+    ['move', 2050, 1610],
+    ['hold', 2200, 1640],
+  ],
+  'b1-13': [['hold', 1910, 1625]], // "hold your ground": where it stands
+  'b2-13': [['hold', 2190, 1640]], // "hold the bank": where it stands, fire being no move
+  'b3-13': /condition or a time/, // a charge only if the enemy gets over: the umpire's
 };
 
 describe('the rules parse of the benchmark orders (#522)', () => {
@@ -133,11 +148,12 @@ describe('the rules parse of the benchmark orders (#522)', () => {
     }
   });
 
-  // 29 orders are sent in the cases' turns, and the picket's (b3-1) the turn before.
-  it('gives 23 of the 30 an engine order (8 before #522, 21 before #536)', () => {
+  // 29 orders are sent in the first twelve cases' turns, and the picket's (b3-1) the turn before;
+  // crossing-assault (#535) adds five.
+  it('gives 27 of the 35 an engine order (8 of 30 before #522, 21 of 30 before #536)', () => {
     const read = orders.filter(({ c, o }) => rulesParseTurnOrder(caseWorld(c), o).intents);
-    expect(orders).toHaveLength(30);
-    expect(read).toHaveLength(23);
+    expect(orders).toHaveLength(35);
+    expect(read).toHaveLength(27);
   });
 });
 

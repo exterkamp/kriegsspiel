@@ -121,6 +121,7 @@ export function windowAt(input: ReplayInput, gameMs: number): WindowAt {
       lastKnownContacts: wire.lastKnownContacts,
     };
   }
+  const named = namedIn(world);
   return {
     gameMs: r.gameMs,
     units,
@@ -136,8 +137,47 @@ export function windowAt(input: ReplayInput, gameMs: number): WindowAt {
           : 'unitId' in x && x.unitId
             ? { unitId: x.unitId }
             : {}),
-        rationale: x.rationale,
-        narrative: x.narrative,
+        rationale: named(x.rationale),
+        narrative: 'kind' in x && x.kind === 'turn' ? turnNarrative(named, x) : named(x.narrative),
       })),
   };
+}
+
+/** What a corrected outcome field reads as in the window (#538). */
+const FIELD_WORDS: Record<string, string> = {
+  outcome: 'outcome',
+  departure: 'departure from the projection',
+  position: 'position',
+  strength: 'losses',
+  status: 'state',
+  morale: 'morale',
+  fatigue: 'fatigue',
+  ammo: 'ammunition',
+  orders: 'orders',
+  observation: 'sighting',
+};
+
+/**
+ * A turn ruling as a player reads it (#538): the unit by its name, not its id, and the field in
+ * words. The ruling itself keeps the id and field; only the window's wording changes.
+ */
+function turnNarrative(named: (text: string) => string, r: TurnRuling): string {
+  const what = FIELD_WORDS[r.field] ?? r.field;
+  return `The umpire's turn ${r.turn} was corrected for ${named(r.unitId)} (${what}): ${named(r.reason)}.`;
+}
+
+/**
+ * Text with every unit id in it replaced by the unit's name, longest id first so "red-10" is not
+ * read as "red-1" (#538). An id is matched only as a whole token.
+ */
+export function namedIn(world: GameState): (text: string) => string {
+  const units = [...world.units].sort((a, b) => b.id.length - a.id.length);
+  if (units.length === 0) return (text) => text;
+  const names = new Map(units.map((u) => [u.id, u.name]));
+  const escape = (id: string) => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(
+    `(?<![\\w-])(${units.map((u) => escape(u.id)).join('|')})(?![\\w-])`,
+    'g',
+  );
+  return (text) => text.replace(pattern, (id) => names.get(id) ?? id);
 }

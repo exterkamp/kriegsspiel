@@ -65,6 +65,8 @@ export interface TurnCase {
   previous?: string;
   /** A string an injected order tries to plant; it must appear nowhere in the proposal. */
   canary?: string;
+  /** The turn's fight calls for a roll (#535): the `assault` check fails a reply that cites none. */
+  expectsRoll?: boolean;
 }
 
 const arrived = (minute: number) => ({ kind: 'arrived' as const, minute });
@@ -513,6 +515,91 @@ export const TURN_CASES: TurnCase[] = [
         text: 'Stand fast.',
         courier: 'safe',
         courierStatus: arrived(2),
+      },
+    ],
+  },
+  {
+    id: 'crossing-assault',
+    title: 'A joint assault over the bridge on two battalions at the bridge-end, with a charge',
+    tests:
+      "Taken from the 11.12 playtest's decisive turn (#408, `free` game, turn 3; #535). The Vanguard in column at the north end storms the bridge at the bayonet with the Line Battalion close behind; Blue's two battalions in line either side of the road at the south end fire into its head and flank, and Blue's squadron is told to charge any infantry that gets across. Whether a column carries a defended bridge-end, and whether a charge goes home, hang on chance: a good umpire does not decide them by judgment but asks for a roll for the assault (well under even odds against two battalions at close range), and one for the charge if it is made, and the outcomes cite them. Whichever way the dice fall, the defenders lose men too: an assault pressed to close range costs the line tens of men even when it is thrown back. The attack breaking while Blue's infantry loses no one is wrong.",
+    turn: 3,
+    expectsRoll: true,
+    units: {
+      'blue-1': {
+        x: 1910,
+        y: 1625,
+        facingDeg: 0,
+        formation: 'line',
+        strength: 590,
+        fatigue: 15,
+        ammo: 70,
+      },
+      'blue-2': {
+        x: 2190,
+        y: 1625,
+        facingDeg: 0,
+        formation: 'line',
+        strength: 545,
+        fatigue: 15,
+        ammo: 70,
+      },
+      'blue-3': { x: 2050, y: 1710, facingDeg: 0, formation: 'line', fatigue: 10 },
+      'red-1': {
+        x: 2050,
+        y: 1340,
+        facingDeg: 180,
+        formation: 'column',
+        strength: 585,
+        fatigue: 30,
+        ammo: 60,
+        morale: 70,
+      },
+      'red-2': { x: 2050, y: 1180, facingDeg: 180, formation: 'column', fatigue: 25, ammo: 70 },
+      'red-3': { x: 1700, y: 1200, facingDeg: 90, formation: 'line', fatigue: 20 },
+    },
+    previous:
+      'Turn 2: the Vanguard and the Line Battalion came down to the north bank and traded fire across the river beyond effective range; at minute 34 the Vanguard formed column on the road at the north end of the bridge, the Line Battalion behind it. Blue lost about 15 men, Red about 65.',
+    orders: [
+      {
+        orderId: 'r1-13',
+        side: 'red',
+        to: 'red-1',
+        text: 'Push on at the bayonet now. Storm the bridge, clear the south end and form line across the road on the far bank. Hold it at all costs.',
+        courier: 'fast',
+        courierStatus: arrived(2),
+      },
+      {
+        orderId: 'r2-13',
+        side: 'red',
+        to: 'red-2',
+        text: 'Follow the Vanguard over the bridge at the double and deploy on its left on the far bank. Together hold the south end.',
+        courier: 'fast',
+        courierStatus: arrived(2),
+      },
+      {
+        orderId: 'b1-13',
+        side: 'blue',
+        to: 'blue-1',
+        text: 'Pour volleys into the head of the column as it comes off the bridge and hold your ground.',
+        courier: 'safe',
+        courierStatus: arrived(2),
+      },
+      {
+        orderId: 'b2-13',
+        side: 'blue',
+        to: 'blue-2',
+        text: 'Swing your left wing forward so that the whole battalion fires into the flank of any column on the bridge. Hold the bank.',
+        courier: 'safe',
+        courierStatus: arrived(2),
+      },
+      {
+        orderId: 'b3-13',
+        side: 'blue',
+        to: 'blue-3',
+        text: 'If enemy infantry gets over the bridge, charge it before it can form, then rally behind the infantry.',
+        courier: 'fast',
+        courierStatus: arrived(1),
       },
     ],
   },

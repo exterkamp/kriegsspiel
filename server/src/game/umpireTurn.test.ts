@@ -15,7 +15,7 @@ import {
   type TurnRuling,
 } from '@kriegsspiel/engine';
 import type { TurnOrder, TurnProposal, UmpireSettings } from '@kriegsspiel/protocol';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser } from '../orders/index.js';
 import { sideViewOf } from '../api/sideView.js';
@@ -832,11 +832,14 @@ describe('a recorded real-model turn (the benchmark’s Opus answers, #398, #440
       raw: string;
       checks: { problems: { schema: string[] } };
     };
+  // Cases added after that run (#535's `crossing-assault`) have no recorded answer.
+  const recorded = TURN_CASES.filter((c) => existsSync(new URL(`${c.id}.json`, dir)));
   // An answer that fails the schema is never applied, so there is nothing to replay.
-  const valid = TURN_CASES.filter((c) => run(c.id).checks.problems.schema.length === 0);
+  const valid = recorded.filter((c) => run(c.id).checks.problems.schema.length === 0);
 
   it('has most of the recorded answers to replay', () => {
-    expect(valid.length).toBeGreaterThanOrEqual(TURN_CASES.length - 2);
+    expect(recorded.length).toBeGreaterThanOrEqual(12);
+    expect(valid.length).toBeGreaterThanOrEqual(recorded.length - 2);
   });
 
   it.each(valid.map((c) => c.id))(
