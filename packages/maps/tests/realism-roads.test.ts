@@ -52,8 +52,8 @@ function plan(preset: (typeof PRESETS)[number], seed: number) {
     requireBridge: settings.hydrology.requireRiver,
     preferredSiteExtentM: { farm: 50 },
   });
-  // A few seeds fail on main as well (river-valley 17, wooded-hills 14 and 15;
-  // #542); the corpus allows four failed maps in all.
+  // A few seeds fail on main as well (on D47 relief, wooded-hills 2 and 11 throw
+  // in geography; #542); the corpus allows four failed maps in all.
   if (!result.ok) return undefined;
   const p = result.value;
   // Only the public layers the report reads; this is not a certified asset.
