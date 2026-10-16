@@ -19,3 +19,7 @@ server/bench/
 
 # Saved generator fixtures (canonical bytes).
 packages/maps/tests/fixtures/*.json
+
+# Playtest input logs (#408), exported from the server as played.
+server/src/game/playtest408/*.json
+docs/turn-playtest-evidence/orders/*.json
