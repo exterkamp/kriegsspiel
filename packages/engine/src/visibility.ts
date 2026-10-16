@@ -302,6 +302,8 @@ export interface ViewReport {
   text: string;
   /** For an acknowledgement or a lost courier: the desk's id of the order it is about. */
   orderRef?: string;
+  /** For a `turn` report: what the side's own unit did in the umpire's turn (D39, 11.9). */
+  turn?: Report['turn'];
 }
 
 /** An enemy dispatch this side took from a courier, once it has reached HQ. */
@@ -531,6 +533,7 @@ export function viewFor(
             state.seed,
           ),
           ...(r.orderRef === undefined ? {} : { orderRef: r.orderRef }),
+          ...(r.turn === undefined ? {} : { turn: structuredClone(r.turn) }),
         };
       }),
     documents: intel.documents
@@ -558,6 +561,34 @@ function reportId(world: GameState, side: SideId): string {
   return `${side}-r${world.intel[side].reports.length + 1}`;
 }
 
+/**
+ * `observer`'s report of enemy `target` newly in sight at `time`, where the target stands: a coarse
+ * size, an uncertainty that grows with the distance, and sure only at half its sight range or less.
+ */
+export function contactReport(
+  w: GameState,
+  id: string,
+  observer: Unit,
+  target: Unit,
+  time: GameTime,
+  deliverAt: GameTime,
+): Report {
+  const dist = distance(observer.center, target.center);
+  return {
+    id,
+    kind: 'contact',
+    observedAt: time,
+    deliverAt,
+    from: observer.name,
+    location: { ...target.center },
+    place: describePlace(w.map, target.center),
+    uncertainty: Math.max(MIN_REPORT_UNCERTAINTY_MM, Math.ceil(dist / 10 / 10_000) * 10_000),
+    sizeEstimate: sizeEstimate(target.strength),
+    confidence: dist <= sightRangeMm(w, observer) / 2 ? 'high' : 'medium',
+    subject: target.id,
+  };
+}
+
 function scan(world: GameState, time: GameTime): GameState {
   let w: GameState = { ...world, time };
   for (const side of w.sides.map((s) => s.id)) {
@@ -576,20 +607,16 @@ function scan(world: GameState, time: GameTime): GameState {
       });
       if (intel.inSight.includes(u.id)) continue;
       const observer = mine.find((m) => canSee(w, m, u))!;
-      const dist = distance(observer.center, u.center);
-      reports.push({
-        id: `${side}-r${reports.length + 1}`,
-        kind: 'contact',
-        observedAt: time,
-        deliverAt: reachesHqAt(w, time, COURIER_DELAY_MS),
-        from: observer.name,
-        location: { ...u.center },
-        place: describePlace(w.map, u.center),
-        uncertainty: Math.max(MIN_REPORT_UNCERTAINTY_MM, Math.ceil(dist / 10 / 10_000) * 10_000),
-        sizeEstimate: sizeEstimate(u.strength),
-        confidence: dist <= sightRangeMm(w, observer) / 2 ? 'high' : 'medium',
-        subject: u.id,
-      });
+      reports.push(
+        contactReport(
+          w,
+          `${side}-r${reports.length + 1}`,
+          observer,
+          u,
+          time,
+          reachesHqAt(w, time, COURIER_DELAY_MS),
+        ),
+      );
     }
     // Prune last-known contacts (#110). One that has aged out no longer says where the enemy
     // might be. One for a destroyed enemy goes only once the side has been told of the
@@ -643,7 +670,7 @@ export function fileReport(
   unit: Unit,
   time: GameTime,
   delayMs: number = COURIER_DELAY_MS,
-  extra: Pick<Report, 'orderDueAt' | 'orderRef' | 'routed' | 'rallied'> = {},
+  extra: Pick<Report, 'orderDueAt' | 'orderRef' | 'routed' | 'rallied' | 'turn'> = {},
 ): GameState {
   const report: Report = {
     id: reportId(world, unit.side),

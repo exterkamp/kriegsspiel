@@ -44,6 +44,31 @@ function stageOf(
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
+/** What became of a unit's orders, in its own words, for a turn report (11.9). */
+const ORDER_RESULT: Record<string, string> = {
+  'carried-out': 'my orders are carried out',
+  partly: 'I could carry out my orders only in part',
+  misread: 'I acted on my orders as I understood them',
+  refused: 'I did not carry out my orders as written',
+};
+
+/**
+ * A unit's note on an umpire turn (11.9): where it stands, its orders' fate, its losses, and the
+ * umpire's account of what its commander did, as given.
+ */
+function turnBody(r: Json, from: string, where: string, when: string): string {
+  const results = arr(r.orders).map((o) => str(o.result));
+  const telling = ['refused', 'misread', 'partly', 'carried-out'].find((k) => results.includes(k));
+  const lost = num(r.menLost);
+  const account = str(r.account).trim();
+  return [
+    `${from} here: ${r.status === 'broke' ? 'we have broken and are falling back' : r.moved === true ? 'we have marched and now stand' : 'we stand'}${where}, ${when}`,
+    ...(telling ? [`; ${ORDER_RESULT[telling]}`] : []),
+    ...(lost > 0 ? [`; we lost ${lost} men`] : []),
+    ...(account ? [`. ${account.replace(/[.!?]+$/, '')}`] : []),
+  ].join('');
+}
+
 /**
  * One dispatch per report, built only from the report's own fields, so it passes `checkNarration`:
  * the officer, place and size as given, and only the numbers the report has.
@@ -78,9 +103,11 @@ function narrate(input: Json) {
                         ? `${from} here: we are taking heavy losses${where}, ${when}`
                         : r.kind === 'broke'
                           ? `${from} here: we have broken and are falling back${where}, ${when}`
-                          : r.kind === 'destroyed'
-                            ? `${from} here: we have destroyed ${size || 'enemy troops'}${where}, ${when}`
-                            : `${from} here: we are in position${where}, ${when}`;
+                          : r.kind === 'turn'
+                            ? turnBody(r, from, where, when)
+                            : r.kind === 'destroyed'
+                              ? `${from} here: we have destroyed ${size || 'enemy troops'}${where}, ${when}`
+                              : `${from} here: we are in position${where}, ${when}`;
       // Only what the staff saw for themselves is hedged or vouched for.
       const sure =
         r.kind !== 'contact' && r.kind !== 'situation'
