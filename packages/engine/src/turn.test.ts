@@ -336,6 +336,34 @@ describe('validateProposal', () => {
     expect(over.corrections[0]!.reason).toMatch(/rises only by supply, to 75/);
   });
 
+  it('keeps the old ceiling for a context logged before #436: projection, no resupply', () => {
+    // A turn logged before #436 carries the projection (its end value has the resupply
+    // baked in) but no `resupply` field. Replay runs the same validator on that logged
+    // context, so its ceiling must stay the old one, the projection's end value: at T0
+    // `a` has 50 and the projection took it to 90 by resupply alone.
+    const w = world();
+    const lowAmmo = { ...w, units: w.units.map((u) => (u.id === 'a' ? { ...u, ammo: 50 } : u)) };
+    const projected = lowAmmo.units.map((u) => (u.id === 'a' ? { ...u, ammo: 90 } : u));
+    const c = ctx({ projection: projected });
+    // A proposal between the start value and the projection's end value stands, as it
+    // did when the turn was applied live.
+    const kept = validateProposal(lowAmmo, proposal(lowAmmo, { a: { ammo: 70 } }), c);
+    expect(kept.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(70);
+    expect(kept.corrections.filter((x) => x.field === 'ammo')).toEqual([]);
+    // An outcome that omits ammunition falls back to the projection's value, which the
+    // old ceiling lets stand; the start value as ceiling would clamp it and file a
+    // ruling that never happened live.
+    const omitted = validateProposal(lowAmmo, proposal(lowAmmo), c);
+    expect(omitted.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(90);
+    expect(omitted.corrections.filter((x) => x.field === 'ammo')).toEqual([]);
+    // Past the projection's end value, the old ceiling still bites.
+    const over = validateProposal(lowAmmo, proposal(lowAmmo, { a: { ammo: 95 } }), c);
+    expect(over.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(90);
+    expect(over.corrections).toMatchObject([
+      { unitId: 'a', field: 'ammo', proposed: 95, applied: 90 },
+    ]);
+  });
+
   it('refuses to bring back a destroyed unit', () => {
     const w = world();
     const dead = {

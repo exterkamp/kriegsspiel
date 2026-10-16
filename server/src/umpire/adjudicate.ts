@@ -270,12 +270,20 @@ export interface AdjudicateResult {
 const MAX_LISTED = 40;
 
 /** The check context the benchmark's checks need, from the stage's input. */
-function checkContext(world: GameState, turn: AdjudicateTurn): TurnCheckContext {
+function checkContext(
+  world: GameState,
+  turn: AdjudicateTurn,
+  resupply?: Record<string, number>,
+): TurnCheckContext {
   return {
     // The checks measure the march from where each unit stands at the turn's start.
     world: standingAt(world, turn.startMs),
     turn: turn.n,
     turnMs: turn.endMs - turn.startMs,
+    // The validator's context carries the projection's measured resupply (#436), so the
+    // checks' ammo ceiling is the validator's (start plus resupply), not the projection's
+    // end value: a sound proposal is not sent back for ammunition it legitimately kept.
+    ...(resupply !== undefined ? { resupply } : {}),
     projection: turn.projection.units.map((u) => ({
       unitId: u.unitId,
       x: u.x,
@@ -314,7 +322,7 @@ function judge(
     if (proposal.rolls.length > 0) extra.push('rolls: dice are not rolled in this version');
     delete proposal.rolls;
   }
-  const checks = checkTurnProposal(proposal, checkContext(world, turn));
+  const checks = checkTurnProposal(proposal, checkContext(world, turn, context.resupply));
   const validation = validateProposal(world, proposal, context);
   const problems = [
     ...extra,
