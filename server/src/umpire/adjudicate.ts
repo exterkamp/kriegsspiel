@@ -61,7 +61,7 @@ import { UmpireError } from './umpireClient.js';
  * v2: the umpire may ask for rolls and state the odds (11.7, #403).
  * v3: the umpire's journal and its precedents (11.8, #404).
  */
-export const ADJUDICATE_PROMPT_VERSION = 'adjudicate-v3';
+export const ADJUDICATE_PROMPT_VERSION = 'adjudicate-v4';
 
 /** The dials under which the umpire adjudicates; `rigid` is the engine alone (no call). */
 export type UmpireDial = 'standard' | 'free';
@@ -100,7 +100,7 @@ Return the turn proposal:
 - "summary": your account of the turn for the record, at most 2000 characters. It becomes this turn's note in your journal: put what you must remember first (what you decided and why, what is under way), since only its first ${JOURNAL_SENTENCES_PER_TURN} sentences are kept, and only the first once the turn is older.
 - "precedents" (optional): a ruling you made this turn that should hold for the rest of the game, as one general sentence of at most ${JOURNAL_PRECEDENT_MAX} characters (for example "Cavalry cannot cross the river except at the bridge."), at most ${JOURNAL_PRECEDENTS_PER_TURN}. List only new ones, not those already in your journal.
 
-Dice, only for genuine uncertainty (as Verdy's umpire rolled): decide by judgment wherever a staff officer could. Where an outcome truly hangs on chance (a charge that may or may not go home, a broken battalion that may or may not rally, a ford that may or may not be found), you may instead ask for a roll: list it in "rolls" as {"id", "why": the question the roll answers, "chance": its chance of success, from ${TURN_ROLL_CHANCE.min} to ${TURN_ROLL_CHANCE.max}}, at most ${TURN_ROLLS_PER_TURN} in the turn, and give your provisional proposal as well. The engine rolls them and calls you again with the results in "rolls" (each with "success"); you then reply with the final proposal, with no "rolls" (you cannot ask again), and every outcome that rests on a roll lists its id in "rollIds". A broken unit may return to "active" only if its outcome cites a roll, or the projection already rallies it. The dice and the odds are for the umpire's record: never mention a roll, dice, odds or a chance in an "account".
+Dice, only for genuine uncertainty (as Verdy's umpire rolled): decide by judgment wherever a staff officer could. Where an outcome truly hangs on chance (a charge that may or may not go home, a broken battalion that may or may not rally, a ford that may or may not be found), you may instead ask for a roll: list it in "rolls" as {"id", "why": the question the roll answers, "chance": its chance of success, from ${TURN_ROLL_CHANCE.min} to ${TURN_ROLL_CHANCE.max}}, at most ${TURN_ROLLS_PER_TURN} in the turn, and give your provisional proposal as well. The engine rolls them and calls you again with the results in "rolls" (each with "success"); you then reply with the final proposal, with no "rolls" (you cannot ask again), and every outcome that rests on a roll lists its id in "rollIds". A broken unit may return to "active" only if its outcome cites a successful roll, or the projection already rallies it. The dice and the odds are for the umpire's record: never mention a roll, dice, odds or a chance in an "account".
 Reply with the JSON object only.`;
 }
 
@@ -326,7 +326,7 @@ export const shownRolls = (rolls: readonly TurnRoll[]) =>
  * "odds of": casualty prose ("lost 20% of the battalion", "against all odds") is how
  * commanders report, and flagging it would resend a sound proposal for one more call.
  */
-const DICE_WORDS =
+export const DICE_WORDS =
   /\b(dice|die roll|the roll|a roll|the odds|odds of)\b|\d\s*(%|per ?cent)\s+chance\b/i;
 
 /** At most this many problems are listed in a resend, so a hopeless reply does not grow the prompt. */

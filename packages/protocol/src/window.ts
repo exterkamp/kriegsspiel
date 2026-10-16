@@ -11,17 +11,68 @@ import { LastKnownContact, Shape, VisibleEnemyUnit } from './view.js';
 export const WindowMark = z
   .object({
     ms: GameMs,
-    kind: z.enum(['input', 'event', 'contact', 'order', 'llm']),
+    kind: z.enum(['input', 'event', 'contact', 'order', 'llm', 'turn']),
     label: z.string(),
   })
   .strict();
 export type WindowMark = z.infer<typeof WindowMark>;
+
+/** A unit a turn changed: men lost, or a new status. */
+export const WindowTurnUnit = z
+  .object({
+    id: z.string().min(1),
+    side: Side,
+    name: z.string(),
+    lost: z.number().nonnegative(),
+    from: z.string(),
+    to: z.string(),
+  })
+  .strict();
+export type WindowTurnUnit = z.infer<typeof WindowTurnUnit>;
+
+/**
+ * One turn of a turn-mode game (D39, 11.11), as the window shows it after the game: who decided
+ * it, the umpire's own account, what it cost each side, the corrections and the dice. `journal` is
+ * the umpire's log (its notes and precedents) as it stood after the turn.
+ */
+export const WindowTurn = z
+  .object({
+    n: z.number().int().positive(),
+    startMs: GameMs,
+    /** Where the turn ended: its scheduled end, or the outcome's time if the game ended inside it. */
+    endMs: GameMs,
+    /** `umpire`, or `engine` when the rules (the tables) decided it. */
+    adjudicator: z.string(),
+    /** The umpire failed and the tables decided the turn. */
+    fellBack: z.boolean(),
+    /** The umpire's account of the turn, for the record; absent when the tables decided it. */
+    summary: z.string().optional(),
+    /** Men lost in the turn, per side. */
+    losses: z.record(z.string(), z.number()),
+    units: z.array(WindowTurnUnit),
+    /** How many of the umpire's outcomes the engine corrected against the hard limits. */
+    corrections: z.number().int().nonnegative(),
+    rolls: z.array(
+      z.object({ why: z.string(), chance: z.number(), success: z.boolean() }).strict(),
+    ),
+    journal: z
+      .object({
+        notes: z.array(z.object({ turn: z.number(), note: z.string() }).strict()),
+        precedents: z.array(z.object({ turn: z.number(), ruling: z.string() }).strict()),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type WindowTurn = z.infer<typeof WindowTurn>;
 
 export const WindowTimeline = z
   .object({
     endMs: GameMs,
     outcome: z.object({ winner: Side.nullable(), reason: z.string(), time: GameMs }).strict(),
     marks: z.array(WindowMark),
+    /** Turn mode only: every turn played, in order. */
+    turns: z.array(WindowTurn).optional(),
   })
   .strict();
 export type WindowTimeline = z.infer<typeof WindowTimeline>;

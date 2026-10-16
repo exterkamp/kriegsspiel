@@ -41,7 +41,8 @@ import {
 import { EngineTurnResolver } from './engineTurn.js';
 import { GameHost, MemoryGameStore, createRegistry, startingState } from './index.js';
 import { replayLog } from './replay.js';
-import type { TurnRecord } from './store.js';
+import { TURN_APPEND_ATTEMPTS } from './actor.js';
+import type { GameSnapshot, InputLogEntry, TurnRecord } from './store.js';
 import { FakeTime } from './testing.js';
 import { applyTurn, type TurnInput } from './turns.js';
 import { UmpireTurnResolver, type UmpireTurnOutput } from './umpireTurn.js';
@@ -108,9 +109,10 @@ async function play(opts: {
   holdMinutes?: number;
   /** Called after each turn resolves. */
   afterTurn?: (game: Awaited<ReturnType<GameHost['create']>>) => void;
+  store?: MemoryGameStore;
 }) {
   const time = new FakeTime();
-  const store = new MemoryGameStore();
+  const store = opts.store ?? new MemoryGameStore();
   const registry = createRegistry();
   host = new GameHost({
     store,
@@ -1041,5 +1043,54 @@ describe("the umpire's journal (D39, 11.8)", () => {
       registry,
     ).state.world;
     expect(end.journal).toEqual(journal);
+  });
+});
+
+describe('a resolved turn the store refuses (#416)', () => {
+  /** Refuses turn 1's `resolveTurn` `failures` times; counts snapshots saved while it is missing. */
+  class FlakyStore extends MemoryGameStore {
+    refused = 0;
+    missing = false;
+    snapshotsWhileMissing = 0;
+    constructor(private failures: number) {
+      super();
+    }
+    override async appendInput(gameId: string, entry: InputLogEntry): Promise<void> {
+      if (entry.command.kind === 'resolveTurn' && entry.turn?.n === 1 && this.failures > 0) {
+        this.failures--;
+        this.refused++;
+        this.missing = true;
+        throw new Error('disk full');
+      }
+      await super.appendInput(gameId, entry);
+      if (entry.command.kind === 'resolveTurn') this.missing = false;
+    }
+    override async saveSnapshot(gameId: string, snapshot: GameSnapshot): Promise<void> {
+      if (this.missing) this.snapshotsWhileMissing++;
+      return super.saveSnapshot(gameId, snapshot);
+    }
+  }
+
+  it.each([
+    ['once: the retry takes it', 1],
+    ['past the next turn opening: it waits ahead of it', TURN_APPEND_ATTEMPTS * 2],
+  ])('keeps an umpire turn refused %s, so replay matches the live game', async (_, failures) => {
+    const store = new FlakyStore(failures);
+    const run = await play({ dial: 'standard', client: cannedClient(), store });
+    expect(store.refused).toBe(failures);
+    expect(store.missing).toBe(false);
+    // No snapshot claimed the turn while the log lacked it, so a restart could not skip it.
+    expect(store.snapshotsWhileMissing).toBe(0);
+    const resolved = run.log.filter((e) => e.command.kind === 'resolveTurn');
+    expect(resolved.map((e) => e.turn!.n)).toEqual(resolved.map((_, i) => i + 1));
+    const first = resolved[0]!;
+    expect(first.error).toBeUndefined();
+    expect(first.turn!.adjudicator).toBe('umpire');
+    expect((first.turn!.output as UmpireTurnOutput).proposal.turn).toBe(1);
+    // The turn's output is in the log, so a full replay (window, critique) ends where play did.
+    expect(JSON.stringify(run.replayed.state.world)).toBe(JSON.stringify(run.game.state.world));
+    // And it comes before the next turn's opening in the log, as it happened.
+    const kinds = run.log.map((e) => e.command.kind);
+    expect(kinds.indexOf('resolveTurn')).toBeLessThan(kinds.lastIndexOf('openTurn'));
   });
 });

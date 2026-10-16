@@ -173,15 +173,18 @@ export class SqliteGameStore implements GameStore {
   }
 
   async appendInput(gameId: string, entry: InputLogEntry): Promise<void> {
-    this.db
-      .prepare('INSERT INTO input_log (game_id, seq, entry) VALUES (?, ?, ?)')
-      .run(gameId, entry.seq, JSON.stringify(entry));
-    // Only a game with a known standing keeps it current; an older one is backfilled by replay.
-    this.db
-      .prepare(
-        'UPDATE games SET last_played_ms = max(coalesce(last_played_ms, ?1), ?1) WHERE game_id = ?2 AND summarized = 1',
-      )
-      .run(entry.wallMs, gameId);
+    // One transaction, so an append that fails wrote nothing and the actor may offer it again (#416).
+    this.transaction(() => {
+      this.db
+        .prepare('INSERT INTO input_log (game_id, seq, entry) VALUES (?, ?, ?)')
+        .run(gameId, entry.seq, JSON.stringify(entry));
+      // Only a game with a known standing keeps it current; an older one is backfilled by replay.
+      this.db
+        .prepare(
+          'UPDATE games SET last_played_ms = max(coalesce(last_played_ms, ?1), ?1) WHERE game_id = ?2 AND summarized = 1',
+        )
+        .run(entry.wallMs, gameId);
+    });
   }
 
   async inputLog(gameId: string, afterSeq = 0): Promise<readonly InputLogEntry[]> {
