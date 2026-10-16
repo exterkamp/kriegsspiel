@@ -293,8 +293,14 @@ export interface AdjudicateResult {
 export const shownRolls = (rolls: readonly TurnRoll[]) =>
   rolls.map((r) => ({ id: r.id, why: r.why, chance: r.chance, success: r.success }));
 
-/** Words that give the dice away in a commander's account (a side reads accounts, 11.9). */
-const DICE_WORDS = /\b(dice|die roll|the roll|a roll|odds)\b|\d\s*(%|per ?cent)/i;
+/**
+ * Words that give the dice away in a commander's account (a side reads accounts, 11.9).
+ * A percentage counts only as a chance ("40% chance"), and odds only as "the odds" /
+ * "odds of": casualty prose ("lost 20% of the battalion", "against all odds") is how
+ * commanders report, and flagging it would resend a sound proposal for one more call.
+ */
+const DICE_WORDS =
+  /\b(dice|die roll|the roll|a roll|the odds|odds of)\b|\d\s*(%|per ?cent)\s+chance\b/i;
 
 /** At most this many problems are listed in a resend, so a hopeless reply does not grow the prompt. */
 const MAX_LISTED = 40;
