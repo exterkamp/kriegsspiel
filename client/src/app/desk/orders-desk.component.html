@@ -106,7 +106,13 @@
       @if (modePending()) {
         <span class="hint" id="order-joining">Reading the game's settings…</span>
       } @else {
-        <button type="button" id="order-sign" (click)="sign()" [disabled]="closed()">
+        <button
+          type="button"
+          id="order-sign"
+          (click)="sign()"
+          [disabled]="closed()"
+          [hidden]="barred()"
+        >
           {{
             !turnMode()
               ? 'Sign and send'

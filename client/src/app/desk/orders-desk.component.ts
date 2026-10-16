@@ -28,7 +28,7 @@ import {
   type Courier,
   type OrderDraft,
 } from '@legacy/desk/orders';
-import { turnPhase } from '@legacy/desk/turn';
+import { turnPhase, turnRights } from '@legacy/desk/turn';
 import type { TurnOrder } from '@kriegsspiel/protocol';
 import { GameService } from '../game/game.service';
 import { ORDER_SENDER, TURN_ACTIONS } from '../game/ports';
@@ -75,7 +75,14 @@ export class OrdersDeskComponent {
   );
   /** In turn mode the order box only takes orders while the side is still writing its turn. */
   protected readonly closed = computed(
-    () => this.over() || (this.turnMode() && turnPhase(this.game.state()) !== 'writing'),
+    () =>
+      this.over() ||
+      this.barred() ||
+      (this.turnMode() && turnPhase(this.game.state()) !== 'writing'),
+  );
+  /** The intelligence officer may not hold a turn's orders, so the box has no Hold for them (#428). */
+  protected readonly barred = computed(
+    () => this.turnMode() && turnRights(this.game.state().view?.role) === 'none',
   );
   protected readonly editing = this.desk.editingTurnOrder;
   /**

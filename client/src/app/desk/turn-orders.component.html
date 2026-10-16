@@ -81,7 +81,7 @@
           @if (p !== 'writing') {
             <small class="state">Sent; the couriers ride when the turn is decided.</small>
           }
-          @if (p === 'writing') {
+          @if (p === 'writing' && rights() !== 'none') {
             <div class="row">
               <button type="button" class="ks-quiet" (click)="edit.emit(o)">
                 {{ editing() === o.orderId ? 'Editing below' : 'Edit' }}
@@ -94,7 +94,9 @@
     </ol>
   }
 
-  @if (p === 'writing') {
+  @if (p === 'writing' && senderText(); as text) {
+    <p class="hint" data-testid="turn-sender">{{ text }}</p>
+  } @else if (p === 'writing') {
     @if (confirming()) {
       <div class="confirm" role="group" aria-labelledby="turn-confirm-q">
         <p id="turn-confirm-q">

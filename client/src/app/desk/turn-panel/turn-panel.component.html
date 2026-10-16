@@ -39,10 +39,10 @@
           <button
             type="button"
             id="turn-open-orders"
-            [class.ks-primary]="heldCount() > 0"
+            [class.ks-primary]="primary()"
             (click)="openOrders()"
           >
-            {{ heldCount() === 0 ? 'Write orders' : 'Send orders (' + heldCount() + ' held)' }}
+            {{ ordersText() }}
           </button>
           @if (deadline(); as d) {
             <span class="deadline">{{ d }}</span>

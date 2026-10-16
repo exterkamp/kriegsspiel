@@ -227,6 +227,13 @@ describe('turn mode over the socket', () => {
     await cos.until((m) => m.find((x) => x.kind === 'error' && x.code === 'not_permitted'));
     intel.send({ kind: 'holdTurnOrder', order: { orderId: 'i1', to: 'blue-2', text: 'x' } });
     await intel.until((m) => m.find((x) => x.kind === 'error' && x.code === 'not_permitted'));
+    // Nor may the intelligence officer send the turn (#428).
+    intel.send({ kind: 'sendTurn' });
+    await intel.until((m) =>
+      m.filter((x) => x.kind === 'error' && x.code === 'not_permitted').length === 2
+        ? true
+        : undefined,
+    );
     lead.send({ kind: 'holdTurnOrder', order: { orderId: 'o2', to: 'red-1', text: 'surrender' } });
     await lead.until((m) =>
       m.find(

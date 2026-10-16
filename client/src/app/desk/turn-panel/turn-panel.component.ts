@@ -13,10 +13,12 @@ import {
   deadlineText,
   howTurnsWork,
   lastTurnText,
+  ordersButtonText,
   pursuitText,
   resolvedText,
   sidesSent,
   turnPhase,
+  turnRights,
 } from '@legacy/desk/turn';
 import { GameService } from '../../game/game.service';
 import { DeskStore } from '../desk.store';
@@ -51,6 +53,10 @@ export class TurnPanelComponent {
     return t ? sidesSent(t, this.game.state().view?.side, this.game.sides()) : [];
   });
   protected readonly heldCount = computed(() => this.turn()?.held.length ?? 0);
+  /** Only a seat that signs is offered Send (#428). */
+  private readonly rights = computed(() => turnRights(this.game.state().view?.role));
+  protected readonly ordersText = computed(() => ordersButtonText(this.heldCount(), this.rights()));
+  protected readonly primary = computed(() => this.heldCount() > 0 && this.rights() === 'send');
   protected readonly deadline = computed(() => deadlineText(this.turn()?.deadline, this.now()));
   protected readonly resolvingText = RESOLVING_TEXT;
   /** What a turn is, for a first-time player, and a word on the last turn when it is short (#439). */
