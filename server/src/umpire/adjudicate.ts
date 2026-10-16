@@ -11,18 +11,30 @@
  * used, and the caller resolves the turn with the engine instead (`game/umpireTurn.ts`). Anything
  * else still wrong is clamped by the validator when the turn is applied. A first reply that passed
  * the gate is applied that way too when the resend fails or its reply does not pass.
+ *
+ * Dice (11.7): a reply may ask for up to three rolls and state the odds of each instead of
+ * deciding an uncertain outcome. The engine screens the requests, rolls the accepted ones on the
+ * umpire's dice (`rollTurnDice`, seeded from the world's RNG at the turn's start; never the
+ * model), and calls the umpire once more with the results for its final proposal, which may not
+ * ask again. A reply that asked for rolls is provisional and is never applied.
  */
 import {
   DEPARTURE_LOSS_SHARE,
   DEPARTURE_TOLERANCE_M,
   MS_PER_MINUTE,
+  TURN_ROLLS_PER_TURN,
+  TURN_ROLL_CHANCE,
   metres,
   msPerMetreOf,
   positionAt,
+  rollTurnDice,
+  screenRollRequests,
   unitTypeOf,
   validateProposal,
   type GameState,
+  type RngState,
   type TurnContext,
+  type TurnRoll,
   type TurnValidation,
 } from '@kriegsspiel/engine';
 import { TurnProposal, type TurnObservation, type UmpirePersona } from '@kriegsspiel/protocol';
@@ -35,8 +47,11 @@ import { ADJUDICATE_MAX_TOKENS } from './config.js';
 import type { JsonSchema, UmpireCallRecord, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
 
-/** v1: v0 of the benchmark (#398) with the dial's instruction and clearer observations. */
-export const ADJUDICATE_PROMPT_VERSION = 'adjudicate-v1';
+/**
+ * v1: v0 of the benchmark (#398) with the dial's instruction and clearer observations.
+ * v2: the umpire may ask for rolls and state the odds (11.7, #403).
+ */
+export const ADJUDICATE_PROMPT_VERSION = 'adjudicate-v2';
 
 /** The dials under which the umpire adjudicates; `rigid` is the engine alone (no call). */
 export type UmpireDial = 'standard' | 'free';
@@ -73,7 +88,9 @@ Return the turn proposal:
 - "units": exactly one outcome per unit in the input, with its end "x","y" (metres), "facingDeg", "formation", "strength" (men at the end, never more than at the start), "morale" (0..100), "fatigue" and "ammo" (0..100), "status" ("active", "broken" for a unit that has broken and flees or is still fleeing, "destroyed" for a unit with no men left, "captured"), "continuing" (what it keeps doing into the next turn: {"kind":"idle"}, {"kind":"hold"} or {"kind":"move","x":..,"y":..}), "orders" (one entry per order listed for it in the input, by its "orderId", with "result": "carried-out", "partly", "misread", "refused" or "not-arrived"; an order still on the road is "not-arrived"), "account" (what its commander did and why, in character, at most 600 characters; he knows only what his own side could know, so never give him the enemy's unit names or commanders), and "departure" when needed.
 - "observations": what each side's units saw. Each is {"side": the observing side, "by": the id of the observing unit, which belongs to that side, "unitId": the id of the ENEMY unit it saw, "when": "start" or "end" of the turn}. A unit never observes itself or its own side. List only sightings that are physically possible at that moment: within the observer's "sightRangeM" and not hidden in a wood beyond close range. The projection's "observations" are what the engine's rules saw; keep those that still hold where you put the units.
 - "summary": your account of the turn for the record, at most 2000 characters.
-Do not ask for dice rolls in this version. Reply with the JSON object only.`;
+
+Dice, only for genuine uncertainty (as Verdy's umpire rolled): decide by judgment wherever a staff officer could. Where an outcome truly hangs on chance (a charge that may or may not go home, a broken battalion that may or may not rally, a ford that may or may not be found), you may instead ask for a roll: list it in "rolls" as {"id", "why": the question the roll answers, "chance": its chance of success, from ${TURN_ROLL_CHANCE.min} to ${TURN_ROLL_CHANCE.max}}, at most ${TURN_ROLLS_PER_TURN} in the turn, and give your provisional proposal as well. The engine rolls them and calls you again with the results in "rolls" (each with "success"); you then reply with the final proposal, with no "rolls" (you cannot ask again), and every outcome that rests on a roll lists its id in "rollIds". A broken unit may return to "active" only if its outcome cites a roll, or the projection already rallies it. The dice and the odds are for the umpire's record: never mention a roll, dice, odds or a chance in an "account".
+Reply with the JSON object only.`;
 }
 
 /** The structured-output schema; the test provider knows the stage by its `observations` key. */
@@ -243,6 +260,8 @@ export type AdjudicateInput = ReturnType<typeof adjudicateInput>;
 export interface AdjudicateOptions {
   /** The engine's context for the validator: the turn, the dial, the projected units, the orders. */
   context: TurnContext;
+  /** The world's RNG state at the turn's start: the seed of the umpire's dice (11.7). */
+  rngAtStart: RngState;
   /** Model calls allowed, the first included (D39: one resend). Default 2. */
   maxCalls?: number;
   /** The umpire's voice (3.11); tone only. */
@@ -262,9 +281,20 @@ export interface AdjudicateResult {
   attempts: number;
   /** The problems sent back with the resend, if there was one. */
   resent?: string[];
+  /** The rolls made on the umpire's dice, if it asked for any (11.7); `proposal` was decided on them. */
+  rolls?: TurnRoll[];
+  /** Why roll requests were refused (range, a fourth roll), as told to the umpire. */
+  refusedRolls?: string[];
   /** Why the umpire's answer was not used. */
   error?: string;
 }
+
+/** The results as the umpire is shown them in its next call: no raw draw, only the outcome. */
+export const shownRolls = (rolls: readonly TurnRoll[]) =>
+  rolls.map((r) => ({ id: r.id, why: r.why, chance: r.chance, success: r.success }));
+
+/** Words that give the dice away in a commander's account (a side reads accounts, 11.9). */
+const DICE_WORDS = /\b(dice|die roll|the roll|a roll|odds)\b|\d\s*(%|per ?cent)/i;
 
 /** At most this many problems are listed in a resend, so a hopeless reply does not grow the prompt. */
 const MAX_LISTED = 40;
@@ -299,7 +329,15 @@ function judge(
   world: GameState,
   turn: AdjudicateTurn,
   context: TurnContext,
-): { proposal?: TurnProposal; validation?: TurnValidation; problems: string[]; gate?: string } {
+  rolled: boolean,
+): {
+  proposal?: TurnProposal;
+  validation?: TurnValidation;
+  problems: string[];
+  gate?: string;
+  /** The roll requests of a reply that may still ask (the first to, in a turn). */
+  asks?: NonNullable<TurnProposal['rolls']>;
+} {
   const parsed = TurnProposal.safeParse(output);
   if (!parsed.success) {
     const problems = parsed.error.issues
@@ -307,12 +345,24 @@ function judge(
       .map((i) => `schema: ${i.path.join('.') || '(root)'}: ${i.message}`);
     return { problems, gate: `the reply fails the schema (${problems[0] ?? 'unknown'})` };
   }
-  // Rolls are 11.7's (#403): this version asks for none and rolls none.
+  // Roll requests are taken off the proposal: the first reply to ask has them rolled (and is then
+  // provisional); once the dice are rolled, a further request is refused.
   const proposal: TurnProposal = { ...parsed.data };
+  const asks = proposal.rolls?.length ? proposal.rolls : undefined;
+  delete proposal.rolls;
   const extra: string[] = [];
-  if (proposal.rolls) {
-    if (proposal.rolls.length > 0) extra.push('rolls: dice are not rolled in this version');
-    delete proposal.rolls;
+  if (asks && rolled) {
+    extra.push('rolls: the dice are rolled for this turn; a final proposal may not ask again');
+  }
+  const made = new Set((context.rolls ?? []).map((r) => r.id));
+  for (const u of proposal.units) {
+    const unknown = (u.rollIds ?? []).filter((id) => !made.has(id));
+    if (unknown.length > 0 && (rolled || !asks)) {
+      extra.push(`${u.unitId}: rollIds ${unknown.join(', ')}: no such roll was made this turn`);
+    }
+    if (DICE_WORDS.test(u.account)) {
+      extra.push(`${u.unitId}: the account speaks of dice or odds; a commander knows only events`);
+    }
   }
   const checks = checkTurnProposal(proposal, checkContext(world, turn));
   const validation = validateProposal(world, proposal, context);
@@ -331,7 +381,13 @@ function judge(
       : validation.clampedUnits * 2 > validation.units
         ? `the validator would clamp ${validation.clampedUnits} of ${validation.units} units`
         : undefined;
-  return { proposal, validation, problems: [...new Set(problems)], ...(gate ? { gate } : {}) };
+  return {
+    proposal,
+    validation,
+    problems: [...new Set(problems)],
+    ...(gate ? { gate } : {}),
+    ...(asks && !rolled ? { asks } : {}),
+  };
 }
 
 const CANCELLED = Symbol('cancelled');
@@ -366,6 +422,10 @@ function untilAborted<T>(
  * is not retried; a transport failure, a schema failure or a reply with problems gets the one
  * resend. When a reply that passed the gate was sent back and the resend fails, does not pass or
  * runs out of the turn's time, that first reply is used, clamped when applied.
+ *
+ * The first reply that asks for rolls has them screened and rolled, and costs one more call: the
+ * umpire is called again with the results (and that reply's problems) for its final proposal. So
+ * a turn makes at most `maxCalls + 1` calls; a later request for rolls is refused as a problem.
  */
 export async function adjudicateTurn(
   client: UmpireClient,
@@ -375,17 +435,35 @@ export async function adjudicateTurn(
 ): Promise<AdjudicateResult> {
   const input = adjudicateInput(world, turn);
   const system = withPersona(adjudicateSystem(turn.dial), opts.persona);
-  const maxCalls = Math.max(1, opts.maxCalls ?? 2);
+  let maxCalls = Math.max(1, opts.maxCalls ?? 2);
   const calls: UmpireCallRecord[] = [];
   let attempts = 0;
   let resent: string[] | undefined;
   let error = 'no call made';
+  // The dice, once rolled (11.7): the validator's context then carries them.
+  let rolls: TurnRoll[] | undefined;
+  let refusedRolls: string[] | undefined;
+  let context = opts.context;
+  // What the call after the rolls is told besides the results: refusals and the asking reply's problems.
+  let afterRolls: string[] | undefined;
   // The newest reply that passed the gate, to apply (clamped) if the resend does no better.
   let usable: { proposal: TurnProposal; validation: TurnValidation } | undefined;
+  const dice = () => ({
+    ...(rolls && rolls.length > 0 ? { rolls } : {}),
+    ...(refusedRolls && refusedRolls.length > 0 ? { refusedRolls } : {}),
+  });
   const result = (): AdjudicateResult =>
     usable
-      ? { ...usable, calls, attempts, ...(resent ? { resent } : {}) }
-      : { calls, attempts, error, ...(resent ? { resent } : {}) };
+      ? { ...usable, calls, attempts, ...(resent ? { resent } : {}), ...dice() }
+      : { calls, attempts, error, ...(resent ? { resent } : {}), ...dice() };
+  const inputNow = () => {
+    const problems = afterRolls ?? resent;
+    return {
+      ...input,
+      ...(rolls ? { rolls: shownRolls(rolls) } : {}),
+      ...(problems && problems.length > 0 ? { rejected: { problems } } : {}),
+    };
+  };
   for (let call = 1; call <= maxCalls; call++) {
     const last = call === maxCalls;
     if (opts.signal?.aborted) {
@@ -399,7 +477,7 @@ export async function adjudicateTurn(
           stage: 'adjudicate',
           promptVersion: ADJUDICATE_PROMPT_VERSION,
           system,
-          input: resent ? { ...input, rejected: { problems: resent } } : input,
+          input: inputNow(),
           schema: ADJUDICATE_SCHEMA,
           // Set on the request, so a config file that replaces the stage's route cannot lower it.
           maxTokens: ADJUDICATE_MAX_TOKENS,
@@ -424,7 +502,19 @@ export async function adjudicateTurn(
       error = 'cancelled: the turn ran out of time';
       return result();
     }
-    const verdict = judge(output, world, turn, opts.context);
+    afterRolls = undefined;
+    const verdict = judge(output, world, turn, context, rolls !== undefined);
+    if (verdict.asks) {
+      // Roll what may be rolled, then ask once more for the final proposal (an extra call).
+      const screened = screenRollRequests(verdict.asks);
+      rolls = rollTurnDice(opts.rngAtStart, turn.n, screened.accepted);
+      refusedRolls = screened.problems;
+      if (rolls.length > 0) context = { ...context, rolls };
+      afterRolls = [...screened.problems, ...verdict.problems].slice(0, MAX_LISTED);
+      maxCalls += 1;
+      error = 'the umpire asked for rolls and gave no final proposal';
+      continue;
+    }
     if (verdict.proposal && verdict.problems.length === 0) {
       return {
         proposal: verdict.proposal,
@@ -432,6 +522,7 @@ export async function adjudicateTurn(
         calls,
         attempts,
         ...(resent ? { resent } : {}),
+        ...dice(),
       };
     }
     if (verdict.proposal && !verdict.gate) {

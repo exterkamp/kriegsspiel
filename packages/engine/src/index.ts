@@ -256,4 +256,12 @@ export type {
   TurnUnitOutcome,
   TurnValidation,
 } from './turn.js';
+export {
+  TURN_ROLLS_PER_TURN,
+  TURN_ROLL_CHANCE,
+  rollTurnDice,
+  screenRollRequests,
+  turnDice,
+} from './turnDice.js';
+export type { ScreenedRolls } from './turnDice.js';
 export { turnVictory } from './combat.js';

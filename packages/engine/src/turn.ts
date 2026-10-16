@@ -108,7 +108,7 @@ export interface TurnContext {
   projection?: Unit[];
   /** Every order sent to a unit so far, with whether it had arrived. Absent: orders unchecked. */
   orders?: TurnOrderStatus[];
-  /** The rolls the engine made for this turn (11.7). */
+  /** The rolls the engine made for this turn on the umpire's dice (11.7, `turnDice.ts`). */
   rolls?: TurnRoll[];
 }
 
@@ -864,7 +864,13 @@ export function registerTurn(registry: EventRegistry<GameState>): void {
     const emit: Array<{ type: string; payload?: Json }> = [
       {
         type: 'umpire.turn',
-        payload: { turn: n, rulings: rulings.map((r) => r.id), clamped: check.clampedUnits },
+        payload: {
+          turn: n,
+          rulings: rulings.map((r) => r.id),
+          clamped: check.clampedUnits,
+          // The umpire's dice (11.7), for the admin view and the record; master state only.
+          ...(context.rolls?.length ? { rolls: context.rolls as unknown as Json } : {}),
+        },
       },
     ];
     const victory = turnVictory(world, endMs);
