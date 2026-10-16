@@ -162,8 +162,11 @@ describe('rigid turns against real time (#430)', () => {
         seed,
         turns.ends.map((e) => e.t),
       );
-      // Until the first fight the field is the same at every turn end.
-      const quiet = turns.ends.filter((e) => e.t <= Math.max(QUIET_UNTIL_MS, turnMinutes * MIN));
+      // Until the first fight the field is the same at every turn end. A turn whose game was decided
+      // in the minute after it ends there (#434: seed 42's 20-minute turn 1 ends at 00:20:42).
+      const quiet = turns.ends.filter(
+        (e) => Math.floor(e.t / MIN) * MIN <= Math.max(QUIET_UNTIL_MS, turnMinutes * MIN),
+      );
       expect(quiet.length).toBeGreaterThan(0);
       for (const [i, end] of quiet.entries()) expect(end).toEqual(real.snaps[i]);
       // After it the dice part (D39: couriers are rolled against held units), but the battle is the same.
