@@ -145,6 +145,87 @@ describe('the turn reports input (11.9)', () => {
     expect(withheld[0]!.reason).toMatch(/account withheld/);
   });
 
+  describe('the screen on the 11.12 playtest’s harmless accounts (#530)', () => {
+    // Each account the playtest withheld, on the word it was withheld for; the entry is the
+    // 2nd Battalion's, whose orders name neither the 1st nor any distance.
+    const entry = turnReportsInput(
+      'blue',
+      1,
+      [report({ id: 'blue-r10', from: '2nd Battalion' })],
+      ctx({ accounts: [] }),
+    ).input.reports[0]!;
+    const own = ['1st Battalion', 'Col. Hartmann', '2nd Battalion', 'Maj. Albers'];
+    const h = ctx().hidden!;
+    const screen = (account: string) => screenAccount(account, entry, ctx().places, h, own);
+
+    it.each([
+      // unknown number 200: a distance in paces
+      'The enemy came up to the far bank and opened fire at about 200 paces. He answered by volleys and held his ground.',
+      // unknown name "Battalion": the side's own unit
+      'Maj. Verneuil crossed the bridge, sighted the enemy column, and recrossed in good time. He now stands behind the 1st Battalion.',
+      // unknown numbers 100 and 200
+      'I gave the column a flank volley at about 100 paces. The battalion on the far bank was too far off (over 200 paces), so I held my powder.',
+      // unknown entity "bridge-head"; unknown name "Battalion's"
+      "The 1st Battalion's line stood in the road at the bridge-head and the enemy was thrown back.",
+      // unknown entity "re-forming"
+      'I drew the remnant back over the bridge to the north bank and am re-forming. We have lost heavily.',
+      // unknown number 1: "the 1st", the side's own battalion
+      'Verneuil kept his squadron behind the infantry, ready in case the 1st gave way.',
+      // unknown entity "re-form"
+      'He drew back to the north bank to re-form, short of men.',
+      // unknown entity "bridge-end"
+      'Swung the left wing forward and fired into the flank of the column at the bridge-end.',
+      // a spelled-out distance, a metre figure and a capitalised compound
+      'We opened fire at two hundred paces, then at 150 metres. Bridge-head and road are held.',
+    ])('shows "%s"', (account) => {
+      expect(screen(account)).toEqual([]);
+    });
+
+    it('still withholds the enemy’s names, strengths and ids, unknown figures, dice and the unknown in a compound', () => {
+      const leaks: Array<[string, RegExp]> = [
+        ['We saw the Vanguard Battalion at 200 paces.', /names the other side/],
+        ["The Vanguard Battalion's column crossed.", /names the other side/],
+        ['The Vanguard-Battalion crossed the bridge.', /unknown name "Vanguard-Battalion"/],
+        ["Gen. Moreau's men came on.", /names the other side/],
+        ["We saw Moreau's column at 200 paces.", /unknown name "Moreau's"/],
+        ['A column of 600 men came over at 200 paces.', /unknown number 600/],
+        ['The enemy had two thousand men in the wood.', /unknown number "two thousand"/],
+        ['We fired on red-3 at the bridge-end.', /unknown entity "red-3"/],
+        ['We fired on red-hussars at the bridge-end.', /unknown entity "red-hussars"/],
+        ['We fell back past Ostwald-Mühle.', /unknown name "Ostwald-Mühle"/],
+        ['The 3rd Battalion came up on our left.', /unknown number 3/],
+        ['The odds were against us at 200 paces, so I held.', /dice/],
+      ];
+      for (const [account, problem] of leaks) {
+        expect(screen(account).join('; '), account).toMatch(problem);
+      }
+    });
+
+    it('takes the side’s own names from its units, not the other side’s', () => {
+      const { input, withheld } = turnReportsInput(
+        'blue',
+        1,
+        [
+          report({
+            id: 'blue-r10',
+            from: '2nd Battalion',
+            turn: { n: 1, lost: 0, movedM: 0, orders: [] },
+          }),
+        ],
+        ctx({
+          accounts: [
+            {
+              unitId: 'blue-2',
+              account: "Maj. Albers kept behind the 1st Battalion's line at the bridge-head.",
+            },
+          ],
+        }),
+      );
+      expect(withheld).toEqual([]);
+      expect(input.reports[0]!.account).toMatch(/^Maj\. Albers/);
+    });
+  });
+
   it('withholds an account that describes enemies its unit could not see, and only that (#533)', () => {
     const seen =
       'I judged the bridge too exposed: infantry in line held it, so I kept my men back.';
@@ -217,6 +298,36 @@ describe('a turn note’s checks (11.9)', () => {
     ).toMatch(/names the other side/);
     expect(checkTurnNote('The 1st Battalion stood at the bridge.', entry).join()).toMatch(
       /first person/,
+    );
+  });
+
+  it('lets a note repeat its account’s condition words and spans, and no others (#530)', () => {
+    const shaken = turnReportsInput(
+      'blue',
+      1,
+      [report()],
+      ctx({
+        ownUnits: [unit({ morale: 50 }), second],
+        orderTexts: new Map([['o1', 'Fire on the bridge for ten minutes, then hold it']]),
+        accounts: [
+          {
+            unitId: 'blue-1',
+            account: 'I fired for ten minutes, then met a steady line at the bridge and drew back.',
+          },
+        ],
+      }),
+    ).input.reports[0]!;
+    expect(
+      checkTurnNote(
+        'Sir, I fired for ten minutes, then met a steady line at the bridge and drew back.',
+        shaken,
+      ),
+    ).toEqual([]);
+    expect(checkTurnNote('Sir, we held for an hour at the bridge.', shaken).join()).toMatch(
+      /invented duration/,
+    );
+    expect(checkTurnNote('Sir, we are tiring, but we held the bridge.', shaken).join()).toMatch(
+      /condition "tiring" is not the unit’s/,
     );
   });
 
