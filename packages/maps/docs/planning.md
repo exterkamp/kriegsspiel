@@ -4,7 +4,7 @@
 planner. It consumes **accepted decimal6 authoritative ground**, bounds, water,
 optional independent cover, D crossing proposals, recorded settings and a seed.
 It changes none of those inputs. It does not import or execute SettleMaker.
-`PLANNING_VERSION = sites-lattice-decks-v1`; `DECK_POLICY =
+`PLANNING_VERSION = sited-graded-network-v2`; `DECK_POLICY =
 linear-ground-endpoints-v1`. Changing geometry, sizing, tie breaks or cost policies
 requires a planning version change. Local sizing/deck certificates retain full precision analytic metadata; frozen
 asset geometry remains decimal6. When assembling a canonical asset, retain or
@@ -57,8 +57,19 @@ rather than being hidden as ordinary generation failure.
 Candidate anchors occupy a deterministic coarse lattice with stride
 `max(planningSpacing, floor(max(planningSpacing,minSpacing/6)/planningSpacing)
 * planningSpacing)`. This does not resample or reduce authoritative elevation.
-Candidates rank by complete maximum gradient, then a `places:v1` derived seed,
-then y/x. Greedy required slots preserve spacing and reject footprint overlap.
+v2 (`SITE_PREFERENCES`, #490) ranks candidates by a landscape score, lower is
+better, then a `places:v1` derived seed, then y/x. The score adds
+`3 × (footprint gradient / maxBuildingGradient)²`; a summit penalty (2 × the
+anchor's height above the mean of eight points on a 400 m ring, relative to 15%
+of map relief) and a smaller valley-floor bonus; on maps with rivers, a bog
+penalty when the anchor stands less than 2 m above the nearest river surface,
+a penalty for being within 120 m of a river bank or more than 700 m from any
+river, and bonuses within 500 m of a bridge candidate and 600 m of a
+confluence (farms weigh water terms at 0.3); and a margin penalty within 400 m
+of the map edge. Villages therefore settle on gentle valley floors near
+crossings and confluences, not on summits or river flats. Nearest-river
+queries use 250 m segment bins. Greedy required slots preserve spacing and
+reject footprint overlap.
 Hard moved anchors place first. The frozen ordered override resolver provides
 last-write-wins names/anchors and a union of exclusions. Renaming changes no
 geometry or geometry identity. An exclusion never silently reduces required
@@ -93,12 +104,22 @@ and node/path endpoint/route provenance is explicit.
 
 ## Terrain-cost routing, crossings and normalization
 
-The bounded internal lattice uses four cardinal neighbours. Traversal cost is
-length × `(1 + 4 * certified directional grade)`; Euclidean distance is an
-admissible A* heuristic. Cover remains an independent layer and does not block
-roads or change height; v1 does not apply a wood cost penalty. Equal f/g costs
-break by internal node index. A deterministic nearest connection process grows
-the required spanning network; failed pairs are excluded with a bounded retry
+The bounded internal lattice uses eight neighbours (axes and diagonals), so roads
+run at 45° as well as along the grid instead of in staircases. v2 traversal
+cost (`ROUTE_COSTS`, #490) is length × `(1 + 6g + 120g² + margin)`, where `g`
+is the certified maximum directional grade and `margin` rises to 0.6 within
+150 m of the map edge: roads wind along contours, valleys and spurs and keep
+off the margin. A bridge costs `2 × span + 250 m`, so routes share crossings.
+Edges already emitted by earlier routes cost 0.55 ×, so later routes join the
+network at junctions rather than running in parallel. Search is weighted A*
+(Euclidean heuristic, at most `1/0.55` above the optimal cost) and lazy: a
+lattice edge is queued with the lower bound given by its endpoint height
+difference and certified only when popped; a dearer certified cost is
+re-queued and an uncertifiable edge dropped, so every emitted edge is certified
+exactly as before. Cover remains an independent layer and does not block roads
+or change height; no wood cost penalty applies. Equal f/g costs break by node
+index, then predecessor. A deterministic nearest connection process grows the
+required spanning network; failed pairs are excluded with a bounded retry
 count. Configured extra site links add bounded redundancy. Requests that cannot
 be satisfied return infeasibility.
 
@@ -112,6 +133,9 @@ norm is large: road grade is the gradient dotted with travel direction.
 Reserved round capsules are checked for complete closed water contact and
 bounds. Gradient certification conservatively examines all corners of each cell
 touched by the capsule, bounding its clipped interior as well as bend/end caps.
+Touched cells are found by `segmentNearCell`, an allocation-free form of the
+same predicate (endpoint in the closed cell, a Liang–Barsky crossing, or an
+endpoint/corner distance within the radius plus the 1e-9 m contact slack).
 This may reject a road that an exact curved capsule intersection could accept;
 it cannot accept an over-grade corridor under the declared bilinear model.
 Grade tolerance is **1e-12**; it is not relaxed to accommodate rounding. Only a
@@ -129,7 +153,7 @@ The explicit bridge deck is linear between authoritative dry endpoint heights,
 with continuity tolerance **1e-7 m**, and constant endpoint cap heights. Deck
 grade is their height difference divided by span; underwater ground is not a
 road-grade shortcut. Both heights must be finite and form a length-two tuple.
-V1 accepts only constant standing-water river profiles; the deck must remain
+Planning accepts only constant standing-water river reaches; the deck must remain
 strictly above that surface by **1e-7 m** over the complete wet interval/full
 transverse reach certified by D. Unsupported variable/carved profiles return a
 named infeasibility. Detailed clearance, structural physics and gameplay bridge

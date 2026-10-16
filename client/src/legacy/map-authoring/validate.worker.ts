@@ -1,7 +1,7 @@
 import {
   exportBattlefield,
   validateBattlefield,
-  supportsReplay,
+  supportsValidation,
   type MapAsset,
 } from '@kriegsspiel/maps';
 import { createValidationRunner } from './runtime/index.js';
@@ -12,7 +12,7 @@ const scope = globalThis as unknown as {
 };
 const runner = createValidationRunner({
   validate: (asset) => {
-    if (!supportsReplay(asset))
+    if (!supportsValidation(asset))
       return {
         ok: false,
         kind: 'infeasible',

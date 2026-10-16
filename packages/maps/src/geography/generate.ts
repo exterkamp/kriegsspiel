@@ -24,7 +24,13 @@ export function generateGeography(
   return bounded<GeographyOutput>(() => {
     const hydro = generateHydrology(elevation, bounds, settings, seed, limits);
     if (!hydro.ok) return hydro;
-    const crossings = findCrossingCandidates(hydro.value.water, bounds, settings, limits);
+    const crossings = findCrossingCandidates(
+      hydro.value.water,
+      bounds,
+      settings,
+      limits,
+      hydro.value.elevation,
+    );
     if (!crossings.ok) return crossings;
     let vertices = 0;
     for (const w of hydro.value.water) {

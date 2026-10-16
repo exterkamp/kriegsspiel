@@ -24,17 +24,21 @@ Output samples, contour coordinates and contour elevations are decimal-6 values.
 
 ## Ground algorithm and streams
 
-Record `TERRAIN_VERSION = value-noise-ridges-v1` and `CONTOUR_VERSION = bilinear-graph-v1` in the corresponding generator stage provenance. Changes to these algorithms, ordering or output normalization require a new stage version. The root seed is a nonnegative safe integer, validated through the frozen `deriveSeed` policy.
+Record `TERRAIN_VERSION = structured-relief-eroded-v2` and `CONTOUR_VERSION = bilinear-graph-v1` in the corresponding generator stage provenance. Changes to these algorithms, ordering or output normalization require a new stage version. The root seed is a nonnegative safe integer, validated through the frozen `deriveSeed` policy. (`value-noise-ridges-v1`, the plain multiscale noise of the first milestone, read as blobs with scattered closed basins; #490 replaced it.)
 
-Terrain uses original integer-hashed lattice value noise with quintic interpolation. Octave `i` has feature scale `featureScaleM / 2^i` and weight `roughness^i`. The weighted signed noise is normalized by the total active weight. Each octave has a separate key:
+v2 builds **structured relief, then erodes and drains it** (`src/terrain/elevation.ts`, `src/terrain/erosion.ts`):
+
+1. **Grain and warp.** A seeded unit vector (built with a square root only, no trigonometry) sets a dominant grain; sample coordinates are domain-warped by `0.45 × featureScale` of low-frequency noise, rotated into the grain frame and stretched 2.5× along it (`RELIEF_SHAPE`), so ridges and valleys are elongated and bend.
+2. **Shape.** Original integer-hashed lattice value noise with quintic interpolation. Octave `i` has feature scale `featureScaleM / 2^i` and weight `roughness^i`, normalized by the total active weight. Ridge and valley fields are `(1 - abs(signedNoise))²` on independent streams; a seeded regional tilt of `0.3` gives drainage a dominant direction across the map. Height is `baseHeightM + reliefM/2 × (rolling + ridgeStrength×ridge² - valleyStrength×valley² + 0.3×tilt)`.
+3. **Fluvial erosion.** Ten implicit stream-power passes (Braun & Willett 2013, `m = 0.5`, `n = 1`): each pass priority-floods the field, routes steepest-descent receivers, accumulates **multiple-flow-direction** upstream area (Quinn-style, weights proportional to drop per unit length, which avoids parallel grid-aligned gullies) and solves `h = (h + F·h_receiver)/(1 + F)` downstream-first with `F = 0.3·sqrt(area cells)/step length`. Two explicit four-neighbour hillslope diffusion steps (rate 0.18) follow each pass, and one more at the end.
+4. **Relief and drainage.** The eroded field is rescaled to the pre-erosion height range so `reliefM` keeps its meaning, then priority-flood filled with a strict rise of 0.05 m per step: every closed depression becomes a gently sloping (0.2%) floor and every sample drains to a boundary outlet. Output is decimal-6 normalized.
 
 ```text
-deriveSeed(rootSeed, 'terrain:value-noise-ridges-v1', 'octave:<i>')
-deriveSeed(rootSeed, 'terrain:value-noise-ridges-v1', 'ridge')
-deriveSeed(rootSeed, 'terrain:value-noise-ridges-v1', 'valley')
+deriveSeed(rootSeed, 'terrain:structured-relief-eroded-v2', 'octave:<i>')
+deriveSeed(rootSeed, 'terrain:structured-relief-eroded-v2', 'ridge' | 'valley' | 'warp-x' | 'warp-y' | 'grain' | 'tilt')
 ```
 
-Ridge and valley fields use `1 - abs(signedNoise)` on independent streams. Height is `baseHeightM + reliefM/2 × (rolling + ridgeStrength×ridge - valleyStrength×valley)`, then decimal-6 normalization. Increasing ridge strength raises ground, increasing valley strength lowers it, and zero relief produces the normalized base-height plateau. Octaves, roughness, feature scale, relief and both shaping controls have independent effectiveness tests. The finest configured feature scale must be at least .001 m and fit the signed lattice range; unsupported scales fail with a setting path before sample allocation. Requested height ranges outside the contract's ±100,000 m return bounded infeasibility.
+Zero relief still produces the normalized base-height plateau without erosion. Octaves, roughness, feature scale, relief and both shaping controls remain effective (tested); ridge strength raises and valley strength lowers ground before erosion. All erosion arithmetic is IEEE-exact apart from `Math.sqrt`, with row-major tie-breaking, so fields are identical across supported runtimes and fresh processes. The finest configured feature scale must be at least .001 m and fit the signed lattice range (including the grain stretch); unsupported scales fail with a setting path before sample allocation. Requested height ranges outside the contract's ±100,000 m return bounded infeasibility. Erosion work is reserved against its own deterministic budget (`20 × maxTopologyChecks`, at most 100,000,000 units: 12 per sample per pass for routing and the implicit update, 5 per sample per diffusion step, and 12 for the final rescale and fill).
 
 Contours are a deterministic function of ground and contour settings: they consume no RNG. Settlement draws or changed contour interval/tolerance/index settings cannot consume or alter an elevation stream. Fresh-process tests compare SHA-256 of complete generated results across TZ/LANG changes and 1,000 unrelated settlement stream derivations.
 

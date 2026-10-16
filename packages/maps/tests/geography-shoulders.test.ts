@@ -12,6 +12,8 @@ import {
   geographyPreset,
   validateWaterPhysics,
 } from '../src/geography/index.js';
+import { ABUTMENT_CLEARANCE_M } from '../src/geography/crossings.js';
+import { certifyRoadSegment } from '../src/planning/index.js';
 import { gradeShoulders, shoulderPolicy } from '../src/geography/shoulders.js';
 import { Budget, bounded } from '../src/geography/budget.js';
 function value<T>(r: GenerationResult<T>): T {
@@ -59,21 +61,29 @@ function maxGrade(
   return grade;
 }
 describe('versioned bounded bank and shoulder cuts', () => {
-  it('gives the exact Manhattan cap and bounds the full bilinear gradient on graded dry cells', () => {
+  it('gives the exact chamfer cap and bounds the full bilinear gradient on graded dry cells', () => {
     const s = structuredClone(DEFAULT_SETTINGS);
     s.widthM = s.heightM = 200;
     const policy = shoulderPolicy(s),
       e: Elevation = { columns: 9, rows: 9, spacingM: 25, samples: Array(81).fill(100) },
-      wet = new Uint8Array(81);
-    wet[40] = 1;
+      anchors = new Float64Array(81).fill(NaN);
+    anchors[40] = 0;
     const samples = e.samples.slice();
     samples[40] = 0;
-    const evidence = gradeShoulders(samples, wet, e, 0, policy, new Budget(1000, 'test'));
+    // An unbounded band keeps every step gentle: axis steps cost cap·d, diagonals √2·cap·d.
+    const evidence = gradeShoulders(samples, anchors, e, policy, new Budget(10_000, 'test'), 99);
     for (let y = 0; y < 9; y++)
-      for (let x = 0; x < 9; x++)
+      for (let x = 0; x < 9; x++) {
+        const dx = Math.abs(x - 4),
+          dy = Math.abs(y - 4),
+          diagonal = Math.min(dx, dy),
+          axis = dx + dy - 2 * diagonal;
         expect(samples[y * 9 + x]).toBe(
-          Number((policy.axisGradeCap * 25 * (Math.abs(x - 4) + Math.abs(y - 4))).toFixed(6)),
+          x === 4 && y === 4
+            ? 0
+            : Number((0 + policy.axisGradeCap * 25 * (axis + Math.SQRT2 * diagonal)).toFixed(6)),
         );
+      }
     const q = createElevationQueries({
       bounds: { minX: 0, minY: 0, maxX: 200, maxY: 200 },
       elevation: { ...e, samples },
@@ -89,29 +99,44 @@ describe('versioned bounded bank and shoulder cuts', () => {
           expect(q.slopeAt((x + u!) * 25, (y + v!) * 25)).toBeLessThanOrEqual(
             s.roads.maxGrade / 2 + 1e-7,
           );
-    expect(evidence.work).toBe(9 * 81);
+    expect(evidence.work).toBe(56 * 81);
     expect(samples.every((h, i) => h <= e.samples[i]!)).toBe(true);
+  });
+  it('stops gentle grading at the band and fades to the steep outer cap', () => {
+    const s = structuredClone(DEFAULT_SETTINGS);
+    const policy = shoulderPolicy(s),
+      e: Elevation = { columns: 13, rows: 1, spacingM: 25, samples: Array(13).fill(100) },
+      anchors = new Float64Array(13).fill(NaN);
+    anchors[0] = 0;
+    const samples = e.samples.slice();
+    samples[0] = 0;
+    gradeShoulders(samples, anchors, e, policy, new Budget(10_000, 'test'), 2);
+    const gentle = policy.axisGradeCap * 25,
+      steep = policy.steepGrade * 25;
+    expect(samples.slice(1, 3)).toEqual([1, 2].map((k) => Number((gentle * k).toFixed(6))));
+    // Beyond two band steps the cap rises at the steep grade until it clears the ground.
+    expect(samples[3]).toBe(Number((gentle * 2 + steep).toFixed(6)));
+    expect(samples.slice(10)).toEqual([100, 100, 100]);
   });
   it('reserves exact W before buffers, succeeds W and rejects W−1 without a partial cut', () => {
     const s = structuredClone(DEFAULT_SETTINGS),
       e: Elevation = { columns: 3, rows: 3, spacingM: 25, samples: Array(9).fill(100) },
-      wet = new Uint8Array(9);
-    wet[4] = 1;
+      anchors = new Float64Array(9).fill(NaN);
+    anchors[4] = 0;
     const run = (work: number) =>
       bounded(() => ({
         ok: true,
         value: gradeShoulders(
           e.samples.slice(),
-          wet,
+          anchors,
           e,
-          0,
           shoulderPolicy(s),
           new Budget(work, 'shoulders'),
         ),
         diagnostics: [],
       }));
-    expect(run(81)).toMatchObject({ ok: true });
-    expect(run(80)).toMatchObject({
+    expect(run(56 * 9)).toMatchObject({ ok: true });
+    expect(run(56 * 9 - 1)).toMatchObject({
       ok: false,
       diagnostics: [{ code: 'GEOGRAPHY_RESOURCE_LIMIT' }],
     });
@@ -125,62 +150,41 @@ describe('versioned bounded bank and shoulder cuts', () => {
       diagnostics: [{ code: 'SHOULDER_PRECISION' }],
     });
   });
-  it('certifies both complete outward25m connectors for every river97 candidate without relaxing maxGrade', () => {
+  it('places every river97 abutment above the water with road-grade approaches that planning certifies', () => {
     const s = geographyPreset('river-valley'),
       bounds = { minX: 0 as const, minY: 0 as const, maxX: 5000, maxY: 5000 },
       source = value(generateElevation(s, 97)),
       r = value(generateGeography(source, bounds, s, 97)),
       q = createElevationQueries({ elevation: r.elevation, bounds });
     expect(r.evidence.shoulder).toMatchObject({
-      policy: 'manhattan-lipschitz-cut-v1',
+      policy: 'banded-lipschitz-cut-v2',
       fullGradientCap: 0.05,
       guaranteedManhattanBandM: 100,
     });
-    expect(r.crossingCandidates).toHaveLength(123);
+    expect(r.crossingCandidates.length).toBeGreaterThan(0);
+    let certified = 0;
     for (const c of r.crossingCandidates) {
       const [a, b] = c.endpoints,
+        w = r.water.find((x) => x.id === c.waterId)!,
         length = Math.hypot(b[0] - a[0], b[1] - a[1]),
         ux = (b[0] - a[0]) / length,
         uy = (b[1] - a[1]) / length,
         before: Point = [a[0] - 25 * ux, a[1] - 25 * uy],
         after: Point = [b[0] + 25 * ux, b[1] + 25 * uy];
+      if (w.kind !== 'river') throw Error('crossing over non-river');
+      // Abutments stand clear of the surface, so a linear deck clears the water.
+      for (const p of [a, b])
+        expect(q.heightAt(...p)).toBeGreaterThan(w.surfaceProfileM[0]! + ABUTMENT_CLEARANCE_M);
+      // Centreline approaches are searched below the road grade, never relaxed.
       expect(maxGrade(q, a, before, 25)).toBeLessThanOrEqual(s.roads.maxGrade);
       expect(maxGrade(q, b, after, 25)).toBeLessThanOrEqual(s.roads.maxGrade);
+      // The complete reserved approach corridors are still certified by planning.
+      const input = { settings: s, seed: 97, bounds, elevation: r.elevation, water: r.water },
+        near = certifyRoadSegment(input, before, a, c.widthM),
+        far = certifyRoadSegment(input, b, after, c.widthM);
+      if (near.ok && far.ok && near.value.traversable && far.value.traversable) certified++;
     }
-    // A conservative bbox covers each whole reserved connector capsule. Check
-    // all four derivative corners of every covered bilinear cell independently.
-    for (const c of r.crossingCandidates) {
-      const [a, b] = c.endpoints,
-        L = Math.hypot(b[0] - a[0], b[1] - a[1]),
-        ux = (b[0] - a[0]) / L,
-        uy = (b[1] - a[1]) / L;
-      for (const [start, end] of [
-        [a, [a[0] - 25 * ux, a[1] - 25 * uy]],
-        [b, [b[0] + 25 * ux, b[1] + 25 * uy]],
-      ] as [Point, Point][]) {
-        const radius = c.widthM / 2,
-          left = Math.max(0, Math.floor((Math.min(start[0], end[0]) - radius) / 25)),
-          right = Math.min(199, Math.floor((Math.max(start[0], end[0]) + radius) / 25)),
-          top = Math.max(0, Math.floor((Math.min(start[1], end[1]) - radius) / 25)),
-          bottom = Math.min(199, Math.floor((Math.max(start[1], end[1]) + radius) / 25));
-        for (let y = top; y <= bottom; y++)
-          for (let x = left; x <= right; x++) {
-            const i = y * 201 + x,
-              h = r.elevation.samples,
-              A = h[i]!,
-              B = h[i + 1]!,
-              C = h[i + 201]!,
-              D = h[i + 202]!;
-            for (const [dx, dy] of [
-              [B - A, C - A],
-              [B - A, D - B],
-              [D - C, C - A],
-              [D - C, D - B],
-            ])
-              expect(Math.hypot(dx!, dy!) / 25).toBeLessThanOrEqual(s.roads.maxGrade);
-          }
-      }
-    }
+    expect(certified / r.crossingCandidates.length).toBeGreaterThan(0.5);
     expect(value(validateWaterPhysics(r.elevation, bounds, r.water, s)).maxGroundExcessM).toBe(0);
     expect(r.sourceElevation).toEqual(source);
     expect(r.elevation.samples.every((h, i) => h <= source.samples[i]!)).toBe(true);

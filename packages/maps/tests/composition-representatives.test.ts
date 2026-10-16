@@ -10,6 +10,7 @@ import {
 } from '../src/composition/index.js';
 import { canonicalGeometry, canonicalizeAsset } from '../src/canonical.js';
 import { importAsset } from '../src/import.js';
+import { realismReport } from '../src/realism.js';
 import type { GenerationResult, MapAsset } from '../src/contract.js';
 const value = <T>(r: GenerationResult<T>): T => {
   if (!r.ok) throw Error(JSON.stringify(r));
@@ -66,6 +67,17 @@ for (const name of ['flat-countryside', 'wooded-hills', 'river-valley'] as const
     }
     for (const site of asset.layers.sites)
       for (const entry of site.entrances) expect(seen.has(entry.nodeId)).toBe(true);
+    // Realism of the complete certified asset (#490).
+    const realism = realismReport(asset);
+    expect(realism.rivers.uphillSteps).toBe(0);
+    expect(realism.rivers.deadEnds).toBe(0);
+    expect(realism.terrain.lakes).toBe(0);
+    expect(realism.roads.maxGrade).toBeLessThanOrEqual(asset.settings.roads.maxGrade + 1e-9);
+    expect(realism.settlements.maxAnchorSlope).toBeLessThanOrEqual(
+      asset.settings.settlements.maxBuildingGradient,
+    );
+    expect(realism.settlements.summits).toBe(0);
+    expect(realism.settlements.lowRiverFlats).toBe(0);
     const exported = value(exportBattlefield(asset));
     await timerYield();
     const loaded = importAsset(exported.json);
@@ -79,7 +91,9 @@ for (const name of ['flat-countryside', 'wooded-hills', 'river-valley'] as const
         for (const id of bridge.roadIds) {
           const road = asset.layers.roads.find((r) => r.id === id)!;
           expect(road.crossingIds).toContain(bridge.id);
-          expect(road.routeIds.some((id) => id.startsWith('route:bridge:'))).toBe(true);
+          // Ordinary routes now reuse bridges, so a deck is not limited to the
+          // explicit required-bridge route; it must still carry some route.
+          expect(road.routeIds.length).toBeGreaterThan(0);
           expect(seen.has(road.fromNodeId) && seen.has(road.toNodeId)).toBe(true);
         }
       const changed = structuredClone(asset),
@@ -104,4 +118,5 @@ it('replays canonical assets in fresh processes without ambient random/clock/nam
   expect(run('en_US.UTF-8')).toBe(first);
   expect(run('C')).toBe(first);
   expect(createHash('sha256').update(first).digest('hex')).toMatch(/^[0-9a-f]{64}$/);
-});
+  // Three fresh processes each generate, erode and certify a small map.
+}, 30_000);

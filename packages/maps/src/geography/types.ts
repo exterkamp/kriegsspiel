@@ -1,8 +1,11 @@
 import type { ShoulderEvidence } from './shoulders.js';
 import type { Bounds, Cover, Drainage, Elevation, Point, Polygon, Water } from '../contract.js';
 
-export const GEOGRAPHY_VERSION = 'flood-carved-graded-backwater-v1' as const;
-export const CROSSING_VERSION = 'reserved-dry-disks-v1' as const;
+export const GEOGRAPHY_VERSION = 'flood-carved-stepped-network-v2' as const;
+export const CROSSING_VERSION = 'reserved-dry-disks-v2' as const;
+/** v1 decks (no rounding margin) remain certifiable for maps saved by the v1 stages. */
+export const LEGACY_CROSSING_VERSION = 'reserved-dry-disks-v1' as const;
+export type CrossingPolicy = typeof CROSSING_VERSION | typeof LEGACY_CROSSING_VERSION;
 /** Resource overrides affect success/failure, never successful geometry. */
 export interface GeographyLimits {
   maxFloodWork?: number;
@@ -32,7 +35,7 @@ export interface CrossingCandidate {
   widthM: number;
   deck: Polygon;
   minimumAbutmentM: number;
-  policy: typeof CROSSING_VERSION;
+  policy: CrossingPolicy;
 }
 export interface GeographyOutput {
   version: typeof GEOGRAPHY_VERSION;
