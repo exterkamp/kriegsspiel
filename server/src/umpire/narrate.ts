@@ -442,7 +442,30 @@ export interface ProseFacts {
    * open one ("Send the reserve."). Capitalised words elsewhere must still be known. Default false.
    */
   lenientOpeners?: boolean;
+  /**
+   * For the umpire's own prose, which estimates ranges (#530): a number given as a distance
+   * ("about 200 paces", "two hundred metres") passes, and a hyphenated word of letters only
+   * ("bridge-head", "re-forming") is an ordinary word, not an id, unless it begins with a side's
+   * id ("red-hussars"). Every other number, id and capitalised word is checked as before. Default
+   * false.
+   */
+  freeProse?: boolean;
 }
+
+/** A side's id opening a hyphenated token makes it an id ("red-3", "blue-r5", "red-hussars"). */
+const SIDE_PREFIX = /^(?:blue|red)-/i;
+
+/** A distance: a number in digits or words, then a unit of length. */
+const DISTANCE = new RegExp(
+  `(?:\\d+(?:[.,]\\d+)?|(?:(?:${[...Object.keys(NUMBER_WORDS), ...Object.keys(NUMBER_SCALES)].join('|')})[\\s-]+)*(?:${[...Object.keys(NUMBER_WORDS), ...Object.keys(NUMBER_SCALES)].join('|')}))\\s*(?:paces?|yards?|yds|met(?:re|er)s?|m|kilomet(?:re|er)s?|km|miles?)\\b`,
+  'giu',
+);
+
+/** Whether an id-shaped token in free prose is only a compound word ("bridge-end"). */
+const isCompoundWord = (token: string) => !/\d/.test(token) && !SIDE_PREFIX.test(token);
+
+/** "Battalion's" is "battalion" with its possessive: the bare word decides. */
+const withoutPossessive = (word: string) => word.replace(/['’]s?$/u, '');
 
 /**
  * The facts a JSON input holds, for `checkProseAgainst`: every number, every word of every string
@@ -476,11 +499,16 @@ export function checkProseAgainst(text: string, facts: ProseFacts): string[] {
 
   if (knownIds) {
     for (const id of text.match(ID_PATTERN) ?? []) {
+      if (facts.freeProse && isCompoundWord(id)) continue;
       if (!knownIds.has(id.toLowerCase())) problems.push(`unknown entity "${id}"`);
     }
   }
-  // Digits inside an id are covered above; the rest must be numbers the input contains.
-  const withoutIds = text.replace(ID_PATTERN, ' ');
+  // Digits inside an id are covered above; the rest must be numbers the input contains. A compound
+  // word in free prose stays, so a capitalised one is still checked as a name below; a distance
+  // is taken out there, whatever its figure.
+  const withoutIds = facts.freeProse
+    ? text.replace(ID_PATTERN, (id) => (isCompoundWord(id) ? id : ' ')).replace(DISTANCE, ' ')
+    : text.replace(ID_PATTERN, ' ');
   for (const n of numbersIn(withoutIds)) {
     if (!knownNumbers.has(n)) problems.push(`unknown number ${n}`);
   }
@@ -497,8 +525,15 @@ export function checkProseAgainst(text: string, facts: ProseFacts): string[] {
     ? /(^\s*|[.!?:;]["')\]]*\s+|[\n"“(]\s*)$/
     : /(^\s*|[.!?]["')\]]*\s+|[\n"“(]\s*)$/;
   for (const m of withoutIds.matchAll(/\p{Lu}[\p{L}'’-]*/gu)) {
-    const word = m[0].toLowerCase();
+    const word = withoutPossessive(m[0].toLowerCase());
     if (knownWords.has(word) || COMMON_CAPITALISED.has(word)) continue;
+    // A known word's possessive, or a compound of known words ("Bridge-head"), names no one new.
+    if (
+      word.includes('-') &&
+      word.split('-').every((p) => p === '' || knownWords.has(p) || COMMON_CAPITALISED.has(p))
+    ) {
+      continue;
+    }
     if (NUMBER_WORDS[word] !== undefined || NUMBER_SCALES[word] !== undefined) continue;
     if (
       (facts.lenientOpeners || SENTENCE_OPENERS.has(word)) &&
@@ -636,8 +671,15 @@ export function checkFieldNote(
       problems.push(`not in the first person: names "${named}" as someone else would`);
     }
   }
+  // A span the turn report's own account or orders give ("fire for ten minutes") is not invented.
+  const given = JSON.stringify([
+    (report as { account?: unknown }).account ?? '',
+    (report as { orders?: unknown }).orders ?? [],
+  ]).toLowerCase();
   const duration = text.match(DURATION);
-  if (duration) problems.push(`invented duration "${duration[0]}"`);
+  if (duration && !given.includes(duration[0].toLowerCase())) {
+    problems.push(`invented duration "${duration[0]}"`);
+  }
   const strength = text.match(STRENGTH);
   if (strength) problems.push(`invented strength "${strength[0]}"`);
   if (!COMBAT_KINDS.has(kind) && /\bunder fire\b/i.test(text)) {
@@ -650,7 +692,14 @@ export function checkFieldNote(
     if (clash.length > 1) problems.push(`contradictory condition "${clash.join('" and "')}"`);
   }
   if (report.condition !== undefined) {
-    const allowed = [...conditionWordsIn(report.condition), ...(KIND_CONDITION[kind] ?? [])];
+    // A turn report's account is the umpire's own words: a note may repeat them ("we met a
+    // steady line") whatever the unit's condition (#530).
+    const account = (report as { account?: unknown }).account;
+    const allowed = [
+      ...conditionWordsIn(report.condition),
+      ...(KIND_CONDITION[kind] ?? []),
+      ...(typeof account === 'string' ? conditionWordsIn(account) : []),
+    ];
     for (const w of said) {
       if (!allowed.includes(w)) problems.push(`condition "${w}" is not the unit’s`);
     }

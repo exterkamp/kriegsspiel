@@ -203,6 +203,9 @@ export function segmentGrade(c: Context, a: Point, b: Point): number {
       q = interpolate(a, b, hi),
       m = interpolate(p, q, 0.5),
       length = distance(p, q);
+    // Seams a rounding error apart (a line through a lattice corner) can leave
+    // a piece with no length; its grade is bounded by its neighbours'.
+    if (length <= 1e-9) continue;
     c.validation.take(3);
     const z0 = c.q.heightAt(...p),
       zm = c.q.heightAt(...m),

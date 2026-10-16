@@ -150,20 +150,17 @@ it('still certifies maps saved by the D45 stages, before fords (D46)', () => {
   expect(supportsReplay(saved)).toBe(false);
   expect(supportsValidation(saved)).toBe(true);
   expect(validateBattlefield(saved).ok).toBe(true);
-  // The current generator records the fording planning stage and replays exactly.
-  expect(asset.provenance.generator.stages.roads).toBe('sited-graded-fording-network-v3');
-  expect(supportsReplay(asset)).toBe(true);
   // D44 rectangle cover with the D45 roads is still a recorded identity; with
-  // the new roads stage it is not.
+  // the fording roads stage it is not.
   const mixed = structuredClone(saved);
   mixed.provenance.generator.stages.cover = 'coherent-dry-runs-v1';
   expect(supportsValidation(mixed)).toBe(true);
   mixed.provenance.generator.stages.roads = 'sited-graded-fording-network-v3';
   expect(supportsValidation(mixed)).toBe(false);
 }, 60_000);
-it('still certifies maps saved by the D46 stages, before unbiased relief (#540)', () => {
-  // A small map saved by the D46 generator: value-noise relief combed along
-  // one grain ('structured-relief-eroded-v2') and D8 rivers.
+it('still certifies maps saved by the D46 stages, before unbiased relief and any-angle roads (D47, D48)', () => {
+  // A small map saved by the D46 generator: value-noise relief combed along one grain
+  // ('structured-relief-eroded-v2'), D8 rivers, and lattice roads with fords.
   const saved = importAsset(
     readFileSync(new URL('./fixtures/d46-saved-map.json', import.meta.url), 'utf8'),
   );
@@ -173,9 +170,10 @@ it('still certifies maps saved by the D46 stages, before unbiased relief (#540)'
   expect(supportsReplay(saved)).toBe(false);
   expect(supportsValidation(saved)).toBe(true);
   expect(validateBattlefield(saved).ok).toBe(true);
-  // The current generator records the new relief and hydrology and replays exactly.
+  // The current generator records the new relief, hydrology and any-angle roads and replays exactly.
   expect(asset.provenance.generator.stages.terrain).toBe('gradient-relief-eroded-v3');
   expect(asset.provenance.generator.stages.hydrology).toBe('flood-carved-flowline-network-v3');
+  expect(asset.provenance.generator.stages.roads).toBe('sited-graded-any-angle-network-v4');
   expect(supportsReplay(asset)).toBe(true);
   // New relief with the old rivers, or the reverse, is not a recorded identity.
   for (const stage of ['terrain', 'hydrology'] as const) {
@@ -183,6 +181,15 @@ it('still certifies maps saved by the D46 stages, before unbiased relief (#540)'
     mixed.provenance.generator.stages[stage] = asset.provenance.generator.stages[stage];
     expect(supportsValidation(mixed)).toBe(false);
   }
+  // D47 relief and rivers with the D46 lattice roads were generated (main between #540 and #541).
+  const between = structuredClone(saved);
+  between.provenance.generator.stages.terrain = asset.provenance.generator.stages.terrain;
+  between.provenance.generator.stages.hydrology = asset.provenance.generator.stages.hydrology;
+  expect(supportsValidation(between)).toBe(true);
+  // D44 rectangle cover with the D46 roads was never generated, so it is not certified.
+  const mixed = structuredClone(saved);
+  mixed.provenance.generator.stages.cover = 'coherent-dry-runs-v1';
+  expect(supportsValidation(mixed)).toBe(false);
 }, 60_000);
 it('rejects one-sided local entrance provenance while the regional graph survives', () => {
   const changed = structuredClone(asset),

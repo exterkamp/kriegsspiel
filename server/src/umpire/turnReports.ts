@@ -35,7 +35,7 @@ import {
 import { withPersona } from './persona.js';
 import { UmpireError, type UmpireClient } from './umpireClient.js';
 
-export const TURN_REPORTS_PROMPT_VERSION = 'turn-reports-v1';
+export const TURN_REPORTS_PROMPT_VERSION = 'turn-reports-v2';
 
 /** A turn's reports narrated in one call; the rest keep their template text. */
 export const TURN_REPORTS_MAX = 12;
@@ -47,7 +47,7 @@ const FIELD_NOTE_LIMITS = { chars: 360, sentences: 4 };
 
 export const TURN_REPORTS_SYSTEM = `You write the notes a general receives at the end of a turn, from his own officers in the field, in the Napoleonic wars.
 
-Input: "reports", one per paper. "kind" is what it is about, "from" the unit, "place" where, "minutesAgo" how long before it reached the general, "sizeEstimate" and "confidence" how sure. It may give the "commander" who writes, his "trait" (his manner) and his unit's "condition".
+Input: "reports", one per paper. "kind" is what it is about, "from" the unit, "place" where, "minutesAgo" how long before it reached the general, "sizeEstimate" and "confidence" how sure, "placeAccuracy" how exactly the place is known. It may give the "commander" who writes, his "trait" (his manner) and his unit's "condition" when he wrote.
 A report of kind "turn" is a unit's own account of the turn: "moved" whether it marched, "menLost" the men it lost, "status" if it broke or rallied, "orders" the orders it had in the general's own words with what became of each ("carried-out", "partly", "misread": he understood them otherwise, "refused": he chose not to, "not-arrived"), and "account": what the commander did and why, as the umpire recorded it.
 
 Write one note per report:
@@ -55,6 +55,8 @@ Write one note per report:
 - For a "turn" report, say what the unit did and why, from the "account" and in the commander's manner. If he misread or refused his orders, say plainly what he did instead and why, as he sees it.
 - Use only the report's own words and figures: no other name, place, number or enemy unit. Say nothing of dice, rolls, odds or chances.
 - Never say how long something lasted.
+- "placeAccuracy" is how sure the place is, never a distance to the enemy or to you: if you give it, say "the place is good to about 40 m". Never say how far off the enemy is unless the report says so.
+- Speak of losses only in a "turn" report.
 - Two to five short sentences.
 
 Return {"dispatches":[{"reportIds":[one report's id],"text":the note}, ...]} with one entry per report. Reply with the JSON object only.`;
@@ -62,8 +64,13 @@ Return {"dispatches":[{"reportIds":[one report's id],"text":the note}, ...]} wit
 /** One report as the narrate stage builds it from the side's view. */
 type NarrateEntry = ReturnType<typeof narrateInput>['reports'][number];
 
-/** What one report looks like to the model; a `turn` report adds the unit's own turn. */
-export interface TurnReportEntry extends NarrateEntry {
+/**
+ * What one report looks like to the model; a `turn` report adds the unit's own turn. The narrate
+ * entry's `radiusM` becomes words (`placeAccuracy`, #532), so the model cannot take the radius for
+ * a range; a report placed exactly has none.
+ */
+export interface TurnReportEntry extends Omit<NarrateEntry, 'radiusM'> {
+  placeAccuracy?: string;
   turn?: number;
   moved?: boolean;
   menLost?: number;
@@ -100,6 +107,18 @@ export interface TurnReportsContext {
    * account that describes enemy troops the unit could not see is withheld (`accountSightProblem`).
    */
   sight?: SideSight;
+  /**
+   * The side's own units as they stood before the turn's outcome (#532): an umpire turn holds its
+   * units until `T1`, so a paper written before `at` (an order's acknowledgement in the turn's
+   * first minutes) gives the condition its unit had then, not after the fight. Without it every
+   * paper gives the condition at the turn's end, as `ownUnits` has it.
+   */
+  before?: { at: number; ownUnits: readonly ViewUnit[] };
+}
+
+/** The radius of a report's place in words that cannot be read as a range (#532). */
+export function placeAccuracy(radiusM: number): string | undefined {
+  return radiusM > 0 ? `good to about ${Math.round(radiusM)} m` : undefined;
 }
 
 const NUMBER = /\d+(?:[.,]\d+)?/g;
@@ -134,20 +153,117 @@ function factsOf(entry: TurnReportEntry, extraWords: readonly string[] = []): Pr
 /**
  * Why the umpire's `account` may not be shown to the side, or nothing when it may: it names the
  * other side (`hidden`), cites a figure, name or id the side's own report and order texts do not
- * have (the map's places excepted), or speaks of dice. Free prose, so any word may open a sentence.
+ * have, or speaks of dice. The map's places and the side's own units' names and commanders (`own`:
+ * "behind the 1st Battalion", "the 1st Battalion's line") are the side's to read. Free prose
+ * (#530): any word may open a sentence, a distance ("at about 200 paces") is the umpire's estimate
+ * and not a figure to withhold, and a compound word ("bridge-head", "re-forming") is not an id.
+ * An enemy's strength or any other figure is still checked.
  */
 export function screenAccount(
   account: string,
   entry: TurnReportEntry,
   places: readonly string[] = [],
   hidden: readonly string[] = [],
+  own: readonly string[] = [],
 ): string[] {
-  const facts = factsOf(entry, places);
+  const facts = factsOf(entry, [...places, ...own]);
   return [
-    ...checkProseAgainst(account, { ...facts, lenientOpeners: true }),
+    ...checkProseAgainst(account, { ...facts, lenientOpeners: true, freeProse: true }),
     ...hiddenIn(account, hidden),
     ...(DICE_WORDS.test(account) ? ['speaks of dice or odds'] : []),
   ];
+}
+
+const SPELLED: Record<string, number> = Object.fromEntries([
+  ...'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty'
+    .split(' ')
+    .map((w, i) => [w, i + 1] as const),
+  ...'thirty forty fifty sixty seventy eighty ninety'
+    .split(' ')
+    .map((w, i) => [w, (i + 3) * 10] as const),
+  ['hundred', 100],
+  ['thousand', 1000],
+]);
+const SPELLED_RUN = `(?:(?:${Object.keys(SPELLED).join('|')})[\\s-]+){0,3}(?:${Object.keys(SPELLED).join('|')})`;
+
+/** A distance: a number in digits or words, then a unit of length. */
+const DISTANCE = new RegExp(
+  `\\b(\\d+(?:[.,]\\d+)?|${SPELLED_RUN})\\s*(?:paces?|yards?|yds|met(?:re|er)s?|m|kilomet(?:re|er)s?|km|miles?)\\b`,
+  'giu',
+);
+
+/** What a distance phrase's number is worth: "40" and "forty" are 40, "two hundred" is 200. */
+function distanceValue(number: string): number {
+  if (/^\d/.test(number)) return Number(number.replace(',', '.'));
+  let total = 0;
+  let current = 0;
+  for (const w of number.toLowerCase().split(/[\s-]+/)) {
+    const v = SPELLED[w] ?? 0;
+    if (v === 1000) {
+      total += (current || 1) * v;
+      current = 0;
+    } else if (v === 100) current = (current || 1) * v;
+    else current += v;
+  }
+  return total + current;
+}
+
+/** Words just before a distance that make it how sure a place is, not a range: "good to about". */
+const ACCURACY_BEFORE =
+  /\b(?:good|accurate|true|exact|right|out|off|wrong|astray|uncertain)\s+(?:to|by|within)?\s*(?:within\s+)?(?:about|some|perhaps|roughly|nearly|around|a)?\s*$|\b(?:give or take|plus or minus)\s+(?:about|some)?\s*$/i;
+
+/** Words just after a distance that make it how far the place may be out: "of that spot". */
+const ACCURACY_AFTER =
+  /^\s+(?:of|from)\s+(?:the|that|this|their|its)\s+(?:position|place|spot|point|mark)\b/i;
+
+/**
+ * The distances a note states that its report does not give (#532). A report's place radius is how
+ * sure the place is (`placeAccuracy`), so a note may word it so ("the place is good to about 40 m",
+ * "out by some 40 metres", "within twenty metres of that spot"); said any other way ("it lies
+ * within twenty metres of us", "within about 40 metres of the bridge") it reads as a range, and is
+ * refused. A distance the report's own
+ * words give (an order's "about 80 paces east of the bridge", an account's "at 200 paces") stands.
+ */
+export function distanceProblems(text: string, entry: TurnReportEntry): string[] {
+  const own: Partial<TurnReportEntry> = { ...entry };
+  delete own.placeAccuracy;
+  const given = new Set(
+    [...JSON.stringify(own).matchAll(DISTANCE)].map((m) => distanceValue(m[1]!)),
+  );
+  const problems: string[] = [];
+  for (const m of text.matchAll(DISTANCE)) {
+    if (given.has(distanceValue(m[1]!))) continue;
+    if (ACCURACY_BEFORE.test(text.slice(0, m.index))) continue;
+    if (ACCURACY_AFTER.test(text.slice(m.index + m[0].length))) continue;
+    problems.push(
+      `states a distance ("${m[0]}") the report does not give: "placeAccuracy" is how sure the place is, not a range`,
+    );
+  }
+  return problems;
+}
+
+/** Kinds written before or apart from the turn's fight, whose notes may not speak of losses. */
+const NO_LOSS_KINDS: ReadonlySet<string> = new Set(['orderDelivered', 'contact']);
+const LOSSES =
+  /\b(?:loss|losses|casualties|killed|wounded|dead|lost (?:\w+ ){0,2}(?:men|heavily|many|dearly|badly)|(?:men|ranks) (?:are |were |have been )?(?:lost|thinned)|cut up|bled|bleeding)\b/i;
+/** Short ammunition said in other words than the condition's ("short of powder"). */
+const SHORT_AMMUNITION =
+  /\b(?:short of (?:powder|ammunition|cartridges|ball|rounds)|(?:powder|ammunition|cartridges) (?:is |are )?(?:running |grown |growing )?(?:low|short|scarce|out)|(?:our|my|the) last (?:rounds|cartridges))\b/i;
+
+/**
+ * What an acknowledgement or contact note says of its unit's state that the report does not give
+ * (#532): any loss, and short ammunition when the unit's condition (when it wrote) has none.
+ */
+function stateProblems(text: string, entry: TurnReportEntry): string[] {
+  if (!NO_LOSS_KINDS.has(entry.kind)) return [];
+  const problems: string[] = [];
+  const loss = text.match(LOSSES);
+  if (loss) problems.push(`speaks of losses ("${loss[0]}") the report does not give`);
+  const short = text.match(SHORT_AMMUNITION);
+  if (short && !/running low|nearly gone/.test(entry.condition ?? '')) {
+    problems.push(`ammunition "${short[0]}" is not the unit’s when it wrote`);
+  }
+  return problems;
 }
 
 /** The problems with one note on `entry`; empty means it may be shown. */
@@ -162,9 +278,12 @@ export function checkTurnNote(
       ...checkProseAgainst(text, factsOf(entry)),
       ...hiddenIn(text, hidden),
       ...(DICE_WORDS.test(text) ? ['speaks of dice or odds'] : []),
+      ...distanceProblems(text, entry),
+      ...stateProblems(text, entry),
       ...checkFieldNote(
         text,
-        entry,
+        // `checkFieldNote` reads neither the radius nor its words.
+        { ...entry, radiusM: 0 },
         entry.kind === 'turn'
           ? { chars: TURN_REPORT_MAX_CHARS, sentences: TURN_REPORT_MAX_SENTENCES }
           : FIELD_NOTE_LIMITS,
@@ -184,9 +303,18 @@ export function turnReportsInput(
   ctx: TurnReportsContext,
 ): { input: TurnReportsInput; withheld: Array<{ reportId: string; reason: string }> } {
   const withheld: Array<{ reportId: string; reason: string }> = [];
-  const base = narrateInput(side, reports, ctx.ownUnits).reports;
+  const atEnd = narrateInput(side, reports, ctx.ownUnits).reports;
+  // A paper written before the outcome speaks for its unit as it stood then (#532).
+  const before = ctx.before && narrateInput(side, reports, ctx.before.ownUnits).reports;
+  const ownNames = ctx.ownUnits.flatMap((u) => [u.name, ...(u.commander ? [u.commander] : [])]);
   const entries = reports.map((r, i): TurnReportEntry => {
-    const entry: TurnReportEntry = { ...base[i]! };
+    const early = before !== undefined && r.observedAt < ctx.before!.at;
+    const { radiusM, ...base } = (early ? before : atEnd)[i]!;
+    const accuracy = placeAccuracy(radiusM);
+    const entry: TurnReportEntry = {
+      ...base,
+      ...(accuracy === undefined ? {} : { placeAccuracy: accuracy }),
+    };
     if (r.kind !== 'turn' || !r.turn) return entry;
     const t = r.turn;
     entry.turn = t.n;
@@ -204,7 +332,7 @@ export function turnReportsInput(
     const unit = ctx.ownUnits.find((u) => u.name === r.from);
     const account = unit && ctx.accounts.find((a) => a.unitId === unit.id)?.account.trim();
     if (account) {
-      const problems = screenAccount(account, entry, ctx.places, ctx.hidden);
+      const problems = screenAccount(account, entry, ctx.places, ctx.hidden, ownNames);
       const unseen =
         ctx.sight && accountSightProblem(account, unit.id, ctx.sight, ownTermsOf(ctx.ownUnits));
       if (unseen) problems.push(unseen);

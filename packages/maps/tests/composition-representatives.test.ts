@@ -108,34 +108,42 @@ for (const name of ['flat-countryside', 'wooded-hills', 'river-valley'] as const
       changed.layers.roads.find((r) => r.id === crossing.roadIds[0])!.crossingIds = [];
       expect(() => canonicalizeAsset(changed)).toThrow(/reciprocal/);
     }
-    if (name === 'wooded-hills') {
-      // A farm road fords a brook (D46); complete validation certifies the ford
-      // and rejects one put on a main road or recorded at another depth.
-      const ford = asset.layers.crossings.find((c) => c.kind === 'ford')!;
-      expect(ford).toBeDefined();
-      const onMain = structuredClone(asset),
-        road = onMain.layers.roads.find((r) => r.id === ford.roadIds[0])!;
-      // Any main route: one joining only villages and boundary exits.
-      const mainRoute = asset.layers.roads
-        .flatMap((r) => r.routeIds)
-        .find(
-          (id) => id.startsWith('route:site:village:') && !isMinorRoute(id, asset.layers.sites),
-        )!;
-      expect(mainRoute).toBeDefined();
-      road.routeIds = [...road.routeIds, mainRoute].sort();
-      expect(validateBattlefield(onMain)).toMatchObject({
-        ok: false,
-        diagnostics: [{ code: 'FORD_MAIN_ROAD' }],
-      });
-      const deeper = structuredClone(asset),
-        forged = deeper.layers.crossings.find((c) => c.id === ford.id)!;
-      if (forged.kind === 'ford') forged.depthM = Math.min(2, forged.depthM + 0.2);
-      expect(validateBattlefield(deeper)).toMatchObject({
-        ok: false,
-        diagnostics: [{ code: 'FORD_DEPTH' }],
-      });
-    }
   }, 90000);
+// A composed farm road fords a brook (D46); complete validation certifies the
+// ford and rejects one put on a main road or recorded at another depth. The
+// wooded-hills preset seed 31 no longer fords under D48: with knight moves its
+// farm is reached by a 2.1 km road on its own side of the brook instead of a
+// 5.8 km route across it. Seed 7 composes the same recipe with fords.
+it('composes a wooded-hills farm-road ford and rejects it on a main road or deeper', async () => {
+  await timerYield();
+  const asset = value(generateBattlefield({ ...battlefieldPreset('wooded-hills'), seed: 7 }));
+  await timerYield();
+  expect(validateBattlefield(asset).ok).toBe(true);
+  const ford = asset.layers.crossings.find((c) => c.kind === 'ford')!;
+  expect(ford).toBeDefined();
+  for (const id of ford.roadIds)
+    for (const route of asset.layers.roads.find((r) => r.id === id)!.routeIds)
+      expect(isMinorRoute(route, asset.layers.sites)).toBe(true);
+  const onMain = structuredClone(asset),
+    road = onMain.layers.roads.find((r) => r.id === ford.roadIds[0])!;
+  // Any main route: one joining only villages and boundary exits.
+  const mainRoute = asset.layers.roads
+    .flatMap((r) => r.routeIds)
+    .find((id) => id.startsWith('route:site:village:') && !isMinorRoute(id, asset.layers.sites))!;
+  expect(mainRoute).toBeDefined();
+  road.routeIds = [...road.routeIds, mainRoute].sort();
+  expect(validateBattlefield(onMain)).toMatchObject({
+    ok: false,
+    diagnostics: [{ code: 'FORD_MAIN_ROAD' }],
+  });
+  const deeper = structuredClone(asset),
+    forged = deeper.layers.crossings.find((c) => c.id === ford.id)!;
+  if (forged.kind === 'ford') forged.depthM = Math.min(2, forged.depthM + 0.2);
+  expect(validateBattlefield(deeper)).toMatchObject({
+    ok: false,
+    diagnostics: [{ code: 'FORD_DEPTH' }],
+  });
+}, 90000);
 it('replays canonical assets in fresh processes without ambient random/clock/name draw coupling', () => {
   const composition = fileURLToPath(new URL('../dist/composition/index.js', import.meta.url)),
     canonical = fileURLToPath(new URL('../dist/canonical.js', import.meta.url));

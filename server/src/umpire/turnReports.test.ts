@@ -88,7 +88,6 @@ describe('the turn reports input (11.9)', () => {
           place: 'at the bridge, on the High road',
           minutesAgo: 0,
           confidence: 'high',
-          radiusM: 0,
           commander: 'Col. Hartmann',
           trait: 'cautious; slow to commit his reserve',
           condition: 'steady, fresh, well supplied',
@@ -143,6 +142,87 @@ describe('the turn reports input (11.9)', () => {
     );
     expect(input.reports[0]!.account).toBeUndefined();
     expect(withheld[0]!.reason).toMatch(/account withheld/);
+  });
+
+  describe('the screen on the 11.12 playtest’s harmless accounts (#530)', () => {
+    // Each account the playtest withheld, on the word it was withheld for; the entry is the
+    // 2nd Battalion's, whose orders name neither the 1st nor any distance.
+    const entry = turnReportsInput(
+      'blue',
+      1,
+      [report({ id: 'blue-r10', from: '2nd Battalion' })],
+      ctx({ accounts: [] }),
+    ).input.reports[0]!;
+    const own = ['1st Battalion', 'Col. Hartmann', '2nd Battalion', 'Maj. Albers'];
+    const h = ctx().hidden!;
+    const screen = (account: string) => screenAccount(account, entry, ctx().places, h, own);
+
+    it.each([
+      // unknown number 200: a distance in paces
+      'The enemy came up to the far bank and opened fire at about 200 paces. He answered by volleys and held his ground.',
+      // unknown name "Battalion": the side's own unit
+      'Maj. Verneuil crossed the bridge, sighted the enemy column, and recrossed in good time. He now stands behind the 1st Battalion.',
+      // unknown numbers 100 and 200
+      'I gave the column a flank volley at about 100 paces. The battalion on the far bank was too far off (over 200 paces), so I held my powder.',
+      // unknown entity "bridge-head"; unknown name "Battalion's"
+      "The 1st Battalion's line stood in the road at the bridge-head and the enemy was thrown back.",
+      // unknown entity "re-forming"
+      'I drew the remnant back over the bridge to the north bank and am re-forming. We have lost heavily.',
+      // unknown number 1: "the 1st", the side's own battalion
+      'Verneuil kept his squadron behind the infantry, ready in case the 1st gave way.',
+      // unknown entity "re-form"
+      'He drew back to the north bank to re-form, short of men.',
+      // unknown entity "bridge-end"
+      'Swung the left wing forward and fired into the flank of the column at the bridge-end.',
+      // a spelled-out distance, a metre figure and a capitalised compound
+      'We opened fire at two hundred paces, then at 150 metres. Bridge-head and road are held.',
+    ])('shows "%s"', (account) => {
+      expect(screen(account)).toEqual([]);
+    });
+
+    it('still withholds the enemy’s names, strengths and ids, unknown figures, dice and the unknown in a compound', () => {
+      const leaks: Array<[string, RegExp]> = [
+        ['We saw the Vanguard Battalion at 200 paces.', /names the other side/],
+        ["The Vanguard Battalion's column crossed.", /names the other side/],
+        ['The Vanguard-Battalion crossed the bridge.', /unknown name "Vanguard-Battalion"/],
+        ["Gen. Moreau's men came on.", /names the other side/],
+        ["We saw Moreau's column at 200 paces.", /unknown name "Moreau's"/],
+        ['A column of 600 men came over at 200 paces.', /unknown number 600/],
+        ['The enemy had two thousand men in the wood.', /unknown number "two thousand"/],
+        ['We fired on red-3 at the bridge-end.', /unknown entity "red-3"/],
+        ['We fired on red-hussars at the bridge-end.', /unknown entity "red-hussars"/],
+        ['We fell back past Ostwald-Mühle.', /unknown name "Ostwald-Mühle"/],
+        ['The 3rd Battalion came up on our left.', /unknown number 3/],
+        ['The odds were against us at 200 paces, so I held.', /dice/],
+      ];
+      for (const [account, problem] of leaks) {
+        expect(screen(account).join('; '), account).toMatch(problem);
+      }
+    });
+
+    it('takes the side’s own names from its units, not the other side’s', () => {
+      const { input, withheld } = turnReportsInput(
+        'blue',
+        1,
+        [
+          report({
+            id: 'blue-r10',
+            from: '2nd Battalion',
+            turn: { n: 1, lost: 0, movedM: 0, orders: [] },
+          }),
+        ],
+        ctx({
+          accounts: [
+            {
+              unitId: 'blue-2',
+              account: "Maj. Albers kept behind the 1st Battalion's line at the bridge-head.",
+            },
+          ],
+        }),
+      );
+      expect(withheld).toEqual([]);
+      expect(input.reports[0]!.account).toMatch(/^Maj\. Albers/);
+    });
   });
 
   it('withholds an account that describes enemies its unit could not see, and only that (#533)', () => {
@@ -220,6 +300,36 @@ describe('a turn note’s checks (11.9)', () => {
     );
   });
 
+  it('lets a note repeat its account’s condition words and spans, and no others (#530)', () => {
+    const shaken = turnReportsInput(
+      'blue',
+      1,
+      [report()],
+      ctx({
+        ownUnits: [unit({ morale: 50 }), second],
+        orderTexts: new Map([['o1', 'Fire on the bridge for ten minutes, then hold it']]),
+        accounts: [
+          {
+            unitId: 'blue-1',
+            account: 'I fired for ten minutes, then met a steady line at the bridge and drew back.',
+          },
+        ],
+      }),
+    ).input.reports[0]!;
+    expect(
+      checkTurnNote(
+        'Sir, I fired for ten minutes, then met a steady line at the bridge and drew back.',
+        shaken,
+      ),
+    ).toEqual([]);
+    expect(checkTurnNote('Sir, we held for an hour at the bridge.', shaken).join()).toMatch(
+      /invented duration/,
+    );
+    expect(checkTurnNote('Sir, we are tiring, but we held the bridge.', shaken).join()).toMatch(
+      /condition "tiring" is not the unit’s/,
+    );
+  });
+
   it('refuses a note on one unit that carries another unit’s facts (a subordinate reads only its own)', () => {
     const { input } = turnReportsInput(
       'blue',
@@ -273,6 +383,94 @@ describe('a turn note’s checks (11.9)', () => {
         }
       }
     }
+  });
+});
+
+describe('papers written before the outcome, and the place radius (#532)', () => {
+  const ack = report({
+    id: 'blue-r2',
+    kind: 'orderDelivered',
+    observedAt: 2 * MS_PER_MINUTE,
+    text: 'Sir, we have your orders.',
+    turn: undefined,
+  });
+  const sighting = report({
+    id: 'blue-r8',
+    kind: 'contact',
+    sizeEstimate: 'about a battalion',
+    uncertaintyRadius: 20,
+    text: 'Sir, we have sighted about a battalion.',
+    turn: undefined,
+  });
+  // At the turn's end the 1st is shaken and nearly out of powder; at its start it was neither.
+  const end = ctx({ ownUnits: [unit({ morale: 50, ammo: 10 }), second] });
+  const timed = { ...end, before: { at: T1, ownUnits: [unit(), second] } };
+
+  it('gives a paper written before the outcome the condition its unit had then', () => {
+    const { input } = turnReportsInput('blue', 1, [ack, report()], timed);
+    const [early, late] = input.reports;
+    expect(early!.condition).toBe('steady, fresh, well supplied');
+    expect(late!.condition).toBe('shaken, fresh, ammunition nearly gone');
+    // Without the start, every paper has the end's condition, as before.
+    expect(turnReportsInput('blue', 1, [ack], end).input.reports[0]!.condition).toBe(
+      'shaken, fresh, ammunition nearly gone',
+    );
+  });
+
+  it('refuses an acknowledgement that reports losses, morale or ammunition its unit did not have', () => {
+    const entry = turnReportsInput('blue', 1, [ack], timed).input.reports[0]!;
+    expect(
+      checkTurnNote('Sir, your orders are in my hands at the bridge. We hold.', entry),
+    ).toEqual([]);
+    expect(
+      checkTurnNote('Sir, your orders are in my hands. The battalion is shaken.', entry).join(),
+    ).toMatch(/condition "shaken" is not the unit’s/);
+    expect(
+      checkTurnNote('Sir, your orders are in my hands, but we are short of powder.', entry).join(),
+    ).toMatch(/ammunition "short of powder" is not the unit’s when it wrote/);
+    expect(
+      checkTurnNote('Sir, your orders are in my hands; we have lost many men.', entry).join(),
+    ).toMatch(/speaks of losses/);
+    // The same words in a turn note, from the unit's end-of-turn condition and losses, stand.
+    const turn = turnReportsInput('blue', 1, [report()], timed).input.reports[0]!;
+    expect(
+      checkTurnNote(
+        'Sir, I kept my men back in the wood and watched the road. We lost 43 men and are short of powder.',
+        turn,
+      ),
+    ).toEqual([]);
+  });
+
+  it('words the radius as how sure the place is, and refuses a note that makes it a range', () => {
+    const entry = turnReportsInput('blue', 1, [sighting], ctx()).input.reports[0]!;
+    expect(entry).not.toHaveProperty('radiusM');
+    expect(entry.placeAccuracy).toBe('good to about 20 m');
+    const sight = 'Sir, we have sighted about a battalion at the bridge, on the High road.';
+    for (const ok of [
+      `${sight} The place is good to about 20 m.`,
+      `${sight} The position may be out by some 20 metres.`,
+      `${sight} It stands within some twenty metres of that spot.`,
+      sight,
+    ]) {
+      expect(checkTurnNote(ok, entry), ok).toEqual([]);
+    }
+    for (const wrong of [
+      `${sight} It lies within twenty metres of us.`,
+      `${sight} I put them within about 20 metres of the bridge.`,
+      `${sight} They are 20 m off.`,
+    ]) {
+      expect(checkTurnNote(wrong, entry).join(), wrong).toMatch(/states a distance/);
+    }
+    // A distance the report's own words give stands: an order's paces in a turn note.
+    const own = turnReportsInput(
+      'blue',
+      1,
+      [report()],
+      ctx({ orderTexts: new Map([['o1', 'Close to about 80 paces of the bridge and hold']]) }),
+    ).input.reports[0]!;
+    expect(
+      checkTurnNote('Sir, I kept my men back in the wood, 80 paces from the bridge.', own),
+    ).toEqual([]);
   });
 });
 

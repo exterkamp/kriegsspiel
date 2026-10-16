@@ -100,9 +100,9 @@ it('checks reciprocal logical provenance and per-route emitted-edge connectivity
 });
 it('reserves every output coordinate and rejects unfulfilled singleton boundary requests', () => {
   const a = small();
-  // The eight-neighbour route is shorter than the old staircase, so this
-  // fixture now succeeds at 25 output coordinates; 20 must still fail.
-  a.settings.limits.maxVertices = 20;
+  // The any-angle route (D48) is one straight line instead of the lattice
+  // steps, so this fixture now succeeds at 17 output coordinates; 16 must fail.
+  a.settings.limits.maxVertices = 16;
   expect(generatePlanning(a)).toMatchObject({
     ok: false,
     diagnostics: [{ code: 'PLANNING_RESOURCE_LIMIT', constraint: 'output vertices' }],

@@ -23,7 +23,14 @@ import { TurnProposal } from '@kriegsspiel/protocol';
 import { replayTurns } from '../admin/turnView.js';
 import { accountSightProblem, ownTermsOf, sideSight } from '../umpire/accountSight.js';
 import { sightProblems } from '../umpire/adjudicate.js';
-import { TURN_REPORTS_MAX, reportsOfTurn, turnReportsInput } from '../umpire/turnReports.js';
+import { umpireConfigFromEnv } from '../umpire/config.js';
+import { createUmpireClient } from '../umpire/createUmpireClient.js';
+import {
+  TURN_REPORTS_MAX,
+  reportsOfTurn,
+  turnReportsInput,
+  writeTurnReports,
+} from '../umpire/turnReports.js';
 import { createRegistry, loadScenarioById, replayLog, startingState } from './index.js';
 import type { InputLogEntry, InputLogHeader } from './store.js';
 import { turnReportsContext, type UmpireTurnOutput } from './umpireTurn.js';
@@ -234,15 +241,91 @@ describe('the playtest accounts and sight (#533)', () => {
 
   it('withholds no account of the two umpire games that the screen kept before (accounts whose sightings stood)', () => {
     const all = [...screened('standard'), ...screened('free')];
-    // Without the sight check the screen withholds what it withheld live: 10 of 36.
-    for (const r of all) {
-      expect(
-        r.before.map((w) => w.split(':')[0]),
-        `turn ${r.turn} ${r.side}`,
-      ).toEqual(r.logged);
-    }
-    expect(all.flatMap((r) => r.before)).toHaveLength(10);
-    // Every final proposal's sightings stood, so the check withholds nothing more (#530 not worse).
+    // Live, the screen withheld 10 of 36 accounts, every one on a harmless word (#530); since
+    // #530 it withholds none of them.
+    expect(all.flatMap((r) => r.logged)).toHaveLength(10);
+    expect(all.flatMap((r) => r.before)).toEqual([]);
+    // Every final proposal's sightings stood, so the sight check withholds nothing more.
     for (const r of all) expect(r.after, `turn ${r.turn} ${r.side}`).toEqual(r.before);
+  });
+});
+
+/** Each side's papers of each umpire turn with the turn reports' context, as `writeReports` builds them. */
+function papers(name: 'standard' | 'free') {
+  const game = load(name);
+  const turns = replayTurns({
+    header: game.header,
+    world: loadScenarioById(game.header.scenarioId),
+    entries: game.entries,
+    registry: createRegistry(),
+    init: startingState,
+  });
+  return turns.flatMap((t) => {
+    const world = t.after.world;
+    const output = t.turn.output as UmpireTurnOutput;
+    const places = [...new Set(world.map.features.flatMap((f) => (f.name ? [f.name] : [])))];
+    return world.sides.map((s) => {
+      const side = s.id as SideId;
+      const view = viewFor(world, side, t.after.time);
+      const due = reportsOfTurn(view.reports, t.turn.startMs, t.after.time).slice(
+        -TURN_REPORTS_MAX,
+      );
+      const ctx = turnReportsContext(world, view, t.turn, output.proposal, places);
+      return { turn: t.turn.n, side, due, ctx };
+    });
+  });
+}
+
+describe('the playtest accounts and the screen (#530)', () => {
+  it('shows every account the screen withheld live on a harmless word', () => {
+    const shown = new Map<string, string>();
+    for (const name of ['standard', 'free'] as const) {
+      for (const p of papers(name)) {
+        const { input, withheld } = turnReportsInput(p.side, p.turn, p.due, p.ctx);
+        expect(withheld, `${name} turn ${p.turn} ${p.side}`).toEqual([]);
+        for (const e of input.reports) {
+          if (e.account) shown.set(`${name} ${e.id}`, e.account);
+        }
+      }
+    }
+    expect(shown.size).toBe(36);
+    // The ten withheld live, by the words they were withheld on.
+    expect(shown.get('standard blue-r5')).toMatch(/about 200 paces/);
+    expect(shown.get('standard blue-r7')).toMatch(/behind the 1st Battalion/);
+    expect(shown.get('standard blue-r14')).toMatch(/about 100 paces.*over 200 paces/);
+    expect(shown.get('standard blue-r15')).toMatch(/1st Battalion's line .* bridge-head/);
+    expect(shown.get('standard red-r14')).toMatch(/re-forming/);
+    expect(shown.get('standard red-r15')).toMatch(/over 200 paces/);
+    expect(shown.get('standard blue-r22')).toMatch(/in case the 1st gave way/);
+    expect(shown.get('standard red-r21')).toMatch(/to re-form/);
+    expect(shown.get('free blue-r20')).toMatch(/at the bridge-end/);
+    expect(shown.get('free blue-r21')).toMatch(/at the bridge-end/);
+  });
+
+  it('with the test provider, every turn note is written from its account, so none contradicts it', async () => {
+    const client = createUmpireClient({
+      config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }),
+      env: {},
+    });
+    const notes = new Map<string, string>();
+    for (const name of ['standard', 'free'] as const) {
+      for (const p of papers(name)) {
+        const r = await writeTurnReports(client, p.side, p.turn, p.due, p.ctx);
+        expect(r.withheld, `${name} turn ${p.turn} ${p.side}`).toEqual([]);
+        const { input } = turnReportsInput(p.side, p.turn, p.due, p.ctx);
+        for (const e of input.reports) {
+          if (!e.account) continue;
+          const note = r.dispatches.find((d) => d.reportIds[0] === e.id)?.text;
+          expect(note, `${name} ${e.id}: ${JSON.stringify(r.fallbacks)}`).toBeDefined();
+          expect(note).toContain(e.account.replace(/[.!?]+$/, ''));
+          notes.set(`${name} ${e.id}`, note!);
+        }
+      }
+    }
+    expect(notes.size).toBe(36);
+    // The cavalry case: back south of the river, not "crossing the bridge to scout north".
+    const cavalry = notes.get('standard blue-r7')!;
+    expect(cavalry).toMatch(/recrossed in good time/);
+    expect(cavalry).not.toMatch(/\b(?:are crossing|mean to be back)\b/);
   });
 });
