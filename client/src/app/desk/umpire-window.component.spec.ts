@@ -272,6 +272,94 @@ describe('UmpireWindowComponent', () => {
     expect(t.desk.windowFrame()?.gameMs).toBe(0);
   });
 
+  it('lists a turn game’s turns, steps turn by turn and shows the umpire’s log on request (11.11)', async () => {
+    const turnTimeline = {
+      ...timeline,
+      endMs: 1_200_000,
+      marks: [
+        { ms: 0, kind: 'turn', label: 'turn 1 begins' },
+        { ms: 300_000, kind: 'event', label: 'x' },
+        { ms: 600_000, kind: 'turn', label: 'turn 1 decided by the umpire' },
+        { ms: 600_000, kind: 'turn', label: 'turn 2 begins' },
+        { ms: 1_200_000, kind: 'turn', label: 'turn 2 decided by the tables' },
+      ],
+      turns: [
+        {
+          n: 1,
+          startMs: 0,
+          endMs: 600_000,
+          adjudicator: 'umpire',
+          fellBack: false,
+          summary: 'Red pressed the bridge and was held.',
+          losses: { blue: 40, red: 12 },
+          units: [
+            {
+              id: 'b1',
+              side: 'blue',
+              name: '1st Battalion',
+              lost: 40,
+              from: 'active',
+              to: 'withdrawn',
+            },
+          ],
+          corrections: 2,
+          rolls: [{ why: 'Does the charge go home?', chance: 0.4, success: true }],
+          journal: {
+            notes: [{ turn: 1, note: 'Red pressed the bridge.' }],
+            precedents: [{ turn: 1, ruling: 'Hussars do not swim.' }],
+          },
+        },
+        {
+          n: 2,
+          startMs: 600_000,
+          endMs: 1_200_000,
+          adjudicator: 'engine',
+          fellBack: true,
+          losses: { blue: 0, red: 0 },
+          units: [],
+          corrections: 0,
+          rolls: [],
+        },
+      ],
+    };
+    const f = stubFetch({
+      timeline: () => Promise.resolve(new Response(JSON.stringify(turnTimeline))),
+    });
+    const t = await open();
+    const sec = () => t.el.querySelector('.turns')!;
+    // Opens at the end: the last turn, decided by the tables.
+    expect(sec().querySelector('.turn h4')!.textContent).toBe('Turn 2');
+    expect(sec().textContent).toContain('the umpire could not rule this turn');
+    const btn = (label: string) =>
+      t.el.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
+    btn('Previous turn').click();
+    await t.settle();
+    expect(f.at.at(-1)).toBe(600_000);
+    const turn = sec().querySelector('.turn')!.textContent!;
+    expect(turn).toContain('Turn 1');
+    expect(turn).toContain('Decided by the umpire.');
+    expect(turn).toContain('Red pressed the bridge and was held.');
+    expect(turn).toContain('Blue lost 40 men, Red lost 12 men.');
+    expect(turn).toContain('1st Battalion (blue)');
+    expect(turn).toContain('corrected 2 outcomes');
+    expect(turn).toContain('Does the charge go home? (40%)');
+    // The log is shown only when asked for.
+    expect(sec().querySelector('.journal')).toBeNull();
+    sec().querySelector<HTMLInputElement>('.log-toggle input')!.click();
+    await t.fixture.whenStable();
+    expect(sec().querySelector('.journal')!.textContent).toContain('Hussars do not swim.');
+    // A turn's button jumps to its end.
+    sec().querySelectorAll<HTMLButtonElement>('.turn-list .jump')[1]!.click();
+    await t.settle();
+    expect(f.at.at(-1)).toBe(1_200_000);
+  });
+
+  it('shows no turns for a real-time game', async () => {
+    stubFetch();
+    const t = await open();
+    expect(t.el.querySelector('.turns')).toBeNull();
+  });
+
   it('fetches nothing without a game', async () => {
     const f = stubFetch();
     await open(null);

@@ -8,7 +8,15 @@ import {
 } from '@angular/core';
 import type { Critique, CritiqueKind, WindowTimeline } from '@kriegsspiel/protocol';
 import { fetchCritique, fetchWindowAt, fetchWindowTimeline } from '@legacy/window/api';
-import { stepMark, unitNotes, type BeliefChoice } from '@legacy/window/model';
+import {
+  decidedBy,
+  lossesText,
+  stepMark,
+  stepTurn,
+  turnAt,
+  unitNotes,
+  type BeliefChoice,
+} from '@legacy/window/model';
 import { formatGameTime } from '@legacy/net/state';
 import { GameService } from '../game/game.service';
 import { DeskStore } from './desk.store';
@@ -67,6 +75,12 @@ export class UmpireWindowComponent {
   protected readonly hovered = computed(() =>
     this.desk.windowFrame()?.units.find((u) => u.id === this.desk.windowHover()),
   );
+  /** Turn mode (11.11): every turn played, the one at the scrubber's time, and the umpire's log. */
+  protected readonly turns = computed(() => this.timeline()?.turns ?? []);
+  protected readonly shownTurn = computed(() => turnAt(this.turns(), this.at()));
+  protected readonly showLog = signal(false);
+  protected readonly decidedBy = decidedBy;
+  protected readonly lossesText = lossesText;
   protected readonly errorText = computed(() =>
     this.error() === 'game_not_over' ? 'Available once the game has ended.' : this.error(),
   );
@@ -112,6 +126,14 @@ export class UmpireWindowComponent {
     } catch (e) {
       if (mine === this.ticket) this.error.set(messageOf(e));
     }
+  }
+
+  /** Step to the next or previous turn's start or end. */
+  protected stepTurn(dir: 1 | -1): void {
+    const tl = this.timeline();
+    if (!tl) return;
+    const i = stepTurn(tl.marks, this.at(), dir);
+    if (i >= 0) void this.load(tl.marks[i]!.ms);
   }
 
   protected step(dir: 1 | -1): void {
