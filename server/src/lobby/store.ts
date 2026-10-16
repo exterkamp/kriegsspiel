@@ -86,6 +86,12 @@ export interface LobbyGame {
   past?: PastHolder[];
   /** How the humans of a side are organised. Unset: shared HQ, so forwarding takes no time. */
   hierarchy?: 'shared' | 'chain';
+  /**
+   * The game's seed (#534), drawn when the record is made (or given in the request) and used when
+   * the game starts; the input-log header keeps it from then on. Absent on a record made before it.
+   * Master state: never sent to a player.
+   */
+  seed?: number;
   createdAtMs: number;
 }
 
