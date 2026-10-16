@@ -9,7 +9,7 @@ import { generatePlanning, type RegionalPlanningOutput } from '../src/planning/i
 import { expectPlausibleCrossings } from './realism-checks.js';
 
 /**
- * Any-angle roads (#541, D47) over a corpus of 20 seeds of two presets. The
+ * Any-angle roads (#541, D48) over a corpus of 20 seeds of two presets. The
  * regional stages are composed without cover or settlements to keep it cheap;
  * `generatePlanning` certifies every road (grade, water, sites, bounds) and
  * the connection of every site and exit before it returns.

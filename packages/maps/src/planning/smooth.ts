@@ -6,7 +6,7 @@ import type { Context } from './context.js';
 import type { Edge, Router } from './router.js';
 
 /**
- * Frozen any-angle policy (`sited-graded-any-angle-network-v4`, D47). Routes
+ * Frozen any-angle policy (`sited-graded-any-angle-network-v4`, D48). Routes
  * are still searched on the lattice (now sixteen neighbours). Each chain of lattice
  * edges between junctions and fixed connectors is then string-pulled, free
  * junctions move toward the point that shortens their branches, and corners

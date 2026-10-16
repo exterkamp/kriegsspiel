@@ -152,7 +152,7 @@ export function assemble(
       'redundant links',
       'Requested bounded redundant site links could not be routed.',
     );
-  // Any-angle geometry (D47): lattice chains become pulled, curved polylines.
+  // Any-angle geometry (D48): lattice chains become pulled, curved polylines.
   const segments = anyAngle(c, r, selected);
   // Planarize actual emitted edges, including off-lattice bridge/site connectors.
   // Local spatial bins bound pair discovery; collinear overlaps split and merge.

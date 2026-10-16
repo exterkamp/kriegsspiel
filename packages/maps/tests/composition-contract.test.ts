@@ -158,18 +158,34 @@ it('still certifies maps saved by the D45 stages, before fords (D46)', () => {
   mixed.provenance.generator.stages.roads = 'sited-graded-fording-network-v3';
   expect(supportsValidation(mixed)).toBe(false);
 }, 60_000);
-it('still certifies maps saved by the D46 stages, with lattice roads (D47)', () => {
-  // A small map saved by the D46 generator (roads 'sited-graded-fording-network-v3').
+it('still certifies maps saved by the D46 stages, before unbiased relief and any-angle roads (D47, D48)', () => {
+  // A small map saved by the D46 generator: value-noise relief combed along one grain
+  // ('structured-relief-eroded-v2'), D8 rivers, and lattice roads with fords.
   const saved = importAsset(
     readFileSync(new URL('./fixtures/d46-saved-map.json', import.meta.url), 'utf8'),
   );
+  expect(saved.provenance.generator.stages.terrain).toBe('structured-relief-eroded-v2');
+  expect(saved.provenance.generator.stages.hydrology).toBe('flood-carved-stepped-network-v2');
   expect(saved.provenance.generator.stages.roads).toBe('sited-graded-fording-network-v3');
   expect(supportsReplay(saved)).toBe(false);
   expect(supportsValidation(saved)).toBe(true);
   expect(validateBattlefield(saved).ok).toBe(true);
-  // The current generator records the any-angle planning stage and replays exactly.
+  // The current generator records the new relief, hydrology and any-angle roads and replays exactly.
+  expect(asset.provenance.generator.stages.terrain).toBe('gradient-relief-eroded-v3');
+  expect(asset.provenance.generator.stages.hydrology).toBe('flood-carved-flowline-network-v3');
   expect(asset.provenance.generator.stages.roads).toBe('sited-graded-any-angle-network-v4');
   expect(supportsReplay(asset)).toBe(true);
+  // New relief with the old rivers, or the reverse, is not a recorded identity.
+  for (const stage of ['terrain', 'hydrology'] as const) {
+    const mixed = structuredClone(saved);
+    mixed.provenance.generator.stages[stage] = asset.provenance.generator.stages[stage];
+    expect(supportsValidation(mixed)).toBe(false);
+  }
+  // D47 relief and rivers with the D46 lattice roads were generated (main between #540 and #541).
+  const between = structuredClone(saved);
+  between.provenance.generator.stages.terrain = asset.provenance.generator.stages.terrain;
+  between.provenance.generator.stages.hydrology = asset.provenance.generator.stages.hydrology;
+  expect(supportsValidation(between)).toBe(true);
   // D44 rectangle cover with the D46 roads was never generated, so it is not certified.
   const mixed = structuredClone(saved);
   mixed.provenance.generator.stages.cover = 'coherent-dry-runs-v1';

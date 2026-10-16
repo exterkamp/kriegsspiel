@@ -66,6 +66,173 @@ export interface RealismReport {
   };
   cover: CoverRealism;
   crossings: CrossingRealism;
+  grain: GrainRealism;
+}
+
+/**
+ * Whether ground and water share one combed direction (#540). Terrain is read
+ * from central-difference gradients of the samples, weighted by their
+ * magnitude; directions are axes (mod 180 degrees), compared through the
+ * doubled-angle vector so no trigonometry is needed.
+ */
+export interface GrainRealism {
+  /**
+   * Elongation of the relief: the ratio of the gradient structure tensor's
+   * eigenvalues (1 = isotropic; v2 terrain measured 1.9-3.5).
+   */
+  anisotropy: number;
+  /** Unit vector of the grain: along ridges, perpendicular to the dominant slope axis. */
+  grainAxis: Point;
+  /**
+   * Gradient-weighted share of slope aspect within 7.5 degrees of 0, 45, 90
+   * and 135 degrees (axes; a uniform aspect gives 1/12 = 8.3% each).
+   */
+  aspectLatticeShare: [number, number, number, number];
+  /** River bank length, metres (polygon rings, excluding the map frame). */
+  riverBankLengthM: number;
+  /** Length-weighted mean |cos| between river banks and the grain (uniform 2/pi = 0.64). */
+  riverGrainAlignment: number;
+  /** Share of river bank length within 15 degrees of the grain (uniform 1/6). */
+  riverNearGrainShare: number;
+  /**
+   * Share of river bank length within 2.5 degrees of 0, 45, 90 and 135
+   * degrees (uniform 2.8% each, 11.1% in total).
+   */
+  riverGridShare: [number, number, number, number];
+}
+
+/** cos(15 deg) and cos(5 deg): doubled half-widths of the 7.5 and 2.5 degree windows. */
+const COS_15 = 0.9659258262890683,
+  COS_5 = 0.9961946980917455,
+  COS_30 = 0.8660254037844387;
+/** Which of the axes 0, 45, 90, 135 degrees a doubled-angle unit vector lies within. */
+function latticeAxis(c2: number, s2: number, cosWindow: number): number {
+  if (c2 >= cosWindow) return 0;
+  if (s2 >= cosWindow) return 1;
+  if (-c2 >= cosWindow) return 2;
+  if (-s2 >= cosWindow) return 3;
+  return -1;
+}
+
+/** A corpus of grain measurements: per-map terrain shares averaged, river banks pooled by length. */
+export interface GrainSummary {
+  maps: number;
+  meanAnisotropy: number;
+  maxAnisotropy: number;
+  /** Mean over maps of each lattice axis's aspect share. */
+  aspectLatticeShare: [number, number, number, number];
+  riverBankLengthM: number;
+  riverGrainAlignment: number;
+  riverNearGrainShare: number;
+  riverGridShare: [number, number, number, number];
+  /** Sum of the four river grid shares. */
+  riverGridTotal: number;
+}
+
+export function summarizeGrain(reports: readonly GrainRealism[]): GrainSummary {
+  const n = reports.length || 1,
+    length = reports.reduce((t, r) => t + r.riverBankLengthM, 0),
+    pooled = (f: (r: GrainRealism) => number) =>
+      length ? reports.reduce((t, r) => t + f(r) * r.riverBankLengthM, 0) / length : 0,
+    four = (f: (k: number) => number) => [0, 1, 2, 3].map(f) as [number, number, number, number];
+  const riverGridShare = four((k) => pooled((r) => r.riverGridShare[k]!));
+  return {
+    maps: reports.length,
+    meanAnisotropy: reports.reduce((t, r) => t + r.anisotropy, 0) / n,
+    maxAnisotropy: reports.reduce((t, r) => Math.max(t, r.anisotropy), 0),
+    aspectLatticeShare: four((k) => reports.reduce((t, r) => t + r.aspectLatticeShare[k]!, 0) / n),
+    riverBankLengthM: length,
+    riverGrainAlignment: pooled((r) => r.riverGrainAlignment),
+    riverNearGrainShare: pooled((r) => r.riverNearGrainShare),
+    riverGridShare,
+    riverGridTotal: riverGridShare.reduce((t, v) => t + v, 0),
+  };
+}
+
+/** The public layers the grain measurement reads: ground and water. */
+export type GrainInput = Pick<MapAsset, 'bounds' | 'elevation'> & {
+  layers: Pick<MapAsset['layers'], 'water'>;
+};
+
+export function grainRealism(asset: GrainInput): GrainRealism {
+  const e = asset.elevation,
+    z = e.samples,
+    w = e.columns,
+    h = e.rows,
+    b = asset.bounds;
+  let sxx = 0,
+    syy = 0,
+    sxy = 0,
+    weight = 0;
+  const aspect = [0, 0, 0, 0];
+  for (let y = 1; y < h - 1; y++)
+    for (let x = 1; x < w - 1; x++) {
+      const gx = (z[y * w + x + 1]! - z[y * w + x - 1]!) / 2,
+        gy = (z[(y + 1) * w + x]! - z[(y - 1) * w + x]!) / 2,
+        m2 = gx * gx + gy * gy;
+      sxx += gx * gx;
+      syy += gy * gy;
+      sxy += gx * gy;
+      if (!m2) continue;
+      const m = Math.sqrt(m2),
+        axis = latticeAxis((gx * gx - gy * gy) / m2, (2 * gx * gy) / m2, COS_15);
+      weight += m;
+      if (axis >= 0) aspect[axis]! += m;
+    }
+  // Eigenvalues of [[sxx, sxy], [sxy, syy]]; the larger one's vector is the slope axis.
+  const mean = (sxx + syy) / 2,
+    root = Math.sqrt(((sxx - syy) / 2) ** 2 + sxy * sxy),
+    major = mean + root,
+    minor = mean - root,
+    anisotropy = minor > 0 ? major / minor : major > 0 ? Infinity : 1;
+  let ax = sxy,
+    ay = major - sxx;
+  if (Math.hypot(ax, ay) < 1e-12 * (major || 1)) [ax, ay] = sxx >= syy ? [1, 0] : [0, 1];
+  const am = Math.hypot(ax, ay),
+    grainAxis: Point = [-ay / am, ax / am];
+  // River banks: every ring edge of every river polygon, except edges on the map frame.
+  const grid = [0, 0, 0, 0];
+  let length = 0,
+    align = 0,
+    near = 0;
+  for (const water of asset.layers.water ?? [])
+    if (water.kind === 'river')
+      for (const polygon of water.polygons)
+        for (const ring of [polygon.outer, ...polygon.holes])
+          for (let k = 1; k < ring.length; k++) {
+            const p = ring[k - 1]!,
+              q = ring[k]!,
+              dx = q[0] - p[0],
+              dy = q[1] - p[1],
+              len = Math.hypot(dx, dy);
+            if (
+              len < 1e-6 ||
+              (dx === 0 && (p[0] <= b.minX || p[0] >= b.maxX)) ||
+              (dy === 0 && (p[1] <= b.minY || p[1] >= b.maxY))
+            )
+              continue;
+            const cos = Math.abs((dx * grainAxis[0] + dy * grainAxis[1]) / len),
+              axis = latticeAxis(
+                (dx * dx - dy * dy) / (len * len),
+                (2 * dx * dy) / (len * len),
+                COS_5,
+              );
+            length += len;
+            align += len * cos;
+            // Within 15 degrees of the grain: cos(2 delta) = 2cos^2 - 1 >= cos 30.
+            if (2 * cos * cos - 1 >= COS_30) near += len;
+            if (axis >= 0) grid[axis]! += len;
+          }
+  const share = (v: number, total: number) => (total ? v / total : 0);
+  return {
+    anisotropy,
+    grainAxis,
+    aspectLatticeShare: aspect.map((v) => share(v, weight)) as GrainRealism['aspectLatticeShare'],
+    riverBankLengthM: length,
+    riverGrainAlignment: share(align, length),
+    riverNearGrainShare: share(near, length),
+    riverGridShare: grid.map((v) => share(v, length)) as GrainRealism['riverGridShare'],
+  };
 }
 
 /**
@@ -547,6 +714,7 @@ export function realismReport(asset: MapAsset): RealismReport {
     },
     cover: coverRealism(asset),
     crossings: crossingRealism(asset, (x, y) => q.heightAt(x, y), budget),
+    grain: grainRealism(asset),
   };
 }
 

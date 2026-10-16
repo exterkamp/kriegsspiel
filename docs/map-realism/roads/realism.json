@@ -1,5 +1,5 @@
 {
- "note": "sweep: seeds 1-20 of each preset, complete battlefields, regional ground roads; main = D46, k0 = D47 pass without knight moves, k1 = D47 as shipped",
+ "note": "sweep: seeds 1-20 of each preset, complete battlefields, regional ground roads; main = D46, k0 = D48 pass without knight moves, k1 = D48 as shipped",
  "sweep": {
   "main:river-valley": {
    "regionalKm": 301.8,

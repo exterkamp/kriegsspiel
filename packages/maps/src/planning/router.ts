@@ -37,7 +37,7 @@ type QueueItem = {
 };
 /**
  * Frozen route costs (`sited-graded-network-v2`, kept by `-fording-network-v3`;
- * fords cost `SHALLOW_WATER.routeSpanFactor` per metre plus `routeFixedM`; D47 adds knight moves). Lattice moves
+ * fords cost `SHALLOW_WATER.routeSpanFactor` per metre plus `routeFixedM`; D48 adds knight moves). Lattice moves
  * avoid staircase roads; the grade penalty grows quadratically so roads wind
  * along contours, valleys and spurs instead of climbing straight; bridges carry
  * a fixed cost so routes share crossings; existing road edges are discounted so
@@ -469,7 +469,7 @@ export class Router {
       north && east ? id - cols + 1 : -1,
       south && west ? id + cols - 1 : -1,
       south && east ? id + cols + 1 : -1,
-      // Knight moves (D47): sixteen directions weaken the lattice's pull toward
+      // Knight moves (D48): sixteen directions weaken the lattice's pull toward
       // axis and diagonal runs (and anchors placed on them) before the any-angle pass.
       ...KNIGHT_MOVES.map(([dx, dy]) =>
         x + dx >= 0 && x + dx < cols && y + dy >= 0 && y + dy < this.c.rows

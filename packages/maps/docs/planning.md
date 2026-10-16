@@ -4,7 +4,7 @@
 planner. It consumes **accepted decimal6 authoritative ground**, bounds, water,
 optional independent cover, D crossing proposals, recorded settings and a seed.
 It changes none of those inputs. It does not import or execute SettleMaker.
-`PLANNING_VERSION = sited-graded-any-angle-network-v4` (D47). For saved maps,
+`PLANNING_VERSION = sited-graded-any-angle-network-v4` (D48). For saved maps,
 `sited-graded-fording-network-v3` (D46, lattice roads with fords) remains
 `FORDING_PLANNING_VERSION`, and `sited-graded-network-v2` (bridges only)
 remains `LEGACY_PLANNING_VERSION`. `DECK_POLICY =
@@ -109,7 +109,7 @@ and node/path endpoint/route provenance is explicit.
 ## Terrain-cost routing, crossings and normalization
 
 The bounded internal lattice uses sixteen neighbours (axes, diagonals and,
-since D47, knight moves). v2 traversal
+since D48, knight moves). v2 traversal
 cost (`ROUTE_COSTS`, #490) is length × `(1 + 6g + 120g² + margin)`, where `g`
 is the certified maximum directional grade and `margin` rises to 0.6 within
 150 m of the map edge: roads wind along contours, valleys and spurs and keep
@@ -127,7 +127,7 @@ required spanning network; failed pairs are excluded with a bounded retry
 count. Configured extra site links add bounded redundancy. Requests that cannot
 be satisfied return infeasibility.
 
-### Any-angle geometry (D47)
+### Any-angle geometry (D48)
 
 Routes are found and shared on the lattice. `anyAngle` (`src/planning/smooth.ts`)
 then rewrites the selected network. It splits the network into chains of

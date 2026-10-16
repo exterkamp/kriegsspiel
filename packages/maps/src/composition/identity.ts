@@ -40,6 +40,11 @@ export const CURRENT_GENERATOR: MapAsset['provenance']['generator'] = Object.fre
   randomPolicy: 'fnv1a-stage-v1',
   runtimePolicy: 'js-binary64-v1',
 });
+/** Terrain and hydrology from D44 until #540: value noise along one grain, D8 rivers. */
+const D44_RELIEF = Object.freeze({
+  terrain: 'structured-relief-eroded-v2',
+  hydrology: 'flood-carved-stepped-network-v2',
+});
 /**
  * Generators whose saved maps the current complete validator still certifies,
  * although they can no longer be regenerated: their geometry is checked by the
@@ -62,6 +67,7 @@ export const LEGACY_GENERATORS: readonly MapAsset['provenance']['generator'][] =
     ...CURRENT_GENERATOR,
     stages: Object.freeze({
       ...CURRENT_GENERATOR.stages,
+      ...D44_RELIEF,
       cover: LEGACY_COVER_VERSION,
       roads: LEGACY_PLANNING_VERSION,
     }),
@@ -69,9 +75,22 @@ export const LEGACY_GENERATORS: readonly MapAsset['provenance']['generator'][] =
   // D45 stages: terrain-following cover, bridges only (before D46 fords).
   Object.freeze({
     ...CURRENT_GENERATOR,
-    stages: Object.freeze({ ...CURRENT_GENERATOR.stages, roads: LEGACY_PLANNING_VERSION }),
+    stages: Object.freeze({
+      ...CURRENT_GENERATOR.stages,
+      ...D44_RELIEF,
+      roads: LEGACY_PLANNING_VERSION,
+    }),
   }),
-  // D46 stages: lattice roads with fords (before D47 any-angle roads).
+  // D46 stages: lattice roads with fords, on the combed v2 relief and D8 rivers (before D47 and D48).
+  Object.freeze({
+    ...CURRENT_GENERATOR,
+    stages: Object.freeze({
+      ...CURRENT_GENERATOR.stages,
+      ...D44_RELIEF,
+      roads: FORDING_PLANNING_VERSION,
+    }),
+  }),
+  // D47 relief and rivers with D46 lattice roads (main between #540 and #541, before D48 any-angle roads).
   Object.freeze({
     ...CURRENT_GENERATOR,
     stages: Object.freeze({ ...CURRENT_GENERATOR.stages, roads: FORDING_PLANNING_VERSION }),
