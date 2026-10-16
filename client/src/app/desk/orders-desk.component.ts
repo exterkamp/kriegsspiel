@@ -69,6 +69,10 @@ export class OrdersDeskComponent {
   protected readonly over = computed(() => this.game.state().gameOver !== undefined);
   /** Turn mode (D39): orders are held for the turn and the side sends them together. */
   protected readonly turnMode = computed(() => this.game.state().turnMode === true);
+  /** A game just joined whose mode is not yet known: the order can be written but not signed or held (#427). */
+  protected readonly modePending = computed(
+    () => !this.turnMode() && this.game.state().modePending === true,
+  );
   /** In turn mode the order box only takes orders while the side is still writing its turn. */
   protected readonly closed = computed(
     () => this.over() || (this.turnMode() && turnPhase(this.game.state()) !== 'writing'),
@@ -294,6 +298,8 @@ export class OrdersDeskComponent {
   }
 
   protected sign(): void {
+    // The words wait in the box until the desk knows whether to send or hold them (#427).
+    if (this.modePending()) return;
     if (this.turnMode()) {
       this.error.set(undefined);
       this.confirmation.set('');

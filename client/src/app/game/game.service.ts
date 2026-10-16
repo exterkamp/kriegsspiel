@@ -9,6 +9,8 @@ import {
   withMarkPut,
   withPendingOrder,
   withRead,
+  withModeKnown,
+  withModePending,
   withTurnSettings,
   type ClientState,
   type PendingOrder,
@@ -50,6 +52,8 @@ export class GameService {
     }
     this._gameId.set(params.game);
     this._sides.set([]);
+    // Neither dress until the game's settings (or its first turn) say how it is played (#427).
+    this._state.update(withModePending);
     const game = params.game;
     fetchGame(game).then(
       (info) => {
@@ -70,7 +74,10 @@ export class GameService {
           () => undefined,
         );
       },
-      () => undefined,
+      // Unreadable settings: play it as the socket says (a turn game still sends its turn).
+      () => {
+        if (this._gameId() === game) this._state.update(withModeKnown);
+      },
     );
     this.conn = new GameConnection({
       url: wsUrl(loc, params.game, params.side),
