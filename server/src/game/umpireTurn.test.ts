@@ -1,7 +1,11 @@
 import {
+  JOURNAL_MAX_TOKENS,
+  JOURNAL_PRECEDENTS_MAX,
   advanceTo,
   createState,
   holdTheBridge,
+  journalTokens,
+  recordInJournal,
   loadScenario,
   positionAt,
   rollTurnDice,
@@ -13,7 +17,12 @@ import type { TurnOrder, TurnProposal, UmpireSettings } from '@kriegsspiel/proto
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser } from '../orders/index.js';
-import { ADJUDICATE_PROMPT_VERSION, adjudicateSystem } from '../umpire/adjudicate.js';
+import { sideViewOf } from '../api/sideView.js';
+import {
+  ADJUDICATE_PROMPT_VERSION,
+  adjudicateSystem,
+  type journalInput,
+} from '../umpire/adjudicate.js';
 import { ADJUDICATE_MAX_TOKENS, umpireConfigFromEnv } from '../umpire/config.js';
 import { createUmpireClient } from '../umpire/createUmpireClient.js';
 import { TURN_CASES, type TurnCase } from '../umpire/eval/turnCases.js';
@@ -90,7 +99,16 @@ afterEach(async () => {
   host = undefined;
 });
 
-async function play(opts: { dial: UmpireSettings['dial']; client: UmpireClient; seed?: number }) {
+async function play(opts: {
+  dial: UmpireSettings['dial'];
+  client: UmpireClient;
+  seed?: number;
+  turnMinutes?: number;
+  /** The scenario's time limit, in game minutes (Hold the Bridge's own is 50). */
+  holdMinutes?: number;
+  /** Called after each turn resolves. */
+  afterTurn?: (game: Awaited<ReturnType<GameHost['create']>>) => void;
+}) {
   const time = new FakeTime();
   const store = new MemoryGameStore();
   const registry = createRegistry();
@@ -110,9 +128,16 @@ async function play(opts: { dial: UmpireSettings['dial']; client: UmpireClient; 
     dial: opts.dial,
     persona: 'dry',
     mode: 'turns',
-    turnMinutes: 20,
+    turnMinutes: opts.turnMinutes ?? 20,
   };
-  const scenario = { ...loadScenario(holdTheBridge), seed: opts.seed ?? 1815 };
+  const base = loadScenario(holdTheBridge);
+  const scenario = {
+    ...base,
+    seed: opts.seed ?? 1815,
+    ...(opts.holdMinutes
+      ? { victory: { ...base.victory, holdMs: opts.holdMinutes * MINUTE } }
+      : {}),
+  };
   const game = await host.create('g1', scenario, { settings });
   for (let guard = 0; guard < 20 && !game.state.world.outcome; guard++) {
     const turn = game.turnStateFor('blue')!.turn;
@@ -125,6 +150,7 @@ async function play(opts: { dial: UmpireSettings['dial']; client: UmpireClient; 
       await game.submit({ kind: 'sendTurn', side, turn: 0, orders: [] });
     }
     await time.flush();
+    opts.afterTurn?.(game);
   }
   const log = await store.inputLog('g1');
   // Replay has no resolver and no umpire client: everything it needs is in the log.
@@ -902,5 +928,102 @@ describe('dice when asked (D39, 11.7)', () => {
       expect((e.turn!.output as UmpireTurnOutput).context.rolls).toHaveLength(1);
     }
     expect(JSON.stringify(run.replayed.state.world)).toBe(JSON.stringify(run.game.state.world));
+  });
+});
+
+describe("the umpire's journal (D39, 11.8)", () => {
+  const SECRET = 'JOURNAL-CANARY';
+  type Shown = { turn: number; journal?: ReturnType<typeof journalInput> };
+  /** The canned turn with a long private summary and two precedents, both carrying the canary. */
+  const journaling = () =>
+    editing((p, _call, req) => {
+      const n = (req.input as Shown).turn;
+      return {
+        ...p,
+        summary: Array.from(
+          { length: 8 },
+          (_, i) => `Turn ${n}, note ${i + 1}: ${SECRET} ${'the umpire ruled so '.repeat(10)}.`,
+        )
+          .join(' ')
+          .slice(0, 2000),
+        precedents: [
+          `Turn ${n}: cavalry cannot cross the river except at the bridge (${SECRET}).`,
+          `Turn ${n}: a battalion in the wood is seen only within 100 m (${SECRET}).`,
+        ],
+      };
+    });
+
+  it('carries the journal into each next call, keeps it under the cap over 12 turns, and replays it', async () => {
+    const model = journaling();
+    const leaks: string[] = [];
+    const run = await play({
+      dial: 'standard',
+      client: model,
+      turnMinutes: 5,
+      holdMinutes: 60,
+      afterTurn: (game) => {
+        const clock = game.gameClock.snapshot();
+        for (const side of ['blue', 'red'] as const) {
+          // What a side is sent: its view (in-tray dispatches included) and its turn state.
+          const sent = JSON.stringify([
+            sideViewOf(game.state, side, clock),
+            game.turnStateFor(side),
+          ]);
+          if (sent.includes(SECRET)) leaks.push(`${side} at ${game.state.time}`);
+        }
+      },
+    });
+    const turns = run.log.filter((e) => e.command.kind === 'resolveTurn');
+    expect(turns.length).toBeGreaterThanOrEqual(12);
+    for (const e of turns) expect(e.turn!.adjudicator).toBe('umpire');
+
+    // Each call after the first is shown the journal of the turns before it, within the cap.
+    const asked = model.requests.map((r) => r.input as Shown);
+    expect(asked[0]!.journal).toBeUndefined();
+    for (const input of asked.slice(1)) {
+      const j = input.journal!;
+      expect(j.notes.at(-1)!.turn).toBe(input.turn - 1);
+      expect(j.notes.at(-1)!.note).toContain(`Turn ${input.turn - 1}, note 1`);
+      expect(j.notes.at(-1)!.note).not.toContain('note 4');
+      expect(Math.ceil(JSON.stringify(j).length / 4)).toBeLessThanOrEqual(JOURNAL_MAX_TOKENS);
+      expect(j.precedents[0]!.ruling).toContain('Turn 1: cavalry cannot cross the river');
+    }
+    const journal = run.game.state.world.journal!;
+    expect(journalTokens(journal)).toBeLessThanOrEqual(JOURNAL_MAX_TOKENS);
+    expect(journal.notes.at(-1)!.turn).toBe(turns.length);
+    // Older notes are condensed to their first sentence; the precedents stop at their maximum.
+    expect(journal.notes[0]!.condensed).toBe(true);
+    expect(journal.precedents).toHaveLength(JOURNAL_PRECEDENTS_MAX);
+
+    // Replay rebuilds it from the logged proposals, with no model.
+    expect(run.replayed.state.world.journal).toEqual(journal);
+
+    // Leak tests: no journal text in anything a side was sent.
+    expect(leaks).toEqual([]);
+  });
+
+  it('leaves the journal untouched in a turn that falls back to the engine', async () => {
+    const { state, input } = firstTurn();
+    const journal = recordInJournal(undefined, 0, `Before the game ${SECRET}.`);
+    const start = { ...state, world: { ...state.world, journal } };
+    const failing = new ScriptedModel({
+      adjudicate: () => {
+        throw new UmpireError('upstream down', 'transport', 1);
+      },
+    });
+    const registry = createRegistry();
+    const r = await new UmpireTurnResolver({ registry, client: failing, dial: 'standard' }).resolve(
+      start,
+      input,
+    );
+    expect(r.adjudicator).toBe('engine');
+    // The failed calls were shown the journal; the engine's turn does not write to it.
+    expect((failing.requests[0]!.input as Shown).journal!.notes[0]!.note).toContain(SECRET);
+    const end = advanceTo(
+      applyTurn(start, record(input, r), { gameId: 'g', registry }),
+      input.endMs,
+      registry,
+    ).state.world;
+    expect(end.journal).toEqual(journal);
   });
 });

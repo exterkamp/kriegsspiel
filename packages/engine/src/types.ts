@@ -4,6 +4,7 @@ import type { Order, OrderIntent } from './orders.js';
 import type { Trait } from './personality.js';
 import type { PlacementProposal, PlacementVerdict } from './placement.js';
 import type { Dial } from './judgment.js';
+import type { UmpireJournal } from './journal.js';
 
 /** Game time in integer milliseconds since the scenario start. Never derived from the wall clock. */
 export type GameTime = number;
@@ -420,6 +421,12 @@ export interface GameState {
    * moves the world up to `endMs`. Absent in real time.
    */
   turn?: TurnFlag;
+  /**
+   * The umpire's journal in a turn-mode game (D39, 11.8): condensed notes of its earlier turns and
+   * the precedents it set, written by `umpire.turn` from the logged proposal. Master state only:
+   * never sent to a client. Absent until the first umpire turn.
+   */
+  journal?: UmpireJournal;
 }
 
 /**
