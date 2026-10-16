@@ -17,7 +17,7 @@
  *                                  (no `role`: the side's seat holder; a subordinate is named by one of their `unit`s)
  *   POST /games/:id/ready          signed in, seated or holding a role: body `{ "ready": boolean }`
  *   POST /games/:id/start          the creator: start a lobby game once every side is taken and every player is ready
- *   GET  /games/:id/window         seated, game over: the umpire's window timeline (403 `game_not_over` before the end)
+ *   GET  /games/:id/window         seated, game over: the umpire's window timeline, with a turn game's turns (403 `game_not_over` before the end)
  *   GET  /games/:id/window/dissents seated, game over: dissents on signed orders, for the critique (D6e)
  *   GET  /games/:id/window/at?at=  seated, game over: true positions, beliefs, dice and rulings at a game time
  *   GET  /games/:id/critique       seated, game over: the umpire's critique, each point citing logged events (403 `game_not_over` before the end)
@@ -93,7 +93,7 @@ import {
 } from '../notify/index.js';
 import { Hub, type Socket } from './hub.js';
 import { CritiqueService } from './critiqueService.js';
-import { windowAt, windowTimeline } from './umpireWindow.js';
+import { windowAt, windowTimeline, withTurns } from './umpireWindow.js';
 import { dissentNotes } from '../critique.js';
 import { seatKey } from './sideView.js';
 
@@ -1137,7 +1137,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
     return tracedHttp(req.params.id, req, reply, async () => {
       const w = await windowFor(req.params.id, user.id, undefined);
       if ('error' in w) return reply.code(w.status).send({ error: w.error });
-      return w.timeline;
+      // A turn-mode game's turns (D39, 11.11), behind the same game-over gate.
+      return withTurns(w.input, w.timeline);
     });
   });
 

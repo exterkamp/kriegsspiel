@@ -20,7 +20,7 @@ import { createRegistry, loadScenarioById, startingState } from '../game/registr
 import { replayLog } from '../game/replay.js';
 import type { GameStore, InputLogEntry, InputLogHeader } from '../game/store.js';
 
-export type MarkKind = 'input' | 'event' | 'contact' | 'order' | 'llm';
+export type MarkKind = 'input' | 'event' | 'contact' | 'order' | 'llm' | 'turn';
 
 /** A point on the scrubber's time line worth jumping to. */
 export interface ReplayMark {
@@ -79,7 +79,45 @@ const EVENT_KIND: Record<string, MarkKind> = {
 
 function describeInput(e: InputLogEntry): string {
   const c = e.command;
-  return c.kind === 'order' ? `${c.side} order: ${c.text}` : `command ${c.kind}`;
+  switch (c.kind) {
+    case 'order':
+      return `${c.side} order: ${c.text}`;
+    case 'openTurn':
+      return `turn ${c.turn} opens`;
+    case 'sendTurn':
+      return `${c.side} sends turn ${c.turn} (${c.orders.length} orders)`;
+    case 'turnOrder':
+      return `${c.side} holds an order for turn ${c.turn}`;
+    case 'withdrawTurnOrder':
+      return `${c.side} withdraws an order for turn ${c.turn}`;
+    default:
+      return `command ${c.kind}`;
+  }
+}
+
+/** Who decided a turn, in words, for its marks. */
+function decidedBy(t: NonNullable<InputLogEntry['turn']>): string {
+  if (t.fallback) return 'the tables (the umpire fell back)';
+  if (t.adjudicator === 'umpire') return 'the umpire';
+  if (t.adjudicator === 'engine') return 'the tables';
+  return 'no adjudicator';
+}
+
+/**
+ * Turn mode (D39, 11.11): two marks per resolved turn, at its start and where it ended, so the
+ * scrubber can step turn by turn. Inside a turn the umpire decided, the world is the turn's start
+ * (units stand while the couriers ride) until its `umpire.turn` event at the end.
+ */
+function turnMarks(e: InputLogEntry, untilMs: number | undefined): ReplayMark[] {
+  const t = e.turn;
+  if (e.command.kind !== 'resolveTurn' || !t) return [];
+  const end = e.endGameMs ?? t.endMs;
+  const marks: ReplayMark[] = [{ ms: t.startMs, kind: 'turn', label: `turn ${t.n} begins` }];
+  if (untilMs === undefined || end <= untilMs) {
+    const failed = e.error ? `; not applied: ${e.error}` : '';
+    marks.push({ ms: end, kind: 'turn', label: `turn ${t.n} decided by ${decidedBy(t)}${failed}` });
+  }
+  return marks;
 }
 
 /** Replay to `untilMs` (or to where the log ends) and list the moments worth stopping at. */
@@ -94,7 +132,18 @@ export function replayTimeline(input: ReplayInput, untilMs?: number): ReplayTime
   );
   const marks: ReplayMark[] = [];
   for (const e of input.entries) {
-    if (e.error || (untilMs !== undefined && e.gameMs > untilMs)) continue;
+    if (untilMs !== undefined && e.gameMs > untilMs) continue;
+    marks.push(...turnMarks(e, untilMs));
+    // An umpire turn's model calls were made while the turn was open, at its start.
+    if (e.command.kind === 'resolveTurn' && e.calls?.length) {
+      const stages = [...new Set(e.calls.map((c) => c.stage))].join(', ');
+      marks.push({
+        ms: e.gameMs,
+        kind: 'llm',
+        label: `turn ${e.command.turn}: ${stages} (${e.calls.length} call${e.calls.length === 1 ? '' : 's'})`,
+      });
+    }
+    if (e.error || e.command.kind === 'resolveTurn') continue;
     marks.push({ ms: e.gameMs, kind: 'input', label: describeInput(e) });
     // A parsed order is the one place a model was called while the game was played.
     if (e.command.kind === 'order' && e.parse && !e.agent) {

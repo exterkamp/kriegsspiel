@@ -132,6 +132,9 @@ export function replayFrom(
     // Stop before the first input after the target, so an earlier `untilGameMs` leaves later
     // inputs out of the state.
     if (untilGameMs !== undefined && entry.gameMs > untilGameMs) break;
+    // A turn that starts at the stop time is not applied yet (D39, 11.11): at a turn boundary the
+    // world is the one the turn closed on, as the live game stood while the turn was open.
+    if (entry.gameMs === untilGameMs && entry.command.kind === 'resolveTurn') continue;
     advance(entry.gameMs);
     // A refused or failed command left the engine untouched (the order is queued last).
     if (!entry.error) {
