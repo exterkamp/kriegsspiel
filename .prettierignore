@@ -9,6 +9,7 @@ vendor/settlemaker/upstream-package.json
 docs/map-verification/*.json
 docs/map-realism/*.json
 docs/map-realism/land-cover/*.json
+docs/map-realism/fords/*.json
 server/baselines/*.recording.json
 .angular
 

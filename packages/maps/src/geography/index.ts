@@ -20,3 +20,12 @@ export { createGeographyQueries, type GeographyQueries } from './queries.js';
 
 export { SHOULDER_POLICY, type ShoulderEvidence } from './shoulders.js';
 export { RIVER_NETWORK } from './rivers.js';
+export {
+  FORD_POLICY,
+  SHALLOW_WATER,
+  riffleDepthM,
+  reachSlope,
+  fordDepthM,
+  isShallow,
+  isMinorRoute,
+} from './shallow.js';

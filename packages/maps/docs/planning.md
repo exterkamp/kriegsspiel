@@ -4,7 +4,8 @@
 planner. It consumes **accepted decimal6 authoritative ground**, bounds, water,
 optional independent cover, D crossing proposals, recorded settings and a seed.
 It changes none of those inputs. It does not import or execute SettleMaker.
-`PLANNING_VERSION = sited-graded-network-v2`; `DECK_POLICY =
+`PLANNING_VERSION = sited-graded-fording-network-v3` (D46; `sited-graded-network-v2`, bridges
+only, remains `LEGACY_PLANNING_VERSION` for saved maps); `DECK_POLICY =
 linear-ground-endpoints-v1`. Changing geometry, sizing, tie breaks or cost policies
 requires a planning version change. Local sizing/deck certificates retain full precision analytic metadata; frozen
 asset geometry remains decimal6. When assembling a canonical asset, retain or
@@ -20,6 +21,7 @@ certifyFootprint(input, polygon): GenerationResult<Suitability>
 directionalGrade(input, from, to): GenerationResult<number>
 certifyRoadSegment(input, from, to, widthM?, boundarySide?): GenerationResult<CorridorCertificate>
 certifyBridge(input, candidate, deckProfile?): GenerationResult<DeckProfile>
+certifyFord(input, candidate): GenerationResult<FordProfile>
 validateRoadPath(input, path, widthM?): GenerationResult<{ maxDirectionalGrade: number }>
 validatePlanning(input, plan): GenerationResult<{ connected: true; validationWork: number }>
 reconcileLocalJoins(input, plan, actualJoins, pass?, previousWork?): ReconciliationResult
@@ -158,6 +160,27 @@ strictly above that surface by **1e-7 m** over the complete wet interval/full
 transverse reach certified by D. Unsupported variable/carved profiles return a
 named infeasibility. Detailed clearance, structural physics and gameplay bridge
 capacity are outside this stage.
+
+### Fords (D46)
+
+Ford candidates (`shallow-riffle-v1`, see [geography](geography.md)) are certified
+by `certifyFord`: the same full crossing geometry as a bridge; a constant
+standing-water reach whose modelled riffle depth is at most 0.8 m and equals the
+recorded `depthM` (1e-6 m); both ends at most 1.5 m above the water; and dry
+ramps from each end to the water no steeper than the road maximum. The
+`FordProfile` records depth, bank heights and ramp grade; the plan lists them in
+`fords` as bridges are listed in `decks`. A ford edge costs `3 × span + 120 m`.
+Each ford end joins the lattice by every certified straight connector to a node
+within two spacings ahead of the bank, each costed by grade like a lattice edge,
+so the road can slant up the valley side toward where it is going.
+
+**Main roads never ford.** A route with a farm at either end is a minor road and
+may use ford edges; a route joining only villages and boundary exits, and the
+required-bridge route, may not. Since road IDs carry their route IDs,
+`validatePlanning` and `validateBattlefield` check this from the asset alone
+(`FORD_MAIN_ROAD`). `requireBridge` (and a required river map) still needs a
+linked bridge; a ford does not satisfy it. Emitted fords set
+`traversableWidthM` to the reserved width.
 
 No smoothing is performed. The public path validator checks replacement geometry
 from scratch. It requires at least two finite, nondegenerate points and checks

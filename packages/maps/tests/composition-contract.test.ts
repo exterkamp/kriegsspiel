@@ -140,6 +140,27 @@ it('still certifies maps saved with rectangle cover by the D44 stages (D45)', ()
   mixed.provenance.generator.stages.terrain = 'value-noise-ridges-v1';
   expect(supportsValidation(mixed)).toBe(false);
 }, 60_000);
+it('still certifies maps saved by the D45 stages, before fords (D46)', () => {
+  // A small map saved by the D45 generator (roads 'sited-graded-network-v2').
+  const saved = importAsset(
+    readFileSync(new URL('./fixtures/d45-saved-map.json', import.meta.url), 'utf8'),
+  );
+  expect(saved.provenance.generator.stages.roads).toBe('sited-graded-network-v2');
+  expect(saved.provenance.generator.stages.cover).toBe('terrain-parcels-v2');
+  expect(supportsReplay(saved)).toBe(false);
+  expect(supportsValidation(saved)).toBe(true);
+  expect(validateBattlefield(saved).ok).toBe(true);
+  // The current generator records the fording planning stage and replays exactly.
+  expect(asset.provenance.generator.stages.roads).toBe('sited-graded-fording-network-v3');
+  expect(supportsReplay(asset)).toBe(true);
+  // D44 rectangle cover with the D45 roads is still a recorded identity; with
+  // the new roads stage it is not.
+  const mixed = structuredClone(saved);
+  mixed.provenance.generator.stages.cover = 'coherent-dry-runs-v1';
+  expect(supportsValidation(mixed)).toBe(true);
+  mixed.provenance.generator.stages.roads = 'sited-graded-fording-network-v3';
+  expect(supportsValidation(mixed)).toBe(false);
+}, 60_000);
 it('rejects one-sided local entrance provenance while the regional graph survives', () => {
   const changed = structuredClone(asset),
     e = changed.layers.sites[0]!.entrances[0]!;

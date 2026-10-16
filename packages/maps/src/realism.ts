@@ -1,5 +1,13 @@
 import type { MapAsset, Point, Polygon } from './contract.js';
-import { distance, pointSegmentDistance, polygonLocation } from './geometry.js';
+import {
+  distance,
+  interpolate,
+  pointSegmentDistance,
+  polygonEdges,
+  polygonLocation,
+  segmentCuts,
+} from './geometry.js';
+import { fordDepthM, isMinorRoute, riffleDepthM, reachSlope } from './geography/shallow.js';
 import { createElevationQueries } from './queries.js';
 import { TopologyBudget } from './errors.js';
 
@@ -50,6 +58,31 @@ export interface RealismReport {
     villagesNearRiver: number;
   };
   cover: CoverRealism;
+  crossings: CrossingRealism;
+}
+
+/**
+ * Bridges and fords (D46), measured from public geometry with the
+ * `shallow-riffle-v1` depth model. Main roads carry a route between villages
+ * or boundary exits; minor roads serve a farm.
+ */
+export interface CrossingRealism {
+  bridges: number;
+  fords: number;
+  /** Deepest modelled riffle depth under any ford, metres. */
+  fordMaxDepthM: number;
+  /** Fords whose road carries a main (village or boundary) route. */
+  fordsOnMainRoads: number;
+  /** Highest ford end above its water surface, metres. */
+  fordMaxBankM: number;
+  /** Steepest ground on a ford's dry ramp, between an end and the water. */
+  fordMaxRampGrade: number;
+  /** Steepest ground on the roads that join a ford's ends. */
+  fordMaxApproachGrade: number;
+  /** Crossings that carry a main road. */
+  mainRoadCrossings: number;
+  /** Shallowest modelled riffle depth under any bridge, metres (Infinity without bridges). */
+  bridgeMinDepthM: number;
 }
 
 /**
@@ -479,5 +512,86 @@ export function realismReport(asset: MapAsset): RealismReport {
       villagesNearRiver: villages && segments.length ? nearVillages / villages : 0,
     },
     cover: coverRealism(asset),
+    crossings: crossingRealism(asset, (x, y) => q.heightAt(x, y), budget),
   };
+}
+
+function crossingRealism(
+  asset: MapAsset,
+  heightAt: (x: number, y: number) => number,
+  budget: TopologyBudget,
+): CrossingRealism {
+  const water = asset.layers.water,
+    roads = new Map(asset.layers.roads.map((r) => [r.id, r])),
+    spacing = asset.elevation.spacingM;
+  const result: CrossingRealism = {
+    bridges: 0,
+    fords: 0,
+    fordMaxDepthM: 0,
+    fordsOnMainRoads: 0,
+    fordMaxBankM: 0,
+    fordMaxRampGrade: 0,
+    fordMaxApproachGrade: 0,
+    mainRoadCrossings: 0,
+    bridgeMinDepthM: Infinity,
+  };
+  for (const crossing of asset.layers.crossings) {
+    const river = water.find((w) => w.id === crossing.waterId);
+    if (!river || river.kind !== 'river') continue;
+    const main = crossing.roadIds.some((id) =>
+      roads.get(id)?.routeIds.some((r) => !isMinorRoute(r, asset.layers.sites)),
+    );
+    if (main) result.mainRoadCrossings++;
+    if (crossing.kind === 'bridge') {
+      result.bridges++;
+      result.bridgeMinDepthM = Math.min(result.bridgeMinDepthM, fordDepthM(river, water, budget));
+      continue;
+    }
+    result.fords++;
+    if (main) result.fordsOnMainRoads++;
+    result.fordMaxDepthM = Math.max(
+      result.fordMaxDepthM,
+      riffleDepthM(river.widthM, reachSlope(river, water, budget)),
+    );
+    const [a, b] = crossing.endpoints,
+      surface = river.surfaceProfileM[0]!,
+      cuts = segmentCuts(a, b, river.polygons.flatMap(polygonEdges), budget, '$.ford');
+    let first: number | undefined,
+      last = 1;
+    for (let i = 1; i < cuts.length; i++) {
+      const mid = interpolate(a, b, (cuts[i - 1]! + cuts[i]!) / 2);
+      if (!river.polygons.some((p) => polygonLocation(mid, p, budget, '$.ford') === 'inside'))
+        continue;
+      first ??= cuts[i - 1]!;
+      last = cuts[i]!;
+    }
+    for (const [end, edge] of [
+      [a, interpolate(a, b, first ?? 0)],
+      [b, interpolate(a, b, last)],
+    ] as [Point, Point][]) {
+      result.fordMaxBankM = Math.max(result.fordMaxBankM, heightAt(...end) - surface);
+      if (distance(end, edge) > 1e-9)
+        result.fordMaxRampGrade = Math.max(
+          result.fordMaxRampGrade,
+          segmentGradeOnSurface(heightAt, end, edge, spacing).max,
+        );
+      // Ground roads joining this end: their first segment away from the ford.
+      for (const road of asset.layers.roads) {
+        if (road.crossingIds.length) continue;
+        const at =
+          distance(road.path[0]!, end) <= 1e-6
+            ? 0
+            : distance(road.path.at(-1)!, end) <= 1e-6
+              ? road.path.length - 1
+              : -1;
+        if (at < 0) continue;
+        const next = road.path[at === 0 ? 1 : at - 1]!;
+        result.fordMaxApproachGrade = Math.max(
+          result.fordMaxApproachGrade,
+          segmentGradeOnSurface(heightAt, end, next, spacing).max,
+        );
+      }
+    }
+  }
+  return result;
 }

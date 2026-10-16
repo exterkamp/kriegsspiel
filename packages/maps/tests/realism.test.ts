@@ -5,7 +5,8 @@ import { realismReport } from '../src/realism.js';
 import { generateElevation } from '../src/terrain/index.js';
 import { generateCover, generateGeography, geographyPreset } from '../src/geography/index.js';
 import { MAX_FIELD_SLOPE } from '../src/geography/cover/index.js';
-import { expectRealisticCover } from './realism-checks.js';
+import { SHALLOW_WATER } from '../src/geography/shallow.js';
+import { expectPlausibleCrossings, expectRealisticCover } from './realism-checks.js';
 import { generatePlanning } from '../src/planning/index.js';
 
 /**
@@ -119,6 +120,8 @@ describe('realistic generated battlefields', () => {
       if (preset === 'river-valley')
         expect(report.settlements.villagesNearRiver).toBeGreaterThanOrEqual(0.5);
       expectRealisticCover(report, settings);
+      expectPlausibleCrossings(report, settings);
+      if (preset === 'wooded-hills') expect(report.crossings.fords).toBeGreaterThan(0);
     }, 60_000);
 
   it('detects uphill steps, dead ends, over-steep roads and lattice cover in a falsified layout', () => {
@@ -208,5 +211,23 @@ describe('realistic generated battlefields', () => {
     expect(report.rivers.uphillSteps).toBeGreaterThan(0);
     expect(report.rivers.deadEnds).toBeGreaterThan(0);
     expect(report.roads.maxGrade).toBeGreaterThan(asset.settings.roads.maxGrade);
+  }, 60_000);
+
+  it('flags a main road fording deep water in a falsified layout', () => {
+    const { asset, report } = regional('river-valley', 97);
+    expect(report.crossings.mainRoadCrossings).toBeGreaterThan(0);
+    expect(report.crossings.bridgeMinDepthM).toBeGreaterThan(SHALLOW_WATER.maxFordDepthM);
+    // Turn every bridge into a ford: the main-road ones now ford deep water.
+    const broken = structuredClone(asset);
+    broken.layers.crossings = broken.layers.crossings.map((c) => ({
+      ...c,
+      kind: 'ford' as const,
+      depthM: 2,
+      traversableWidthM: c.widthM,
+    }));
+    const flagged = realismReport(broken).crossings;
+    expect(flagged.bridges).toBe(0);
+    expect(flagged.fordsOnMainRoads).toBeGreaterThan(0);
+    expect(flagged.fordMaxDepthM).toBeGreaterThan(SHALLOW_WATER.maxFordDepthM);
   }, 60_000);
 });

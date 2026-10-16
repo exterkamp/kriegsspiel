@@ -1,6 +1,7 @@
 // Render saved map assets to JPEG with the authoring preview renderer in headless Chrome.
 // Build packages/maps first. Usage:
-//   node scripts/maps-render/render.mjs <out.jpg> <asset.json>[=caption] [<asset.json>[=caption]]
+//   node scripts/maps-render/render.mjs <out.jpg> <asset.json>[@x,y,sizeM][=caption] [...]
+// `@x,y,sizeM` draws a square close-up of that size centred on local metres x,y.
 // Two assets are drawn side by side (for before/after comparisons).
 // Environment: CHROME (default google-chrome), SIZE (default 1000 px per map).
 import { build } from 'esbuild';
@@ -26,15 +27,20 @@ const bundle = await build({
 });
 const script = bundle.outputFiles[0].text.replace(/<\/script/g, '<\\/script');
 const assets = inputs.map((arg) => {
-  const [file, caption = ''] = arg.split('=');
-  return { json: readFileSync(file, 'utf8'), caption };
+  const [spec, caption = ''] = arg.split('=');
+  const [file, focus] = spec.split('@');
+  return {
+    json: readFileSync(file, 'utf8'),
+    caption,
+    focus: focus ? focus.split(',').map(Number) : null,
+  };
 });
 const work = mkdtempSync(join(tmpdir(), 'maps-render-'));
 try {
   const html = join(work, 'page.html');
   writeFileSync(
     html,
-    `<!doctype html><meta charset="utf-8"><body><script>const ASSETS=[${assets.map((a) => a.json).join(',')}];const CAPTIONS=${JSON.stringify(assets.map((a) => a.caption))};const SIZE=${size};</script><script>${script}</script></body>`,
+    `<!doctype html><meta charset="utf-8"><body><script>const ASSETS=[${assets.map((a) => a.json).join(',')}];const CAPTIONS=${JSON.stringify(assets.map((a) => a.caption))};const FOCUS=${JSON.stringify(assets.map((a) => a.focus))};const SIZE=${size};</script><script>${script}</script></body>`,
   );
   const r = spawnSync(
     chrome,
