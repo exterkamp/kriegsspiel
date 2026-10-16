@@ -60,6 +60,8 @@ The same orders, decided by the tables: the rules parser (#522) reads each order
 
 The first turn's losses are exactly the standard game's (the umpire kept the engine's fire fight there). After that the two games part: under the tables four of six units never moved and the game was decided by one battalion a side. As either player, `rigid` with written orders is not a game: 3 of 18 orders did anything. The comparison says more about the rules parser than about the dial (#536).
 
+**Since #536** the rules read 15 of these 18 orders, and 17 of the standard game's and 16 of the free game's (each in the world its turn opened in; `server/src/game/rulesParse.test.ts`); what they leave as no new order is an attack on troops or an order that says when. No reading puts a destination on impassable ground. The logged games replay as played, since replay applies the logged readings.
+
 ## Game 3: `free`
 
 Red: both battalions to 300 paces short of the bridge, Hussars west along the river looking for a ford; then fire for ten minutes and assault together in column, Line Battalion behind the Vanguard; then push on. Blue: both battalions in line at the bridge-end either side of the road, cavalry in reserve; then flank fire and a charge on the column's head.

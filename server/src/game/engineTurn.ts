@@ -38,6 +38,7 @@ import {
 import { parseOrdersInput } from '../orders/llmParser.js';
 import {
   hasConditionOrTime,
+  hasDuration,
   isInjection,
   rulesParse,
   sentencesOf,
@@ -112,10 +113,14 @@ export function rulesParseTurnOrder(world: GameState, order: SentTurnOrder): Rul
   if (parsed.unitId !== unit.id || !parsed.intents?.length) {
     return { ...base, none: 'not understood' };
   }
-  if (parsed.intents.some((i) => i.kind === 'attack')) {
+  // An attack on enemy troops is not modelled; one on a place ("storm the bridge") is a march to it.
+  if (parsed.intents.some((i) => i.kind === 'attack' && i.target === 'unit')) {
     return { ...base, none: 'attack orders are not modelled yet' };
   }
-  const intents = placeRulesIntents(parsed.intents, unit, world);
+  const read = parsed.intents.map((i) =>
+    i.kind === 'attack' ? { ...i, kind: 'move' as const } : i,
+  );
+  const intents = placeRulesIntents(read, unit, world);
   if (typeof intents === 'string') return { ...base, none: intents };
   return { ...base, intents };
 }
@@ -123,7 +128,7 @@ export function rulesParseTurnOrder(world: GameState, order: SentTurnOrder): Rul
 /**
  * The part of an order the rules carry out in turn mode (D39, #522): its sentences up to the first
  * with a condition or a time ("If pressed, fall back"), or with words addressed to the umpire
- * rather than the unit. What follows is left to the umpire; the rules never act on half a sentence
+ * rather than the unit, and none after one that says how long ("fire for ten minutes", #536). What follows is left to the umpire; the rules never act on half a sentence
  * or on a sentence after a condition. When the first sentence is such, it is "no new order".
  */
 export function plainSentences(text: string): string | { none: string } {
@@ -138,6 +143,8 @@ export function plainSentences(text: string): string | { none: string } {
       break;
     }
     kept.push(s);
+    // "Fire for ten minutes. Then storm the bridge": what follows is timed.
+    if (hasDuration(s)) break;
   }
   return kept.length > 0 ? kept.join(' ') : { none: 'not understood' };
 }
