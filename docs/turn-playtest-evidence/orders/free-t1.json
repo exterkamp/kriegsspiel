@@ -1,0 +1,12 @@
+{
+  "blue": [
+    { "orderId": "f1-1", "to": "blue-1", "text": "March to the south end of the bridge and form line across the High road facing north, your right on the road. Hold the bridge-end against all comers." },
+    { "orderId": "f1-2", "to": "blue-2", "text": "Form line on the south bank just east of the High road, your left touching the 1st Battalion's right, so the two battalions together cover the bridge-end. Hold there." },
+    { "orderId": "f1-3", "to": "blue-3", "text": "Remain in reserve 300 paces behind the bridge on the High road, out of musket range. Watch the river banks east and west of the bridge for any enemy trying to cross elsewhere and report at once." }
+  ],
+  "red": [
+    { "orderId": "g1-1", "to": "red-1", "text": "March down the High road with all speed to within 300 paces of the bridge and deploy into line west of the road. Do not attack yet: wait there for the Line Battalion to come up on your left." },
+    { "orderId": "g1-2", "to": "red-2", "text": "March down the east side of the High road with all speed and deploy into line 300 paces short of the bridge, east of the road, beside the Vanguard. We will assault together next." },
+    { "orderId": "g1-3", "to": "red-3", "courier": "fast", "text": "Ride west along the north bank of the river for a mile and look for a ford or any other place where horse could cross. Report what you find. Avoid the enemy." }
+  ]
+}
