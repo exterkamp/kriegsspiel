@@ -115,6 +115,11 @@ export interface ClientState {
   turn?: TurnInfo;
   /** Set once the server has sent a `turnState`: the game is played in turns (D39). Kept after the game ends. */
   turnMode?: true;
+  /**
+   * Set while a joined game's mode is not yet known: neither its settings (`GET /games/:id`) nor a `turnState` have
+   * arrived. The desk then shows neither the real-time nor the turn dress (#427).
+   */
+  modePending?: true;
   /** Turn mode: game minutes per turn, from the game's settings (`GET /games/:id`); kept after the game ends. */
   turnMinutes?: number;
   /** The scenario's time limit in game minutes, from `/scenarios`, so a turn game can say "Turn 2 of about 3" (#439). */
@@ -301,7 +306,7 @@ export function applyServerMessage(s: ClientState, m: ServerMessage, nowWall: nu
     case 'turnState': {
       const { turn, startsAt, endsAt, sent, deadline, resolving, held, pursuitUntil } = m;
       return {
-        ...s,
+        ...withModeKnown(s),
         turnMode: true,
         pending: withSentTurn(s, m),
         turn: {
@@ -493,11 +498,36 @@ export function withTurnSettings(
   umpire: Partial<UmpireSettings> | undefined,
 ): ClientState {
   const t = turnSettingsOf(umpire);
-  if (t) return { ...s, turnMode: true, turnMinutes: t.turnMinutes };
-  if (!s.turnMode && s.turnMinutes === undefined) return s;
+  if (t) return { ...withModeKnown(s), turnMode: true, turnMinutes: t.turnMinutes };
+  if (!s.turnMode && s.turnMinutes === undefined && !s.modePending) return s;
   const rest = { ...s };
   delete rest.turnMode;
   delete rest.turnMinutes;
+  delete rest.modePending;
+  return rest;
+}
+
+/**
+ * A game just joined: its mode is unknown until its settings or a `turnState` arrive (#427), and nothing of a turn
+ * game opened earlier in the session carries over.
+ */
+export function withModePending(s: ClientState): ClientState {
+  const rest: ClientState = { ...s, modePending: true };
+  delete rest.turnMode;
+  delete rest.turnMinutes;
+  delete rest.turn;
+  delete rest.battleMinutes;
+  return rest;
+}
+
+/**
+ * The mode is as known as it will get: settings or a `turnState` arrived, or the settings could not be read (the
+ * game is then real-time unless a `turnState` says otherwise).
+ */
+export function withModeKnown(s: ClientState): ClientState {
+  if (!s.modePending) return s;
+  const rest = { ...s };
+  delete rest.modePending;
   return rest;
 }
 
