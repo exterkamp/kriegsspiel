@@ -1,0 +1,240 @@
+{
+ "note": "sweep: seeds 1-20 of each preset, complete battlefields, regional ground roads; main = D46, k0 = D48 pass without knight moves, k1 = D48 as shipped",
+ "sweep": {
+  "main:river-valley": {
+   "regionalKm": 301.8,
+   "gridAlignedPercent": 96.7,
+   "failedSeeds": [
+    7,
+    17
+   ]
+  },
+  "main:wooded-hills": {
+   "regionalKm": 298.2,
+   "gridAlignedPercent": 98.1,
+   "failedSeeds": [
+    8,
+    14,
+    15,
+    17
+   ]
+  },
+  "k0:river-valley": {
+   "regionalKm": 272.4,
+   "gridAlignedPercent": 19,
+   "failedSeeds": [
+    7,
+    17
+   ]
+  },
+  "k0:wooded-hills": {
+   "regionalKm": 271.2,
+   "gridAlignedPercent": 18.1,
+   "failedSeeds": [
+    8,
+    14,
+    15,
+    17
+   ]
+  },
+  "k1:river-valley": {
+   "regionalKm": 275.4,
+   "gridAlignedPercent": 12.1,
+   "failedSeeds": [
+    7,
+    17
+   ]
+  },
+  "k1:wooded-hills": {
+   "regionalKm": 289.2,
+   "gridAlignedPercent": 15,
+   "failedSeeds": [
+    14,
+    15,
+    17
+   ]
+  }
+ },
+ "corpus": {
+  "main": {
+   "river-valley-97": {
+    "roads": {
+     "lengthM": 16382.86481081199,
+     "meanGrade": 0.012216936508645745,
+     "maxGrade": 0.09774151999999958,
+     "marginShare": 0.00736810560989253,
+     "junctions": 12,
+     "bridges": 3
+    },
+    "crossings": {
+     "bridges": 3,
+     "fords": 0,
+     "fordMaxDepthM": 0,
+     "fordsOnMainRoads": 0,
+     "fordMaxBankM": 0,
+     "fordMaxRampGrade": 0,
+     "fordMaxApproachGrade": 0,
+     "mainRoadCrossings": 2,
+     "bridgeMinDepthM": 0.973367
+    }
+   },
+   "river-valley-3": {
+    "roads": {
+     "lengthM": 17497.52350636927,
+     "meanGrade": 0.015431059628443973,
+     "maxGrade": 0.09165371999999991,
+     "marginShare": 0.007490546712526079,
+     "junctions": 11,
+     "bridges": 3
+    },
+    "crossings": {
+     "bridges": 3,
+     "fords": 1,
+     "fordMaxDepthM": 0.5936151151954353,
+     "fordsOnMainRoads": 0,
+     "fordMaxBankM": 0,
+     "fordMaxRampGrade": 0.04765616787551806,
+     "fordMaxApproachGrade": 0.03252620939698579,
+     "mainRoadCrossings": 2,
+     "bridgeMinDepthM": 1.150815
+    }
+   },
+   "wooded-hills-31": {
+    "roads": {
+     "lengthM": 20184.132649461248,
+     "meanGrade": 0.023962633412801596,
+     "maxGrade": 0.09734269537692589,
+     "marginShare": 0.008457667271781993,
+     "junctions": 8,
+     "bridges": 1
+    },
+    "crossings": {
+     "bridges": 1,
+     "fords": 1,
+     "fordMaxDepthM": 0.38340117842688104,
+     "fordsOnMainRoads": 0,
+     "fordMaxBankM": 0,
+     "fordMaxRampGrade": 0.04008040000000763,
+     "fordMaxApproachGrade": 0.08390522056548474,
+     "mainRoadCrossings": 0,
+     "bridgeMinDepthM": 0.999306
+    }
+   },
+   "wooded-hills-7": {
+    "roads": {
+     "lengthM": 16902.327214822202,
+     "meanGrade": 0.016350416164129,
+     "maxGrade": 0.08952200000000061,
+     "marginShare": 0.006529002643053388,
+     "junctions": 9,
+     "bridges": 1
+    },
+    "crossings": {
+     "bridges": 1,
+     "fords": 3,
+     "fordMaxDepthM": 0.671515251838443,
+     "fordsOnMainRoads": 0,
+     "fordMaxBankM": 0.02150892121049708,
+     "fordMaxRampGrade": 0.06662859394486365,
+     "fordMaxApproachGrade": 0.05090728868507811,
+     "mainRoadCrossings": 0,
+     "bridgeMinDepthM": 0.942352
+    }
+   }
+  },
+  "branch": {
+   "river-valley-97": {
+    "roads": {
+     "lengthM": 14559.924448933258,
+     "meanGrade": 0.0073850175975701815,
+     "maxGrade": 0.08973525518613522,
+     "marginShare": 0.0017170418766720757,
+     "junctions": 12,
+     "bridges": 3,
+     "gridAlignedShare": 0.14656516434049652,
+     "streetGridAlignedShare": 0.993647030662011
+    },
+    "crossings": {
+     "bridges": 3,
+     "fords": 0,
+     "fordMaxDepthM": 0,
+     "fordsOnMainRoads": 0,
+     "fordMaxBankM": 0,
+     "fordMaxRampGrade": 0,
+     "fordMaxApproachGrade": 0,
+     "mainRoadCrossings": 2,
+     "bridgeMinDepthM": 0.973367
+    }
+   },
+   "river-valley-3": {
+    "roads": {
+     "lengthM": 15657.982607978949,
+     "meanGrade": 0.009089445981755439,
+     "maxGrade": 0.09552697915617508,
+     "marginShare": 0.01087954438524621,
+     "junctions": 6,
+     "bridges": 3,
+     "gridAlignedShare": 0.007654836552237934,
+     "streetGridAlignedShare": 0.9937558806730341
+    },
+    "crossings": {
+     "bridges": 3,
+     "fords": 1,
+     "fordMaxDepthM": 0.5936151151954353,
+     "fordsOnMainRoads": 0,
+     "fordMaxBankM": 0,
+     "fordMaxRampGrade": 0.04765616787551806,
+     "fordMaxApproachGrade": 0.03252620939698579,
+     "mainRoadCrossings": 2,
+     "bridgeMinDepthM": 1.150815
+    }
+   },
+   "wooded-hills-31": {
+    "roads": {
+     "lengthM": 15848.381460943803,
+     "meanGrade": 0.015098274874433904,
+     "maxGrade": 0.09803876643427169,
+     "marginShare": 0.07533048062732287,
+     "junctions": 8,
+     "bridges": 0,
+     "gridAlignedShare": 0.2433368410021257,
+     "streetGridAlignedShare": 0.9935841182755846
+    },
+    "crossings": {
+     "bridges": 0,
+     "fords": 1,
+     "fordMaxDepthM": 0.7750860715282841,
+     "fordsOnMainRoads": 0,
+     "fordMaxBankM": 0,
+     "fordMaxRampGrade": 0.07236005568686556,
+     "fordMaxApproachGrade": 0.07300608771700452,
+     "mainRoadCrossings": 0,
+     "bridgeMinDepthM": null
+    }
+   },
+   "wooded-hills-7": {
+    "roads": {
+     "lengthM": 15251.832945467497,
+     "meanGrade": 0.014917780285834834,
+     "maxGrade": 0.09999219394893032,
+     "marginShare": 0.0016391472480315515,
+     "junctions": 9,
+     "bridges": 1,
+     "gridAlignedShare": 0.15142040898020193,
+     "streetGridAlignedShare": 0.9936608440030926
+    },
+    "crossings": {
+     "bridges": 1,
+     "fords": 3,
+     "fordMaxDepthM": 0.671515251838443,
+     "fordsOnMainRoads": 0,
+     "fordMaxBankM": 0.02150892121049708,
+     "fordMaxRampGrade": 0.06662859394486365,
+     "fordMaxApproachGrade": 0.05090728868507811,
+     "mainRoadCrossings": 0,
+     "bridgeMinDepthM": 0.942352
+    }
+   }
+  }
+ }
+}

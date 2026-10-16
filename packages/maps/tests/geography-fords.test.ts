@@ -237,8 +237,10 @@ describe('ford sites and certificates', () => {
 
 describe('fords in a planned wooded-hills network', () => {
   it('fords brooks on farm roads only and certifies the plan; a main-road ford fails', () => {
+    // Seed 7 fords two brooks. Seed 31 forded one before D48; its knight moves
+    // reach that farm by a shorter road on its own bank, so it no longer fords.
     const s = geographyPreset('wooded-hills'),
-      seed = 31,
+      seed = 7,
       b = { minX: 0 as const, minY: 0 as const, maxX: s.widthM, maxY: s.heightM },
       geo = value(
         generateGeography(value(generateElevation(s, seed)), b, s, seed, {}, { cover: false }),
