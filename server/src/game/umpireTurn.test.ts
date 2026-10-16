@@ -25,8 +25,8 @@ import {
 } from '../umpire/adjudicate.js';
 import { ADJUDICATE_MAX_TOKENS, umpireConfigFromEnv } from '../umpire/config.js';
 import { createUmpireClient } from '../umpire/createUmpireClient.js';
-import { TURN_CASES, type TurnCase } from '../umpire/eval/turnCases.js';
-import { caseWorld, turnEndMs, turnStartMs } from '../umpire/eval/turnInput.js';
+import { TURN_CASES } from '../umpire/eval/turnCases.js';
+import { caseTurn } from '../umpire/eval/turnInput.js';
 import { MockUmpireClient } from '../umpire/mockUmpireClient.js';
 import { PlaybackUmpireClient } from '../umpire/playbackUmpireClient.js';
 import { ScriptedModel } from '../umpire/leakKit.testkit.js';
@@ -689,51 +689,27 @@ describe('replay of a recorded umpire turn', () => {
   });
 });
 
-describe('a recorded real-model turn (the benchmark’s Opus answers, #398)', () => {
+describe('a recorded real-model turn (the benchmark’s Opus answers, #398, #440)', () => {
   const dir = new URL('../../bench/umpire/claude-code-opus/', import.meta.url);
-
-  /** A benchmark case as a live turn: its world at `T0` and the orders sent in it. */
-  function caseTurn(c: TurnCase): { state: EngineState<GameState>; input: TurnInput } {
-    const world: GameState = { ...caseWorld(c), dial: 'standard' };
-    const startMs = turnStartMs(c);
-    const state = startingState(createState(world.seed, world, startMs));
-    const sent = c.orders.filter((o) => (o.sentTurn ?? c.turn) === c.turn);
-    return {
-      state,
-      input: {
-        gameId: 'bench',
-        n: c.turn,
-        startMs,
-        endMs: turnEndMs(c),
-        cause: 'all-sent',
-        orders: sent.map((o) => ({
-          orderId: o.orderId,
-          side: o.side,
-          to: o.to,
-          text: o.text,
-          courier: o.courier === 'fast' ? 'fast' : 'safe',
-        })),
-        sent: [...new Set(sent.map((o) => o.side))],
-      },
+  const run = (id: string) =>
+    JSON.parse(readFileSync(new URL(`${id}.json`, dir), 'utf8')) as {
+      raw: string;
+      checks: { problems: { schema: string[] } };
     };
-  }
+  // An answer that fails the schema is never applied, so there is nothing to replay.
+  const valid = TURN_CASES.filter((c) => run(c.id).checks.problems.schema.length === 0);
 
-  it.each(TURN_CASES.map((c) => c.id))(
+  it('has most of the recorded answers to replay', () => {
+    expect(valid.length).toBeGreaterThanOrEqual(TURN_CASES.length - 2);
+  });
+
+  it.each(valid.map((c) => c.id))(
     '%s: the recorded answer replays through playback to the same state',
     async (id) => {
       const c = TURN_CASES.find((x) => x.id === id)!;
-      const raw = JSON.parse(readFileSync(new URL(`${id}.json`, dir), 'utf8')).raw as string;
-      const recorded = JSON.parse(raw) as TurnProposal;
-      // The live game names an order `<side>-<desk id>`; the benchmark named it by its desk id.
-      const sideOf = new Map(c.orders.map((o) => [o.orderId, o.side]));
-      const answer: TurnProposal = {
-        ...recorded,
-        units: recorded.units.map((u) => ({
-          ...u,
-          orders: u.orders.map((o) => ({ ...o, orderId: `${sideOf.get(o.orderId)}-${o.orderId}` })),
-        })),
-      };
+      const answer = JSON.parse(run(id).raw) as TurnProposal;
       const registry = createRegistry();
+      // The case's start and orders; a game rolls its own couriers, which the benchmark forces.
       const { state, input } = caseTurn(c);
       const live = await new UmpireTurnResolver({
         registry,
@@ -754,9 +730,9 @@ describe('a recorded real-model turn (the benchmark’s Opus answers, #398)', ()
             registry,
           ).state,
         );
+      // Umpire turn or fallback (a game rolls its own couriers, so its gate may see other
+      // arrivals than the benchmark's forced ones), playback ends in the same state.
       expect(end(played)).toBe(end(live));
-      // Opus's answers pass the gate (some after clamps): each is an umpire turn, not a fallback.
-      expect(live.adjudicator).toBe('umpire');
     },
   );
 });

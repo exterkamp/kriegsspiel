@@ -211,6 +211,26 @@ describe('the courier pass and forced rides (D39, 11.4)', () => {
     expect(rides(run.emitted).get('o1')).toEqual({ outcome: 'delivered', atMs: 0 });
   });
 
+  it('times a forced ride to `arriveAt` when one is given (the umpire benchmark, #440)', () => {
+    const s0 = start(3);
+    const turn = { n: 1, startMs: 0, endMs: 30 * MS_PER_MINUTE };
+    const real = courierPass(s0, [ORDER], turn, reg);
+    expect(real.forced.o1?.arriveAt).toBeUndefined(); // the pass never sets it
+    for (const arriveAt of [7 * MS_PER_MINUTE, 45 * MS_PER_MINUTE]) {
+      const pass = { ...real, forced: { o1: { untilMs: turn.endMs, arriveAt } } };
+      const run = advanceTo(engineTurnStart(s0, [ORDER], pass, turn), turn.endMs, reg);
+      if (arriveAt <= turn.endMs) {
+        expect(rides(run.emitted).get('o1')).toEqual({ outcome: 'delivered', atMs: arriveAt });
+      } else {
+        // still riding at the turn's end, due when forced
+        expect(rides(run.emitted).get('o1')).toBeUndefined();
+        const c = run.state.world.couriers.find((x) => x.order.id === 'o1')!;
+        expect(c.legs.at(-1)!.arriveAt).toBe(arriveAt);
+        expect(c.legs[0]!.startedAt).toBe(0);
+      }
+    }
+  });
+
   it('continues a ride still on the road at the turn end into the next turn', () => {
     let checked = 0;
     const outcomes = new Set<string>();

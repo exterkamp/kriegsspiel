@@ -49,7 +49,7 @@ import {
 import { TurnProposal, type TurnObservation, type UmpirePersona } from '@kriegsspiel/protocol';
 import { CHECKS, checkTurnProposal, type TurnCheckContext } from './eval/turnChecks.js';
 import { TURN_PROPOSAL_JSON_SCHEMA } from './eval/turnProposal.js';
-import { deg } from './eval/turnInput.js';
+import { deg } from './eval/turnProposal.js';
 import { featureInput } from './judgePlacement.js';
 import { withPersona } from './persona.js';
 import { ADJUDICATE_MAX_TOKENS } from './config.js';
@@ -332,8 +332,8 @@ export const DICE_WORDS =
 /** At most this many problems are listed in a resend, so a hopeless reply does not grow the prompt. */
 const MAX_LISTED = 40;
 
-/** The check context the benchmark's checks need, from the stage's input. */
-function checkContext(world: GameState, turn: AdjudicateTurn): TurnCheckContext {
+/** The check context the benchmark's checks need, from the stage's input (the benchmark's too, #440). */
+export function checkContext(world: GameState, turn: AdjudicateTurn): TurnCheckContext {
   return {
     // The checks measure the march from where each unit stands at the turn's start.
     world: standingAt(world, turn.startMs),

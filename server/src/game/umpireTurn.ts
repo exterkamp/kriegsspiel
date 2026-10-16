@@ -41,7 +41,7 @@ import {
   type ShownOrder,
   type UmpireDial,
 } from '../umpire/adjudicate.js';
-import { deg } from '../umpire/eval/turnInput.js';
+import { deg } from '../umpire/eval/turnProposal.js';
 import { hiddenTerms } from '../umpire/leakGuard.js';
 import { reportsOfTurn, writeTurnReports } from '../umpire/turnReports.js';
 import type { UmpireCallRecord, UmpireClient, UmpireRequest } from '../umpire/umpireClient.js';
@@ -220,6 +220,46 @@ function shownOrders(
   return shown;
 }
 
+/**
+ * What the `adjudicate` stage is given for a turn, from the world at its start and the engine's
+ * projection: the orders the umpire may act on, the projection in the proposal's terms with the
+ * engine's sightings, and the validator's context. The umpire benchmark builds its cases' inputs
+ * with it too (#440), so it measures what a game sends.
+ */
+export function adjudicationOf(
+  state: EngineState<GameState>,
+  input: TurnInput,
+  p: Projection,
+  dial: UmpireDial,
+): { turn: AdjudicateTurn; context: TurnContext } {
+  const live = new Set(state.world.units.filter((u) => u.status !== 'destroyed').map((u) => u.id));
+  const orders = shownOrders(state, input, p.couriers);
+  const turn: AdjudicateTurn = {
+    n: input.n,
+    startMs: input.startMs,
+    endMs: input.endMs,
+    dial,
+    orders,
+    projection: {
+      units: projectedUnits(p, live, input.endMs),
+      observations: projectedObservations(state.world, p.state.world, input),
+      events: p.summary.events,
+      ...(p.summary.outcome ? { outcome: p.summary.outcome } : {}),
+    },
+  };
+  const context: TurnContext = {
+    turn: { n: input.n, startMs: input.startMs, endMs: input.endMs },
+    dial,
+    projection: p.state.world.units.filter((u) => live.has(u.id)),
+    orders: orders.map((o) => ({
+      orderId: o.orderId,
+      unitId: o.to,
+      ...(o.arrivedAtMs !== undefined ? { deliveredAt: o.arrivedAtMs } : {}),
+    })),
+  };
+  return { turn, context };
+}
+
 /** The umpire's resolver for `standard` and `free` turns; it always answers. */
 export class UmpireTurnResolver implements TurnResolver {
   constructor(private readonly opts: UmpireTurnResolverOptions) {}
@@ -361,33 +401,7 @@ export class UmpireTurnResolver implements TurnResolver {
     context?: TurnResolveContext,
   ): Promise<TurnResolution> {
     const { client, dial } = this.opts;
-    const live = new Set(
-      state.world.units.filter((u) => u.status !== 'destroyed').map((u) => u.id),
-    );
-    const orders = shownOrders(state, input, p.couriers);
-    const turn: AdjudicateTurn = {
-      n: input.n,
-      startMs: input.startMs,
-      endMs: input.endMs,
-      dial,
-      orders,
-      projection: {
-        units: projectedUnits(p, live, input.endMs),
-        observations: projectedObservations(state.world, p.state.world, input),
-        events: p.summary.events,
-        ...(p.summary.outcome ? { outcome: p.summary.outcome } : {}),
-      },
-    };
-    const turnContext: TurnContext = {
-      turn: { n: input.n, startMs: input.startMs, endMs: input.endMs },
-      dial,
-      projection: p.state.world.units.filter((u) => live.has(u.id)),
-      orders: orders.map((o) => ({
-        orderId: o.orderId,
-        unitId: o.to,
-        ...(o.arrivedAtMs !== undefined ? { deliveredAt: o.arrivedAtMs } : {}),
-      })),
-    };
+    const { turn, context: turnContext } = adjudicationOf(state, input, p, dial);
 
     // The time limit cancels the adjudication: the call in flight is abandoned and no resend
     // goes out after the turn has fallen back.

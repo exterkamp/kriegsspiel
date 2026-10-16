@@ -178,6 +178,20 @@ export interface ForcedIssue extends ForcedRide {
   garbled?: OrderIntent[];
   /** Under rules 2 (#432): the courier's own dice as the pass left them at the turn's end. */
   dice?: RngState;
+  /**
+   * The ride's arrival, overriding the route's timing (its legs are stretched to end there). The
+   * courier pass never sets it; the umpire benchmark does, to fix a case's courier results (#440).
+   */
+  arriveAt?: GameTime;
+}
+
+/** `legs` stretched or shrunk in time so that the ride, begun at `start`, ends at `arriveAt`. */
+function retimed(legs: Leg[], start: GameTime, arriveAt: GameTime): Leg[] {
+  const end = legs.at(-1)?.arriveAt ?? start;
+  if (end === start) return legs;
+  const k = (arriveAt - start) / (end - start);
+  const at = (t: GameTime) => start + Math.round((t - start) * k);
+  return legs.map((l) => ({ ...l, startedAt: at(l.startedAt), arriveAt: at(l.arriveAt) }));
 }
 
 /** Queue `order` to leave HQ at `time` on a ride the turn's courier pass already decided. */
@@ -252,7 +266,9 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     if (!hq || !route) return failed(world, order, 'no route for courier');
 
     const choice = order.courier ? COURIER_CHOICES[order.courier] : { speed: 1, risk: 1 };
-    const legs = ridesAlong(world.map, route.waypoints, route.cost, ev.time, choice.speed);
+    const routed = ridesAlong(world.map, route.waypoints, route.cost, ev.time, choice.speed);
+    const legs =
+      forced?.arriveAt === undefined ? routed : retimed(routed, ev.time, forced.arriveAt);
     const length = route.waypoints
       .slice(1)
       .reduce((a, p, i) => a + distance(route.waypoints[i]!, p), 0);
@@ -270,7 +286,11 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     const later: NewEvent[] = [];
     if (forced) {
       // The turn's courier pass rolled this ride already: replay its outcome, drawing nothing.
-      const { lostAt, garbled, dice: passDice, ...ride } = forced;
+      // The ride itself keeps only what its checks need (`ForcedRide`); its timing is in the legs.
+      const { lostAt, garbled, dice: passDice, ...issue } = forced;
+      const ride: ForcedRide = { untilMs: issue.untilMs };
+      if (issue.takenAt !== undefined) ride.takenAt = issue.takenAt;
+      if (issue.takenBy !== undefined) ride.takenBy = issue.takenBy;
       courier.forced = ride;
       if (garbled) courier.garbled = garbled;
       if (passDice !== undefined) courier.dice = passDice;
