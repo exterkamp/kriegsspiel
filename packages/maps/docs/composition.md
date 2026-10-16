@@ -24,6 +24,8 @@ Local policy is version-bound: 5m routing lattice, 7m frontage spacing,18m stree
 
 The adapter uses a detached rotation/translation frame: world(x,y)=anchor+Rθ×local(x,y); local gradients are Rθᵀ×world gradients. Compass bearings subtractθ in local space. Transformed output is decimal6 before final certification. The asymmetric90° fixture local(137,-241), anchor(3456,1234), gives world(3697,1371); plane120+.012x+.034y gives210.978m and local gradient(.034,-.012). There is no competing height implementation.
 
+Cover is generated last (D45): after settlement layouts are assembled and compacted, `generateCover` receives the final roads (regional, streets, access) and sites, within the feature/vertex capacity the other layers leave; `generateGeography` runs with `{ cover: false }`.
+
 Local water windows intersect complete polygons and preserve dry-island holes and water identity. Their padding covers reserved entrance caps and dry-abutment clearance. Whole-shape callbacks always use the detached full world water/elevation context, so window clipping cannot authorize omitted water. All current permissible sites are wholly dry; the adapter supplies no invented local crossing. Regional bridges remain explicit accepted planning decks, with reciprocal road IDs and a linear deck rederived from authoritative dry endpoint heights during saved validation.
 
 Exact unchanged fork entrances share the existing regional node IDs in the global graph. A changed join takes the bounded accepted reconciliation path and charges its returned work, including expected failures. Current constrained outputs preserve the supplied endpoints/bearings/widths exactly. No fabricated internal street is substituted for an infeasible local layout.

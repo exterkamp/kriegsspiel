@@ -860,3 +860,33 @@ The benchmark in [umpire-benchmark.md](umpire-benchmark.md) (12 turn cases on "H
 **Not done.** Roads cross water only by bridge: the contract has `ford` crossings, but no depth/traversability model links them to roads yet. The authoring renderer outlines each reach polygon, so a thin seam shows where reaches meet; styling is #491. `flat-countryside` keeps its zero-relief preset.
 
 **See.** [Terrain](../packages/maps/docs/terrain.md), [geography](../packages/maps/docs/geography.md), [planning](../packages/maps/docs/planning.md), [map architecture](map-architecture.md).
+
+## D45: Generated land cover follows the ground, water and settlements (#500)
+
+**Decision.** Cover stage `terrain-parcels-v2` replaces the rectangle cover `coherent-dry-runs-v1`. Composition now generates cover last, after settlement layouts are assembled, from the final roads and sites; `generateGeography` takes `{ cover: false }` for this. On a 50 m lattice (75 m at 15 km), every cell is scored:
+
+- woods by steepness, ridge height, poor soil (domain-warped value noise at `coherenceM`) and distance from settlements and roads;
+- fields by nearness to villages (1.2 km), farms (0.5 km) and roads (400 m), good soil and gentle ground.
+
+Scores are box-blurred. Woods, then fields, take the best-ranked cells up to the recipe's shares. Fields need the conservative cell slope bound ≤ 0.08, a dry cell between them and water, and ground off the river flat (within 250 m of water and under 3 m above it). River flats and site grounds stay open (water meadow, village ground). Specks under 2 ha are dropped, small enclosed clearings filled, and the shares restored by growing or trimming patch edges.
+
+Fields are split into parcels by an anisotropic Voronoi partition: about 220 m apart, stretched along the contour on slopes and perpendicular to the nearest road near roads, and split by roads. Woods and open ground are split into warped ~800 m compartments, so outlines and hole counts stay bounded.
+
+Outlines are traced once per shared boundary and used by both neighbours, so features neither overlap nor leave gaps. Each boundary chain is smoothed: midpoints, lattice steps straightened, moving average, simplification, and interior junctions moved off the lattice. Boundaries against water only cut the cover's own convex corners, so cover never grows over water. Any feature that fails the frozen polygon validator falls back to coarser smoothing, down to the exact lattice outline. All randomness is coordinate-hashed per `deriveSeed` stream, and the arithmetic uses no transcendental functions.
+
+**Contract.** The `kriegsspiel/local-map` v1 schema is unchanged; cover features are still `wood`, `field` and `open` polygons, now with organic rings and occasional holes. `LEGACY_GENERATORS` gains the D44 identity with `cover: 'coherent-dry-runs-v1'`, so maps saved since D44 still certify. `supportsReplay` stays exact to the current stages. A saved D44 map (`packages/maps/tests/fixtures/d44-saved-map.json`) is tested to certify but not replay. `data/maps` is not regenerated. Cover work is metered against `8 × maxTopologyChecks`; input and water topology keep the v1 reservation.
+
+**Measured.** `realismReport` gains `cover`, sampled at every elevation cell centre: shares, mean slope under woods and fields, steepest field point, distance to settlements, what covers river flats, and the share of outline length on axis-aligned segments. The realism corpus (river-valley 97 and 3, wooded-hills 31 and 7) and the three full preset assets require:
+
+- woods steeper than fields;
+- no field point steeper than 0.08;
+- fields nearer settlements than woods;
+- shares within 3 points of the recipe;
+- under 5% axis-aligned shared boundaries (rectangle cover is 100%), and under 25% overall;
+- river flats over 60% open.
+
+Renders, metrics and interleaved benchmarks are in `docs/map-realism/land-cover/`.
+
+**Not done.** Outlines against water follow the conservative cell mask with cut corners, so a thin uncovered margin and some axis-aligned steps remain along rivers. Hedgerows are not separate features, and the renderer (D43) does not outline parcels, so they show only as faint seams.
+
+**See.** [Cover](../packages/maps/docs/geography-cover.md), [geography](../packages/maps/docs/geography.md), [composition](../packages/maps/docs/composition.md).
