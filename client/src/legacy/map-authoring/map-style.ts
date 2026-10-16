@@ -2,14 +2,14 @@
  * Cartographic style definitions for `MapRenderer` (#491).
  *
  * Every colour, stroke width, dash, symbol size and label font the renderer uses lives here, so another
- * surface (the in-game map table) can adopt a style by passing it to `new MapRenderer(asset, style)`.
+ * surface can adopt a style by passing it to `new MapRenderer(asset, style)`. The authoring preview and the
+ * table raster (`shared/map-table/raster.ts`, #498) both draw the period style.
  * Pixel sizes are CSS pixels at the current zoom; metre sizes come from the map asset itself.
  *
  * - `PERIOD_MAP_STYLE`: a 19th-century staff map (Prussian Generalstab / Ordnance Survey sheets of the
  *   1860s-70s): paper ground, sepia hachures and shading, lined water, tree-symbol woods, ochre settlements
  *   with hatched buildings, roads cased by class, bridge and ford symbols and serif lettering.
- * - `CLASSIC_MAP_STYLE`: the earlier flat look. The in-game table's raster still uses it until it adopts
- *   the period style.
+ * - `CLASSIC_MAP_STYLE`: the earlier flat look, still `MapRenderer`'s default; no surface draws it now.
  */
 
 export type RoadClass = 'regional' | 'street' | 'track';
@@ -167,7 +167,7 @@ export interface MapStyle {
 const SERIF = "Georgia, 'Times New Roman', serif";
 const SANS = 'system-ui';
 
-/** The period staff-map style the authoring preview draws. */
+/** The period staff-map style the authoring preview and the table raster draw. */
 export const PERIOD_MAP_STYLE: MapStyle = Object.freeze({
   name: 'period',
   palette: {
@@ -273,7 +273,7 @@ export const PERIOD_MAP_STYLE: MapStyle = Object.freeze({
   neatLine: { innerPx: 1, outerPx: 2.5, gapPx: 5 },
 } satisfies MapStyle);
 
-/** The earlier flat style, unchanged; kept for the in-game table raster until it adopts the period style. */
+/** The earlier flat style, unchanged; `MapRenderer`'s default, which the table raster drew until #498. */
 export const CLASSIC_MAP_STYLE: MapStyle = Object.freeze({
   name: 'classic',
   palette: {

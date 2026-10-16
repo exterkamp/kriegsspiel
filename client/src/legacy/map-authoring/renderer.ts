@@ -108,15 +108,18 @@ function canvas(width: number, height: number): HTMLCanvasElement {
   element.height = height;
   return element;
 }
-function context2d(element: HTMLCanvasElement): CanvasRenderingContext2D {
-  const ctx = element.getContext('2d');
+function context2d(element: HTMLCanvasElement, software = false): CanvasRenderingContext2D {
+  const ctx = software
+    ? element.getContext('2d', { willReadFrequently: true })
+    : element.getContext('2d');
   if (!ctx) throw new Error('Canvas2D is unavailable');
   return ctx;
 }
 
 /**
  * Browser-only cached presentation, derived solely from a frozen asset snapshot. Every colour and stroke
- * comes from `style` (see `map-style.ts`); the default is the classic flat look the table raster uses.
+ * comes from `style` (see `map-style.ts`); the default is the classic flat look. The authoring preview and
+ * the table raster (#498) both pass `PERIOD_MAP_STYLE`.
  */
 export class MapRenderer {
   private readonly cover: Shape[];
@@ -133,10 +136,18 @@ export class MapRenderer {
   private outline?: { body: Shape[]; shore: Shape[]; welds: Shape[] };
   private readonly tiles = new Map<string, Tile>();
   private readonly patterns = new Map<string, CanvasPattern | null>();
+  /** Set only while `renderOnce` draws: the period base goes straight onto the target, untiled. */
+  private direct = false;
 
+  /**
+   * `software` puts the renderer's own helper rasters (hillshade, symbol tiles) on CPU-backed canvases.
+   * Set it when drawing onto a CPU-backed target such as the table raster: in Chromium the whole-map
+   * table paper took 44 s to rasterise with GPU-backed helpers and 0.4 s without them (#498).
+   */
   constructor(
     readonly asset: PreviewAsset,
     readonly style: MapStyle = CLASSIC_MAP_STYLE,
+    private readonly options: { readonly software?: boolean } = {},
   ) {
     const l = asset.layers;
     this.cover = l.cover.flatMap((f) => f.polygons.map((p) => polygonShape(p, f.kind)));
@@ -199,7 +210,7 @@ export class MapRenderer {
       Math.max(2, Math.round((512 * (b.maxX - b.minX)) / longest)),
       Math.max(2, Math.round((512 * (b.maxY - b.minY)) / longest)),
     );
-    const ctx = context2d(shade);
+    const ctx = context2d(shade, this.options.software);
     const pixels = ctx.createImageData(shade.width, shade.height);
     for (let y = 0; y < shade.height; y++)
       for (let x = 0; x < shade.width; x++) {
@@ -239,7 +250,7 @@ export class MapRenderer {
       if (size && typeof ctx.createPattern === 'function') {
         const px = Math.max(2, Math.round(size * dpr));
         const tile = canvas(px, px);
-        const t = context2d(tile);
+        const t = context2d(tile, this.options.software);
         t.scale(px / size, px / size);
         t.lineCap = 'round';
         if (key === 'trees' && trees) {
@@ -276,6 +287,27 @@ export class MapRenderer {
     if (pattern && typeof DOMMatrix === 'function')
       pattern.setTransform(new DOMMatrix([1 / (dpr * scale), 0, 0, 1 / (dpr * scale), 0, 0]));
     return pattern;
+  }
+
+  /**
+   * Draw one complete frame for a one-off raster (the in-game table's map paper, #498). The period base
+   * is drawn straight onto `ctx` at the view's own scale in one pass: no base tiles, no per-frame tile
+   * budget and nothing added to the tile cache, so a whole-map raster larger than the cache still comes
+   * out whole. Interactive views use `render`, whose cached tiles make panning and zooming cheap.
+   */
+  renderOnce(
+    ctx: CanvasRenderingContext2D,
+    view: Viewport,
+    layers: Layers,
+    highContrast: boolean,
+    dpr = 1,
+  ): void {
+    this.direct = true;
+    try {
+      this.render(ctx, view, layers, highContrast, dpr);
+    } finally {
+      this.direct = false;
+    }
   }
 
   /**
@@ -323,7 +355,16 @@ export class MapRenderer {
           }
         }
     };
-    if (period) pending = this.drawBase(ctx, view, visible, layers, p, highContrast, dpr);
+    if (period && this.direct) {
+      const area = {
+        minX: Math.max(b.minX, visible.minX),
+        minY: Math.max(b.minY, visible.minY),
+        maxX: Math.min(b.maxX, visible.maxX),
+        maxY: Math.min(b.maxY, visible.maxY),
+      };
+      if (area.minX < area.maxX && area.minY < area.maxY)
+        this.drawBaseArea(ctx, area, view.scale, dpr, layers, p, highContrast);
+    } else if (period) pending = this.drawBase(ctx, view, visible, layers, p, highContrast, dpr);
     else {
       if (layers.cover)
         fill(
@@ -497,10 +538,7 @@ export class MapRenderer {
     p: MapPalette,
     highContrast: boolean,
   ): Tile {
-    const style = this.style;
-    const scale = 2 ** band;
     const res = TILE_PX / tileM;
-    const px = 1 / scale;
     const tile = canvas(TILE_PX, TILE_PX);
     const ctx = context2d(tile);
     const area = {
@@ -510,10 +548,30 @@ export class MapRenderer {
       maxY: (ty + 1) * tileM,
     };
     ctx.setTransform(res, 0, 0, res, -area.minX * res, -area.minY * res);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
     ctx.fillStyle = p.paper;
     ctx.fillRect(area.minX, area.minY, tileM, tileM);
+    this.drawBaseArea(ctx, area, 2 ** band, tileDpr, layers, p, highContrast);
+    return { canvas: tile };
+  }
+
+  /**
+   * The period base (cover, wood symbols, settlement wash, shading, hachures, water) over `area`, onto a
+   * context already transformed to map metres at `scale` CSS pixels per metre and `dpr` device pixels per
+   * CSS pixel, over paper. Base tiles draw it per tile; `renderOnce` draws it straight onto its target.
+   */
+  private drawBaseArea(
+    ctx: CanvasRenderingContext2D,
+    area: ViewBounds,
+    scale: number,
+    dpr: number,
+    layers: Layers,
+    p: MapPalette,
+    highContrast: boolean,
+  ): void {
+    const style = this.style;
+    const px = 1 / scale;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     // Shapes meeting this tile, merged into one path so adjoining polygons fill without seams.
     const merged = (shapes: readonly { path: Path2D; bounds: ViewBounds }[], margin: number) => {
       const path = new Path2D();
@@ -544,7 +602,7 @@ export class MapRenderer {
         ctx.stroke(woods);
         ctx.fillStyle = p.wood;
         ctx.fill(woods, 'evenodd');
-        const trees = this.pattern(ctx, 'trees', p, tileDpr, scale);
+        const trees = this.pattern(ctx, 'trees', p, dpr, scale);
         if (trees) {
           ctx.fillStyle = trees;
           ctx.fill(woods, 'evenodd');
@@ -608,7 +666,6 @@ export class MapRenderer {
       }
     }
     if (layers.water) this.drawWater(ctx, area, p, px);
-    return { canvas: tile };
   }
 
   private drawWater(ctx: CanvasRenderingContext2D, area: ViewBounds, p: MapPalette, px: number) {

@@ -216,7 +216,7 @@ describe('period staff-map style (recorded Canvas2D)', () => {
   };
   const palette = PERIOD_MAP_STYLE.palette;
 
-  it('keeps the classic style as the default, so the table raster is unchanged', () => {
+  it('keeps the classic style as the default', () => {
     const renderer = new MapRenderer(reference());
     expect(renderer.style).toBe(CLASSIC_MAP_STYLE);
     const calls: Call[] = [];
@@ -249,6 +249,63 @@ describe('period staff-map style (recorded Canvas2D)', () => {
     expect(renderer.render(proxyContext([]), view, DEFAULT_LAYERS, false)).toBe(false);
     expect(made() - setup).toBe(tiles);
     expect(JSON.stringify(asset)).toBe(before);
+  });
+
+  it('draws a whole frame in one pass for a one-off raster, with no tiles and nothing cached (#498)', () => {
+    const asset = reference();
+    const before = JSON.stringify(asset);
+    const renderer = new MapRenderer(asset, PERIOD_MAP_STYLE);
+    // The same 5 × 5 tile view as above: the interactive path would need five frames.
+    const view = { width: 1200, height: 1200, scale: 8, offset: [0, 0] as [number, number] };
+    const setup = canvases.length;
+    const calls: Call[] = [];
+    renderer.renderOnce(proxyContext(calls), view, DEFAULT_LAYERS, false);
+    // Only the two symbol tiles (tree marks, building hatching); no base tile, which starts with paper.
+    const made = canvases.slice(setup);
+    expect(made).toHaveLength(2);
+    expect(made.some((c) => c.some((call) => call.name === 'fillRect'))).toBe(false);
+    // The base lands straight on the target: the hillshade, sepia hachures and lined water.
+    expect(calls.filter((c) => c.name === 'drawImage')).toHaveLength(1);
+    // (Hachures fade out above 3 px/m, so they are checked at 1 px/m.)
+    const hachured: Call[] = [];
+    const wide = { width: 150, height: 150, scale: 1, offset: [0, 0] as [number, number] };
+    new MapRenderer(asset, PERIOD_MAP_STYLE).renderOnce(
+      proxyContext(hachured),
+      wide,
+      DEFAULT_LAYERS,
+      false,
+    );
+    expect(
+      hachured.some((c) => c.name === 'stroke' && c.strokeStyle === palette.regular.relief),
+    ).toBe(true);
+    expect(calls.some((c) => c.name === 'fill' && c.fillStyle === palette.regular.water)).toBe(
+      true,
+    );
+    expect(
+      calls.some((c) => c.name === 'stroke' && c.strokeStyle === palette.regular.waterLine),
+    ).toBe(true);
+    // Nothing was cached: the interactive path still makes its tiles, and then renders as before.
+    const afterOnce = canvases.length;
+    expect(renderer.render(proxyContext([]), view, DEFAULT_LAYERS, false)).toBe(true);
+    expect(canvases.length).toBe(afterOnce + BASE_TILES_PER_FRAME);
+    expect(JSON.stringify(asset)).toBe(before);
+  });
+
+  it('puts its helper rasters on CPU-backed canvases only when asked', () => {
+    const options: unknown[][] = [];
+    vi.stubGlobal('document', {
+      createElement: () => ({
+        width: 0,
+        height: 0,
+        getContext: (...args: unknown[]) => {
+          options.push(args);
+          return proxyContext([]);
+        },
+      }),
+    });
+    new MapRenderer(reference(), PERIOD_MAP_STYLE);
+    new MapRenderer(reference(), PERIOD_MAP_STYLE, { software: true });
+    expect(options).toEqual([['2d'], ['2d', { willReadFrequently: true }]]);
   });
 
   it('hachures sloping ground in sepia on the base tile, heavier strokes wider', () => {
