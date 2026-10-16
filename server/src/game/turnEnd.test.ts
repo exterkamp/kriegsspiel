@@ -218,9 +218,9 @@ describe('turn mode: the game ends in the turn that decides it (#429)', () => {
 
 /**
  * Hold the Bridge with Blue's 2nd Battalion alone at its post by the bridge, seed 2: scripted Red
- * attacks it, and the combat tick that runs every two minutes from first contact breaks it at
- * 00:30:11, so Blue has nobody left standing and the declared battle closes at once. Every turn
- * length here decides the game at that instant, a fraction of a minute after a turn ends at 00:30.
+ * attacks it, and the combat tick that runs every two minutes from first contact breaks it a few
+ * seconds into a game minute (00:30:11 today), so Blue has nobody left standing and the declared
+ * battle closes at once, at a fractional time that no minute rule floors.
  */
 function loneBattalion(): Scenario {
   const units = holdTheBridge.units.filter((u) => u.side === 'red' || u.id === 'blue-2');
@@ -228,24 +228,26 @@ function loneBattalion(): Scenario {
 }
 
 describe('turn mode: no phantom turn from a decider just past a turn end (#434)', () => {
-  it.each([5, 10, 30])(
-    'ends the game in the %i-minute turn that ends at 00:30 when a combat tick decides it at 00:30:11',
-    async (turnMinutes) => {
-      const scenario = loneBattalion();
+  it('ends the game in the turn before a combat tick that decides it just past that turn end', async () => {
+    const scenario = loneBattalion();
+    // Where the combat tick decides it: one turn to the time limit has no turn end before it.
+    const probe = (await play(scenario, 60)).game.state.world.outcome!;
+    expect(probe).toMatchObject({ winner: 'red', reason: 'defence-broken', loserOut: 'withdrawn' });
+    expect(probe.time % MINUTE).toBeGreaterThan(0);
+    // Turns that end at the minute it falls in: that minute itself, and its smallest divisor of 5 or more.
+    const end = Math.floor(probe.time / MINUTE) * MINUTE;
+    const m = end / MINUTE;
+    expect(m).toBeGreaterThanOrEqual(5);
+    const lengths = [m];
+    const small = [5, 6, 7, 8, 9, 10, 11, 12, 13].find((d) => d < m && m % d === 0);
+    if (small) lengths.push(small);
+    for (const turnMinutes of lengths) {
       const { game, log, store } = await play(scenario, turnMinutes);
       const outcome = game.state.world.outcome!;
-      expect(outcome).toMatchObject({
-        winner: 'red',
-        reason: 'defence-broken',
-        loserOut: 'withdrawn',
-      });
-      // A fractional time just past the turn's end, which #431's minute rule does not floor.
-      expect(outcome.time).toBeGreaterThan(30 * MINUTE);
-      expect(outcome.time).toBeLessThan(31 * MINUTE);
-      expect(outcome.time % 1000).not.toBe(0);
-      // The turn that ended at 00:30 was the last: no turn was opened for the rest of the minute.
-      expect(opened(log).at(-1)).toMatchObject({ endMs: 30 * MINUTE });
-      expect(opened(log)).toHaveLength(30 / turnMinutes);
+      expect(outcome, `${turnMinutes}-minute turns`).toEqual(probe);
+      // The turn that ended at that minute was the last: no turn was opened for the rest of it.
+      expect(opened(log).at(-1)).toMatchObject({ endMs: end });
+      expect(opened(log)).toHaveLength(m / turnMinutes);
       // That turn's record ends where the game did, and the clock, views and papers agree.
       expect(resolved(log).at(-1)?.endGameMs).toBe(outcome.time);
       expectOver(game, outcome.time);
@@ -257,6 +259,6 @@ describe('turn mode: no phantom turn from a decider just past a turn end (#434)'
       expect(JSON.stringify(replayAt(input, outcome.time).engine.world)).toBe(
         JSON.stringify(game.state.world),
       );
-    },
-  );
+    }
+  });
 });
