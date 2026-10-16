@@ -34,11 +34,13 @@ Example file: parse on a local model, judging and narration in the cloud.
 }
 ```
 
-Env overrides (they win over the file): `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_MODEL_PARSE|JUDGE|NARRATE|STAFF|COMMAND`, `UMPIRE_TIMEOUT_MS`, `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`, `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS`, `UMPIRE_GAME_BUDGET_USD`, `UMPIRE_GAME_BUDGET_TOKENS`, `UMPIRE_GAME_CALLS_PER_MINUTE`.
+Env overrides (they win over the file): `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND|CRITIQUE|ADJUDICATE`, `UMPIRE_MODEL_<same stages>`, `UMPIRE_TIMEOUT_MS`, `UMPIRE_TIMEOUT_MS_ADJUDICATE` (per attempt, default 300 s; the file's `stageTimeoutMs.adjudicate`), `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`, `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS`, `UMPIRE_GAME_BUDGET_USD`, `UMPIRE_GAME_BUDGET_TOKENS`, `UMPIRE_GAME_CALLS_PER_MINUTE`.
+
+**The turn umpire** (`adjudicate`, D39, 11.6) defaults to `claude-sonnet-5-5` with a 12,000-token reply limit and the 300 s per-attempt timeout above; a whole turn's adjudication (both calls and their retries) is cut off after 15 minutes and the turn falls back to the engine. It runs only when `turnUmpireEnabled` holds: an Anthropic route with its key, or another provider type than `test` and `ollama` on the stage, or `UMPIRE_PROVIDER_ADJUDICATE` set explicitly (any provider, `test` included, for development). `TURN_UMPIRE=off` turns it off. Otherwise turn-mode games are decided by the engine at every dial; the keyless demo (Ollama or `test`) is in this case, by the benchmark below. The stage is not in `OLLAMA_STAGES`' eligible list. Its calls count against the game's `GameUmpireClient` caps; a refused call is not retried and the turn falls back. After an umpire turn the same client makes one report call per human side on the `narrate` stage's route (prompt `turn-reports-v1`, D39 "As built (11.9)"), with that route's provider and model; a failed or refused report call keeps the engine's text and never fails the turn.
 
 **API keys come only from the environment.** A provider names the variable in `apiKeyEnv`; a literal key in a file is rejected. `anthropic` defaults to `ANTHROPIC_API_KEY`. `openai-compatible` sends no key unless `apiKeyEnv` is set. Never commit keys.
 
-Provider fields: `type`, `baseUrl`, `apiKeyEnv`, `structuredOutput` (`native`, `json-mode` or `none`, see below), `contextWindow` (informational), `numCtx` (Ollama).
+Provider types: `anthropic`, `openai-compatible`, `ollama`, `claude-bridge` (the host's Claude Code, [below](#claude-code-bridge)) and `test`. Provider fields: `type`, `baseUrl`, `apiKeyEnv`, `structuredOutput` (`native`, `json-mode` or `none`, see below), `contextWindow` (informational), `numCtx` (Ollama).
 
 ## Test provider
 
@@ -49,11 +51,12 @@ Select it with `UMPIRE_PROVIDER=test` (every stage), `UMPIRE_PROVIDER_<STAGE>=te
 | Stage | What it does |
 | --- | --- |
 | `parse` | Finds the unit (id, name, or `the cavalry`, `the 1st`), then one or more clauses split at `and`, `then` and commas, each a verb (move, hold/screen/defend, withdraw/fall back, attack) and a place (by name, or by kind narrowed by name words, such as `the northern wood`). `it` or `there` means the place before. No unit named: the unit nearest the first place. Several fits: a clarification with options. An unknown place or unit, no verb, or injected instructions: a rejection with a reason. Conditions and times are ignored. |
-| `narrate` | One dispatch per report, built only from the report's own officer, place, size and numbers, so it passes `checkNarration`. |
+| `narrate` | One dispatch per report, built only from the report's own officer, place, size and numbers, so it passes `checkNarration`. A turn report (11.9) also says what became of the unit's orders and its losses, and gives the umpire's account as written. |
 | `staff` | One short piece of advice, chosen by the topic keywords of an optional `question` (enemy, supply, fatigue, ground, orders) or else by the officer's role, from counts in the officer's view. |
 | `judge` | No placements. |
 | `command` | Every unit holds the named place nearest the objective. |
 | `critique` | Quotes the digest's own facts as points (result, a report per side, misreadings, pauses, a delivery), so it passes `checkCritique`. |
+| `adjudicate` | The engine's projection as the proposal: each unit where the projection ends it, every arrived order `carried-out` and every riding one `not-arrived`, the engine's own sightings, no departures. A turn it answers ends as the engine adjudicator's would. |
 
 Its output is deterministic and validated like any model's, and recorded through `CallRecorder`. The game shows a "Test umpire (canned responses)" badge (`GET /scenarios` carries `umpire: "test"`), and the admin LLM panel shows its calls with mode `test`.
 
@@ -78,6 +81,46 @@ Its output is deterministic and validated like any model's, and recorded through
 | `llama3.2:1b` | 1.3 GB | 2.4 GB | 24/50, 16.6 s / 48.6 s | 1/6, 11.8 s / 72.9 s | 8/8, 19.5 s / 51.0 s |
 
 Narrate "pass" means the first reply passed `checkNarration` (no repair, no template); staff "pass" means a non-silent turn with no rejected reply. Parse "pass" counts the corpus's expected result per order. **No model parses a clear order**: all three score 0/10 in the `clear` category (they leave out `unitId`, or give names where place ids are required) and their 24 passes are clarifications and rejections that the corpus also accepts, with 5/15 on the injection orders. So `parse` is not on the model by default; set `OLLAMA_STAGES=parse,narrate,staff` to try it (an unusable parse falls back to the canned parser, after waiting for the model). `qwen2.5:0.5b` is the default because it is the smallest model that passes narration and almost all staff turns, and it is faster than the 1B model.
+
+## Claude Code bridge
+
+The `claude-bridge` provider (#457) runs the umpire on Claude Code's models through the `claude` CLI and its login on the host, so a subscription can serve the game with no API key. The game server runs in Docker and the CLI does not, so a small host-side service, `tools/claude-bridge/`, sits between them: `POST /v1/generate` takes the provider request (model, system prompt, messages, JSON schema, `maxTokens`) and runs `claude -p` once for it.
+
+**Isolation.** Each request is a fresh `claude -p --output-format json` process with `--tools ""` (no tools at all), `--safe-mode` (no CLAUDE.md, hooks, plugins or skills), `--strict-mcp-config` (no MCP servers), `--permission-mode dontAsk --permission-prompts none` (nothing can prompt), `--disable-slash-commands` and `--no-session-persistence`, in a new empty working directory under the system temp directory that is deleted afterwards. The system prompt replaces Claude Code's own and is passed as a file outside that directory; the messages go on stdin (a repair turn's rejected reply is quoted in the prompt, as the CLI takes no assistant turns). A model reply is text and nothing else: it cannot run a command or touch a file. `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are removed from the child's environment, so a key in a shared `.env` does not silently bill the API instead of the subscription.
+
+**Structured output.** The provider declares `json-mode`: the client puts the schema in the system prompt and validates and repairs the reply as for any provider. `structuredOutput: "native"` on the provider spec makes the bridge pass the schema to `--json-schema`, which the CLI enforces with an extra tool turn; it is not the default because it has not been measured on the umpire's schemas.
+
+**Failures.** The bridge maps the CLI to HTTP statuses, by the API status when the result has one and by its text otherwise, that the provider turns into `TransportError` verdicts: CLI not found or not logged in, 424 (not retried); rate or usage limit, 429 with `Retry-After` (from the limit's reset time, else 60 s; the client fails at once when that is longer than the barrier can wait); overloaded, 503; another API 4xx such as an unknown model, 400 (not retried); a crash or output with no result event, 502; no answer within `CLAUDE_BRIDGE_TIMEOUT_MS`, 504; the queue full, 503. A reply cut at `maxTokens` (passed as `CLAUDE_CODE_MAX_OUTPUT_TOKENS`) comes back `truncated`. On a timeout, or when the server gives up and closes the connection, the bridge kills the CLI's whole process group (SIGTERM, then SIGKILL after 2 s); a queued request is dropped. A body over the size limit gets 413 (not retried). On SIGTERM or SIGINT the bridge kills every run and waits for them to end (up to the kill grace plus a second) before it exits.
+
+**Cost and tokens.** Token counts come from the CLI's result event (input, output, cache read and cache write), so token budgets work. Cost is reported as zero, since a subscription is not billed per call and the CLI's `total_cost_usd` is a list-price estimate; budgets in dollars therefore never trip. With `CLAUDE_BRIDGE_BILLING=api` (the CLI logged in with an API key) the bridge reports that cost and budgets count it.
+
+**Security.** The bridge spends the host's Claude subscription, so it binds the docker0 gateway (`172.17.0.1`) by default, which the containers can reach and other LAN hosts normally cannot, and it refuses to start on any address but the loopback without `CLAUDE_BRIDGE_SECRET` (at least 16 characters), which every request must carry as `Authorization: Bearer`. It refuses `0.0.0.0` and `::`, in any spelling. The server sends the secret from `CLAUDE_BRIDGE_SECRET` (or the variable named by the provider's `apiKeyEnv`). Never publish the port.
+
+**Run it.**
+
+```bash
+# on the host, where `claude` is installed and logged in; .env is read if present
+echo "CLAUDE_BRIDGE_SECRET=$(openssl rand -hex 24)" >> .env
+npm run claude-bridge          # builds tools/claude-bridge and listens on http://172.17.0.1:8790
+docker compose -f docker-compose.yml -f docker-compose.claude-bridge.yml up -d
+```
+
+Without Docker (`npm run dev -w server` on the host), set `CLAUDE_BRIDGE_HOST=127.0.0.1` for the bridge, which then needs no secret, and `UMPIRE_PROVIDER=claude-bridge CLAUDE_BRIDGE_URL=http://127.0.0.1:8790` for the server. Under `devrun`: `devrun up --name claude-bridge --port-env CLAUDE_BRIDGE_PORT -- sh -c 'CLAUDE_BRIDGE_HOST=127.0.0.1 npm run claude-bridge'`. It logs one JSON line per call with the model, queue wait, CLI time and tokens.
+
+| Bridge variable | Default | Meaning |
+| --- | --- | --- |
+| `CLAUDE_BRIDGE_HOST` | `172.17.0.1` | Address to listen on. Not `0.0.0.0`; anything but the loopback needs the secret |
+| `CLAUDE_BRIDGE_PORT` | `8790` | Port |
+| `CLAUDE_BRIDGE_SECRET` | unset | Shared bearer secret, also set for the game server |
+| `CLAUDE_BIN` | `claude` | The CLI to run |
+| `CLAUDE_BRIDGE_MAX_CONCURRENT` | `2` | CLI runs at once; the rest wait in order. Time in the queue counts toward the server's per-attempt timeout (60 s), so with several games resolving turns at once raise this or `UMPIRE_TIMEOUT_MS` |
+| `CLAUDE_BRIDGE_MAX_QUEUE` | `16` | Waiting requests beyond this get 503 |
+| `CLAUDE_BRIDGE_TIMEOUT_MS` | `300000` | Kill a run after this long (the server's own per-attempt timeout is usually shorter) |
+| `CLAUDE_BRIDGE_BILLING` | `subscription` | `api` reports the CLI's cost to the server's budgets |
+
+**Server side.** `UMPIRE_PROVIDER=claude-bridge` puts every stage on the bridge, `UMPIRE_PROVIDER_<STAGE>=claude-bridge` one stage, and `UMPIRE_KEYLESS_PROVIDER=claude-bridge` every stage that would use Anthropic with no key (parse, judge, narrate, staff, command, critique and adjudicate), with the `test` provider as the fallback while the bridge is down or failing, as in the Ollama mode above; the turn umpire's `adjudicate` falls back to the engine instead (D39). Naming the bridge in any of these, or setting `CLAUDE_BRIDGE_URL` (default `http://127.0.0.1:8790`), configures a `claude-bridge` provider; a config file can define its own (`{ "type": "claude-bridge", "baseUrl": "...", "apiKeyEnv": "..." }`). Stages keep their route's model (`claude-haiku-5-5` for parse, `claude-opus-5-5` for judge, `claude-sonnet-5-5` for the rest), which the CLI accepts, and `UMPIRE_MODEL_<STAGE>` picks another, including the CLI's aliases `sonnet`, `opus` and `haiku`. Timeouts and attempts are the ordinary ones (60 s per attempt, 300 s for `adjudicate`, three attempts). The turn umpire is on with the bridge (`turnUmpireEnabled`), and the admin LLM panel shows the provider `claude-bridge` and the model like any other.
+
+**Measured** on this host (CLI 2.1.299, `UMPIRE_PROVIDER=claude-bridge`, through `createUmpireClient` and the real stage code, one call each, all valid on the first attempt): parse (`claude-haiku-5-5`, the golden order "Move the 1st Battalion to the bridge and hold it.") 3.7 s; narrate (`claude-sonnet-5-5`, one contact report) 3.5 s; adjudicate (`claude-sonnet-5-5`, benchmark case `advance-to-contact`, 4,192 output tokens) 31.9 s. Of that, the CLI's start-up is about 1 to 2 s per call. From the game container over the docker0 address a trivial call took 2.9 s.
 
 ## Turn umpire benchmark
 

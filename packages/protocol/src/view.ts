@@ -54,6 +54,8 @@ export const Dispatch = z
         'heavyLosses',
         'broke',
         'battle',
+        'turn',
+        'notice',
       ])
       .optional(),
     location: Coord.optional(),

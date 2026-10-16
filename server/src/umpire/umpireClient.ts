@@ -6,7 +6,8 @@
  * returns validated structured output, and the engine decides what to do with it.
  */
 
-export type UmpireStage = 'parse' | 'judge' | 'narrate' | 'staff' | 'command' | 'critique';
+export type UmpireStage =
+  'parse' | 'judge' | 'narrate' | 'staff' | 'command' | 'critique' | 'adjudicate';
 
 /** A JSON Schema (draft 2020-12 subset the API accepts) for the structured output. */
 export type JsonSchema = Record<string, unknown>;

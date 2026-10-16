@@ -7,7 +7,14 @@ import {
   type MapAsset,
 } from '../contract.js';
 import { TERRAIN_VERSION, CONTOUR_VERSION } from '../terrain/index.js';
-import { GEOGRAPHY_VERSION, COVER_VERSION, geographyPreset } from '../geography/index.js';
+import {
+  GEOGRAPHY_VERSION,
+  COVER_VERSION,
+  CROSSING_VERSION,
+  LEGACY_CROSSING_VERSION,
+  geographyPreset,
+  type CrossingPolicy,
+} from '../geography/index.js';
 import { PLANNING_VERSION } from '../planning/index.js';
 import { preflightAsset } from '../resources.js';
 import { CONSUMED_FORK } from './source.js';
@@ -28,15 +35,30 @@ export const CURRENT_GENERATOR: MapAsset['provenance']['generator'] = Object.fre
   randomPolicy: 'fnv1a-stage-v1',
   runtimePolicy: 'js-binary64-v1',
 });
-/** Synchronous identity support check, independent of generation/physical validation. */
-export function supportsReplay(asset: unknown): boolean {
+/**
+ * Generators whose saved maps the current complete validator still certifies,
+ * although they can no longer be regenerated: their geometry is checked by the
+ * same generator-independent rules, with the crossing deck policy they recorded.
+ */
+export const LEGACY_GENERATORS: readonly MapAsset['provenance']['generator'][] = Object.freeze([
+  Object.freeze({
+    ...CURRENT_GENERATOR,
+    stages: Object.freeze({
+      ...CURRENT_GENERATOR.stages,
+      terrain: 'value-noise-ridges-v1',
+      hydrology: 'flood-carved-graded-backwater-v1',
+      roads: 'sites-lattice-decks-v1',
+    }),
+  }),
+]);
+function recordedIdentity(asset: unknown): MapAsset['provenance']['generator'] | undefined {
   try {
     if (
       configurationData(asset, 'schema') !== 'kriegsspiel/local-map' ||
       configurationData(asset, 'schemaVersion') !== SCHEMA_VERSION ||
       configurationData(asset, 'precisionPolicy') !== PRECISION_POLICY
     )
-      return false;
+      return undefined;
     const p = configurationData(asset, 'provenance'),
       generator = configurationData(p, 'generator'),
       fork = configurationData(p, 'fork'),
@@ -45,14 +67,25 @@ export function supportsReplay(asset: unknown): boolean {
       { generator, fork, coordinates },
       { ...HARD_LIMITS, maxNodes: 1000, maxBytes: 16384 },
     );
-    return (
-      equal(coordinates, COORDINATES) &&
-      equal(generator, CURRENT_GENERATOR) &&
-      equal(fork, CONSUMED_FORK)
-    );
+    if (!equal(coordinates, COORDINATES) || !equal(fork, CONSUMED_FORK)) return undefined;
+    return [CURRENT_GENERATOR, ...LEGACY_GENERATORS].find((g) => equal(generator, g));
   } catch {
-    return false;
+    return undefined;
   }
+}
+/** Synchronous check that the current generator can regenerate this recipe exactly. */
+export function supportsReplay(asset: unknown): boolean {
+  return recordedIdentity(asset) === CURRENT_GENERATOR;
+}
+/** Synchronous check that the complete validator can certify this saved map (current or legacy generator). */
+export function supportsValidation(asset: unknown): boolean {
+  return recordedIdentity(asset) !== undefined;
+}
+/** Crossing deck policy recorded by a supported generator. */
+export function crossingPolicyFor(asset: MapAsset): CrossingPolicy {
+  return asset.provenance.generator.stages.hydrology === LEGACY_GENERATORS[0]!.stages.hydrology
+    ? LEGACY_CROSSING_VERSION
+    : CROSSING_VERSION;
 }
 function equal(a: unknown, b: unknown): boolean {
   if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return a === b;

@@ -11,7 +11,7 @@ import type {
 } from '../contract.js';
 import type { CrossingCandidate } from '../geography/types.js';
 import type { Water } from '../contract.js';
-export const PLANNING_VERSION = 'sites-lattice-decks-v1' as const;
+export const PLANNING_VERSION = 'sited-graded-network-v2' as const;
 export const DECK_POLICY = 'linear-ground-endpoints-v1' as const;
 export interface PlanningLimits {
   maxCandidateWork?: number;

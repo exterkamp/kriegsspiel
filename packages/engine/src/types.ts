@@ -4,6 +4,7 @@ import type { Order, OrderIntent } from './orders.js';
 import type { Trait } from './personality.js';
 import type { PlacementProposal, PlacementVerdict } from './placement.js';
 import type { Dial } from './judgment.js';
+import type { UmpireJournal } from './journal.js';
 
 /** Game time in integer milliseconds since the scenario start. Never derived from the wall clock. */
 export type GameTime = number;
@@ -279,7 +280,9 @@ export interface Report {
     | 'engaged'
     | 'heavyLosses'
     | 'broke'
-    | 'battle';
+    | 'battle'
+    | 'turn'
+    | 'notice';
   /** Game time of the thing reported. */
   observedAt: GameTime;
   /** Game time the report reaches HQ (observedAt plus courier delay). */
@@ -307,6 +310,34 @@ export interface Report {
   routed?: true;
   /** The unit's first report of the fight since it rallied from a break: it says so. */
   rallied?: true;
+  /** For `turn`: what the unit did in an umpire turn, as the engine applied it (D39, 11.9). */
+  turn?: TurnReportFacts;
+}
+
+/**
+ * A unit's own account of an umpire turn, as the engine applied it (D39, 11.9, #405): only what the
+ * unit knows of itself. The commander's words come from the umpire's `account`, which the server
+ * adds when it writes the side's reports; the engine's note is built from these facts alone.
+ */
+export interface TurnReportFacts {
+  /** The turn's number. */
+  n: number;
+  /** Men lost in the turn. */
+  lost: number;
+  /** Whole metres between where it stood at the turn's start and where it stands at its end. */
+  movedM: number;
+  /** It broke in the turn and is falling back. */
+  broke?: true;
+  /** It rallied from a break in the turn. */
+  rallied?: true;
+  /**
+   * What became of each order it had in the turn, as the umpire ruled and the engine applied it.
+   * `ref` is the desk's id of the order when the side's own desk sent it.
+   */
+  orders: {
+    ref?: string;
+    result: 'carried-out' | 'partly' | 'misread' | 'refused' | 'not-arrived';
+  }[];
 }
 
 /**
@@ -420,6 +451,12 @@ export interface GameState {
    * moves the world up to `endMs`. Absent in real time.
    */
   turn?: TurnFlag;
+  /**
+   * The umpire's journal in a turn-mode game (D39, 11.8): condensed notes of its earlier turns and
+   * the precedents it set, written by `umpire.turn` from the logged proposal. Master state only:
+   * never sent to a client. Absent until the first umpire turn.
+   */
+  journal?: UmpireJournal;
 }
 
 /**

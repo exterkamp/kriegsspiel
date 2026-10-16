@@ -219,6 +219,8 @@ describe('benchmark run interruption lifecycle', () => {
     (document.getElementById('benchmark-cancel') as HTMLButtonElement).click();
     await drain();
     expect(result().status).toBe('failed');
+    const status = document.getElementById('benchmark-status')!;
+    expect(status.className).toBe('ks-status ks-error');
     const calls = cancel.mock.calls.length;
     queries[0]!.dispatchEvent(new Event('change'));
     window.dispatchEvent(new Event('focus'));
@@ -229,6 +231,26 @@ describe('benchmark run interruption lifecycle', () => {
     start();
     await drain();
     expect(result().status).toBe('completed-diagnostic');
+    expect(status.className).toBe('ks-status ks-ok');
     expect(queries).toHaveLength(2);
+  });
+  it('lays out the form with the shared field classes and no inline styles except the fixed canvas size (#308)', () => {
+    const root = document.querySelector('main')!;
+    expect(root.querySelector('h1')).toBeNull(); // The host's tool header carries the title.
+    const labels = [...root.querySelectorAll('label')];
+    expect(labels).toHaveLength(7);
+    for (const label of labels) {
+      const control = label.querySelector('input, select')!;
+      const checkbox = control instanceof HTMLInputElement && control.type === 'checkbox';
+      expect(label.className).toBe(checkbox ? 'ks-choice' : 'ks-field');
+      expect(label.textContent!.trim()).not.toBe('');
+    }
+    expect(document.getElementById('benchmark-run')!.className).toBe('ks-primary');
+    expect(document.getElementById('benchmark-status')!.className).toBe('ks-status');
+    expect(document.getElementById('benchmark-result')!.classList).toContain('ks-mono');
+    const styled = [...root.querySelectorAll<HTMLElement>('[style]')];
+    expect(styled.map((el) => el.id)).toEqual(['benchmark-canvas']);
+    expect(styled[0]!.style.width).toBe('1440px');
+    expect(styled[0]!.style.height).toBe('900px');
   });
 });

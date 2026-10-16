@@ -25,11 +25,11 @@ import {
 } from '../geometry.js';
 import { placeId, resolveOverrides } from '../overrides.js';
 import { createPlanningCertificates, type PlanningCertificates } from '../planning/index.js';
-import { CROSSING_VERSION, validateWaterPhysics } from '../geography/index.js';
+import { validateWaterPhysics } from '../geography/index.js';
 import { validateContourHeights } from '../terrain/index.js';
 import { accessId, isLocalRoad, occupiedEnvelope } from './assemble.js';
 import { bounded, compositionLimits, CompositionFailure, Meter, requireValue } from './budget.js';
-import { supportsReplay } from './identity.js';
+import { crossingPolicyFor, supportsValidation } from './identity.js';
 import {
   COMPLETE_VALIDATION_VERSION,
   type CompositionLimits,
@@ -360,7 +360,7 @@ export function validateBattlefield(
     // complete hard ceiling rather than allowing hidden work outside this meter.
     meter.take(HARD_LIMITS.maxTopologyChecks);
     const asset = parseAsset(raw);
-    if (!supportsReplay(asset))
+    if (!supportsValidation(asset))
       stop(
         'UNSUPPORTED_REPLAY',
         'Generator/stage/fork identities are unsupported by this complete validator.',
@@ -612,7 +612,7 @@ export function validateBattlefield(
         cert.bridge({
           ...crossing,
           kind: 'bridge',
-          policy: CROSSING_VERSION,
+          policy: crossingPolicyFor(asset),
           minimumAbutmentM: s.roads.minimumAbutmentM,
         }),
       );

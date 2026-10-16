@@ -14,3 +14,4 @@ export { generateCover, COVER_VERSION } from './cover/index.js';
 export { createGeographyQueries, type GeographyQueries } from './queries.js';
 
 export { SHOULDER_POLICY, type ShoulderEvidence } from './shoulders.js';
+export { RIVER_NETWORK } from './rivers.js';

@@ -1,9 +1,18 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { PROTOCOL_VERSION, parseServerMessage, type ServerMessage } from '@kriegsspiel/protocol';
+import { holdTheBridge, loadScenario } from '@kriegsspiel/engine';
+import {
+  PROTOCOL_VERSION,
+  parseServerMessage,
+  type Dispatch,
+  type ServerMessage,
+} from '@kriegsspiel/protocol';
 import { MemoryGameStore } from '../game/index.js';
 import { StubOrderParser } from '../orders/stubParser.js';
 import { buildApp, type App } from './app.js';
 import { MAX_TURN_COMMANDS_PER_MINUTE } from './hub.js';
+import { umpireConfigFromEnv } from '../umpire/config.js';
+import { createUmpireClient } from '../umpire/createUmpireClient.js';
+import type { UmpireClient, UmpireRequest } from '../umpire/umpireClient.js';
 
 const v = PROTOCOL_VERSION;
 const RATE = 3600;
@@ -89,9 +98,21 @@ interface Table {
 }
 
 /** A started turn-mode game: blue's commander, chief of staff and intelligence officer, and red's player. */
-async function startedTable(): Promise<Table> {
+async function startedTable(
+  opts: {
+    adjudicator?: () => UmpireClient;
+    dial?: string;
+    admin?: { enabled: boolean; token?: string };
+  } = {},
+): Promise<Table> {
   store = new MemoryGameStore();
-  app = await buildApp({ parser: new StubOrderParser(), store, auth: { mailer } });
+  app = await buildApp({
+    parser: new StubOrderParser(),
+    store,
+    auth: { mailer },
+    ...(opts.adjudicator ? { adjudicator: opts.adjudicator } : {}),
+    ...(opts.admin ? { admin: opts.admin } : {}),
+  });
   const base = await app.server.listen({ port: 0, host: '127.0.0.1' });
   const [lead, red, cos, intel] = await Promise.all(
     ['lead', 'red', 'cos', 'intel'].map((n) => signIn(base, `${n}@example.test`)),
@@ -104,10 +125,16 @@ async function startedTable(): Promise<Table> {
       sessionType: 'team_vs_team',
       side: 'blue',
       mode: 'turns',
+      ...(opts.dial ? { dial: opts.dial } : {}),
     }),
   );
   const { id, umpire } = (await created.json()) as { id: string; umpire: unknown };
-  expect(umpire).toEqual({ dial: 'standard', persona: 'dry', mode: 'turns', turnMinutes: 20 });
+  expect(umpire).toEqual({
+    dial: opts.dial ?? 'standard',
+    persona: 'dry',
+    mode: 'turns',
+    turnMinutes: 20,
+  });
   const j = (cookie: string, body: unknown) =>
     fetch(`${base}/games/${id}/join`, post(cookie, body));
   expect((await j(red!, { side: 'red' })).status).toBe(200);
@@ -304,6 +331,193 @@ describe('turn mode over the socket', () => {
       from: "The umpire's ruling",
       receivedAtGame: end.atGame,
     });
+    app!.hub.closeAll();
+  });
+});
+
+describe('the turn umpire in the app (D39, 11.6)', () => {
+  /** The canned umpire, keeping every request it was sent. */
+  const counting = () => {
+    const requests: UmpireRequest[] = [];
+    const inner = createUmpireClient({
+      config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }),
+      env: {},
+    });
+    const client: UmpireClient = {
+      call: (r) => {
+        requests.push(r);
+        return inner.call(r);
+      },
+    };
+    return { requests, client };
+  };
+
+  const playOneTurn = async (t: Table) => {
+    const lead = await Tap.open(t.url, t.lead);
+    const red = await Tap.open(t.url, t.red);
+    await lead.until(lastTurn);
+    lead.send({
+      kind: 'holdTurnOrder',
+      order: { orderId: 'o1', to: 'blue-1', text: 'March to the bridge and hold it' },
+    });
+    await lead.until((m) => (lastTurn(m)?.held.length === 1 ? true : undefined));
+    red.send({ kind: 'sendTurn' });
+    lead.send({ kind: 'sendTurn' });
+    await lead.until((m) => (lastTurn(m)?.turn === 2 ? true : undefined));
+    const log = await store.inputLog(t.id);
+    return { log, lead, red };
+  };
+
+  it('adjudicates a standard turn with the umpire, and sends each side its own papers (11.9)', async () => {
+    const { requests, client } = counting();
+    const t = await startedTable({ adjudicator: () => client });
+    const { log, red, lead } = await playOneTurn(t);
+    // One adjudicate call, then one report call per side.
+    expect(requests.map((r) => r.stage)).toEqual(['adjudicate', 'narrate', 'narrate']);
+    const turn = log.find((e) => e.command.kind === 'resolveTurn')!;
+    expect(turn.turn!.adjudicator).toBe('umpire');
+    expect(turn.calls).toHaveLength(1);
+    const reported = log.filter((e) => e.command.kind === 'turnReports');
+    expect(reported.map((e) => (e.command as { side: string }).side).sort()).toEqual([
+      'blue',
+      'red',
+    ]);
+    for (const e of reported) {
+      expect(e.calls).toHaveLength(1);
+      expect(e.narrated!.length).toBeGreaterThan(0);
+    }
+    // The turn's papers reach each in-tray at the turn's end, in the units' own narrated words:
+    // the canned umpire's account of each of the side's own units ("... staff tables direct").
+    const { units } = loadScenario(holdTheBridge);
+    for (const [tap, side] of [
+      [lead, 'blue'],
+      [red, 'red'],
+    ] as const) {
+      const papers = await tap.until((m) => {
+        const got = m.flatMap((x) =>
+          x.kind === 'dispatch' && x.dispatch.kind === 'turn' ? [x.dispatch] : [],
+        );
+        return got.length > 0 ? got : undefined;
+      });
+      const own = units.filter((u) => u.side === side).map((u) => u.name);
+      for (const d of papers as Dispatch[]) {
+        expect(own).toContain(d.from);
+        expect(d.writtenAtGame).toBe(turn.turn!.endMs);
+        expect(d.receivedAtGame).toBe(turn.turn!.endMs);
+        expect(d.text).toContain('staff tables');
+      }
+      // The proposal's summary is master state, and no paper names the other side's units.
+      const sent = JSON.stringify(tap.messages);
+      expect(sent).not.toContain('resolved by the tables');
+      for (const u of units.filter((x) => x.side !== side)) expect(sent).not.toContain(u.name);
+    }
+    app!.hub.closeAll();
+  });
+
+  it('keeps a rigid turn on the engine: no adjudicate call', async () => {
+    const { requests, client } = counting();
+    const t = await startedTable({ adjudicator: () => client, dial: 'rigid' });
+    const { log } = await playOneTurn(t);
+    expect(requests).toEqual([]);
+    expect(log.find((e) => e.command.kind === 'resolveTurn')!.turn!.adjudicator).toBe('engine');
+    app!.hub.closeAll();
+  });
+
+  it('keeps every turn on the engine with no adjudicator configured (the keyless demo)', async () => {
+    const t = await startedTable();
+    const { log } = await playOneTurn(t);
+    expect(log.find((e) => e.command.kind === 'resolveTurn')!.turn!.adjudicator).toBe('engine');
+    app!.hub.closeAll();
+  });
+});
+
+describe('turn internals reach no player before the game ends (D39, 11.11)', () => {
+  const CANARY = 'CANARY-TURN-PANEL-4417';
+  const TOKEN = 'admin-token-11-11';
+  /** The canned umpire, with a canary in every summary and precedent. */
+  const canary = (): UmpireClient => {
+    const inner = createUmpireClient({
+      config: umpireConfigFromEnv({ UMPIRE_PROVIDER: 'test' }),
+      env: {},
+    });
+    return {
+      call: async <T>(r: UmpireRequest) => {
+        const res = await inner.call<T>(r);
+        if (r.stage !== 'adjudicate') return res;
+        const output = {
+          ...(res.output as object),
+          summary: `The umpire's own account. ${CANARY}.`,
+          precedents: [`A standing ruling. ${CANARY}.`],
+        } as T;
+        return { output, record: { ...res.record, rawOutput: JSON.stringify(output) } };
+      },
+    };
+  };
+
+  it('keeps the Turn panel behind the admin gate and the window behind game over', async () => {
+    const t = await startedTable({ adjudicator: canary, admin: { enabled: true, token: TOKEN } });
+    const lead = await Tap.open(t.url, t.lead);
+    const red = await Tap.open(t.url, t.red);
+    await lead.until(lastTurn);
+    red.send({ kind: 'sendTurn' });
+    lead.send({ kind: 'sendTurn' });
+    await lead.until((m) => (lastTurn(m)?.turn === 2 ? true : undefined));
+    const resolved = (await store.inputLog(t.id)).find((e) => e.command.kind === 'resolveTurn')!;
+    expect(resolved.turn!.adjudicator).toBe('umpire');
+
+    // Mid-game, a seated player gets none of the window's routes.
+    for (const cookie of [t.lead, t.red, t.cos, t.intel]) {
+      for (const path of [
+        'window',
+        'window/at?at=0',
+        'window/at?at=1200000',
+        'window/dissents',
+        'critique',
+      ]) {
+        const res = await fetch(`${t.base}/games/${t.id}/${path}`, { headers: { cookie } });
+        expect(res.status, path).toBe(403);
+        expect(await res.json()).toEqual({ error: 'game_not_over' });
+      }
+    }
+    // The admin Turn panel is the admin API's: a player's session is no key to it from outside,
+    // nor through a proxy on the same host.
+    const turns = `/admin/api/games/${t.id}/turns`;
+    const inject = (remoteAddress: string, headers: Record<string, string> = {}) =>
+      app!.server.inject({ method: 'GET', url: turns, remoteAddress, headers });
+    expect((await inject('203.0.113.9', { cookie: t.lead })).statusCode).toBe(401);
+    expect(
+      (await inject('127.0.0.1', { cookie: t.lead, 'x-forwarded-for': '203.0.113.9' })).statusCode,
+    ).toBe(401);
+    const admin = await inject('203.0.113.9', { authorization: `Bearer ${TOKEN}` });
+    expect(admin.statusCode).toBe(200);
+    expect(admin.body).toContain(CANARY);
+    // Nothing of it reached a player's socket or game record.
+    for (const tap of [lead, red]) expect(JSON.stringify(tap.messages)).not.toContain(CANARY);
+    for (const cookie of [t.lead, t.red]) {
+      const game = await fetch(`${t.base}/games/${t.id}`, { headers: { cookie } });
+      expect(await game.text()).not.toContain(CANARY);
+    }
+
+    // Once the game is over the window shows each turn, the umpire's account and its log.
+    const actor = app!.host.get(t.id)!;
+    for (let n = 2; n < 10 && !actor.state.world.outcome; n++) {
+      red.send({ kind: 'sendTurn' });
+      lead.send({ kind: 'sendTurn' });
+      await lead.until((m) =>
+        lastTurn(m)?.turn === n + 1 || m.some((x) => x.kind === 'gameOver') ? true : undefined,
+      );
+    }
+    expect(actor.state.world.outcome).toBeTruthy();
+    const window = await fetch(`${t.base}/games/${t.id}/window`, { headers: { cookie: t.red } });
+    expect(window.status).toBe(200);
+    const tl = (await window.json()) as {
+      turns: Array<{ n: number; summary?: string; journal?: { notes: unknown[] } }>;
+      marks: Array<{ kind: string }>;
+    };
+    expect(tl.turns.map((x) => x.n)).toEqual(tl.turns.map((_, i) => i + 1));
+    expect(tl.turns[0]!.summary).toContain(CANARY);
+    expect(tl.turns[0]!.journal!.notes).toHaveLength(1);
+    expect(tl.marks.filter((m) => m.kind === 'turn').length).toBe(tl.turns.length * 2);
     app!.hub.closeAll();
   });
 });

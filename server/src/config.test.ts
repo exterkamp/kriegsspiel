@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { aiCommanderFromEnv, llmOrderParserEnabled } from './config.js';
-import { DEFAULT_UMPIRE_CONFIG } from './umpire/index.js';
+import { aiCommanderFromEnv, llmOrderParserEnabled, turnUmpireEnabled } from './config.js';
+import { DEFAULT_UMPIRE_CONFIG, umpireConfigFromEnv } from './umpire/index.js';
 
 describe('aiCommanderFromEnv', () => {
   it('is off unless AI_COMMANDER is llm', () => {
@@ -50,5 +50,48 @@ describe('llmOrderParserEnabled', () => {
       },
     };
     expect(llmOrderParserEnabled({}, config)).toBe(true);
+  });
+});
+
+describe('turnUmpireEnabled (D39, 11.6)', () => {
+  const on = (env: Record<string, string>) => turnUmpireEnabled(env, umpireConfigFromEnv(env));
+
+  it('is on with the Anthropic key, on Sonnet with a 300 s call timeout', () => {
+    expect(on({ ANTHROPIC_API_KEY: 'k' })).toBe(true);
+    const cfg = umpireConfigFromEnv({ ANTHROPIC_API_KEY: 'k' });
+    expect(cfg.stages.adjudicate).toMatchObject({
+      provider: 'anthropic',
+      model: 'claude-sonnet-5-5',
+    });
+    expect(cfg.stageTimeoutMs?.adjudicate).toBe(300_000);
+    expect(
+      umpireConfigFromEnv({ UMPIRE_TIMEOUT_MS_ADJUDICATE: '600000' }).stageTimeoutMs?.adjudicate,
+    ).toBe(600_000);
+  });
+
+  it('is off with no capable model: no key, the keyless demo (test or Ollama), or every stage canned', () => {
+    expect(on({})).toBe(false);
+    expect(on({ UMPIRE_KEYLESS_PROVIDER: 'test' })).toBe(false);
+    expect(on({ UMPIRE_KEYLESS_PROVIDER: 'ollama' })).toBe(false);
+    // The keyless Ollama demo leaves adjudicate on the canned provider, not the local model.
+    expect(
+      umpireConfigFromEnv({ UMPIRE_KEYLESS_PROVIDER: 'ollama' }).stages.adjudicate.provider,
+    ).toBe('test');
+    expect(on({ UMPIRE_PROVIDER: 'test' })).toBe(false);
+    expect(on({ ANTHROPIC_API_KEY: 'k', TURN_UMPIRE: 'off' })).toBe(false);
+  });
+
+  it('is on when the stage’s provider is named, even the canned one', () => {
+    expect(on({ UMPIRE_PROVIDER_ADJUDICATE: 'test' })).toBe(true);
+  });
+
+  it('counts a configured remote provider but not a local Ollama', () => {
+    const with_ = (type: string) => ({
+      ...DEFAULT_UMPIRE_CONFIG,
+      providers: { other: { type } },
+      stages: { ...DEFAULT_UMPIRE_CONFIG.stages, adjudicate: { provider: 'other', model: 'm' } },
+    });
+    expect(turnUmpireEnabled({}, with_('openai-compatible'))).toBe(true);
+    expect(turnUmpireEnabled({}, with_('ollama'))).toBe(false);
   });
 });

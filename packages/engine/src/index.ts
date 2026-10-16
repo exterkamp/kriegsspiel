@@ -137,7 +137,7 @@ export {
   registerOrders,
 } from './orders.js';
 export type { ForcedIssue } from './orders.js';
-export { courierPass, engineTurnStart } from './engineTurn.js';
+export { courierPass, engineTurnStart, heldTurnStart } from './engineTurn.js';
 export type { CourierPass, TurnCourier } from './engineTurn.js';
 export {
   GARBLE_MAX_M,
@@ -186,7 +186,7 @@ export type {
   ViewUnit,
 } from './visibility.js';
 export * from './fatigue.js';
-export { clockTime, fieldNote, temperOf } from './fieldNotes.js';
+export { TURN_MOVED_M, clockTime, fieldNote, temperOf } from './fieldNotes.js';
 export type { NoteSender, Temper } from './fieldNotes.js';
 export {
   AMMO_PER_FIRE_TICK,
@@ -237,6 +237,9 @@ export {
   DEPARTURE_LOSS_SHARE,
   DEPARTURE_TOLERANCE_M,
   TURN_EVENT,
+  TURN_NOTICE_EVENT,
+  TURN_NOTICE_FROM,
+  issueTurnNotice,
   beginTurn,
   issueTurn,
   registerTurn,
@@ -256,4 +259,24 @@ export type {
   TurnUnitOutcome,
   TurnValidation,
 } from './turn.js';
+export {
+  TURN_ROLLS_PER_TURN,
+  TURN_ROLL_CHANCE,
+  rollTurnDice,
+  screenRollRequests,
+  turnDice,
+} from './turnDice.js';
+export type { ScreenedRolls } from './turnDice.js';
 export { turnVictory } from './combat.js';
+export {
+  JOURNAL_FULL_TURNS,
+  JOURNAL_MAX_TOKENS,
+  JOURNAL_PRECEDENTS_MAX,
+  JOURNAL_PRECEDENTS_PER_TURN,
+  JOURNAL_PRECEDENT_MAX,
+  JOURNAL_SENTENCES_PER_TURN,
+  JOURNAL_SENTENCE_MAX,
+  journalTokens,
+  recordInJournal,
+} from './journal.js';
+export type { JournalNote, JournalPrecedent, UmpireJournal } from './journal.js';

@@ -27,7 +27,12 @@ import type {
 import { turnSettingsOf } from '@kriegsspiel/protocol';
 import type { GameStore, InputLogEntry } from './store.js';
 import { EngineTurnResolver } from './engineTurn.js';
-import { openTurnFromLog, sentTurnIdsFromLog, type TurnResolver } from './turns.js';
+import {
+  openTurnFromLog,
+  sentTurnIdsFromLog,
+  turnNarrationsFromLog,
+  type TurnResolver,
+} from './turns.js';
 
 /** Each side's deputy settings (the last set) and the account of its turns, from a game's whole input log (D6f). */
 export function deputiesFromLog(
@@ -285,6 +290,8 @@ export class GameHost {
       .reverse()
       .find((e) => e.command.kind === 'narrate' && e.narrateBreaker)?.narrateBreaker;
     const open = turnOptions ? openTurnFromLog(log) : undefined;
+    // The turns' narrated papers (11.9) as they were written: no model is asked again.
+    const narrations = turnOptions ? turnNarrationsFromLog(log) : undefined;
     const turns = turnOptions && {
       ...turnOptions,
       ...(open ? { open } : {}),
@@ -303,6 +310,7 @@ export class GameHost {
       restart: { downMs },
       persona: settings?.persona,
       ...(narrateBreaker ? { narrateBreaker } : {}),
+      ...(narrations && narrations.size > 0 ? { narrations } : {}),
       // The log is in insertion order, which is not always seq order (see D14b).
       seq: tail.reduce((max, e) => Math.max(max, e.seq), snap.seq),
     });

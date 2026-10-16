@@ -47,6 +47,8 @@ export { createUmpireClient } from './createUmpireClient.js';
 export type { CreateUmpireClientOptions } from './createUmpireClient.js';
 export {
   AnthropicProvider,
+  CLAUDE_BRIDGE_DEFAULT_URL,
+  ClaudeBridgeProvider,
   OllamaProvider,
   OpenAiCompatibleProvider,
   TEST_MODEL,

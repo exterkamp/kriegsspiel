@@ -32,6 +32,13 @@ export {
   rulesParseTurnOrder,
 } from './engineTurn.js';
 export type { EngineTurnOutput, Projection, ProjectionSummary, RulesOrder } from './engineTurn.js';
+export {
+  ADJUDICATE_TURN_TIMEOUT_MS,
+  UMPIRE_ADJUDICATOR,
+  UmpireTurnResolver,
+  umpireAdjudicator,
+} from './umpireTurn.js';
+export type { UmpireTurnOutput, UmpireTurnResolverOptions } from './umpireTurn.js';
 export type {
   TurnAdjudicator,
   TurnAgent,

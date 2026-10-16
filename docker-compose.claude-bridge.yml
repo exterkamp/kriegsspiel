@@ -1,0 +1,12 @@
+# The umpire on Claude Code models through the host-side bridge (#457). Start the bridge on the host first:
+#   npm run claude-bridge                     (reads CLAUDE_BRIDGE_SECRET from .env; see docs/llm-providers.md)
+#   docker compose -f docker-compose.yml -f docker-compose.claude-bridge.yml up -d
+# With no ANTHROPIC_API_KEY every umpire stage, the turn umpire included, asks the bridge; while the bridge is down the
+# stages answer from the canned `test` provider and a turn falls back to the engine. A key switches back to the API.
+services:
+  kriegsspiel:
+    environment:
+      UMPIRE_KEYLESS_PROVIDER: claude-bridge
+      # 172.17.0.1 is the docker0 gateway, where the bridge listens by default; a container reaches it as a host address.
+      CLAUDE_BRIDGE_URL: ${CLAUDE_BRIDGE_URL:-http://172.17.0.1:8790}
+      CLAUDE_BRIDGE_SECRET: ${CLAUDE_BRIDGE_SECRET:?set CLAUDE_BRIDGE_SECRET in .env, the same value the bridge reads}

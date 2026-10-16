@@ -13,10 +13,10 @@
     "client"
   ],
   "scripts": {
-    "test": "npm run verify:map-source && npm run test --workspaces --if-present && npm run test:repository && npm run test:local-map-catalog",
+    "test": "npm run verify:map-source && npm run test --workspaces --if-present && npm run test:repository && npm run test:local-map-catalog && npm run test:claude-bridge",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
-    "typecheck": "npm run typecheck --workspaces --if-present && npm run typecheck:local-map-catalog",
+    "typecheck": "npm run typecheck --workspaces --if-present && npm run typecheck:local-map-catalog && npm run typecheck:claude-bridge",
     "build": "npm run verify:map-source && npm run build --workspaces --if-present && npm run build:local-map-catalog",
     "verify:map-source": "node scripts/verify-map-source.mjs",
     "setup:map-source": "node scripts/setup-map-source.mjs",
@@ -26,9 +26,12 @@
     "build:local-map-catalog": "npm run build -w packages/maps && tsc -p tools/local-map-catalog/tsconfig.json",
     "typecheck:local-map-catalog": "npm run build -w packages/maps && tsc --noEmit -p tools/local-map-catalog/tsconfig.json",
     "test:local-map-catalog": "vitest run --config tools/local-map-catalog/vitest.config.ts",
+    "claude-bridge": "tsc -p tools/claude-bridge/tsconfig.json && node --env-file-if-exists=.env .local/claude-bridge/serve.js",
+    "typecheck:claude-bridge": "tsc --noEmit -p tools/claude-bridge/tsconfig.json",
+    "test:claude-bridge": "vitest run --config tools/claude-bridge/vitest.config.ts",
     "test:repository": "node --test \"test/*.test.js\" \"scripts/maps-assessment/*.test.mjs\"",
     "test:ci-maps": "npm run verify:map-source && npm run test -w packages/maps && npm run test:local-map-catalog",
-    "test:ci-application": "npm run verify:map-source && npm run test -w packages/engine -w packages/protocol -w server -w client --if-present && npm run test:repository"
+    "test:ci-application": "npm run verify:map-source && npm run test -w packages/engine -w packages/protocol -w server -w client --if-present && npm run test:repository && npm run test:claude-bridge"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

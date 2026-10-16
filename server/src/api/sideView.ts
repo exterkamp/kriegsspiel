@@ -56,6 +56,8 @@ const CATEGORY: Record<ViewReport['kind'], Dispatch['category']> = {
   heavyLosses: 'subordinates',
   broke: 'subordinates',
   battle: 'staff',
+  turn: 'subordinates',
+  notice: 'staff',
 };
 
 export function toDispatch(r: ViewReport): Dispatch {
@@ -243,11 +245,11 @@ export function toSideView(
       sizeEstimate: c.sizeEstimate,
     })),
     dispatches: [
-      ...reports.filter((d) => d.kind !== 'battle'),
+      ...reports.filter((d) => d.kind !== 'battle' && d.kind !== 'notice'),
       ...view.documents.map(documentToDispatch),
       // The umpire's papers on the battle close the in-tray: a captured dispatch handed in at the
       // same turn's end comes before the ruling (#438).
-      ...reports.filter((d) => d.kind === 'battle'),
+      ...reports.filter((d) => d.kind === 'battle' || d.kind === 'notice'),
       ...staff.flatMap((x) => staffDispatch(x, view.time)),
       ...(deputy?.account ?? []).map(deputyDispatch),
     ],

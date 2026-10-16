@@ -10,7 +10,9 @@
  * cannot differ. Only after that does the actor advance the clock to the turn's end.
  *
  * The engine adjudicator (`engine`, 11.4, `engineTurn.ts`) resolves a turn by the rigid rules
- * with no model; `GameHost` uses its resolver unless told otherwise. 11.6 (#402) adds the umpire's.
+ * with no model; `GameHost` uses its resolver unless told otherwise. The umpire adjudicator
+ * (`umpire`, 11.6, `umpireTurn.ts`) applies a turn the `adjudicate` stage decided; the app gives
+ * `standard` and `free` games its resolver when a capable model is configured.
  * `none` logs the sent orders without carrying them out (units go on with their last orders).
  */
 import {
@@ -22,6 +24,7 @@ import {
 import { MAX_TURN_ORDERS, type TurnCause, type TurnOrder } from '@kriegsspiel/protocol';
 import type { UmpireCallRecord } from '../umpire/umpireClient.js';
 import { ENGINE_ADJUDICATOR, engineAdjudicator } from './engineTurn.js';
+import { UMPIRE_ADJUDICATOR, umpireAdjudicator } from './umpireTurn.js';
 import type { InputLogEntry, SentTurnOrder, TurnRecord } from './store.js';
 
 /** What a resolver is given when a turn closes. */
@@ -44,6 +47,11 @@ export interface TurnResolveContext {
    * is logged as they order it.
    */
   agents?: () => TurnAgent[];
+  /**
+   * The sides whose papers are written after an umpire turn (11.9): those people play. A scripted
+   * side's tray is read by nobody. Absent: every side.
+   */
+  reportSides?: readonly string[];
 }
 
 /** A scripted side as a turn's projection runs it: a copy, so the live agent is untouched. */
@@ -69,6 +77,22 @@ export interface TurnResolution {
   /** Model calls the resolver made, logged on the entry so replay needs no model. */
   calls?: UmpireCallRecord[];
   fallback?: { error: string; attempts: number };
+  /**
+   * Each side's papers of the turn as the umpire's staff wrote them (11.9): logged after the turn
+   * as one `turnReports` entry per side, never applied to the engine.
+   */
+  reports?: TurnReports[];
+}
+
+/** One side's narrated papers of a turn, as a resolver hands them to the actor (11.9). */
+export interface TurnReports {
+  side: string;
+  turn: number;
+  /** The notes that replaced template text, by report id. */
+  narrated: Array<{ reportId: string; text: string }>;
+  calls: UmpireCallRecord[];
+  /** Why any report kept its template text, for the log. */
+  error?: string;
 }
 
 /**
@@ -100,6 +124,7 @@ export const NO_ADJUDICATOR = 'none';
 const adjudicators = new Map<string, TurnAdjudicator>([
   [NO_ADJUDICATOR, (state) => state],
   [ENGINE_ADJUDICATOR, engineAdjudicator],
+  [UMPIRE_ADJUDICATOR, umpireAdjudicator],
 ]);
 
 /** Make an adjudicator known to live play and replay by the name a resolver logs. */
@@ -231,4 +256,22 @@ export function sentOrdersOf(turn: OpenTurn): SentTurnOrder[] {
 /** Which of `sides` must send before a turn closes without its deadline: those no agent plays. */
 export function humanSides(sides: readonly { id: SideId }[], agentSides: ReadonlySet<string>) {
   return sides.map((s) => s.id as string).filter((id) => !agentSides.has(id));
+}
+
+/**
+ * The narrated papers of a game's umpire turns, by side and report id, from its input log (11.9):
+ * what a reopened game, replay and the admin view show in place of the template text. A later
+ * entry for the same report replaces an earlier one.
+ */
+export function turnNarrationsFromLog(
+  log: readonly InputLogEntry[],
+): Map<string, Map<string, string | null>> {
+  const out = new Map<string, Map<string, string | null>>();
+  for (const e of log) {
+    if (e.command.kind !== 'turnReports' || !e.narrated) continue;
+    const side = out.get(e.command.side) ?? new Map<string, string | null>();
+    for (const n of e.narrated) side.set(n.reportId, n.text);
+    out.set(e.command.side, side);
+  }
+  return out;
 }

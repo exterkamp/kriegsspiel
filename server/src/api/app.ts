@@ -17,7 +17,7 @@
  *                                  (no `role`: the side's seat holder; a subordinate is named by one of their `unit`s)
  *   POST /games/:id/ready          signed in, seated or holding a role: body `{ "ready": boolean }`
  *   POST /games/:id/start          the creator: start a lobby game once every side is taken and every player is ready
- *   GET  /games/:id/window         seated, game over: the umpire's window timeline (403 `game_not_over` before the end)
+ *   GET  /games/:id/window         seated, game over: the umpire's window timeline, with a turn game's turns (403 `game_not_over` before the end)
  *   GET  /games/:id/window/dissents seated, game over: dissents on signed orders, for the critique (D6e)
  *   GET  /games/:id/window/at?at=  seated, game over: true positions, beliefs, dice and rulings at a game time
  *   GET  /games/:id/critique       seated, game over: the umpire's critique, each point citing logged events (403 `game_not_over` before the end)
@@ -61,6 +61,7 @@ import {
   loadScenarioById,
   scenarioList,
   startingState,
+  UmpireTurnResolver,
   type GameStore,
   type Timers,
 } from '../game/index.js';
@@ -92,7 +93,7 @@ import {
 } from '../notify/index.js';
 import { Hub, type Socket } from './hub.js';
 import { CritiqueService } from './critiqueService.js';
-import { windowAt, windowTimeline } from './umpireWindow.js';
+import { windowAt, windowTimeline, withTurns } from './umpireWindow.js';
 import { dissentNotes } from '../critique.js';
 import { seatKey } from './sideView.js';
 
@@ -203,6 +204,12 @@ export interface AppOptions {
   narrator?: GameHostOptions['narrator'];
   /** The umpire that writes the post-game critique, per game. Unset: the critique is the log's own wording. */
   critic?: GameHostOptions['narrator'];
+  /**
+   * The umpire that adjudicates a turn-mode game's turns at the `standard` and `free` dials (D39,
+   * 11.6), per game. Unset, or undefined for a game: every turn is the engine's, as at `rigid`.
+   * `main.ts` sets it only when a capable model serves the `adjudicate` stage.
+   */
+  adjudicator?: GameHostOptions['narrator'];
   /** Directory of the built client to serve at `/`. Unset: API only (dev uses the Vite server). */
   staticDir?: string;
   /**
@@ -420,10 +427,11 @@ export async function buildApp(options: AppOptions): Promise<App> {
         ];
   /** A role changed hands in a running game: its voters follow (D6e). */
   const syncVoters = (rec: LobbyGame): void => host.get(rec.id)?.setVoters(votersOf(rec));
+  const registry = createRegistry();
   const host: GameHost = new GameHost({
     store,
     parser: options.parser,
-    registry: createRegistry(),
+    registry,
     wallNow: options.wallNow ?? Date.now,
     timers: options.timers,
     init: startingState,
@@ -437,6 +445,24 @@ export async function buildApp(options: AppOptions): Promise<App> {
       options.scriptedOpponents === true && recordOf(id)?.sessionType === 'co_op_vs_ai',
     aiAgents: options.aiAgents,
     narrator: options.narrator,
+    // The dial picks the adjudicator (D39): `rigid` is the engine alone, `standard` and `free` the umpire.
+    turnResolver: (id, settings) => {
+      if (settings.dial === 'rigid') return undefined;
+      const client = options.adjudicator?.(id);
+      if (!client) return undefined;
+      return new UmpireTurnResolver({
+        registry,
+        client,
+        dial: settings.dial,
+        persona: settings.persona,
+        // Each side's papers of an umpire turn, on the same capped client (11.9).
+        reporter: client,
+        onFallback: (turn, reason) => {
+          server.log.warn({ gameId: id, turn, reason }, 'turn umpire fallback');
+          if (trace?.enabled) trace.record(id, 'error', { source: 'adjudicate', turn, reason });
+        },
+      });
+    },
     deputyAway: (id, side, seat) => hub.isAway(id, side as SideId, seat),
     trace,
     onUpdate: (id) => {
@@ -1113,7 +1139,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
     return tracedHttp(req.params.id, req, reply, async () => {
       const w = await windowFor(req.params.id, user.id, undefined);
       if ('error' in w) return reply.code(w.status).send({ error: w.error });
-      return w.timeline;
+      // A turn-mode game's turns (D39, 11.11), behind the same game-over gate.
+      return withTurns(w.input, w.timeline);
     });
   });
 

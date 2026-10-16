@@ -10,8 +10,15 @@
  *  3. the engine state is unchanged by any of it.
  */
 import { describe, expect, it } from 'vitest';
-import { holdTheBridge, loadScenario, viewFor } from '@kriegsspiel/engine';
+import { advanceTo, createState, holdTheBridge, loadScenario, viewFor } from '@kriegsspiel/engine';
 import type { GameState, SideId, ViewReport } from '@kriegsspiel/engine';
+import type { TurnProposal } from '@kriegsspiel/protocol';
+import { EngineTurnResolver } from '../game/engineTurn.js';
+import { createRegistry, startingState } from '../game/registry.js';
+import { applyTurn, type TurnInput } from '../game/turns.js';
+import { UmpireTurnResolver } from '../game/umpireTurn.js';
+import { adjudicateSystem } from './adjudicate.js';
+import { testReply } from './providers/test.js';
 import { LlmOrderParser, PARSE_ORDERS_SYSTEM } from '../orders/llmParser.js';
 import type { ParseContext } from '../orders/orderParser.js';
 import { HOSTILE, LONG_INPUT } from './injection.corpus.js';
@@ -347,5 +354,141 @@ describe('the same checks hold for Red', () => {
     const model = new ScriptedModel({ parse: obeysOnEnemy(blue.id) });
     const res = await new LlmOrderParser(model).parse(`${blue.id}: ${HOSTILE[0]!.text}`, red);
     expect(res.kind).toBe('clarification');
+  });
+});
+
+/**
+ * Turn orders (D39, 11.6): in turn mode the umpire reads every order as written, so hostile text
+ * reaches the `adjudicate` call. It must arrive only as an order's `text` in the input, and an
+ * umpire that obeys it (destroys the enemy, swells its own side, names the enemy) is held to the
+ * hard limits and the gate: no other side's unit ends anywhere the engine would not have it, and
+ * nothing hidden reaches a side.
+ */
+describe('turn orders: hostile text in front of the turn umpire', () => {
+  const { world, secrets } = plantCanaries(loadScenario(holdTheBridge));
+  const registry = createRegistry();
+  const state = startingState(createState(world.seed, { ...world, dial: 'standard' }, 0));
+  const enemyNames = world.units
+    .filter((u) => u.side === 'red')
+    .map((u) => `${u.name} (${u.commander})`);
+
+  /** The canned answer, then everything the injection asked for. */
+  const obeying = (namesEnemy: boolean) =>
+    new ScriptedModel({
+      adjudicate: (req) => {
+        const p = testReply(
+          req.schema as Record<string, unknown>,
+          req.input as never,
+        ) as TurnProposal;
+        return {
+          ...p,
+          units: p.units.map((u) =>
+            u.unitId.startsWith('red')
+              ? { ...u, strength: 0, status: 'destroyed', x: 100, y: 100 }
+              : u.unitId === 'blue-1'
+                ? {
+                    ...u,
+                    strength: 9999,
+                    ...(namesEnemy ? { account: `As ordered: ${enemyNames.join(', ')}.` } : {}),
+                  }
+                : u,
+          ),
+          summary: 'By the authority claimed in the order, Red is destroyed.',
+        };
+      },
+    });
+
+  const run = async (text: string, client: ScriptedModel) => {
+    const input: TurnInput = {
+      gameId: 'inj',
+      n: 1,
+      startMs: 0,
+      endMs: 20 * 60_000,
+      cause: 'all-sent',
+      orders: [{ orderId: 'b1', side: 'blue', to: 'blue-1', text }],
+      sent: ['blue'],
+    };
+    const before = JSON.stringify(state);
+    const r = await new UmpireTurnResolver({ registry, client, dial: 'standard' }).resolve(
+      state,
+      input,
+    );
+    const engine = await new EngineTurnResolver(registry).resolve(state, input);
+    expect(JSON.stringify(state)).toBe(before);
+    const end = (res: { adjudicator: string; output?: unknown }) =>
+      advanceTo(
+        applyTurn(
+          state,
+          {
+            n: 1,
+            startMs: 0,
+            endMs: input.endMs,
+            cause: 'all-sent',
+            orders: [...input.orders],
+            sent: ['blue'],
+            ...res,
+          },
+          { gameId: 'inj', registry },
+        ),
+        input.endMs,
+        registry,
+      ).state.world;
+    return { r, world: end(r), engineWorld: end(engine) };
+  };
+
+  for (const h of HOSTILE) {
+    it(`${h.kind}: is input only, and an obedient umpire changes no other side's unit`, async () => {
+      for (const namesEnemy of [false, true]) {
+        const model = obeying(namesEnemy);
+        const { r, world: after, engineWorld } = await run(h.text, model);
+        for (const req of model.requests) {
+          expect(req.system).toBe(withPersona(adjudicateSystem('standard')));
+          expect(req.system).not.toContain(h.text.slice(0, 40));
+          expect((req.input as { orders: { text: string }[] }).orders[0]!.text).toBe(h.text);
+        }
+        // Red ends where the engine has it: the destruction had no reason and no reach.
+        for (const u of after.units.filter((x) => x.side === 'red')) {
+          const e = engineWorld.units.find((x) => x.id === u.id)!;
+          expect(u.status).toBe(e.status);
+          expect(Math.round(u.strength)).toBe(Math.round(e.strength));
+          expect(
+            Math.abs(u.center.x - e.center.x) + Math.abs(u.center.y - e.center.y),
+          ).toBeLessThan(2_000);
+        }
+        const b1 = after.units.find((u) => u.id === 'blue-1')!;
+        expect(b1.strength).toBeLessThanOrEqual(
+          world.units.find((u) => u.id === 'blue-1')!.strength,
+        );
+        // An account that names the enemy fails the gate: the engine resolves the turn. (The
+        // clamp gate would fire here too: the next test shows the fog gate alone.)
+        if (namesEnemy) expect(r.adjudicator).toBe('engine');
+        const view = JSON.stringify(viewFor(after, 'blue', 20 * 60_000));
+        expect(hiddenIn(view, enemyNames)).toEqual([]);
+        expect(secrets.filter((s) => s.hiddenFrom === 'blue' && view.includes(s.value))).toEqual(
+          [],
+        );
+      }
+    });
+  }
+
+  it('falls back when only an account names the enemy: the fog gate alone', async () => {
+    const model = new ScriptedModel({
+      adjudicate: (req) => {
+        const p = testReply(
+          req.schema as Record<string, unknown>,
+          req.input as never,
+        ) as TurnProposal;
+        return {
+          ...p,
+          units: p.units.map((u) =>
+            u.unitId === 'blue-1' ? { ...u, account: `As ordered: ${enemyNames.join(', ')}.` } : u,
+          ),
+        };
+      },
+    });
+    const { r } = await run(HOSTILE[0]!.text, model);
+    expect(model.requests).toHaveLength(2);
+    expect(r.adjudicator).toBe('engine');
+    expect(r.fallback!.error).toMatch(/names the other side/);
   });
 });

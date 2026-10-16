@@ -48,7 +48,10 @@ interface NoteParts {
 }
 
 type Line = (p: NoteParts) => string;
-type UnitKind = Exclude<Report['kind'], 'situation' | 'unitLost' | 'courierLost' | 'battle'>;
+type UnitKind = Exclude<
+  Report['kind'],
+  'situation' | 'unitLost' | 'courierLost' | 'battle' | 'turn' | 'notice'
+>;
 type StaffKind = 'situation' | 'unitLost' | 'courierLost';
 
 /**
@@ -194,6 +197,82 @@ const ROUTED_CLOSINGS: Record<Temper, string[]> = {
   plain: ['We must be relieved.', 'Orders, sir?'],
 };
 
+/**
+ * A unit's note on an umpire turn (D39, 11.9): where it stands, what became of its orders, what it
+ * lost. Built from `Report.turn` alone; the commander's own words are the narrated version's.
+ */
+const TURN_STAYED: Line[] = [
+  (p) => `we stand where we were, ${p.where}.`,
+  (p) => `we have kept our ground ${p.where}.`,
+  (p) => `we are still in position ${p.where}.`,
+  (p) => `we remain in position ${p.where}.`,
+  (p) => `we have not moved; we stand ${p.where}.`,
+];
+const TURN_MOVED: Line[] = [
+  (p) => `we have marched and now stand ${p.where}.`,
+  (p) => `we have moved and are now ${p.where}.`,
+  (p) => `we are now in position ${p.where}.`,
+  (p) => `we have come up and stand ${p.where}.`,
+  (p) => `after our march we stand ${p.where}.`,
+];
+const TURN_BROKE: Line[] = [
+  (p) => `we have broken and are falling back ${p.where}.`,
+  (p) => `the men have given way; we are falling back ${p.where}.`,
+  (p) => `we could not stand and are going back ${p.where}.`,
+  (p) => `we are driven back ${p.where} and the men will not stand.`,
+  (p) => `my line has broken; we fall back ${p.where}.`,
+];
+type TurnResult = 'carried-out' | 'partly' | 'misread' | 'refused';
+/** The most telling result speaks for the turn: a refusal before a misreading, a part, obedience. */
+const TELLING: readonly TurnResult[] = ['refused', 'misread', 'partly', 'carried-out'];
+const TURN_ORDER_LINES: Record<TurnResult, string[]> = {
+  'carried-out': ['My orders are carried out.', 'We have done as ordered.'],
+  partly: ['I could carry out my orders only in part.', 'We have done part of what was ordered.'],
+  misread: [
+    'I acted on my orders as I understood them.',
+    'I have done what I took my orders to mean.',
+  ],
+  refused: [
+    'I did not carry out my orders as written; I judged it better otherwise.',
+    'I have not done as ordered, for good reason as I saw it.',
+  ],
+};
+const TURN_CLOSINGS: Record<Temper, string[]> = {
+  bold: ['We are ready to go on.', 'Give us the word and we go forward.'],
+  cautious: ['I await further orders before I do more.', 'I will not go further without word.'],
+  steady: ['We keep to our task.', 'We are in good order here.'],
+  plain: ['I await orders.', 'Orders, sir?'],
+};
+
+const cap = (s: string) => `${s[0]!.toUpperCase()}${s.slice(1)}`;
+
+/** "about 120 men" for a loss the side knows exactly; a small one is "a few men". */
+function menLost(lost: number): string {
+  return lost < 10 ? 'a few men' : `about ${Math.round(lost / 10) * 10} men`;
+}
+
+/** The engine's note on an umpire turn: see `TURN_STAYED`. */
+function turnNote(
+  r: Report,
+  parts: NoteParts,
+  temper: Temper,
+  pick: <T>(list: readonly T[]) => T,
+): string {
+  const t = r.turn;
+  const moved = (t?.movedM ?? 0) >= TURN_MOVED_M;
+  const body = t?.broke ? pick(TURN_BROKE)(parts) : pick(moved ? TURN_MOVED : TURN_STAYED)(parts);
+  const lines = [t?.rallied && !t.broke ? `we have rallied. ${cap(body)}` : body];
+  const results = (t?.orders ?? []).map((o) => o.result);
+  const telling = TELLING.find((k) => results.includes(k));
+  if (telling) lines.push(pick(TURN_ORDER_LINES[telling]));
+  if (t && t.lost > 0) lines.push(`We lost ${menLost(t.lost)}.`);
+  if (!t?.broke) lines.push(pick(TURN_CLOSINGS[temper]));
+  return `Sir, ${lines.join(' ')} — ${r.from}, ${parts.when}.`;
+}
+
+/** A unit that ends an umpire turn closer than this to where it began says it stayed. */
+export const TURN_MOVED_M = 50;
+
 /** Headquarters' wording of the kinds no unit wrote: the opening situation, a lost unit or courier. */
 const STAFF_NOTES: Record<StaffKind, Line[]> = {
   situation: [
@@ -305,12 +384,14 @@ export function fieldNote(
   const rng = seed === undefined ? undefined : wordingRng(seed, r.id);
   const pick = <T>(list: readonly T[]): T => list[rng ? rng.int(0, list.length - 1) : 0]!;
   if (r.kind === 'battle') return r.text ?? `The umpire has decided the battle ${r.place}.`;
+  if (r.kind === 'notice') return r.text ?? `Sir, the umpire's staff have resolved the turn.`;
   if (r.kind === 'situation' || r.kind === 'unitLost' || r.kind === 'courierLost') {
     const lines = r.kind === 'courierLost' && heardSince ? HEARD_SINCE : STAFF_NOTES[r.kind];
     return `Sir, ${pick(lines)(parts)}`;
   }
   // A contact note is read by the intelligence officer too, who is not told the officers' manners.
   const temper = r.kind === 'contact' ? 'plain' : temperOf(sender.trait);
+  if (r.kind === 'turn') return turnNote(r, parts, temper, pick);
   if (r.routed) {
     const body = pick(ROUTED_BODIES)(parts);
     return `Sir, ${body} ${pick(ROUTED_CLOSINGS[temper])} — ${r.from}, ${parts.when}.`;

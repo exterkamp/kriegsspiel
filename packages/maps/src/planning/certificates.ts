@@ -1,11 +1,12 @@
 import type { GenerationResult, Point, Polygon } from '../contract.js';
 import { fail } from '../errors.js';
 import {
+  TOPOLOGY_EPSILON,
   distance,
   interpolate,
+  pointSegmentDistance,
   polygonEdges,
   polygonLocation,
-  segmentDistance,
   validatePolygon,
 } from '../geometry.js';
 import { bounded } from './budget.js';
@@ -34,6 +35,58 @@ function clippedRing(ring: Point[], x0: number, y0: number, x1: number, y1: numb
     result = next;
   }
   return result;
+}
+/**
+ * Whether a closed segment comes within `r` (plus the 1e-9 contact slack) of a
+ * closed axis-aligned cell. Equivalent to the generic polygon location and
+ * segment-distance predicates for a rectangle, without allocating polygons:
+ * an endpoint in the cell, a crossing (Liang-Barsky), or a disjoint distance
+ * attained at an endpoint or a cell corner.
+ */
+export function segmentNearCell(
+  a: Point,
+  b: Point,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  r: number,
+): boolean {
+  const e = TOPOLOGY_EPSILON,
+    inside = (p: Point) => p[0] >= x0 - e && p[0] <= x1 + e && p[1] >= y0 - e && p[1] <= y1 + e;
+  if (inside(a) || inside(b)) return true;
+  const dx = b[0] - a[0],
+    dy = b[1] - a[1];
+  let t0 = 0,
+    t1 = 1;
+  for (const [p, q] of [
+    [-dx, a[0] - x0],
+    [dx, x1 - a[0]],
+    [-dy, a[1] - y0],
+    [dy, y1 - a[1]],
+  ] as const) {
+    if (p === 0) {
+      if (q < 0) {
+        t0 = 1;
+        t1 = 0;
+        break;
+      }
+    } else if (p < 0) t0 = Math.max(t0, q / p);
+    else t1 = Math.min(t1, q / p);
+  }
+  if (t0 <= t1) return true;
+  const limit = r + 1e-9,
+    toCell = (p: Point) =>
+      Math.hypot(Math.max(x0 - p[0], 0, p[0] - x1), Math.max(y0 - p[1], 0, p[1] - y1));
+  if (toCell(a) <= limit || toCell(b) <= limit) return true;
+  for (const corner of [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ] as Point[])
+    if (pointSegmentDistance(corner, a, b) <= limit) return true;
+  return false;
 }
 /** Affine gradient of one bilinear cell, evaluated using the authoritative query. */
 export function cellGradient(
@@ -213,28 +266,16 @@ export function corridor(
       col++
     ) {
       c.validation.take();
-      const cell: Polygon = {
-        outer: [
-          [col * h, row * h],
-          [(col + 1) * h, row * h],
-          [(col + 1) * h, (row + 1) * h],
-          [col * h, (row + 1) * h],
-          [col * h, row * h],
-        ],
-        holes: [],
-      };
-      const es = polygonEdges(cell);
       // Bbox cells off the capsule are harmlessly conservative but avoid distant diagonals.
-      if (
-        polygonLocation(a, cell) === 'outside' &&
-        polygonLocation(b, cell) === 'outside' &&
-        !es.some(([u, v]) => {
-          c.validation.take();
-          return segmentDistance(a, b, u, v) <= r + 1e-9;
-        })
-      )
-        continue;
-      for (const v of cell.outer.slice(0, 4)) {
+      c.validation.take(4);
+      if (!segmentNearCell(a, b, col * h, row * h, (col + 1) * h, (row + 1) * h, r)) continue;
+      const corners: Point[] = [
+        [col * h, row * h],
+        [(col + 1) * h, row * h],
+        [(col + 1) * h, (row + 1) * h],
+        [col * h, (row + 1) * h],
+      ];
+      for (const v of corners) {
         const g = cellGradient(c, col, row, v);
         max = Math.max(max, Math.abs(g.dx * ux + g.dy * uy));
       }

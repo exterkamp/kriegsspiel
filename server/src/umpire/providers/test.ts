@@ -27,8 +27,10 @@ function stageOf(
   | 'judge'
   | 'command'
   | 'critique'
+  | 'adjudicate'
   | undefined {
   const keys = Object.keys((schema.properties as Json | undefined) ?? {});
+  if (keys.includes('observations')) return 'adjudicate';
   if (keys.includes('result')) return 'parse';
   if (keys.includes('action')) return 'interpret';
   if (keys.includes('dispatches')) return 'narrate';
@@ -41,6 +43,31 @@ function stageOf(
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** What became of a unit's orders, in its own words, for a turn report (11.9). */
+const ORDER_RESULT: Record<string, string> = {
+  'carried-out': 'my orders are carried out',
+  partly: 'I could carry out my orders only in part',
+  misread: 'I acted on my orders as I understood them',
+  refused: 'I did not carry out my orders as written',
+};
+
+/**
+ * A unit's note on an umpire turn (11.9): where it stands, its orders' fate, its losses, and the
+ * umpire's account of what its commander did, as given.
+ */
+function turnBody(r: Json, from: string, where: string, when: string): string {
+  const results = arr(r.orders).map((o) => str(o.result));
+  const telling = ['refused', 'misread', 'partly', 'carried-out'].find((k) => results.includes(k));
+  const lost = num(r.menLost);
+  const account = str(r.account).trim();
+  return [
+    `${from} here: ${r.status === 'broke' ? 'we have broken and are falling back' : r.moved === true ? 'we have marched and now stand' : 'we stand'}${where}, ${when}`,
+    ...(telling ? [`; ${ORDER_RESULT[telling]}`] : []),
+    ...(lost > 0 ? [`; we lost ${lost} men`] : []),
+    ...(account ? [`. ${account.replace(/[.!?]+$/, '')}`] : []),
+  ].join('');
+}
 
 /**
  * One dispatch per report, built only from the report's own fields, so it passes `checkNarration`:
@@ -76,9 +103,11 @@ function narrate(input: Json) {
                         ? `${from} here: we are taking heavy losses${where}, ${when}`
                         : r.kind === 'broke'
                           ? `${from} here: we have broken and are falling back${where}, ${when}`
-                          : r.kind === 'destroyed'
-                            ? `${from} here: we have destroyed ${size || 'enemy troops'}${where}, ${when}`
-                            : `${from} here: we are in position${where}, ${when}`;
+                          : r.kind === 'turn'
+                            ? turnBody(r, from, where, when)
+                            : r.kind === 'destroyed'
+                              ? `${from} here: we have destroyed ${size || 'enemy troops'}${where}, ${when}`
+                              : `${from} here: we are in position${where}, ${when}`;
       // Only what the staff saw for themselves is hedged or vouched for.
       const sure =
         r.kind !== 'contact' && r.kind !== 'situation'
@@ -263,6 +292,45 @@ function critique(input: Json) {
   };
 }
 
+/**
+ * The canned adjudicator (D39, "Keyless demo"): the engine's projection as the proposal, with no
+ * departures. Each order that arrived is carried out, each still on the road has not arrived, and
+ * the sightings are the engine's own.
+ */
+function adjudicate(input: Json) {
+  const projection = (input.projection ?? {}) as Json;
+  const orders = arr(input.orders);
+  const names = new Map(arr(input.units).map((u) => [str(u.id), str(u.name)]));
+  return {
+    turn: num(input.turn),
+    units: arr(projection.units).map((p) => {
+      const id = str(p.unitId);
+      return {
+        unitId: id,
+        x: num(p.x),
+        y: num(p.y),
+        facingDeg: num(p.facingDeg),
+        formation: str(p.formation),
+        strength: num(p.strength),
+        morale: num(p.morale),
+        fatigue: num(p.fatigue),
+        ammo: num(p.ammo),
+        status: str(p.status),
+        continuing: p.continuing,
+        orders: orders
+          .filter((o) => str(o.to) === id)
+          .map((o) => ({
+            orderId: str(o.orderId),
+            result: o.status === 'arrived' ? 'carried-out' : 'not-arrived',
+          })),
+        account: `The ${names.get(id) || id} acted as the staff tables direct.`,
+      };
+    }),
+    observations: arr(projection.observations),
+    summary: 'The turn was resolved by the tables.',
+  };
+}
+
 export function testReply(schema: Json, input: Json): unknown {
   switch (stageOf(schema)) {
     case 'parse':
@@ -279,6 +347,8 @@ export function testReply(schema: Json, input: Json): unknown {
       return command(input);
     case 'critique':
       return critique(input);
+    case 'adjudicate':
+      return adjudicate(input);
     case 'judge':
       return 'modifier' in (schema.properties as Json) ? judgeSituation() : { placements: [] };
     default:
