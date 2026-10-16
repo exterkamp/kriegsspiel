@@ -45,6 +45,13 @@ export interface RealismReport {
     marginShare: number;
     junctions: number;
     bridges: number;
+    /**
+     * Share of regional ground road length running within 2.5° of 0°, 45°,
+     * 90° or 135° (#541). A lattice zigzag is 100%; uniformly random bearings 11%.
+     */
+    gridAlignedShare: number;
+    /** The same share for settlement streets (laid out in each site's frame). */
+    streetGridAlignedShare: number;
   };
   settlements: {
     sites: number;
@@ -300,6 +307,23 @@ const RING: Point[] = [
 ];
 
 /** Exact maximum directional grade of a straight segment on the bilinear surface. */
+/** sin 2.5°: the tolerance of `gridAligned`. */
+const GRID_ANGLE_SIN = Math.sin((2.5 * Math.PI) / 180);
+/** Whether a segment runs within 2.5° of 0°, 45°, 90° or 135° (either way along it). */
+export function gridAligned(a: Point, b: Point): boolean {
+  const dx = b[0] - a[0],
+    dy = b[1] - a[1],
+    length = Math.hypot(dx, dy);
+  if (!length) return false;
+  // |sin| of the angle to each grid axis: the cross product with its unit vector.
+  return [
+    Math.abs(dy),
+    Math.abs(dx),
+    Math.abs(dx - dy) / Math.SQRT2,
+    Math.abs(dx + dy) / Math.SQRT2,
+  ].some((cross) => cross / length <= GRID_ANGLE_SIN);
+}
+
 export function segmentGradeOnSurface(
   heightAt: (x: number, y: number) => number,
   a: Point,
@@ -431,8 +455,15 @@ export function realismReport(asset: MapAsset): RealismReport {
     gradeSum = 0,
     maxGrade = 0,
     margin = 0;
-  const degree = new Map<string, number>();
+  const degree = new Map<string, number>(),
+    aligned = { regional: 0, street: 0, streetLength: 0 };
   for (const road of asset.layers.roads) {
+    if (road.kind === 'street')
+      for (let i = 1; i < road.path.length; i++) {
+        const len = distance(road.path[i - 1]!, road.path[i]!);
+        aligned.streetLength += len;
+        if (gridAligned(road.path[i - 1]!, road.path[i]!)) aligned.street += len;
+      }
     if (road.kind !== 'regional') continue;
     for (const id of [road.fromNodeId, road.toNodeId]) degree.set(id, (degree.get(id) ?? 0) + 1);
     if (road.crossingIds.length) continue;
@@ -443,6 +474,7 @@ export function realismReport(asset: MapAsset): RealismReport {
         g = segmentGradeOnSurface((x, y) => q.heightAt(x, y), a, c, asset.elevation.spacingM),
         mid: Point = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2];
       length += len;
+      if (gridAligned(a, c)) aligned.regional += len;
       gradeSum += g.mean * len;
       maxGrade = Math.max(maxGrade, g.max);
       if (Math.min(mid[0], mid[1], b.maxX - mid[0], b.maxY - mid[1]) < 100) margin += len;
@@ -503,6 +535,8 @@ export function realismReport(asset: MapAsset): RealismReport {
       marginShare: length ? margin / length : 0,
       junctions: [...degree.values()].filter((n) => n >= 3).length,
       bridges: asset.layers.crossings.filter((c) => c.kind === 'bridge').length,
+      gridAlignedShare: length ? aligned.regional / length : 0,
+      streetGridAlignedShare: aligned.streetLength ? aligned.street / aligned.streetLength : 0,
     },
     settlements: {
       sites: asset.layers.sites.length,

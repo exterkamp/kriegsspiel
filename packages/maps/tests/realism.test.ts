@@ -107,6 +107,9 @@ describe('realistic generated battlefields', () => {
       expect(report.roads.meanGrade).toBeLessThan(0.05);
       expect(report.roads.marginShare).toBeLessThan(0.2);
       expect(report.roads.junctions).toBeGreaterThan(0);
+      // Any bearing, not lattice zigzags (#541): a lattice network is ~97% on
+      // the grid angles; the 20-seed total is held to 20% in realism-roads.
+      expect(report.roads.gridAlignedShare).toBeLessThan(0.35);
       if (preset === 'river-valley') expect(report.roads.bridges).toBeGreaterThan(0);
       // Settlements: gentle ground, never a summit, never a river flat.
       expect(report.settlements.sites).toBe(

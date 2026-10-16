@@ -37,7 +37,7 @@ type QueueItem = {
 };
 /**
  * Frozen route costs (`sited-graded-network-v2`, kept by `-fording-network-v3`;
- * fords cost `SHALLOW_WATER.routeSpanFactor` per metre plus `routeFixedM`). Eight-neighbour lattice moves
+ * fords cost `SHALLOW_WATER.routeSpanFactor` per metre plus `routeFixedM`; D47 adds knight moves). Lattice moves
  * avoid staircase roads; the grade penalty grows quadratically so roads wind
  * along contours, valleys and spurs instead of climbing straight; bridges carry
  * a fixed cost so routes share crossings; existing road edges are discounted so
@@ -55,6 +55,17 @@ export const ROUTE_COSTS = Object.freeze({
   marginM: 150,
   margin: 0.6,
 });
+/** Knight moves (column, row) added to the lattice by `sited-graded-any-angle-network-v4`. */
+const KNIGHT_MOVES: readonly (readonly [number, number])[] = Object.freeze([
+  [-2, -1],
+  [-1, -2],
+  [1, -2],
+  [2, -1],
+  [2, 1],
+  [1, 2],
+  [-1, 2],
+  [-2, 1],
+]);
 class Heap {
   data: QueueItem[] = [];
   constructor(readonly c: Context) {}
@@ -161,8 +172,8 @@ export class Router {
     if (this.wet[id] === -1) this.wet[id] = this.c.wet(this.points[id]!) ? 1 : 0;
     return !this.wet[id];
   }
-  clearSites(a: Point, b: Point, ignore?: string): boolean {
-    const r = this.c.settings.roads.maxReservedWidthM / 2,
+  clearSites(a: Point, b: Point, ignore?: string, margin = 0): boolean {
+    const r = this.c.settings.roads.maxReservedWidthM / 2 + margin,
       rect: [number, number, number, number] = [
         Math.min(a[0], b[0]),
         Math.min(a[1], b[1]),
@@ -439,7 +450,7 @@ export class Router {
       );
     return result;
   }
-  /** Lattice neighbours in fixed order: four axes, then four diagonals. */
+  /** Lattice neighbours in fixed order: four axes, four diagonals, then eight knight moves. */
   latticeNeighbours(id: number): number[] {
     if (id >= this.c.cells) return [];
     const cols = this.c.columns,
@@ -458,6 +469,13 @@ export class Router {
       north && east ? id - cols + 1 : -1,
       south && west ? id + cols - 1 : -1,
       south && east ? id + cols + 1 : -1,
+      // Knight moves (D47): sixteen directions weaken the lattice's pull toward
+      // axis and diagonal runs (and anchors placed on them) before the any-angle pass.
+      ...KNIGHT_MOVES.map(([dx, dy]) =>
+        x + dx >= 0 && x + dx < cols && y + dy >= 0 && y + dy < this.c.rows
+          ? id + dy * cols + dx
+          : -1,
+      ),
     ].filter((n) => n >= 0);
   }
   /**

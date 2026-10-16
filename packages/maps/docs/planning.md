@@ -4,8 +4,10 @@
 planner. It consumes **accepted decimal6 authoritative ground**, bounds, water,
 optional independent cover, D crossing proposals, recorded settings and a seed.
 It changes none of those inputs. It does not import or execute SettleMaker.
-`PLANNING_VERSION = sited-graded-fording-network-v3` (D46; `sited-graded-network-v2`, bridges
-only, remains `LEGACY_PLANNING_VERSION` for saved maps); `DECK_POLICY =
+`PLANNING_VERSION = sited-graded-any-angle-network-v4` (D47). For saved maps,
+`sited-graded-fording-network-v3` (D46, lattice roads with fords) remains
+`FORDING_PLANNING_VERSION`, and `sited-graded-network-v2` (bridges only)
+remains `LEGACY_PLANNING_VERSION`. `DECK_POLICY =
 linear-ground-endpoints-v1`. Changing geometry, sizing, tie breaks or cost policies
 requires a planning version change. Local sizing/deck certificates retain full precision analytic metadata; frozen
 asset geometry remains decimal6. When assembling a canonical asset, retain or
@@ -106,8 +108,8 @@ and node/path endpoint/route provenance is explicit.
 
 ## Terrain-cost routing, crossings and normalization
 
-The bounded internal lattice uses eight neighbours (axes and diagonals), so roads
-run at 45° as well as along the grid instead of in staircases. v2 traversal
+The bounded internal lattice uses sixteen neighbours (axes, diagonals and,
+since D47, knight moves). v2 traversal
 cost (`ROUTE_COSTS`, #490) is length × `(1 + 6g + 120g² + margin)`, where `g`
 is the certified maximum directional grade and `margin` rises to 0.6 within
 150 m of the map edge: roads wind along contours, valleys and spurs and keep
@@ -124,6 +126,35 @@ index, then predecessor. A deterministic nearest connection process grows the
 required spanning network; failed pairs are excluded with a bounded retry
 count. Configured extra site links add bounded redundancy. Requests that cannot
 be satisfied return infeasibility.
+
+### Any-angle geometry (D47)
+
+Routes are found and shared on the lattice. `anyAngle` (`src/planning/smooth.ts`)
+then rewrites the selected network. It splits the network into chains of
+replaceable edges between anchors. Replaceable edges are lattice edges and the
+connector from a bridge's outward point to the lattice. Anchors are junctions,
+nodes where the route set changes, and the ends of fixed edges: decks, outward
+bridge approaches, ford connectors, site connectors and boundary exits. In
+`ANY_ANGLE` order, each chain is:
+
+1. string-pulled to the farthest vertex (at most 48 steps on) whose straight
+   line costs no more than the steps it replaces, using the route cost in 25 m
+   pieces;
+2. relaxed by dropping vertices whose neighbours can be joined for no more
+   cost;
+3. re-anchored where a junction of chains only can slide onto its straightest
+   through pair or move toward its branches' Weiszfeld point, for no more cost;
+4. rounded: each corner becomes a quadratic curve inside its triangle, cut
+   back by `150 m × tan(θ/2)` and at most 45% of either side, halving up to
+   three times before the corner stays sharp.
+
+Every new line must certify as a reserved corridor with 1 mm extra half-width
+and 1e-6 grade headroom, so its micrometre-rounded sub-segments certify exactly.
+It must also clear sites by the same 1 mm, cross no road except at a shared
+end, and stay one road width from roads that do not end at its chain's ends.
+Where no line qualifies, the lattice edges stay. Chains are processed in a fixed
+order, against the current geometry of all the others, so the result is
+deterministic and planar before normalization.
 
 Ground segments use existing `createElevationQueries`, not a competing height
 implementation. Centreline segments split at every elevation cell seam. Three

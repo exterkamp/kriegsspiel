@@ -970,3 +970,31 @@ Wooded hills must ford somewhere. A falsified map with every bridge turned into 
 **Not done.** Depth is a single ordinary-water value per reach: there are no seasons or floods, and no per-ford bed survey. The gameplay engine's ford `risk` is not derived from depth. Bridge connectors keep the single straight outward approach of D44.
 
 **See.** [Geography](../packages/maps/docs/geography.md), [planning](../packages/maps/docs/planning.md), [composition](../packages/maps/docs/composition.md).
+
+## D47: Regional roads run at any bearing and bend in curves (#541)
+
+**Decision.** Planning stage `sited-graded-any-angle-network-v4` replaces `sited-graded-fording-network-v3`. Measured over 20 seeds each of `river-valley` and `wooded-hills`, 97% of D46 regional road length ran within 2.5° of 0°, 45°, 90° or 135°: every road was an octilinear lattice zigzag. Routes are still searched by lazy weighted A* with the D44 costs, on the same 25 m lattice, which gains the eight knight moves (sixteen directions). Then a post-pass (`packages/maps/src/planning/smooth.ts`, `ANY_ANGLE`) replaces each chain of selected lattice edges between junctions and fixed connectors:
+
+1. **String-pull.** From each kept vertex, take the farthest later vertex, up to 48 steps on, whose straight line costs no more than the lattice steps it replaces. The cost uses the same grade and margin terms in 25 m pieces.
+2. **Relax.** Drop a kept vertex when the line joining its neighbours costs no more, so long runs straighten past the 48-step reach.
+3. **Junctions.** A junction joining only replaceable chains slides onto the straightest pair of its branches at the nearest point, or moves toward the point that minimises its branches' total length (Weiszfeld). This happens only when its branches cost no more.
+4. **Curves.** Each remaining corner becomes a quadratic curve cut back by `150 m × tan(θ/2)`, at most 45% of either side, in pieces of about 15°. The cut is halved up to three times before the corner stays sharp.
+
+Every new line must certify as a complete reserved corridor, checked for grade, water, bounds and sites. The check uses 1 mm extra half-width and 1e-6 grade headroom, so the micrometre-rounded parts of a line still certify exactly. A new line must not cross any other road except at a shared end, and must stay a road width clear of roads that do not share its chain's ends. Where no such line exists, the lattice edges stay.
+
+The following stay exactly as before: bridge decks, the straight outward bridge approaches (D44), ford ends and their straight connectors (D46), site connectors and boundary exits. The short connector from a bridge's outward point to the lattice may be replaced. Junction reuse is unchanged, because routes are found and shared on the lattice first; a chain shared by several routes is smoothed once. All arithmetic is IEEE (square roots only); there is no runtime trigonometry, randomness or clock.
+
+**Contract.** The `kriegsspiel/local-map` v1 schema is unchanged. Regional roads are still two-point edges between explicit nodes, now at any bearing; curves are runs of short edges. `segmentGrade` skips a zero-length piece between seams a rounding error apart, which arises when a line passes exactly through a lattice corner. Before, such a line gave a NaN grade and failed. `LEGACY_GENERATORS` gains the D46 identity (roads `sited-graded-fording-network-v3`). A saved D46 map (`packages/maps/tests/fixtures/d46-saved-map.json`) is tested to certify but not replay, and the D44 and D45 fixtures still certify. `data/maps` is not regenerated.
+
+**Measured.** `realismReport` gains `roads.gridAlignedShare`, the share of regional ground road length within 2.5° of the four grid angles, and `roads.streetGridAlignedShare` for settlement streets. `tests/realism-roads.test.ts` plans 20 seeds of each preset. It requires the total share to be at most 20%, and every map to pass the road grade, margin and crossing checks with every site joined. The four-map realism corpus holds each map under 35%. Over the 40 maps:
+
+| | D46 (main) | D47 |
+|---|---|---|
+| river-valley regional roads on grid angles | 96.7% | 12.1% |
+| wooded-hills regional roads on grid angles | 98.1% | 15.0% |
+
+Uniformly random bearings would give 11%. The knight moves matter. Without them the share is 19.0% and 18.1%, because junctions and connectors sit on lattice runs. Seeds that fail on main fail the same way here (#542), and wooded-hills 8 now generates. Renders, metrics and interleaved benchmarks are in `docs/map-realism/roads/`.
+
+**Not done.** Settlement streets are 99% on the grid angles, because every site is an axis-aligned square laid out with rotation 0. Rotating sites is a settlement-stage change. Site connectors and ford connectors still end on lattice nodes, and junctions are not rounded. Long straight lines remain where the ground allows them.
+
+**See.** [Planning](../packages/maps/docs/planning.md), [map architecture](map-architecture.md).

@@ -10,6 +10,7 @@ docs/map-verification/*.json
 docs/map-realism/*.json
 docs/map-realism/land-cover/*.json
 docs/map-realism/fords/*.json
+docs/map-realism/roads/*.json
 server/baselines/*.recording.json
 .angular
 

@@ -150,15 +150,29 @@ it('still certifies maps saved by the D45 stages, before fords (D46)', () => {
   expect(supportsReplay(saved)).toBe(false);
   expect(supportsValidation(saved)).toBe(true);
   expect(validateBattlefield(saved).ok).toBe(true);
-  // The current generator records the fording planning stage and replays exactly.
-  expect(asset.provenance.generator.stages.roads).toBe('sited-graded-fording-network-v3');
-  expect(supportsReplay(asset)).toBe(true);
   // D44 rectangle cover with the D45 roads is still a recorded identity; with
-  // the new roads stage it is not.
+  // the fording roads stage it is not.
   const mixed = structuredClone(saved);
   mixed.provenance.generator.stages.cover = 'coherent-dry-runs-v1';
   expect(supportsValidation(mixed)).toBe(true);
   mixed.provenance.generator.stages.roads = 'sited-graded-fording-network-v3';
+  expect(supportsValidation(mixed)).toBe(false);
+}, 60_000);
+it('still certifies maps saved by the D46 stages, with lattice roads (D47)', () => {
+  // A small map saved by the D46 generator (roads 'sited-graded-fording-network-v3').
+  const saved = importAsset(
+    readFileSync(new URL('./fixtures/d46-saved-map.json', import.meta.url), 'utf8'),
+  );
+  expect(saved.provenance.generator.stages.roads).toBe('sited-graded-fording-network-v3');
+  expect(supportsReplay(saved)).toBe(false);
+  expect(supportsValidation(saved)).toBe(true);
+  expect(validateBattlefield(saved).ok).toBe(true);
+  // The current generator records the any-angle planning stage and replays exactly.
+  expect(asset.provenance.generator.stages.roads).toBe('sited-graded-any-angle-network-v4');
+  expect(supportsReplay(asset)).toBe(true);
+  // D44 rectangle cover with the D46 roads was never generated, so it is not certified.
+  const mixed = structuredClone(saved);
+  mixed.provenance.generator.stages.cover = 'coherent-dry-runs-v1';
   expect(supportsValidation(mixed)).toBe(false);
 }, 60_000);
 it('rejects one-sided local entrance provenance while the regional graph survives', () => {
