@@ -12,6 +12,7 @@ import { RULES_VERSION, type GameState } from '@kriegsspiel/engine';
 import { describe, expect, it } from 'vitest';
 import { createRegistry, loadScenarioById, replayLog, startingState } from './index.js';
 import type { InputLogEntry, InputLogHeader } from './store.js';
+import { asPlayed } from './playtest408/asPlayed.js';
 
 interface Final {
   time: number;
@@ -38,7 +39,10 @@ const summary = (state: { time: number; rng: number; world: GameState }): Final 
     strength: u.strength,
     status: u.status,
   })),
-  worldSha256: createHash('sha256').update(JSON.stringify(state.world)).digest('hex'),
+  // The logged hashes are of the world as played, with #538's old comma (asPlayed).
+  worldSha256: createHash('sha256')
+    .update(JSON.stringify(asPlayed(state.world)))
+    .digest('hex'),
 });
 
 const replay = (game: Logged, header: InputLogHeader = game.header) =>

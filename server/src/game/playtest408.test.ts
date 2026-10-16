@@ -21,6 +21,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { TurnProposal } from '@kriegsspiel/protocol';
 import { replayTurns } from '../admin/turnView.js';
+import { asPlayed } from './playtest408/asPlayed.js';
 import { windowAt } from '../api/umpireWindow.js';
 import { accountSightProblem, ownTermsOf, sideSight } from '../umpire/accountSight.js';
 import { sightProblems } from '../umpire/adjudicate.js';
@@ -55,29 +56,6 @@ const GAMES = {
   rigid: { adjudicators: ['engine', 'engine', 'engine'], reason: 'objective-held' },
   free: { adjudicators: ['umpire', 'umpire', 'umpire'], reason: 'attack-broken' },
 } as const;
-
-/**
- * The world as it was played: the closing time-limit paper then read "on the High road,." (#538), a
- * stray comma the engine no longer writes. The hash is of that text, so a replay that differs from
- * the logged game anywhere else still fails.
- */
-const PLAYED_COMMA = /(has not taken the objective [^.]*, on [^.,]*)(\. The game is over)/;
-const asPlayed = (world: GameState): GameState => ({
-  ...world,
-  intel: Object.fromEntries(
-    Object.entries(world.intel).map(([side, intel]) => [
-      side,
-      {
-        ...intel,
-        reports: intel.reports.map((r) =>
-          r.from === "The umpire's ruling" && r.text && PLAYED_COMMA.test(r.text)
-            ? { ...r, text: r.text.replace(PLAYED_COMMA, '$1,$2') }
-            : r,
-        ),
-      },
-    ]),
-  ) as GameState['intel'],
-});
 
 const summary = (state: { time: number; rng: number; world: GameState }): Final => ({
   time: state.time,
