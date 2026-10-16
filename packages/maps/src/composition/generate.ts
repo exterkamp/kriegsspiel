@@ -114,15 +114,36 @@ export function generateBattlefield(raw: BattlefieldInput): BattlefieldResult {
           meter,
           state,
         );
-        const joins = layouts.flatMap((l) =>
-          l.model.constraints!.entrances.map((e) => ({
-            siteId: l.site.id,
-            entranceId: e.id,
-            endpoint: settlementFrame(l.site).world(e.endpoint),
-            bearingDeg: (e.bearingDeg + l.site.rotationDeg) % 360,
-            widthM: e.widthM,
-          })),
-        );
+        const joins = layouts.flatMap((l) => {
+          const f = settlementFrame(l.site);
+          return l.model.constraints!.entrances.map((e) => {
+            // An entrance the fork kept exactly as supplied is the planned one: a
+            // turned frame's round trip through local coordinates is not exact (#545).
+            const planned = l.site.entrances.find((p) => p.id === e.id),
+              local = planned && f.local(planned.endpoint);
+            if (
+              planned &&
+              local!.x === e.endpoint.x &&
+              local!.y === e.endpoint.y &&
+              f.localBearing(planned.bearingDeg) === e.bearingDeg &&
+              planned.widthM === e.widthM
+            )
+              return {
+                siteId: l.site.id,
+                entranceId: e.id,
+                endpoint: planned.endpoint,
+                bearingDeg: planned.bearingDeg,
+                widthM: e.widthM,
+              };
+            return {
+              siteId: l.site.id,
+              entranceId: e.id,
+              endpoint: f.world(e.endpoint),
+              bearingDeg: (e.bearingDeg + l.site.rotationDeg) % 360,
+              widthM: e.widthM,
+            };
+          });
+        });
         const changed = joins.some((j) => {
           const e = plan.sites
             .find((s) => s.id === j.siteId)!

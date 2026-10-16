@@ -284,13 +284,20 @@ function localCorridor(
     });
     if (e) {
       // Only finite outer-boundary overflow at an authoritative inward approach.
-      const angle = (e.bearingDeg * Math.PI) / 180,
-        ux = Math.sin(angle),
-        uy = -Math.cos(angle),
+      // The mouth runs along the street itself, which lies on the entrance
+      // bearing within a micrometre (checked above): a polygonal capsule turned
+      // by that micrometre's angle would leave slivers at any bearing that is
+      // not a quarter turn (#545).
+      const c = e.endpoint,
+        [near, far] = distance(a, c) <= distance(b, c) ? [a, b] : [b, a],
+        length = distance(near, far),
+        ux = (far[0] - near[0]) / length,
+        uy = (far[1] - near[1]) / length,
         r = road.widthM / 2,
         L = r + asset.settings.geometry.joinToleranceM;
-      const c = e.endpoint,
-        mouth = capsule(c, [c[0] - ux * L, c[1] - uy * L], r, meter);
+      // 10 µm wider than the street, as the fork's own mouth: coincident
+      // capsule edges are where polygon clipping's sweep line breaks down.
+      const mouth = capsule(c, [c[0] + ux * L, c[1] + uy * L], r + 1e-5, meter);
       meter.take((v + mouth.outer.length) ** 2);
       remainder = clipping.difference(outside, [mouth.outer]);
     }

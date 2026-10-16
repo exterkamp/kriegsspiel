@@ -331,7 +331,8 @@ export function assemble(
         nodeId: id,
         endpoint: p,
         widthM: road.widthM,
-        bearingDeg: decimal6(bearingDegrees(p, other)),
+        // A turned site's straight connector leaves along its side's exact normal.
+        bearingDeg: t.bearingDeg ?? decimal6(bearingDegrees(p, other)),
       },
     ];
   }

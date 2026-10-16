@@ -76,7 +76,9 @@ describe('any-angle regional roads (#541)', () => {
   it(`keeps at most ${MAX_GRID_ALIGNED_SHARE * 100}% of road length on the grid angles over ${SEEDS.length} seeds of ${PRESETS.join(' and ')}`, () => {
     let length = 0,
       aligned = 0,
-      maps = 0;
+      maps = 0,
+      sites = 0,
+      gridSites = 0;
     for (const preset of PRESETS)
       for (const seed of SEEDS) {
         const run = plan(preset, seed);
@@ -88,13 +90,27 @@ describe('any-angle regional roads (#541)', () => {
         expectPlausibleCrossings(report, settings);
         // Every site is joined to the network.
         for (const site of p.sites) expect(site.entrances.length).toBeGreaterThan(0);
+        // Sites turn to their ground (#545), keeping gentle anchors off summits and river flats.
+        for (const site of p.sites) {
+          sites++;
+          const r = site.rotationDeg % 45;
+          if (r <= 2 || r >= 43) gridSites++;
+        }
+        expect(report.settlements.maxAnchorSlope).toBeLessThanOrEqual(
+          settings.settlements.maxBuildingGradient,
+        );
+        expect(report.settlements.summits).toBe(0);
+        expect(report.settlements.lowRiverFlats).toBe(0);
         length += report.roads.lengthM;
         aligned += report.roads.gridAlignedShare * report.roads.lengthM;
       }
     console.info(
       `grid-aligned road length: ${((100 * aligned) / length).toFixed(1)}% of ${(length / 1000).toFixed(0)} km over ${maps} maps`,
     );
+    console.info(`sites turned within 2.5° of a grid angle: ${gridSites} of ${sites}`);
     expect(maps).toBe(PRESETS.length * SEEDS.length);
+    // Their streets run on the site's axes and diagonals: uniform turns put 11% there.
+    expect(gridSites / sites).toBeLessThanOrEqual(0.2);
     expect(aligned / length).toBeLessThanOrEqual(MAX_GRID_ALIGNED_SHARE);
   }, 900_000);
 });

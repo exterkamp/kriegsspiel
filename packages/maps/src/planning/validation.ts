@@ -24,6 +24,7 @@ import { footprint, corridor, requireFinitePoint } from './certificates.js';
 import { Context, box, touches } from './context.js';
 import type { PlanningInput, RegionalPlanningOutput } from './types.js';
 import { CROSSING_VERSION } from '../geography/types.js';
+import { siteFrameExtents } from '../rotation.js';
 
 const same = (p: Point, q: Point) => p[0] === q[0] && p[1] === q[1];
 /** Segments sharing exactly one endpoint and leaving it on opposite sides (negative dot). */
@@ -110,10 +111,9 @@ export function validate(c: Context, plan: RegionalPlanningOutput): void {
   const adjacency = new Map<string, Set<string>>();
   const join = c.settings.geometry.joinToleranceM;
   for (const site of plan.sites) {
+    // Extents are measured in the site's own frame (#545); unturned, the world axes.
     const area = polygonArea(site.placementArea),
-      rect = box(site.placementArea.outer),
-      width = rect[2] - rect[0],
-      height = rect[3] - rect[1],
+      [width, height] = siteFrameExtents(site),
       config =
         site.kind === 'village'
           ? c.settings.settlements.villageSite

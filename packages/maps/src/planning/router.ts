@@ -9,6 +9,8 @@ import { corridor, segmentGrade } from './certificates.js';
 import { box, type Context, touches } from './context.js';
 import type { CrossingCandidate } from '../geography/types.js';
 import type { DeckProfile, FordProfile } from './types.js';
+import { degreeUnit, siteFrameExtents } from '../rotation.js';
+import { siteSides } from './sites.js';
 export interface Edge {
   a: number;
   b: number;
@@ -25,6 +27,8 @@ export interface Terminal {
   site?: Site;
   entry?: number;
   edge?: Edge;
+  /** A site entrance's exact outward bearing: its side's whole-degree normal (#545). */
+  bearingDeg?: number;
 }
 /** `exact` entries carry certified edge costs; others carry an optimistic estimate. */
 type QueueItem = {
@@ -131,6 +135,8 @@ export class Router {
   readonly sites: Site[];
   /** Placement-area boxes, computed once; sites never move during routing. */
   readonly siteBoxes: [number, number, number, number][];
+  /** A turned site's frame (#545): its square's half side, in its own axes. */
+  readonly siteFrames: ({ c: number; s: number; half: number } | undefined)[];
   /** Undirected edge keys already emitted by earlier routes. */
   readonly used = new Set<string>();
   constructor(
@@ -139,6 +145,12 @@ export class Router {
   ) {
     this.sites = sites;
     this.siteBoxes = sites.map((s) => box(s.placementArea.outer));
+    this.siteFrames = sites.map((s) => {
+      if (s.rotationDeg === 0) return undefined;
+      const [c, sin] = degreeUnit(s.rotationDeg)!,
+        [width, height] = siteFrameExtents(s);
+      return { c, s: sin, half: Math.max(width, height) / 2 };
+    });
     c.candidates.take(c.cells * 2);
     this.points = Array.from({ length: c.cells }, (_, i) => c.point(i));
     this.wet = new Int8Array(c.cells);
@@ -170,11 +182,22 @@ export class Router {
       const p = this.points[id]!,
         r = this.c.settings.roads.maxReservedWidthM / 2;
       this.c.candidates.take(this.sites.length + 1);
+      // A node within a road half-width of a site's square, in the square's own frame.
       this.blocked[id] =
         this.c.inBounds(p, r) &&
-        !this.siteBoxes.some(
-          (b) => p[0] >= b[0] - r && p[0] <= b[2] + r && p[1] >= b[1] - r && p[1] <= b[3] + r,
-        )
+        !this.siteBoxes.some((b, i) => {
+          if (!(p[0] >= b[0] - r && p[0] <= b[2] + r && p[1] >= b[1] - r && p[1] <= b[3] + r))
+            return false;
+          const f = this.siteFrames[i];
+          if (!f) return true;
+          const [x, y] = this.sites[i]!.anchor,
+            dx = p[0] - x,
+            dy = p[1] - y;
+          return (
+            Math.abs(f.c * dx + f.s * dy) <= f.half + r &&
+            Math.abs(f.c * dy - f.s * dx) <= f.half + r
+          );
+        })
           ? 0
           : 1;
     }
@@ -236,38 +259,34 @@ export class Router {
     return e;
   }
   attachSites(): void {
+    const width = this.c.settings.roads.maxReservedWidthM;
     for (const site of this.sites) {
-      const b = box(site.placementArea.outer),
-        x = site.anchor[0],
-        y = site.anchor[1];
-      const options: [Point, Point][] = [
-        [
-          [x, b[1]],
-          [x, b[1] - this.c.spacing],
-        ],
-        [
-          [b[2], y],
-          [b[2] + this.c.spacing, y],
-        ],
-        [
-          [x, b[3]],
-          [x, b[3] + this.c.spacing],
-        ],
-        [
-          [b[0], y],
-          [b[0] - this.c.spacing, y],
-        ],
-      ];
-      let best: { p: Point; n: number; grade: number } | undefined;
-      for (const [p, out] of options) {
+      // Each side's midpoint leads straight out along its normal for one lattice
+      // spacing; a turned site's outward point joins the nearest lattice node
+      // by a second, graded connector (#545), as a bridge approach does.
+      let best: { p: Point; out: Point; n: number; grade: number; bearing: number } | undefined;
+      for (const { point: p, normal, bearingDeg: bearing } of siteSides(site)) {
         this.c.candidates.take();
+        const out = [
+          decimal6(p[0] + normal[0] * this.c.spacing),
+          decimal6(p[1] + normal[1] * this.c.spacing),
+        ] as Point;
         if (!this.c.inBounds(out)) continue;
         const n = this.c.node(out),
           q = this.points[n];
-        if (!q || !this.open(n) || !this.clearSites(p, q, site.id)) continue;
-        const cert = corridor(this.c, p, q, this.c.settings.roads.maxReservedWidthM);
-        if (cert.traversable && (!best || cert.maxDirectionalGrade < best.grade))
-          best = { p, n, grade: cert.maxDirectionalGrade };
+        if (!q || !this.open(n)) continue;
+        const direct = distance(out, q) < 1e-9;
+        if (!this.clearSites(p, direct ? q : out, site.id)) continue;
+        if (!direct && !this.clearSites(out, q)) continue;
+        const cert = corridor(this.c, p, direct ? q : out, width);
+        if (!cert.traversable) continue;
+        let grade = cert.maxDirectionalGrade;
+        if (!direct) {
+          const link = corridor(this.c, out, q, width);
+          if (!link.traversable) continue;
+          grade = Math.max(grade, link.maxDirectionalGrade);
+        }
+        if (!best || grade < best.grade) best = { p, out: direct ? q : out, n, grade, bearing };
       }
       if (!best)
         throw new PlanningFailure(
@@ -276,14 +295,31 @@ export class Router {
           'No complete dry, grade-certified approach reaches this permissible footprint.',
         );
       const entry = this.addPoint(best.p),
+        q = this.points[best.n]!,
+        outward = distance(best.out, q) < 1e-9 ? best.n : this.addPoint(best.out),
         edge: Edge = {
           a: entry,
-          b: best.n,
-          cost: distance(best.p, this.points[best.n]!),
+          b: outward,
+          cost: distance(best.p, best.out),
           siteId: site.id,
         };
       this.addEdge(edge);
-      this.terminals.push({ id: site.id, node: entry, entry, site, edge });
+      if (outward !== best.n) {
+        const p = this.points[outward]!;
+        this.addEdge({
+          a: outward,
+          b: best.n,
+          cost: distance(p, q) * this.factor(p, q, segmentGrade(this.c, p, q)),
+        });
+      }
+      this.terminals.push({
+        id: site.id,
+        node: entry,
+        entry,
+        site,
+        edge,
+        ...(site.rotationDeg === 0 ? {} : { bearingDeg: best.bearing }),
+      });
     }
   }
   attachBoundary(): void {
