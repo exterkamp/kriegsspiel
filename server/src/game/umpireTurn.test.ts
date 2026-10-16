@@ -898,6 +898,22 @@ describe('dice when asked (D39, 11.7)', () => {
     expect(problems).toContain('blue-1: rollIds r9: no such roll was made this turn');
   });
 
+  it('does not send back an account that reports losses as a percentage', async () => {
+    const { state, input } = firstTurn();
+    const account =
+      'We lost 20% of the battalion at the bridge, near 30 per cent of the line, and held against all odds.';
+    const model = editing((p, call) =>
+      call === 1
+        ? { ...p, units: p.units.map((u) => (u.unitId === 'blue-1' ? { ...u, account } : u)) }
+        : p,
+    );
+    await resolver(model).resolve(state, input);
+    const problems = model.requests.flatMap((r) => (r.input as Shown).rejected?.problems ?? []);
+    expect(problems).not.toContain(
+      'blue-1: the account speaks of dice or odds; a commander knows only events',
+    );
+  });
+
   it('refuses to apply a logged turn whose rolls are not the umpire’s dice', async () => {
     const { state, input } = firstTurn();
     const model = editing((p, call) => (call === 1 ? { ...p, rolls: [charge] } : final(p)));
