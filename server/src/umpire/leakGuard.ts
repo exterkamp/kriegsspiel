@@ -1,7 +1,7 @@
 import type { GameState, SideId } from '@kriegsspiel/engine';
 
 /** Drops invisible format characters (zero-width spaces, joiners, bidi marks) and collapses runs of whitespace. */
-const squash = (s: string) => s.replace(/\p{Cf}/gu, '').replace(/\s+/gu, ' ');
+export const squash = (s: string) => s.replace(/\p{Cf}/gu, '').replace(/\s+/gu, ' ');
 
 /**
  * What a side must never read in an LLM's words (#44): the name and commander of every unit of the

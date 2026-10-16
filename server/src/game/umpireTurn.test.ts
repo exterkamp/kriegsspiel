@@ -9,6 +9,7 @@ import {
   loadScenario,
   positionAt,
   rollTurnDice,
+  viewFor,
   type EngineState,
   type GameState,
   type TurnRuling,
@@ -45,7 +46,8 @@ import { TURN_APPEND_ATTEMPTS } from './actor.js';
 import type { GameSnapshot, InputLogEntry, TurnRecord } from './store.js';
 import { FakeTime } from './testing.js';
 import { applyTurn, type TurnInput } from './turns.js';
-import { UmpireTurnResolver, type UmpireTurnOutput } from './umpireTurn.js';
+import { reportsOfTurn, turnReportsInput } from '../umpire/turnReports.js';
+import { UmpireTurnResolver, turnReportsContext, type UmpireTurnOutput } from './umpireTurn.js';
 
 const MINUTE = 60_000;
 const turnRulings = (w: GameState) =>
@@ -634,6 +636,119 @@ describe('the adjudicate pipeline: checks, one resend, clamp or fall back', () =
     const problems = JSON.stringify(model.requests[1]?.input ?? {});
     expect(problems).toMatch(/blue-2: .*no departure reason/);
     expect(problems).not.toMatch(/departure.*(null|expected string)/i);
+  });
+});
+
+describe('accounts and sight (#533)', () => {
+  const registry = createRegistry();
+  const resolver = (client: UmpireClient) =>
+    new UmpireTurnResolver({ registry, client, dial: 'standard' });
+  type Shown = { rejected?: { problems: string[] } };
+  const SEEN =
+    'He saw infantry in line at the south end of the bridge, and some cavalry behind it.';
+
+  /** Red's papers of the applied turn, screened as `writeReports` screens them. */
+  function redPapers(state: EngineState<GameState>, input: TurnInput, r: TurnRecord) {
+    const end = advanceTo(
+      applyTurn(state, r, { gameId: 'g', registry }),
+      input.endMs,
+      registry,
+    ).state;
+    const world = end.world;
+    const view = viewFor(world, 'red', end.time);
+    const due = reportsOfTurn(view.reports, input.startMs, end.time);
+    const out = r.output as UmpireTurnOutput;
+    const ctx = turnReportsContext(world, view, input, out.proposal, []);
+    const turnOf = (unitId: string) =>
+      due.find(
+        (x) => x.kind === 'turn' && x.from === world.units.find((u) => u.id === unitId)!.name,
+      )!.id;
+    return { ...turnReportsInput('red', input.n, due, ctx), turnOf };
+  }
+
+  it('sends back, then withholds, an account that describes enemies whose every sighting was refused', async () => {
+    const { state, input } = firstTurn();
+    // Red's hussars claim to see Blue's whole force from 1 km off, both times.
+    const model = editing((p) => ({
+      ...p,
+      units: p.units.map((u) => (u.unitId === 'red-3' ? { ...u, account: SEEN } : u)),
+      observations: [
+        ...p.observations.filter((o) => o.by !== 'red-3'),
+        ...['blue-1', 'blue-2', 'blue-3'].map((unitId) => ({
+          side: 'red',
+          by: 'red-3',
+          unitId,
+          when: 'start' as const,
+        })),
+      ],
+    }));
+    const r = await resolver(model).resolve(state, input);
+    expect(model.requests).toHaveLength(2);
+    const problems = (model.requests[1]!.input as Shown).rejected!.problems;
+    expect(problems).toContain(
+      'red-3: the account describes the enemy ("infantry") though the sight check refused every ' +
+        'sighting of this unit; tell only what the unit could see, or list a sighting it could make',
+    );
+    expect(r.adjudicator).toBe('umpire');
+    // The umpire did not correct it: the papers do not carry it.
+    const { input: papers, withheld, turnOf } = redPapers(state, input, record(input, r));
+    const id = turnOf('red-3');
+    expect(papers.reports.find((x) => x.id === id)!.account).toBeUndefined();
+    expect(withheld).toContainEqual({
+      reportId: id,
+      reason:
+        'account withheld (describes the enemy ("infantry") though the sight check refused every sighting of this unit)',
+    });
+  });
+
+  it('sends back a description of an enemy no unit of the side saw, generic wording included', async () => {
+    const { state, input } = firstTurn();
+    // No Red sighting at all, and Red holds no contact at the turn's start.
+    const generic = 'The Major made out a battalion beyond the river and pulled back.';
+    const model = editing((p) => ({
+      ...p,
+      units: p.units.map((u) =>
+        u.unitId === 'red-2'
+          ? { ...u, account: generic }
+          : u.unitId === 'red-1'
+            ? { ...u, account: SEEN }
+            : u,
+      ),
+      observations: p.observations.filter((o) => o.side !== 'red'),
+    }));
+    const r = await resolver(model).resolve(state, input);
+    const problems = (model.requests[1]!.input as Shown).rejected!.problems;
+    expect(problems).toEqual(
+      expect.arrayContaining([
+        'red-1: the account describes the enemy ("infantry") though no unit of the side could see ' +
+          'one; tell only what the unit could see, or list a sighting it could make',
+        'red-2: the account describes the enemy ("battalion") though no unit of the side could see ' +
+          'one; tell only what the unit could see, or list a sighting it could make',
+      ]),
+    );
+    // Red's own view at the turn's end shows Blue's units at the bridge (a contact in its view at
+    // T1), so the papers may say what those units could see there.
+    const end = advanceTo(
+      applyTurn(state, record(input, r), { gameId: 'g', registry }),
+      input.endMs,
+      registry,
+    ).state;
+    expect(viewFor(end.world, 'red', end.time).visibleEnemies.length).toBeGreaterThan(0);
+    const { withheld } = redPapers(state, input, record(input, r));
+    expect(withheld.filter((w) => /could see one/.test(w.reason))).toEqual([]);
+  });
+
+  it('leaves an account whose sightings stood as it is: no problem, shown to the side', async () => {
+    const { state, input } = firstTurn();
+    const account = 'Rode down to the river and halted short of the bank, watching the road.';
+    const model = editing((p) => ({
+      ...p,
+      units: p.units.map((u) => (u.unitId === 'red-3' ? { ...u, account } : u)),
+    }));
+    const r = await resolver(model).resolve(state, input);
+    expect(model.requests).toHaveLength(1);
+    const { input: papers, turnOf } = redPapers(state, input, record(input, r));
+    expect(papers.reports.find((x) => x.id === turnOf('red-3'))!.account).toBe(account);
   });
 });
 

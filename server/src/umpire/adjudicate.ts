@@ -47,6 +47,7 @@ import {
   type UmpireJournal,
 } from '@kriegsspiel/engine';
 import { TurnProposal, type TurnObservation, type UmpirePersona } from '@kriegsspiel/protocol';
+import { accountSightProblem, ownTermsOf, sideSight } from './accountSight.js';
 import { CHECKS, checkTurnProposal, type TurnCheckContext } from './eval/turnChecks.js';
 import { TURN_PROPOSAL_JSON_SCHEMA } from './eval/turnProposal.js';
 import { deg } from './eval/turnProposal.js';
@@ -356,6 +357,41 @@ export function checkContext(world: GameState, turn: AdjudicateTurn): TurnCheckC
   };
 }
 
+/**
+ * The accounts that tell a side of enemies the sight check did not let it see (#533): a unit whose
+ * every sighting was refused, or a unit of a side with no sighting that stood and no contact, whose
+ * account still describes enemy troops. Sent back with the resend, so the umpire corrects the
+ * account or the sighting; the turn reports withhold any that remain (`screenAccount`).
+ */
+export function sightProblems(
+  world: GameState,
+  proposal: TurnProposal,
+  validation: TurnValidation,
+): string[] {
+  const problems: string[] = [];
+  for (const side of world.sides) {
+    const units = world.units.filter((u) => u.side === side.id);
+    const ids = new Set(units.map((u) => u.id));
+    const sight = sideSight(
+      side.id,
+      proposal.observations,
+      validation.observations,
+      (world.intel[side.id]?.contacts.length ?? 0) > 0,
+    );
+    const own = ownTermsOf(units);
+    for (const u of proposal.units) {
+      if (!ids.has(u.unitId)) continue;
+      const why = accountSightProblem(u.account, u.unitId, sight, own);
+      if (why) {
+        problems.push(
+          `${u.unitId}: the account ${why}; tell only what the unit could see, or list a sighting it could make`,
+        );
+      }
+    }
+  }
+  return problems;
+}
+
 /** One reply judged: what to send back, and whether it may be applied as it stands after clamps. */
 function judge(
   output: unknown,
@@ -399,6 +435,7 @@ function judge(
   }
   const checks = checkTurnProposal(proposal, checkContext(world, turn));
   const validation = validateProposal(world, proposal, context);
+  extra.push(...sightProblems(world, proposal, validation));
   const problems = [
     ...extra,
     // The validator's own wording comes first: it is what will be clamped.

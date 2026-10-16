@@ -7,8 +7,9 @@
  * umpire's `account` of what that unit's commander did and why, and the side's own words for the
  * orders that unit had. Never the umpire's `summary`, its journal, its rolls, another side's
  * accounts or any master state. An account is screened before it is shown (`screenAccount`): one
- * that names the other side, cites a figure or name the side could not know, or speaks of dice is
- * left out, and that unit's note is written from the report's facts alone.
+ * that names the other side, cites a figure or name the side could not know, speaks of dice, or
+ * describes enemy troops the unit could not see (#533, `accountSight.ts`) is left out, and that
+ * unit's note is written from the report's facts alone.
  *
  * Every note is checked as a narrated dispatch is (`checkProseAgainst` against that one report's
  * facts, `checkFieldNote`, `hiddenIn`), plus the dice words; a note that fails twice keeps the
@@ -18,6 +19,7 @@
  */
 import type { SideId, ViewReport, ViewUnit } from '@kriegsspiel/engine';
 import type { UmpirePersona } from '@kriegsspiel/protocol';
+import { accountSightProblem, ownTermsOf, type SideSight } from './accountSight.js';
 import { DICE_WORDS } from './adjudicate.js';
 import { hiddenIn } from './leakGuard.js';
 import {
@@ -93,6 +95,11 @@ export interface TurnReportsContext {
   places?: readonly string[];
   /** Names the side must not read (`hiddenTerms`). */
   hidden?: readonly string[];
+  /**
+   * What the side's units saw in the turn as the sight check let it stand (#533). With it, an
+   * account that describes enemy troops the unit could not see is withheld (`accountSightProblem`).
+   */
+  sight?: SideSight;
 }
 
 const NUMBER = /\d+(?:[.,]\d+)?/g;
@@ -198,6 +205,9 @@ export function turnReportsInput(
     const account = unit && ctx.accounts.find((a) => a.unitId === unit.id)?.account.trim();
     if (account) {
       const problems = screenAccount(account, entry, ctx.places, ctx.hidden);
+      const unseen =
+        ctx.sight && accountSightProblem(account, unit.id, ctx.sight, ownTermsOf(ctx.ownUnits));
+      if (unseen) problems.push(unseen);
       if (problems.length === 0) entry.account = account;
       else withheld.push({ reportId: r.id, reason: `account withheld (${problems.join('; ')})` });
     }
