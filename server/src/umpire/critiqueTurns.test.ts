@@ -109,7 +109,9 @@ async function turnGame(): Promise<ReplayInput> {
   });
   const game = await host.create(
     'g1',
-    { ...loadScenario(holdTheBridge), seed: 1815 },
+    // Rules 1 (#432): the story below is told for seed 1815's fight with couriers on the world's
+    // dice; under rules 2 the fight ends a turn sooner.
+    { ...loadScenario(holdTheBridge), seed: 1815, rules: 1 },
     { settings: { dial: 'standard', persona: 'dry', mode: 'turns', turnMinutes: 10 } },
   );
   for (let guard = 0; guard < 20 && !game.state.world.outcome; guard++) {

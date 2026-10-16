@@ -12,6 +12,18 @@ export type GameTime = number;
 export const MS_PER_SECOND = 1000;
 export const MS_PER_MINUTE = 60 * MS_PER_SECOND;
 
+/**
+ * The engine's rules version, for rules that change what a seed draws, so a game logged under an
+ * older version replays as it was played (`GameState.rules`). A new game is made at this version.
+ * - 1 (absent): every die on the world's RNG.
+ * - 2 (#432): each courier rolls its loss, garbling and interceptions on a stream of its own
+ *   (`Courier.dice`), seeded by one draw from the world's RNG as it sets out.
+ */
+export const RULES_VERSION = 2;
+
+/** True when couriers roll on their own stream (rules 2, #432). */
+export const courierStreams = (world: { rules?: number }): boolean => (world.rules ?? 1) >= 2;
+
 export type SideId = 'blue' | 'red';
 
 /**
@@ -366,6 +378,12 @@ export interface Courier {
    * the pass had it taken. Absent in real-time play.
    */
   forced?: ForcedRide;
+  /**
+   * Under rules 2 (#432): the state of the courier's own dice, from which its loss, garbling and
+   * interception checks are drawn, so a ride never moves the world's RNG past its one seeding draw.
+   * Absent under rules 1.
+   */
+  dice?: number;
 }
 
 /** A ride's outcome in a turn, fixed by the turn's courier pass (see `courierPass`). */
@@ -440,6 +458,8 @@ export interface GameState {
   rulings: Array<Ruling | BattleRuling | JudgmentRuling | TurnRuling>;
   /** The rigid-to-free dial chosen for this game; absent counts as 'standard'. Sets the judgment cap only. */
   dial?: Dial;
+  /** The rules version the game is played under (`RULES_VERSION`); absent counts as 1. */
+  rules?: number;
   /** Men each unit started with, the yardstick for a broken force (D13). Absent: no unit counts as broken. */
   startStrength?: Record<string, number>;
   /** Set once, when the umpire has declared one side's force broken; the game closes soon after (D13). */

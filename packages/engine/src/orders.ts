@@ -20,8 +20,10 @@ import { schedule } from './queue.js';
 import { heldTurn, reachesHqAt } from './held.js';
 import { applyIntents, fireOnReceipt, registerStanding } from './standing.js';
 import { COURIER_DELAY_MS, REPORT_EVENT, fileReport } from './visibility.js';
+import { Rng, seedRng, type RngState } from './rng.js';
 import {
   MS_PER_MINUTE,
+  courierStreams,
   type Courier,
   type ForcedRide,
   type GameState,
@@ -174,6 +176,8 @@ function ridesAlong(
 export interface ForcedIssue extends ForcedRide {
   lostAt?: GameTime;
   garbled?: OrderIntent[];
+  /** Under rules 2 (#432): the courier's own dice as the pass left them at the turn's end. */
+  dice?: RngState;
 }
 
 /** Queue `order` to leave HQ at `time` on a ride the turn's courier pass already decided. */
@@ -193,6 +197,9 @@ export function issueForcedOrder(
 }
 
 const courierOf = (world: GameState, id: unknown) => world.couriers.find((c) => c.id === id);
+
+/** One draw from the world's RNG as a 32-bit seed for a courier's own dice (rules 2, #432). */
+const seedDraw = (rng: Rng): number => Math.floor(rng.next() * 4294967296);
 const without = (world: GameState, id: string): GameState => ({
   ...world,
   couriers: world.couriers.filter((c) => c.id !== id),
@@ -263,24 +270,29 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     const later: NewEvent[] = [];
     if (forced) {
       // The turn's courier pass rolled this ride already: replay its outcome, drawing nothing.
-      const { lostAt, garbled, ...ride } = forced;
+      const { lostAt, garbled, dice: passDice, ...ride } = forced;
       courier.forced = ride;
       if (garbled) courier.garbled = garbled;
+      if (passDice !== undefined) courier.dice = passDice;
       if (lostAt !== undefined) {
         later.push({ time: lostAt, type: COURIER_LOST_EVENT, payload: { courierId: courier.id } });
       }
     }
+    // Under rules 2 (#432) the ride rolls on dice of its own, seeded by one draw from the world's
+    // RNG, so however the ride goes it moves the world's dice by exactly that draw. A forced ride
+    // draws nothing: the courier pass made the seeding draw, and the turn starts from its RNG.
+    const dice = !forced && courierStreams(world) ? new Rng(seedRng(seedDraw(rng))) : rng;
     // Lost on the road: the point is drawn along the ride, so the loss can be before or after a check.
     // The turn's courier pass reads the loss time from this handler's `schedule` (`SetOutRegistry`,
     // engineTurn.ts): schedule it anywhere else and the pass stops forcing it.
-    if (!forced && rng.next() < risk.loss) {
-      const at = ev.time + Math.floor(rng.next() * (arrival - ev.time));
+    if (!forced && dice.next() < risk.loss) {
+      const at = ev.time + Math.floor(dice.next() * (arrival - ev.time));
       later.push({ time: at, type: COURIER_LOST_EVENT, payload: { courierId: courier.id } });
     }
-    if (!forced && rng.next() < risk.garble) {
+    if (!forced && dice.next() < risk.garble) {
       // All draws are taken whatever the order holds, so the RNG stream does not depend on it.
-      const angle = rng.next() * 2 * Math.PI;
-      const away = (GARBLE_MIN_M + rng.next() * (GARBLE_MAX_M - GARBLE_MIN_M)) * 1000;
+      const angle = dice.next() * 2 * Math.PI;
+      const away = (GARBLE_MIN_M + dice.next() * (GARBLE_MAX_M - GARBLE_MIN_M)) * 1000;
       // The intent the unit adopts is the first immediate one (see `applyIntents`); an order of
       // conditionals only garbles the first that names a destination, and none if none does.
       const at = order.intents.findIndex((i) => i.kind !== 'when' && i.kind !== 'at');
@@ -298,6 +310,7 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       later.push({ time: t, type: COURIER_STEP_EVENT, payload: { courierId: courier.id } });
     }
     later.push({ time: arrival, type: ORDER_DELIVER_EVENT, payload: { courierId: courier.id } });
+    if (dice !== rng) courier.dice = dice.getState();
     return { world: { ...world, couriers: [...world.couriers, courier] }, schedule: later };
   });
 
@@ -323,6 +336,8 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
     // One roll per enemy unit in reach, in unit order; the first to succeed takes the courier.
     // Rolls stop at the first success, so draws per step depend on who captured: still fixed by
     // the seed, but keep every roll inside this handler or the clock-invariance rule breaks.
+    // Under rules 2 (#432) the checks roll on the courier's own dice, kept on the courier.
+    const dice = c.dice !== undefined ? new Rng(c.dice) : rng;
     const captor = forcedRide
       ? forcedRide.takenAt === ev.time
         ? world.units.find(
@@ -332,8 +347,15 @@ export function registerOrders(registry: EventRegistry<GameState>): void {
       : world.units.find((u) => {
           if (u.side === c.side) return false;
           const chance = interceptChance(world, u, at);
-          return chance > 0 && rng.next() < chance;
+          return chance > 0 && dice.next() < chance;
         });
+    if (dice !== rng && dice.getState() !== c.dice) {
+      const rolled = dice.getState();
+      world = {
+        ...world,
+        couriers: world.couriers.map((x) => (x.id === c.id ? { ...x, dice: rolled } : x)),
+      };
+    }
     if (!captor) return { world };
     const doc = {
       id: `${captor.side}-d${world.intel[captor.side].documents.length + 1}`,
