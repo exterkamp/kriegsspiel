@@ -161,6 +161,29 @@ it('still certifies maps saved by the D45 stages, before fords (D46)', () => {
   mixed.provenance.generator.stages.roads = 'sited-graded-fording-network-v3';
   expect(supportsValidation(mixed)).toBe(false);
 }, 60_000);
+it('still certifies maps saved by the D46 stages, before unbiased relief (#540)', () => {
+  // A small map saved by the D46 generator: value-noise relief combed along
+  // one grain ('structured-relief-eroded-v2') and D8 rivers.
+  const saved = importAsset(
+    readFileSync(new URL('./fixtures/d46-saved-map.json', import.meta.url), 'utf8'),
+  );
+  expect(saved.provenance.generator.stages.terrain).toBe('structured-relief-eroded-v2');
+  expect(saved.provenance.generator.stages.hydrology).toBe('flood-carved-stepped-network-v2');
+  expect(saved.provenance.generator.stages.roads).toBe('sited-graded-fording-network-v3');
+  expect(supportsReplay(saved)).toBe(false);
+  expect(supportsValidation(saved)).toBe(true);
+  expect(validateBattlefield(saved).ok).toBe(true);
+  // The current generator records the new relief and hydrology and replays exactly.
+  expect(asset.provenance.generator.stages.terrain).toBe('gradient-relief-eroded-v3');
+  expect(asset.provenance.generator.stages.hydrology).toBe('flood-carved-flowline-network-v3');
+  expect(supportsReplay(asset)).toBe(true);
+  // New relief with the old rivers, or the reverse, is not a recorded identity.
+  for (const stage of ['terrain', 'hydrology'] as const) {
+    const mixed = structuredClone(saved);
+    mixed.provenance.generator.stages[stage] = asset.provenance.generator.stages[stage];
+    expect(supportsValidation(mixed)).toBe(false);
+  }
+}, 60_000);
 it('rejects one-sided local entrance provenance while the regional graph survives', () => {
   const changed = structuredClone(asset),
     e = changed.layers.sites[0]!.entrances[0]!;

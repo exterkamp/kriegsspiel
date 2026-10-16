@@ -1,9 +1,10 @@
 import { WorkBudget } from './budgets.js';
 
 /**
- * Frozen `structured-relief-eroded-v2` landform processes. Every routine is a
+ * Frozen `gradient-relief-eroded-v3` landform processes. Every routine is a
  * deterministic function of its typed-array input: integer tie-breaking, a
  * fixed visiting order and only IEEE-exact arithmetic plus `Math.sqrt`.
+ * (v2 differed only in incising toward the single steepest D8 receiver.)
  */
 export const EROSION = Object.freeze({
   /** Implicit stream-power passes (Braun & Willett 2013 with m=0.5, n=1). */
@@ -15,8 +16,16 @@ export const EROSION = Object.freeze({
   diffusionRate: 0.18,
   /** Diffusion between stream-power passes. */
   interleavedDiffusion: 2,
-  /** Rise per flood step that fills closed depressions as gently sloping (0.2%) floors. */
+  /** Rise per cell of distance that fills closed depressions as gently sloping (0.2%) floors. */
   drainageEpsilonM: 0.05,
+  /**
+   * Rise per cell of distance on the routing surface during erosion, so
+   * filled flats drain radially to their spill point instead of along flood
+   * parents found in row-major tie order (v2 routed on level flats).
+   */
+  routingEpsilonM: 0.001,
+  /** Least rise over a flood parent, as a share of the epsilon. */
+  minimumRiseShare: 0.01,
 });
 
 const D8 = [
@@ -95,8 +104,10 @@ export function floodRoute(
     order = new Int32Array(n),
     receiver = new Int32Array(n).fill(-1),
     length = new Float64Array(n),
-    heap = new IndexHeap(n, filled);
+    heap = new IndexHeap(n, filled),
+    root = new Int32Array(n);
   for (let i = 0; i < n; i++) {
+    root[i] = i;
     const x = i % columns,
       y = (i - x) / columns;
     if (x === 0 || y === 0 || x === columns - 1 || y === rows - 1) {
@@ -118,8 +129,23 @@ export function floodRoute(
       if (seen[j]) continue;
       seen[j] = 1;
       parent[j] = i;
-      const floor = filled[i]! + epsilon;
-      if (filled[j]! < floor) filled[j] = floor;
+      if (epsilon) {
+        // Submerged ground rises by epsilon per cell of Euclidean distance
+        // from where the flood entered it (vector propagation), at least a
+        // hundredth of epsilon above its flood parent, so filled floors slope
+        // radially toward their spill point instead of in D8 rings.
+        const r = root[i]!,
+          rx = r % columns,
+          ry = (r - rx) / columns,
+          floor = Math.max(
+            filled[r]! + epsilon * Math.sqrt((nx - rx) ** 2 + (ny - ry) ** 2),
+            filled[i]! + epsilon * EROSION.minimumRiseShare,
+          );
+        if (filled[j]! < floor) {
+          filled[j] = floor;
+          root[j] = r;
+        } else root[j] = j;
+      } else if (filled[j]! < filled[i]!) filled[j] = filled[i]!;
       heap.push(j);
     }
   }
@@ -152,6 +178,92 @@ export function floodRoute(
     length[i] = step;
   }
   return { order, receiver, length, filled };
+}
+
+/**
+ * Triangular facets around a sample (Tarboton 1997): a cardinal neighbour and
+ * the diagonal beside it, as [cardinal dx, dy, diagonal dx, dy].
+ */
+const FACETS = [
+  [1, 0, 1, -1],
+  [0, -1, 1, -1],
+  [0, -1, -1, -1],
+  [-1, 0, -1, -1],
+  [-1, 0, -1, 1],
+  [0, 1, -1, 1],
+  [0, 1, 1, 1],
+  [1, 0, 1, 1],
+] as const;
+
+/**
+ * D-infinity flow directions on the filled surface: each sample drains along
+ * the steepest facet slope, toward a point on the edge between a cardinal and
+ * a diagonal neighbour at share `t` of the way to the diagonal. Without trig,
+ * `t` is the facet slope's cross component over its along component. Both
+ * receivers with positive share are strictly lower, so they precede the
+ * sample in flood order. Where no facet descends (flats), the flood receiver.
+ */
+export interface InfinityRouting {
+  cardinal: Int32Array;
+  diagonal: Int32Array;
+  /** Share toward the diagonal receiver, in [0, 1]. */
+  share: Float64Array;
+  /** Distance to the edge point in cells. */
+  length: Float64Array;
+}
+export function infinityRoute(
+  route: FloodRouting,
+  columns: number,
+  rows: number,
+  out?: InfinityRouting,
+): InfinityRouting {
+  const n = route.filled.length,
+    f = route.filled,
+    r: InfinityRouting = out ?? {
+      cardinal: new Int32Array(n),
+      diagonal: new Int32Array(n),
+      share: new Float64Array(n),
+      length: new Float64Array(n),
+    };
+  for (let i = 0; i < n; i++) {
+    const x = i % columns,
+      y = (i - x) / columns;
+    r.cardinal[i] = route.receiver[i]!;
+    r.diagonal[i] = -1;
+    r.share[i] = 0;
+    r.length[i] = route.length[i]!;
+    if (route.receiver[i]! < 0) continue;
+    let best = 0;
+    for (const [cx, cy, dx, dy] of FACETS) {
+      const ax = x + cx,
+        ay = y + cy,
+        bx = x + dx,
+        by = y + dy;
+      if (ax < 0 || ay < 0 || ax >= columns || ay >= rows) continue;
+      if (bx < 0 || by < 0 || bx >= columns || by >= rows) continue;
+      const a = ay * columns + ax,
+        b = by * columns + bx,
+        s1 = f[i]! - f[a]!,
+        s2 = f[a]! - f[b]!;
+      let slope2: number, card: number, diag: number, t: number;
+      if (s2 <= 0) {
+        if (s1 <= 0) continue;
+        [slope2, card, diag, t] = [s1 * s1, a, -1, 0];
+      } else if (s2 >= s1) {
+        const drop = f[i]! - f[b]!;
+        if (drop <= 0) continue;
+        [slope2, card, diag, t] = [(drop * drop) / 2, -1, b, 1];
+      } else [slope2, card, diag, t] = [s1 * s1 + s2 * s2, a, b, s2 / s1];
+      if (slope2 > best) {
+        best = slope2;
+        r.cardinal[i] = t < 1 ? card : diag;
+        r.diagonal[i] = t > 0 && t < 1 ? diag : -1;
+        r.share[i] = t > 0 && t < 1 ? t : 0;
+        r.length[i] = t === 1 ? Math.SQRT2 : Math.sqrt(1 + t * t);
+      }
+    }
+  }
+  return r;
 }
 
 /** Explicit four-neighbour hillslope diffusion with reflecting edges. */
@@ -236,17 +348,25 @@ export function erodeRelief(
     hi = Math.max(hi, h[i]!);
   }
   const area = new Float64Array(n);
+  let flow: InfinityRouting | undefined;
   for (let pass = 0; pass < EROSION.iterations; pass++) {
-    budget.take(n * 12);
-    const route = floodRoute(h, columns, rows, 0);
+    budget.take(n * 14);
+    const route = floodRoute(h, columns, rows, EROSION.routingEpsilonM);
     multipleFlowArea(route, columns, rows, area);
-    // Receivers precede donors in pop order, so each update uses the new receiver height.
+    flow = infinityRoute(route, columns, rows, flow);
+    // Receivers precede donors in pop order, so each update uses the new
+    // receiver heights. Incision pulls toward the D-infinity edge point, so
+    // valleys follow the true fall line rather than eight lattice directions.
     for (let k = 0; k < n; k++) {
       const i = route.order[k]!,
-        r = route.receiver[i]!;
-      if (r < 0 || h[i]! <= h[r]!) continue;
-      const f = (EROSION.coefficient * Math.sqrt(area[i]!)) / route.length[i]!;
-      h[i] = (h[i]! + f * h[r]!) / (1 + f);
+        a = flow.cardinal[i]!;
+      if (a < 0) continue;
+      const b = flow.diagonal[i]!,
+        t = flow.share[i]!,
+        target = b < 0 ? h[a]! : h[a]! + t * (h[b]! - h[a]!);
+      if (h[i]! <= target) continue;
+      const f = (EROSION.coefficient * Math.sqrt(area[i]!)) / flow.length[i]!;
+      h[i] = (h[i]! + f * target) / (1 + f);
     }
     for (let d = 0; d < EROSION.interleavedDiffusion; d++) diffuse(h, columns, rows, budget);
   }

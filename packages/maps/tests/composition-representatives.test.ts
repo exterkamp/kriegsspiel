@@ -11,6 +11,7 @@ import {
 import { canonicalGeometry, canonicalizeAsset } from '../src/canonical.js';
 import { importAsset } from '../src/import.js';
 import { realismReport } from '../src/realism.js';
+import { isMinorRoute } from '../src/geography/shallow.js';
 import { expectPlausibleCrossings, expectRealisticCover } from './realism-checks.js';
 import type { GenerationResult, MapAsset } from '../src/contract.js';
 const value = <T>(r: GenerationResult<T>): T => {
@@ -114,9 +115,13 @@ for (const name of ['flat-countryside', 'wooded-hills', 'river-valley'] as const
       expect(ford).toBeDefined();
       const onMain = structuredClone(asset),
         road = onMain.layers.roads.find((r) => r.id === ford.roadIds[0])!;
+      // Any main route: one joining only villages and boundary exits.
       const mainRoute = asset.layers.roads
         .flatMap((r) => r.routeIds)
-        .find((id) => id.startsWith('route:site:village:') && id.includes(':boundary:'))!;
+        .find(
+          (id) => id.startsWith('route:site:village:') && !isMinorRoute(id, asset.layers.sites),
+        )!;
+      expect(mainRoute).toBeDefined();
       road.routeIds = [...road.routeIds, mainRoute].sort();
       expect(validateBattlefield(onMain)).toMatchObject({
         ok: false,

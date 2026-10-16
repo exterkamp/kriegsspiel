@@ -1,7 +1,7 @@
 import type { ShoulderEvidence } from './shoulders.js';
 import type { Bounds, Cover, Drainage, Elevation, Point, Polygon, Water } from '../contract.js';
 
-export const GEOGRAPHY_VERSION = 'flood-carved-stepped-network-v2' as const;
+export const GEOGRAPHY_VERSION = 'flood-carved-flowline-network-v3' as const;
 export const CROSSING_VERSION = 'reserved-dry-disks-v2' as const;
 /** v1 decks (no rounding margin) remain certifiable for maps saved by the v1 stages. */
 export const LEGACY_CROSSING_VERSION = 'reserved-dry-disks-v1' as const;

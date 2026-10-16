@@ -16,6 +16,7 @@ import { Budget, GeographyFailure } from './budget.js';
 import { GEOGRAPHY_VERSION } from './types.js';
 import { gradeShoulders, shoulderPolicy } from './shoulders.js';
 import type { WaterConstruction } from './water.js';
+import { routeFlowlines, smoothPath } from './flowlines.js';
 
 /**
  * Frozen `stepped-network-v2` river policy. A drainage network, not a single
@@ -39,8 +40,11 @@ export const RIVER_NETWORK = Object.freeze({
   simplifyCells: 0.6,
   /** Douglas-Peucker tolerance for reach outlines; carving covers it. */
   outlineToleranceM: 0.75,
-  /** Circle approximation for joins and round ends (inscribed, so inside the buffer). */
-  joinSides: 8 as const,
+  /**
+   * Joins and round ends are chords inscribed in the true buffer circle, so
+   * inside the buffer, each within this distance of the arc.
+   */
+  joinToleranceM: 0.25,
   /**
    * Rivers at least this share of the maximum width (and a road corridor wide)
    * get the full guaranteed approach band; narrower brooks get one sample, so
@@ -59,6 +63,8 @@ export const RIVER_NETWORK = Object.freeze({
   meanderStepsPerHalfWave: 5,
   /** Channel bed below the reach surface, from narrow brooks to the widest river. */
   bedDepthM: [0.5, 2] as const,
+  /** Euclidean shoulder caps reach this many samples beyond the gentle band. */
+  steepSeedCells: 8,
 });
 
 interface Stream {
@@ -169,22 +175,66 @@ function buffer(path: Point[], radius: number): ClipMultiPolygon {
       ],
     ]);
   }
-  // Eighth turns from a 22.5 degree start, so join vertices never coincide with
-  // the rectangle corners of axis or diagonal segments. Literal constants only.
-  const sides = RIVER_NETWORK.joinSides,
-    cos = Math.SQRT1_2,
-    sin = Math.SQRT1_2;
-  for (let i = 0; i < path.length; i++) {
-    const p = path[i]!,
-      ring: Ring = [];
-    let ux = radius * 0.9238795325112867,
-      uy = radius * 0.3826834323650898;
-    for (let k = 0; k < sides; k++) {
-      ring.push([p[0] + ux, p[1] + uy]);
-      [ux, uy] = [ux * cos - uy * sin, ux * sin + uy * cos];
+  // Joins and caps are fans of chords inscribed in the true round join,
+  // oriented by the path itself: v2 used fixed octagons, whose edges all ran
+  // at 0, 45, 90 or 135 degrees and showed as notches on every outer bend.
+  const fan = (p: Point, from: Point, to: Point, ring: Ring) => {
+    // Bisect the arc from unit vector `from` to `to` (under 180 degrees)
+    // until each chord lies within the join tolerance of the circle.
+    const half = Math.hypot(from[0] + to[0], from[1] + to[1]) / 2;
+    if (radius * (1 - half) > RIVER_NETWORK.joinToleranceM && half > 1e-9) {
+      const mid: Point = [(from[0] + to[0]) / (2 * half), (from[1] + to[1]) / (2 * half)];
+      fan(p, from, mid, ring);
+      fan(p, mid, to, ring);
+      return;
     }
-    ring.push(ring[0]!);
+    ring.push([p[0] + radius * to[0], p[1] + radius * to[1]]);
+  };
+  const unitDirection = (a: Point, b: Point): Point => {
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    return [(b[0] - a[0]) / length, (b[1] - a[1]) / length];
+  };
+  const wedge = (p: Point, arcs: [Point, Point][]) => {
+    const start: Point = arcs[0]![0],
+      ring: Ring = [p, [p[0] + radius * start[0], p[1] + radius * start[1]]];
+    for (const [from, to] of arcs) fan(p, from, to, ring);
+    ring.push(p);
     parts.push([ring]);
+  };
+  for (let i = 0; i < path.length; i++) {
+    const p = path[i]!;
+    if (i === 0 || i === path.length - 1) {
+      // Round cap: a half disc ahead of the end, as two quarter fans.
+      const u = i === 0 ? unitDirection(path[1]!, path[0]!) : unitDirection(path[i - 1]!, path[i]!),
+        left: Point = [-u[1], u[0]],
+        right: Point = [u[1], -u[0]];
+      wedge(p, [
+        [left, u],
+        [u, right],
+      ]);
+      continue;
+    }
+    const u1 = unitDirection(path[i - 1]!, p),
+      u2 = unitDirection(p, path[i + 1]!),
+      cross = u1[0] * u2[1] - u1[1] * u2[0],
+      dot = u1[0] * u2[0] + u1[1] * u2[1];
+    // The outer side of the bend: right of the path when it turns left.
+    const side = cross > 0 ? -1 : 1,
+      n1: Point = [-side * u1[1], side * u1[0]],
+      n2: Point = [-side * u2[1], side * u2[0]];
+    if (radius * Math.hypot(n1[0] - n2[0], n1[1] - n2[1]) < 1e-3) continue;
+    if (dot > -0.5) wedge(p, [[n1, n2]]);
+    else {
+      // Sharp turn: go round through the bisector of the reversed directions.
+      const bx = u1[0] - u2[0],
+        by = u1[1] - u2[1],
+        bl = Math.hypot(bx, by),
+        mid: Point = [bx / bl, by / bl];
+      wedge(p, [
+        [n1, mid],
+        [mid, n2],
+      ]);
+    }
   }
   return clip(() => clipping.union(parts[0]!, ...parts.slice(1)));
 }
@@ -274,8 +324,7 @@ export function carveRiverNetwork(
     rows = elevation.rows,
     d = elevation.spacingM,
     ground = elevation.samples,
-    acc = drainage.accumulation,
-    down = drainage.downstream;
+    { accumulation: acc, downstream: down } = routeFlowlines(drainage, ranks, c, rows, budget);
   let minimum = Infinity,
     maximum = -Infinity,
     largest = 0;
@@ -352,6 +401,16 @@ export function carveRiverNetwork(
   const narrowBand = Math.min(policy.guaranteedBandSteps, RIVER_NETWORK.brookBandSteps),
     wideWidth = Math.max(s.roads.maxReservedWidthM, RIVER_NETWORK.wideShare * maxW);
   const offset = (bandSteps: number) => 1 + bandSteps * d * policy.axisGradeCap;
+  // Smoothed centrelines per stream, ends pinned; a tributary ends on its
+  // parent's smoothed centreline, so reaches still meet exactly.
+  const centres: Point[][] = [];
+  for (const st of streams) {
+    const points = st.nodes.map((k): Point => [(k % c) * d, Math.floor(k / c) * d]);
+    if (st.parent >= 0)
+      points[points.length - 1] =
+        centres[st.parent]![streams[st.parent]!.nodes.indexOf(st.nodes.at(-1)!)]!;
+    centres.push(smoothPath(points));
+  }
   const reaches: Reach[] = [];
   for (const [id, st] of streams.entries()) {
     let start = 0;
@@ -367,7 +426,7 @@ export function carveRiverNetwork(
           own = owner[nodes.at(-1)!] === id ? nodes.at(-1)! : nodes.at(-2)!,
           share = Math.min(1, Math.max(0, (acc[own]! - source) / span)),
           widthM = decimal6(minW + (maxW - minW) * Math.sqrt(share));
-        const points = nodes.map((k): Point => [(k % c) * d, Math.floor(k / c) * d]),
+        const points = centres[id]!.slice(start, i + 1),
           run = Math.max(d, (nodes.length - 1) * d),
           fall = ground[nodes[0]!]! - ground[nodes.at(-1)!]!,
           side =
@@ -476,7 +535,7 @@ export function carveRiverNetwork(
       dropped.add(r.stream);
       continue;
     }
-    budget.take(64 * r.path.length * RIVER_NETWORK.joinSides);
+    budget.take(64 * r.path.length * 16);
     try {
       let geometry = clip(() => clipping.intersection(buffer(r.path, r.widthM / 2), box));
       const own = geometryBox(geometry),
@@ -514,7 +573,8 @@ export function carveRiverNetwork(
     bed = new Float64Array(n).fill(Infinity);
   budget.take(w * h);
   for (const { r } of kept) {
-    const reachOut = r.widthM / 2 + (d * Math.SQRT2) / 2 + RIVER_NETWORK.outlineToleranceM + 1e-3;
+    const reachOut = r.widthM / 2 + (d * Math.SQRT2) / 2 + RIVER_NETWORK.outlineToleranceM + 1e-3,
+      bedRadius = r.widthM / 2 + (d * Math.SQRT2) / 2;
     for (let j = 1; j < r.path.length; j++) {
       const a = r.path[j - 1]!,
         b = r.path[j]!,
@@ -530,12 +590,18 @@ export function carveRiverNetwork(
             cellLevel[k] = Math.min(cellLevel[k]!, r.levelM);
             cellBand[k] = Math.max(cellBand[k]!, r.bandSteps);
           }
+      // A parabolic channel across the centreline, from the bed at the centre
+      // to the surface half a cell diagonal beyond the banks (v2: a flat bed
+      // of whole nodes, a staircase of 0.5-2 m steps along every bank).
       for (let y = top; y <= bottom + 1; y++)
-        for (let x = left; x <= right + 1; x++)
-          if (pointSegmentDistance([x * d, y * d], a, b) <= r.widthM / 2) {
-            const k = y * c + x;
-            bed[k] = Math.min(bed[k]!, r.bedM);
+        for (let x = left; x <= right + 1; x++) {
+          const dist = pointSegmentDistance([x * d, y * d], a, b);
+          if (dist < bedRadius) {
+            const k = y * c + x,
+              share = dist / bedRadius;
+            bed[k] = Math.min(bed[k]!, decimal6(r.bedM + (r.levelM - r.bedM) * share * share));
           }
+        }
     }
   }
   const samples = elevation.samples.slice(),
@@ -567,12 +633,76 @@ export function carveRiverNetwork(
       band = nodeBand[k]!;
     budget.take((2 * band + 1) ** 2);
     let low = Infinity;
+    // A disc of the band radius (v2: a square, whose corners made the floor
+    // step along lattice rows and diagonals).
     for (let yy = Math.max(0, y - band); yy <= Math.min(rows - 1, y + band); yy++)
       for (let xx = Math.max(0, x - band); xx <= Math.min(c - 1, x + band); xx++)
-        low = Math.min(low, ground[yy * c + xx]!);
+        if ((xx - x) ** 2 + (yy - y) ** 2 <= band * band + band)
+          low = Math.min(low, ground[yy * c + xx]!);
     floors[k] = Math.max(anchors[k]!, decimal6(low - offset(band)));
   }
-  const grading = gradeShoulders(samples, floors, elevation, policy, budget, nodeBand);
+  // Euclidean shoulder seeds: dry nodes near a reach get the floor at their
+  // nearest centreline point (bilinear over that wet cell's corner floors)
+  // plus the gentle grade beyond the widest wet extent. Measured from the
+  // continuous centreline, not the wet-cell staircase, the graded valley
+  // sides face across the channel instead of along lattice rows.
+  const seeds = new Float64Array(n).fill(NaN),
+    floorAt = (p: Point) => {
+      const cx = Math.min(w - 1, Math.max(0, Math.floor(p[0] / d))),
+        cy = Math.min(h - 1, Math.max(0, Math.floor(p[1] / d))),
+        u = Math.min(1, Math.max(0, p[0] / d - cx)),
+        v = Math.min(1, Math.max(0, p[1] / d - cy)),
+        k = cy * c + cx,
+        f00 = floors[k]!,
+        f10 = floors[k + 1]!,
+        f01 = floors[k + c]!,
+        f11 = floors[k + c + 1]!;
+      return (f00 * (1 - u) + f10 * u) * (1 - v) + (f01 * (1 - u) + f11 * u) * v;
+    };
+  for (const { r } of kept) {
+    const wetExtent = r.widthM / 2 + d * Math.SQRT2 + RIVER_NETWORK.outlineToleranceM + 1e-3,
+      bandM = r.bandSteps * d,
+      reach = wetExtent + bandM + RIVER_NETWORK.steepSeedCells * d;
+    for (let j = 1; j < r.path.length; j++) {
+      const a = r.path[j - 1]!,
+        b = r.path[j]!,
+        left = Math.max(0, Math.ceil((Math.min(a[0], b[0]) - reach) / d)),
+        right = Math.min(c - 1, Math.floor((Math.max(a[0], b[0]) + reach) / d)),
+        top = Math.max(0, Math.ceil((Math.min(a[1], b[1]) - reach) / d)),
+        bottom = Math.min(rows - 1, Math.floor((Math.max(a[1], b[1]) + reach) / d)),
+        dx = b[0] - a[0],
+        dy = b[1] - a[1],
+        length2 = dx * dx + dy * dy;
+      budget.take(2 * (right - left + 1) * (bottom - top + 1));
+      for (let y = top; y <= bottom; y++)
+        for (let x = left; x <= right; x++) {
+          const k = y * c + x;
+          if (!Number.isNaN(anchors[k]!)) continue;
+          const px = x * d,
+            py = y * d,
+            t = length2
+              ? Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / length2))
+              : 0,
+            q: Point = [a[0] + t * dx, a[1] + t * dy],
+            dist = Math.hypot(px - q[0], py - q[1]);
+          if (dist > reach) continue;
+          const f = floorAt(q);
+          if (Number.isNaN(f)) continue;
+          // The bank rises from the water level at the widest wet extent to
+          // the floor one sample further out, along a smooth line rather
+          // than the wet-cell staircase.
+          const out = Math.max(0, dist - wetExtent),
+            bank = Math.min(1, out / d),
+            value =
+              r.levelM +
+              (Math.max(f, r.levelM) - r.levelM) * bank +
+              policy.axisGradeCap * Math.min(out, bandM) +
+              policy.steepGrade * Math.max(0, out - bandM);
+          if (Number.isNaN(seeds[k]!) || value < seeds[k]!) seeds[k] = value;
+        }
+    }
+  }
+  const grading = gradeShoulders(samples, floors, elevation, policy, budget, nodeBand, seeds);
   const water: Water[] = [];
   let vertices = 0;
   const streamIds = new Map<number, number>(),

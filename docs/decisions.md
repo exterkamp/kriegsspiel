@@ -968,3 +968,44 @@ Wooded hills must ford somewhere. A falsified map with every bridge turned into 
 **Not done.** Depth is a single ordinary-water value per reach: there are no seasons or floods, and no per-ford bed survey. The gameplay engine's ford `risk` is not derived from depth. Bridge connectors keep the single straight outward approach of D44.
 
 **See.** [Geography](../packages/maps/docs/geography.md), [planning](../packages/maps/docs/planning.md), [composition](../packages/maps/docs/composition.md).
+
+## D47: Generated relief and rivers have no shared combed angle (#540)
+
+**Decision.** Terrain stage `gradient-relief-eroded-v3` replaces `structured-relief-eroded-v2`, and hydrology stage `flood-carved-flowline-network-v3` replaces `flood-carved-stepped-network-v2`. v2 stretched every map 2.5× along one seeded axis over value noise whose octaves shared one lattice, and routed rivers along D8 receivers, so slopes, valleys and river banks all gathered on one angle and on the lattice axes.
+
+- **Noise.** Perlin gradient noise over 24 literal unit gradients at 7.5 + 15k degrees (none on a lattice axis or diagonal). Every octave, warp, ridge and valley field has its own seeded rotation and lattice offset.
+- **Grain and tilt per map.** `reliefShape(terrain, seed)` draws the stretch, its axis, the tilt strength and the tilt axis from the seed and a hash of the recipe (feature scale, relief, roughness, octaves), so one seed gives different axes on different presets. The stretch is `1 + 0.15·u²` on most maps, and 1.25–1.4 on one map in eight. Tilt strength is 0.03–0.2 (v2: always 0.3).
+- **Erosion and filling.** Stream-power incision pulls toward the D-infinity point on the steepest facet (Tarboton), not the steepest D8 neighbour. Filled depressions rise 0.05 m per cell of Euclidean distance from their spill point (vector propagation), not per flood step, so floors slope radially. Erosion routes with a 0.001 m per cell rise on flats, so flats no longer drain along row-major flood parents.
+- **Rivers.** Channels follow D8-LTD flow lines (`ltd-flowlines-v1`, `src/geography/flowlines.ts`): the D-infinity direction, with the cardinal or diagonal receiver chosen to keep the accumulated transverse deviation smallest (Orlandini et al. 2003). Centrelines get three binomial smoothing passes before Douglas–Peucker. Joins and caps are fans inscribed in the true round join, oriented by the path (v2's fixed octagons put lattice-angle notches on every outer bend). The bed is parabolic across the channel. Shoulder caps (`banded-lipschitz-cut-v3`) also start from the continuous centreline, with the bank rising from the water along a smooth line, and floors use a disc instead of a square. Reach levels are unchanged, so they still never rise downstream.
+
+Generation stays deterministic per seed: no `Math.random`, clock or locale, and no runtime trigonometry (literal gradient tables, square roots only).
+
+**Contract.** The `kriegsspiel/local-map` v1 schema is unchanged; the saved `drainage` layer keeps `filled-ground-d8-v1` (steepest D8 on the final ground). `LEGACY_GENERATORS` gains the D46 identity (terrain and hydrology v2 with the fording roads), and the D44 and D45 identities now pin terrain and hydrology v2 too. A saved D46 map (`packages/maps/tests/fixtures/d46-saved-map.json`) is tested to certify but not replay; mixing either new stage into an old identity is rejected. `data/maps` is not regenerated. Erosion work is metered at 14 per sample per pass (was 12), still within the 100,000,000 cap at the 601×601 maximum.
+
+**Measured.** `realismReport` gains `grain` (`grainRealism`, aggregated by `summarizeGrain`):
+
+- anisotropy: the eigenvalue ratio of the gradient structure tensor;
+- the gradient-weighted share of slope aspect within 7.5 degrees of 0, 45, 90 and 135 degrees;
+- river bank alignment with the grain: mean |cos|, with the grain perpendicular to the dominant slope axis;
+- the share of bank length within 2.5 degrees of those four angles (the map frame is excluded).
+
+Over seeds 1–20 of `wooded-hills` and `river-valley` (40 maps), `tests/realism-grain.test.ts` requires:
+
+- mean anisotropy ≤ 1.5, and no map over 2.2;
+- each aspect share ≤ 10%;
+- river alignment ≤ 0.70;
+- grid-angle bank share ≤ 16% in total.
+
+| 40 maps | v2 (D46) | v3 |
+|---|---|---|
+| anisotropy mean / max | 2.58 / 3.49 | 1.23 / 1.76 |
+| aspect 0 / 45 / 90 / 135 | 10.8 / 8.3 / 9.4 / 12.8% | 8.5 / 8.8 / 9.0 / 9.2% |
+| river alignment (uniform 0.64) | 0.805 | 0.698 (wooded hills 0.686, river valley 0.707) |
+| banks within 15° of grain (uniform 16.7%) | 36.5% | 21.9% |
+| banks within 2.5° of grid angles (uniform 11.1%) | 37.3% | 12.1% |
+
+`scripts/maps-render/grain.mjs` prints these for any build. Renders, metrics and interleaved benchmarks are in `docs/map-realism/unbiased/`.
+
+**Not done.** River alignment is measured against a grain read from the final ground, which includes the rivers' own graded valleys. Even fully isotropic noise measures about 0.69 here, so the 0.70 limit has little margin. No recipe setting asks for a strong grain yet: the strong grain is capped below the 2.2 limit. The graded band beside wide rivers (D44) still makes steep walls along its edge.
+
+**See.** [Terrain](../packages/maps/docs/terrain.md), [geography](../packages/maps/docs/geography.md).
