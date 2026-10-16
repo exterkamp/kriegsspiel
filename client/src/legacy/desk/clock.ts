@@ -31,10 +31,23 @@ const TURN_LABEL = {
 /** Turn mode is known from the game's settings but the server has not yet sent the open turn. */
 const TURN_WAITING = 'Waiting for the turn';
 
+/** A game just joined whose mode is not yet known: no rate and no status that belongs to one mode (#427). */
+const JOINING = 'Joining the game';
+
 /** What the desk clock shows, from the client state at a local wall time. Pure, so it needs no DOM. */
 export function clockView(state: ClientState, nowWall: number): ClockView {
   if (state.turnMode) return turnClockView(state);
   const c = state.clock;
+  if (state.modePending) {
+    const at = state.gameOver?.atGame ?? (c ? gameNowMs(c, nowWall) : state.view?.atGame);
+    return {
+      time: at === undefined ? '--' : formatGameTime(at),
+      rate: '',
+      status: state.gameOver ? 'stopped' : 'none',
+      staffAtWork: false,
+      label: state.gameOver ? TURN_LABEL.over : JOINING,
+    };
+  }
   if (!c) return { time: '--', rate: '', status: 'none', staffAtWork: false, label: LABEL.none };
   const open = state.pause?.proposal;
   return {
@@ -76,6 +89,7 @@ function turnClockView(state: ClientState): ClockView {
 /** One line for assistive tech and the compact clock's tooltip. */
 export function clockSummary(v: ClockView): string {
   if (v.turn) return [v.turn, v.label.toLowerCase()].join(', ');
+  if (v.label === JOINING) return JOINING;
   if (v.status === 'none') return 'No clock yet';
   // A finished turn-mode game has no rate to give.
   const parts = [

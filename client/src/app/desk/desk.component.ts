@@ -68,7 +68,10 @@ export class DeskComponent {
   protected readonly state = this.game.state;
   protected readonly gameId = this.game.gameId;
   private readonly ended = computed(() => this.game.state().gameOver !== undefined);
-  /** A turn-mode game (D39) has no pause vote; the turn panel takes its place. */
+  /**
+   * A turn-mode game (D39) has no pause vote; the turn panel takes its place. Until the game's mode is known the
+   * dock shows neither (#427).
+   */
   protected readonly turnMode = computed(() => this.game.state().turnMode === true);
   protected readonly unread = computed(() =>
     unreadCount(this.desk.papers(), this.desk.trayMarks()),
