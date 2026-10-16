@@ -98,7 +98,11 @@ const FIGHT_KINDS = new Set<Dispatch['kind']>([
   'unitLost',
 ]);
 
-export const isFight = (d: Dispatch): boolean => FIGHT_KINDS.has(d.kind);
+/** A unit's paper on an umpire turn (11.9) that lost men or broke: it fought in the turn. */
+const foughtInTurn = (d: Dispatch): boolean =>
+  d.kind === 'turn' && !!d.turn && (d.turn.lost > 0 || !!d.turn.broke);
+
+export const isFight = (d: Dispatch): boolean => FIGHT_KINDS.has(d.kind) || foughtInTurn(d);
 
 const byWritten = (a: Dispatch, b: Dispatch): number =>
   a.writtenAtGame - b.writtenAtGame || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
@@ -177,6 +181,12 @@ function doingOf(
   if (last?.kind === 'broke') return 'Broken, falling back';
   if (last?.kind === 'heavyLosses') return 'In action, with heavy losses';
   if (last?.kind === 'engaged') return 'In action';
+  // An umpire turn's paper (11.9) says what the unit went through in the turn.
+  if (last?.kind === 'turn' && last.turn) {
+    if (last.turn.broke) return 'Broken, falling back';
+    if (last.turn.rallied) return 'Rallied';
+    if (last.turn.lost > 0) return 'In action';
+  }
   // An enemy in sight within fire, as the table marks a fight.
   if (enemies.some((e) => dist(e.position, unit.position) <= ENGAGE_RANGE_M)) return 'In action';
   if (last?.kind === 'destroyed') return 'Has beaten the enemy before it';
@@ -278,6 +288,8 @@ export function turnSummary(a: {
     `Sir, the staff's summary of turn ${a.turn}, ${timeOfDay(a.startsAt)} to ${timeOfDay(a.endsAt)}.`,
   ];
   const was = new Map((a.before ?? []).map((u) => [u.id, u]));
+  /** The units' own accounts of an umpire turn (11.9), one per unit. */
+  const accounts = a.papers.filter((d) => d.kind === 'turn' && d.turn);
   if (a.before) {
     const moved = a.view.ownUnits.flatMap((u) => {
       const b = was.get(u.id);
@@ -287,6 +299,16 @@ export function turnSummary(a: {
       const where = u.place ? `, now ${u.place}` : '';
       return [
         `${u.name} about ${Math.round(d / 50) * 50} m ${compass(u.position.x - b.position.x, u.position.y - b.position.y)}${where}`,
+      ];
+    });
+    lines.push(moved.length ? `Moved: ${list(moved)}.` : 'Moved: no unit moved.');
+  } else if (accounts.length) {
+    // No snapshot: the units' accounts of an umpire turn say how far each moved, if not which way.
+    const moved = accounts.flatMap((d) => {
+      if (d.turn!.movedM < 50) return [];
+      const place = a.view.ownUnits.find((u) => u.name === d.from)?.place;
+      return [
+        `${d.from} about ${Math.round(d.turn!.movedM / 50) * 50} m${place ? `, now ${place}` : ''}`,
       ];
     });
     lines.push(moved.length ? `Moved: ${list(moved)}.` : 'Moved: no unit moved.');
@@ -326,6 +348,15 @@ export function turnSummary(a: {
       const all = total > 0 ? ` In all ${roundLoss(Math.round(total))}.` : '';
       lines.push(`Losses: ${list(losses)}.${all}`);
     } else lines.push('Losses: the staff have no figures for the units.');
+  } else if (accounts.length) {
+    // No snapshot, but the units' own papers on an umpire turn (11.9) say what each lost.
+    const total = accounts.reduce((n, d) => n + d.turn!.lost, 0);
+    const losses = accounts.map((d) => {
+      const now = a.view.ownUnits.find((u) => u.name === d.from)?.strength;
+      const lost = d.turn!.lost;
+      return `${d.from} ${now === undefined ? (lost > 0 ? roundLoss(lost) : 'none') : lossBand(now + lost, now)}`;
+    });
+    lines.push(`Losses: ${list(losses)}.${total > 0 ? ` In all ${roundLoss(total)}.` : ''}`);
   } else {
     lines.push(
       'The desk was not open when the turn began, so the staff cannot say what moved or what it cost.',

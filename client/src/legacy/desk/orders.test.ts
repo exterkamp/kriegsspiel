@@ -253,4 +253,35 @@ describe('where a sent order stands (#439)', () => {
     expect(orderProgress(p, [lost])?.state).toBe('lost');
     expect(orderProgress(p, [])).toBeUndefined();
   });
+
+  it('takes what became of it from the unit’s paper on an umpire turn (11.9)', () => {
+    const clock = (ms: number) => `${ms / 60_000}`;
+    const turn = (id: string, result: NonNullable<Dispatch['turn']>['orders'][number]['result']) =>
+      d(id, {
+        kind: 'turn',
+        writtenAtGame: 20 * 60_000,
+        turn: { n: 1, lost: 0, movedM: 0, orders: [{ ref: 't-1', result }] },
+      });
+    expect(orderProgress(p, [turn('t', 'not-arrived')], clock)).toEqual({
+      state: 'riding',
+      atGame: 20 * 60_000,
+      label: 'Not arrived by 20; with the courier',
+    });
+    expect(orderProgress(p, [turn('t', 'carried-out')], clock)?.label).toBe(
+      'Delivered by 20; carried out',
+    );
+    expect(orderProgress(p, [turn('t', 'misread')], clock)?.label).toBe(
+      'Delivered by 20; acted on as he read it',
+    );
+    const ack = d('a', { kind: 'orderDelivered', orderId: 't-1' });
+    expect(orderProgress(p, [ack, turn('t', 'refused')], clock)?.label).toBe(
+      'Delivered at 4; not acted on',
+    );
+    // A paper about another order says nothing of this one.
+    const other = d('o', {
+      kind: 'turn',
+      turn: { n: 1, lost: 0, movedM: 0, orders: [{ ref: 't-2', result: 'carried-out' }] },
+    });
+    expect(orderProgress(p, [other])).toBeUndefined();
+  });
 });

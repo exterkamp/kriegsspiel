@@ -101,6 +101,21 @@ describe('papers by turn (#439)', () => {
     ]);
   });
 
+  it('puts an umpire turn’s papers (all handed in at its end) in that turn, the ruling and notice last', () => {
+    const groups = byTurn(
+      [
+        at('a-notice', 20, 20, { kind: 'notice' }),
+        at('b-turn', 20, 20, { kind: 'turn' }),
+        at('c-battle', 20, 20, { kind: 'battle' }),
+        at('turn-summary-1', 20, 20),
+      ],
+      TURN,
+    );
+    expect(groups.map((g) => [g.turn, g.rows.map((r) => r.d.id)])).toEqual([
+      [1, ['turn-summary-1', 'b-turn', 'a-notice', 'c-battle']],
+    ]);
+  });
+
   it('merges repeated sightings into one row that opens on the newest', () => {
     const seen = {
       kind: 'contact' as const,

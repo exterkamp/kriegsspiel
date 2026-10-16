@@ -281,16 +281,42 @@ export function orderOutcomes(
 
 /** Where a sent order stands once word of it has come back (#439). */
 export interface OrderProgress {
-  state: 'delivered' | 'actedOn' | 'lost';
-  /** When its unit got it, or when the staff gave its courier up. */
+  /** `riding`: an umpire turn's papers say it had not arrived by the turn's end. */
+  state: 'delivered' | 'actedOn' | 'lost' | 'riding';
+  /** When its unit got it, when the staff gave its courier up, or the end of the turn that said so. */
   atGame: number;
   label: string;
 }
 
+type TurnResult = NonNullable<Dispatch['turn']>['orders'][number]['result'];
+
+/** What an umpire turn's paper (11.9) says its unit made of an order, in the desk's words. */
+const RESULT_WORDS: Record<Exclude<TurnResult, 'not-arrived'>, string> = {
+  'carried-out': 'carried out',
+  partly: 'partly carried out',
+  misread: 'acted on as he read it',
+  refused: 'not acted on',
+};
+
+/** The latest umpire-turn paper (11.9) that names the order, and what it says its unit made of it. */
+function turnWordOf(
+  p: PendingOrder,
+  sorted: readonly Dispatch[],
+): { paper: Dispatch; result: TurnResult } | undefined {
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const d = sorted[i]!;
+    const r = d.kind === 'turn' ? d.turn?.orders.find((o) => o.ref === p.orderId) : undefined;
+    if (r) return { paper: d, result: r.result };
+  }
+  return undefined;
+}
+
 /**
  * What became of a sent order, from the papers: delivered at the time its unit had it (the acknowledgement's
- * written time, not when the paper reached HQ), acted on once the unit has written since, or lost. Undefined
- * while no word has come back. `clock` formats the time (`Day 1 00:04` by default).
+ * written time, not when the paper reached HQ), acted on once the unit has written since, or lost. After an
+ * umpire turn (11.9) its unit's `turn` paper says what it made of the order (carried out, misread, not acted
+ * on) or that it had not arrived by the turn's end. Undefined while no word has come back. `clock` formats the
+ * time (`Day 1 00:04` by default).
  */
 export function orderProgress(
   p: PendingOrder,
@@ -299,12 +325,30 @@ export function orderProgress(
 ): OrderProgress | undefined {
   const sorted = byWritten(dispatches);
   const o = outcomeOf(p, sorted);
-  if (!o) return undefined;
-  if ('lost' in o) {
+  if (o && 'lost' in o) {
     const at = o.lost.writtenAtGame;
     return { state: 'lost', atGame: at, label: `Lost: the courier was given up at ${clock(at)}` };
   }
+  const word = turnWordOf(p, sorted);
+  if (!o) {
+    if (!word) return undefined;
+    const at = word.paper.writtenAtGame;
+    return word.result === 'not-arrived'
+      ? { state: 'riding', atGame: at, label: `Not arrived by ${clock(at)}; with the courier` }
+      : {
+          state: 'actedOn',
+          atGame: at,
+          label: `Delivered by ${clock(at)}; ${RESULT_WORDS[word.result]}`,
+        };
+  }
   const at = o.arrived.writtenAtGame;
+  if (word && word.result !== 'not-arrived') {
+    return {
+      state: 'actedOn',
+      atGame: at,
+      label: `Delivered at ${clock(at)}; ${RESULT_WORDS[word.result]}`,
+    };
+  }
   const since = sorted.some(
     (d) =>
       !!p.toName &&

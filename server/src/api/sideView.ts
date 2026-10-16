@@ -74,6 +74,7 @@ export function toDispatch(r: ViewReport): Dispatch {
     confidence: r.confidence,
     text: r.text,
     ...(r.orderRef === undefined ? {} : { orderId: r.orderRef }),
+    ...(r.turn === undefined ? {} : { turn: r.turn }),
   };
 }
 

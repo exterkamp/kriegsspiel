@@ -341,6 +341,46 @@ describe('turn summary (#439)', () => {
     expect(d.text).toContain('the staff cannot say what moved or what it cost');
     expect(d.text).not.toMatch(/Moved|Losses/);
   });
+
+  it('reads movement, losses and fighting from the units’ papers on an umpire turn (11.9)', () => {
+    const turnPaper = (id: string, from: string, facts: NonNullable<Dispatch['turn']>) =>
+      paper({
+        id,
+        from,
+        kind: 'turn',
+        writtenAtGame: 40 * MIN,
+        receivedAtGame: 40 * MIN,
+        location: { x: 1000, y: 2000 },
+        place: 'at the bridge',
+        turn: facts,
+      });
+    const papers = [
+      turnPaper('t1', '1st Battalion', { n: 2, lost: 120, movedM: 610, broke: true, orders: [] }),
+      turnPaper('t2', '2nd Battalion', { n: 2, lost: 0, movedM: 0, orders: [] }),
+    ];
+    const d = turnSummary({ turn: 2, startsAt: 20 * MIN, endsAt: 40 * MIN, view: view(), papers });
+    expect(d.text).toContain(
+      'Moved: 1st Battalion about 600 m, now at the bridge, on the High road.',
+    );
+    expect(d.text).toContain('Fought: 1st Battalion at the bridge, from 00:40.');
+    expect(d.text).toContain(
+      'Losses: 1st Battalion heavy, about 120 men; and 2nd Battalion none. In all about 120 men.',
+    );
+    expect(d.text).not.toContain('cannot say');
+    expect(turnFights(papers, 2)).toEqual([
+      { id: 'fought-2-0', position: { x: 1000, y: 2000 }, label: 'Fought 00:40' },
+    ]);
+    const [first, second] = unitStatuses({
+      view: view(),
+      held: [],
+      pending: [],
+      dispatches: papers,
+      papers,
+      sent: false,
+    });
+    expect(first!.doing).toBe('Broken, falling back');
+    expect(second!.doing).toBe('Standing');
+  });
 });
 
 describe('turn record storage', () => {

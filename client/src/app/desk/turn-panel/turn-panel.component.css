@@ -73,7 +73,7 @@ p:last-child {
   color: var(--ks-brass-hi);
 }
 .how {
-  margin-top: 4px;
+  margin-top: var(--ks-space-1);
   font-size: var(--ks-text-xs);
   max-width: 34rem;
 }
@@ -82,5 +82,5 @@ p:last-child {
   opacity: 0.9;
 }
 .how p {
-  margin-top: 4px;
+  margin-top: var(--ks-space-1);
 }

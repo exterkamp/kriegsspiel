@@ -78,7 +78,8 @@ export interface TurnGroup {
 /**
  * A pile's papers in a turn-mode game, grouped under the turn they came in with, newest turn first (#439). Within
  * a turn the staff's summary comes first, then the papers in the order they were written, with repeated
- * sightings of one enemy (same strength, same place) merged into one row.
+ * sightings of one enemy (same strength, same place) merged into one row, and the umpire's ruling or notice last.
+ * An umpire turn's papers (11.9) are all handed in at its end, so they come with that turn.
  */
 export function byTurn(items: readonly Dispatch[], turnMs: number): TurnGroup[] {
   const turns = new Map<number, Dispatch[]>();
@@ -100,8 +101,11 @@ export function byTurn(items: readonly Dispatch[], turnMs: number): TurnGroup[] 
         // A merged sighting stands where it was first seen, and opens on its newest paper.
         else if (s.papers[0] === d) rows.push({ d: s.papers.at(-1)!, papers: s.papers });
       }
+      // The staff's summary first; the umpire's ruling and notices (11.9) last, as the server sends them (#438).
       const first = rows.filter((r) => isSummary(r.d));
-      return { turn, rows: [...first, ...rows.filter((r) => !isSummary(r.d))] };
+      const last = rows.filter((r) => r.d.kind === 'battle' || r.d.kind === 'notice');
+      const middle = rows.filter((r) => !first.includes(r) && !last.includes(r));
+      return { turn, rows: [...first, ...middle, ...last] };
     });
 }
 
