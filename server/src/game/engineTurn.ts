@@ -1,9 +1,11 @@
 /**
  * The engine adjudicator (D39, story 11.4): a turn resolved by the rigid rules, with no model.
  *
- * The turn's orders are read by the rules parser (`testParse`, the canned rules of #389) with two
- * turn-mode changes: the addressee is the one chosen on the desk, never guessed from the text, and
- * an order with a condition or a time is "no new order" rather than its plain verb. Its couriers
+ * The turn's orders are read by the rules parser (`rulesParse`, the canned rules of #389) with
+ * turn-mode changes: the addressee is the one chosen on the desk, never guessed from the text; only
+ * the plain sentences before a condition, a time or an injection are read, and an order that opens
+ * with one is "no new order" rather than its plain verb; and where at a place the order means is put
+ * on the map (`rulesPlace.ts`, #522). Its couriers
  * are rolled once by the engine's courier pass; the turn then runs from its start under the
  * ordinary handlers (movement, contact, combat, morale, rally, supply, visibility, victory) to its
  * end, with each ride forced to the pass's outcome, and the scripted sides thinking at their
@@ -33,8 +35,14 @@ import {
   type Unit,
   type UnitStatus,
 } from '@kriegsspiel/engine';
-import { parseOrdersInput, placeIntents } from '../orders/llmParser.js';
-import { hasConditionOrTime, testParse } from '../umpire/providers/testParse.js';
+import { parseOrdersInput } from '../orders/llmParser.js';
+import {
+  hasConditionOrTime,
+  isInjection,
+  rulesParse,
+  sentencesOf,
+} from '../umpire/providers/testParse.js';
+import { placeRulesIntents } from './rulesPlace.js';
 import { parseContextOf } from './parseContext.js';
 import { advanceUntilOver } from './advance.js';
 import type { SentTurnOrder, TurnRecord } from './store.js';
@@ -74,8 +82,9 @@ type Bounds = Pick<TurnInput, 'n' | 'startMs' | 'endMs'>;
 
 /**
  * Read one turn order with the rules, in turn mode (D39, "Orders in turn mode"): only the addressee
- * is offered as the unit, so it is never guessed; a conditional or timed order, or one the rules
- * cannot read, is "no new order".
+ * is offered as the unit, so it is never guessed (the side's other units are points of reference
+ * only); the sentences after a condition, a time or an injection are left to the umpire; an order
+ * that opens with one, or that the rules cannot read, is "no new order".
  */
 export function rulesParseTurnOrder(world: GameState, order: SentTurnOrder): RulesOrder {
   const base = {
@@ -86,13 +95,16 @@ export function rulesParseTurnOrder(world: GameState, order: SentTurnOrder): Rul
   };
   const unit = world.units.find((u) => u.id === order.to && u.side === order.side);
   if (!unit) return { ...base, none: 'no such unit of this side' };
-  if (hasConditionOrTime(order.text)) {
-    return { ...base, none: 'a condition or a time the rules cannot carry out' };
-  }
+  const kept = plainSentences(order.text);
+  if (typeof kept !== 'string') return { ...base, none: kept.none };
   const ctx = parseContextOf(world, order.side);
-  // An order that names no unit ("hold here") is for the addressee: the desk already chose it.
-  const parsed = testParse({
-    ...parseOrdersInput(order.text, { ...ctx, units: ctx.units.filter((u) => u.id === unit.id) }),
+  const input = parseOrdersInput(kept, ctx);
+  // An order that names no unit ("hold here") is for the addressee: the desk already chose it. The
+  // side's other units are only points of reference ("behind the 1st Battalion").
+  const parsed = rulesParse({
+    ...input,
+    units: input.units.filter((u) => u.id === unit.id),
+    refs: input.units.filter((u) => u.id !== unit.id),
     addressee: unit.id,
   });
   if (parsed.result === 'rejection') return { ...base, none: parsed.reason ?? 'not understood' };
@@ -103,9 +115,31 @@ export function rulesParseTurnOrder(world: GameState, order: SentTurnOrder): Rul
   if (parsed.intents.some((i) => i.kind === 'attack')) {
     return { ...base, none: 'attack orders are not modelled yet' };
   }
-  const intents = placeIntents(parsed.intents, unit, ctx);
+  const intents = placeRulesIntents(parsed.intents, unit, world);
   if (typeof intents === 'string') return { ...base, none: intents };
-  return { ...base, intents: intents as OrderIntent[] };
+  return { ...base, intents };
+}
+
+/**
+ * The part of an order the rules carry out in turn mode (D39, #522): its sentences up to the first
+ * with a condition or a time ("If pressed, fall back"), or with words addressed to the umpire
+ * rather than the unit. What follows is left to the umpire; the rules never act on half a sentence
+ * or on a sentence after a condition. When the first sentence is such, it is "no new order".
+ */
+export function plainSentences(text: string): string | { none: string } {
+  const kept: string[] = [];
+  for (const s of sentencesOf(text)) {
+    if (hasConditionOrTime(s)) {
+      if (kept.length === 0) return { none: 'a condition or a time the rules cannot carry out' };
+      break;
+    }
+    if (isInjection(s)) {
+      if (kept.length === 0) return { none: 'not an order for any unit' };
+      break;
+    }
+    kept.push(s);
+  }
+  return kept.length > 0 ? kept.join(' ') : { none: 'not understood' };
 }
 
 /** The engine orders a turn's rules-read orders become: every one rides, "no new order" too. */
