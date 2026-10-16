@@ -307,6 +307,112 @@ describe('period staff-map style (recorded Canvas2D)', () => {
     }
   });
 
+  describe('adjoining river reaches', () => {
+    // The reference river split into two reaches whose cut edges were simplified apart, as D44's are:
+    // a 3 cm gap at the west bank closing to a 2 cm overlap at the east bank.
+    const reaches = () =>
+      reference((input) => {
+        const river = input.layers.water[0]!;
+        input.layers.water = [
+          {
+            ...river,
+            polygons: [
+              {
+                outer: [
+                  [40, 10],
+                  [60, 10],
+                  [60, 99.98],
+                  [40, 100.03],
+                  [40, 10],
+                ],
+                holes: [],
+              },
+            ],
+          },
+          {
+            ...river,
+            id: 'river:1',
+            polygons: [
+              {
+                outer: [
+                  [40, 100.03],
+                  [60, 99.98],
+                  [60, 140],
+                  [40, 140],
+                  [40, 100.03],
+                ],
+                holes: [],
+              },
+            ],
+          },
+        ];
+      });
+    /** Nonzero winding of a point over a recorded path's rings. */
+    const winding = (path: PeriodPath, x: number, y: number) => {
+      const rings: number[][][] = [];
+      for (const [op, px, py] of path.ops as [string, number, number][])
+        if (op === 'M') rings.push([[px, py]]);
+        else rings.at(-1)!.push([px, py]);
+      let w = 0;
+      for (const ring of rings)
+        for (let i = 0; i < ring.length; i++) {
+          const [ax, ay] = ring[i]!;
+          const [bx, by] = ring[(i + 1) % ring.length]!;
+          const side = (bx! - ax!) * (y - ay!) - (x - ax!) * (by! - ay!);
+          if (ay! <= y && by! > y && side > 0) w++;
+          else if (ay! > y && by! <= y && side < 0) w--;
+        }
+      return w;
+    };
+    /** Some recorded line runs across the river near the junction (a seam), not along a bank. */
+    const seam = (path: PeriodPath) =>
+      path.ops.some((op, i) => {
+        const prev = path.ops[i - 1] as [string, number, number] | undefined;
+        const [kind, x, y] = op as [string, number, number];
+        return (
+          kind === 'L' &&
+          prev !== undefined &&
+          Math.abs(y - 100) < 0.5 &&
+          Math.abs(prev[2] - 100) < 0.5 &&
+          Math.min(x, prev[1]) < 59 &&
+          Math.max(x, prev[1]) > 41
+        );
+      });
+    const view = { width: 400, height: 400, scale: 8, offset: [-200, -600] as [number, number] };
+
+    it.each([false, true])(
+      'draw as one body with no seam in the period style (high contrast: %s)',
+      (highContrast) => {
+        const renderer = new MapRenderer(reaches(), PERIOD_MAP_STYLE);
+        const before = canvases.length;
+        for (let i = 0; i < 10; i++)
+          if (!renderer.render(proxyContext([]), view, { ...layers, water: true }, highContrast))
+            break;
+        const p = highContrast ? palette.contrast : palette.regular;
+        const tiles = canvases.slice(before).filter((c) => c.some((call) => call.name === 'clip'));
+        expect(tiles.length).toBeGreaterThan(0);
+        for (const tile of tiles) {
+          const fills = tile.filter((c) => c.name === 'fill' && c.fillStyle === p.water);
+          expect(fills.map((c) => c.args[1])).toEqual(['nonzero']);
+          expect(tile.find((c) => c.name === 'clip')!.args[1]).toBe('nonzero');
+          // Shore, lining and its cut-backs all follow the shore path: none of it crosses the river.
+          const strokes = tile.filter((c) => c.name === 'stroke');
+          expect(strokes.length).toBe(1 + 2 * PERIOD_MAP_STYLE.water.liningPx.length);
+          for (const stroke of strokes) expect(seam(stroke.args[0] as PeriodPath)).toBe(false);
+        }
+        // Across the whole junction the water is filled, gap included, and filled once.
+        const body = tiles
+          .map((tile) => tile.find((c) => c.name === 'fill' && c.fillStyle === p.water)!)
+          .map((c) => c.args[0] as PeriodPath);
+        for (let x = 40.5; x < 60; x += 0.5) {
+          const gapY = 100.03 - (0.05 * (x - 40)) / 20;
+          for (const y of [99.9, (100 + gapY) / 2, 100.1])
+            expect(body.some((path) => winding(path, x, y) > 0)).toBe(true);
+        }
+      },
+    );
+  });
+
   it('cases roads by class with a minimum screen width and breaks cart tracks', () => {
     const view = { width: 150, height: 150, scale: 0.5, offset: [0, 0] as [number, number] };
     const only = { ...layers, roads: true };
