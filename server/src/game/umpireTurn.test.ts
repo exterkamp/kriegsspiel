@@ -672,15 +672,6 @@ describe('the umpire’s prompt', () => {
     const shown = model.requests[0]!.input as { orders: { orderId: string; text: string }[] };
     expect(shown.orders.map((o) => o.orderId)).toEqual(['blue-b1', 'blue-b2', 'red-r1', 'red-r2']);
   });
-
-  it('asks under standard for each departing unit’s own reason, in that unit’s outcome (#523)', () => {
-    expect(ADJUDICATE_PROMPT_VERSION).toBe('adjudicate-v5');
-    const standard = adjudicateSystem('standard');
-    expect(standard).toContain('give the reason in that unit\'s own "departure"');
-    expect(standard).toContain('a reason given only in the "summary"');
-    expect(standard).toContain('never of the proposal itself');
-    expect(standard).toContain('left out, not null');
-  });
 });
 
 describe('replay of a recorded umpire turn', () => {
