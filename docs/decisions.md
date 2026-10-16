@@ -1053,3 +1053,20 @@ Uniformly random bearings would give 11%. The knight moves matter. Without them 
 **Not done.** Settlement streets are 99% on the grid angles, because every site is an axis-aligned square laid out with rotation 0. Rotating sites is a settlement-stage change. Site connectors and ford connectors still end on lattice nodes, and junctions are not rounded. Long straight lines remain where the ground allows them.
 
 **See.** [Planning](../packages/maps/docs/planning.md), [map architecture](map-architecture.md).
+
+## D49: Map generation returns a result for every seed (#542)
+
+**Decision.** `generateBattlefield` never throws once its input is accepted, and every default preset generates. Over seeds 1–50 of `flat-countryside`, `wooded-hills` and `river-valley` at default size, main (D47 relief, D48 roads) generated 143 of 150 maps: four seeds threw and three returned failures. Each had its own cause, now fixed where it arose:
+
+- **Ford probe outside the map** (wooded-hills 2, 11 and 44 threw `RangeError: Height query … is outside`). On a reach along the map edge, a ford's transverse line put an end outside the bounds, and the bank check queried its height. Such ends are now skipped before any height query; they could never certify, because abutment disks must fit the bounds.
+- **Touching reach components** (river-valley 35 threw in cover: `Water multipolygon components touch or overlap`). A reach pinched in two by a neighbour's water could have its two parts touch after rounding or outline simplification. Touching parts fall back to their exact outlines. A reach whose exact parts still touch is unrepresentable, and is dropped like other unrepresentable tributary geometry.
+- **False road overlap** (flat-countryside 13 and river-valley 25 failed `OVERLAPPING_ROADS`). Two nearly collinear straight roads meeting end to end at a junction have an ill-conditioned line intersection, which landed micrometres inside an edge. The planning validator now skips pairs that share an endpoint and leave it on opposite sides, since they can meet only there. The saved-map contract validator already accepted these.
+- **Boundary exit in a pocket** (river-valley 44 failed `REGIONAL_CONNECTIVITY`). The west exit, the first certified position from the middle of its side, was cut off from every site. When no route reaches an exit, it now moves along its side to the next certified position at least 400 m from those already tried, at most four times (`EXIT_RETRY`), before failing.
+
+As a last line of defence, composition turns any exception no stage expected into `ok:false` with a `GENERATION_INTERNAL_ERROR` diagnostic. The diagnostic names the running stage and keeps the error's name and message. Malformed input (settings, seed, limits) still throws before generation starts, and the stage entry points keep their documented argument errors.
+
+**Contract.** No stage version changes, and the `kriegsspiel/local-map` v1 schema is unchanged. Each fix changes only maps that previously threw or failed: the 143 maps that generated on main are byte-identical (canonical SHA-256). Replay and the legacy identities are untouched, and `data/maps` is not regenerated. No seed in the sweep was a legitimate infeasibility, so there is no sub-seed retry. Recording such a retry in provenance would need a schema change.
+
+**Measured.** All 150 maps now generate and certify. In CI, `tests/generation-sweep.test.ts` runs the seeds that failed (one or more per cause) plus seed 1 of each preset. After `npm run build -w packages/maps`, `node scripts/maps-render/sweep.mjs` runs the full sweep. `tests/realism-roads.test.ts` now requires all 40 of its maps to plan.
+
+**See.** [Geography](../packages/maps/docs/geography.md), [planning](../packages/maps/docs/planning.md), [composition](../packages/maps/docs/composition.md).

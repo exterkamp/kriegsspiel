@@ -9,7 +9,12 @@ import type {
   Water,
 } from '../contract.js';
 import { MapValidationError, TopologyBudget } from '../errors.js';
-import { polygonArea, pointSegmentDistance, validatePolygon } from '../geometry.js';
+import {
+  polygonArea,
+  polygonsOverlap,
+  pointSegmentDistance,
+  validatePolygon,
+} from '../geometry.js';
 import { decimal6 } from '../terrain/precision.js';
 import { deriveSeed } from '../overrides.js';
 import { Budget, GeographyFailure } from './budget.js';
@@ -250,7 +255,8 @@ function clip(run: () => ClipMultiPolygon): ClipMultiPolygon {
 
 /** Decimal6 rings with duplicate and collinear vertices removed, then strictly validated. */
 function toPolygons(geometry: ClipMultiPolygon, minimumArea: number, path: string): Polygon[] {
-  const result: Polygon[] = [];
+  const result: Polygon[] = [],
+    exact: Polygon[] = [];
   for (const raw of geometry) {
     const rings: Point[][] = [];
     for (const ring of raw) {
@@ -292,6 +298,7 @@ function toPolygons(geometry: ClipMultiPolygon, minimumArea: number, path: strin
       return kept.length >= 4 ? kept : ring;
     };
     const reduced: Polygon = { outer: simple(polygon.outer), holes: polygon.holes.map(simple) };
+    exact.push(polygon);
     try {
       validatePolygon(reduced, path, new TopologyBudget(10_000_000));
       result.push(reduced);
@@ -300,6 +307,24 @@ function toPolygons(geometry: ClipMultiPolygon, minimumArea: number, path: strin
       validatePolygon(polygon, path, new TopologyBudget(10_000_000));
       result.push(polygon);
     }
+  }
+  // Components of one reach must stay apart (#542): rounding and outline
+  // simplification can close the gap where a neighbour's water pinches a
+  // reach in two. Fall back to the exact outlines of touching components; if
+  // even those touch, the reach is not representable.
+  const topology = new TopologyBudget(10_000_000),
+    touching = () => {
+      for (let i = 0; i < result.length; i++)
+        for (let j = 0; j < i; j++)
+          if (polygonsOverlap(result[i]!, result[j]!, topology, path)) return [i, j] as const;
+      return undefined;
+    };
+  for (let pair = touching(); pair; pair = touching()) {
+    const [i, j] = pair;
+    if (result[i] === exact[i] && result[j] === exact[j])
+      throw new GeographyFailure('RIVER_GEOMETRY', 'reach polygon', 'Reach components touch.');
+    result[i] = exact[i]!;
+    result[j] = exact[j]!;
   }
   return result;
 }

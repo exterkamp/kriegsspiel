@@ -35,7 +35,13 @@ reconcileLocalJoins(input, plan, actualJoins, pass?, previousWork?): Reconciliat
 `requireBridge`. One west boundary exit is the default; an explicit empty list
 requests none. A singleton requested terminal returns `REGIONAL_TERMINALS`
 rather than silently dropping its certified exit/approach. Zero sites with an
-explicit empty boundary list is a legitimate empty plan. Independent validation
+explicit empty boundary list is a legitimate empty plan. Each exit takes the
+first certified position on its side, from the middle outward. When no route
+from the joined network reaches it (a pocket cut off by water or steep ground,
+#542), the exit moves along the side to the next certified position at least
+400 m from every position already tried, at most four times per side
+(`EXIT_RETRY`), before `REGIONAL_CONNECTIVITY`. This changes only plans that
+would otherwise fail. Independent validation
 compares the complete requested boundary-side set. `requireBridge` requires a linked, used bridge in a route between
 required sites, rather than merely retaining geometric proposals.
 
@@ -225,7 +231,10 @@ is rejected as `ROAD_CORRIDOR`, even when original segments passed.
 Final validation separately walks the actual certified emitted graph, enforces
 exact counts/entrance references/bearings, reciprocal crossing references,
 continuous grade-valid decks and ground approaches, boundary exit degree one,
-and rejects unjoined geometric intersections. Validation resolves input overrides again, enforces geometry-independent slots,
+and rejects unjoined geometric intersections. Two edges that share an endpoint
+and leave it on opposite sides (negative dot product) meet only there, so the
+overlap check skips them: nearly collinear, their line intersection is
+ill-conditioned and fell micrometres inside an edge (#542). Validation resolves input overrides again, enforces geometry-independent slots,
 hard moves, names and exclusions, and checks each logical route's reciprocal
 road/crossing memberships and graph connectivity through its own emitted edges.
 Ground paths cannot backtrack or enter unrelated permissible regions; an actual
