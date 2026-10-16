@@ -518,6 +518,16 @@ describe('turn internals reach no player before the game ends (D39, 11.11)', () 
     expect(tl.turns[0]!.summary).toContain(CANARY);
     expect(tl.turns[0]!.journal!.notes).toHaveLength(1);
     expect(tl.marks.filter((m) => m.kind === 'turn').length).toBe(tl.turns.length * 2);
+    // And the critique, behind the same gate, cites the turns the umpire decided (#506).
+    const critique = await fetch(`${t.base}/games/${t.id}/critique`, {
+      headers: { cookie: t.red },
+    });
+    expect(critique.status).toBe(200);
+    const c = (await critique.json()) as { points: Array<{ cites: Array<{ label: string }> }> };
+    const labels = c.points.flatMap((p) => p.cites.map((x) => x.label));
+    expect(
+      labels.some((l) => l.startsWith('Turn 1 (minutes 0 to 20) was decided by the umpire')),
+    ).toBe(true);
     app!.hub.closeAll();
   });
 });

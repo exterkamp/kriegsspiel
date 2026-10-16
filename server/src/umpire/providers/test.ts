@@ -264,9 +264,20 @@ const CRITIQUE_KIND: Record<string, string> = {
   ruling: 'decision',
   loss: 'decision',
   contact: 'decision',
+  turn: 'decision',
+  fallback: 'decision',
+  clamp: 'decision',
+  roll: 'decision',
+  precedent: 'decision',
 };
 
-/** The critique's own facts, quoted: outcome, a report for each side, misreadings, pauses and a delivery. */
+/** Most points the canned critique gives (the stage's limit). */
+const CRITIQUE_POINTS_MAX = 12;
+
+/**
+ * The critique's own facts, quoted: outcome, a report for each side, misreadings, pauses and a
+ * delivery; in a turn game also a turn, a fallback, a correction, a roll and a precedent.
+ */
 function critique(input: Json) {
   const facts = arr(input.facts);
   const picked: Json[] = [];
@@ -275,10 +286,25 @@ function critique(input: Json) {
     const kind = str(f.kind);
     const key = kind === 'report' ? `report:${str(f.side)}` : kind;
     const limit =
-      { outcome: 1, report: 1, misreading: 2, pause: 2, delivery: 1 }[kind.split(':')[0]!] ?? 0;
+      {
+        outcome: 1,
+        report: 1,
+        misreading: 2,
+        pause: 2,
+        delivery: 1,
+        turn: 1,
+        fallback: 1,
+        clamp: 1,
+        roll: 1,
+        precedent: 1,
+      }[kind.split(':')[0]!] ?? 0;
     if ((seen.get(key) ?? 0) >= limit) continue;
     seen.set(key, (seen.get(key) ?? 0) + 1);
     picked.push(f);
+  }
+  // Over the limit, the latest points other than the outcome go.
+  for (let i = picked.length - 1; picked.length > CRITIQUE_POINTS_MAX && i >= 0; i--) {
+    if (str(picked[i]!.kind) !== 'outcome') picked.splice(i, 1);
   }
   return {
     summary: str(input.result),
