@@ -14,10 +14,12 @@ import { umpireConfigFromEnv } from '../umpire/config.js';
 import { createUmpireClient } from '../umpire/createUmpireClient.js';
 import {
   TURN_REPORTS_MAX,
+  TURN_REPORTS_SYSTEM,
   checkTurnNote,
   reportsOfTurn,
   turnReportsInput,
   writeTurnReports,
+  type TurnReportsInput,
 } from '../umpire/turnReports.js';
 import { createRegistry, loadScenarioById, startingState } from './index.js';
 import type { InputLogEntry, InputLogHeader } from './store.js';
@@ -166,5 +168,77 @@ describe('the playtest’s papers and the time they were written (#532)', () => 
       }
     }
     expect(contacts).toBeGreaterThan(5);
+  });
+});
+
+/** Each side-turn's first report call as logged: the input the model was given and its reply. */
+function firstCalls(name: 'standard' | 'free') {
+  const game = JSON.parse(
+    readFileSync(new URL(`./playtest408/${name}.json`, import.meta.url), 'utf8'),
+  ) as Logged;
+  return game.entries.flatMap((e) => {
+    const call = e.calls?.[0];
+    if (e.command.kind !== 'turnReports' || !call) return [];
+    const raw = call.rawOutput ?? '';
+    const reply = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)) as {
+      dispatches: { reportIds: string[]; text: string }[];
+    };
+    const rejected = (e.calls?.[1]?.input as { rejected?: string[] } | undefined)?.rejected ?? [];
+    return [
+      {
+        key: `${name} t${e.command.turn} ${e.command.side}`,
+        calls: e.calls?.length ?? 0,
+        input: call.input as TurnReportsInput,
+        reply,
+        resent: rejected.map((r) => r.split(':')[0]!),
+      },
+    ];
+  });
+}
+
+describe('the playtest’s second report calls (#537)', () => {
+  const FIRST = [...firstCalls('standard'), ...firstCalls('free')];
+  const RECITES = 'recites the unit’s condition instead of judging it';
+
+  it('were made in every side-turn, mostly for reciting the condition, which the prompt now forbids', () => {
+    expect(FIRST).toHaveLength(12);
+    expect(FIRST.every((f) => f.calls === 2)).toBe(true);
+    // The first replies against the input the model was given, with today's checks.
+    const left = new Map(
+      FIRST.map((f) => [
+        f.key,
+        f.input.reports.flatMap((entry) => {
+          const note = f.reply.dispatches.find((d) => d.reportIds[0] === entry.id);
+          if (!note) return [`${entry.id}: no note`];
+          return checkTurnNote(note.text, entry).map((p) => `${entry.id}: ${p}`);
+        }),
+      ]),
+    );
+    const other = [...left].flatMap(([key, problems]) =>
+      problems.filter((p) => !p.endsWith(RECITES)).map((p) => `${key} ${p}`),
+    );
+    // Three refusals were the checks' own mistakes and pass now: "no fresh orders reached my
+    // squadron" is not the men's condition, "we have made out a small detachment" is a sighting,
+    // and "my squadron rode round ... I found no ford" says what the unit did.
+    const live = FIRST.flatMap((f) => f.resent.map((id) => `${f.key} ${id}`));
+    for (const fixed of ['free t3 red red-r22', 'standard t1 red red-r10', 'free t1 red red-r7']) {
+      expect(live).toContain(fixed);
+      expect(other.some((o) => o.startsWith(`${fixed}:`))).toBe(false);
+    }
+    // Besides reciting, one report was given no note and one contact note read the place's radius
+    // as a range (#532; turn-reports-v2 tells the model).
+    expect(other).toEqual([
+      'standard t2 blue blue-r12: no note',
+      expect.stringMatching(/^free t2 red red-r16: states a distance \("twenty metres"\)/),
+    ]);
+    // Free turn 3's Red papers now pass as written: one call. Reciting is the rest, in 10 of the 12
+    // side-turns; turn-reports-v3 tells the model not to list the condition back. With that
+    // heeded, 10 of the 12 side-turns would need one call.
+    expect(left.get('free t3 red')).toEqual([]);
+    const reciting = [...left.values()].filter((p) => p.some((x) => x.endsWith(RECITES)));
+    expect(reciting).toHaveLength(10);
+    const oneCall = [...left.keys()].filter((key) => !other.some((o) => o.startsWith(`${key} `)));
+    expect(oneCall).toHaveLength(10);
+    expect(TURN_REPORTS_SYSTEM).toMatch(/never list it back/);
   });
 });
