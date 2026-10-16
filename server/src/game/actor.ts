@@ -110,6 +110,9 @@ const realTimers: Timers = {
 /** Longest single sleep; Node timers overflow beyond 2^31-1 ms. */
 const MAX_SLEEP_MS = 2 ** 30;
 
+/** Times a resolved turn's log entry is offered to the store in a row before the caller is told (#416). */
+export const TURN_APPEND_ATTEMPTS = 3;
+
 /** The umpire's state as the client shows it ("staff at work"). */
 export interface StaffAtWork {
   working: boolean;
@@ -316,6 +319,12 @@ export class GameActor {
   private readonly deputyAccounts = new Map<string, DeputyAccount[]>();
   /** Agent orders issued since the last flush, to be appended to the input log in order. */
   private agentLog: InputLogEntry[] = [];
+  /**
+   * Entries the store has not taken yet that must reach it before anything logged after them: a
+   * resolved turn whose append failed, and everything logged since (#416). While any is here no
+   * snapshot is saved, so a restart never resumes past a turn the log lacks.
+   */
+  private unlogged: InputLogEntry[] = [];
   private readonly snapshotEvery: number;
   /** Seq covered by the newest stored snapshot. */
   private snapshotSeq: number;
@@ -642,6 +651,9 @@ export class GameActor {
       }
     }
     await this.tail.catch(() => undefined);
+    // One last try for a resolved turn the store refused (#416); if it still fails, no snapshot
+    // covers it, so a reopened game resolves the turn again from the log.
+    if (this.unlogged.length > 0) await this.flushUnlogged().catch(() => undefined);
     // A clean stop: the next start measures downtime from here, not from the last tick.
     await this.store.saveHeartbeat(this.id, this.wallNow()).catch(() => undefined);
   }
@@ -1440,9 +1452,40 @@ export class GameActor {
 
   /** Append the agent orders issued so far, before anything logged after them. */
   private async flushAgentLog(): Promise<void> {
+    await this.append();
+  }
+
+  /**
+   * Append the agent orders issued so far, then `entry`. A resolved turn may not be lost from the
+   * log (#416): its append is retried, and if the store still refuses it, it and everything logged
+   * after it wait in `unlogged`, in order, and go first on the next append. Other entries are
+   * appended once, as before.
+   */
+  private async append(entry?: InputLogEntry): Promise<void> {
+    if (this.unlogged.length > 0 || entry?.command.kind === 'resolveTurn') {
+      this.unlogged.push(...this.agentLog.splice(0), ...(entry ? [entry] : []));
+      return this.flushUnlogged();
+    }
     while (this.agentLog.length > 0) {
-      const entry = this.agentLog.shift()!;
-      await this.store.appendInput(this.id, entry);
+      const next = this.agentLog.shift()!;
+      await this.store.appendInput(this.id, next);
+    }
+    if (entry) await this.store.appendInput(this.id, entry);
+  }
+
+  /** Hand the store every waiting entry in order; throws, keeping the rest, if it refuses one. */
+  private async flushUnlogged(): Promise<void> {
+    while (this.unlogged.length > 0) {
+      const entry = this.unlogged[0]!;
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await this.store.appendInput(this.id, entry);
+          break;
+        } catch (e) {
+          if (attempt >= TURN_APPEND_ATTEMPTS) throw e;
+        }
+      }
+      this.unlogged.shift();
     }
   }
 
@@ -1624,8 +1667,7 @@ export class GameActor {
   private async commit(entry: InputLogEntry): Promise<void> {
     // A failing store must not leave the scheduler unarmed after the clock already changed.
     try {
-      await this.flushAgentLog();
-      await this.store.appendInput(this.id, entry);
+      await this.append(entry);
       this.sync();
       await this.persistProgress();
       // Not while an order is mid-parse: its seq is taken at signing but it is logged when the
@@ -2020,7 +2062,9 @@ export class GameActor {
       await this.logTurnReports(reports);
     } finally {
       // The turn is resolved in memory whether or not the store took it; a failed commit must not
-      // leave the live game with no turn open (a restart would re-resolve it from the log).
+      // leave the live game with no turn open. The entry is not lost (#416): `append` retried it
+      // and keeps it, ahead of the next turn's `openTurn`, until the store takes it, and no
+      // snapshot is saved meanwhile, so a restart before then resolves the turn again from the log.
       await this.openNextTurn(t.n);
     }
   }
