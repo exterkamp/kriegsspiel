@@ -27,6 +27,7 @@ import {
   startGame,
   startVisibility,
   validateProposal,
+  viewFor,
   type EngineState,
   type AppliedOutcome,
   type GameState,
@@ -1017,5 +1018,33 @@ describe('umpire.turn', () => {
       }),
       { numRuns: 60 },
     );
+  });
+});
+
+describe("umpire.turn and the umpire's journal (11.8)", () => {
+  const SECRET = 'JOURNAL-CANARY';
+  it('records the turn’s note and precedents from the proposal, and no side sees them', () => {
+    const w = world();
+    const p = proposal(
+      w,
+      {},
+      {
+        summary: `Blue’s line held ${SECRET} the river. Red waits for its guns.`,
+        precedents: [`Cavalry cannot cross the river except at the bridge ${SECRET}.`],
+      },
+    );
+    const { state, emitted } = play(w, p);
+    expect(state.world.journal).toEqual({
+      notes: [{ turn: 1, note: `Blue’s line held ${SECRET} the river. Red waits for its guns.` }],
+      precedents: [
+        { turn: 1, ruling: `Cavalry cannot cross the river except at the bridge ${SECRET}.` },
+      ],
+    });
+    // Master state only: not in the emitted events (the window shows those after the game), nor
+    // in any side's view.
+    expect(JSON.stringify(emitted)).not.toContain(SECRET);
+    for (const side of state.world.sides) {
+      expect(JSON.stringify(viewFor(state.world, side.id, T1))).not.toContain(SECRET);
+    }
   });
 });

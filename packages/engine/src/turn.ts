@@ -20,6 +20,7 @@ import { ROAD_CLASS_COST } from './terrain.js';
 import { FORMATION_RULES, unitTypeOf } from './unitTypes.js';
 import { canSee, coarseFacing, sizeEstimate } from './visibility.js';
 import { FORCED_PACE_FACTOR } from './fatigue.js';
+import { recordInJournal } from './journal.js';
 import type {
   Contact,
   Formation,
@@ -87,6 +88,8 @@ export interface TurnProposal {
   observations: TurnObservation[];
   rolls?: TurnRollRequest[];
   summary: string;
+  /** Rulings the umpire sets as precedent for the rest of the game (11.8); kept in its journal. */
+  precedents?: string[];
 }
 
 /** Where a turn's order stood at the turn's end: `deliveredAt` is absent if it had not arrived. */
@@ -842,7 +845,17 @@ export function registerTurn(registry: EventRegistry<GameState>): void {
     });
     // The turn flag stays until the next turn begins, so the scan and the other handlers at
     // this same instant leave the applied outcome as it is.
-    world = { ...world, rulings: [...world.rulings, ...rulings], combatActive: false };
+    // The umpire's journal (11.8): this turn's note and precedents, from the logged proposal, so
+    // replay rebuilds it. Master state; it is not in the emitted payload, which the window shows.
+    const journal = recordInJournal(
+      w.journal,
+      n,
+      typeof proposal.summary === 'string' ? proposal.summary : '',
+      Array.isArray(proposal.precedents)
+        ? proposal.precedents.filter((p): p is string => typeof p === 'string')
+        : [],
+    );
+    world = { ...world, rulings: [...world.rulings, ...rulings], combatActive: false, journal };
 
     // Just past the held instant: a march the umpire left under way sets off, and combat is
     // checked for units still in contact. Both matter only if the next turn is the engine's (rigid

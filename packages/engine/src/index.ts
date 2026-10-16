@@ -265,3 +265,15 @@ export {
 } from './turnDice.js';
 export type { ScreenedRolls } from './turnDice.js';
 export { turnVictory } from './combat.js';
+export {
+  JOURNAL_FULL_TURNS,
+  JOURNAL_MAX_TOKENS,
+  JOURNAL_PRECEDENTS_MAX,
+  JOURNAL_PRECEDENTS_PER_TURN,
+  JOURNAL_PRECEDENT_MAX,
+  JOURNAL_SENTENCES_PER_TURN,
+  JOURNAL_SENTENCE_MAX,
+  journalTokens,
+  recordInJournal,
+} from './journal.js';
+export type { JournalNote, JournalPrecedent, UmpireJournal } from './journal.js';
