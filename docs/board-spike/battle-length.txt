@@ -1,0 +1,37 @@
+200 seeds; minutes from a unit's first exchange, p10/p50/p90; a '-' is never within 3 h
+
+current
+  case                          losses       wavering     broken       breaks  melee
+  firefight 150 m, morale 80    6/8/12       58/86/118    148/168/178  132     0%
+  red attacks from 400 m        12/14/18     136/156/172  -/-/-        0       0%
+  Hold the Bridge, all attack   0/6/16       0/6/66       2/6/22       400     6%
+
+cap 8
+  case                          losses       wavering     broken       breaks  melee
+  firefight 150 m, morale 80    6/8/12       58/86/118    148/168/178  132     0%
+  red attacks from 400 m        12/14/18     136/156/172  -/-/-        0       0%
+  Hold the Bridge, all attack   0/8/14       8/18/64      10/20/84     401     1%
+
+cap 6, long range 0.5
+  case                          losses       wavering     broken       breaks  melee
+  firefight 150 m, morale 80    4/6/8        18/38/68     82/108/128   203     0%
+  red attacks from 400 m        4/6/10       38/66/96     126/146/166  206     0%
+  Hold the Bridge, all attack   0/6/12       10/14/20     20/34/56     354     0%  (2 runs threw)
+
+PROPOSAL: cap 6, long range 0.5, under fire 1
+  case                          losses       wavering     broken       breaks  melee
+  firefight 150 m, morale 80    4/6/8        14/16/22     28/36/42     213     0%
+  red attacks from 400 m        4/6/10       16/20/28     38/46/50     222     0%
+  Hold the Bridge, all attack   0/6/12       10/14/18     18/22/30     408     0%  (1 runs threw)
+
+cap 6, long range 0.5, under fire 2
+  case                          losses       wavering     broken       breaks  melee
+  firefight 150 m, morale 80    4/6/8        12/14/16     20/24/28     229     0%
+  red attacks from 400 m        4/6/10       12/14/18     24/26/30     235     0%
+  Hold the Bridge, all attack   0/6/12       10/14/16     18/22/24     409     0%  (1 runs threw)
+
+cap 5, long range 0.5, under fire 2
+  case                          losses       wavering     broken       breaks  melee
+  firefight 150 m, morale 80    4/6/8        14/14/16     26/28/28     246     0%
+  red attacks from 400 m        4/6/10       14/16/18     26/28/32     233     0%
+  Hold the Bridge, all attack   0/6/12       12/16/18     22/26/28     399     0%  (1 runs threw)

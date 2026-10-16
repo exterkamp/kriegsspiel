@@ -6,6 +6,7 @@ const SPA_ROOTS = [
   '/map-authoring',
   '/map-benchmark',
   '/map-table',
+  '/spike',
   '/style-guide',
   '/table-benchmark',
 ];

@@ -19,6 +19,12 @@ export const routes: Routes = [
       import('./style-guide/style-guide.component').then((m) => m.StyleGuideComponent),
   },
   {
+    path: 'spike/board',
+    title: 'Board spike · Kriegsspiel',
+    loadComponent: () =>
+      import('./spike-board/spike-board.component').then((m) => m.SpikeBoardComponent),
+  },
+  {
     path: 'admin',
     title: 'Kriegsspiel admin',
     loadComponent: () => import('./admin/admin.component').then((m) => m.AdminComponent),

@@ -1,0 +1,524 @@
+:host {
+  display: block;
+}
+.spike {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-areas: 'bar bar' 'board side';
+  gap: var(--ks-space-3);
+  min-height: 100vh;
+  padding: var(--ks-space-3) var(--ks-space-4);
+  background: var(--ks-page-bg);
+  color: var(--ks-text);
+  font-family: var(--ks-font);
+}
+.bar {
+  grid-area: bar;
+  display: flex;
+  align-items: baseline;
+  gap: var(--ks-space-3);
+  flex-wrap: wrap;
+}
+.bar h1 {
+  margin: 0;
+  font-size: var(--ks-text-xl);
+}
+.bar .sub {
+  margin: 0;
+}
+.board-wrap {
+  grid-area: board;
+  min-width: 0;
+}
+.side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ks-space-3);
+}
+@media (max-width: 900px) {
+  .spike {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'bar' 'board' 'side';
+  }
+}
+.turnbar {
+  display: flex;
+  align-items: center;
+  gap: var(--ks-space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--ks-space-2);
+}
+.turn-label {
+  font-weight: bold;
+  min-width: 13em;
+  text-align: center;
+}
+.spacer {
+  flex: 1;
+}
+.board {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  border: 1px solid var(--ks-rule);
+  border-radius: var(--ks-radius);
+  box-shadow: var(--ks-shadow-small);
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Ground */
+.ground {
+  fill: var(--ks-paper-sunk);
+}
+.edge {
+  fill: var(--ks-map-ground);
+}
+.wood {
+  fill: var(--ks-map-wood);
+  opacity: 0.85;
+}
+.river {
+  fill: none;
+  stroke: var(--ks-map-water);
+  stroke-width: 46;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.road {
+  fill: none;
+  stroke: var(--ks-map-road);
+  stroke-width: 14;
+  stroke-linejoin: round;
+}
+.bridge {
+  fill: var(--ks-map-road);
+  stroke: var(--ks-ink);
+  stroke-width: 6;
+}
+.place {
+  fill: var(--ks-ink-muted);
+  font-style: italic;
+  text-anchor: middle;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+/* Trails since the last turn, on a pale casing so they read over the road and the wood */
+.trail polyline {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.trail .casing {
+  stroke: var(--ks-paper);
+  stroke-width: 8;
+  opacity: 0.7;
+}
+.trail .line {
+  stroke-width: 4;
+}
+.trail.own .line {
+  stroke: var(--ks-map-own);
+}
+.trail.own polygon {
+  fill: var(--ks-map-own);
+}
+.trail.enemy .line {
+  stroke: var(--ks-map-enemy);
+  stroke-dasharray: 9 6;
+}
+.trail.enemy polygon {
+  fill: var(--ks-map-enemy);
+}
+.trail.dim {
+  opacity: 0.35;
+}
+
+/* The selected unit's order */
+.route polyline {
+  fill: none;
+  stroke: var(--ks-ink);
+  stroke-width: 2;
+  stroke-dasharray: 2 6;
+  stroke-linecap: round;
+}
+.route.draft polyline {
+  stroke: var(--ks-map-route);
+  stroke-width: 3;
+}
+.route circle {
+  fill: var(--ks-paper);
+  stroke: var(--ks-map-route);
+  stroke-width: 12;
+}
+
+/* Contact line between units in a fight: a bar across the line between them */
+.contact .casing {
+  stroke: var(--ks-paper);
+  stroke-width: 11;
+  stroke-linecap: round;
+}
+.contact .front {
+  stroke: var(--ks-ink);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.uncertain {
+  fill: var(--ks-map-enemy);
+  fill-opacity: 0.05;
+  stroke: var(--ks-map-enemy);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  opacity: 0.6;
+}
+
+/* Counters */
+.counter {
+  cursor: pointer;
+}
+.counter .body {
+  stroke-width: 2;
+}
+.counter.own .body {
+  fill: var(--ks-map-own);
+  stroke: var(--ks-ink);
+}
+.counter .sym {
+  fill: none;
+  stroke: var(--ks-paper);
+  stroke-width: 2;
+}
+.counter .sym-dot {
+  fill: var(--ks-paper);
+}
+.counter .facing {
+  fill: var(--ks-ink);
+}
+.counter.enemy.seen .body {
+  fill: var(--ks-map-enemy);
+  stroke: var(--ks-ink);
+  stroke-width: 2.5;
+}
+.counter.enemy.stale {
+  opacity: 0.8;
+}
+.counter.enemy.stale .body {
+  fill: var(--ks-paper);
+  stroke: var(--ks-map-enemy);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+.counter.enemy.stale .sym {
+  stroke: var(--ks-map-enemy);
+}
+.counter.enemy.stale .sym-dot {
+  fill: var(--ks-map-enemy);
+}
+.counter.enemy.stale .facing {
+  display: none;
+}
+.counter.selected .body {
+  stroke: var(--ks-brass-hi);
+  stroke-width: 4;
+}
+.counter.target .body {
+  stroke: var(--ks-map-route);
+  stroke-width: 4;
+}
+.counter:focus,
+.old-piece:focus {
+  outline: none;
+}
+.counter:focus-visible .body {
+  stroke: var(--ks-focus);
+  stroke-width: 4;
+}
+.str-bg {
+  fill: var(--ks-paper);
+  stroke: none;
+}
+.str {
+  fill: var(--ks-ok);
+}
+.leader {
+  stroke: var(--ks-ink);
+  stroke-width: 1;
+}
+.leader-dot {
+  fill: var(--ks-ink);
+}
+.short,
+.name,
+.age {
+  text-anchor: middle;
+  fill: var(--ks-ink);
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: var(--ks-paper);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.name {
+  font-weight: bold;
+}
+.age {
+  fill: var(--ks-map-enemy);
+  font-style: italic;
+}
+
+/* Fight stage pips */
+.pip {
+  stroke: var(--ks-ink);
+  stroke-width: 1.5;
+}
+.stage-engaged {
+  fill: var(--ks-paper);
+}
+.stage-losses {
+  fill: var(--ks-brass-hi);
+}
+.stage-wavering {
+  fill: var(--ks-wax-on-dark);
+}
+.stage-broken {
+  fill: var(--ks-ink);
+}
+
+/* The current look, for comparison */
+.old-piece {
+  cursor: pointer;
+}
+.old-piece rect:first-child {
+  stroke: var(--ks-ink);
+  stroke-width: 1;
+}
+.old-piece.own rect:first-child {
+  fill: var(--ks-map-own);
+}
+.old-piece.enemy rect:first-child {
+  fill: var(--ks-map-enemy);
+}
+.old-piece.ghost rect:first-child {
+  fill: var(--ks-rule-soft);
+  opacity: 0.55;
+}
+.old-piece.selected rect:first-child {
+  stroke: var(--ks-brass-hi);
+  stroke-width: 3;
+}
+.old-piece .tag {
+  fill: var(--ks-paper-raised);
+  stroke: var(--ks-rule);
+  stroke-width: 1;
+}
+.old-piece .tag-text {
+  fill: var(--ks-ink);
+  font-weight: bold;
+  text-anchor: middle;
+}
+
+/* Key */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ks-space-1) var(--ks-space-4);
+  list-style: none;
+  margin: var(--ks-space-2) 0 0;
+  padding: 0;
+  font-size: var(--ks-text-sm);
+}
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--ks-space-1);
+}
+.key {
+  display: inline-block;
+  width: 18px;
+  height: 12px;
+  border: 1.5px solid var(--ks-ink);
+}
+.key.own {
+  background: var(--ks-map-own);
+}
+.key.enemy {
+  transform: rotate(45deg) scale(0.75);
+}
+.key.enemy.seen {
+  background: var(--ks-map-enemy);
+  width: 12px;
+}
+.key.enemy.stale {
+  background: var(--ks-paper);
+  border: 1.5px dashed var(--ks-map-enemy);
+  width: 12px;
+}
+.key.trail-own,
+.key.trail-enemy,
+.key.contact {
+  height: 0;
+  border: 0;
+  border-top: 3px solid var(--ks-map-own);
+}
+.key.trail-enemy {
+  border-top: 3px dashed var(--ks-map-enemy);
+}
+.key.contact {
+  border-top: 4px solid var(--ks-ink);
+  width: 4px;
+  height: 14px;
+  border-top: 0;
+  background: var(--ks-ink);
+}
+.key.pip {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border-width: 1px;
+}
+.key.stage-engaged {
+  background: var(--ks-paper);
+}
+.key.stage-losses {
+  background: var(--ks-brass-hi);
+}
+.key.stage-wavering {
+  background: var(--ks-wax-on-dark);
+}
+.key.stage-broken {
+  background: var(--ks-ink);
+}
+
+/* Side panels */
+.panel {
+  background: var(--ks-surface);
+  border: 1px solid var(--ks-rule-soft);
+  border-radius: var(--ks-radius);
+  padding: var(--ks-space-3);
+  box-shadow: var(--ks-shadow-small);
+}
+.panel h2 {
+  margin: 0 0 var(--ks-space-2);
+  font-size: var(--ks-text-lg);
+}
+.panel h3 {
+  margin: var(--ks-space-3) 0 var(--ks-space-2);
+  font-size: var(--ks-text-md);
+}
+.panel p {
+  margin: 0 0 var(--ks-space-2);
+}
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--ks-space-1) var(--ks-space-3);
+  margin: 0;
+}
+.facts dt {
+  color: var(--ks-text-muted);
+}
+.facts dd {
+  margin: 0;
+}
+.pip-inline {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--ks-ink);
+  vertical-align: middle;
+}
+.pip-inline.stage-fresh {
+  background: var(--ks-ok);
+}
+.pip-inline.stage-engaged {
+  background: var(--ks-paper);
+}
+.pip-inline.stage-losses {
+  background: var(--ks-brass-hi);
+}
+.pip-inline.stage-wavering {
+  background: var(--ks-wax-on-dark);
+}
+.pip-inline.stage-broken {
+  background: var(--ks-ink);
+}
+.verbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ks-space-1);
+}
+.verbs button {
+  text-transform: capitalize;
+}
+.help {
+  font-size: var(--ks-text-sm);
+  margin-top: var(--ks-space-2);
+}
+.note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ks-space-1);
+  font-size: var(--ks-text-sm);
+  margin-bottom: var(--ks-space-2);
+}
+.intent code {
+  font-family: var(--ks-font-mono);
+  font-size: var(--ks-text-sm);
+  word-break: break-all;
+}
+.row {
+  display: flex;
+  gap: var(--ks-space-2);
+}
+.report .gist {
+  font-weight: bold;
+}
+.report h2 button {
+  font-size: var(--ks-text-lg);
+  font-weight: bold;
+  padding: 0;
+}
+.unit-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ks-link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  min-height: 0;
+}
+.variants fieldset {
+  border: 0;
+  margin: 0 0 var(--ks-space-2);
+  padding: 0;
+  display: flex;
+  gap: var(--ks-space-3);
+  flex-wrap: wrap;
+}
+.variants legend {
+  font-weight: bold;
+  padding: 0;
+  margin-bottom: var(--ks-space-1);
+}
+.hint {
+  margin: 0;
+}
+.report h3 {
+  margin: var(--ks-space-2) 0 var(--ks-space-1);
+  font-size: var(--ks-text-md);
+}
+.enemy-list {
+  margin: 0;
+  padding-left: var(--ks-space-4);
+}
+.enemy-list li {
+  margin-bottom: var(--ks-space-1);
+}
