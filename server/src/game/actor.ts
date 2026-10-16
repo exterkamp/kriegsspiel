@@ -1579,6 +1579,10 @@ export class GameActor {
       this.enqueue(async () => {
         if (this.pauseVoting?.isDue(this.wallNow())) await this.apply({ kind: 'pauseExpire' });
         if (this.ratioVoting?.isDue(this.wallNow())) await this.apply({ kind: 'rateExpire' });
+        // A timer can wake a millisecond before the wall clock reaches the deadline (Node times it
+        // on the monotonic clock, `wallNow` is Date.now), and a long sleep is capped: then nothing
+        // was due and nothing re-armed it, so sleep again or the vote never lapses (#503).
+        if (!this.pauseTimerSet) this.reschedulePause();
       }).catch((e) => {
         if (this.trace.enabled) this.trace.record(this.id, 'error', { source: 'pause', error: e });
         this.onError?.(e);
