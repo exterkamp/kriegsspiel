@@ -117,7 +117,14 @@ function narrate(input: Json) {
             : r.confidence === 'high'
               ? ' There is no doubt of it'
               : '';
-      const reach = radius > 0 ? ` The ground is good to within ${radius} metres.` : '';
+      // A turn report words the radius itself (#532); the place is how sure, never a range.
+      const accuracy = str(r.placeAccuracy);
+      const reach =
+        radius > 0
+          ? ` The ground is good to within ${radius} metres.`
+          : accuracy
+            ? ` The place is ${accuracy}.`
+            : '';
       return {
         reportIds: [str(r.id)],
         text: `Sir, ${body}.${sure ? `${sure}.` : ''}${reach}`,
