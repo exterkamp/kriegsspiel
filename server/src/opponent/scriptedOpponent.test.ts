@@ -49,6 +49,7 @@ function view(over: Partial<EngineSideView> = {}): EngineSideView {
         name: 'Vanguard',
         kind: 'infantry',
         position: { x: 1950, y: 450 },
+        place: 'on the High road',
         facing: Math.PI,
         formation: 'line',
         footprint: { frontage: 100, depth: 30 },

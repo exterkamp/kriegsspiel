@@ -1647,11 +1647,16 @@ describe('pause voting over the WebSocket', () => {
   });
 
   it('emergency hold: stops the clock, shows tallies only, and refuses with fixed wording when spent', async () => {
-    const { game, blue, red } = await votingGame({
-      rule: 'unanimous',
-      holdMs: 1000,
-      holdsPerPlayer: 1,
-    });
+    const { game, blue, red } = await votingGame(
+      {
+        rule: 'unanimous',
+        holdMs: 1000,
+        holdsPerPlayer: 1,
+      },
+      // Slow enough that the 50-minute bridge hold cannot end the game before the hold is called,
+      // even on a loaded machine (at RATE it ends under a wall second after the start).
+      60,
+    );
     await blue.waitFor('pauseState', (m) => m.phase === 'running' && m.holdsLeft === 1);
     blue.send(cmd({ kind: 'proposeHold', reason: 'phone' }));
     const open = await red.waitFor('pauseState', (m) => m.phase === 'pause_proposed');

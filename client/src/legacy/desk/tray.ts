@@ -1,4 +1,5 @@
 import type { Dispatch } from '@kriegsspiel/protocol';
+import { isSummary, sightings, turnOfPaper } from './turnReport.js';
 
 export type Pile = Dispatch['category'];
 
@@ -58,6 +59,54 @@ export function sortTray(
     }
   }
   return { piles: [...piles.values()], filed, unread };
+}
+
+/** One row of a turn's papers: a paper, or several merged sightings of the same enemy (newest last). */
+export interface TrayRow {
+  /** The paper the row opens: the newest of a merged sighting. */
+  d: Dispatch;
+  /** Every paper in the row, in written order; one unless sightings were merged. */
+  papers: Dispatch[];
+}
+
+/** One turn's papers on a pile, for a turn-mode game (D39). */
+export interface TurnGroup {
+  turn: number;
+  rows: TrayRow[];
+}
+
+/**
+ * A pile's papers in a turn-mode game, grouped under the turn they came in with, newest turn first (#439). Within
+ * a turn the staff's summary comes first, then the papers in the order they were written, with repeated
+ * sightings of one enemy (same strength, same place) merged into one row, and the umpire's ruling or notice last.
+ * An umpire turn's papers (11.9) are all handed in at its end, so they come with that turn.
+ */
+export function byTurn(items: readonly Dispatch[], turnMs: number): TurnGroup[] {
+  const turns = new Map<number, Dispatch[]>();
+  for (const d of items) {
+    const n = turnOfPaper(d.receivedAtGame, turnMs);
+    turns.set(n, [...(turns.get(n) ?? []), d]);
+  }
+  return [...turns]
+    .sort(([a], [b]) => b - a)
+    .map(([turn, papers]) => {
+      const merged = sightings(papers).filter((s) => s.papers.length > 1);
+      const inMerge = new Map(merged.flatMap((s) => s.papers.map((d) => [d.id, s] as const)));
+      const rows: TrayRow[] = [];
+      for (const d of [...papers].sort(
+        (a, b) => a.writtenAtGame - b.writtenAtGame || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      )) {
+        const s = inMerge.get(d.id);
+        if (!s) rows.push({ d, papers: [d] });
+        // A merged sighting stands where it was first seen, and opens on its newest paper.
+        else if (s.papers[0] === d) rows.push({ d: s.papers.at(-1)!, papers: s.papers });
+      }
+      // The staff's summary first; the umpire's ruling and notices (11.9) last, as the server sends them (#438).
+      const first = rows.filter((r) => isSummary(r.d));
+      const last = rows.filter((r) => r.d.kind === 'battle' || r.d.kind === 'notice');
+      const middle = rows.filter((r) => !first.includes(r) && !last.includes(r));
+      return { turn, rows: [...first, ...middle, ...last] };
+    });
 }
 
 /** Dispatches still on the desk (not discarded) that are unread; filed papers count too. */

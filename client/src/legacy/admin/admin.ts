@@ -3,6 +3,7 @@
  * Mostly read-only: GETs to `/admin/api`, plus the clock control bar's POSTs (#128). Shares nothing with the game client.
  */
 import { ReplayPanel } from './replay.js';
+import { TurnsPanel } from './turns.js';
 import { LlmPanel } from './llm.js';
 import { OrdersPanel } from './orders.js';
 import { EntryStore, type TraceEntry } from './entries.js';
@@ -71,6 +72,7 @@ export class AdminPage {
   private readonly panels = new Map<PanelId, HTMLElement>();
   private readonly note: HTMLElement;
   private replay!: ReplayPanel;
+  private turns!: TurnsPanel;
   private orders!: OrdersPanel;
   private readonly llm: LlmPanel;
   private readonly entries = new EntryStore();
@@ -98,7 +100,7 @@ export class AdminPage {
       <nav role="tablist" aria-label="Panels"></nav>
       <div id="filterbar">
         <input id="filter" type="search" placeholder="filter  ( / )" aria-label="Filter" />
-        <small>1-6 switch panel · ←/→ move between tabs · / filter</small>
+        <small>1-7 switch panel · ←/→ move between tabs · / filter</small>
       </div>
       <main></main>`;
     this.picker = root.querySelector('#game')!;
@@ -135,11 +137,12 @@ export class AdminPage {
       const config =
         id === 'Events' ? EVENTS_PANEL : id === 'Requests' ? REQUESTS_PANEL : undefined;
       if (config) this.lists.set(id, new ListPanel(sec, this.entries, config));
-      else if (id !== 'Replay' && id !== 'Orders')
+      else if (id !== 'Replay' && id !== 'Orders' && id !== 'Turns')
         sec.innerHTML = `<p class="empty">${id} panel — not implemented yet.</p>`;
       this.panels.set(id, sec);
       if (id === 'Replay') this.replay = new ReplayPanel(sec, () => this.token, this.fetchFn);
       if (id === 'Orders') this.orders = new OrdersPanel(sec, () => this.token, this.fetchFn);
+      if (id === 'Turns') this.turns = new TurnsPanel(sec, () => this.token, this.fetchFn);
     }
     this.controls = new ControlBar(
       root.querySelector('#controls')!,
@@ -184,6 +187,7 @@ export class AdminPage {
     clearTimeout(this.timer);
     clearTimeout(this.stateTimer);
     this.orders.stop();
+    this.turns.stop();
     this.closeStream();
   }
 
@@ -204,6 +208,7 @@ export class AdminPage {
     this.lists.get(id)?.renderNow();
     // Reloading also picks up the new end of a running game's timeline.
     if (id === 'Replay') void this.replay.setGame(this.gameId, true);
+    if (id === 'Turns') void this.turns.setGame(this.gameId, true);
     if (id === 'Orders') void this.orders.setGame(this.gameId);
   }
 
@@ -262,6 +267,7 @@ export class AdminPage {
     for (const list of this.lists.values()) list.reset();
     this.status = id ? 'connecting' : 'live';
     if (this.panel === 'Replay') void this.replay.setGame(id);
+    if (this.panel === 'Turns') void this.turns.setGame(id);
     if (this.panel === 'Orders') void this.orders.setGame(id);
     this.statePanel.showMessage(id ? 'Loading state…' : 'No game selected.');
     if (id) {
@@ -300,6 +306,7 @@ export class AdminPage {
         const entry = JSON.parse(e.data) as TraceEntry;
         this.llm.add(entry);
         if (this.panel === 'Orders') this.orders.notify(entry.kind);
+        if (this.panel === 'Turns' && entry.kind === 'command') this.turns.notify();
         if (this.entries.add(entry)) for (const list of this.lists.values()) list.refresh();
       } catch {
         // A malformed frame is skipped; the stream carries on.

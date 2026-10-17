@@ -103,15 +103,25 @@
       @if (turnMode() && editing()) {
         <button type="button" id="order-cancel-edit" (click)="cancelEdit()">Cancel edit</button>
       }
-      <button type="button" id="order-sign" (click)="sign()" [disabled]="closed()">
-        {{
-          !turnMode()
-            ? 'Sign and send'
-            : editing()
-              ? 'Hold the changed order'
-              : 'Hold for this turn'
-        }}
-      </button>
+      @if (modePending()) {
+        <span class="hint" id="order-joining">Reading the game's settings…</span>
+      } @else {
+        <button
+          type="button"
+          id="order-sign"
+          (click)="sign()"
+          [disabled]="closed()"
+          [hidden]="barred()"
+        >
+          {{
+            !turnMode()
+              ? 'Sign and send'
+              : editing()
+                ? 'Hold the changed order'
+                : 'Hold for this turn'
+          }}
+        </button>
+      }
     </div>
     <div class="err ks-error" id="order-err-send" role="alert">{{ errorFor('send') }}</div>
     @if (confirmation()) {

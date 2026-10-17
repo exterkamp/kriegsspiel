@@ -13,7 +13,12 @@ import {
   type GenerationWorker,
   type ValidationOutcome,
 } from '../generation/index.js';
-import { createAuthoringPanel, type AuthoringPanel, type PanelOptions } from './panel.js';
+import {
+  createAuthoringPanel,
+  statusClass,
+  type AuthoringPanel,
+  type PanelOptions,
+} from './panel.js';
 import { editOverrides, type OverrideEdit } from './recipe.js';
 
 vi.mock('@kriegsspiel/maps', async (importOriginal) => {
@@ -812,5 +817,73 @@ describe('Simple and Advanced recipe preservation', () => {
     preset.value = 'test';
     preset.dispatchEvent(new Event('change'));
     expect(panel.getParameters()).toEqual({ ...recipe, settings });
+  });
+});
+
+describe('shared design-system markup (#308)', () => {
+  function statusLine(panel: AuthoringPanel): HTMLElement {
+    return panel.element.querySelector<HTMLElement>('[data-role="status"]')!;
+  }
+
+  it('labels every field with the shared field or choice layout, and marks the tabs and main action', () => {
+    const { panel } = setup();
+    const labels = [...panel.element.querySelectorAll('label')];
+    expect(labels.length).toBeGreaterThan(10);
+    for (const label of labels) {
+      const control = label.querySelector('input, select, textarea')!;
+      expect(control).not.toBeNull();
+      expect(label.querySelector('span')!.textContent!.trim()).not.toBe('');
+      const checkbox = control instanceof HTMLInputElement && control.type === 'checkbox';
+      expect(label.className).toBe(checkbox ? 'ks-choice' : 'ks-field');
+      // A checkbox sits before its label text; other controls under it.
+      expect(label.firstElementChild).toBe(checkbox ? control : label.querySelector('span'));
+    }
+    expect(labels.some((label) => label.className === 'ks-choice')).toBe(true);
+    expect(panel.element.querySelector('[role="tablist"]')!.classList).toContain('ks-tabs');
+    expect(button(panel, 'generate').classList).toContain('ks-primary');
+    expect(panel.element.querySelector('.authoring-actions')!.classList).toContain('ks-cluster');
+    expect(panel.element.querySelector('h2')!.classList).toContain('ks-section-h');
+  });
+
+  it('gives the status line the tone of the state: warn for a bad draft, ok when ready, error on failure', async () => {
+    const { panel, workers } = setup({ checkReplaySupport: () => ({ supported: true }) });
+    const line = statusLine(panel);
+    expect(line.classList).toContain('ks-status');
+    expect([...line.classList].filter((c) => c !== 'ks-status')).toEqual([]);
+    change(panel, 'seed', '');
+    expect(line.classList).toContain('ks-warn');
+    expect(line.classList).not.toContain('ks-ok');
+    change(panel, 'seed', '7');
+    expect(line.classList).not.toContain('ks-warn');
+    panel.generate();
+    workers[0]!.result();
+    await settle();
+    expect(status(panel)).toContain('Ready');
+    expect(line.classList).toContain('ks-ok');
+    panel.generate();
+    workers[1]!.send({
+      v: 1,
+      type: 'error',
+      requestId: workers[1]!.sent[0]!.requestId,
+      error: { kind: 'programming', code: 'BUG', message: 'Defect' },
+    });
+    await settle();
+    expect(line.classList).toContain('ks-error');
+    expect(line.classList).not.toContain('ks-ok');
+  });
+
+  it('marks candidate diagnostics with their severity', async () => {
+    const { panel, workers } = setup({}, () => reject);
+    panel.generate();
+    workers[0]!.result();
+    await settle();
+    const row = panel.element.querySelector('[data-role="diagnostics"] li')!;
+    expect(row.className).toBe('ks-status ks-error');
+  });
+
+  it('maps diagnostic severities to the shared status classes', () => {
+    expect(statusClass('error')).toBe('ks-status ks-error');
+    expect(statusClass('warning')).toBe('ks-status ks-warn');
+    expect(statusClass('info')).toBe('ks-status');
   });
 });
