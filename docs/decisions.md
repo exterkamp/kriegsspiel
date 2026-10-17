@@ -1126,3 +1126,11 @@ Generation of the 40 maps took 460 s against main's 423 s, run interleaved on tw
 **Not done.** On flat ground, sites on the candidate lattice turn toward each other along lattice directions, so some turn by exactly 0° or 45°. The fork still lays streets out on its own local lattice, so a site's streets keep right angles to each other. Villages do not bend along a curved road or valley.
 
 **See.** [Planning](../packages/maps/docs/planning.md), [composition](../packages/maps/docs/composition.md).
+
+## D51: Lobby battlefield descriptions distinguish terrain from approved scenarios
+
+**Decision.** Following owner approval of the lobby map-selection design, `GET /scenarios` describes each registered scenario's default battlefield with an explicit public-geography DTO. Its geometry comes from the actual validated initial scenario terrain, in north-west-origin metres, rather than the standalone local-board default. The DTO includes a versioned full terrain identity, an exact initial-scenario revision and their default pairing. Rendering data is allowlisted: no units, HQs, observations, private objectives or terrain gameplay attributes are serialized into the preview.
+
+**Delivery boundary.** This first metadata prerequisite does not add an accepted map parameter to game creation, enable arbitrary map/scenario conversion, or supply an owned map library. `addMaps` is false until durable storage and the corresponding user flow are implemented. Existing scenario-only creation, replay and the development local board retain their semantics. The accepted design's remaining picker, curated selection and owned-library work is tracked separately; this metadata is not completion of that flow.
+
+**See.** [Lobby map selection design](lobby-map-selection-ux-design.md), [execution log](lobby-map-selection-execution-log.md), [map-to-gameplay boundary](map-gameplay-handoff.md).

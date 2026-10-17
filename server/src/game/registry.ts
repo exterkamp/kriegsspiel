@@ -14,6 +14,8 @@ import {
   type EngineState,
   type GameState,
 } from '@kriegsspiel/engine';
+import type { ScenarioBattlefield } from '@kriegsspiel/protocol';
+import { describeDefaultBattlefield } from './battlefield.js';
 
 /** An event registry with every handler the engine has. */
 export function createRegistry(): EventRegistry<GameState> {
@@ -57,6 +59,7 @@ export interface ScenarioInfo {
   lengthMinutes: number;
   sides: Array<{ id: string; name: string; controller: 'human' | 'scripted' }>;
   defaults: { side: string; rate: number };
+  battlefield: ScenarioBattlefield;
 }
 
 const BRIEFINGS: Record<string, string> = {
@@ -94,6 +97,7 @@ export function scenarioList(): ScenarioInfo[] {
       lengthMinutes: holdMinutes,
       sides,
       defaults: { side: (sides.find((s) => s.controller === 'human') ?? sides[0]!).id, rate: 12 },
+      battlefield: describeDefaultBattlefield(loadScenario(raw), 'The bridge battlefield'),
     };
   });
 }
