@@ -66,8 +66,8 @@ const captured = (world: GameState) =>
     }));
 
 describe('interception needs reach, versioned (#531)', () => {
-  it('is rules 4', () => {
-    expect(RULES_VERSION).toBe(4);
+  it('is rules 5', () => {
+    expect(RULES_VERSION).toBe(5);
   });
 
   it.each(['standard', 'free', 'rigid'] as const)(
