@@ -1,5 +1,7 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { decodeApprovedBattlefield } from '@kriegsspiel/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlayedGame } from '@legacy/shell/continueList';
 import type { ScenarioOptions } from '@legacy/shell/newGame';
@@ -8,6 +10,8 @@ import { fakeGame } from '../desk/fake-game';
 import { TABLE_SCENE_FACTORY } from '../game/table.service';
 import { SHELL_API, SHELL_NOW, SHELL_WINDOW, type ShellApi } from './shell-api';
 import { ShellComponent } from './shell.component';
+import { NewGameComponent } from './new-game.component';
+import { CreationPendingError } from '@legacy/shell/newGameApi';
 
 const game = (over: Partial<PlayedGame>): PlayedGame => ({
   id: 'g1',
@@ -149,6 +153,251 @@ const click = (label: string): void => {
     .click();
 };
 const radio = (sel: string) => el.querySelector<HTMLInputElement>(sel)!;
+
+function nativeDraftOptions(): ScenarioOptions {
+  const parent = 'hold-the-bridge';
+  const terrainIdentity = `engine-terrain-v1:sha256:${'a'.repeat(64)}`;
+  const entries = [true, false].map((isDefault) =>
+    decodeApprovedBattlefield(
+      {
+        map: {
+          id: `${parent}:${isDefault ? 'default' : 'open'}`,
+          name: isDefault ? 'Default bridge' : 'Open bridge approaches',
+          source: isDefault ? 'scenario-default' : 'included',
+          terrainIdentity,
+          widthM: 4000,
+          heightM: 3000,
+          preview: [],
+        },
+        pairing: {
+          id: `${parent}:${isDefault ? 'default' : 'open'}`,
+          revision: `engine-pairing-v1:sha256:${(isDefault ? 'b' : 'c').repeat(64)}`,
+          scenarioId: parent,
+          resolvedScenarioId: isDefault ? parent : 'bridge-open',
+          scenarioRevision: `engine-scenario-v1:sha256:${'d'.repeat(64)}`,
+          terrainIdentity,
+          assemblyVersion: 'engine-native-v1',
+        },
+        isDefault,
+      },
+      parent,
+    ),
+  );
+  const first = entries[0]!;
+  return {
+    ...structuredClone(options),
+    opponent: undefined,
+    scenarios: [
+      {
+        ...structuredClone(options.scenarios[0]!),
+        battlefield: { map: first.map, pairing: first.pairing, capabilities: { addMaps: false } },
+        battlefields: { schemaVersion: 1, scenarioId: parent, entries },
+      },
+    ],
+  };
+}
+
+describe('ordinary New game draft within one Shell visit', () => {
+  let showModal: PropertyDescriptor | undefined;
+  let closeDialog: PropertyDescriptor | undefined;
+  beforeEach(() => {
+    sessionStorage.clear();
+    showModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal');
+    closeDialog = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
+    // jsdom lacks native top-layer dialog methods; real Angular selection/history runs.
+    Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+      configurable: true,
+      value: function (this: HTMLDialogElement) {
+        this.setAttribute('open', '');
+      },
+    });
+    Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+      configurable: true,
+      value: function (this: HTMLDialogElement) {
+        this.removeAttribute('open');
+        this.dispatchEvent(new Event('close'));
+      },
+    });
+  });
+  afterEach(() => {
+    f?.destroy();
+    if (showModal) Object.defineProperty(HTMLDialogElement.prototype, 'showModal', showModal);
+    else Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
+    if (closeDialog) Object.defineProperty(HTMLDialogElement.prototype, 'close', closeDialog);
+    else Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
+    sessionStorage.clear();
+  });
+  const field = (selector: string, value: string) => {
+    const input = el.querySelector<HTMLInputElement>(selector)!;
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  async function commitAlternative(loaded: ScenarioOptions) {
+    const selected = loaded.scenarios[0]!.battlefields!.entries[1]!;
+    click('Choose map');
+    await settle();
+    const candidate = el.querySelector<HTMLInputElement>(
+      `dialog input[value="${selected.pairing.id}"]`,
+    )!;
+    candidate.click();
+    await settle();
+    click('Use map');
+    await vi.waitFor(() => {
+      expect(el.querySelector<HTMLDialogElement>('dialog')!.open).toBe(false);
+      expect(el.querySelector('button[type=submit]')?.getAttribute('aria-disabled')).toBe('false');
+    });
+    await settle();
+    expect(el.querySelector('ks-battlefield-map > fieldset')?.textContent).toContain(
+      selected.map.name,
+    );
+    return selected;
+  }
+  it.each(['Back', '← Main menu', 'browser Back'])(
+    'retains edited ordinary fields and the actual Use-committed alternative after %s',
+    async (exit) => {
+      const loaded = nativeDraftOptions();
+      const createGame = vi.fn(async () => 'must-not-create');
+      const createQuickGame = vi.fn(async () => 'must-not-create-quick');
+      await open('/', { fetchScenarioOptions: async () => loaded, createGame, createQuickGame });
+      click('New game');
+      await settle();
+      radio('input[name=side][value=red]').click();
+      radio('input[name=rate][value=custom]').click();
+      await settle();
+      field('input[aria-label="Custom clock rate"]', '6:1');
+      radio('input[name=mode][value=turns]').click();
+      radio('input[name=dial][value=free]').click();
+      radio('input[name=persona][value=dramatic]').click();
+      await settle();
+      field('#turn-minutes', '30');
+      field('#turn-deadline', '24');
+      await settle();
+      const selected = await commitAlternative(loaded);
+      if (exit === 'browser Back') {
+        const traversed = new Promise<void>((done) =>
+          window.addEventListener('popstate', () => done(), { once: true }),
+        );
+        window.history.back();
+        await traversed;
+      } else click(exit);
+      await settle();
+      expect(el.querySelector('#continue-h')).not.toBeNull();
+      click('New game');
+      await settle();
+      expect(radio('input[name=mode][value=turns]').checked).toBe(true);
+      expect(radio('input[name=side][value=red]').checked).toBe(true);
+      expect(radio('input[name=dial][value=free]').checked).toBe(true);
+      expect(radio('input[name=persona][value=dramatic]').checked).toBe(true);
+      expect(el.querySelector<HTMLInputElement>('#turn-minutes')!.value).toBe('30');
+      expect(el.querySelector<HTMLInputElement>('#turn-deadline')!.value).toBe('24');
+      expect(el.querySelector('ks-battlefield-map > fieldset')?.textContent).toContain(
+        selected.map.name,
+      );
+      radio('input[name=mode][value=realtime]').click();
+      await settle();
+      expect(radio('input[name=rate][value=custom]').checked).toBe(true);
+      expect(
+        el.querySelector<HTMLInputElement>('input[aria-label="Custom clock rate"]')!.value,
+      ).toBe('6:1');
+      expect(createGame).not.toHaveBeenCalled();
+      expect(createQuickGame).not.toHaveBeenCalled();
+      expect(reload).not.toHaveBeenCalled();
+      expect(assign).not.toHaveBeenCalled();
+      expect(sessionStorage.getItem('ks:lobby-creation:u')).toBeNull();
+    },
+  );
+
+  it('keeps the public briefing visible inside an initially open Armies and objectives disclosure', async () => {
+    await open('/?lobby=1');
+    const details = el.querySelector<HTMLDetailsElement>('details')!;
+    expect(details).not.toBeNull();
+    expect(details.open).toBe(true);
+    expect(details.querySelector('summary')!.textContent?.trim()).toBe('Armies and objectives');
+    expect(details.textContent).toContain(options.scenarios[0]!.briefing);
+  });
+
+  it('a fresh Shell starts with defaults even for the same owner after a previous Back', async () => {
+    const loaded = nativeDraftOptions();
+    const createGame = vi.fn(async () => 'must-not-create');
+    await open('/', { fetchScenarioOptions: async () => loaded, createGame });
+    click('New game');
+    await settle();
+    radio('input[name=rate][value="4"]').click();
+    await commitAlternative(loaded);
+    click('Back');
+    await settle();
+    f.destroy();
+    TestBed.resetTestingModule();
+    await open('/?lobby=1', { fetchScenarioOptions: async () => loaded, createGame });
+    expect(radio('input[name=rate][value="12"]').checked).toBe(true);
+    expect(el.querySelector('ks-battlefield-map > fieldset')?.textContent).toContain(
+      'Default bridge',
+    );
+    expect(createGame).not.toHaveBeenCalled();
+  });
+
+  it.each(['different-owner', undefined])(
+    'retires a prior owner draft after identity becomes %s even if that owner returns',
+    async (nextOwner) => {
+      const createGame = vi.fn(async () => 'must-not-create');
+      await open('/', { createGame });
+      click('New game');
+      await settle();
+      radio('input[name=rate][value="4"]').click();
+      click('Back');
+      await settle();
+      // Auth updates are supplied by the shell owner; exercise its current identity
+      // signal without creating a session or changing the transport.
+      const owner = f.componentInstance as unknown as {
+        me: { set(value: { id: string; email: string } | undefined): void };
+      };
+      owner.me.set(nextOwner ? { id: nextOwner, email: 'different@example.invalid' } : undefined);
+      await settle();
+      owner.me.set({ id: 'u', email: 'me@example.test' });
+      await settle();
+      click('New game');
+      await settle();
+      expect(radio('input[name=rate][value="12"]').checked).toBe(true);
+      expect(createGame).not.toHaveBeenCalled();
+    },
+  );
+
+  it('never resurrects a pre-lock ordinary snapshot over pending recovery after browser Back', async () => {
+    const loaded = nativeDraftOptions();
+    const createGame = vi.fn(async (request: import('@legacy/shell/newGame').CreateRequest) => {
+      throw new CreationPendingError(request.requestId!);
+    });
+    await open('/', { fetchScenarioOptions: async () => loaded, createGame });
+    click('New game');
+    await settle();
+    radio('input[name=rate][value="4"]').click();
+    click('Back');
+    await settle();
+    click('New game');
+    await settle();
+    radio('input[name=rate][value="1"]').click();
+    click('Start game');
+    await settle();
+    const request = structuredClone(createGame.mock.calls[0]![0]);
+    const retained = sessionStorage.getItem('ks:lobby-creation:u');
+    const traversed = new Promise<void>((done) =>
+      window.addEventListener('popstate', () => done(), { once: true }),
+    );
+    window.history.back();
+    await traversed;
+    await settle();
+    click('New game');
+    await settle();
+    expect(el.textContent).toContain('Retry creation');
+    expect(radio('input[name=rate][value="1"]').checked).toBe(true);
+    expect(sessionStorage.getItem('ks:lobby-creation:u')).toBe(retained);
+    expect(createGame).toHaveBeenCalledOnce();
+    const page = f.debugElement.query(By.directive(NewGameComponent))
+      .componentInstance as NewGameComponent;
+    expect(page.snapshotDraft()).toBeUndefined();
+    expect(JSON.parse(retained!).request).toEqual(request);
+  });
+});
 
 beforeEach(() => {
   assign.mockClear();

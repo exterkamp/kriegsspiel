@@ -44,6 +44,26 @@ import { GameListComponent } from '../lobby/game-list.component';
 import { PageFrameComponent } from '../ui/page-frame.component';
 import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-map.component';
 
+/** Ordinary choices only, retained by one Shell instance for this authenticated owner. */
+export interface NewGameDraft {
+  readonly ownerId: string;
+  readonly form: Readonly<Form>;
+  readonly selection?: { readonly pairingId: string; readonly revision: string };
+}
+function copyForm(form: Readonly<Form>): Form {
+  return {
+    scenario: form.scenario,
+    side: form.side,
+    rate: form.rate,
+    customRate: form.customRate,
+    dial: form.dial,
+    persona: form.persona,
+    mode: form.mode,
+    turnMinutes: form.turnMinutes,
+    deadlineHours: form.deadlineHours,
+  };
+}
+
 /** Scenario-first live setup; map inspection is separately gated from the existing creation request. */
 @Component({
   selector: 'ks-new-game',
@@ -66,6 +86,21 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
         <button type="button" (click)="goBack()">Back</button>
       } @else if (loadError()) {
         <p role="alert" class="ks-status ks-error">{{ loadError() }}</p>
+      } @else if (options() && form() && !scenario()) {
+        <section aria-label="Choose another scenario">
+          <p role="alert" class="ks-status ks-error">
+            Your previous scenario is no longer available. Choose another scenario.
+          </p>
+          <fieldset>
+            <legend>Scenario</legend>
+            @for (s of options()!.scenarios; track s.id) {
+              <label class="ks-choice">
+                <input type="radio" name="scenario" [value]="s.id" (change)="pick(s.id)" />
+                <b>{{ s.name }}</b>
+              </label>
+            }
+          </fieldset>
+        </section>
       } @else if (!options() || !form() || !scenario()) {
         <p role="status" class="ks-muted">Loading scenarios…</p>
       } @else {
@@ -84,7 +119,10 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
                 <b>{{ s.name }}</b>
               </label>
             }
-            <p>{{ scenario()!.briefing }}</p>
+            <details open>
+              <summary>Armies and objectives</summary>
+              <p>{{ scenario()!.briefing }}</p>
+            </details>
             <p class="ks-muted">Sides: {{ sideNames() }}. {{ length() }}</p>
           </fieldset>
 
@@ -104,7 +142,11 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
           } @else {
             <fieldset [disabled]="starting() || creationPending()">
               <legend>Battlefield map</legend>
-              <p>The scenario's default battlefield will be used.</p>
+              @if (mapInvalid()) {
+                <p>The selected battlefield is unavailable on this server.</p>
+              } @else {
+                <p>The scenario's default battlefield will be used.</p>
+              }
               <p class="ks-muted">Map previews are not available on this server.</p>
             </fieldset>
           }
@@ -328,6 +370,12 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
     .games {
       margin-top: var(--ks-space-5);
     }
+    summary {
+      min-height: 44px;
+      padding-block: var(--ks-space-2);
+      box-sizing: border-box;
+      cursor: pointer;
+    }
     input[type='text'],
     input[type='number'] {
       display: block;
@@ -350,6 +398,7 @@ export class NewGameComponent implements OnInit, OnChanges, OnDestroy {
   /** Makes the game; resolves to its id, or throws an Error whose message is shown. */
   readonly create = input.required<(req: CreateRequest) => Promise<string>>();
   readonly ownerId = input<string>();
+  readonly draft = input<NewGameDraft>();
   readonly started = output<string>();
   readonly back = output();
   protected readonly presets = ['1', '4', '12'];
@@ -370,7 +419,8 @@ export class NewGameComponent implements OnInit, OnChanges, OnDestroy {
   );
   protected readonly checkedChoice = computed(() => {
     const scenario = this.scenario();
-    if (!scenario || !Object.hasOwn(scenario, 'battlefields')) return undefined;
+    if (!scenario) return undefined;
+    if (!Object.hasOwn(scenario, 'battlefields')) return this.mapSelection() ? null : undefined;
     try {
       const catalog = decodeBattlefieldCatalog(scenario.battlefields, scenario.id);
       const selected = this.mapSelection();
@@ -498,6 +548,21 @@ export class NewGameComponent implements OnInit, OnChanges, OnDestroy {
       }
     }
     if (!current()) return;
+    // Keep the ordinary owner draft through a slow/offline catalog; recovery wins above.
+    const supplied = this.draft();
+    const ordinary =
+      !this.creationPending() && !this.recoveryBlocked() && ownerId && supplied?.ownerId === ownerId
+        ? {
+            form: copyForm(supplied.form),
+            selection: supplied.selection
+              ? { pairingId: supplied.selection.pairingId, revision: supplied.selection.revision }
+              : undefined,
+          }
+        : undefined;
+    if (ordinary) {
+      this.form.set(copyForm(ordinary.form));
+      this.mapSelection.set(ordinary.selection ? { ...ordinary.selection } : undefined);
+    }
     let loaded: Promise<ScenarioOptions>;
     try {
       loaded = this.load()();
@@ -510,13 +575,63 @@ export class NewGameComponent implements OnInit, OnChanges, OnDestroy {
         if (!current() || !o) return;
         this.options.set(o);
         const f = initialForm(o);
-        if (!this.creationPending() && !this.recoveryBlocked()) this.form.set(f);
+        if (!this.creationPending() && !this.recoveryBlocked()) {
+          if (ordinary) {
+            const restored = copyForm(ordinary.form);
+            const scenario = o.scenarios.find((s) => s.id === restored.scenario);
+            if (scenario) {
+              const sides = allowedSides(scenario, o.opponent);
+              if (!sides.some((side) => side.id === restored.side))
+                restored.side =
+                  sides.find((side) => side.id === scenario.defaults.side)?.id ??
+                  sides[0]?.id ??
+                  '';
+            }
+            this.form.set(restored);
+            this.mapSelection.set(
+              ordinary.selection
+                ? { pairingId: ordinary.selection.pairingId, revision: ordinary.selection.revision }
+                : undefined,
+            );
+          } else this.form.set(f);
+        }
         if (!f && !this.creationPending()) this.loadError.set('This server has no scenarios.');
       },
       (e: unknown) => {
         if (current()) this.loadError.set(e instanceof Error ? e.message : String(e));
       },
     );
+  }
+
+  /** Called before Shell removes this form. Pending recovery owns its separate existing storage. */
+  snapshotDraft(): NewGameDraft | undefined {
+    const ownerId = this.ownerId();
+    const form = this.form();
+    if (
+      !ownerId ||
+      this.destroyed ||
+      this.loadedOwner !== ownerId ||
+      !form ||
+      this.busy ||
+      this.starting() ||
+      this.creationPending() ||
+      this.recoveryBlocked() ||
+      this.pendingRequest ||
+      this.mapDialogOpen()
+    )
+      return undefined;
+    // Freeze even an implicitly selected modern default to its current revision.
+    const checked = this.checkedChoice();
+    const selected =
+      this.mapSelection() ??
+      (checked ? { pairingId: checked.pairing.id, revision: checked.pairing.revision } : undefined);
+    return {
+      ownerId,
+      form: copyForm(form),
+      ...(selected
+        ? { selection: { pairingId: selected.pairingId, revision: selected.revision } }
+        : {}),
+    };
   }
 
   protected pick(id: string): void {

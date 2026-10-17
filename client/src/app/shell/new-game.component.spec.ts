@@ -2,11 +2,16 @@ import { Component, input, output, provideZonelessChangeDetection } from '@angul
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import type { ScenarioBattlefield } from '@kriegsspiel/protocol';
-import type { ScenarioOptions, CreateRequest } from '@legacy/shell/newGame';
+import {
+  initialForm,
+  type Form,
+  type ScenarioOptions,
+  type CreateRequest,
+} from '@legacy/shell/newGame';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-map.component';
 import { SHELL_API } from './shell-api';
-import { NewGameComponent } from './new-game.component';
+import { NewGameComponent, type NewGameDraft } from './new-game.component';
 import { CreationPendingError } from '@legacy/shell/newGameApi';
 
 /** Parent contract test: actual dialog/geometry/focus behavior belongs to the component's own tests/browser. */
@@ -82,6 +87,7 @@ async function open(
   create: (req: CreateRequest) => Promise<string> = vi.fn(async () => 'game-1'),
   ownerId?: string,
   loadOverride?: () => Promise<ScenarioOptions>,
+  draft?: NewGameDraft,
 ) {
   TestBed.configureTestingModule({
     providers: [
@@ -105,6 +111,7 @@ async function open(
   fixture.componentRef.setInput('load', loadOverride ?? (async () => loaded));
   fixture.componentRef.setInput('create', create);
   if (ownerId) fixture.componentRef.setInput('ownerId', ownerId);
+  if (draft) fixture.componentRef.setInput('draft', draft);
   fixture.detectChanges();
   await fixture.whenStable();
   fixture.detectChanges();
@@ -492,4 +499,281 @@ it('blocks stale rendered map and Start controls before acknowledging an owner r
   await page.fixture.whenStable();
   expect(sessionStorage.getItem('ks:lobby-creation:first-owner')).toBeNull();
   expect(sessionStorage.getItem('ks:lobby-creation:second-owner')).toBeNull();
+});
+
+function ordinaryDraft(loaded = modernOptions(), ownerId = 'draft-owner'): NewGameDraft {
+  const alternative = loaded.scenarios[0]!.battlefields!.entries[1]!;
+  return {
+    ownerId,
+    form: {
+      ...initialForm(loaded)!,
+      rate: 'custom',
+      customRate: '6:1',
+      mode: 'turns',
+      turnMinutes: '30',
+      deadlineHours: '24',
+      dial: 'free',
+      persona: 'dramatic',
+    },
+    selection: { pairingId: alternative.pairing.id, revision: alternative.pairing.revision },
+  };
+}
+describe('owner-scoped ordinary draft snapshots', () => {
+  it.each(['slow', 'offline', 'empty'])(
+    'keeps an owner draft snapshot available through a %s current catalog without creating',
+    async (kind) => {
+      const draft = ordinaryDraft();
+      let resolve!: (value: ScenarioOptions) => void;
+      const delayed = new Promise<ScenarioOptions>((done) => {
+        resolve = done;
+      });
+      const load =
+        kind === 'slow'
+          ? () => delayed
+          : async () => {
+              if (kind === 'offline') throw new Error('Catalog unavailable');
+              return { ...modernOptions(), scenarios: [] };
+            };
+      const page = await open(modernOptions(), false, undefined, draft.ownerId, load, draft);
+      expect(page.fixture.componentInstance.snapshotDraft()).toEqual(draft);
+      expect(page.create).not.toHaveBeenCalled();
+      if (kind === 'slow') {
+        expect(page.element.textContent).toContain('Loading scenarios');
+        resolve(modernOptions());
+        await delayed;
+        await page.fixture.whenStable();
+        expect(page.fixture.componentInstance.snapshotDraft()).toEqual(draft);
+      } else expect(page.element.textContent).not.toContain('Loading scenarios');
+    },
+  );
+
+  it('restores detached allowlisted form and committed pairing only, excluding assets and creation state', async () => {
+    const draft = ordinaryDraft();
+    Object.assign(draft, { canonicalJson: 'not a draft field', requestId: 'not retained' });
+    Object.assign(draft.form, { asset: { private: 'not retained' } });
+    const page = await open(modernOptions(), false, undefined, draft.ownerId, undefined, draft);
+    const snapshot = page.fixture.componentInstance.snapshotDraft()!;
+    expect(Object.keys(snapshot).sort()).toEqual(['form', 'ownerId', 'selection']);
+    expect(Object.keys(snapshot.form).sort()).toEqual(
+      [
+        'scenario',
+        'side',
+        'rate',
+        'customRate',
+        'dial',
+        'persona',
+        'mode',
+        'turnMinutes',
+        'deadlineHours',
+      ].sort(),
+    );
+    expect(Object.keys(snapshot.selection!).sort()).toEqual(['pairingId', 'revision']);
+    expect(snapshot.form).toEqual({
+      scenario: 'bridge',
+      side: 'blue',
+      rate: 'custom',
+      customRate: '6:1',
+      dial: 'free',
+      persona: 'dramatic',
+      mode: 'turns',
+      turnMinutes: '30',
+      deadlineHours: '24',
+    });
+    expect(snapshot.form).not.toBe(draft.form);
+    expect(snapshot.selection).not.toBe(draft.selection);
+    Object.assign(snapshot.form, { turnMinutes: '60' });
+    Object.assign(snapshot.selection!, { pairingId: 'changed' });
+    expect(page.fixture.componentInstance.snapshotDraft()!.form.turnMinutes).toBe('30');
+    expect(page.fixture.componentInstance.snapshotDraft()!.selection).toEqual(draft.selection);
+    expect(page.create).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('ks:lobby-creation:draft-owner')).toBeNull();
+  });
+
+  it('does not restore a draft for a different current owner', async () => {
+    const page = await open(
+      modernOptions(),
+      false,
+      undefined,
+      'other-owner',
+      undefined,
+      ordinaryDraft(),
+    );
+    expect(
+      page.element.querySelector<HTMLInputElement>('input[name=mode][value=realtime]')!.checked,
+    ).toBe(true);
+    expect(page.fixture.componentInstance.snapshotDraft()!.ownerId).toBe('other-owner');
+    expect(page.fixture.componentInstance.snapshotDraft()!.form.rate).toBe('12');
+    expect(page.create).not.toHaveBeenCalled();
+  });
+
+  it('gives retained pending creation precedence over an ordinary draft without automatically creating', async () => {
+    const loaded = modernOptions();
+    const first = loaded.scenarios[0]!.battlefields!.entries[0]!;
+    const form: Form = { ...initialForm(loaded)!, rate: '4' };
+    const selection = { pairingId: first.pairing.id, revision: first.pairing.revision };
+    const request: CreateRequest = {
+      scenario: form.scenario,
+      side: form.side,
+      rate: 4,
+      dial: form.dial,
+      persona: form.persona,
+      sessionType: 'co_op_vs_ai',
+      pairing: selection,
+      requestId: '7da01aae-638e-4700-9a8d-5f39646c78d1',
+      battlefieldVersion: 1,
+    };
+    const saved = JSON.stringify({ form, selection, request });
+    sessionStorage.setItem('ks:lobby-creation:draft-owner', saved);
+    const page = await open(
+      loaded,
+      false,
+      undefined,
+      'draft-owner',
+      undefined,
+      ordinaryDraft(loaded),
+    );
+    expect(page.element.textContent).toContain('Retry creation');
+    expect(
+      page.element.querySelector<HTMLInputElement>('input[name=rate][value="4"]')!.checked,
+    ).toBe(true);
+    expect(page.fixture.componentInstance.snapshotDraft()).toBeUndefined();
+    expect(page.create).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('ks:lobby-creation:draft-owner')).toBe(saved);
+    click(page.element, 'Retry creation');
+    await page.fixture.whenStable();
+    expect(page.create).toHaveBeenCalledExactlyOnceWith(request);
+  });
+
+  it('cannot snapshot a recovery-blocked form or replace its retained evidence with an ordinary draft', async () => {
+    sessionStorage.setItem('ks:lobby-creation:draft-owner', '{');
+    const page = await open(
+      modernOptions(),
+      false,
+      undefined,
+      'draft-owner',
+      undefined,
+      ordinaryDraft(),
+    );
+    expect(page.element.textContent).toContain('could not be recovered');
+    expect(page.fixture.componentInstance.snapshotDraft()).toBeUndefined();
+    expect(sessionStorage.getItem('ks:lobby-creation:draft-owner')).toBe('{');
+    expect(page.create).not.toHaveBeenCalled();
+  });
+
+  it.each(['removed pairing', 'changed revision', 'removed catalog', 'removed metadata'])(
+    'restores a stale committed identity and visibly blocks Start for %s',
+    async (change) => {
+      const loaded = modernOptions();
+      const draft = ordinaryDraft(loaded);
+      const catalog = loaded.scenarios[0]!.battlefields!;
+      if (change === 'removed pairing') catalog.entries = [catalog.entries[0]!];
+      if (change === 'changed revision')
+        catalog.entries = catalog.entries.map((entry) => ({
+          ...entry,
+          pairing: { ...entry.pairing, revision: `engine-pairing-v1:sha256:${'f'.repeat(64)}` },
+        }));
+      if (change === 'removed catalog' || change === 'removed metadata')
+        delete loaded.scenarios[0]!.battlefields;
+      if (change === 'removed metadata') delete loaded.scenarios[0]!.battlefield;
+      const page = await open(loaded, false, undefined, 'draft-owner', undefined, draft);
+      expect(page.element.textContent).toContain(
+        'Choose an available battlefield map before starting.',
+      );
+      expect(page.element.querySelector('button[type=submit]')!.getAttribute('aria-disabled')).toBe(
+        'true',
+      );
+      expect(page.fixture.componentInstance.snapshotDraft()!.selection).toEqual(draft.selection);
+      if (change === 'removed metadata') {
+        expect(page.element.textContent).toContain('selected battlefield is unavailable');
+        expect(page.element.textContent).not.toContain(
+          "The scenario's default battlefield will be used.",
+        );
+      }
+      click(page.element, 'Start game');
+      await page.fixture.whenStable();
+      expect(page.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('pins an implicit modern default revision in the snapshot instead of silently updating it on restore', async () => {
+    let page = await open(modernOptions(), false, undefined, 'draft-owner');
+    const draft = page.fixture.componentInstance.snapshotDraft()!;
+    expect(draft.selection).toEqual({
+      pairingId: 'bridge:default',
+      revision: modernOptions().scenarios[0]!.battlefields!.entries[0]!.pairing.revision,
+    });
+    page.fixture.destroy();
+    TestBed.resetTestingModule();
+    const changed = modernOptions();
+    const catalog = changed.scenarios[0]!.battlefields!;
+    catalog.entries = catalog.entries.map((entry) => ({
+      ...entry,
+      pairing: { ...entry.pairing, revision: `engine-pairing-v1:sha256:${'e'.repeat(64)}` },
+    }));
+    page = await open(changed, false, undefined, 'draft-owner', undefined, draft);
+    click(page.element, 'Start game');
+    await page.fixture.whenStable();
+    expect(page.create).not.toHaveBeenCalled();
+    expect(page.element.textContent).toContain('Choose an available battlefield');
+  });
+
+  it('reconciles a removed allowed side without resetting the other ordinary edits', async () => {
+    const draft = ordinaryDraft();
+    Object.assign(draft.form, { side: 'red' });
+    const page = await open(modernOptions(), false, undefined, 'draft-owner', undefined, draft);
+    const snapshot = page.fixture.componentInstance.snapshotDraft()!;
+    expect(snapshot.form).toEqual({ ...draft.form, side: 'blue' });
+    expect(page.element.querySelector('input[name=side][value=red]')).toBeNull();
+    expect(page.create).not.toHaveBeenCalled();
+  });
+
+  it('offers current scenario choices when the retained scenario has disappeared rather than hanging Loading', async () => {
+    const loaded = modernOptions();
+    loaded.scenarios = [
+      {
+        ...loaded.scenarios[0]!,
+        id: 'another',
+        name: 'Another scenario',
+        battlefield: undefined,
+        battlefields: undefined,
+      },
+    ];
+    const page = await open(loaded, false, undefined, 'draft-owner', undefined, ordinaryDraft());
+    expect(page.element.textContent).toContain('previous scenario is no longer available');
+    expect(page.element.textContent).not.toContain('Loading scenarios');
+    expect(page.element.querySelector('button[type=submit]')).toBeNull();
+    page.element.querySelector<HTMLInputElement>('input[name=scenario][value=another]')!.click();
+    await page.fixture.whenStable();
+    expect(page.element.querySelector('form[aria-label="New game"]')).not.toBeNull();
+    expect(page.element.textContent).not.toContain('previous scenario is no longer available');
+    expect(page.fixture.componentInstance.snapshotDraft()!.selection).toBeUndefined();
+    expect(page.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses snapshots while a map dialog is active, starting, stale-owned, or destroyed', async () => {
+    let fail!: (error: Error) => void;
+    const create = vi.fn(
+      () =>
+        new Promise<string>((_resolve, reject) => {
+          fail = reject;
+        }),
+    );
+    const page = await open(modernOptions(), false, create, 'draft-owner');
+    const child = page.fixture.debugElement.query(By.directive(MapFixture))
+      .componentInstance as MapFixture;
+    child.activeChange.emit(true);
+    expect(page.fixture.componentInstance.snapshotDraft()).toBeUndefined();
+    child.activeChange.emit(false);
+    expect(page.fixture.componentInstance.snapshotDraft()).toBeDefined();
+    click(page.element, 'Start game');
+    expect(page.fixture.componentInstance.snapshotDraft()).toBeUndefined();
+    fail(new Error('Definite rejection'));
+    await Promise.resolve();
+    await page.fixture.whenStable();
+    expect(page.fixture.componentInstance.snapshotDraft()).toBeDefined();
+    page.fixture.componentRef.setInput('ownerId', 'next-owner');
+    expect(page.fixture.componentInstance.snapshotDraft()).toBeUndefined();
+    page.fixture.destroy();
+    expect(page.fixture.componentInstance.snapshotDraft()).toBeUndefined();
+  });
 });
