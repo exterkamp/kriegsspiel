@@ -1,0 +1,102 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+figure {
+  margin: 0;
+  min-width: 0;
+}
+svg {
+  display: block;
+  width: 100%;
+  height: clamp(220px, 38dvh, 420px);
+  border: 1px solid var(--ks-rule);
+  box-sizing: border-box;
+  background: var(--ks-paper-sunk);
+}
+svg.compact {
+  height: 160px;
+}
+svg.interactive {
+  touch-action: none;
+}
+.ground {
+  fill: var(--ks-map-ground);
+}
+.terrain {
+  fill: var(--ks-map-ground);
+  stroke: var(--ks-map-ground);
+}
+.terrain-wood {
+  fill: var(--ks-map-wood);
+  stroke: var(--ks-map-wood);
+}
+.terrain-marsh {
+  fill: var(--ks-map-marsh);
+  stroke: var(--ks-map-marsh);
+}
+.terrain-water,
+.terrain-river,
+.terrain-stream {
+  fill: var(--ks-map-water);
+  stroke: var(--ks-map-water);
+}
+.terrain-road,
+.terrain-bridge,
+.terrain-ford {
+  fill: var(--ks-map-road);
+  stroke: var(--ks-map-road);
+}
+.terrain-building {
+  fill: var(--ks-ink-muted);
+  stroke: var(--ks-ink-muted);
+}
+polygon,
+circle {
+  stroke: var(--ks-ink);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ks-space-2);
+  margin-top: var(--ks-space-2);
+}
+button {
+  min-height: 44px;
+}
+figcaption {
+  margin: var(--ks-space-2) 0;
+  color: var(--ks-text-muted);
+  font-size: var(--ks-text-sm);
+}
+summary {
+  min-height: 44px;
+  display: list-item;
+  align-content: center;
+  cursor: pointer;
+}
+details {
+  overflow-wrap: anywhere;
+}
+ul {
+  padding-inline-start: var(--ks-space-5);
+}
+li + li {
+  margin-top: var(--ks-space-2);
+}
+@media (forced-colors: active) {
+  .ground {
+    fill: Canvas;
+  }
+  .terrain {
+    fill: Canvas;
+    stroke: CanvasText;
+  }
+  polygon,
+  circle {
+    stroke: CanvasText;
+  }
+}

@@ -1,4 +1,5 @@
-/** Pure rules for the new-game form: state, validation and the request it makes. The DOM lives in NewGame.svelte. */
+/** Pure rules for the Angular new-game form: defaults, validation and the creation request. */
+import type { ScenarioBattlefield } from '@kriegsspiel/protocol';
 import {
   DEFAULT_TURN_MINUTES,
   DEFAULT_UMPIRE_DIAL,
@@ -24,6 +25,8 @@ export interface ScenarioInfo {
   lengthMinutes: number;
   sides: Array<{ id: string; name: string; controller: 'human' | 'scripted' }>;
   defaults: { side: string; rate: number };
+  /** Additive server metadata; older servers can still create their scenario's default game. */
+  battlefield?: ScenarioBattlefield;
 }
 
 /** Who plays a side nobody sits at; undefined when the server has no computer opponent. */
