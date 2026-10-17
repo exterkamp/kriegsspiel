@@ -35,6 +35,15 @@ import { TableService } from './table.service';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
+    @if (game.mapLoading()) {
+      <section class="map-status ks-theme" role="status">Loading battlefield map…</section>
+    } @else if (game.mapError()) {
+      <section class="map-status ks-theme" role="alert">
+        <p>{{ game.mapError() }}</p>
+        <button class="ks-button" type="button" (click)="game.retry()">Retry</button>
+        <a class="ks-button" href="/?lobby=1">Back to New game</a>
+      </section>
+    }
     <ks-table-host />
     <ks-hud />
     <ks-marks-bar />
@@ -45,6 +54,15 @@ import { TableService } from './table.service';
     <ks-test-umpire-badge />
   `,
   styles: `
+    .map-status {
+      position: absolute;
+      z-index: 20;
+      inset: var(--ks-space-4) var(--ks-space-4) auto;
+      padding: var(--ks-space-4);
+      background: var(--ks-paper);
+      color: var(--ks-ink);
+      border: 1px solid var(--ks-rule);
+    }
     :host {
       display: block;
       position: fixed;

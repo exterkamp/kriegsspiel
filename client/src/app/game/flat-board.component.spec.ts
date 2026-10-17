@@ -1,13 +1,83 @@
 import { TestBed } from '@angular/core/testing';
-import { fixtureView } from '@legacy/table/fixture';
-import { initialState } from '@legacy/net/state';
+import { computed, provideZonelessChangeDetection, signal } from '@angular/core';
+import { fixtureMap, fixtureView } from '@legacy/table/fixture';
+import { initialState, type ClientState } from '@legacy/net/state';
+import type { BaseMap } from '@legacy/table/types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WindowAt } from '@kriegsspiel/protocol';
 import { GLIDE_MS } from '@legacy/table/glide';
 import { DeskStore } from '../desk/desk.store';
-import { stubGame } from '../desk/testing';
+import { GameService } from './game.service';
 import { FlatBoardComponent } from './flat-board.component';
 import { MarksService } from './marks.service';
+import { TableService } from './table.service';
+
+function configuredGame(state: ClientState, terrain: BaseMap | undefined) {
+  const s = signal(state);
+  const map = signal(terrain);
+  const fake = {
+    state: s.asReadonly(),
+    view: computed(() => s().view),
+    map: map.asReadonly(),
+    sides: () => [],
+    putMark: vi.fn(() => true),
+    deleteMark: vi.fn(),
+  };
+  TestBed.configureTestingModule({
+    providers: [provideZonelessChangeDetection(), { provide: GameService, useValue: fake }],
+  });
+  return { state: s, map, fake };
+}
+
+/** The existing behavior cases deliberately use the offline fixture, supplied by their game fake. */
+function stubGame(state: ClientState) {
+  return configuredGame(state, fixtureMap).state;
+}
+
+function alternate(): BaseMap {
+  return {
+    width: 8000,
+    height: 3000,
+    features: [
+      {
+        id: 'east-wood',
+        kind: 'wood',
+        layer: -2,
+        geometry: {
+          shape: 'polygon',
+          points: [
+            { x: 6000.001, y: 300.001 },
+            { x: 7300.001, y: 350.001 },
+            { x: 7250.001, y: 900.001 },
+          ],
+        },
+      },
+      {
+        id: 'river',
+        kind: 'river',
+        layer: 0,
+        geometry: {
+          shape: 'polyline',
+          points: [
+            { x: 0.001, y: 1500.001 },
+            { x: 8000, y: 1500.001 },
+          ],
+          width: 0.001,
+        },
+      },
+      {
+        id: 'bridge',
+        kind: 'bridge',
+        layer: 4,
+        geometry: { shape: 'point', at: { x: 6050.001, y: 1500.001 }, radius: 0.001 },
+      },
+    ],
+  };
+}
+
+function pointer(el: Element, type: string, x: number, y: number): void {
+  el.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y, bubbles: true }));
+}
 
 const view = {
   ...fixtureView,
@@ -42,9 +112,186 @@ async function open() {
 }
 
 describe('FlatBoardComponent (#343)', () => {
+  it('draws checked asymmetric native geometry exactly, in supplied painter order, without legacy rounding/caps', async () => {
+    const map = alternate();
+    configuredGame({ ...initialState, view }, map);
+    const f = TestBed.createComponent(FlatBoardComponent);
+    await f.whenStable();
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 8000 3000');
+    expect(el.querySelector('.ground')?.getAttribute('width')).toBe('8000');
+    expect([...el.querySelectorAll('.feature')].map((node) => node.tagName)).toEqual([
+      'polygon',
+      'polyline',
+      'circle',
+    ]);
+    expect(el.querySelector('polygon.wood')?.getAttribute('points')).toBe(
+      '6000.001,300.001 7300.001,350.001 7250.001,900.001',
+    );
+    const river = el.querySelector('polyline.river')!;
+    expect(river.getAttribute('points')).toBe('0.001,1500.001 8000,1500.001');
+    expect(river.getAttribute('stroke-width')).toBe('0.001');
+    expect(getComputedStyle(river).strokeLinecap).toBe('round');
+    const bridge = el.querySelector('circle.bridge')!;
+    expect(['cx', 'cy', 'r'].map((attr) => bridge.getAttribute(attr))).toEqual([
+      '6050.001',
+      '1500.001',
+      '0.001',
+    ]);
+    expect(el.querySelector('svg')?.style.fontSize).toBe(`${8000 / 60}px`);
+  });
+
+  it('renders nothing and cannot pick old live/window state when the map is absent', async () => {
+    const g = configuredGame({ ...initialState, view }, undefined);
+    const f = TestBed.createComponent(FlatBoardComponent);
+    await f.whenStable();
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector('svg')).toBeNull();
+    expect(el.querySelector('#board-summary')).toBeNull();
+    TestBed.inject(DeskStore).windowFrame.set({
+      gameMs: 0,
+      units: [],
+      beliefs: {},
+      events: [],
+      rulings: [],
+    } as unknown as WindowAt);
+    await f.whenStable();
+    expect(el.querySelector('svg')).toBeNull();
+    expect(g.fake.putMark).not.toHaveBeenCalled();
+  });
+
+  it('picks in the actual letterboxed dimensions with the native piece tolerance, not fixture extent', async () => {
+    const first = fixtureView.ownUnits[0]!;
+    const g = configuredGame(
+      {
+        ...initialState,
+        view: {
+          ...view,
+          ownUnits: [
+            { ...first, position: { x: 6000, y: 1500 }, footprint: { frontage: 10, depth: 10 } },
+          ],
+          visibleEnemies: [],
+          lastKnownContacts: [],
+        },
+      },
+      alternate(),
+    );
+    const f = TestBed.createComponent(FlatBoardComponent);
+    await f.whenStable();
+    const svg = (f.nativeElement as HTMLElement).querySelector('svg')!;
+    svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600 }) as DOMRect;
+    pointer(svg, 'pointerdown', 604, 300);
+    pointer(svg, 'pointerup', 604, 300);
+    expect(JSON.parse(TestBed.inject(TableService).status())).toEqual({
+      type: 'piece',
+      pieceKind: 'own',
+      id: first.id,
+      coord: { x: 6040, y: 1500 },
+    });
+    const marks = TestBed.inject(MarksService);
+    marks.setTool('pin');
+    pointer(svg, 'pointerdown', 600, 149);
+    pointer(svg, 'pointerup', 600, 149);
+    expect(g.fake.putMark).not.toHaveBeenCalled();
+    pointer(svg, 'pointerdown', 700, 300);
+    pointer(svg, 'pointerup', 700, 300);
+    expect(g.fake.putMark).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'pin', at: { x: 7000, y: 1500 } }),
+    );
+  });
+
+  it('rejects events from an old SVG before rendering same-ID geometry replacement, then uses the new board', async () => {
+    const map = alternate();
+    const g = configuredGame({ ...initialState, view }, map);
+    const f = TestBed.createComponent(FlatBoardComponent);
+    await f.whenStable();
+    const el = f.nativeElement as HTMLElement;
+    const oldSvg = el.querySelector('svg')!;
+    oldSvg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600 }) as DOMRect;
+    const marks = TestBed.inject(MarksService);
+    marks.setTool('pin');
+    pointer(oldSvg, 'pointerdown', 600, 300);
+    expect(marks.draft()).toMatchObject({ at: { x: 6000, y: 1500 } });
+    const next = alternate();
+    next.features[2]!.geometry = {
+      shape: 'point',
+      at: { x: 6050.002, y: 1500.002 },
+      radius: 1.001,
+    };
+    g.map.set(next);
+    expect(marks.draft()).toBeUndefined();
+    pointer(oldSvg, 'pointerup', 600, 300);
+    pointer(oldSvg, 'pointerdown', 600, 300);
+    expect(marks.draft()).toBeUndefined();
+    expect(g.fake.putMark).not.toHaveBeenCalled();
+    await f.whenStable();
+    const newSvg = el.querySelector('svg')!;
+    expect(newSvg).not.toBe(oldSvg);
+    expect(oldSvg.isConnected).toBe(false);
+    expect(el.querySelector('circle.bridge')?.getAttribute('cx')).toBe('6050.002');
+    newSvg.getBoundingClientRect = oldSvg.getBoundingClientRect;
+    pointer(newSvg, 'pointerdown', 600, 300);
+    pointer(newSvg, 'pointerup', 600, 300);
+    expect(g.fake.putMark).toHaveBeenCalledTimes(1);
+    g.map.set(undefined);
+    pointer(newSvg, 'pointerdown', 600, 300);
+    pointer(newSvg, 'pointerup', 600, 300);
+    await f.whenStable();
+    expect(el.querySelector('svg')).toBeNull();
+    expect(g.fake.putMark).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses checked dimensions and positions for the umpire window and its text alternative', async () => {
+    configuredGame({ ...initialState, view }, alternate());
+    const first = fixtureView.ownUnits[0]!;
+    const desk = TestBed.inject(DeskStore);
+    desk.windowFrame.set({
+      gameMs: 0,
+      units: [{ ...first, side: 'blue', position: { x: 6000, y: 1500 } }],
+      beliefs: {
+        blue: { visibleEnemies: [], lastKnownContacts: [] },
+        red: { visibleEnemies: [], lastKnownContacts: [] },
+      },
+      events: [],
+      rulings: [],
+    } as unknown as WindowAt);
+    const f = TestBed.createComponent(FlatBoardComponent);
+    await f.whenStable();
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector('#board-summary')?.textContent).toContain(
+      'east, 6000 m east and 1500 m south',
+    );
+    const points = el
+      .querySelector('polygon.piece.own')!
+      .getAttribute('points')!
+      .split(' ')
+      .map((point) => point.split(',').map(Number));
+    expect(points.reduce((sum, point) => sum + point[0]!, 0) / 4).toBe(6000);
+    expect(points.reduce((sum, point) => sum + point[1]!, 0) / 4).toBe(1500);
+  });
+
+  it('cancels an unfinished mark when its board is destroyed', async () => {
+    const g = configuredGame({ ...initialState, view }, alternate());
+    const f = TestBed.createComponent(FlatBoardComponent);
+    await f.whenStable();
+    const svg = (f.nativeElement as HTMLElement).querySelector('svg')!;
+    svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600 }) as DOMRect;
+    const marks = TestBed.inject(MarksService);
+    marks.setTool('pin');
+    pointer(svg, 'pointerdown', 600, 300);
+    expect(marks.draft()).toBeDefined();
+    f.destroy();
+    expect(marks.draft()).toBeUndefined();
+    marks.pointerUp(
+      { pickAt: () => ({ type: 'point', coord: { x: 6000, y: 1500 } }) },
+      { clientX: 600, clientY: 300, pointerId: 1, button: 0 },
+    );
+    expect(g.fake.putMark).not.toHaveBeenCalled();
+  });
   it('draws the map, own units, known enemy, order arrow and a dotted route', async () => {
     const { el } = await open();
     expect(el.querySelector('polyline.river')).not.toBeNull();
+    expect(getComputedStyle(el.querySelector('polyline.river')!).strokeLinecap).toBe('butt');
     expect(el.querySelector('circle.bridge')).not.toBeNull();
     expect(el.querySelectorAll('polygon.wood').length).toBeGreaterThan(0);
     expect(el.querySelectorAll('polygon.piece.own')).toHaveLength(fixtureView.ownUnits.length);
@@ -250,6 +497,24 @@ describe('FlatBoardComponent (#343)', () => {
       desk.windowFrame.set(undefined);
       await b.f.whenStable();
       expect(b.piece()).toBe(b.before);
+    });
+
+    it('sets a new map lifetime down immediately instead of gliding from old-map positions', async () => {
+      clock();
+      const g = configuredGame({ ...initialState, view, turnMode: true }, fixtureMap);
+      const f = TestBed.createComponent(FlatBoardComponent);
+      await f.whenStable();
+      g.state.update((state) => ({ ...state, view: moved }));
+      g.map.set(alternate());
+      await f.whenStable();
+      const points = (f.nativeElement as HTMLElement)
+        .querySelector('polygon.piece.own')!
+        .getAttribute('points')!
+        .split(' ')
+        .map((point) => point.split(',').map(Number));
+      expect(points.reduce((sum, point) => sum + point[0]!, 0) / 4).toBe(
+        moved.ownUnits[0]!.position.x,
+      );
     });
   });
 });

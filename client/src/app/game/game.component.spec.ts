@@ -180,15 +180,17 @@ describe('GameComponent without WebGL (#259)', () => {
 
   it('disposes a half-built scene when start() throws', async () => {
     const dispose = vi.fn();
+    const start = vi.fn(() => {
+      throw new Error('Error creating WebGL context.');
+    });
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
         {
           provide: TABLE_SCENE_FACTORY,
           useValue: () => ({
-            start: () => {
-              throw new Error('Error creating WebGL context.');
-            },
+            ...fakeScene(),
+            start,
             dispose,
           }),
         },
@@ -196,6 +198,7 @@ describe('GameComponent without WebGL (#259)', () => {
     });
     const f = TestBed.createComponent(GameComponent);
     await f.whenStable();
+    expect(start).toHaveBeenCalledOnce();
     expect(dispose).toHaveBeenCalledTimes(1);
     expect(f.nativeElement.querySelector('ks-webgl-fallback')).not.toBeNull();
     expect(TestBed.inject(TableService).scene()).toBeUndefined();

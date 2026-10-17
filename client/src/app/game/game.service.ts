@@ -1,4 +1,4 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
 import { GameConnection } from '@legacy/net/connection';
 import {
   applyServerMessage,
@@ -9,7 +9,6 @@ import {
   withMarkPut,
   withPendingOrder,
   withRead,
-  withModeKnown,
   withModePending,
   withTurnSettings,
   type ClientState,
@@ -17,8 +16,19 @@ import {
 } from '@legacy/net/state';
 import type { Mark, TurnOrder } from '@kriegsspiel/protocol';
 import { fetchGame, fetchScenarios } from '@legacy/lobby/api';
-import { fixtureView } from '@legacy/table/fixture';
+import { fetchGameBattlefield, GameBattlefieldError } from '@legacy/lobby/battlefield';
+import { fixtureView, fixtureMap } from '@legacy/table/fixture';
+import type { BaseMap } from '@legacy/table/types';
 import { parseSession, wsUrl } from '@legacy/session';
+
+/** Narrow transport seams keep lifecycle tests independent of browser HTTP. */
+export const GAME_BATTLEFIELD_LOADER = new InjectionToken<typeof fetchGameBattlefield>(
+  'GAME_BATTLEFIELD_LOADER',
+  { factory: () => fetchGameBattlefield },
+);
+export const GAME_INFO_LOADER = new InjectionToken<typeof fetchGame>('GAME_INFO_LOADER', {
+  factory: () => fetchGame,
+});
 
 /**
  * The client state for one game, as a signal. The reducers and the WebSocket client are the existing framework-free
@@ -27,6 +37,8 @@ import { parseSession, wsUrl } from '@legacy/session';
  */
 @Injectable({ providedIn: 'root' })
 export class GameService {
+  private readonly loadBattlefield = inject(GAME_BATTLEFIELD_LOADER);
+  private readonly loadInfo = inject(GAME_INFO_LOADER);
   private readonly _state = signal<ClientState>(initialState);
   readonly state = this._state.asReadonly();
   readonly view = computed(() => this._state().view);
@@ -36,6 +48,16 @@ export class GameService {
   private readonly _sides = signal<readonly string[]>([]);
   /** Every side in the game, from the lobby record; empty until read. The turn panel lists who has sent. */
   readonly sides = this._sides.asReadonly();
+  private readonly _map = signal<BaseMap | undefined>(fixtureMap);
+  /** Checked public terrain for this connection; undefined while a live game's terrain is unverified. */
+  readonly map = this._map.asReadonly();
+  private readonly _mapLoading = signal(false);
+  readonly mapLoading = this._mapLoading.asReadonly();
+  private readonly _mapError = signal('');
+  readonly mapError = this._mapError.asReadonly();
+  private mapRequest: AbortController | undefined;
+  private visit = 0;
+  private location: { protocol: string; host: string; search: string } | undefined;
   private conn: GameConnection | undefined;
   private orderSeq = 0;
   private stopPageEvents: (() => void) | undefined;
@@ -46,21 +68,41 @@ export class GameService {
     const params = parseSession(loc.search);
     if (params.mode !== 'join') {
       // `?new=1` and `?lobby` also land here until the shell routes them (stage 2 step 4).
+      this._map.set(fixtureMap);
       this._gameId.set(undefined);
       this._state.set({ ...withLink(initialState, 'offline'), view: fixtureView });
       return;
     }
+    this.location = { ...loc };
+    this._map.set(undefined);
     this._gameId.set(params.game);
     this._sides.set([]);
     // Neither dress until the game's settings (or its first turn) say how it is played (#427).
-    this._state.update(withModePending);
-    const game = params.game;
-    fetchGame(game).then(
-      (info) => {
-        if (this._gameId() !== game) return;
+    this._state.set(withModePending(initialState));
+    this._mapLoading.set(true);
+    this._mapError.set('');
+    const request = new AbortController();
+    this.mapRequest = request;
+    const visit = this.visit;
+    const current = () => visit === this.visit && !request.signal.aborted;
+    const timeout = setTimeout(() => request.abort(), 30_000);
+    // Terrain and game settings belong to one connection lifetime, including reconnects to the same game.
+    void Promise.all([
+      this.loadBattlefield(params.game, request.signal),
+      this.loadInfo(params.game, fetch, request.signal),
+    ])
+      .then(([terrain, info]) => {
+        if (!current()) return;
+        if (
+          info.id !== params.game ||
+          info.scenario !== terrain.scenarioId ||
+          !Array.isArray(info.sides)
+        )
+          throw new Error('Game metadata mismatch');
+        this._map.set(terrain.map);
         this._sides.set(info.sides.map((x) => x.side));
         // The mode comes with the game, so a finished turn game reloads in turn dress (#429, #427).
-        this._state.update((s) => withTurnSettings(s, info.umpire));
+        this._state.update((state) => withTurnSettings(state, info.umpire));
         // The battle's length, so the turn desk can count its turns (#439).
         fetchScenarios().then(
           (list) => {
@@ -68,43 +110,66 @@ export class GameService {
             const minutes = Array.isArray(list)
               ? list.find((x) => x.id === info.scenario)?.lengthMinutes
               : undefined;
-            if (this._gameId() !== game || minutes === undefined) return;
-            this._state.update((s) => ({ ...s, battleMinutes: minutes }));
+            if (!current() || minutes === undefined) return;
+            this._state.update((state) => ({ ...state, battleMinutes: minutes }));
           },
           () => undefined,
         );
-      },
-      // Unreadable settings: play it as the socket says (a turn game still sends its turn).
-      () => {
-        if (this._gameId() === game) this._state.update(withModeKnown);
-      },
-    );
-    this.conn = new GameConnection({
-      url: wsUrl(loc, params.game, params.side),
-      onStatus: (s) => this._state.update((st) => withLink(st, s)),
-      onMessage: (m) => {
-        const before = this._state();
-        const after = applyServerMessage(before, m, Date.now());
-        this._state.set(after);
-        // An entry that skipped a rev: start over from the server's snapshot.
-        if (after.draftsStale && !before.draftsStale) this.conn?.syncDrafts();
-      },
-    });
-    this.conn.start();
-    this.listenForPageCache();
+        const url = wsUrl(loc, params.game, params.side);
+        this.conn = new GameConnection({
+          url: url + (url.includes('?') ? '&' : '?') + 'battlefieldVersion=1',
+          onStatus: (status) => {
+            if (current()) this._state.update((state) => withLink(state, status));
+          },
+          onMessage: (message) => {
+            if (!current()) return;
+            const before = this._state();
+            const after = applyServerMessage(before, message, Date.now());
+            this._state.set(after);
+            if (after.draftsStale && !before.draftsStale) this.conn?.syncDrafts();
+          },
+        });
+        this.conn.start();
+        this.listenForPageCache();
+      })
+      .catch((error: unknown) => {
+        if (visit !== this.visit) return;
+        request.abort();
+        this.conn?.stop();
+        this.conn = undefined;
+        this._map.set(undefined);
+        this._mapError.set(
+          error instanceof GameBattlefieldError
+            ? error.message
+            : 'The battlefield map could not be loaded. Try again.',
+        );
+        this._state.set(withLink(initialState, 'offline'));
+      })
+      .finally(() => {
+        clearTimeout(timeout);
+        if (visit === this.visit) this._mapLoading.set(false);
+      });
   }
 
-  /** The player's manual retry after the connection gave up. */
+  /** Retry the terrain gate after a loading failure, otherwise retry the established side connection. */
   retry(): void {
-    this.conn?.retry();
+    if (this._mapError() && this.location) this.connect(this.location);
+    else this.conn?.retry();
   }
 
-  /** Stop the connection and the page listeners. */
+  /** Stop this lifetime before clearing its map; late messages cannot repopulate it. */
   disconnect(): void {
+    this.visit++;
+    this.mapRequest?.abort();
+    this.mapRequest = undefined;
     this.stopPageEvents?.();
     this.stopPageEvents = undefined;
     this.conn?.stop();
     this.conn = undefined;
+    this.location = undefined;
+    this._map.set(undefined);
+    this._mapLoading.set(false);
+    this._mapError.set('');
   }
 
   /** A page kept in the back/forward cache is not closed, so it must come back with a live connection. */

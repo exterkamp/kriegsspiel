@@ -8,12 +8,15 @@ import {
   computed,
   effect,
   inject,
+  signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import * as THREE from 'three';
 import { buildSceneState, withTurnOverlays } from '@legacy/table/sceneState';
 import { GLIDE_MS } from '@legacy/table/glide';
-import { fixtureMap } from '@legacy/table/fixture';
+import type { BaseMap, SceneState } from '@legacy/table/types';
+import type { TableScene } from '@legacy/table/TableScene';
 import { buildWindowScene } from '@legacy/window/model';
 import { DeskStore } from '../desk/desk.store';
 import { GameService } from './game.service';
@@ -22,20 +25,20 @@ import { WebglFallbackComponent } from './webgl-fallback.component';
 import { TABLE_SCENE_FACTORY, TableService } from './table.service';
 
 /**
- * Hosts the framework-agnostic Three.js `TableScene` on one canvas. The scene is built once, after the first render,
- * and lives as long as this component (the game route, not a desk view); Angular never touches Three.js objects, it
+ * Hosts one `TableScene` per checked map lifetime, after rendering the canvas. Ordinary view/desk updates keep it;
+ * absent or replaced terrain disposes its resources. Angular never touches Three.js objects, it
  * only calls into the scene from effects and the canvas pointer handlers.
  */
 @Component({
   selector: 'ks-table-host',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [WebglFallbackComponent],
-  template: `@if (tableService.unavailable()) {
+  template: `@if (map() && tableService.unavailable()) {
       <ks-webgl-fallback />
     }
     <canvas
       #table
-      [hidden]="tableService.unavailable()"
+      [hidden]="!currentScene() || tableService.unavailable()"
       (pointerdown)="down($event)"
       (pointermove)="move($event)"
       (pointerup)="up($event)"
@@ -50,7 +53,7 @@ import { TABLE_SCENE_FACTORY, TableService } from './table.service';
     }
   `,
   host: {
-    '(window:resize)': 'tableService.scene()?.resize()',
+    '(window:resize)': 'currentScene()?.resize()',
     '(window:keydown)': 'marks.onKey($event)',
   },
 })
@@ -61,70 +64,101 @@ export class TableHostComponent implements OnDestroy {
   protected readonly tableService = inject(TableService);
   private readonly makeScene = inject(TABLE_SCENE_FACTORY);
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('table');
+  protected readonly map = this.game.map;
+  private readonly rendered = signal(false);
+  private readonly sceneMap = signal<BaseMap | undefined>(undefined);
+  private ownedScene: TableScene | undefined;
+  protected readonly currentScene = computed(() =>
+    this.map() && this.map() === this.sceneMap() ? this.tableService.scene() : undefined,
+  );
   /** A turn-mode game (D39) moves by whole turns, so its pieces glide to their new places. */
   private readonly turnMode = computed(() => this.game.state().turnMode === true);
 
   constructor() {
-    afterNextRender(() => {
-      let built: ReturnType<typeof this.makeScene> | undefined;
-      try {
-        built = this.makeScene(this.canvas().nativeElement);
-        built.start();
-        this.tableService.scene.set(built);
-      } catch (e) {
-        built?.dispose();
-        // No WebGL (GPU or hardware acceleration off): the desk still works, so say so and list the units.
-        this.tableService.unavailable.set(e instanceof Error ? e.message : String(e));
-      }
+    afterNextRender(() => this.rendered.set(true));
+    effect(() => {
+      const rendered = this.rendered();
+      const map = this.map();
+      if (!rendered) return;
+      untracked(() => {
+        if (map === this.sceneMap()) return;
+        this.disposeScene();
+        this.desk.showOnTable.set(undefined);
+        this.sceneMap.set(map);
+        this.tableService.unavailable.set(undefined);
+        if (!map) return;
+        let built: TableScene | undefined;
+        try {
+          built = this.makeScene(this.canvas().nativeElement);
+          // apply supplies dimensions/texture and camera limits; start must never draw a fixture or old map.
+          built.setGlide(0);
+          built.apply(this.picture(map));
+          built.setDesk(this.marks.deskOpen(), 0);
+          built.setOverlays(this.marks.overlays());
+          built.setMarks(this.marks.shown(), this.marks.nowGame(), this.marks.selectedId());
+          built.start();
+          this.ownedScene = built;
+          this.tableService.scene.set(built);
+        } catch (e) {
+          built?.dispose();
+          this.tableService.unavailable.set(e instanceof Error ? e.message : String(e));
+        }
+      });
     });
     // The player's picture, or after the game the umpire's window at the scrubbed time.
     let shownFrame = false;
+    let previousScene: TableScene | undefined;
     effect(() => {
-      const scene = this.tableService.scene();
+      const scene = this.currentScene();
       const frame = this.desk.windowFrame();
-      const view = this.game.view();
-      if (!scene) return;
+      const turns = this.turnMode();
+      if (!scene) {
+        shownFrame = false;
+        previousScene = undefined;
+        return;
+      }
       const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
       // Only a turn glides: the window's frames, and the way back from them to the live picture, are set down at once.
-      const glide = !frame && !shownFrame && this.turnMode() && !still;
+      const glide = scene === previousScene && !frame && !shownFrame && turns && !still;
       shownFrame = !!frame;
+      previousScene = scene;
       scene.setGlide(glide ? GLIDE_MS : 0);
-      if (frame) scene.apply(buildWindowScene(frame, this.desk.windowBelief(), fixtureMap));
-      else if (view) {
-        // Turn mode: the turn's orders and the last turn's fighting on the table too (#439).
-        const turn = this.desk.turnTable();
-        const built = buildSceneState(view, fixtureMap);
-        scene.apply(turn ? withTurnOverlays(built, view, turn) : built);
-      }
+      scene.apply(this.picture(this.map()!));
     });
     // Leaving the table dollies the camera to the desk and back.
     effect(() => {
-      const scene = this.tableService.scene();
+      const scene = this.currentScene();
       const deskOpen = this.marks.deskOpen();
       scene?.setDesk(
         deskOpen,
         window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 600,
       );
     });
-    effect(() => this.tableService.scene()?.setOverlays(this.marks.overlays()));
+    effect(() => this.currentScene()?.setOverlays(this.marks.overlays()));
     // Drawing tools take the left button; the camera keeps the wheel and the other buttons.
     effect(() => {
-      const scene = this.tableService.scene();
+      const scene = this.currentScene();
       const look = this.marks.tool() === 'view';
       if (!scene) return;
       scene.controls.mouseButtons.LEFT = look ? THREE.MOUSE.ROTATE : (null as never);
       scene.controls.touches.ONE = look ? THREE.TOUCH.ROTATE : (null as never);
     });
     effect(() =>
-      this.tableService
-        .scene()
-        ?.setMarks(this.marks.shown(), this.marks.nowGame(), this.marks.selectedId()),
+      this.currentScene()?.setMarks(
+        this.marks.shown(),
+        this.marks.nowGame(),
+        this.marks.selectedId(),
+      ),
     );
     // The desk asks the table to show a place; the table pans there and clears the request.
     effect(() => {
       const at = this.desk.showOnTable();
-      const scene = this.tableService.scene();
-      if (!at || !scene) return;
+      const scene = this.currentScene();
+      if (!at) return;
+      if (!scene) {
+        this.desk.showOnTable.set(undefined);
+        return;
+      }
       scene.panTo(at);
       this.desk.showOnTable.set(undefined);
     });
@@ -134,20 +168,38 @@ export class TableHostComponent implements OnDestroy {
   }
 
   protected down(e: PointerEvent): void {
-    const scene = this.tableService.scene();
+    const scene = this.currentScene();
     if (scene) this.marks.pointerDown(scene, this.canvas().nativeElement, e);
   }
   protected move(e: PointerEvent): void {
-    const scene = this.tableService.scene();
+    const scene = this.currentScene();
     if (scene) this.marks.pointerMove(scene, e);
   }
   protected up(e: PointerEvent): void {
-    const scene = this.tableService.scene();
+    const scene = this.currentScene();
     if (scene) this.marks.pointerUp(scene, e);
   }
 
   ngOnDestroy(): void {
-    this.tableService.scene()?.dispose();
-    this.tableService.scene.set(undefined);
+    this.marks.pointerCancel();
+    this.disposeScene();
+  }
+
+  private picture(map: BaseMap): SceneState {
+    const frame = this.desk.windowFrame();
+    if (frame) return buildWindowScene(frame, this.desk.windowBelief(), map);
+    const view = this.game.view();
+    if (!view) return { side: '', map, own: [], ghosts: [] };
+    // Turn mode: the turn's orders and the last turn's fighting on the table too (#439).
+    const turn = this.desk.turnTable();
+    const built = buildSceneState(view, map);
+    return turn ? withTurnOverlays(built, view, turn) : built;
+  }
+
+  private disposeScene(): void {
+    const scene = this.ownedScene;
+    this.ownedScene = undefined;
+    if (this.tableService.scene() === scene) this.tableService.scene.set(undefined);
+    scene?.dispose();
   }
 }

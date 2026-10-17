@@ -1,5 +1,5 @@
 /** The lobby REST calls (server/src/api/app.ts): make a game, list yours, join, ready up, start. */
-import type { UmpireSettings } from '@kriegsspiel/protocol';
+import type { UmpireSettings, ApprovedBattlefield } from '@kriegsspiel/protocol';
 
 export type SessionType = 'team_vs_team' | 'co_op_vs_ai' | 'hot_seat';
 
@@ -23,6 +23,7 @@ export interface GameSummary {
 }
 
 export interface GameInfo extends GameSummary {
+  battlefield?: ApprovedBattlefield;
   you: string | null;
   ready: boolean;
   pause: PauseSettings | null;
@@ -95,8 +96,15 @@ export async function fetchGames(f: Fetch = fetch): Promise<GameSummary[]> {
   return ((await res.json()) as { games: GameSummary[] }).games;
 }
 
-export async function fetchGame(id: string, f: Fetch = fetch): Promise<GameInfo> {
-  const res = await f(`/games/${encodeURIComponent(id)}`);
+export async function fetchGame(
+  id: string,
+  f: Fetch = fetch,
+  signal?: AbortSignal,
+): Promise<GameInfo> {
+  const res = await f(`/games/${encodeURIComponent(id)}?battlefieldVersion=1`, {
+    credentials: 'same-origin',
+    ...(signal ? { signal } : {}),
+  });
   if (res.status === 404) throw new Error('no such game');
   if (!res.ok) throw await failure(res, 'could not read the game');
   return (await res.json()) as GameInfo;
@@ -110,7 +118,10 @@ export async function createLobbyGame(game: NewGame, f: Fetch = fetch): Promise<
 }
 
 export async function joinSide(id: string, side: string, f: Fetch = fetch): Promise<void> {
-  const res = await f(`/games/${encodeURIComponent(id)}/join`, jsonInit({ side }));
+  const res = await f(
+    `/games/${encodeURIComponent(id)}/join?battlefieldVersion=1`,
+    jsonInit({ side }),
+  );
   if (res.status === 409) throw new Error(`${side} is already taken`);
   if (!res.ok) throw await failure(res, 'could not join');
 }

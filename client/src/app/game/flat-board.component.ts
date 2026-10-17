@@ -12,7 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import type { Mark } from '@kriegsspiel/protocol';
-import { fixtureMap } from '@legacy/table/fixture';
+import { battlefieldPoints } from '@legacy/table/battlefieldMap';
 import { dashPolyline } from '@legacy/table/dash';
 import {
   arrowHead,
@@ -25,7 +25,7 @@ import {
 import { pieceAtPoint } from '@legacy/table/picking';
 import { markAgeFactor } from '@legacy/table/marks';
 import { buildSceneState, withTurnOverlays } from '@legacy/table/sceneState';
-import type { SceneState } from '@legacy/table/types';
+import type { BaseFeature, BaseMap, SceneState } from '@legacy/table/types';
 import {
   GLIDE_MS,
   NO_GLIDES,
@@ -52,166 +52,180 @@ import { MarksService, type Picker } from './marks.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'ks-theme' },
   template: `
-    <svg
-      #svg
-      role="img"
-      aria-label="Flat map board. The units on it are listed in the map summary."
-      aria-describedby="board-summary"
-      preserveAspectRatio="xMidYMid meet"
-      [attr.viewBox]="'0 0 ' + map.width + ' ' + map.height"
-      [style.font-size.px]="fontSize"
-      (pointerdown)="marks.pointerDown(picker, svg, $event)"
-      (pointermove)="marks.pointerMove(picker, $event)"
-      (pointerup)="marks.pointerUp(picker, $event)"
-      (pointercancel)="marks.pointerCancel()"
-    >
-      <rect class="ground" x="0" y="0" [attr.width]="map.width" [attr.height]="map.height" />
-      @for (f of map.features; track f.id) {
-        @switch (f.geometry.shape) {
-          @case ('polygon') {
-            <polygon [class]="'feature ' + f.kind" [attr.points]="pts(f.geometry.points)" />
-          }
-          @case ('polyline') {
-            <polyline
-              [class]="'feature ' + f.kind"
-              [attr.points]="pts(f.geometry.points)"
-              [attr.stroke-width]="f.geometry.width"
-            />
-          }
-          @case ('point') {
-            <circle
-              [class]="'feature ' + f.kind"
-              [attr.cx]="f.geometry.at.x"
-              [attr.cy]="f.geometry.at.y"
-              [attr.r]="f.geometry.radius"
-            />
-          }
-        }
-      }
-      @for (g of ghosts(); track g.id) {
-        @if (g.uncertaintyRadius > 0) {
-          <circle
-            class="uncertainty"
-            [class.hidden]="!marks.overlays().lastKnown"
-            [attr.cx]="g.position.x"
-            [attr.cy]="g.position.y"
-            [attr.r]="g.uncertaintyRadius"
-          />
-        }
-      }
-      @for (r of routes(); track r.id) {
-        @if (r.kind === 'order') {
-          <polyline class="order" [attr.points]="pts(r.points)" [attr.stroke-width]="stroke * 2" />
-          <polygon class="order-head" [attr.points]="pts(head(r.points))" />
-        } @else if (r.kind === 'held') {
-          <polyline
-            class="held"
-            [attr.data-held]="r.id"
-            [attr.points]="pts(r.points)"
-            [attr.stroke-width]="stroke * 2"
-            [attr.stroke-dasharray]="fontSize * 0.8 + ' ' + fontSize * 0.5"
-          />
-          <polygon class="held-head" [attr.points]="pts(head(r.points))" />
-        } @else {
-          @for (d of dashes(r.points); track $index) {
-            <polyline class="route" [attr.points]="pts(d)" [attr.stroke-width]="stroke * 5" />
-          }
-          <circle
-            class="route-end"
-            [attr.cx]="r.points[r.points.length - 1]!.x"
-            [attr.cy]="r.points[r.points.length - 1]!.y"
-            [attr.r]="fontSize * 0.45"
-          />
-        }
-      }
-      @for (c of couriers(); track c.id) {
-        <g class="courier" [attr.data-courier]="c.id">
-          <circle [attr.cx]="c.position.x" [attr.cy]="c.position.y" [attr.r]="fontSize * 0.6" />
-          <text [attr.x]="c.position.x" [attr.y]="c.position.y - fontSize * 1">
-            {{ c.etaMin > 0 ? 'Courier, ' + c.etaMin + ' min' : 'Courier' }}
-          </text>
-        </g>
-      }
-      @for (p of own(); track p.id) {
-        <polygon class="piece own" [attr.points]="pts(corners(p))" />
-        <line
-          class="front own"
-          [attr.x1]="corners(p)[0]!.x"
-          [attr.y1]="corners(p)[0]!.y"
-          [attr.x2]="corners(p)[1]!.x"
-          [attr.y2]="corners(p)[1]!.y"
-          [attr.stroke-width]="stroke * 3"
-        />
-      }
-      @for (p of ghosts(); track p.id) {
-        <polygon class="piece enemy" [class.stale]="p.ageMs > 0" [attr.points]="pts(corners(p))" />
-      }
-      @for (f of fights(); track f.id) {
-        <circle
-          class="fight"
-          [class.past]="!!f.past"
-          [attr.cx]="f.position.x"
-          [attr.cy]="f.position.y"
-          [attr.r]="fontSize * 1.4"
-          [attr.stroke-width]="stroke * 2"
-        />
-        @if (f.past; as past) {
-          <text
-            class="fought"
-            [attr.data-fought]="f.id"
-            [attr.x]="f.position.x"
-            [attr.y]="f.position.y - fontSize * 1.8"
-          >
-            {{ past.label }}
-          </text>
-        }
-      }
-      @for (m of markList(); track m.mark.id) {
-        <g
-          class="mark"
-          [class.selected]="m.mark.id === marks.selectedId()"
-          [style.opacity]="m.fade"
-        >
-          @switch (m.mark.kind) {
-            @case ('pin') {
-              <circle [attr.cx]="m.mark.at.x" [attr.cy]="m.mark.at.y" [attr.r]="stroke * 5" />
-            }
-            @case ('line') {
-              <polyline [attr.points]="pts(m.mark.points)" [attr.stroke-width]="stroke * 2" />
-            }
-            @case ('arrow') {
-              <line
-                [attr.x1]="m.mark.from.x"
-                [attr.y1]="m.mark.from.y"
-                [attr.x2]="m.mark.to.x"
-                [attr.y2]="m.mark.to.y"
-                [attr.stroke-width]="stroke * 2"
+    @for (map of maps(); track map) {
+      <svg
+        #svg
+        role="img"
+        aria-label="Flat map board. The units on it are listed in the map summary."
+        aria-describedby="board-summary"
+        preserveAspectRatio="xMidYMid meet"
+        [attr.viewBox]="'0 0 ' + map.width + ' ' + map.height"
+        [style.font-size.px]="fontSize"
+        (pointerdown)="marks.pointerDown(picker(map), svg, $event)"
+        (pointermove)="marks.pointerMove(picker(map), $event)"
+        (pointerup)="marks.pointerUp(picker(map), $event)"
+        (pointercancel)="marks.pointerCancel()"
+      >
+        <rect class="ground" x="0" y="0" [attr.width]="map.width" [attr.height]="map.height" />
+        @for (f of map.features; track f.id) {
+          @switch (f.geometry.shape) {
+            @case ('polygon') {
+              <polygon
+                [class]="'feature ' + f.kind"
+                [attr.points]="terrainPoints(f, f.geometry.points)"
               />
-              <polygon class="mark-head" [attr.points]="pts(head([m.mark.from, m.mark.to]))" />
             }
-            @case ('ring') {
+            @case ('polyline') {
+              <polyline
+                [class]="'feature ' + f.kind"
+                [attr.points]="terrainPoints(f, f.geometry.points)"
+                [attr.stroke-width]="f.geometry.width"
+                [class.native]="f.layer !== undefined"
+              />
+            }
+            @case ('point') {
               <circle
-                class="ring"
-                [attr.cx]="m.mark.at.x"
-                [attr.cy]="m.mark.at.y"
-                [attr.r]="m.mark.radius"
-                [attr.stroke-width]="stroke * 2"
+                [class]="'feature ' + f.kind"
+                [attr.cx]="f.geometry.at.x"
+                [attr.cy]="f.geometry.at.y"
+                [attr.r]="f.geometry.radius"
               />
             }
           }
-        </g>
-      }
-      @for (t of tags(); track t.id) {
-        <text class="tag" [class.enemy]="t.enemy" [attr.x]="t.at.x" [attr.y]="t.at.y">
-          {{ t.text }}
-        </text>
-      }
-    </svg>
-    <ul id="board-summary" class="ks-sr-only" aria-label="Map summary">
-      @for (line of summary(); track $index) {
-        <li>{{ line }}</li>
-      }
-    </ul>
+        }
+        @for (g of ghosts(); track g.id) {
+          @if (g.uncertaintyRadius > 0) {
+            <circle
+              class="uncertainty"
+              [class.hidden]="!marks.overlays().lastKnown"
+              [attr.cx]="g.position.x"
+              [attr.cy]="g.position.y"
+              [attr.r]="g.uncertaintyRadius"
+            />
+          }
+        }
+        @for (r of routes(); track r.id) {
+          @if (r.kind === 'order') {
+            <polyline
+              class="order"
+              [attr.points]="pts(r.points)"
+              [attr.stroke-width]="stroke * 2"
+            />
+            <polygon class="order-head" [attr.points]="pts(head(r.points))" />
+          } @else if (r.kind === 'held') {
+            <polyline
+              class="held"
+              [attr.data-held]="r.id"
+              [attr.points]="pts(r.points)"
+              [attr.stroke-width]="stroke * 2"
+              [attr.stroke-dasharray]="fontSize * 0.8 + ' ' + fontSize * 0.5"
+            />
+            <polygon class="held-head" [attr.points]="pts(head(r.points))" />
+          } @else {
+            @for (d of dashes(r.points); track $index) {
+              <polyline class="route" [attr.points]="pts(d)" [attr.stroke-width]="stroke * 5" />
+            }
+            <circle
+              class="route-end"
+              [attr.cx]="r.points[r.points.length - 1]!.x"
+              [attr.cy]="r.points[r.points.length - 1]!.y"
+              [attr.r]="fontSize * 0.45"
+            />
+          }
+        }
+        @for (c of couriers(); track c.id) {
+          <g class="courier" [attr.data-courier]="c.id">
+            <circle [attr.cx]="c.position.x" [attr.cy]="c.position.y" [attr.r]="fontSize * 0.6" />
+            <text [attr.x]="c.position.x" [attr.y]="c.position.y - fontSize * 1">
+              {{ c.etaMin > 0 ? 'Courier, ' + c.etaMin + ' min' : 'Courier' }}
+            </text>
+          </g>
+        }
+        @for (p of own(); track p.id) {
+          <polygon class="piece own" [attr.points]="pts(corners(p))" />
+          <line
+            class="front own"
+            [attr.x1]="corners(p)[0]!.x"
+            [attr.y1]="corners(p)[0]!.y"
+            [attr.x2]="corners(p)[1]!.x"
+            [attr.y2]="corners(p)[1]!.y"
+            [attr.stroke-width]="stroke * 3"
+          />
+        }
+        @for (p of ghosts(); track p.id) {
+          <polygon
+            class="piece enemy"
+            [class.stale]="p.ageMs > 0"
+            [attr.points]="pts(corners(p))"
+          />
+        }
+        @for (f of fights(); track f.id) {
+          <circle
+            class="fight"
+            [class.past]="!!f.past"
+            [attr.cx]="f.position.x"
+            [attr.cy]="f.position.y"
+            [attr.r]="fontSize * 1.4"
+            [attr.stroke-width]="stroke * 2"
+          />
+          @if (f.past; as past) {
+            <text
+              class="fought"
+              [attr.data-fought]="f.id"
+              [attr.x]="f.position.x"
+              [attr.y]="f.position.y - fontSize * 1.8"
+            >
+              {{ past.label }}
+            </text>
+          }
+        }
+        @for (m of markList(); track m.mark.id) {
+          <g
+            class="mark"
+            [class.selected]="m.mark.id === marks.selectedId()"
+            [style.opacity]="m.fade"
+          >
+            @switch (m.mark.kind) {
+              @case ('pin') {
+                <circle [attr.cx]="m.mark.at.x" [attr.cy]="m.mark.at.y" [attr.r]="stroke * 5" />
+              }
+              @case ('line') {
+                <polyline [attr.points]="pts(m.mark.points)" [attr.stroke-width]="stroke * 2" />
+              }
+              @case ('arrow') {
+                <line
+                  [attr.x1]="m.mark.from.x"
+                  [attr.y1]="m.mark.from.y"
+                  [attr.x2]="m.mark.to.x"
+                  [attr.y2]="m.mark.to.y"
+                  [attr.stroke-width]="stroke * 2"
+                />
+                <polygon class="mark-head" [attr.points]="pts(head([m.mark.from, m.mark.to]))" />
+              }
+              @case ('ring') {
+                <circle
+                  class="ring"
+                  [attr.cx]="m.mark.at.x"
+                  [attr.cy]="m.mark.at.y"
+                  [attr.r]="m.mark.radius"
+                  [attr.stroke-width]="stroke * 2"
+                />
+              }
+            }
+          </g>
+        }
+        @for (t of tags(); track t.id) {
+          <text class="tag" [class.enemy]="t.enemy" [attr.x]="t.at.x" [attr.y]="t.at.y">
+            {{ t.text }}
+          </text>
+        }
+      </svg>
+      <ul id="board-summary" class="ks-sr-only" aria-label="Map summary">
+        @for (line of summary(); track $index) {
+          <li>{{ line }}</li>
+        }
+      </ul>
+    }
   `,
   styles: `
     :host {
@@ -241,6 +255,9 @@ import { MarksService, type Picker } from './marks.service';
     .feature {
       stroke-linecap: butt;
       stroke-linejoin: round;
+    }
+    polyline.feature.native {
+      stroke-linecap: round;
     }
     polygon.wood {
       fill: var(--ks-map-wood);
@@ -384,34 +401,54 @@ export class FlatBoardComponent {
   private readonly game = inject(GameService);
   private readonly desk = inject(DeskStore);
   protected readonly marks = inject(MarksService);
-  private readonly svg = viewChild.required<ElementRef<SVGSVGElement>>('svg');
+  private readonly svg = viewChild<ElementRef<SVGSVGElement>>('svg');
 
-  protected readonly map = fixtureMap;
-  protected readonly fontSize = longSide(fixtureMap) / 60;
-  protected readonly stroke = longSide(fixtureMap) / 900;
+  protected readonly map = this.game.map;
+  protected readonly maps = computed(() => {
+    const map = this.map();
+    return map ? [map] : [];
+  });
+  protected get fontSize(): number {
+    const map = this.map();
+    return map ? longSide(map) / 60 : 0;
+  }
+  protected get stroke(): number {
+    const map = this.map();
+    return map ? longSide(map) / 900 : 0;
+  }
 
   /** The player's picture, or after the game the umpire's window at the scrubbed time (as the 3D table shows). */
   private readonly scene = computed(() => {
+    const map = this.map();
+    if (!map) return undefined;
     const frame = this.desk.windowFrame();
-    if (frame) return buildWindowScene(frame, this.desk.windowBelief(), fixtureMap);
+    if (frame) return buildWindowScene(frame, this.desk.windowBelief(), map);
     const view = this.game.view();
     if (!view) return undefined;
+    // Turn mode: the turn's orders and the last turn's fighting on the board too (#439).
     const turn = this.desk.turnTable();
-    const scene = buildSceneState(view, fixtureMap);
+    const scene = buildSceneState(view, map);
     return turn ? withTurnOverlays(scene, view, turn) : scene;
   });
-  protected readonly summary = computed(() => boardLines(this.scene(), fixtureMap));
+  protected readonly summary = computed(() => {
+    const map = this.map();
+    return map ? boardLines(this.scene(), map) : [];
+  });
   /**
    * In a turn-mode game (D39) the pieces glide to where a turn left them, as on the 3D table. `frameNow`
    * is the wall time of the frame being drawn; it only ticks while a glide is running.
    */
   private readonly frameNow = signal(0);
   private readonly glide = linkedSignal<
-    { scene: SceneState | undefined; frame: boolean },
+    { scene: SceneState | undefined; frame: boolean; map: BaseMap | undefined },
     GlideState
   >({
-    source: () => ({ scene: this.scene(), frame: this.desk.windowFrame() !== undefined }),
-    computation: ({ scene: s, frame }, prev) => {
+    source: () => ({
+      scene: this.scene(),
+      frame: this.desk.windowFrame() !== undefined,
+      map: this.map(),
+    }),
+    computation: ({ scene: s, frame, map }, prev) => {
       const at = new Map([
         ...(s?.own ?? []).map((o) => [`own:${o.id}`, o.position] as const),
         ...(s?.ghosts ?? []).map((g) => [`ghost:${g.id}`, g.position] as const),
@@ -422,7 +459,7 @@ export class FlatBoardComponent {
       // Only a new scene starts a glide; the mode is read, not tracked. The umpire's window's frames, and the way
       // back from them to the live picture, are set down at once.
       const turns = untracked(() => this.game.state().turnMode) && !frame && !prev?.source.frame;
-      const ms = turns && !still ? GLIDE_MS : 0;
+      const ms = turns && !still && prev?.source.map === map ? GLIDE_MS : 0;
       return nextGlides(prev?.value ?? NO_GLIDES, at, performance.now(), ms);
     },
   });
@@ -479,16 +516,20 @@ export class FlatBoardComponent {
   });
 
   /** Screen position to map point and piece, for the mark tools (the same contract as the 3D table's `pickAt`). */
-  protected readonly picker: Picker = {
-    pickAt: (clientX, clientY): PickResult => {
-      const el = this.svg().nativeElement;
-      const coord = screenToMap(fixtureMap, el.getBoundingClientRect(), clientX, clientY);
-      if (!coord) return { type: 'none' };
-      const scene = this.scene();
-      const piece = scene && pieceAtPoint(scene, coord);
-      return piece ? { type: 'piece', ...piece, coord } : { type: 'point', coord };
-    },
-  };
+  protected picker(map: BaseMap): Picker {
+    return {
+      pickAt: (clientX, clientY): PickResult => {
+        const el = this.svg()?.nativeElement;
+        // An event from an old SVG can arrive before Angular renders the replacement.
+        if (map !== this.map() || !el) return { type: 'none' };
+        const coord = screenToMap(map, el.getBoundingClientRect(), clientX, clientY);
+        if (!coord) return { type: 'none' };
+        const scene = this.scene();
+        const piece = scene && pieceAtPoint(scene, coord);
+        return piece ? { type: 'piece', ...piece, coord } : { type: 'point', coord };
+      },
+    };
+  }
 
   constructor() {
     let raf = 0;
@@ -502,12 +543,22 @@ export class FlatBoardComponent {
       };
       if (g.glides.size > 0) frame();
     });
-    inject(DestroyRef).onDestroy(() => cancelAnimationFrame(raf));
+    inject(DestroyRef).onDestroy(() => {
+      cancelAnimationFrame(raf);
+      this.marks.pointerCancel();
+    });
   }
 
   protected pts = pointsAttr;
+  protected terrainPoints(
+    feature: BaseFeature,
+    points: readonly { x: number; y: number }[],
+  ): string {
+    return feature.layer === undefined ? pointsAttr(points) : battlefieldPoints(points);
+  }
   protected corners(p: Parameters<typeof pieceCorners>[0]) {
-    return pieceCorners(p, this.map);
+    const map = this.map();
+    return map ? pieceCorners(p, map) : [];
   }
   protected head(points: readonly { x: number; y: number }[]) {
     return arrowHead(points[points.length - 2]!, points[points.length - 1]!, this.fontSize * 1.2);
