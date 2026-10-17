@@ -1,0 +1,21 @@
+{
+  "caseId": "uncontested-march",
+  "model": "claude-code-sonnet",
+  "provider": "claude-code",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 22219,
+  "raw": "{\"turn\":1,\"units\":[\n{\"unitId\":\"blue-1\",\"x\":1960,\"y\":1680,\"facingDeg\":0,\"formation\":\"line\",\"strength\":600,\"morale\":80,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"Col. Aubry has no order and holds his line south of the river, facing the bridge. Towards the end of the turn he sights an enemy column halted on the road some 590 m to the north and keeps his men quiet.\"},\n{\"unitId\":\"blue-2\",\"x\":2140,\"y\":1680,\"facingDeg\":0,\"formation\":\"line\",\"strength\":550,\"morale\":75,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"Col. Delacroix has no order and keeps his line beside the 1st Battalion. He sights an enemy column on the road to the north, halted, and waits to see what it does.\"},\n{\"unitId\":\"blue-3\",\"x\":2050,\"y\":1850,\"facingDeg\":0,\"formation\":\"line\",\"strength\":200,\"morale\":85,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"Maj. Verneuil has no order and stays behind the infantry. He sights an enemy column on the road, a kilometre away at most, and reports it, but does not move without orders.\"},\n{\"unitId\":\"red-1\",\"x\":2050,\"y\":1100,\"facingDeg\":180,\"formation\":\"column\",\"strength\":650,\"morale\":80,\"fatigue\":5,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[{\"orderId\":\"r1-1\",\"result\":\"carried-out\"}],\"account\":\"Col. Brandt gets his order at about the second minute and marches his battalion south down the high road in column. He halts at about the fifth minute, 400 paces (about 300 m) short of the river, as he was told. He sees the enemy line beyond the river at about 590 m and holds there, eager to go on.\"},\n{\"unitId\":\"red-2\",\"x\":2050,\"y\":860,\"facingDeg\":180,\"formation\":\"column\",\"strength\":650,\"morale\":70,\"fatigue\":5,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[{\"orderId\":\"r2-1\",\"result\":\"carried-out\"}],\"account\":\"Col. Hartmann gets his order at about the third minute and follows the Vanguard down the road, by the book, keeping 300 paces (about 225 m) behind it. When the Vanguard halts he halts behind it, and waits for orders.\"},\n{\"unitId\":\"red-3\",\"x\":1550,\"y\":400,\"facingDeg\":180,\"formation\":\"line\",\"strength\":220,\"morale\":85,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"Maj. von Reiter has no order and holds his position at the edge of the northern wood.\"}\n],\n\"observations\":[\n{\"side\":\"blue\",\"by\":\"blue-1\",\"unitId\":\"red-1\",\"when\":\"end\"},\n{\"side\":\"blue\",\"by\":\"blue-2\",\"unitId\":\"red-1\",\"when\":\"end\"},\n{\"side\":\"blue\",\"by\":\"blue-3\",\"unitId\":\"red-1\",\"when\":\"end\"},\n{\"side\":\"red\",\"by\":\"red-1\",\"unitId\":\"blue-1\",\"when\":\"end\"},\n{\"side\":\"red\",\"by\":\"red-1\",\"unitId\":\"blue-2\",\"when\":\"end\"}\n],\n\"summary\":\"A quiet turn. Red-1 marched down the high road in column and halted 400 paces (about 300 m) short of the river at about (2050,1100), as ordered, and Red-2 followed 300 paces behind and halted at about (2050,860). No contact: the Blue infantry in line south of the river were about 590 m from the Red head of column, which is out of musket range, and no shots were fired. By the end of the turn the Blue infantry and cavalry had sighted the Red column on the road, and Red-1 had sighted the Blue infantry. Blue and Red-3 held. This matches the projection.\"}\n",
+  "checks": {
+    "pass": true,
+    "problems": {
+      "schema": [],
+      "ids": [],
+      "limits": [],
+      "ammo": [],
+      "observations": [],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

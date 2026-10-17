@@ -124,12 +124,42 @@ describe('private pinned input headers', () => {
         scenarioId: 'hold-the-bridge',
         seed: good.seed,
       },
-      { ...good, seed: 17 },
       { ...good, scenarioId: 'hold-the-bridge' },
     ])
       expect(() => initialWorldFromHeader(input as InputLogHeader)).toThrow();
     expect(() => initialWorldFromHeader(good, 'other-game')).toThrow(/identity mismatch/);
   });
+
+  it.each(['memory', 'jsonl', 'sqlite'] as const)(
+    'keeps a pinned game its own seed and rules version through %s storage and replay (#534, #432)',
+    async (kind) => {
+      const path = await folder();
+      const store =
+        kind === 'memory'
+          ? new MemoryGameStore()
+          : kind === 'jsonl'
+            ? new FileGameStore(path)
+            : new SqliteGameStore(join(path, 'game.sqlite'));
+      try {
+        // The pin keeps the scenario's authored world (seed 1815); the game rolls its own dice.
+        const input = { ...header(), seed: 424242, rules: 4 };
+        expect(input.battlefieldPin!.initialWorld.seed).not.toBe(input.seed);
+        await store.saveLogHeader(input);
+        const read = (await store.logHeader(input.gameId))!;
+        expect(read).toEqual(input);
+        expect(headerPin(read)).toEqual(input.battlefieldPin);
+        const world = initialWorldFromHeader(read, input.gameId);
+        expect(world.seed).toBe(input.battlefieldPin!.initialWorld.seed);
+        const replay = replayLog(read, world, [], createRegistry(), 0, startingState);
+        expect(replay.state.world.seed).toBe(424242);
+        expect(replay.state.world.rules).toBe(4);
+        const live = { ...structuredClone(world), seed: 424242, dial: 'standard' as const };
+        expect(() => assertPinnedWorld(read, live, input.gameId)).not.toThrow();
+      } finally {
+        if (store instanceof SqliteGameStore) store.close();
+      }
+    },
+  );
 
   it('rejects contradictory recovered static terrain but permits evolved unit positions', () => {
     const input = header();

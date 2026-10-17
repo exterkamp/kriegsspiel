@@ -57,11 +57,11 @@ import { TableService } from './table.service';
     .map-status {
       position: absolute;
       z-index: 20;
-      inset: 1rem 1rem auto;
-      padding: 1rem;
+      inset: var(--ks-space-4) var(--ks-space-4) auto;
+      padding: var(--ks-space-4);
       background: var(--ks-paper);
       color: var(--ks-ink);
-      border: 1px solid var(--ks-ink);
+      border: 1px solid var(--ks-rule);
     }
     :host {
       display: block;
@@ -87,6 +87,8 @@ export class GameComponent implements OnInit, OnDestroy {
       this.desk.persistTray(key),
       this.desk.persistDraft(key),
       this.desk.persistJournal(key),
+      // A side's own record: in hot-seat play one browser holds both sides' desks.
+      this.desk.persistTurns(params.mode === 'join' && params.side ? `${key}:${params.side}` : key),
     ];
     if (params.mode !== 'join') return;
     // Hot-seat: the one account plays both sides, so offer the other side's desk.

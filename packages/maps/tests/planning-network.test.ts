@@ -8,6 +8,8 @@ import {
   type RegionalPlanningOutput,
 } from '../src/planning/index.js';
 import { generateElevation } from '../src/terrain/index.js';
+import { decimal6 } from '../src/terrain/precision.js';
+import { pointSegmentDistance } from '../src/geometry.js';
 import { generateGeography, geographyPreset, crossingCandidate } from '../src/geography/index.js';
 function value<T>(r: GenerationResult<T>): T {
   if (!r.ok) throw Error(JSON.stringify(r));
@@ -135,8 +137,18 @@ describe('actual emitted regional graph and reconciliation', () => {
       site = p.sites[0]!,
       entry = site.entrances[0]!,
       endpoint = [...entry.endpoint] as [number, number];
-    if (entry.bearingDeg === 0 || entry.bearingDeg === 180) endpoint[0] += 2;
-    else endpoint[1] += 2;
+    // Two metres along the side the entrance lies on (a turned site's side is slanted, #545).
+    const ring = site.placementArea.outer,
+      k = ring.findIndex(
+        (q, i) =>
+          i > 0 &&
+          pointSegmentDistance(entry.endpoint, ring[i - 1]!, q) <= 1e-9 &&
+          Math.hypot(q[0] - endpoint[0], q[1] - endpoint[1]) > 2,
+      ),
+      [x, y] = ring[k]!,
+      d = Math.hypot(x - endpoint[0], y - endpoint[1]);
+    endpoint[0] += (2 * (x - endpoint[0])) / d;
+    endpoint[1] += (2 * (y - endpoint[1])) / d;
     const joined = value(
       reconcileLocalJoins(a, p, [
         {
@@ -148,7 +160,7 @@ describe('actual emitted regional graph and reconciliation', () => {
         },
       ]),
     );
-    expect(joined.joins[0]!.endpoint).toEqual(endpoint);
+    expect(joined.joins[0]!.endpoint).toEqual(endpoint.map(decimal6));
     expect(validatePlanning(a, joined.plan)).toMatchObject({ ok: true });
     expect(p.sites[0]!.entrances[0]!.endpoint).not.toEqual(endpoint);
     expect(
