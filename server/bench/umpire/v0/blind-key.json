@@ -1,0 +1,8 @@
+{
+  "A": "qwen2.5:7b",
+  "B": "llama3.1:8b",
+  "C": "gemma4:e4b",
+  "D": "claude-code-opus",
+  "E": "claude-code-sonnet",
+  "F": "test"
+}

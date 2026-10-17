@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DeputyView } from './deputy.js';
 import { ClockState, Coord, Facing, Footprint, Formation, GameMs, Side, UnitId } from './common.js';
+import { TURN_ORDER_RESULTS } from './turn.js';
 
 /** The officers a player can put a question to in the staff conference (docs/staff-conference.md). */
 export const StaffRole = z.enum(['chiefOfStaff', 'intelligence', 'quartermaster', 'engineer']);
@@ -54,15 +55,36 @@ export const Dispatch = z
         'heavyLosses',
         'broke',
         'battle',
+        'turn',
+        'notice',
       ])
       .optional(),
     location: Coord.optional(),
+    /** `location` in the paper's own words, "near the bridge, on the High road" (#439). */
+    place: z.string().optional(),
     unit: z.string().optional(),
     sizeEstimate: z.string().optional(),
     confidence: z.enum(['low', 'medium', 'high']).optional(),
     text: z.string(),
     /** For `orderDelivered` and `courierLost`: the id of the order the paper is about, as the desk sent it (#438). */
     orderId: z.string().optional(),
+    /**
+     * For a `turn` paper (11.9): the unit's own account of the umpire's turn as the engine applied it, so the
+     * desk can tell its status, where it fought and what became of each order (#439). The side's own unit only.
+     */
+    turn: z
+      .object({
+        n: z.number().int().positive(),
+        lost: z.number().nonnegative(),
+        movedM: z.number().nonnegative(),
+        broke: z.literal(true).optional(),
+        rallied: z.literal(true).optional(),
+        orders: z.array(
+          z.object({ ref: z.string().optional(), result: z.enum(TURN_ORDER_RESULTS) }).strict(),
+        ),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type Dispatch = z.infer<typeof Dispatch>;
@@ -93,6 +115,8 @@ export const OwnUnit = z
     trait: z.string().optional(),
     /** Centre of the footprint, in metres. */
     position: Coord,
+    /** Where it stands in the words its papers use, "near the bridge, on the High road" (#439). */
+    place: z.string().optional(),
     facing: Facing,
     formation: Formation,
     footprint: Footprint,

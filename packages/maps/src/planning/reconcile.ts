@@ -1,5 +1,12 @@
 import type { Point } from '../contract.js';
-import { distance, polygonLocation, validatePath, interpolate } from '../geometry.js';
+import {
+  distance,
+  interpolate,
+  pointSegmentDistance,
+  polygonArea,
+  polygonLocation,
+  validatePath,
+} from '../geometry.js';
 import { preflightAsset } from '../resources.js';
 import { HARD_LIMITS } from '../contract.js';
 import { decimal6 } from '../terrain/precision.js';
@@ -141,6 +148,34 @@ export function reconcileLocalJoins(
             'Generated actual connector backtracks or intersects itself.',
           );
         throw e;
+      }
+      // On a turned site's slanted side (#545) the rounded endpoint can leave the
+      // boundary by a micrometre: it becomes a vertex of the ring it lies on.
+      if (polygonLocation(path[0]!, site.placementArea, c.meter) !== 'boundary') {
+        const ring = site.placementArea.outer,
+          i = ring.findIndex(
+            (p, k) => k > 0 && pointSegmentDistance(join.endpoint, ring[k - 1]!, p) <= 1e-9,
+          );
+        if (i < 1)
+          throw new PlanningFailure(
+            'RECONCILIATION_CONTRACT',
+            join.entranceId,
+            'Actual endpoint must lie on the permissible outer boundary.',
+          );
+        ring.splice(i, 0, path[0]!);
+        // A neighbouring vertex in the middle of the same side (a turned site's
+        // planned entrance) goes, so the new entrance's edges span that side.
+        for (const k of [i + 1, i - 1])
+          if (
+            k > 0 &&
+            k < ring.length - 1 &&
+            pointSegmentDistance(ring[k]!, ring[k - 1]!, ring[k + 1]!) <= 1e-6
+          ) {
+            ring.splice(k, 1);
+            break;
+          }
+        const size = next.sizes.find((s) => s.siteId === site.id);
+        if (size) size.areaM2 = polygonArea(site.placementArea);
       }
       node.position = path[0]!;
       road.path = from ? path : path.reverse();

@@ -24,7 +24,7 @@ import {
 } from '@legacy/table/flatBoard';
 import { pieceAtPoint } from '@legacy/table/picking';
 import { markAgeFactor } from '@legacy/table/marks';
-import { buildSceneState } from '@legacy/table/sceneState';
+import { buildSceneState, withTurnOverlays } from '@legacy/table/sceneState';
 import type { SceneState } from '@legacy/table/types';
 import {
   GLIDE_MS,
@@ -103,6 +103,15 @@ import { MarksService, type Picker } from './marks.service';
         @if (r.kind === 'order') {
           <polyline class="order" [attr.points]="pts(r.points)" [attr.stroke-width]="stroke * 2" />
           <polygon class="order-head" [attr.points]="pts(head(r.points))" />
+        } @else if (r.kind === 'held') {
+          <polyline
+            class="held"
+            [attr.data-held]="r.id"
+            [attr.points]="pts(r.points)"
+            [attr.stroke-width]="stroke * 2"
+            [attr.stroke-dasharray]="fontSize * 0.8 + ' ' + fontSize * 0.5"
+          />
+          <polygon class="held-head" [attr.points]="pts(head(r.points))" />
         } @else {
           @for (d of dashes(r.points); track $index) {
             <polyline class="route" [attr.points]="pts(d)" [attr.stroke-width]="stroke * 5" />
@@ -140,11 +149,22 @@ import { MarksService, type Picker } from './marks.service';
       @for (f of fights(); track f.id) {
         <circle
           class="fight"
+          [class.past]="!!f.past"
           [attr.cx]="f.position.x"
           [attr.cy]="f.position.y"
           [attr.r]="fontSize * 1.4"
           [attr.stroke-width]="stroke * 2"
         />
+        @if (f.past; as past) {
+          <text
+            class="fought"
+            [attr.data-fought]="f.id"
+            [attr.x]="f.position.x"
+            [attr.y]="f.position.y - fontSize * 1.8"
+          >
+            {{ past.label }}
+          </text>
+        }
       }
       @for (m of markList(); track m.mark.id) {
         <g
@@ -313,6 +333,25 @@ import { MarksService, type Picker } from './marks.service';
       fill: none;
       stroke: var(--ks-map-enemy);
     }
+    .fight.past {
+      stroke-opacity: 0.5;
+      stroke-dasharray: 18 10;
+    }
+    .fought {
+      fill: var(--ks-ink);
+      stroke: var(--ks-paper);
+      stroke-width: 3;
+      paint-order: stroke;
+      text-anchor: middle;
+      font-size: inherit;
+    }
+    .held {
+      fill: none;
+      stroke: var(--ks-brass);
+    }
+    .held-head {
+      fill: var(--ks-brass);
+    }
     .mark {
       fill: none;
       stroke: var(--ks-brass-hi);
@@ -356,7 +395,10 @@ export class FlatBoardComponent {
     const frame = this.desk.windowFrame();
     if (frame) return buildWindowScene(frame, this.desk.windowBelief(), fixtureMap);
     const view = this.game.view();
-    return view ? buildSceneState(view, fixtureMap) : undefined;
+    if (!view) return undefined;
+    const turn = this.desk.turnTable();
+    const scene = buildSceneState(view, fixtureMap);
+    return turn ? withTurnOverlays(scene, view, turn) : scene;
   });
   protected readonly summary = computed(() => boardLines(this.scene(), fixtureMap));
   /**
@@ -402,7 +444,7 @@ export class FlatBoardComponent {
   protected readonly routes = computed(() => {
     const o = this.marks.overlays();
     return (this.scene()?.orderRoutes ?? []).filter((r) =>
-      r.kind === 'order' ? o.orders : o.routes,
+      r.kind === 'route' ? o.routes : o.orders,
     );
   });
   protected readonly couriers = computed(() =>
