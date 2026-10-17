@@ -15,11 +15,13 @@ import type { CritiqueDigest, CritiqueFact, FactKind } from './critiqueFacts.js'
 import type { JsonSchema, UmpireCallRecord, UmpireClient } from './umpireClient.js';
 import { UmpireError } from './umpireClient.js';
 
-export const CRITIQUE_PROMPT_VERSION = 'critique-v1';
+export const CRITIQUE_PROMPT_VERSION = 'critique-v2';
 
 export const CRITIQUE_SYSTEM = `You are the umpire of a finished Napoleonic wargame in the tradition of Kriegsspiel, giving the players your critique. Input: "sides", "result", "endMinute" and "facts", the only record you have: each fact has an "id" (fact-N), a game "minute", a "kind" and its "text". Optionally "rejected", the problems with your last reply.
 
 Write what the players can learn from: what each side knew and when (kind "knowledge", from the report facts), the decisions that mattered (kind "decision", from orders, deliveries, rulings and losses), misreadings (kind "misreading", where a report did not match the truth), and pauses or votes (kind "pause"). You may add one "outcome" point.
+
+A game played in turns also has facts of kind "turn" (who decided each turn: the umpire, with its account, or the tables), "fallback" (a turn the umpire could not decide, and why), "clamp" (a correction the engine made to the umpire's proposal, with the limit it broke), "roll" (dice the umpire asked for, the odds and the result) and "precedent" (a standing ruling from the umpire's journal). Use them for "decision" points: say what a turn decided and why, citing the turn and its corrections, rolls and precedents.
 
 Rules:
 - Every point cites the fact ids it rests on in "cites" (one to six), and "minute" must be the minute of one of them.
@@ -161,6 +163,11 @@ const KIND_OF: Record<FactKind, CritiqueKind> = {
   fire: 'decision',
   ruling: 'decision',
   pause: 'pause',
+  turn: 'decision',
+  fallback: 'decision',
+  clamp: 'decision',
+  roll: 'decision',
+  precedent: 'decision',
 };
 
 /** Rendered with its cites resolved. Throws if a cite is not a fact, so nothing unchecked is shown. */
@@ -194,9 +201,27 @@ const TEMPLATE_TAKE: Partial<Record<FactKind, { n: number; perSide?: boolean }>>
   courier: { n: 2 },
   ruling: { n: 2 },
   loss: { n: 3 },
+  // Turn mode only (D39).
+  turn: { n: 2 },
+  fallback: { n: 1 },
+  clamp: { n: 2 },
+  roll: { n: 1 },
+  precedent: { n: 1 },
 };
 
-const DROP_FIRST: readonly FactKind[] = ['loss', 'ruling', 'courier', 'delivery', 'pause'];
+/** Real-time kinds keep their order; a turn game's join them, the fallback and clamps last. */
+const DROP_FIRST: readonly FactKind[] = [
+  'loss',
+  'precedent',
+  'roll',
+  'turn',
+  'ruling',
+  'courier',
+  'clamp',
+  'delivery',
+  'fallback',
+  'pause',
+];
 
 /**
  * The critique the log alone supports: the facts themselves, picked and dated. Used when no

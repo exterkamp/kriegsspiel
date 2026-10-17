@@ -6,7 +6,7 @@ import { courierPosition, destinationOf } from './courier.js';
 import { findPath } from './navigation.js';
 import { distance, metres } from './geometry.js';
 import { describePlace } from './place.js';
-import { fieldNote, type NoteSender } from './fieldNotes.js';
+import { clockTime, fieldNote, type NoteSender } from './fieldNotes.js';
 import { evaluateStanding } from './standing.js';
 import { unitTypeOf } from './unitTypes.js';
 import { BLOCKS_SIGHT, profileAlong, terrainAt } from './terrain.js';
@@ -218,6 +218,8 @@ export interface ViewUnit {
   kind: UnitKind;
   /** Centre of the footprint, in metres. */
   position: Point;
+  /** Where it stands in plain words, "near the bridge, on the High road" (`describePlace`). */
+  place: string;
   /** Compass bearing in radians (0 north, growing clockwise). */
   facing: number;
   formation: Formation;
@@ -302,6 +304,8 @@ export interface ViewReport {
   text: string;
   /** For an acknowledgement or a lost courier: the desk's id of the order it is about. */
   orderRef?: string;
+  /** For a `turn` report: what the side's own unit did in the umpire's turn (D39, 11.9). */
+  turn?: Report['turn'];
 }
 
 /** An enemy dispatch this side took from a courier, once it has reached HQ. */
@@ -321,6 +325,8 @@ export interface ViewDocument {
   place: string;
   /** The order exactly as the enemy wrote it. */
   text: string;
+  /** A turn-mode game: its prose names the clock time it was taken, not its age (#439). */
+  clock?: true;
 }
 
 /**
@@ -354,6 +360,7 @@ export interface EngineSideView {
  * is the same whenever it is read and agrees with the "received" time shown beside it (#318); never an
  * age measured against the clock at read time. Every kind says it one way: "about N minutes ago", or
  * "just now" (#325). `sender` and `seed` choose the manner and wording; without them, the first wording.
+ * `clock` (a turn-mode game) gives the clock time of the event instead, "at 00:12" (#439).
  */
 export function renderReport(
   r: Report,
@@ -361,14 +368,21 @@ export function renderReport(
   heardSince = false,
   sender?: NoteSender,
   seed?: number,
+  clock = false,
 ): string {
-  return fieldNote(r, leadMs, heardSince, sender, seed);
+  return fieldNote(r, leadMs, heardSince, sender, seed, clock);
 }
 
-/** Prose for the table: where and when the dispatch was taken, then the enemy's own words. */
+/**
+ * Prose for the table: where and when the dispatch was taken, then the enemy's own words. In a turn-mode
+ * game (`d.clock`) "when" is the clock time it was taken, as for a report (#439).
+ */
 export function renderDocument(d: ViewDocument): string {
   const mins = Math.round(d.ageMs / MS_PER_MINUTE);
-  return `Enemy dispatch to ${d.addressedTo}, taken from a courier ${d.place}, ${mins} ${mins === 1 ? 'minute' : 'minutes'} ago: "${d.text}"`;
+  const when = d.clock
+    ? `at ${clockTime(d.capturedAt)}`
+    : `${mins} ${mins === 1 ? 'minute' : 'minutes'} ago`;
+  return `Enemy dispatch to ${d.addressedTo}, taken from a courier ${d.place}, ${when}: "${d.text}"`;
 }
 
 function couriersOf(state: GameState, side: SideId): ViewCourier[] {
@@ -462,6 +476,8 @@ export function viewFor(
         ...(u.trait === undefined ? {} : { trait: u.trait }),
         kind: u.kind,
         position: viewPoint(u.center),
+        // Where it stands, in the words its papers use, for the desk's status of each unit (#439).
+        place: describePlace(state.map, u.center),
         facing: u.facing,
         formation: u.formation,
         footprint: viewFootprint(u),
@@ -529,8 +545,11 @@ export function viewFor(
             heardFromSince(intel.reports, r),
             senderOf(state, side, r),
             state.seed,
+            // A turn-mode game, once its first turn is under way: its papers name clock times (#439).
+            state.turn !== undefined,
           ),
           ...(r.orderRef === undefined ? {} : { orderRef: r.orderRef }),
+          ...(r.turn === undefined ? {} : { turn: structuredClone(r.turn) }),
         };
       }),
     documents: intel.documents
@@ -546,6 +565,7 @@ export function viewFor(
         location: viewPoint(d.location),
         place: d.place,
         text: d.text,
+        ...(state.turn === undefined ? {} : { clock: true as const }),
       })),
   };
 }
@@ -556,6 +576,34 @@ function withIntel(world: GameState, side: SideId, patch: Partial<GameState['int
 
 function reportId(world: GameState, side: SideId): string {
   return `${side}-r${world.intel[side].reports.length + 1}`;
+}
+
+/**
+ * `observer`'s report of enemy `target` newly in sight at `time`, where the target stands: a coarse
+ * size, an uncertainty that grows with the distance, and sure only at half its sight range or less.
+ */
+export function contactReport(
+  w: GameState,
+  id: string,
+  observer: Unit,
+  target: Unit,
+  time: GameTime,
+  deliverAt: GameTime,
+): Report {
+  const dist = distance(observer.center, target.center);
+  return {
+    id,
+    kind: 'contact',
+    observedAt: time,
+    deliverAt,
+    from: observer.name,
+    location: { ...target.center },
+    place: describePlace(w.map, target.center),
+    uncertainty: Math.max(MIN_REPORT_UNCERTAINTY_MM, Math.ceil(dist / 10 / 10_000) * 10_000),
+    sizeEstimate: sizeEstimate(target.strength),
+    confidence: dist <= sightRangeMm(w, observer) / 2 ? 'high' : 'medium',
+    subject: target.id,
+  };
 }
 
 function scan(world: GameState, time: GameTime): GameState {
@@ -576,20 +624,16 @@ function scan(world: GameState, time: GameTime): GameState {
       });
       if (intel.inSight.includes(u.id)) continue;
       const observer = mine.find((m) => canSee(w, m, u))!;
-      const dist = distance(observer.center, u.center);
-      reports.push({
-        id: `${side}-r${reports.length + 1}`,
-        kind: 'contact',
-        observedAt: time,
-        deliverAt: reachesHqAt(w, time, COURIER_DELAY_MS),
-        from: observer.name,
-        location: { ...u.center },
-        place: describePlace(w.map, u.center),
-        uncertainty: Math.max(MIN_REPORT_UNCERTAINTY_MM, Math.ceil(dist / 10 / 10_000) * 10_000),
-        sizeEstimate: sizeEstimate(u.strength),
-        confidence: dist <= sightRangeMm(w, observer) / 2 ? 'high' : 'medium',
-        subject: u.id,
-      });
+      reports.push(
+        contactReport(
+          w,
+          `${side}-r${reports.length + 1}`,
+          observer,
+          u,
+          time,
+          reachesHqAt(w, time, COURIER_DELAY_MS),
+        ),
+      );
     }
     // Prune last-known contacts (#110). One that has aged out no longer says where the enemy
     // might be. One for a destroyed enemy goes only once the side has been told of the
@@ -643,7 +687,7 @@ export function fileReport(
   unit: Unit,
   time: GameTime,
   delayMs: number = COURIER_DELAY_MS,
-  extra: Pick<Report, 'orderDueAt' | 'orderRef' | 'routed' | 'rallied'> = {},
+  extra: Pick<Report, 'orderDueAt' | 'orderRef' | 'routed' | 'rallied' | 'turn'> = {},
 ): GameState {
   const report: Report = {
     id: reportId(world, unit.side),

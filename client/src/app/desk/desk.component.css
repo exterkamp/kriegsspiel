@@ -60,8 +60,11 @@ kbd {
   top: 8%;
   transform: translateX(-50%);
   width: min(560px, calc(100% - 16px));
-  /* One height for every view, so switching views does not make the paper jump (#344). */
-  height: 70%;
+  /*
+   * One height for every view, so switching views does not make the paper jump (#344): 70% of the screen, or less
+   * where the dock (measured into --dock-h) is taller than the 22% below it, so the paper ends above the dock (#455).
+   */
+  bottom: max(22%, calc(var(--dock-h, 0px) + var(--ks-space-4)));
   overflow: auto;
   box-sizing: border-box;
   z-index: 3;
