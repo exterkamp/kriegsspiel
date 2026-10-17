@@ -47,6 +47,12 @@ it('revalidates decimal6 planarized subsegments at the unchanged strict grade to
       { id: 'c', node: 3 },
     ],
     special: new Map(),
+    // Routes record emitted edges so later routes can reuse them (v2 network costs).
+    used: new Set<string>(),
+    // The any-angle pass (D48) costs and certifies shortcuts and curves; this
+    // fixture blocks every new line so the given edges are planarized as they are.
+    factor: () => 1,
+    clearSites: () => false,
     route(start: number, end: number) {
       const queue = [start],
         parent = new Map<number, Edge>();

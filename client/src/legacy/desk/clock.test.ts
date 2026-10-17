@@ -17,6 +17,8 @@ import { clockSummary, clockView } from './clock.js';
 import {
   applyServerMessage,
   initialState,
+  withModeKnown,
+  withModePending,
   withTurnSettings,
   type ClientState,
 } from '../net/state.js';
@@ -148,5 +150,51 @@ describe('clockView', () => {
     expect(s.turnMode).toBeUndefined();
     expect(s.turnMinutes).toBeUndefined();
     expect(clockView(s, 0)).toMatchObject({ rate: '4:1', label: 'Running' });
+  });
+
+  it('shows no rate and no mode while a joined game has not yet said how it is played (#427)', () => {
+    const joining = withModePending(withClock(initialState, clock(4, 'running')));
+    const view = clockView(joining, 60_000);
+    expect(view).toMatchObject({ time: 'Day 1 01:04', rate: '', label: 'Joining the game' });
+    expect(view.turnLength).toBeUndefined();
+    expect(clockSummary(view)).toBe('Joining the game');
+    // Real-time settings: the rate comes back.
+    const live = withTurnSettings(joining, { dial: 'standard', persona: 'dry' });
+    expect(live.modePending).toBeUndefined();
+    expect(clockView(live, 60_000)).toMatchObject({ rate: '4:1', label: 'Running' });
+    // A turnState settles it as well, without the settings.
+    const turn = applyServerMessage(
+      joining,
+      {
+        v,
+        kind: 'turnState',
+        turn: 1,
+        startsAt: 0,
+        endsAt: 1_200_000,
+        sent: [],
+        resolving: false,
+        held: [],
+      },
+      0,
+    );
+    expect(turn).toMatchObject({ turnMode: true });
+    expect(turn.modePending).toBeUndefined();
+    // Settings that cannot be read leave it to the socket.
+    expect(withModeKnown(joining).modePending).toBeUndefined();
+    expect(clockView(withModeKnown(joining), 60_000).rate).toBe('4:1');
+  });
+
+  it('forgets an earlier turn game when another is joined (#427)', () => {
+    const turns = withTurnSettings(initialState, {
+      dial: 'rigid',
+      persona: 'dry',
+      mode: 'turns',
+      turnMinutes: 20,
+    });
+    const s = withModePending({ ...turns, battleMinutes: 60 });
+    expect(s).toMatchObject({ modePending: true });
+    expect(s.turnMode).toBeUndefined();
+    expect(s.turnMinutes).toBeUndefined();
+    expect(s.battleMinutes).toBeUndefined();
   });
 });

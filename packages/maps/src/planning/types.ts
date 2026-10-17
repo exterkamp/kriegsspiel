@@ -11,7 +11,14 @@ import type {
 } from '../contract.js';
 import type { CrossingCandidate } from '../geography/types.js';
 import type { Water } from '../contract.js';
-export const PLANNING_VERSION = 'sites-lattice-decks-v1' as const;
+/** D50 planning: any-angle roads to sites turned to their ground and approach (#545). */
+export const PLANNING_VERSION = 'rotated-sites-any-angle-network-v5' as const;
+/** D48 planning (any-angle roads, unturned sites); saved maps under it still certify. */
+export const ANY_ANGLE_PLANNING_VERSION = 'sited-graded-any-angle-network-v4' as const;
+/** D46 planning (lattice roads with fords); saved maps under it still certify. */
+export const FORDING_PLANNING_VERSION = 'sited-graded-fording-network-v3' as const;
+/** D44/D45 planning (bridges only); saved maps under it still certify. */
+export const LEGACY_PLANNING_VERSION = 'sited-graded-network-v2' as const;
 export const DECK_POLICY = 'linear-ground-endpoints-v1' as const;
 export interface PlanningLimits {
   maxCandidateWork?: number;
@@ -42,6 +49,16 @@ export interface DeckProfile {
   endpointHeightsM: [number, number];
   maxGrade: number;
 }
+/** Ford certificate (D46): modelled riffle depth, bank heights and ramp grade. */
+export interface FordProfile {
+  crossingId: string;
+  policy: 'shallow-riffle-v1';
+  depthM: number;
+  /** Ground at each end above the water surface. */
+  bankHeightsM: [number, number];
+  /** Steepest dry ramp ground between an end and the water. */
+  maxGrade: number;
+}
 export interface SiteSizing {
   siteId: string;
   areaM2: number;
@@ -70,6 +87,7 @@ export interface RegionalPlanningOutput extends PlanningOutput {
   routes: RouteProvenance[];
   sizes: SiteSizing[];
   decks: DeckProfile[];
+  fords: FordProfile[];
   evidence: PlanningEvidence;
 }
 export interface Suitability {

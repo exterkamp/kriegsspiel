@@ -69,6 +69,8 @@ export class GameComponent implements OnInit, OnDestroy {
       this.desk.persistTray(key),
       this.desk.persistDraft(key),
       this.desk.persistJournal(key),
+      // A side's own record: in hot-seat play one browser holds both sides' desks.
+      this.desk.persistTurns(params.mode === 'join' && params.side ? `${key}:${params.side}` : key),
     ];
     if (params.mode !== 'join') return;
     // Hot-seat: the one account plays both sides, so offer the other side's desk.

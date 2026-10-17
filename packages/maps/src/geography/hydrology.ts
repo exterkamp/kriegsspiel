@@ -10,7 +10,8 @@ import { checkField } from '../terrain/input.js';
 import { Budget, bounded } from './budget.js';
 import { deriveDrainage } from './drainage.js';
 import { validateWaterPhysics } from './physics.js';
-import { carveRiver, depressionWater } from './water.js';
+import { depressionWater } from './water.js';
+import { carveRiverNetwork } from './rivers.js';
 import { GEOGRAPHY_VERSION, type GeographyLimits, type GeographyOutput } from './types.js';
 export type HydrologyStageOutput = Omit<GeographyOutput, 'cover' | 'crossingCandidates'>;
 export function generateHydrology(
@@ -32,12 +33,13 @@ export function generateHydrology(
       output = new Budget(s.limits.maxVertices, 'aggregate water vertices');
     const initial = deriveDrainage(sourceElevation, bounds, s, limits);
     if (!initial.ok) return initial;
-    const carved = carveRiver(
+    const carved = carveRiverNetwork(
       sourceElevation,
       bounds,
       initial.value.drainage,
       initial.value.ranks,
       s,
+      seed,
       budget,
       output,
     );
@@ -49,7 +51,8 @@ export function generateHydrology(
     const final = carved ? deriveDrainage(authoritative, bounds, s, limits) : initial;
     if (!final.ok) return final;
     const lakeSettings = structuredClone(s);
-    if (carved) lakeSettings.limits.maxFeatures = Math.max(1, s.limits.maxFeatures - 1);
+    if (carved)
+      lakeSettings.limits.maxFeatures = Math.max(1, s.limits.maxFeatures - carved.water.length);
     const lakes = depressionWater(
         authoritative,
         final.value.drainage,
@@ -77,7 +80,7 @@ export function generateHydrology(
           code: 'RIVER_INFEASIBLE',
           constraint: 'required river',
           message:
-            'No qualifying drainage trunk supports the configured grid-aligned channel. Flat ground, threshold, width below four spacings, or disconnected raster banks can prevent carving.',
+            'No qualifying drainage stream supports a river network. Flat ground, a threshold above the largest catchment, or unrepresentable trunk geometry can prevent carving.',
           remediation:
             'Use the documented river-valley-v1 preset or revise width/spacing/threshold; the seed is never changed.',
         },
@@ -106,7 +109,7 @@ export function generateHydrology(
           stage: 'hydrology',
           code: carved ? 'GROUND_CARVED_REGENERATE_CONTOURS' : 'NO_RIVER_FALLBACK',
           message: carved
-            ? 'Authoritative ground changed: regenerate contours from returned elevation. River stage is explicit constant standing/backwater; original samples are retained separately.'
+            ? 'Authoritative ground changed: regenerate contours from returned elevation. Each river reach is an explicit constant standing surface, stepping down the network; original samples are retained separately.'
             : 'No supported trunk was carved; depression lakes remain physically checked and no decorative river is emitted.',
         },
       ],

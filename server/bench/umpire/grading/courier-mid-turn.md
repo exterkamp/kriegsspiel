@@ -374,33 +374,32 @@
  ],
  "orders": [
   {
-   "orderId": "b2-7",
+   "orderId": "blue-b2-7",
    "side": "blue",
    "to": "blue-2",
    "text": "Move your battalion across behind the 1st, to the west of the road, and form line facing the bridge.",
    "courier": "safe",
-   "sentTurn": 2,
+   "sentAtMinute": 20,
    "status": "arrived",
    "arrivedAtMinuteOfTurn": 14
   },
   {
-   "orderId": "b1-7",
+   "orderId": "blue-b1-7",
    "side": "blue",
    "to": "blue-1",
    "text": "Advance to the south end of the bridge and hold it.",
    "courier": "safe",
-   "sentTurn": 2,
+   "sentAtMinute": 20,
    "status": "on-the-road",
-   "dueTurn": 3,
-   "dueMinuteOfTurn": 6
+   "dueAtMinute": 46
   },
   {
-   "orderId": "r1-7",
+   "orderId": "red-r1-7",
    "side": "red",
    "to": "red-1",
    "text": "Continue to the bridge and seize it.",
    "courier": "fast",
-   "sentTurn": 2,
+   "sentAtMinute": 20,
    "status": "arrived",
    "arrivedAtMinuteOfTurn": 3
   }
@@ -420,12 +419,13 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the bridge, west of the High road"
    },
    {
     "unitId": "blue-2",
-    "x": 1820,
-    "y": 1700,
+    "x": 2050,
+    "y": 1500,
     "facingDeg": 0,
     "formation": "line",
     "strength": 550,
@@ -435,7 +435,22 @@
     "status": "active",
     "continuing": {
      "kind": "idle"
-    }
+    },
+    "at": "at the bridge, on the High road",
+    "path": [
+     [
+      2140,
+      1680
+     ],
+     [
+      2066,
+      1613
+     ],
+     [
+      2050,
+      1500
+     ]
+    ]
    },
    {
     "unitId": "blue-3",
@@ -450,22 +465,24 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the bridge, on the High road"
    },
    {
     "unitId": "red-1",
     "x": 2050,
-    "y": 1380,
+    "y": 950,
     "facingDeg": 180,
     "formation": "column",
     "strength": 650,
     "morale": 80,
-    "fatigue": 8,
+    "fatigue": 7,
     "ammo": 100,
     "status": "active",
     "continuing": {
-     "kind": "idle"
-    }
+     "kind": "hold"
+    },
+    "at": "near the bridge, on the High road"
    },
    {
     "unitId": "red-2",
@@ -480,7 +497,8 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "east of the High road"
    },
    {
     "unitId": "red-3",
@@ -495,12 +513,28 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the Northern wood"
+   }
+  ],
+  "observations": [
+   {
+    "side": "blue",
+    "unitId": "red-1",
+    "by": "blue-2",
+    "when": "end"
+   },
+   {
+    "side": "red",
+    "unitId": "blue-2",
+    "by": "red-1",
+    "when": "end"
    }
   ],
   "events": [
-   "minute 5: unit.arrived {\"unitId\":\"red-1\",\"at\":[2050,1380]}",
-   "minute 17: unit.arrived {\"unitId\":\"blue-2\",\"at\":[1820,1700]}"
+   "23: order_delivered red-1, orderId red-r1-7",
+   "34: order_delivered blue-2, orderId blue-b2-7",
+   "36: unit.arrived blue-2"
   ]
  }
 }
@@ -518,39 +552,44 @@
    "y": 1680,
    "facingDeg": 0,
    "formation": "line",
-   "strength": 600,
-   "morale": 80,
+   "strength": 590,
+   "morale": 79,
+   "fatigue": 0,
+   "ammo": 97,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
    "orders": [
     {
-     "orderId": "b1-7",
+     "orderId": "blue-b1-7",
      "result": "not-arrived"
     }
    ],
-   "account": "Col. Aubry, cautious and methodical, held his position as ordered, awaiting further instructions."
+   "account": "The orders to advance to the bridge have not reached Colonel Aubry. He stood in line west of the road, as before. Towards the end of the turn a French column came down on the bridge, 150 paces off. He held his ground and gave it a volley."
   },
   {
    "unitId": "blue-2",
-   "x": 1820,
-   "y": 1700,
-   "facingDeg": 0,
+   "x": 1900,
+   "y": 1730,
+   "facingDeg": 30,
    "formation": "line",
    "strength": 550,
    "morale": 75,
+   "fatigue": 3,
+   "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "idle"
+    "kind": "hold"
    },
    "orders": [
     {
-     "orderId": "b2-7",
-     "result": "partly"
+     "orderId": "blue-b2-7",
+     "result": "carried-out"
     }
    ],
-   "account": "Col. Delacroix, cautious, moved his battalion to the west of the road, but did not fully form up as ordered due to the terrain."
+   "account": "The order reached Colonel Delacroix with six minutes of the turn left. He marched the battalion across behind the 1st, west of the road, and formed line facing the bridge, just short of the 1st's flank. He did not push forward. He saw the enemy column on the bridge and kept his line steady.",
+   "departure": "The projection put the battalion on the bridge itself. The order says west of the road, behind the 1st, in line facing the bridge, and the commander is cautious. He therefore ends about 250 m from his start, not at the bridge."
   },
   {
    "unitId": "blue-3",
@@ -560,37 +599,39 @@
    "formation": "line",
    "strength": 200,
    "morale": 85,
+   "fatigue": 0,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
-   "orders": [
-    {
-     "orderId": "b1-7",
-     "result": "not-arrived"
-    }
-   ],
-   "account": "Maj. Verneuil, bold and impatient, remained in position as he was cautious about overextending his cavalry."
+   "orders": [],
+   "account": "No new orders. Major Verneuil held on the road behind the infantry. He watched the enemy column come onto the bridge and kept the squadron ready, though he is impatient to charge."
   },
   {
    "unitId": "red-1",
    "x": 2050,
-   "y": 1380,
+   "y": 1560,
    "facingDeg": 180,
    "formation": "column",
-   "strength": 650,
-   "morale": 80,
+   "strength": 625,
+   "morale": 78,
+   "fatigue": 25,
+   "ammo": 97,
    "status": "active",
    "continuing": {
-    "kind": "idle"
+    "kind": "move",
+    "x": 2050,
+    "y": 1500
    },
    "orders": [
     {
-     "orderId": "r1-7",
+     "orderId": "red-r1-7",
      "result": "carried-out"
     }
    ],
-   "account": "Col. Brandt, aggressive, pressed forward and seized the bridge, but took some casualties in the process."
+   "account": "The order reached Colonel Brandt at about minute 23. He marched down the High road in column and went onto the bridge. At the south end he met a blue line close ahead and took its volley. He kept pressing for the far bank, as ordered.",
+   "departure": "The projection kept the battalion standing at y=950. The order to seize the bridge reached an aggressive commander 550 m from it, and he would march at once down the road. He ends on the bridge, in fire range of the blue line, with a small loss from the exchange."
   },
   {
    "unitId": "red-2",
@@ -600,17 +641,14 @@
    "formation": "column",
    "strength": 650,
    "morale": 70,
+   "fatigue": 7,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
-   "orders": [
-    {
-     "orderId": "b2-7",
-     "result": "not-arrived"
-    }
-   ],
-   "account": "Col. Hartmann, by the book, held his position as ordered, awaiting further instructions."
+   "orders": [],
+   "account": "No orders have reached Colonel Hartmann. He waited in column east of the road, as before."
   },
   {
    "unitId": "red-3",
@@ -620,58 +658,58 @@
    "formation": "line",
    "strength": 220,
    "morale": 85,
+   "fatigue": 0,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
-   "orders": [
-    {
-     "orderId": "b1-7",
-     "result": "not-arrived"
-    }
-   ],
-   "account": "Maj. von Reiter, dashing scout, remained in position as he was cautious about overextending his cavalry."
+   "orders": [],
+   "account": "No orders. Major von Reiter held by the Northern wood and saw nothing."
   }
  ],
  "observations": [
   {
    "side": "blue",
-   "unitId": "blue-1",
-   "by": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "blue-2",
-   "by": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "blue-3",
-   "by": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
    "unitId": "red-1",
+   "by": "blue-1",
+   "when": "end"
+  },
+  {
+   "side": "blue",
+   "unitId": "red-1",
+   "by": "blue-2",
+   "when": "end"
+  },
+  {
+   "side": "blue",
+   "unitId": "red-1",
+   "by": "blue-3",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-1",
    "by": "red-1",
    "when": "end"
   },
   {
    "side": "red",
-   "unitId": "red-2",
+   "unitId": "blue-2",
    "by": "red-1",
    "when": "end"
   },
   {
    "side": "red",
-   "unitId": "red-3",
+   "unitId": "blue-3",
    "by": "red-1",
    "when": "end"
   }
  ],
- "summary": "In this turn, the red vanguard battalion under Col. Brandt seized the bridge, while the blue units held their positions. The cautious Col. Delacroix moved his battalion to the west of the road but did not fully form up as ordered. The aggressive Col. Brandt pressed forward and seized the bridge, taking some casualties. The blue cavalry remained in position, while the red hussars also held their ground. The bridge is now in red hands, and the battle is likely to intensify in the next turn."
+ "summary": "Red-1 marched down the High road on the bridge, and blue-2 moved west behind blue-1 and formed line facing the bridge. Red-1 ends on the bridge at y=1560, and an exchange of fire with blue-1 begins at the end. Red-1 loses about 25 men and blue-1 about 10. Blue-1's order to hold the south end of the bridge is still on the road and has not been acted on. Blue-3, red-2 and red-3 held. The engine held red-1 back at y=950, against its order, and I overrode that. I also kept blue-2 off the bridge, since its order put it west of the road. Next turn, expect blue-1's order to arrive, a fight at the south end of the bridge, and possibly an early charge by blue-3's cavalry.",
+ "precedents": [
+  "A unit given an order to seize an objective on arrival marches at once at full road pace; it does not stand idle."
+ ]
 }
 ```
 
@@ -689,359 +727,45 @@
    "formation": "line",
    "strength": 600,
    "morale": 80,
+   "fatigue": 0,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
    "orders": [
     {
-     "orderId": "b1-7",
+     "orderId": "blue-b1-7",
      "result": "not-arrived"
     }
    ],
-   "account": "Colonel Aubry held his line as ordered, but his men are getting restless.",
+   "account": "Col. Aubry holds his line west of the road as last ordered. Toward the end of the turn an enemy column comes down to the far end of the bridge, still out of musket range. He waits for orders and does not open fire.",
    "departure": ""
   },
   {
    "unitId": "blue-2",
-   "x": 1820,
-   "y": 1700,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 550,
-   "morale": 75,
-   "status": "active",
-   "continuing": {
-    "kind": "move",
-    "x": 2050,
-    "y": 1680
-   },
-   "orders": [
-    {
-     "orderId": "b2-7",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Colonel Delacroix moved his battalion as ordered, but it's a bit of a tight squeeze.",
-   "departure": ""
-  },
-  {
-   "unitId": "blue-3",
-   "x": 2050,
-   "y": 1850,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 200,
-   "morale": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Major Verneuil held his ground, but his men are getting a bit anxious.",
-   "departure": ""
-  },
-  {
-   "unitId": "red-1",
-   "x": 2050,
-   "y": 1380,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 80,
-   "status": "active",
-   "continuing": {
-    "kind": "move",
-    "x": 2050,
-    "y": 1500
-   },
-   "orders": [
-    {
-     "orderId": "r1-7",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Colonel Brandt moved his battalion as ordered, but it's a bit of a tight squeeze.",
-   "departure": ""
-  },
-  {
-   "unitId": "red-2",
-   "x": 2250,
-   "y": 700,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 70,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Colonel Hartmann held his ground, but his men are getting a bit anxious.",
-   "departure": ""
-  },
-  {
-   "unitId": "red-3",
-   "x": 1550,
-   "y": 400,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "move",
-    "x": 2050,
-    "y": 1500
-   },
-   "orders": [],
-   "account": "Major von Reiter moved his squadron as ordered, but it's a bit of a long way.",
-   "departure": ""
-  }
- ],
- "observations": [
-  {
-   "side": "blue",
-   "unitId": "blue-1",
-   "by": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "blue-2",
-   "by": "blue-2",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "blue-3",
-   "by": "blue-3",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "unitId": "red-1",
-   "by": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "unitId": "red-2",
-   "by": "red-2",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "unitId": "red-3",
-   "by": "red-3",
-   "when": "end"
-  }
- ],
- "summary": "The battle continues with both sides holding their ground. The Blue forces are trying to outflank the Red forces, while the Red forces are trying to seize the bridge. The cavalry on both sides are getting restless, but so far no one has made a decisive move."
-}
-```
-
-## Proposal C
-
-```json
-{
- "turn": 2,
- "units": [
-  {
-   "unitId": "blue-1",
-   "x": 2030,
-   "y": 1600,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 560,
-   "morale": 75,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "b1-7",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Aubry, being literal, moved his battalion steadily towards the south end of the bridge as ordered. Upon reaching the vicinity, he engaged the advancing enemy force, sustaining moderate losses but holding his ground firmly.",
-   "departure": "Moved significantly towards the bridge and engaged the enemy, contrary to the projection."
-  },
-  {
-   "unitId": "blue-2",
-   "x": 1850,
-   "y": 1700,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 550,
-   "morale": 75,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "b2-7",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Delacroix, being cautious, executed the movement slowly, positioning his battalion to the west and slightly behind the 1st Battalion, forming a line to support the main defensive position near the bridge.",
-   "departure": "Moved significantly to the west flank, contrary to the projection."
-  },
-  {
-   "unitId": "blue-3",
-   "x": 2050,
-   "y": 1850,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 200,
-   "morale": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. Verneuil maintained his position, holding the high ground and observing the enemy movements below, ready to exploit any opportunity.",
-   "departure": "No departure."
-  },
-  {
-   "unitId": "red-1",
-   "x": 2050,
-   "y": 1350,
-   "facingDeg": 0,
-   "formation": "column",
-   "strength": 600,
-   "morale": 75,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r1-7",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Brandt, being aggressive, pressed his battalion rapidly towards the bridge. Upon arrival, he immediately engaged the defending blue unit, seizing the critical position despite taking losses in the initial clash.",
-   "departure": "Moved significantly towards the bridge and engaged the enemy, contrary to the projection."
-  },
-  {
-   "unitId": "red-2",
-   "x": 2250,
-   "y": 700,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 70,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Hartmann maintained his position, adhering strictly to the defensive plan and awaiting further orders from HQ.",
-   "departure": "No departure."
-  },
-  {
-   "unitId": "red-3",
-   "x": 1550,
-   "y": 400,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. von Reiter held his scouting position, maintaining vigilance over the northern approaches, though he did not press forward.",
-   "departure": "No departure."
-  }
- ],
- "observations": [
-  {
-   "side": "blue",
-   "unitId": "blue-1",
-   "by": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "blue-2",
-   "by": "blue-2",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "blue-3",
-   "by": "blue-3",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "unitId": "red-1",
-   "by": "red-1",
-   "when": "end"
-  }
- ],
- "summary": "The Red forces launched a determined push towards the objective. R1, driven by aggression, advanced rapidly and successfully reached the bridge area, engaging B1. The resulting clash saw moderate losses for both sides, but R1 managed to seize the critical position. Meanwhile, Blue forces reacted to the threat. B1 moved to hold the bridge approach, while B2, following orders, moved cautiously to the west flank to reinforce the line. B3 maintained its position, observing the developing battle. R2 and R3 remained static, holding their respective positions away from the immediate action.",
- "rolls": []
-}
-```
-
-## Proposal D
-
-```json
-{
- "turn": 2,
- "units": [
-  {
-   "unitId": "blue-1",
-   "x": 1960,
-   "y": 1680,
-   "facingDeg": 10,
-   "formation": "line",
-   "strength": 591,
-   "morale": 77,
-   "fatigue": 5,
-   "ammo": 88,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "b1-7",
-     "result": "not-arrived"
-    }
-   ],
-   "account": "Col. Aubry had no new order; it was still on its way. He kept his line where it stood. When an enemy column came onto the bridge and its head neared the south half of the span, he opened fire by volleys at about 170 m, and the column stopped short."
-  },
-  {
-   "unitId": "blue-2",
-   "x": 2010,
-   "y": 1790,
+   "x": 2040,
+   "y": 1765,
    "facingDeg": 250,
    "formation": "column",
-   "strength": 546,
-   "morale": 74,
-   "fatigue": 6,
-   "ammo": 95,
+   "strength": 550,
+   "morale": 75,
+   "fatigue": 2,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "move",
     "x": 1960,
-    "y": 1800
+    "y": 1790
    },
    "orders": [
     {
-     "orderId": "b2-7",
+     "orderId": "blue-b2-7",
      "result": "partly"
     }
    ],
-   "account": "Col. Delacroix fired a few volleys at the column on the bridge. When the order to shift west came at minute 14, he took his time breaking line, as is his way. He formed column and crossed the road behind the 1st, and is still on the move, not yet in line, as the turn ends.",
-   "departure": "The order came at minute 14, with only six minutes left. The engine placed the battalion in line at (1820,1700), which is not behind the 1st Battalion at all. It has crossed the road only to (2010,1790), still in column, and will finish forming line behind the 1st, west of the road, facing the bridge next turn."
+   "account": "Col. Delacroix receives the order six minutes before the turn ends. He breaks his line into column and leads it south-west, behind the 1st Battalion and across the road. He is still on the march at the end, and will form line facing the bridge once he is in place.",
+   "departure": "The order says to move behind the 1st and west of the road. The projection put the battalion on the bridge itself, in front of the 1st, which is a misreading of the order. The order also arrived with only six minutes left, so a cautious colonel is only part-way to the place behind the 1st Battalion."
   },
   {
    "unitId": "blue-3",
@@ -1058,196 +782,32 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Maj. Verneuil watched the enemy column come onto the bridge and itched to charge. But it never cleared the span, and he would not ride into a defile under musketry, so he held behind the infantry."
+   "account": "Maj. Verneuil holds on the road behind the infantry. He has the enemy column at the bridge in sight across the river. He has no order to move and stays where he is, impatiently."
   },
   {
    "unitId": "red-1",
    "x": 2050,
-   "y": 1460,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 622,
-   "morale": 74,
-   "fatigue": 24,
-   "ammo": 94,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r1-7",
-     "result": "partly"
-    }
-   ],
-   "account": "Col. Brandt marched on the bridge at once and pushed his column onto the span. He seized the north end and the middle of the crossing. As the head passed the centre it came under volleys from a battalion in line on the south bank. He halted it there, his front ranks returning fire, and he holds the bridge while waiting for support to carry the far end."
-  },
-  {
-   "unitId": "red-2",
-   "x": 2250,
-   "y": 700,
+   "y": 1420,
    "facingDeg": 180,
    "formation": "column",
    "strength": 650,
-   "morale": 70,
-   "fatigue": 8,
+   "morale": 80,
+   "fatigue": 22,
    "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Hartmann had no new orders, so he held his column in place and rested his men."
-  },
-  {
-   "unitId": "red-3",
-   "x": 1550,
-   "y": 400,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. von Reiter had no orders and held his squadron where it stood."
-  }
- ],
- "observations": [
-  {
-   "side": "blue",
-   "by": "blue-1",
-   "unitId": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-2",
-   "unitId": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-2",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-3",
-   "when": "end"
-  }
- ],
- "summary": "Turn 2 (20-40). Red's Vanguard Battalion received its order to seize the bridge at minute 3. It marched down the high road and reached the north end around minute 8, then pushed onto the span. As its head passed the middle it came within musket range of Blue's 1st Battalion on the south bank and was halted by volleys. It ends holding the north end and the middle of the bridge (centre about 2050,1460), having lost 28 men to Blue's 9. Blue's 2nd Battalion fired briefly. Then its order to shift behind the 1st, west of the road, arrived at minute 14, and its cautious colonel had only begun the move: it is in column at (2010,1790) and will form line facing the bridge next turn. Blue's order for the 1st to advance to the bridge's south end is still on the road, due turn 3 minute 6, and was not acted on. Blue's cavalry held behind the line. Red's Line Battalion and hussars held without orders. The bridge is contested: Red holds the span and Blue covers the south exit."
-}
-```
-
-## Proposal E
-
-```json
-{
- "turn": 2,
- "units": [
-  {
-   "unitId": "blue-1",
-   "x": 1960,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 592,
-   "morale": 79,
-   "fatigue": 3,
-   "ammo": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
+    "kind": "move",
+    "x": 2050,
+    "y": 1580
    },
    "orders": [
     {
-     "orderId": "b1-7",
-     "result": "not-arrived"
-    }
-   ],
-   "account": "Col. Aubry holds his line south of the river as before. The head of the enemy column comes out on to the bridge and he gives it volleys at under 200 m. He gets no other order during the turn and does not leave his position."
-  },
-  {
-   "unitId": "blue-2",
-   "x": 1840,
-   "y": 1740,
-   "facingDeg": 40,
-   "formation": "line",
-   "strength": 545,
-   "morale": 75,
-   "fatigue": 6,
-   "ammo": 92,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "b2-7",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Delacroix stands in line beside the 1st Battalion and fires on the head of the enemy column on the bridge until his order comes at about the fourteenth minute. The column is already recoiling. He then marches his battalion behind the 1st, to the west of the road, and forms line facing the bridge, as ordered, keeping his reserve in hand."
-  },
-  {
-   "unitId": "blue-3",
-   "x": 2050,
-   "y": 1850,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 200,
-   "morale": 85,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. Verneuil has no order and holds behind the infantry. He sees the enemy column come on to the bridge and fall back, and wants to charge, but there is no order and no clear field."
-  },
-  {
-   "unitId": "red-1",
-   "x": 2050,
-   "y": 1370,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 450,
-   "morale": 42,
-   "fatigue": 35,
-   "ammo": 95,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r1-7",
+     "orderId": "red-r1-7",
      "result": "partly"
     }
    ],
-   "account": "Col. Brandt receives his order at about the third minute and marches at once down the road to the north end of the bridge, then drives his column on to it to seize it. Two battalions in line on either side of the far end pour volleys into the head of the column on the bridge, where it cannot deploy. After a heavy loss he draws back to the north end, not broken but shaken, and halts there.",
-   "departure": "Projection stops the column at the bridge head (2050,1380) with no casualties and no morale loss. The order is to seize the bridge; an aggressive colonel presses on to it and is shot down by the two battalions covering the far end, so the column loses about 200 men and morale falls to 42 before falling back to the same spot. The position matches; the strength and morale differ."
+   "account": "Col. Brandt has the order early in the turn and puts his column down the high road at once. By the end the head of the column is at the north end of the bridge. He can see two enemy battalions in line across the river and horse behind them. He closes up his column to push over the bridge.",
+   "departure": "The order arrived at minute 3 and Brandt is aggressive. On the road he covers the 470 m to the north end of the bridge easily within the turn. The projection left him idle at his start point, which is wrong. He is not yet within musket range of the enemy line, so there is no fire."
   },
   {
    "unitId": "red-2",
@@ -1264,7 +824,7 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Col. Hartmann has no new order and keeps his column where it is, by the book."
+   "account": "Col. Hartmann has no new orders and stays in column east of the road, waiting for orders by the book. His men rest."
   },
   {
    "unitId": "red-3",
@@ -1281,52 +841,55 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Maj. von Reiter has no new order and holds his position."
+   "account": "Maj. von Reiter has no new orders and holds by the northern wood."
   }
  ],
  "observations": [
   {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-2",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-3",
-   "when": "end"
-  },
-  {
    "side": "blue",
+   "unitId": "red-1",
    "by": "blue-1",
-   "unitId": "red-1",
    "when": "end"
   },
   {
    "side": "blue",
+   "unitId": "red-1",
    "by": "blue-2",
-   "unitId": "red-1",
    "when": "end"
   },
   {
    "side": "blue",
-   "by": "blue-3",
    "unitId": "red-1",
+   "by": "blue-3",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-1",
+   "by": "red-1",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-2",
+   "by": "red-1",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-3",
+   "by": "red-1",
    "when": "end"
   }
  ],
- "summary": "Red-1 reached the bridge at about minute 5 and, ordered to seize it, drove its column on to it. Blue-1 and Blue-2, in line on either side of the south end, fired on it. Unable to deploy on the bridge, the column lost about 200 men and was shaken; Brandt drew it back to the north end. At minute 14 Blue-2's order to move behind the 1st Battalion, to the west of the road, and form line facing the bridge arrived, and it carried it out; the column was already falling back. Blue-1's order to advance to the south end of the bridge was still on the road and was not acted on. Blue-3, Red-2 and Red-3 had no orders and held. Blue losses were about 8 men in Blue-1 and 5 in Blue-2."
+ "summary": "Red-1 marched on its arrived order and ends in column at the north end of the bridge (2050,1420), set to push across next turn. Blue-2 got its order late and is in column moving to 1960,1790, behind Blue-1 and west of the road, where it will form line facing the bridge; the projection's placing of it on the bridge was rejected as a misreading. Blue-1 holds at 1960,1680; its order to advance to the south end of the bridge is due at minute 46. No fire was exchanged, since Red-1 at the bridge end is about 275 m from Blue-1 and out of range. Red-2 and Red-3 have no orders and hold. Blue-3 holds on the road at 2050,1850. Both sides now see each other across the river at the bridge.",
+ "precedents": [
+  "A unit on the high road with an arrived order marches at road pace; the tables may not leave it idle when its order says to advance."
+ ]
 }
 ```
 
-## Proposal F
+## Proposal C
 
 ```json
 {
@@ -1348,7 +911,7 @@
    },
    "orders": [
     {
-     "orderId": "b1-7",
+     "orderId": "blue-b1-7",
      "result": "not-arrived"
     }
    ],
@@ -1356,8 +919,8 @@
   },
   {
    "unitId": "blue-2",
-   "x": 1820,
-   "y": 1700,
+   "x": 2050,
+   "y": 1500,
    "facingDeg": 0,
    "formation": "line",
    "strength": 550,
@@ -1370,7 +933,7 @@
    },
    "orders": [
     {
-     "orderId": "b2-7",
+     "orderId": "blue-b2-7",
      "result": "carried-out"
     }
    ],
@@ -1396,20 +959,20 @@
   {
    "unitId": "red-1",
    "x": 2050,
-   "y": 1380,
+   "y": 950,
    "facingDeg": 180,
    "formation": "column",
    "strength": 650,
    "morale": 80,
-   "fatigue": 8,
+   "fatigue": 7,
    "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "idle"
+    "kind": "hold"
    },
    "orders": [
     {
-     "orderId": "r1-7",
+     "orderId": "red-r1-7",
      "result": "carried-out"
     }
    ],
@@ -1450,7 +1013,20 @@
    "account": "The Hussar Squadron acted as the staff tables direct."
   }
  ],
- "observations": [],
+ "observations": [
+  {
+   "side": "blue",
+   "unitId": "red-1",
+   "by": "blue-2",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-2",
+   "by": "red-1",
+   "when": "end"
+  }
+ ],
  "summary": "The turn was resolved by the tables."
 }
 ```

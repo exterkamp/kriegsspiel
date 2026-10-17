@@ -1,0 +1,1114 @@
+{
+  "realtime": {
+    "header": {
+      "gameId": "rt",
+      "scenarioId": "hold-the-bridge",
+      "seed": 12,
+      "rules": 2
+    },
+    "entries": [
+      {
+        "seq": 1,
+        "wallMs": 1000000,
+        "gameMs": 0,
+        "command": {
+          "kind": "setMode",
+          "mode": "fast-forward"
+        },
+        "endGameMs": 0
+      },
+      {
+        "seq": 3,
+        "wallMs": 1000000,
+        "gameMs": 600000,
+        "endGameMs": 600000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Vanguard Battalion advance to a position at the bridge, on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Vanguard Battalion advance to a position at the bridge, on the High road",
+          "unitId": "red-1",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2040252,
+                "y": 1542707
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 4,
+        "wallMs": 1000000,
+        "gameMs": 600000,
+        "endGameMs": 600000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Line Battalion advance to a position at the bridge, on the river"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Line Battalion advance to a position at the bridge, on the river",
+          "unitId": "red-2",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2000464,
+                "y": 1527945
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 5,
+        "wallMs": 1000000,
+        "gameMs": 600000,
+        "endGameMs": 600000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Hussar Squadron advance to a position at the bridge, on the river"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Hussar Squadron advance to a position at the bridge, on the river",
+          "unitId": "red-3",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2012786,
+                "y": 1454148
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 6,
+        "wallMs": 1000000,
+        "gameMs": 900000,
+        "endGameMs": 900000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Vanguard Battalion advance on the enemy near the bridge, west of the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Vanguard Battalion advance on the enemy near the bridge, west of the High road",
+          "unitId": "red-1",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 1960000,
+                "y": 1680000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 7,
+        "wallMs": 1000000,
+        "gameMs": 900000,
+        "endGameMs": 900000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Hussar Squadron advance to a position at the bridge, on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Hussar Squadron advance to a position at the bridge, on the High road",
+          "unitId": "red-3",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2050000,
+                "y": 1500000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 8,
+        "wallMs": 1000000,
+        "gameMs": 1200000,
+        "endGameMs": 1200000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Line Battalion advance to a position at the bridge, on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Line Battalion advance to a position at the bridge, on the High road",
+          "unitId": "red-2",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2050000,
+                "y": 1500000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 9,
+        "wallMs": 1000000,
+        "gameMs": 1500000,
+        "endGameMs": 1500000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Vanguard Battalion fall back to a position on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Vanguard Battalion fall back to a position on the High road",
+          "unitId": "red-1",
+          "intents": [
+            {
+              "kind": "withdraw",
+              "toward": {
+                "x": 2050000,
+                "y": 50000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 10,
+        "wallMs": 1000000,
+        "gameMs": 1800000,
+        "endGameMs": 1800000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Vanguard Battalion advance on the enemy near the bridge, west of the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Vanguard Battalion advance on the enemy near the bridge, west of the High road",
+          "unitId": "red-1",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 1960000,
+                "y": 1680000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 11,
+        "wallMs": 1000000,
+        "gameMs": 1800000,
+        "endGameMs": 1800000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Hussar Squadron advance on the enemy near the bridge, on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Hussar Squadron advance on the enemy near the bridge, on the High road",
+          "unitId": "red-3",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2050000,
+                "y": 1850000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 12,
+        "wallMs": 1000000,
+        "gameMs": 2100000,
+        "endGameMs": 2100000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Vanguard Battalion advance to a position at the bridge, on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Vanguard Battalion advance to a position at the bridge, on the High road",
+          "unitId": "red-1",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2050000,
+                "y": 1500000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 13,
+        "wallMs": 1000000,
+        "gameMs": 2100000,
+        "endGameMs": 2100000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Hussar Squadron fall back to a position on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Hussar Squadron fall back to a position on the High road",
+          "unitId": "red-3",
+          "intents": [
+            {
+              "kind": "withdraw",
+              "toward": {
+                "x": 2050000,
+                "y": 50000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 2,
+        "wallMs": 1000000,
+        "gameMs": 0,
+        "command": {
+          "kind": "advanceTo",
+          "gameMs": 12000000
+        },
+        "endGameMs": 2167024
+      }
+    ],
+    "final": {
+      "time": 2167024,
+      "rng": 3272787596,
+      "outcome": {
+        "winner": "red",
+        "reason": "objective-taken",
+        "time": 2167024
+      },
+      "units": [
+        {
+          "id": "blue-1",
+          "x": 1960000,
+          "y": 1680000,
+          "strength": 565.52,
+          "status": "active"
+        },
+        {
+          "id": "blue-2",
+          "x": 2140000,
+          "y": 1680000,
+          "strength": 550,
+          "status": "active"
+        },
+        {
+          "id": "blue-3",
+          "x": 2050000,
+          "y": 1850000,
+          "strength": 0,
+          "status": "destroyed"
+        },
+        {
+          "id": "red-1",
+          "x": 2025641,
+          "y": 1620923,
+          "strength": 403.25,
+          "status": "active"
+        },
+        {
+          "id": "red-2",
+          "x": 2050000,
+          "y": 1500000,
+          "strength": 613.15,
+          "status": "active"
+        },
+        {
+          "id": "red-3",
+          "x": 2050000,
+          "y": 1850000,
+          "strength": 163.46,
+          "status": "withdrawn"
+        }
+      ],
+      "worldSha256": "87c0df4d2379dd6d866e1c29b22da6cdc2fcfa63538d0150f23cc2c42060e9b0"
+    }
+  },
+  "turns": {
+    "header": {
+      "gameId": "turns",
+      "scenarioId": "hold-the-bridge",
+      "seed": 12,
+      "settings": {
+        "dial": "rigid",
+        "persona": "dry",
+        "mode": "turns",
+        "turnMinutes": 20
+      },
+      "rules": 2
+    },
+    "entries": [
+      {
+        "seq": 1,
+        "wallMs": 1000000,
+        "gameMs": 0,
+        "endGameMs": 0,
+        "command": {
+          "kind": "openTurn",
+          "turn": 1,
+          "startMs": 0,
+          "endMs": 1200000
+        }
+      },
+      {
+        "seq": 2,
+        "wallMs": 1000000,
+        "gameMs": 0,
+        "command": {
+          "kind": "sendTurn",
+          "side": "blue",
+          "turn": 1,
+          "orders": []
+        },
+        "endGameMs": 0
+      },
+      {
+        "seq": 4,
+        "wallMs": 1000000,
+        "gameMs": 600000,
+        "endGameMs": 600000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Vanguard Battalion advance to a position at the bridge, on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Vanguard Battalion advance to a position at the bridge, on the High road",
+          "unitId": "red-1",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2040252,
+                "y": 1542707
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 5,
+        "wallMs": 1000000,
+        "gameMs": 600000,
+        "endGameMs": 600000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Line Battalion advance to a position at the bridge, on the river"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Line Battalion advance to a position at the bridge, on the river",
+          "unitId": "red-2",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2000464,
+                "y": 1527945
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 6,
+        "wallMs": 1000000,
+        "gameMs": 600000,
+        "endGameMs": 600000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Hussar Squadron advance to a position at the bridge, on the river"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Hussar Squadron advance to a position at the bridge, on the river",
+          "unitId": "red-3",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2012786,
+                "y": 1454148
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 7,
+        "wallMs": 1000000,
+        "gameMs": 900000,
+        "endGameMs": 900000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Vanguard Battalion advance on the enemy near the bridge, west of the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Vanguard Battalion advance on the enemy near the bridge, west of the High road",
+          "unitId": "red-1",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 1960000,
+                "y": 1680000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 8,
+        "wallMs": 1000000,
+        "gameMs": 900000,
+        "endGameMs": 900000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Hussar Squadron advance to a position at the bridge, on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Hussar Squadron advance to a position at the bridge, on the High road",
+          "unitId": "red-3",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2050000,
+                "y": 1500000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 9,
+        "wallMs": 1000000,
+        "gameMs": 1200000,
+        "endGameMs": 1200000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Line Battalion advance to a position at the bridge, on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Line Battalion advance to a position at the bridge, on the High road",
+          "unitId": "red-2",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2050000,
+                "y": 1500000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 3,
+        "wallMs": 1000000,
+        "gameMs": 0,
+        "command": {
+          "kind": "resolveTurn",
+          "turn": 1,
+          "cause": "all-sent"
+        },
+        "turn": {
+          "n": 1,
+          "startMs": 0,
+          "endMs": 1200000,
+          "cause": "all-sent",
+          "orders": [],
+          "sent": ["blue"],
+          "adjudicator": "engine",
+          "output": {
+            "orders": [],
+            "couriers": [],
+            "projection": {
+              "turn": 1,
+              "fromMin": 0,
+              "toMin": 20,
+              "units": [
+                {
+                  "id": "blue-1",
+                  "side": "blue",
+                  "from": {
+                    "at": "near the bridge, west of the High road",
+                    "x": 1960,
+                    "y": 1680
+                  },
+                  "to": {
+                    "at": "near the bridge, west of the High road",
+                    "x": 1960,
+                    "y": 1680
+                  },
+                  "contacts": ["red-1"],
+                  "status": "active"
+                },
+                {
+                  "id": "blue-2",
+                  "side": "blue",
+                  "from": {
+                    "at": "near the bridge, east of the High road",
+                    "x": 2140,
+                    "y": 1680
+                  },
+                  "to": {
+                    "at": "near the bridge, east of the High road",
+                    "x": 2140,
+                    "y": 1680
+                  },
+                  "contacts": ["red-1"],
+                  "status": "active"
+                },
+                {
+                  "id": "blue-3",
+                  "side": "blue",
+                  "from": {
+                    "at": "near the bridge, on the High road",
+                    "x": 2050,
+                    "y": 1850
+                  },
+                  "to": {
+                    "at": "near the bridge, on the High road",
+                    "x": 2050,
+                    "y": 1850
+                  },
+                  "status": "active"
+                },
+                {
+                  "id": "red-1",
+                  "side": "red",
+                  "from": {
+                    "at": "west of the High road",
+                    "x": 1950,
+                    "y": 300
+                  },
+                  "to": {
+                    "at": "near the bridge, west of the High road",
+                    "x": 1979,
+                    "y": 1663
+                  },
+                  "path": [
+                    [1950, 300],
+                    [2045, 1000],
+                    [1979, 1663]
+                  ],
+                  "contacts": ["blue-1", "blue-2"],
+                  "status": "active"
+                },
+                {
+                  "id": "red-2",
+                  "side": "red",
+                  "from": {
+                    "at": "east of the High road",
+                    "x": 2250,
+                    "y": 150
+                  },
+                  "to": {
+                    "at": "at the bridge, on the river",
+                    "x": 2007,
+                    "y": 1512
+                  },
+                  "path": [
+                    [2250, 150],
+                    [2050, 651],
+                    [2007, 1512]
+                  ],
+                  "status": "active"
+                },
+                {
+                  "id": "red-3",
+                  "side": "red",
+                  "from": {
+                    "at": "near the Northern wood",
+                    "x": 1550,
+                    "y": 400
+                  },
+                  "to": {
+                    "at": "at the bridge, on the High road",
+                    "x": 2050,
+                    "y": 1500
+                  },
+                  "path": [
+                    [1550, 400],
+                    [2024, 1439],
+                    [2050, 1500]
+                  ],
+                  "status": "active"
+                }
+              ],
+              "events": [
+                "11: order_delivered red-2, orderId turns-t1-o2",
+                "11: order_delivered red-1, orderId turns-t1-o1",
+                "12: order_delivered red-3, orderId turns-t1-o3",
+                "15: unit.arrived red-3",
+                "16: order_delivered red-1, orderId turns-t1-o4",
+                "17: order_delivered red-3, orderId turns-t1-o5",
+                "17: unit.arrived red-3",
+                "18: contact.begin blue-1 v red-1, blue-2 v red-1"
+              ]
+            }
+          }
+        },
+        "endGameMs": 1200000
+      },
+      {
+        "seq": 10,
+        "wallMs": 1000000,
+        "gameMs": 1200000,
+        "endGameMs": 1200000,
+        "command": {
+          "kind": "openTurn",
+          "turn": 2,
+          "startMs": 1200000,
+          "endMs": 2400000
+        }
+      },
+      {
+        "seq": 11,
+        "wallMs": 1000000,
+        "gameMs": 1200000,
+        "command": {
+          "kind": "sendTurn",
+          "side": "blue",
+          "turn": 2,
+          "orders": []
+        },
+        "endGameMs": 1200000
+      },
+      {
+        "seq": 13,
+        "wallMs": 1000000,
+        "gameMs": 1500000,
+        "endGameMs": 1500000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Vanguard Battalion fall back to a position on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Vanguard Battalion fall back to a position on the High road",
+          "unitId": "red-1",
+          "intents": [
+            {
+              "kind": "withdraw",
+              "toward": {
+                "x": 2050000,
+                "y": 50000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 14,
+        "wallMs": 1000000,
+        "gameMs": 1800000,
+        "endGameMs": 1800000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Vanguard Battalion advance on the enemy near the bridge, west of the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Vanguard Battalion advance on the enemy near the bridge, west of the High road",
+          "unitId": "red-1",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 1960000,
+                "y": 1680000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 15,
+        "wallMs": 1000000,
+        "gameMs": 1800000,
+        "endGameMs": 1800000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Hussar Squadron advance on the enemy near the bridge, on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Hussar Squadron advance on the enemy near the bridge, on the High road",
+          "unitId": "red-3",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2050000,
+                "y": 1850000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 16,
+        "wallMs": 1000000,
+        "gameMs": 2100000,
+        "endGameMs": 2100000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Vanguard Battalion advance to a position at the bridge, on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Vanguard Battalion advance to a position at the bridge, on the High road",
+          "unitId": "red-1",
+          "intents": [
+            {
+              "kind": "move",
+              "to": {
+                "x": 2050000,
+                "y": 1500000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 17,
+        "wallMs": 1000000,
+        "gameMs": 2100000,
+        "endGameMs": 2100000,
+        "command": {
+          "kind": "order",
+          "side": "red",
+          "text": "Hussar Squadron fall back to a position on the High road"
+        },
+        "parse": {
+          "kind": "intents",
+          "text": "Hussar Squadron fall back to a position on the High road",
+          "unitId": "red-3",
+          "intents": [
+            {
+              "kind": "withdraw",
+              "toward": {
+                "x": 2050000,
+                "y": 50000
+              }
+            }
+          ]
+        },
+        "agent": true
+      },
+      {
+        "seq": 12,
+        "wallMs": 1000000,
+        "gameMs": 1200000,
+        "command": {
+          "kind": "resolveTurn",
+          "turn": 2,
+          "cause": "all-sent"
+        },
+        "turn": {
+          "n": 2,
+          "startMs": 1200000,
+          "endMs": 2400000,
+          "cause": "all-sent",
+          "orders": [],
+          "sent": ["blue"],
+          "adjudicator": "engine",
+          "output": {
+            "orders": [],
+            "couriers": [
+              {
+                "orderId": "turns-o9",
+                "side": "red",
+                "unitId": "red-2",
+                "outcome": "delivered",
+                "atMs": 1312370
+              }
+            ],
+            "projection": {
+              "turn": 2,
+              "fromMin": 20,
+              "toMin": 40,
+              "units": [
+                {
+                  "id": "blue-1",
+                  "side": "blue",
+                  "from": {
+                    "at": "near the bridge, west of the High road",
+                    "x": 1960,
+                    "y": 1680
+                  },
+                  "to": {
+                    "at": "near the bridge, west of the High road",
+                    "x": 1960,
+                    "y": 1680
+                  },
+                  "contacts": ["red-3"],
+                  "lost": 34,
+                  "morale": -14,
+                  "status": "active"
+                },
+                {
+                  "id": "blue-2",
+                  "side": "blue",
+                  "from": {
+                    "at": "near the bridge, east of the High road",
+                    "x": 2140,
+                    "y": 1680
+                  },
+                  "to": {
+                    "at": "near the bridge, east of the High road",
+                    "x": 2140,
+                    "y": 1680
+                  },
+                  "contacts": ["red-3"],
+                  "status": "active"
+                },
+                {
+                  "id": "blue-3",
+                  "side": "blue",
+                  "from": {
+                    "at": "near the bridge, on the High road",
+                    "x": 2050,
+                    "y": 1850
+                  },
+                  "to": {
+                    "at": "near the bridge, on the High road",
+                    "x": 2050,
+                    "y": 1850
+                  },
+                  "path": [
+                    [2050, 1850],
+                    [2050, 1599],
+                    [2050, 1850]
+                  ],
+                  "lost": 200,
+                  "morale": -85,
+                  "status": "destroyed",
+                  "wasStatus": "active"
+                },
+                {
+                  "id": "red-1",
+                  "side": "red",
+                  "from": {
+                    "at": "near the bridge, west of the High road",
+                    "x": 1979,
+                    "y": 1663
+                  },
+                  "to": {
+                    "at": "near the bridge, west of the High road",
+                    "x": 2034,
+                    "y": 1613
+                  },
+                  "path": [
+                    [1979, 1663],
+                    [2050, 1432],
+                    [2050, 850],
+                    [2050, 1520],
+                    [2034, 1613]
+                  ],
+                  "lost": 247,
+                  "morale": -40,
+                  "status": "active"
+                },
+                {
+                  "id": "red-2",
+                  "side": "red",
+                  "from": {
+                    "at": "at the bridge, on the river",
+                    "x": 2007,
+                    "y": 1512
+                  },
+                  "to": {
+                    "at": "at the bridge, on the High road",
+                    "x": 2050,
+                    "y": 1500
+                  },
+                  "path": [
+                    [2007, 1512],
+                    [2050, 1500]
+                  ],
+                  "lost": 37,
+                  "morale": -21,
+                  "status": "active"
+                },
+                {
+                  "id": "red-3",
+                  "side": "red",
+                  "from": {
+                    "at": "at the bridge, on the High road",
+                    "x": 2050,
+                    "y": 1500
+                  },
+                  "to": {
+                    "at": "near the bridge, on the High road",
+                    "x": 2050,
+                    "y": 1850
+                  },
+                  "path": [
+                    [2050, 1500],
+                    [2050, 1762],
+                    [2050, 1850]
+                  ],
+                  "contacts": ["blue-1", "blue-2"],
+                  "lost": 57,
+                  "morale": -77,
+                  "status": "withdrawn",
+                  "wasStatus": "active"
+                }
+              ],
+              "events": [
+                "20: unit.arrived red-2",
+                "20: unit.arrived red-1",
+                "22: order_delivered red-2, orderId turns-o9",
+                "22: unit.broken red-1",
+                "22: unit.arrived red-2",
+                "26: courier_intercepted red-1, orderId turns-t2-o1, by blue-3",
+                "26: unit.broken blue-3",
+                "27: unit.arrived blue-3",
+                "28: unit.rallied red-1",
+                "28: unit.destroyed blue-3",
+                "30: unit.broken red-3",
+                "31: order_delivered red-1, orderId turns-t2-o2",
+                "32: contact.end",
+                "32: order_delivered red-3, orderId turns-t2-o3",
+                "34: contact.begin blue-1 v red-3, blue-2 v red-3",
+                "35: unit.arrived red-3",
+                "36: game.end reason objective-taken, winner red"
+              ],
+              "outcome": {
+                "winner": "red",
+                "reason": "objective-taken",
+                "atMin": 36
+              }
+            }
+          }
+        },
+        "endGameMs": 2160000
+      }
+    ],
+    "final": {
+      "time": 2160000,
+      "rng": 3272787596,
+      "outcome": {
+        "winner": "red",
+        "reason": "objective-taken",
+        "time": 2160000
+      },
+      "units": [
+        {
+          "id": "blue-1",
+          "x": 1960000,
+          "y": 1680000,
+          "strength": 565.52,
+          "status": "active"
+        },
+        {
+          "id": "blue-2",
+          "x": 2140000,
+          "y": 1680000,
+          "strength": 550,
+          "status": "active"
+        },
+        {
+          "id": "blue-3",
+          "x": 2050000,
+          "y": 1850000,
+          "strength": 0,
+          "status": "destroyed"
+        },
+        {
+          "id": "red-1",
+          "x": 2034343,
+          "y": 1613092,
+          "strength": 403.25,
+          "status": "active"
+        },
+        {
+          "id": "red-2",
+          "x": 2050000,
+          "y": 1500000,
+          "strength": 613.15,
+          "status": "active"
+        },
+        {
+          "id": "red-3",
+          "x": 2050000,
+          "y": 1850000,
+          "strength": 163.46,
+          "status": "withdrawn"
+        }
+      ],
+      "worldSha256": "0806dfaf135e5549289630668cf5f54045b04cfc979220a43f65e83657f3bb77"
+    }
+  }
+}

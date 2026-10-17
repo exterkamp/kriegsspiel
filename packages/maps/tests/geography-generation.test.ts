@@ -45,12 +45,15 @@ describe('versioned geography integration and deterministic recipes', () => {
     expect(geo.sourceElevation).toEqual(original);
     expect(elevation).toEqual(original);
     expect(geo.elevation).not.toEqual(original);
-    expect(geo.water[0]).toMatchObject({ kind: 'river', surfacePolicy: 'standing-water-v1' });
-    const river = geo.water[0]!;
-    if (river.kind === 'river') {
-      expect(river.centreline.length).toBeGreaterThan(100);
+    // A stepped network: several streams, each split into constant-surface reaches.
+    const rivers = geo.water.filter((w) => w.kind === 'river');
+    expect(new Set(rivers.map((r) => r.id.split(':')[2])).size).toBeGreaterThan(1);
+    expect(rivers.reduce((n, r) => n + r.centreline.length, 0)).toBeGreaterThan(100);
+    for (const river of rivers) {
+      expect(river).toMatchObject({ kind: 'river', surfacePolicy: 'standing-water-v1' });
       expect(new Set(river.surfaceProfileM).size).toBe(1);
     }
+    expect(geo.water.some((w) => w.kind === 'lake')).toBe(false);
     expect(geo.crossingCandidates.length).toBeGreaterThan(0);
     for (const c of geo.crossingCandidates)
       expect(validateCrossingCandidate(c, geo.water, bounds(s), s)).toMatchObject({ ok: true });
@@ -68,9 +71,17 @@ describe('versioned geography integration and deterministic recipes', () => {
       const s = geographyPreset(name),
         ground = value(generateElevation(s, seed)),
         geo = value(generateGeography(ground, bounds(s), s, seed));
-      expect(geo.groundChanged).toBe(false);
       expect(geo.cover.some((c) => c.kind === 'wood')).toBe(true);
-      if (name === 'flat-countryside') expect(geo.water).toEqual([]);
+      if (name === 'flat-countryside') {
+        expect(geo.groundChanged).toBe(false);
+        expect(geo.water).toEqual([]);
+      } else {
+        // Drained, eroded hills carry brooks in their valleys instead of
+        // scattered depression lakes; carving changes authoritative ground.
+        expect(geo.groundChanged).toBe(true);
+        expect(geo.water.length).toBeGreaterThan(0);
+        expect(geo.water.every((w) => w.kind === 'river')).toBe(true);
+      }
     }
   }, 20000);
   it('records all24 fixed diagnostic recipes without retrying or changing seeds', () => {
@@ -159,8 +170,9 @@ describe('versioned geography integration and deterministic recipes', () => {
       r = value(generateGeography(e, bounds(s), s, 17));
     expect(r.elevation.samples).toHaveLength(160801);
     expect(r.water.length).toBeGreaterThan(0);
+    expect(r.water.every((w) => w.kind === 'river')).toBe(true);
     expect(r.cover.length).toBeGreaterThan(0);
-    expect(r.groundChanged).toBe(false);
+    expect(r.groundChanged).toBe(true);
     expect(s.limits.maxTopologyChecks).toBe(5000000);
     expect(s.sampleSpacingM).toBe(25);
   }, 20000);

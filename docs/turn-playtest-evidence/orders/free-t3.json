@@ -1,0 +1,12 @@
+{
+  "blue": [
+    { "orderId": "f3-1", "to": "blue-1", "text": "The enemy column is on the bridge. Pour volleys into its head as it comes off the bridge and hold your ground." },
+    { "orderId": "f3-2", "to": "blue-2", "text": "Swing your left wing forward so that the whole battalion fires into the flank of the column on the bridge. Hold the bank." },
+    { "orderId": "f3-3", "to": "blue-3", "courier": "fast", "text": "Charge the head of the enemy column the moment it comes off the bridge onto our bank, then rally behind the 1st Battalion." }
+  ],
+  "red": [
+    { "orderId": "g3-1", "to": "red-1", "text": "Push on at the bayonet now. Clear the south end of the bridge and form line across the road on the far bank. Hold it at all costs." },
+    { "orderId": "g3-2", "to": "red-2", "text": "Follow the Vanguard over the bridge at the double and deploy on its left on the far bank. Together hold the south end." },
+    { "orderId": "g3-3", "to": "red-3", "courier": "fast", "text": "As soon as the Vanguard is over, cross the bridge and drive off the enemy horse behind the bridge-end." }
+  ]
+}
