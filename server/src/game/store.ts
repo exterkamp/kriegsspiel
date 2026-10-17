@@ -28,9 +28,12 @@ import type { PauseTransition } from '../pause.js';
 import type { RatioTransition } from '../ratioVote.js';
 import { detachedInputHeader } from './pinned-header.js';
 import type { NativeScenarioPinV1 } from './native-scenario-pin.js';
+import type { NativeSnapshotBinding } from './snapshot-binding.js';
 
 /** Everything needed to resume a game: serialised engine state and the clock's anchor. */
 export interface GameSnapshot {
+  /** Required on native snapshots; absence may only describe a legacy input header. */
+  battlefield?: NativeSnapshotBinding;
   /** Seq of the last input log entry this snapshot includes. Recovery replays the entries after it. */
   seq: number;
   /** `serialize(engineState)` from the engine. */

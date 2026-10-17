@@ -1,3 +1,4 @@
+import type { NativeSnapshotBinding } from './snapshot-binding.js';
 /**
  * GameActor: the single writer for one game. See docs/architecture.md (Scheduler and event
  * queue, Single writer per game).
@@ -157,6 +158,7 @@ export type CommandResult =
   | { ok: false; kind: 'rejection'; reason: string };
 
 export interface GameActorOptions {
+  battlefield?: NativeSnapshotBinding;
   id: string;
   /** Engine state to start from (a new scenario, or a restored snapshot). */
   state: EngineState<GameState>;
@@ -301,6 +303,7 @@ export class GameActor {
   private readonly wallNow: WallClock;
   private readonly parser: OrderParser;
   private readonly store: GameStore;
+  private readonly battlefield: NativeSnapshotBinding | undefined;
   private readonly trace: TraceSink;
   private readonly timers: Timers;
   private readonly parseTimers = new Set<unknown>();
@@ -389,6 +392,7 @@ export class GameActor {
     this.wallNow = options.wallNow;
     this.parser = options.parser;
     this.store = options.store;
+    this.battlefield = options.battlefield && structuredClone(options.battlefield);
     this.trace = options.trace ?? NOOP_TRACE;
     this.timers = options.timers ?? realTimers;
     this.onEmitted = options.onEmitted;
@@ -1495,6 +1499,7 @@ export class GameActor {
     await this.flushAgentLog();
     const seq = this.seq;
     await this.store.saveSnapshot(this.id, {
+      ...(this.battlefield ? { battlefield: structuredClone(this.battlefield) } : {}),
       seq,
       engine: serialize(this.engine),
       clock: { ...this.clock.snapshot(), mode: this.clock.mode },
