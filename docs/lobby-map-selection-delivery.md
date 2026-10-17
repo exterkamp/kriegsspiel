@@ -1,5 +1,7 @@
 # Lobby map implementation handoff
 
+> **Reconciled with main (2026-10-16).** Each branch of the stack was brought up to date with main by merge commits; the heads, CI states and preview URLs below are the pre-merge record. Since then: Dom's decisions are D51–D54 in `docs/decisions.md`; pinned games, like every game, draw their own seed (#534), kept on the creation receipt, lobby record and log header, while the pin keeps the authored world; headers carry the rules version (#432); the live table draws the checked terrain through main's period renderer (`periodMap.ts`, #563); and owned-map certification accepts the current generator and every `LEGACY_GENERATORS` identity.
+
 Implemented as independently reviewed **draft PRs**, not merged or deployed. Approved design chunks1–5 have product source and functional task-preview evidence. Browser game creation/live entry remains an explicit missing acceptance gate; generated-map scenario policy is the separate chunk6 follow-up.
 
 ## Try the task preview

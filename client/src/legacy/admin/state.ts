@@ -56,7 +56,15 @@ export const MASTER_ONLY_WORLD = [
   'sightFactor',
   'victory',
   'outcome',
+  'journal',
 ] as const;
+
+/** The umpire's journal of a turn-mode game (D39, 11.8), as `GameState.journal` holds it. */
+export interface JournalLike {
+  notes: { turn: number; note: string; condensed?: boolean }[];
+  dropped?: number;
+  precedents: { turn: number; ruling: string }[];
+}
 
 /** Top-level engine fields with no counterpart in any view. */
 export const MASTER_ONLY_ENGINE = ['rng', 'queue', 'nextSeq'] as const;
@@ -208,10 +216,13 @@ export class StatePanel {
     views.append(cols);
     out.push(views);
 
+    const journal = world.journal as JournalLike | undefined;
+    if (journal) out.push(this.journalBlock(journal));
+
     const rest = el('div', 'block');
     rest.append(el('h2', undefined, 'Other master-only world state'));
     for (const key of MASTER_ONLY_WORLD) {
-      if (key === 'seed' || key === 'outcome') continue;
+      if (key === 'seed' || key === 'outcome' || key === 'journal') continue;
       const d = el('details', 'masteronly');
       d.dataset.key = `world:${key}`;
       d.append(
@@ -234,6 +245,31 @@ export class StatePanel {
       if (open.has(d.dataset.key)) d.open = true;
     }
     this.setFilter(this.filterText);
+  }
+
+  /** The umpire's journal: its notes by turn and the precedents it set. Never in a side's view. */
+  private journalBlock(j: JournalLike): HTMLElement {
+    const block = el('div', 'block journal');
+    block.append(el('h2', undefined, "Umpire's journal"));
+    block.firstElementChild!.append(badge('master only'));
+    if (j.dropped) {
+      block.append(el('p', 'legend', `${j.dropped} older notes dropped to keep it under its cap.`));
+    }
+    const notes = el('ol', 'journal-notes');
+    for (const n of j.notes) {
+      notes.append(
+        el('li', undefined, `Turn ${n.turn}${n.condensed ? ' (condensed)' : ''}: ${n.note}`),
+      );
+    }
+    if (j.notes.length === 0) notes.append(el('li', 'empty', 'No notes yet.'));
+    block.append(el('h3', undefined, 'Notes'), notes);
+    const precedents = el('ol', 'journal-precedents');
+    for (const p of j.precedents) {
+      precedents.append(el('li', undefined, `Turn ${p.turn}: ${p.ruling}`));
+    }
+    if (j.precedents.length === 0) precedents.append(el('li', 'empty', 'None set.'));
+    block.append(el('h3', undefined, 'Precedents'), precedents);
+    return block;
   }
 
   private kv(k: string, v: string, masterOnly = false): HTMLElement {

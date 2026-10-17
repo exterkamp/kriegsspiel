@@ -68,3 +68,54 @@ small {
 .confirm p {
   margin: 0 0 var(--ks-space-2);
 }
+.last {
+  font-style: italic;
+}
+.units ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--ks-space-2);
+}
+.units li {
+  border-top: 1px solid var(--ks-rule-soft);
+  padding-top: var(--ks-space-1);
+  min-width: 0;
+}
+.units dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0 var(--ks-space-2);
+  margin: 2px 0 0;
+  font-size: var(--ks-text-xs);
+}
+.units dt {
+  color: var(--ks-text-muted);
+}
+.units dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.state {
+  display: block;
+}
+.units .state {
+  display: inline;
+}
+.earlier {
+  margin: var(--ks-space-2) 0;
+}
+.earlier ol {
+  margin: var(--ks-space-1) 0 0;
+  padding-left: 1.4em;
+}
+.earlier li {
+  margin-bottom: var(--ks-space-2);
+}
+.how summary,
+.earlier summary {
+  cursor: pointer;
+  font-size: var(--ks-text-sm);
+}

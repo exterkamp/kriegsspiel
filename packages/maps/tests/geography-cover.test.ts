@@ -185,19 +185,20 @@ describe('bounded standalone cover generation', () => {
     const water = [lake('lake:ring', pond)];
     const before = JSON.stringify(water);
     const result = success(f, water);
-    expect(kindAt(result.value, 187.5, 187.5)).toBe('wood'); // Dry island.
+    // The 1 ha island is below the minimum wood patch, so it stays covered as open ground.
+    expect(kindAt(result.value, 187.5, 187.5)).toBe('open'); // Dry island.
     expect(kindAt(result.value, 87.5, 87.5)).toBeUndefined(); // Wet ring.
     expect(kindAt(result.value, 12.5, 12.5)).toBe('wood'); // Exterior.
-    expect(area(result.value)).toBe(80000); // 160000 - (90000 - 10000).
+    // 160000 - (90000 - 10000), less the island's four cut convex corners.
+    expect(area(result.value)).toBeLessThanOrEqual(80000);
+    expect(area(result.value)).toBeGreaterThan(79000);
     expect(metrics(result).dryAreaLossUpperBoundM2).toBe(0); // Aligned boundaries.
     expect(JSON.stringify(water)).toBe(before);
     contractCheck(f, result.value, water);
-    // Independent 5 m interior probes, away from boundaries, detect any wet cover.
-    for (const c of result.value)
-      for (const p of c.polygons)
-        for (let y = p.outer[0]![1] + 2.5; y < p.outer[2]![1]; y += 5)
-          for (let x = p.outer[0]![0] + 2.5; x < p.outer[2]![0]; x += 5)
-            expect(polygonLocation([x, y], pond)).not.toBe('inside');
+    // Independent 5 m probes detect any wet cover.
+    for (let y = 2.5; y < 400; y += 5)
+      for (let x = 2.5; x < 400; x += 5)
+        if (kindAt(result.value, x, y)) expect(polygonLocation([x, y], pond)).not.toBe('inside');
   });
   it('masks sub-cell water and diagonal edge penetration missed by centre sampling', () => {
     const f = fixture(100);
@@ -222,16 +223,21 @@ describe('bounded standalone cover generation', () => {
     );
     contractCheck(f, result.value);
   });
-  it('provides an explicit all-wet fallback and restricts fields in the riparian band', () => {
+  it('provides an explicit all-wet fallback and keeps the bank and river flats as open meadow', () => {
     const f = fixture(100);
     f.settings.cover = { woodFraction: 0, fieldFraction: 1, coherenceM: 100 };
     const wet = success(f, [lake('lake:all', rect(0, 0, 100, 100))]);
     expect(wet.value).toEqual([]);
     expect(metrics(wet).dryEligibleAreaM2).toBe(0);
     expect(wet.diagnostics.some((d) => d.code === 'COVER_NO_DRY_AREA')).toBe(true);
-    const bank = success(f, [lake('lake:bank', rect(0, 0, 25, 100))]);
-    expect(kindAt(bank.value, 37.5, 12.5)).toBe('open');
-    expect(kindAt(bank.value, 87.5, 12.5)).toBe('field');
+    // Flat ground level with the water: the bank and the flat beyond it stay
+    // open (water meadow); fields start where the flat ends.
+    const wide = fixture(400);
+    wide.settings.cover = { woodFraction: 0, fieldFraction: 1, coherenceM: 100 };
+    const bank = success(wide, [lake('lake:bank', rect(0, 0, 25, 400))]);
+    expect(kindAt(bank.value, 37.5, 200)).toBe('open');
+    expect(kindAt(bank.value, 112.5, 200)).toBe('open');
+    expect(kindAt(bank.value, 337.5, 200)).toBe('field');
   });
   it('has spatially coherent canopy, not independent per-cell salt-and-pepper', () => {
     const f = fixture(2000);
@@ -253,7 +259,7 @@ describe('bounded standalone cover generation', () => {
             }
         }
       expect(same / total).toBeGreaterThan(0.85); // Independent .5 Bernoulli canopy expects .5.
-      expect(metrics(result).woodFraction).toBeCloseTo(0.5, 3);
+      expect(Math.abs(metrics(result).woodFraction! - 0.5)).toBeLessThan(0.02);
     }
   });
   it('reproduces density/geometry and keeps ground/water/settings unchanged as cover controls vary', () => {
@@ -284,11 +290,13 @@ describe('bounded standalone cover generation', () => {
       contractCheck(f, result.value);
     }
   });
-  it('reports achieved fractions against dry eligible area with at most one-cell density quantization', () => {
+  it('reports achieved fractions of covered area close to the recipe', () => {
     const f = fixture(800);
     const result = success(f);
     const m = metrics(result);
-    const tolerance = m.maxCellAreaM2! / m.dryEligibleAreaM2!;
+    // Patch clean-up and smoothed outlines move a little area between kinds;
+    // on this 800 m map (256 cells) a few cells' worth.
+    const tolerance = 0.03;
     expect(Math.abs(m.woodFraction! - f.settings.cover.woodFraction)).toBeLessThanOrEqual(
       tolerance + 1e-6,
     );
@@ -313,12 +321,13 @@ describe('bounded standalone cover generation', () => {
     const f = fixture(15000);
     f.settings.cover = { woodFraction: 0, fieldFraction: 0, coherenceM: 300 };
     const result = success(f);
-    expect(result.value).toHaveLength(1);
-    expect(area(result.value)).toBe(225000000);
+    // All open, split into compartments that keep every outline small.
+    expect(result.value.every((c) => c.kind === 'open')).toBe(true);
+    expect(area(result.value)).toBeCloseTo(225000000, 0);
     const message = result.diagnostics.find((d) => d.code === 'COVER_LATTICE')!.message;
-    expect(message).toContain('120x120');
-    expect(MAX_COVER_AXIS).toBe(128);
-    expect(COVER_VERSION).toBe('coherent-dry-runs-v1');
+    expect(message).toContain('200x200');
+    expect(MAX_COVER_AXIS).toBe(200);
+    expect(COVER_VERSION).toBe('terrain-parcels-v2');
   });
   it('matches the brute-force frozen geometry oracle across holes, islands, slivers, diagonals and corner/side contacts', () => {
     const lattice: Lattice = {

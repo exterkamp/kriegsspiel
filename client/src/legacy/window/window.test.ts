@@ -1,7 +1,16 @@
-import type { WindowAt } from '@kriegsspiel/protocol';
+import type { WindowAt, WindowTurn } from '@kriegsspiel/protocol';
 import { describe, expect, it } from 'vitest';
 import { fixtureMap } from '../table/fixture.js';
-import { buildWindowScene, stepMark, unitNotes } from './model.js';
+import {
+  buildWindowScene,
+  decidedBy,
+  lossesText,
+  stepMark,
+  stepTurn,
+  turnAt,
+  unitChange,
+  unitNotes,
+} from './model.js';
 
 const fp = { frontage: 100, depth: 50 };
 const frame: WindowAt = {
@@ -142,5 +151,65 @@ describe("umpire's window model", () => {
     expect(stepMark(marks, 20, -1)).toBe(0);
     expect(stepMark(marks, 30, 1)).toBe(-1);
     expect(stepMark(marks, 10, -1)).toBe(-1);
+  });
+});
+
+describe("the window's turns (D39, 11.11)", () => {
+  const turn = (n: number, extra: Partial<WindowTurn> = {}): WindowTurn => ({
+    n,
+    startMs: (n - 1) * 600_000,
+    endMs: n * 600_000,
+    adjudicator: 'umpire',
+    fellBack: false,
+    losses: { blue: 0, red: 0 },
+    units: [],
+    corrections: 0,
+    rolls: [],
+    ...extra,
+  });
+  const turns = [turn(1), turn(2, { adjudicator: 'engine', fellBack: true }), turn(3)];
+
+  it('shows the turn under way, or the one that ended at the time shown', () => {
+    expect(turnAt(turns, 0)!.n).toBe(1);
+    expect(turnAt(turns, 300_000)!.n).toBe(1);
+    expect(turnAt(turns, 600_000)!.n).toBe(1);
+    expect(turnAt(turns, 600_001)!.n).toBe(2);
+    expect(turnAt(turns, 1_800_000)!.n).toBe(3);
+    expect(turnAt(turns, 1_800_001)).toBeUndefined();
+    expect(turnAt([], 0)).toBeUndefined();
+  });
+
+  it('says who decided a turn and what it cost', () => {
+    expect(decidedBy(turns[0]!)).toBe('Decided by the umpire.');
+    expect(decidedBy(turns[1]!)).toMatch(/^Decided by the tables: the umpire could not/);
+    expect(decidedBy(turn(4, { adjudicator: 'engine' }))).toBe('Decided by the tables.');
+    expect(lossesText(turn(1, { losses: { blue: 40, red: 0 } }))).toBe(
+      'Blue lost 40 men, Red none.',
+    );
+  });
+
+  it('says what a turn did to a unit', () => {
+    const u = {
+      id: 'r1',
+      side: 'red' as const,
+      name: 'Vanguard',
+      lost: 172,
+      from: 'active',
+      to: 'withdrawn',
+    };
+    expect(unitChange(u)).toBe('lost 172 men, active → withdrawn');
+    expect(unitChange({ ...u, lost: 0 })).toBe('active → withdrawn');
+    expect(unitChange({ ...u, to: 'active' })).toBe('lost 172 men');
+  });
+
+  it('steps between turn marks only', () => {
+    const marks = [
+      { ms: 0, kind: 'turn' as const, label: 'turn 1 begins' },
+      { ms: 300_000, kind: 'event' as const, label: 'x' },
+      { ms: 600_000, kind: 'turn' as const, label: 'turn 1 decided' },
+    ];
+    expect(stepTurn(marks, 0, 1)).toBe(2);
+    expect(stepTurn(marks, 600_000, 1)).toBe(-1);
+    expect(stepTurn(marks, 600_000, -1)).toBe(0);
   });
 });

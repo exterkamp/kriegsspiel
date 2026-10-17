@@ -2,7 +2,14 @@ import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import type { Worker } from 'node:worker_threads';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { importAsset, canonicalizeAsset, assetIdentity } from '@kriegsspiel/maps';
+import {
+  importAsset,
+  canonicalizeAsset,
+  assetIdentity,
+  generateBattlefield,
+  supportsReplay,
+  type MapAsset,
+} from '@kriegsspiel/maps';
 import { LibraryAdmission } from './admission.js';
 import {
   LIBRARY_ASSET_BYTES,
@@ -176,4 +183,35 @@ describe('actual current complete map certification worker', () => {
       await next.release();
     }
   }, 30000);
+  it('certifies maps from the current generator and every legacy generator identity', async () => {
+    // The library uses the maps package's complete validator, so it accepts what main still
+    // certifies: the current generator and its LEGACY_GENERATORS (D44 to D49 saved maps).
+    const fixtures = ['d44', 'd45', 'd46', 'd48'].map((name) =>
+      readFileSync(
+        new URL(`../../../packages/maps/tests/fixtures/${name}-saved-map.json`, import.meta.url),
+        'utf8',
+      ),
+    );
+    const legacy = fixtures.map((raw) => importAsset(raw));
+    expect(legacy.every((asset) => !supportsReplay(asset))).toBe(true);
+    const generated = generateBattlefield({
+      seed: legacy[3]!.provenance.seed,
+      settings: legacy[3]!.settings,
+      overrides: legacy[3]!.overrides,
+    });
+    if (!generated.ok) throw new Error('current generator failed');
+    const current: MapAsset = generated.value;
+    expect(supportsReplay(current)).toBe(true);
+    const pool = new LibraryAdmission();
+    for (const asset of [current, ...legacy]) {
+      const json = canonicalizeAsset(asset);
+      const lease = pool.acquire('owner');
+      try {
+        const result = await validateLibraryAsset(json, lease, new AbortController().signal);
+        expect(result).toMatchObject({ canonicalJson: json, widthM: 600, heightM: 600 });
+      } finally {
+        await lease.release();
+      }
+    }
+  }, 120000);
 });

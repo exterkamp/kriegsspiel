@@ -7,12 +7,24 @@ vendor/settlemaker/upstream-package-lock.json
 vendor/settlemaker/upstream-package.json
 # Preserve the original measured evidence bytes.
 docs/map-verification/*.json
+docs/map-realism/*.json
+docs/map-realism/land-cover/*.json
+docs/map-realism/fords/*.json
+docs/map-realism/roads/*.json
+docs/map-realism/unbiased/*.json
 server/baselines/*.recording.json
 .angular
 
 # Preserve certified canonical map bytes.
 data/maps/*.json
 server/bench/
+
+# Saved generator fixtures (canonical bytes).
+packages/maps/tests/fixtures/*.json
+
+# Playtest input logs (#408), exported from the server as played.
+server/src/game/playtest408/*.json
+docs/turn-playtest-evidence/orders/*.json
 
 # Preserve the independently inspected browser source-binding evidence bytes.
 docs/lobby-map-selection-implementation-evidence/final/source-binding.json
