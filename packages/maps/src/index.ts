@@ -32,3 +32,15 @@ export {
 export * from './geography/index.js';
 export * from './planning/index.js';
 export * from './composition/index.js';
+export {
+  coverRealism,
+  realismReport,
+  grainRealism,
+  summarizeGrain,
+  type GrainRealism,
+  type GrainSummary,
+  type GrainInput,
+  segmentGradeOnSurface,
+  type CoverRealism,
+  type RealismReport,
+} from './realism.js';

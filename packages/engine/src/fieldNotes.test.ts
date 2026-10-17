@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fieldNote, temperOf } from './fieldNotes.js';
+import { clockTime, fieldNote, temperOf } from './fieldNotes.js';
 import type { Report } from './types.js';
 
 const KINDS = [
@@ -14,6 +14,7 @@ const KINDS = [
   'engaged',
   'heavyLosses',
   'broke',
+  'turn',
 ] as const;
 
 function report(kind: Report['kind'], id = 'blue-r1'): Report {
@@ -169,6 +170,79 @@ describe('a broken unit in its notes (#438)', () => {
     for (const id of ids.slice(0, 20)) {
       const text = fieldNote({ ...report('engaged', id), rallied: true }, 0, false, {}, 7);
       expect(text).toMatch(/^Sir, we have rallied\. [A-Z]/);
+    }
+  });
+});
+
+describe('clock times in turn mode (#439)', () => {
+  it('names the clock time the report was made, not its age', () => {
+    // The opening situation and a lost courier give no time in either mode.
+    for (const kind of KINDS.filter((k) => k !== 'situation' && k !== 'courierLost')) {
+      for (const id of ids.slice(0, 20)) {
+        const r = { ...report(kind, id), observedAt: 12 * 60_000, deliverAt: 20 * 60_000 };
+        const text = fieldNote(r, 8 * 60_000, false, {}, 7, true);
+        expect(text, text).not.toMatch(/\bago\b|just now/);
+        expect(text, text).toContain('at 00:12');
+      }
+    }
+  });
+
+  it('keeps the age in real time', () => {
+    const r = { ...report('engaged'), observedAt: 12 * 60_000, deliverAt: 15 * 60_000 };
+    expect(fieldNote(r, 3 * 60_000)).toMatch(/about 3 minutes ago\.$/);
+  });
+
+  it('gives the day only after the first', () => {
+    expect(clockTime(0)).toBe('00:00');
+    expect(clockTime(65 * 60_000)).toBe('01:05');
+    expect(clockTime((24 * 60 + 7) * 60_000)).toBe('Day 2 00:07');
+  });
+});
+
+describe('a unit’s note on an umpire turn (11.9)', () => {
+  const turn = (facts: NonNullable<Report['turn']>, id: string): Report => ({
+    ...report('turn', id),
+    deliverAt: 0,
+    turn: facts,
+  });
+  const base = { n: 2, lost: 0, movedM: 0, orders: [] };
+
+  it('says where it stands, what became of its orders and what it lost, from the facts alone', () => {
+    for (const id of ids.slice(0, 40)) {
+      const stayed = fieldNote(turn(base, id), 0, false, {}, 3);
+      expect(stayed).toMatch(/^Sir, we (stand|have kept|are still|remain|have not moved)/);
+      expect(stayed).toMatch(/— 1st Battalion, just now\.$/);
+      const moved = fieldNote(
+        turn({ ...base, movedM: 600, lost: 123, orders: [{ result: 'refused' }] }, id),
+        0,
+        false,
+        {},
+        3,
+      );
+      expect(moved).toMatch(/marched|moved|now in position|come up|after our march/);
+      expect(moved).toMatch(/not carry out my orders|not done as ordered/);
+      expect(moved).toContain('We lost about 120 men.');
+      const misread = fieldNote(
+        turn({ ...base, orders: [{ result: 'carried-out' }, { result: 'misread' }] }, id),
+        0,
+        false,
+        {},
+        3,
+      );
+      expect(misread).toMatch(/as I understood them|took my orders to mean/);
+    }
+  });
+
+  it('never says it holds when it broke, and says first that it rallied', () => {
+    const HOLDS = /\bwe (hold|stand|remain)\b|kept our ground|in good order/i;
+    for (const trait of [undefined, 'bold', 'cautious', 'steady']) {
+      for (const id of ids.slice(0, 40)) {
+        const broke = fieldNote(turn({ ...base, broke: true }, id), 0, false, { trait }, 5);
+        expect(broke).not.toMatch(HOLDS);
+        expect(broke).toMatch(/back/);
+        const rallied = fieldNote(turn({ ...base, rallied: true }, id), 0, false, { trait }, 5);
+        expect(rallied).toMatch(/^Sir, we have rallied\. [A-Z]/);
+      }
     }
   });
 });

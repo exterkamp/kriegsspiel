@@ -177,7 +177,12 @@ describe('ratio change by vote', () => {
       await game.submit({ kind: 'setMode', mode: 'manual' });
       await game.submit({ kind: 'advanceTo', gameMs: 900_000 });
       const replayed = replayLog(
-        { gameId: 'g1', scenarioId: 'hold-the-bridge', seed: game.state.world.seed },
+        {
+          gameId: 'g1',
+          scenarioId: 'hold-the-bridge',
+          seed: game.state.world.seed,
+          rules: game.state.world.rules,
+        },
         loadScenario(holdTheBridge),
         await store.inputLog('g1'),
         registry(),

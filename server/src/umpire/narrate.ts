@@ -155,7 +155,8 @@ export function narrateInput(
   };
 }
 
-type Input = ReturnType<typeof narrateInput>;
+export type NarrateInput = ReturnType<typeof narrateInput>;
+type Input = NarrateInput;
 
 const NUMBER_WORDS: Record<string, number> = {
   ...Object.fromEntries(
@@ -441,7 +442,30 @@ export interface ProseFacts {
    * open one ("Send the reserve."). Capitalised words elsewhere must still be known. Default false.
    */
   lenientOpeners?: boolean;
+  /**
+   * For the umpire's own prose, which estimates ranges (#530): a number given as a distance
+   * ("about 200 paces", "two hundred metres") passes, and a hyphenated word of letters only
+   * ("bridge-head", "re-forming") is an ordinary word, not an id, unless it begins with a side's
+   * id ("red-hussars"). Every other number, id and capitalised word is checked as before. Default
+   * false.
+   */
+  freeProse?: boolean;
 }
+
+/** A side's id opening a hyphenated token makes it an id ("red-3", "blue-r5", "red-hussars"). */
+const SIDE_PREFIX = /^(?:blue|red)-/i;
+
+/** A distance: a number in digits or words, then a unit of length. */
+const DISTANCE = new RegExp(
+  `(?:\\d+(?:[.,]\\d+)?|(?:(?:${[...Object.keys(NUMBER_WORDS), ...Object.keys(NUMBER_SCALES)].join('|')})[\\s-]+)*(?:${[...Object.keys(NUMBER_WORDS), ...Object.keys(NUMBER_SCALES)].join('|')}))\\s*(?:paces?|yards?|yds|met(?:re|er)s?|m|kilomet(?:re|er)s?|km|miles?)\\b`,
+  'giu',
+);
+
+/** Whether an id-shaped token in free prose is only a compound word ("bridge-end"). */
+const isCompoundWord = (token: string) => !/\d/.test(token) && !SIDE_PREFIX.test(token);
+
+/** "Battalion's" is "battalion" with its possessive: the bare word decides. */
+const withoutPossessive = (word: string) => word.replace(/['’]s?$/u, '');
 
 /**
  * The facts a JSON input holds, for `checkProseAgainst`: every number, every word of every string
@@ -475,11 +499,16 @@ export function checkProseAgainst(text: string, facts: ProseFacts): string[] {
 
   if (knownIds) {
     for (const id of text.match(ID_PATTERN) ?? []) {
+      if (facts.freeProse && isCompoundWord(id)) continue;
       if (!knownIds.has(id.toLowerCase())) problems.push(`unknown entity "${id}"`);
     }
   }
-  // Digits inside an id are covered above; the rest must be numbers the input contains.
-  const withoutIds = text.replace(ID_PATTERN, ' ');
+  // Digits inside an id are covered above; the rest must be numbers the input contains. A compound
+  // word in free prose stays, so a capitalised one is still checked as a name below; a distance
+  // is taken out there, whatever its figure.
+  const withoutIds = facts.freeProse
+    ? text.replace(ID_PATTERN, (id) => (isCompoundWord(id) ? id : ' ')).replace(DISTANCE, ' ')
+    : text.replace(ID_PATTERN, ' ');
   for (const n of numbersIn(withoutIds)) {
     if (!knownNumbers.has(n)) problems.push(`unknown number ${n}`);
   }
@@ -496,8 +525,15 @@ export function checkProseAgainst(text: string, facts: ProseFacts): string[] {
     ? /(^\s*|[.!?:;]["')\]]*\s+|[\n"“(]\s*)$/
     : /(^\s*|[.!?]["')\]]*\s+|[\n"“(]\s*)$/;
   for (const m of withoutIds.matchAll(/\p{Lu}[\p{L}'’-]*/gu)) {
-    const word = m[0].toLowerCase();
+    const word = withoutPossessive(m[0].toLowerCase());
     if (knownWords.has(word) || COMMON_CAPITALISED.has(word)) continue;
+    // A known word's possessive, or a compound of known words ("Bridge-head"), names no one new.
+    if (
+      word.includes('-') &&
+      word.split('-').every((p) => p === '' || knownWords.has(p) || COMMON_CAPITALISED.has(p))
+    ) {
+      continue;
+    }
     if (NUMBER_WORDS[word] !== undefined || NUMBER_SCALES[word] !== undefined) continue;
     if (
       (facts.lenientOpeners || SENTENCE_OPENERS.has(word)) &&
@@ -533,11 +569,11 @@ const KIND_CONDITION: Partial<Record<ViewReport['kind'], readonly string[]>> = {
  * Words of which a note on a report of this kind must use one, so it is about the reported event and
  * not about something the model made up (#419). Generous on purpose: any fair way of saying it passes.
  */
-const EVENT_WORDS: Record<Exclude<ViewReport['kind'], 'battle'>, RegExp> = {
+const EVENT_WORDS: Record<Exclude<ViewReport['kind'], 'battle' | 'notice'>, RegExp> = {
   situation:
     /\b(position|posted|placed|in place|in line|line|ready|deployed|formed|stand|standing|quiet|no enemy|nothing)\b/i,
   contact:
-    /\b(see|seen|saw|sight|sighted|sighting|spotted|spied|observed|watch|watching|enemy|enemies|troops|column|columns|men|horse|foot|force|battalions?|squadrons?|regiments?|companies|company|brigades?|infantry|cavalry|guns|artillery|before us)\b/i,
+    /\b(see|seen|saw|sight|sighted|sighting|spotted|spied|observed|made out|make out|watch|watching|enemy|enemies|troops|column|columns|men|horse|foot|force|detachments?|party|parties|body|bodies|battalions?|squadrons?|regiments?|companies|company|brigades?|infantry|cavalry|guns|artillery|before us)\b/i,
   orderDelivered:
     /\b(order|orders|instructions|your note|your letter|despatch|dispatch|received|in hand|have them|obey)\b/i,
   lowAmmo: /\b(ammunition|cartridges?|powder|ball|shot|rounds|supply|supplies|resupply)\b/i,
@@ -553,6 +589,7 @@ const EVENT_WORDS: Record<Exclude<ViewReport['kind'], 'battle'>, RegExp> = {
     /\b(broke|broken|break|fall back|falling back|fell back|retreat|retreating|rout|routed|flee|fled|fleeing|withdraw|withdrawing|gave way|give way|given way|rally|driven back|ran)\b/i,
   unitLost: /\b(lost|gone|destroyed|no word|silent|silence|missing|no more|cut off|perished)\b/i,
   courierLost: /\b(courier|rider|messenger|orders?|overdue|lost|no word)\b/i,
+  turn: /\b(stand|standing|stood|stayed|stay|position|posted|ground|held|hold|holding|kept|keep|march|marched|marching|moved|move|went|advanced|advance|pushed|crossed|took|came up|come up|reached|occupied|formed|deployed|remain|remained|waited|watched|rode|ride|riding|scouted|searched|found|met|orders?|ordered|fall back|falling back|fell back|back|broken|broke|rallied|engaged|attacked|charged|fight|fought|halted|halt|retired|withdrew|withdrawn|lost)\b/i,
 };
 
 const FIRST_PERSON =
@@ -580,7 +617,7 @@ const COMBAT_KINDS: ReadonlySet<ViewReport['kind']> = new Set([
  */
 const NOT_THE_MEN: Readonly<Record<string, string>> = {
   fresh:
-    '(?:troops|regiments?|battalions?|columns?|reserves?|enemy|horses|supply|supplies|ammunition|cartridges)',
+    '(?:troops|regiments?|battalions?|columns?|reserves?|enemy|horses|supply|supplies|ammunition|cartridges|orders?|instructions|news|word|despatch(?:es)?|dispatch(?:es)?)',
   steady: '(?:fire|volleys?|rain|advance|pace|march)',
   spent: '(?:balls?|shot|cartridges)',
 };
@@ -605,19 +642,26 @@ function conditionWordsIn(text: string): string[] {
  *   the note does not recite the whole condition list instead of judging it;
  * - it says what happened (a word for the report's kind), and it is short.
  */
-export function checkFieldNote(text: string, report: Input['reports'][number]): string[] {
+export function checkFieldNote(
+  text: string,
+  report: Input['reports'][number],
+  limits: { chars: number; sentences: number } = {
+    chars: NARRATE_MAX_CHARS,
+    sentences: NARRATE_MAX_SENTENCES,
+  },
+): string[] {
   const problems: string[] = [];
   const kind = report.kind as ViewReport['kind'];
-  if (text.length > NARRATE_MAX_CHARS) {
-    problems.push(`too long (${text.length} characters, at most ${NARRATE_MAX_CHARS})`);
+  if (text.length > limits.chars) {
+    problems.push(`too long (${text.length} characters, at most ${limits.chars})`);
   }
   // "Lt. Col. Aubry" is one name, not three sentences.
   const sentences = text
     .replace(/\b(Lt|Col|Maj|Gen|Capt|Sgt|Brig|St)\./g, '$1')
     .split(/[.!?]+(?:\s|$)/)
     .filter((x) => x.trim() !== '').length;
-  if (sentences > NARRATE_MAX_SENTENCES) {
-    problems.push(`too long (${sentences} sentences, at most ${NARRATE_MAX_SENTENCES})`);
+  if (sentences > limits.sentences) {
+    problems.push(`too long (${sentences} sentences, at most ${limits.sentences})`);
   }
   const lower = text.toLowerCase();
   if (!STAFF_KINDS.has(kind) && !FIRST_PERSON.test(text)) {
@@ -627,8 +671,15 @@ export function checkFieldNote(text: string, report: Input['reports'][number]): 
       problems.push(`not in the first person: names "${named}" as someone else would`);
     }
   }
+  // A span the turn report's own account or orders give ("fire for ten minutes") is not invented.
+  const given = JSON.stringify([
+    (report as { account?: unknown }).account ?? '',
+    (report as { orders?: unknown }).orders ?? [],
+  ]).toLowerCase();
   const duration = text.match(DURATION);
-  if (duration) problems.push(`invented duration "${duration[0]}"`);
+  if (duration && !given.includes(duration[0].toLowerCase())) {
+    problems.push(`invented duration "${duration[0]}"`);
+  }
   const strength = text.match(STRENGTH);
   if (strength) problems.push(`invented strength "${strength[0]}"`);
   if (!COMBAT_KINDS.has(kind) && /\bunder fire\b/i.test(text)) {
@@ -641,7 +692,14 @@ export function checkFieldNote(text: string, report: Input['reports'][number]): 
     if (clash.length > 1) problems.push(`contradictory condition "${clash.join('" and "')}"`);
   }
   if (report.condition !== undefined) {
-    const allowed = [...conditionWordsIn(report.condition), ...(KIND_CONDITION[kind] ?? [])];
+    // A turn report's account is the umpire's own words: a note may repeat them ("we met a
+    // steady line") whatever the unit's condition (#530).
+    const account = (report as { account?: unknown }).account;
+    const allowed = [
+      ...conditionWordsIn(report.condition),
+      ...(KIND_CONDITION[kind] ?? []),
+      ...(typeof account === 'string' ? conditionWordsIn(account) : []),
+    ];
     for (const w of said) {
       if (!allowed.includes(w)) problems.push(`condition "${w}" is not the unit’s`);
     }
@@ -649,7 +707,7 @@ export function checkFieldNote(text: string, report: Input['reports'][number]): 
       problems.push('recites the unit’s condition instead of judging it');
     }
   }
-  if (kind !== 'battle' && !EVENT_WORDS[kind].test(text)) {
+  if (kind !== 'battle' && kind !== 'notice' && !EVENT_WORDS[kind].test(text)) {
     problems.push(`does not say what happened (${kind})`);
   }
   return problems;
@@ -746,7 +804,7 @@ export async function narrateReports(
   opts: NarrateOptions = {},
 ): Promise<NarrateResult> {
   // The umpire's ruling is already in its own words; a rewrite could lose what it decided.
-  const reports = allReports.filter((r) => r.kind !== 'battle');
+  const reports = allReports.filter((r) => r.kind !== 'battle' && r.kind !== 'notice');
   const maxCalls = opts.maxCalls ?? 2;
   const maxReports = opts.maxReports ?? NARRATE_MAX_REPORTS;
   const result: NarrateResult = {
