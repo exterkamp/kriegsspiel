@@ -3,7 +3,7 @@ import type { TurnOrder, UmpireSettings } from '@kriegsspiel/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SideAgent } from '../opponent/index.js';
 import type { OrderParser } from '../orders/index.js';
-import { TURN_APPEND_ATTEMPTS, TURN_MODE_REFUSAL } from './actor.js';
+import { APPEND_ATTEMPTS, TURN_MODE_REFUSAL } from './actor.js';
 import { GameHost, MemoryGameStore, createRegistry, startingState } from './index.js';
 import { replayLog } from './replay.js';
 import type { InputLogEntry } from './store.js';
@@ -421,7 +421,7 @@ describe('turn mode: the turn clock (D39, 11.3)', () => {
   it('opens the next turn even when the store fails to take the resolved one', async () => {
     // Fails every offer of the resolved turn until `failures` run out (#416: it is retried).
     class FlakyStore extends MemoryGameStore {
-      failures = TURN_APPEND_ATTEMPTS;
+      failures = APPEND_ATTEMPTS;
       failed = false;
       override async appendInput(gameId: string, entry: InputLogEntry): Promise<void> {
         if (entry.command.kind === 'resolveTurn' && this.failures > 0) {

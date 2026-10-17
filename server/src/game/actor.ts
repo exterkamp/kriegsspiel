@@ -112,8 +112,8 @@ const realTimers: Timers = {
 /** Longest single sleep; Node timers overflow beyond 2^31-1 ms. */
 const MAX_SLEEP_MS = 2 ** 30;
 
-/** Times a resolved turn's log entry is offered to the store in a row before the caller is told (#416). */
-export const TURN_APPEND_ATTEMPTS = 3;
+/** Times a log entry is offered to the store in a row before the caller is told (#416, #507). */
+export const APPEND_ATTEMPTS = 3;
 
 /** The umpire's state as the client shows it ("staff at work"). */
 export interface StaffAtWork {
@@ -324,9 +324,9 @@ export class GameActor {
   /** Agent orders issued since the last flush, to be appended to the input log in order. */
   private agentLog: InputLogEntry[] = [];
   /**
-   * Entries the store has not taken yet that must reach it before anything logged after them: a
-   * resolved turn whose append failed, and everything logged since (#416). While any is here no
-   * snapshot is saved, so a restart never resumes past a turn the log lacks.
+   * Entries the store has not taken yet that must reach it before anything logged after them:
+   * an entry whose append failed, and everything logged since (#416, #507). While any is here
+   * no snapshot is saved, so a restart never resumes past an entry the log lacks.
    */
   private unlogged: InputLogEntry[] = [];
   private readonly snapshotEvery: number;
@@ -656,8 +656,8 @@ export class GameActor {
       }
     }
     await this.tail.catch(() => undefined);
-    // One last try for a resolved turn the store refused (#416); if it still fails, no snapshot
-    // covers it, so a reopened game resolves the turn again from the log.
+    // One last try for entries the store refused (#416, #507); if it still fails, no snapshot
+    // covers them, so a reopened game resumes from an earlier snapshot and the log it has.
     if (this.unlogged.length > 0) await this.flushUnlogged().catch(() => undefined);
     // A clean stop: the next start measures downtime from here, not from the last tick.
     await this.store.saveHeartbeat(this.id, this.wallNow()).catch(() => undefined);
@@ -1461,21 +1461,14 @@ export class GameActor {
   }
 
   /**
-   * Append the agent orders issued so far, then `entry`. A resolved turn may not be lost from the
-   * log (#416): its append is retried, and if the store still refuses it, it and everything logged
-   * after it wait in `unlogged`, in order, and go first on the next append. Other entries are
-   * appended once, as before.
+   * Append the agent orders issued so far, then `entry`. No applied command may be lost from
+   * the log (#416, #507): every append is retried, and if the store still refuses an entry, it
+   * and everything logged after it wait in `unlogged`, in order, and go first on the next
+   * append.
    */
   private async append(entry?: InputLogEntry): Promise<void> {
-    if (this.unlogged.length > 0 || entry?.command.kind === 'resolveTurn') {
-      this.unlogged.push(...this.agentLog.splice(0), ...(entry ? [entry] : []));
-      return this.flushUnlogged();
-    }
-    while (this.agentLog.length > 0) {
-      const next = this.agentLog.shift()!;
-      await this.store.appendInput(this.id, next);
-    }
-    if (entry) await this.store.appendInput(this.id, entry);
+    this.unlogged.push(...this.agentLog.splice(0), ...(entry ? [entry] : []));
+    return this.flushUnlogged();
   }
 
   /** Hand the store every waiting entry in order; throws, keeping the rest, if it refuses one. */
@@ -1487,7 +1480,7 @@ export class GameActor {
           await this.store.appendInput(this.id, entry);
           break;
         } catch (e) {
-          if (attempt >= TURN_APPEND_ATTEMPTS) throw e;
+          if (attempt >= APPEND_ATTEMPTS) throw e;
         }
       }
       this.unlogged.shift();
