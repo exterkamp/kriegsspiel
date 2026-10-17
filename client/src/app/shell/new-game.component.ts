@@ -39,6 +39,7 @@ import { decodePendingCreation } from '@legacy/shell/pendingCreation';
 import { CreationPendingError } from '@legacy/shell/newGameApi';
 import { createHttpMapLibrary } from '../../shared/lobby-map-library/http';
 import { createBoardPreparation } from '../../shared/game-setup/preparation';
+import { verifyPreparedLibraryAsset } from '../../shared/lobby-map-library/preparation-verifier';
 import { GameListComponent } from '../lobby/game-list.component';
 import { PageFrameComponent } from '../ui/page-frame.component';
 import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-map.component';
@@ -390,7 +391,8 @@ export class NewGameComponent implements OnInit, OnChanges, OnDestroy {
   protected readonly library = computed(() =>
     this.ownerId() && this.options()?.mapLibrary === true ? createHttpMapLibrary() : undefined,
   );
-  protected readonly prepareLibraryMap = () => createBoardPreparation();
+  protected readonly prepareLibraryMap = () =>
+    createBoardPreparation({ verifyAsset: verifyPreparedLibraryAsset });
   protected readonly canInspectMap = () =>
     !!this.options() &&
     this.loadedOwner === this.ownerId() &&

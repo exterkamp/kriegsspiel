@@ -1,4 +1,9 @@
-import { assetIdentity, canonicalizeAsset, createReferenceAsset } from '@kriegsspiel/maps';
+import {
+  assetIdentity,
+  canonicalizeAsset,
+  createReferenceAsset,
+  importAsset,
+} from '@kriegsspiel/maps';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createAuthoringRuntime,
@@ -6,7 +11,7 @@ import {
 } from '../../legacy/map-authoring/runtime/index.js';
 import type { GenerateRequest } from '../../legacy/map-authoring/generation/protocol.js';
 import { defaultParameters } from '../../legacy/map-authoring/controls/recipe.js';
-import { createBoardPreparation } from './preparation.js';
+import { createBoardPreparation, type PreparationAssetVerifier } from './preparation.js';
 import type { BoardPreparation, CertifiedBoard, MapSummary } from './contracts.js';
 type Runtime = ReturnType<typeof createAuthoringRuntime>;
 class Worker<T> {
@@ -30,6 +35,7 @@ afterEach(() => {
 function harness(
   options: {
     runtime?: (runtime: Runtime) => void;
+    verifyAsset?: PreparationAssetVerifier;
     generation?: (worker: Worker<GenerateRequest>) => void;
     validation?: (worker: Worker<ValidationRequest>) => void;
   } = {},
@@ -57,7 +63,7 @@ function harness(
     options.runtime?.(runtime);
     return runtime;
   });
-  const preparation = createBoardPreparation({ runtimeFactory });
+  const preparation = createBoardPreparation({ runtimeFactory, verifyAsset: options.verifyAsset });
   preparations.push(preparation);
   return { preparation, generation, validation, generationFactory, runtimeFactory, runtimes };
 }
@@ -546,5 +552,71 @@ describe('certified board snapshots', () => {
     await rejection;
     expect(h.validation).toHaveLength(0);
     expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+});
+
+describe('opt-in lobby export verification ownership', () => {
+  it('hands detached export bytes to the captured trusted verifier and keeps saved reference binding', async () => {
+    const verifyAsset = vi.fn<PreparationAssetVerifier>(async (candidate, text) => {
+      expect(canonicalizeAsset(candidate)).toBe(text);
+      return {
+        asset: structuredClone(candidate),
+        assetIdentity: await assetIdentity(candidate, 'asset'),
+      };
+    });
+    const h = harness({ verifyAsset });
+    const abort = new AbortController();
+    const pending = h.preparation.load(json, summary, abort.signal);
+    await flush();
+    accept(h.validation[0]!);
+    const result = await pending;
+    expect(verifyAsset).toHaveBeenCalledOnce();
+    expect(verifyAsset.mock.calls[0]![0]).toEqual(importAsset(json));
+    expect(verifyAsset.mock.calls[0]![0]).not.toBe(h.runtimes[0]!.controller.exportAsset);
+    expect(verifyAsset.mock.calls[0]!.slice(1)).toEqual([json, abort.signal]);
+    expect(result.summary.ref).toEqual(summary.ref);
+    expect(result.canonicalJson).toBe(json);
+  });
+  it('rejects an opt-in verification failure without falling back to main-thread acceptance', async () => {
+    const h = harness({
+      verifyAsset: async () => {
+        throw new Error('Verification unavailable');
+      },
+    });
+    const pending = h.preparation.load(json, summary, new AbortController().signal);
+    await flush();
+    accept(h.validation[0]!);
+    await expect(pending).rejects.toThrow('Verification unavailable');
+  });
+  it('does not publish a departed verification result or retire its successor', async () => {
+    let finish!: (value: { asset: typeof asset; assetIdentity: string }) => void;
+    const verifyAsset = vi
+      .fn<PreparationAssetVerifier>()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockImplementation(async (candidate) => ({
+        asset: structuredClone(candidate),
+        assetIdentity: await assetIdentity(candidate, 'asset'),
+      }));
+    const h = harness({ verifyAsset });
+    const firstAbort = new AbortController();
+    const first = h.preparation.load(json, summary, firstAbort.signal);
+    await flush();
+    accept(h.validation[0]!);
+    await flush();
+    firstAbort.abort();
+    await expect(first).rejects.toThrow('cancelled');
+    const second = h.preparation.load(json, summary, new AbortController().signal);
+    await flush();
+    accept(h.validation[1]!);
+    finish({ asset: structuredClone(asset), assetIdentity: await assetIdentity(asset, 'asset') });
+    const result = await second;
+    expect(result.canonicalJson).toBe(json);
+    expect(verifyAsset).toHaveBeenCalledTimes(2);
+    expect(h.validation[1]!.terminate).toHaveBeenCalledOnce();
   });
 });

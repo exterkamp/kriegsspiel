@@ -4,10 +4,17 @@ import type { ReplayParameters } from '../../legacy/map-authoring/generation/pro
 import type { BoardPreparation, CertifiedBoard, MapSummary } from './contracts.js';
 
 type Runtime = ReturnType<typeof createAuthoringRuntime>;
+/** Trusted opt-in verification of the runtime export; the ordinary local-board path is unchanged. */
+export type PreparationAssetVerifier = (
+  candidate: MapAsset,
+  canonicalJson: string,
+  signal: AbortSignal,
+) => Promise<{ asset: MapAsset; assetIdentity: string }>;
 /** Each operation owns a fresh runtime; saved certification never invokes generation. */
 export function createBoardPreparation(
-  options: { runtimeFactory?: () => Runtime } = {},
+  options: { runtimeFactory?: () => Runtime; verifyAsset?: PreparationAssetVerifier } = {},
 ): BoardPreparation {
+  const verifyAsset = options.verifyAsset;
   let disposed = false;
   let stop: (() => void) | null = null;
   let retiring: Promise<void> | null = null;
@@ -86,10 +93,22 @@ export function createBoardPreparation(
             try {
               const asset = ownedRuntime.controller.exportAsset;
               const files = ownedRuntime.exportFiles;
-              const snapshot = asset ? (structuredClone(asset) as MapAsset) : null;
-              if (!snapshot || !files || canonicalizeAsset(snapshot) !== files.json)
+              let snapshot = asset ? (structuredClone(asset) as MapAsset) : null;
+              if (!snapshot || !files)
                 throw new Error('Certification export does not match the current asset');
-              const identity = await assetIdentity(snapshot, 'asset');
+              let identity: string;
+              if (verifyAsset) {
+                const verified = await verifyAsset(snapshot, files.json, signal);
+                if (!current()) return;
+                snapshot = structuredClone(verified.asset);
+                identity = verified.assetIdentity;
+                if (!/^[a-f0-9]{64}$/.test(identity))
+                  throw new Error('Invalid verified asset identity');
+              } else {
+                if (canonicalizeAsset(snapshot) !== files.json)
+                  throw new Error('Certification export does not match the current asset');
+                identity = await assetIdentity(snapshot, 'asset');
+              }
               if (!current()) return;
               if (
                 ownedRuntime.controller.state.status !== 'ready' ||
