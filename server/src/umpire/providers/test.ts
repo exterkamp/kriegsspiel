@@ -44,6 +44,31 @@ function stageOf(
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
+/** What became of a unit's orders, in its own words, for a turn report (11.9). */
+const ORDER_RESULT: Record<string, string> = {
+  'carried-out': 'my orders are carried out',
+  partly: 'I could carry out my orders only in part',
+  misread: 'I acted on my orders as I understood them',
+  refused: 'I did not carry out my orders as written',
+};
+
+/**
+ * A unit's note on an umpire turn (11.9): where it stands, its orders' fate, its losses, and the
+ * umpire's account of what its commander did, as given.
+ */
+function turnBody(r: Json, from: string, where: string, when: string): string {
+  const results = arr(r.orders).map((o) => str(o.result));
+  const telling = ['refused', 'misread', 'partly', 'carried-out'].find((k) => results.includes(k));
+  const lost = num(r.menLost);
+  const account = str(r.account).trim();
+  return [
+    `${from} here: ${r.status === 'broke' ? 'we have broken and are falling back' : r.moved === true ? 'we have marched and now stand' : 'we stand'}${where}, ${when}`,
+    ...(telling ? [`; ${ORDER_RESULT[telling]}`] : []),
+    ...(lost > 0 ? [`; we lost ${lost} men`] : []),
+    ...(account ? [`. ${account.replace(/[.!?]+$/, '')}`] : []),
+  ].join('');
+}
+
 /**
  * One dispatch per report, built only from the report's own fields, so it passes `checkNarration`:
  * the officer, place and size as given, and only the numbers the report has.
@@ -78,9 +103,11 @@ function narrate(input: Json) {
                         ? `${from} here: we are taking heavy losses${where}, ${when}`
                         : r.kind === 'broke'
                           ? `${from} here: we have broken and are falling back${where}, ${when}`
-                          : r.kind === 'destroyed'
-                            ? `${from} here: we have destroyed ${size || 'enemy troops'}${where}, ${when}`
-                            : `${from} here: we are in position${where}, ${when}`;
+                          : r.kind === 'turn'
+                            ? turnBody(r, from, where, when)
+                            : r.kind === 'destroyed'
+                              ? `${from} here: we have destroyed ${size || 'enemy troops'}${where}, ${when}`
+                              : `${from} here: we are in position${where}, ${when}`;
       // Only what the staff saw for themselves is hedged or vouched for.
       const sure =
         r.kind !== 'contact' && r.kind !== 'situation'
@@ -90,7 +117,14 @@ function narrate(input: Json) {
             : r.confidence === 'high'
               ? ' There is no doubt of it'
               : '';
-      const reach = radius > 0 ? ` The ground is good to within ${radius} metres.` : '';
+      // A turn report words the radius itself (#532); the place is how sure, never a range.
+      const accuracy = str(r.placeAccuracy);
+      const reach =
+        radius > 0
+          ? ` The ground is good to within ${radius} metres.`
+          : accuracy
+            ? ` The place is ${accuracy}.`
+            : '';
       return {
         reportIds: [str(r.id)],
         text: `Sir, ${body}.${sure ? `${sure}.` : ''}${reach}`,
@@ -237,9 +271,20 @@ const CRITIQUE_KIND: Record<string, string> = {
   ruling: 'decision',
   loss: 'decision',
   contact: 'decision',
+  turn: 'decision',
+  fallback: 'decision',
+  clamp: 'decision',
+  roll: 'decision',
+  precedent: 'decision',
 };
 
-/** The critique's own facts, quoted: outcome, a report for each side, misreadings, pauses and a delivery. */
+/** Most points the canned critique gives (the stage's limit). */
+const CRITIQUE_POINTS_MAX = 12;
+
+/**
+ * The critique's own facts, quoted: outcome, a report for each side, misreadings, pauses and a
+ * delivery; in a turn game also a turn, a fallback, a correction, a roll and a precedent.
+ */
 function critique(input: Json) {
   const facts = arr(input.facts);
   const picked: Json[] = [];
@@ -248,10 +293,25 @@ function critique(input: Json) {
     const kind = str(f.kind);
     const key = kind === 'report' ? `report:${str(f.side)}` : kind;
     const limit =
-      { outcome: 1, report: 1, misreading: 2, pause: 2, delivery: 1 }[kind.split(':')[0]!] ?? 0;
+      {
+        outcome: 1,
+        report: 1,
+        misreading: 2,
+        pause: 2,
+        delivery: 1,
+        turn: 1,
+        fallback: 1,
+        clamp: 1,
+        roll: 1,
+        precedent: 1,
+      }[kind.split(':')[0]!] ?? 0;
     if ((seen.get(key) ?? 0) >= limit) continue;
     seen.set(key, (seen.get(key) ?? 0) + 1);
     picked.push(f);
+  }
+  // Over the limit, the latest points other than the outcome go.
+  for (let i = picked.length - 1; picked.length > CRITIQUE_POINTS_MAX && i >= 0; i--) {
+    if (str(picked[i]!.kind) !== 'outcome') picked.splice(i, 1);
   }
   return {
     summary: str(input.result),

@@ -66,6 +66,13 @@ export const CreationRequestSchema = z
       .optional(),
     hierarchy: z.enum(['shared', 'chain']).optional(),
     lobby: z.boolean().optional(),
+    /** The game's dice (#534), as `POST /games` takes them: absent, the receipt draws its own. */
+    seed: z
+      .number()
+      .int()
+      .min(0)
+      .max(2 ** 32 - 1)
+      .optional(),
     pairing: pairing.optional(),
     requestId: z.uuid().optional(),
     battlefieldVersion: z.literal(1).optional(),
@@ -170,6 +177,8 @@ export function normalizeCreationIntent(request: CreationRequest, context: Creat
     turnDeadlineHours: mode === 'turns' ? (request.turnDeadlineHours ?? null) : null,
     hierarchy: request.hierarchy ?? 'shared',
     lobby: request.lobby ?? false,
+    // A named seed is part of what was asked for; a drawn one is kept on the receipt (#534).
+    ...(request.seed === undefined ? {} : { seed: request.seed }),
     pause: request.pause
       ? {
           rule: request.pause.rule,

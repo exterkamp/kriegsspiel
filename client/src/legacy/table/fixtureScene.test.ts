@@ -46,7 +46,26 @@ beforeEach(() => {
     stroke: vi.fn(),
     fill: vi.fn(),
     closePath: vi.fn(),
+    // The period map paper (#498) draws through MapRenderer onto the same stub.
+    save: vi.fn(),
+    restore: vi.fn(),
+    setTransform: vi.fn(),
+    translate: vi.fn(),
+    scale: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    setLineDash: vi.fn(),
+    getImageData: vi.fn(),
   };
+  vi.stubGlobal(
+    'Path2D',
+    class {
+      moveTo(): void {}
+      lineTo(): void {}
+      closePath(): void {}
+      addPath(): void {}
+    },
+  );
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
     context as unknown as CanvasRenderingContext2D,
   );
@@ -54,6 +73,7 @@ beforeEach(() => {
 afterEach(() => {
   tables.splice(0).forEach((table) => table.dispose());
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 const count = (t: TableScene): number => t.pieceCount;

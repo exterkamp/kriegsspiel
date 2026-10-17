@@ -1,0 +1,310 @@
+{
+ "main": {
+  "flat-countryside-17": {
+   "terrain": {
+    "reliefM": 0,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 0,
+    "systems": 0,
+    "confluences": 0,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 0
+   },
+   "roads": {
+    "lengthM": 22225,
+    "meanGrade": 0,
+    "maxGrade": 0,
+    "marginShare": 0.0719910011248594,
+    "junctions": 12,
+    "bridges": 0
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 0
+   }
+  },
+  "wooded-hills-31": {
+   "terrain": {
+    "reliefM": 95.28582899999999,
+    "lakes": 157,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 0,
+    "systems": 0,
+    "confluences": 0,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 0
+   },
+   "roads": {
+    "lengthM": 20500,
+    "meanGrade": 0.027713784975609692,
+    "maxGrade": 0.09711455999999999,
+    "marginShare": 0.004878048780487805,
+    "junctions": 11,
+    "bridges": 0
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.024041498665732117,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 0
+   }
+  },
+  "river-valley-97": {
+   "terrain": {
+    "reliefM": 59.44416,
+    "lakes": 24,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 1,
+    "systems": 1,
+    "confluences": 0,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 0
+   },
+   "roads": {
+    "lengthM": 27078.653099518204,
+    "meanGrade": 0.017596107674568946,
+    "maxGrade": 0.0924546399999997,
+    "marginShare": 0.09878630189503756,
+    "junctions": 15,
+    "bridges": 1
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.009035355693540846,
+    "summits": 4,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 0
+   }
+  },
+  "river-valley-3": {
+   "terrain": {
+    "reliefM": 59.97130699999998,
+    "lakes": 41,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 1,
+    "systems": 1,
+    "confluences": 0,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 0
+   },
+   "roads": {
+    "lengthM": 19028.653099518204,
+    "meanGrade": 0.013954741790323811,
+    "maxGrade": 0.05563236000000018,
+    "marginShare": 0.017079506274053042,
+    "junctions": 10,
+    "bridges": 1
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.008764840811606204,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 0
+   }
+  }
+ },
+ "branch": {
+  "flat-countryside-17": {
+   "terrain": {
+    "reliefM": 0,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 0,
+    "systems": 0,
+    "confluences": 0,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 0
+   },
+   "roads": {
+    "lengthM": 15254.646455628199,
+    "meanGrade": 0,
+    "maxGrade": 0,
+    "marginShare": 0.006555379719279238,
+    "junctions": 8,
+    "bridges": 0
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 0
+   }
+  },
+  "wooded-hills-31": {
+   "terrain": {
+    "reliefM": 111.68337,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 33,
+    "systems": 2,
+    "confluences": 2,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 34.66225000000001
+   },
+   "roads": {
+    "lengthM": 22654.004841212216,
+    "meanGrade": 0.023157545027085395,
+    "maxGrade": 0.09734269537692589,
+    "marginShare": 0.007535562886792428,
+    "junctions": 8,
+    "bridges": 1
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.032206710109540876,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 0.5
+   }
+  },
+  "river-valley-97": {
+   "terrain": {
+    "reliefM": 70.98707999999999,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 28,
+    "systems": 2,
+    "confluences": 2,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 26.818527000000003
+   },
+   "roads": {
+    "lengthM": 16382.86481081199,
+    "meanGrade": 0.012216936508645745,
+    "maxGrade": 0.09774151999999958,
+    "marginShare": 0.00736810560989253,
+    "junctions": 12,
+    "bridges": 3
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.023889361976745578,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 0.75
+   }
+  },
+  "river-valley-3": {
+   "terrain": {
+    "reliefM": 60.67210499999999,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 32,
+    "systems": 3,
+    "confluences": 2,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 18.664040999999997
+   },
+   "roads": {
+    "lengthM": 18745.242571074938,
+    "meanGrade": 0.014997351110845148,
+    "maxGrade": 0.09165371999999991,
+    "marginShare": 0.006991961650057549,
+    "junctions": 10,
+    "bridges": 3
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.014101237705960282,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 1
+   }
+  },
+  "wooded-hills-7": {
+   "terrain": {
+    "reliefM": 82.087221,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 28,
+    "systems": 4,
+    "confluences": 3,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 16.72569399999999
+   },
+   "roads": {
+    "lengthM": 16932.54564707253,
+    "meanGrade": 0.016061152734724582,
+    "maxGrade": 0.08984689213442176,
+    "marginShare": 0.006517350749230475,
+    "junctions": 11,
+    "bridges": 4
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.003054920000000152,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 1
+   }
+  },
+  "river-valley-13-10km": {
+   "terrain": {
+    "reliefM": 66.727059,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 49,
+    "systems": 5,
+    "confluences": 1,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 24.425082000000003
+   },
+   "roads": {
+    "lengthM": 22217.3858862227,
+    "meanGrade": 0.016478209241912175,
+    "maxGrade": 0.09313080000000014,
+    "marginShare": 0.005433162962412651,
+    "junctions": 6,
+    "bridges": 4
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.0020000000000004545,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 1
+   }
+  }
+ },
+ "mainFailures": {
+  "wooded-hills-7": "REGIONAL_CONNECTIVITY",
+  "river-valley-13-10km": "GEOGRAPHY_RESOURCE_LIMIT (crossing work)"
+ }
+}

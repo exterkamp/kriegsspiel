@@ -4,7 +4,10 @@ import {
   EventRegistry,
   MS_PER_MINUTE,
   advanceTo,
+  RULES_VERSION,
+  canReachCourier,
   createState,
+  holdTheBridge,
   interceptChance,
   issueOrder,
   loadScenario,
@@ -294,6 +297,85 @@ describe('interceptChance', () => {
   it('is scaled by the sight factor', () => {
     const w = { ...raw('cavalry'), sightFactor: 0.5 };
     expect(chance(w, 1100)).toBeCloseTo(0.15);
+  });
+});
+
+describe('interception needs reach (rules 4, #531)', () => {
+  // Hold the Bridge: the river runs east-west at y 1400-1600 m, and the only crossing is the
+  // bridge at (2050, 1500) m on the High road (x 2050).
+  const world = (rules: number | undefined, place: Record<string, [number, number]>) => {
+    const w = loadScenario(holdTheBridge);
+    return {
+      ...w,
+      ...(rules === undefined ? {} : { rules }),
+      units: w.units.map((u) => {
+        const p = place[u.id];
+        return p ? { ...u, center: pointMm(p[0], p[1]) } : u;
+      }),
+    };
+  };
+  const cavalry = (w: GameState) => w.units.find((u) => u.id === 'blue-3')!;
+  // Red's infantry well away from the bridge unless a test puts them there.
+  const away: Record<string, [number, number]> = { 'red-1': [1000, 200], 'red-2': [3000, 200] };
+  const south = { ...away, 'blue-3': [1450, 1700] as [number, number] };
+
+  it('is rules 4 for a new game', () => {
+    expect(RULES_VERSION).toBe(4);
+  });
+
+  it('cavalry south of the river cannot take a courier on the north bank with no crossing in reach', () => {
+    // 400 m apart over the water; by the bridge, 600 m east, the ride is over 1.2 km.
+    const courier = pointMm(1450, 1300);
+    const w = world(4, south);
+    expect(interceptChance(w, cavalry(w), courier)).toBe(0);
+    expect(canReachCourier(w, cavalry(w), courier, 800_000)).toBe(false);
+    // Under rules 3 the same courier was taken from across the water.
+    const w3 = world(3, south);
+    expect(interceptChance(w3, cavalry(w3), courier)).toBeCloseTo(0.3);
+  });
+
+  it('cavalry on the same bank still can', () => {
+    const n = world(4, { ...away, 'blue-3': [1450, 1250] });
+    expect(interceptChance(n, cavalry(n), pointMm(1450, 1000))).toBeCloseTo(0.3);
+    const s = world(4, south);
+    expect(interceptChance(s, cavalry(s), pointMm(1800, 2000))).toBeCloseTo(0.3);
+  });
+
+  it('a crossing within reach allows it', () => {
+    // Straight up the High road and over the bridge.
+    const w = world(4, { ...away, 'blue-3': [2050, 1700] });
+    expect(interceptChance(w, cavalry(w), pointMm(2050, 1250))).toBeCloseTo(0.3);
+    // From off the road, round by the bridge: about 650 m, in reach.
+    const o = world(4, { ...away, 'blue-3': [1900, 1700] });
+    const courier = pointMm(1900, 1350);
+    expect(canReachCourier(o, cavalry(o), courier, 800_000)).toBe(true);
+    expect(interceptChance(o, cavalry(o), courier)).toBeCloseTo(0.3);
+    // But not if that way round is longer than the cavalry's reach.
+    expect(canReachCourier(o, cavalry(o), courier, 500_000)).toBe(false);
+  });
+
+  it('not over a crossing the courier’s side holds (the playtest’s interception, #408)', () => {
+    // The standard game, turn 3: Red's infantry at the north end of the bridge, Blue's cavalry
+    // at the south end, and Red's courier to its Hussars on the High road 440 m north of it.
+    const place: Record<string, [number, number]> = {
+      'red-1': [2050, 1360],
+      'red-2': [2130, 1385],
+      'blue-3': [2050, 1690],
+    };
+    const courier = pointMm(2050, 1250);
+    const w4 = world(4, place);
+    expect(interceptChance(w4, cavalry(w4), courier)).toBe(0);
+    const w3 = world(3, place);
+    expect(interceptChance(w3, cavalry(w3), courier)).toBeCloseTo(0.3);
+    // A Red battalion 150 m beyond the bridge's end does not hold it.
+    const loose = world(4, { ...place, 'red-1': [2050, 1240], 'red-2': [3000, 200] });
+    expect(interceptChance(loose, cavalry(loose), courier)).toBeCloseTo(0.3);
+  });
+
+  it('is unchanged for a world with no rules field (rules 1)', () => {
+    const w = world(undefined, south);
+    expect(w.rules).toBeUndefined();
+    expect(interceptChance(w, cavalry(w), pointMm(1450, 1300))).toBeCloseTo(0.3);
   });
 });
 
