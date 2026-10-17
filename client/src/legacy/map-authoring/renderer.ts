@@ -1,5 +1,11 @@
 import { createElevationQueries, type ElevationQueries } from '@kriegsspiel/maps';
 import type { PreviewAsset } from './asset.js';
+
+/**
+ * What the renderer reads from an asset: its extent, ground and layers. A loaded `PreviewAsset` is one;
+ * the live table's scenario map is drawn through a small adapter that makes one (`legacy/table/periodMap.ts`).
+ */
+export type RenderableAsset = Pick<PreviewAsset, 'bounds' | 'elevation' | 'layers'>;
 import {
   geometryBounds,
   traceLine,
@@ -121,7 +127,7 @@ function context2d(element: HTMLCanvasElement, software = false): CanvasRenderin
  * comes from `style` (see `map-style.ts`); the default is the classic flat look. The authoring preview and
  * the table raster (#498) both pass `PERIOD_MAP_STYLE`.
  */
-export class MapRenderer {
+export class MapRenderer<A extends RenderableAsset = PreviewAsset> {
   private readonly cover: Shape[];
   private readonly water: Shape[];
   private readonly rivers: Shape[];
@@ -130,7 +136,8 @@ export class MapRenderer {
   private readonly buildings: Shape[];
   private readonly settlements: Shape[];
   private readonly contours: Shape[];
-  private readonly shade: HTMLCanvasElement;
+  /** Made on first use: a renderer drawn with the relief layers off never reads the ground. */
+  private shade?: HTMLCanvasElement;
   private ground?: ElevationQueries;
   private readonly woods: Shape[];
   private outline?: { body: Shape[]; shore: Shape[]; welds: Shape[] };
@@ -145,7 +152,7 @@ export class MapRenderer {
    * table paper took 44 s to rasterise with GPU-backed helpers and 0.4 s without them (#498).
    */
   constructor(
-    readonly asset: PreviewAsset,
+    readonly asset: A,
     readonly style: MapStyle = CLASSIC_MAP_STYLE,
     private readonly options: { readonly software?: boolean } = {},
   ) {
@@ -173,7 +180,10 @@ export class MapRenderer {
           )
         : [];
     this.contours = l.contours.map((f) => ({ ...lineShape(f.path, 'contour'), index: f.index }));
-    this.shade = this.createHillshade();
+  }
+
+  private hillshade(): HTMLCanvasElement {
+    return (this.shade ??= this.createHillshade());
   }
 
   private elevation(): ElevationQueries {
@@ -378,7 +388,7 @@ export class MapRenderer {
           ? style.relief.shade.contrastAlpha
           : style.relief.shade.alpha;
         ctx.globalCompositeOperation = 'multiply';
-        ctx.drawImage(this.shade, b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
+        ctx.drawImage(this.hillshade(), b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
         ctx.restore();
       }
       if (layers.water) fill(this.water, () => p.water, p.shore);
@@ -623,7 +633,7 @@ export class MapRenderer {
       const shade = style.relief.shade;
       ctx.globalAlpha = highContrast ? shade.contrastAlpha : shade.alpha;
       ctx.globalCompositeOperation = 'multiply';
-      ctx.drawImage(this.shade, b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
+      ctx.drawImage(this.hillshade(), b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
     }

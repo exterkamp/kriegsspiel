@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { Coord, Mark } from '@kriegsspiel/protocol';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mapCanvas } from './mapTexture.js';
+import { tableHighContrast } from './periodMap.js';
 import {
   mapToWorld,
   pickFromRay,
@@ -69,6 +70,8 @@ export class TableScene {
   private state: SceneState | undefined;
   private mapKey = '';
   private mapRef: SceneState['map'] | undefined;
+  /** Whether the paper was drawn in the high-contrast palette; a change redraws it in place. */
+  private mapContrast = false;
   private mapMesh: THREE.Mesh | undefined;
   private tableMesh: THREE.Mesh | undefined;
   private pieces = new Map<string, PieceObject>();
@@ -122,11 +125,17 @@ export class TableScene {
     const mapChanged = state.map !== this.mapRef;
     this.mapRef = state.map;
     const key = mapChanged ? JSON.stringify(state.map) : this.mapKey;
+    const contrast = tableHighContrast();
     if (key !== this.mapKey) {
       this.mapKey = key;
+      this.mapContrast = contrast;
       this.buildMap();
       this.setCameraLimits();
       this.snapTopDown();
+    } else if (contrast !== this.mapContrast) {
+      // The app's contrast changed: redraw the paper in the other palette, leaving the camera be.
+      this.mapContrast = contrast;
+      this.buildMap();
     }
     const seen = new Set<string>();
     for (const o of state.own) this.syncPiece(`own:${o.id}`, o, seen);
@@ -528,7 +537,7 @@ export class TableScene {
       disposeTree(this.tableMesh);
     }
     const span = this.span;
-    const tex = new THREE.CanvasTexture(mapCanvas(map));
+    const tex = new THREE.CanvasTexture(mapCanvas(map, this.mapContrast));
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     this.mapMesh = new THREE.Mesh(

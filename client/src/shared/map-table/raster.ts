@@ -1,28 +1,11 @@
 import { MapRenderer, DEFAULT_LAYERS } from '../../legacy/map-authoring/renderer.js';
-import { PERIOD_MAP_STYLE, type MapStyle } from '../../legacy/map-authoring/map-style.js';
+import { TABLE_MAP_STYLE } from '../../legacy/map-authoring/map-style.js';
+import { tableHighContrast } from '../../legacy/table/periodMap.js';
 import type { PreviewAsset } from '../../legacy/map-authoring/asset.js';
 import type { PreviewRaster } from '../../legacy/table/FixtureTableScene.js';
 
-/**
- * The table's paper is the authoring preview's period staff map (D43, #498). The raster is exactly the
- * map sheet, so the neat line, which the preview draws round the sheet, is left off: it would be cut in
- * half at the edge of the paper, and the table's board frames the sheet instead.
- */
-export const TABLE_MAP_STYLE: MapStyle = Object.freeze({ ...PERIOD_MAP_STYLE, neatLine: null });
-
-/**
- * Whether the paper is drawn in the style's high-contrast palette: the app's own contrast choice
- * (`data-contrast` on <html>, #308), or else the OS `prefers-contrast: more`, as the CSS tokens read it.
- */
-export function tableHighContrast(doc: Document = document): boolean {
-  const choice = doc.documentElement.dataset['contrast'];
-  if (choice === 'high' || choice === 'normal') return choice === 'high';
-  try {
-    return doc.defaultView?.matchMedia?.('(prefers-contrast: more)').matches ?? false;
-  } catch {
-    return false;
-  }
-}
+// The table's paper style and contrast choice are shared with the live game's table (#498).
+export { TABLE_MAP_STYLE, tableHighContrast };
 
 /** Full bounds, one uniform scale, zero offset. Padding stays outside the registered UV rectangle. */
 export function rasterLayout(widthM: number, heightM: number, limit: number) {
