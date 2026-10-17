@@ -82,6 +82,14 @@ header h2 {
   background: var(--ks-paper-raised);
   padding: var(--ks-space-3);
   min-height: 44px;
+  margin-bottom: var(--ks-space-2);
+}
+.candidate span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.candidate input {
+  flex: none;
 }
 footer {
   display: flex;
