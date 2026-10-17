@@ -5,7 +5,7 @@
  * plus clock) and an append-only input log: every player command and every parser result, so a
  * game can be replayed with no model calls. `SqliteGameStore` (sqlite.ts) is the durable implementation.
  */
-import { appendFile, mkdir, readFile, truncate, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, open, readFile, stat, truncate, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Discretion, Seat } from '@kriegsspiel/engine';
 import type {
@@ -457,7 +457,8 @@ export class MemoryGameStore implements GameStore {
 /**
  * Snapshots in memory (use `SqliteGameStore` for durable ones), input log on disk: one JSON-lines file per game,
  * `<dir>/<gameId>.jsonl`. The first line is the `InputLogHeader`, every later line is an
- * `InputLogEntry`. Lines are only ever appended, so a crash loses at most a trailing partial line.
+ * `InputLogEntry`. Lines are only ever appended, and each append is all-or-nothing, so a crash
+ * loses at most a trailing partial line, which the next append settles (see `settleTail`).
  */
 export class FileGameStore extends MemoryGameStore {
   constructor(private readonly dir: string) {
@@ -483,40 +484,100 @@ export class FileGameStore extends MemoryGameStore {
     return (await this.readLog(gameId))?.header;
   }
 
-  /** Games whose log tail this store has already checked for crash damage. */
-  private readonly tailChecked = new Set<string>();
-
   override async appendInput(gameId: string, entry: InputLogEntry): Promise<void> {
-    await this.repairTruncatedTail(gameId);
-    await appendFile(this.logPath(gameId), `${JSON.stringify(entry)}\n`);
+    const path = this.logPath(gameId);
+    const line = `${JSON.stringify(entry)}\n`;
+    // All-or-nothing, as the actor relies on (see SqliteGameStore, #416): settle the tail,
+    // write the line in a single append, and roll a failed write back to the size the file
+    // had before it, so a refused append leaves the log exactly as it was and the entry may
+    // be offered again (#508).
+    const settled = await this.settleTail(path, line);
+    if (settled.alreadyLogged) return;
+    try {
+      await appendFile(path, line);
+    } catch (e) {
+      await truncate(path, settled.size).catch(() => {});
+      throw e;
+    }
   }
 
   /**
-   * A crash can leave the log's final line half-written. `parseInputLog` ignores such a tail,
-   * but appending to the file as-is would glue the next entry onto the partial line and make
-   * the whole log unparseable. So before this store's first append to a log, drop a partial
-   * tail; a final line that is complete except for its newline just gets the newline. Only
-   * the first append needs the check: this store only ever writes whole lines, so a tail can
-   * be partial again only after another crash, which means a new process and a new store.
+   * Bring the log's tail to a line boundary before `line` is appended, and report the size
+   * the file has once settled, and whether `line` is in it already.
+   *
+   * A crash or a failed write can leave the final line torn. `parseInputLog` ignores such a
+   * tail, but appending anyway would glue the next entry onto the fragment and make the
+   * whole log unparseable, and a retry of the torn entry could duplicate it. So settle the
+   * tail before every append, not just a new process's first (#157): a fragment that does
+   * not parse is dropped, and a complete line that is only missing its newline is given it.
+   * A fragment is recognisable either way because an entry's serialised form is one JSON
+   * object: a torn prefix of it never parses, its outer brace being unclosed. If the fragment
+   * is exactly `line` without its newline, the entry landed on the earlier attempt: it is
+   * terminated, and `alreadyLogged` tells the caller not to write it a second time.
    */
-  private async repairTruncatedTail(gameId: string): Promise<void> {
-    if (this.tailChecked.has(gameId)) return;
-    this.tailChecked.add(gameId);
-    const path = this.logPath(gameId);
-    let text: string;
+  private async settleTail(
+    path: string,
+    line: string,
+  ): Promise<{ size: number; alreadyLogged: boolean }> {
+    let size: number;
     try {
-      text = await readFile(path, 'utf8');
+      size = (await stat(path)).size;
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return;
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { size: 0, alreadyLogged: false };
       throw e;
     }
-    if (text === '' || text.endsWith('\n')) return;
-    const tail = text.slice(text.lastIndexOf('\n') + 1);
-    try {
-      JSON.parse(tail);
+    if (size === 0) return { size, alreadyLogged: false };
+    const tail = await this.readTail(path, size);
+    if (!tail) return { size, alreadyLogged: false };
+    if (tail.text === line.slice(0, -1)) {
       await appendFile(path, '\n');
+      return { size: size + 1, alreadyLogged: true };
+    }
+    let complete = true;
+    try {
+      JSON.parse(tail.text);
     } catch {
-      await truncate(path, Buffer.byteLength(text) - Buffer.byteLength(tail));
+      complete = false;
+    }
+    if (complete) {
+      await appendFile(path, '\n');
+      return { size: size + 1, alreadyLogged: false };
+    }
+    await truncate(path, tail.start);
+    return { size: tail.start, alreadyLogged: false };
+  }
+
+  /**
+   * The log's final line when it has no terminating newline: the offset it starts at and its
+   * text. Undefined when the file already ends at a line boundary.
+   */
+  private async readTail(
+    path: string,
+    size: number,
+  ): Promise<{ start: number; text: string } | undefined> {
+    const handle = await open(path, 'r');
+    try {
+      const last = Buffer.alloc(1);
+      await handle.read(last, 0, 1, size - 1);
+      if (last[0] === 0x0a) return undefined;
+      // Scan back in chunks for the previous newline; the final line starts after it.
+      let start = 0;
+      for (let end = size; end > 0;) {
+        const from = Math.max(0, end - 64 * 1024);
+        const chunk = Buffer.alloc(end - from);
+        await handle.read(chunk, 0, chunk.length, from);
+        const newline = chunk.lastIndexOf(0x0a);
+        if (newline >= 0) {
+          start = from + newline + 1;
+          break;
+        }
+        end = from;
+      }
+      const bytes = Buffer.alloc(size - start);
+      await handle.read(bytes, 0, bytes.length, start);
+      return { start, text: bytes.toString('utf8') };
+    } finally {
+      await handle.close();
     }
   }
 
