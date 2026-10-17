@@ -219,10 +219,13 @@ interface Row {
 /** Account tables in the same SQLite file as the games (own `auth_` tables, created if missing). */
 export class SqliteAuthStore implements AuthStore {
   private readonly db: DatabaseSync;
+  private readonly ownsDatabase: boolean;
 
-  constructor(path: string) {
-    this.db = new DatabaseSync(path);
-    this.db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
+  /** A borrowed handle allows a caller-owned transaction across account and lobby tables. */
+  constructor(database: string | DatabaseSync) {
+    this.ownsDatabase = typeof database === 'string';
+    this.db = typeof database === 'string' ? new DatabaseSync(database) : database;
+    if (this.ownsDatabase) this.db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
     this.db.exec(SCHEMA);
     const cols = this.db.prepare('PRAGMA table_info(auth_users)').all() as Row[];
     if (!cols.some((c) => c.name === 'guest')) {
@@ -397,7 +400,7 @@ export class SqliteAuthStore implements AuthStore {
   }
 
   close(): void {
-    this.db.close();
+    if (this.ownsDatabase) this.db.close();
   }
 }
 

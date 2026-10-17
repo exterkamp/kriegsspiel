@@ -189,10 +189,13 @@ const parse = (r: Row): LobbyGame => JSON.parse(String(r.body)) as LobbyGame;
 /** Lobby records in the same SQLite file as the games (own `lobby_` table, created if missing). */
 export class SqliteLobbyStore implements LobbyStore {
   private readonly db: DatabaseSync;
+  private readonly ownsDatabase: boolean;
 
-  constructor(path: string) {
-    this.db = new DatabaseSync(path);
-    this.db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
+  /** A borrowed handle allows a caller-owned transaction across account and lobby tables. */
+  constructor(database: string | DatabaseSync) {
+    this.ownsDatabase = typeof database === 'string';
+    this.db = typeof database === 'string' ? new DatabaseSync(database) : database;
+    if (this.ownsDatabase) this.db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
     this.db.exec(SCHEMA);
   }
 
@@ -256,6 +259,6 @@ export class SqliteLobbyStore implements LobbyStore {
   }
 
   close(): void {
-    this.db.close();
+    if (this.ownsDatabase) this.db.close();
   }
 }
