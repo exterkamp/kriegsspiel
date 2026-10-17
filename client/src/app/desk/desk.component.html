@@ -4,7 +4,7 @@
 <div class="dock">
   @if (turnMode()) {
     <ks-turn-panel />
-  } @else {
+  } @else if (!state().modePending) {
     <ks-pause-panel />
   }
   <ks-clock />

@@ -110,6 +110,31 @@ describe('JournalComponent', () => {
     expect(noEta.textContent).toContain('awaiting word');
   });
 
+  it("says the order was delivered, at the unit's time, once word came back, not awaiting word (#439)", async () => {
+    const t = await open({
+      ...initialState,
+      pending: [
+        { orderId: 'o1', text: 'Advance', sentAtGame: 0, toName: 'Guards', etaGame: 240_000 },
+      ],
+      dispatches: [
+        {
+          id: 'ack',
+          from: 'Guards',
+          kind: 'orderDelivered',
+          orderId: 'o1',
+          writtenAtGame: 240_000,
+          receivedAtGame: 1_200_000,
+          category: 'subordinates',
+          text: 'Sir, we have your orders.',
+        },
+      ],
+    });
+    const order = t.el.querySelector('li[data-kind=order]')!;
+    expect(order.querySelector('progress')).toBeNull();
+    expect(order.textContent).toContain('Delivered at Day 1 00:04');
+    expect(order.textContent).not.toContain('awaiting word');
+  });
+
   it('re-reads delivery against game time on a timer', () => {
     vi.useFakeTimers();
     try {
