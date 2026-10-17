@@ -1,14 +1,12 @@
-<main class="shell" #root>
-  <header>
-    <div>
-      <p class="eyebrow">KRIEGSSPIEL / MAP AUTHORING</p>
-      <h1>Battlefield authoring</h1>
-    </div>
-    <p id="asset-status" role="status">No validated map · generate or load a saved asset</p>
-  </header>
+<div class="shell" #root>
+  <ks-tool-header heading="Battlefield authoring">
+    <p id="asset-status" class="ks-status" role="status">
+      No validated map · generate or load a saved asset
+    </p>
+  </ks-tool-header>
   <aside aria-label="Map inspection controls">
     <section>
-      <h2>Asset</h2>
+      <h2 class="ks-section-h">Asset</h2>
       <div id="summary"></div>
       <p class="note">
         Generate or load a saved battlefield map. Only complete validated maps can be exported.
@@ -18,17 +16,21 @@
       <legend>Independent layers</legend>
       <div id="layers"></div>
     </fieldset>
-    <label class="contrast"><input id="contrast" type="checkbox" /> High contrast</label>
+    <label class="ks-choice contrast"
+      ><input id="contrast" type="checkbox" /> High-contrast map</label
+    >
     <section>
-      <h2>Diagnostics</h2>
-      <ul id="diagnostics" aria-live="polite"></ul>
+      <h2 class="ks-section-h">Diagnostics</h2>
+      <ul id="diagnostics" class="ks-stack" aria-live="polite"></ul>
     </section>
   </aside>
-  <section class="map-panel" aria-label="Top-down map preview">
+  <main class="map-panel" aria-label="Top-down map preview">
     <nav aria-label="Viewport controls">
       <button id="fit">Fit map</button><button id="detail" disabled>Site detail</button
-      ><span class="spacer"></span><button id="zoom-out" aria-label="Zoom out">−</button
-      ><button id="zoom-in" aria-label="Zoom in">+</button>
+      ><span class="zoom" role="group" aria-label="Zoom"
+        ><button id="zoom-out" aria-label="Zoom out">−</button
+        ><button id="zoom-in" aria-label="Zoom in">+</button></span
+      >
     </nav>
     <div class="canvas-wrap">
       <canvas
@@ -39,10 +41,9 @@
         >Canvas2D is required to view this map.</canvas
       ><span class="north" aria-hidden="true">↑ N</span>
     </div>
-    <footer>
+    <footer class="ks-muted">
       <p id="position"></p>
       <p id="map-help">Drag to pan · scroll or + / − to zoom · F to fit · arrows to pan</p>
     </footer>
-  </section>
-</main>
-<ks-menu-link />
+  </main>
+</div>

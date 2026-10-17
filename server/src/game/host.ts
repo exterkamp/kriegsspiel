@@ -3,6 +3,7 @@ import {
   advanceTo,
   createState,
   deserialize,
+  RULES_VERSION,
   type EmittedEvent,
   type EngineState,
   type EventRegistry,
@@ -27,7 +28,12 @@ import type {
 import { turnSettingsOf } from '@kriegsspiel/protocol';
 import type { GameStore, InputLogEntry } from './store.js';
 import { EngineTurnResolver } from './engineTurn.js';
-import { openTurnFromLog, sentTurnIdsFromLog, type TurnResolver } from './turns.js';
+import {
+  openTurnFromLog,
+  sentTurnIdsFromLog,
+  turnNarrationsFromLog,
+  type TurnResolver,
+} from './turns.js';
 
 /** Each side's deputy settings (the last set) and the account of its turns, from a game's whole input log (D6f). */
 export function deputiesFromLog(
@@ -188,7 +194,16 @@ export class GameHost {
     }
     // The dial is part of the world (it sets the judgment cap); the persona is only prose.
     const { settings } = clock;
-    const world: GameState = settings ? { ...scenario, dial: settings.dial } : scenario;
+    // A new game is played under the current rules, kept in the world and the log header (#432).
+    // A world that names its rules keeps them (a test pinned to a seed's story under rules 1).
+    // The keys are in the order replay sets them (the dial, then the rules), so the two compare equal.
+    const { rules: pinned, ...base } = scenario;
+    const rules = pinned ?? RULES_VERSION;
+    const world: GameState = {
+      ...base,
+      ...(settings ? { dial: settings.dial } : {}),
+      rules,
+    };
     const state0 = createState(world.seed, world, 0);
     const state = this.options.init?.(state0) ?? state0;
     await this.options.store.saveLogHeader({
@@ -196,6 +211,7 @@ export class GameHost {
       scenarioId: world.scenarioId,
       seed: world.seed,
       ...(settings ? { settings } : {}),
+      rules,
     });
     // Turn mode (D39): the clock is manual for the game's whole life, there is no pause vote, and
     // the rate is ignored.
@@ -285,6 +301,8 @@ export class GameHost {
       .reverse()
       .find((e) => e.command.kind === 'narrate' && e.narrateBreaker)?.narrateBreaker;
     const open = turnOptions ? openTurnFromLog(log) : undefined;
+    // The turns' narrated papers (11.9) as they were written: no model is asked again.
+    const narrations = turnOptions ? turnNarrationsFromLog(log) : undefined;
     const turns = turnOptions && {
       ...turnOptions,
       ...(open ? { open } : {}),
@@ -303,6 +321,7 @@ export class GameHost {
       restart: { downMs },
       persona: settings?.persona,
       ...(narrateBreaker ? { narrateBreaker } : {}),
+      ...(narrations && narrations.size > 0 ? { narrations } : {}),
       // The log is in insertion order, which is not always seq order (see D14b).
       seq: tail.reduce((max, e) => Math.max(max, e.seq), snap.seq),
     });

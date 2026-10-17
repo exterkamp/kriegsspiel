@@ -2,7 +2,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixtureView } from '@legacy/table/fixture';
-import type { GameOver } from '@legacy/net/state';
+import { initialState, withModePending, withTurnSettings, type GameOver } from '@legacy/net/state';
 import { DeskComponent } from './desk.component';
 import { DeskStore } from './desk.store';
 import { fakeGame } from './fake-game';
@@ -93,6 +93,96 @@ describe('DeskComponent shell', () => {
     g.fake.set({ gameOver: over });
     await tick();
     expect(el.querySelectorAll('nav button')).toHaveLength(7);
+  });
+});
+
+describe("the desk's dress follows the game's mode (#427)", () => {
+  const dock = (el: HTMLElement) => ({
+    pause: el.querySelector('ks-pause-panel') !== null,
+    turn: el.querySelector('ks-turn-panel') !== null,
+    status: el.querySelector('[data-testid=clock-status]')?.textContent?.trim(),
+    rate: el.querySelector('[data-testid=clock-rate]')?.textContent?.trim(),
+  });
+  const turns = { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 20 } as const;
+  const clock = {
+    gameMs: 60_000,
+    localWallMs: Date.now(),
+    rate: 4,
+    status: 'running',
+  } as const;
+
+  it('shows neither the pause nor the turn panel, nor a rate, until the mode is known', async () => {
+    const { el, g, desk, tick } = mount(withModePending({ ...initialState, clock }), 'g1');
+    await tick();
+    expect(dock(el)).toMatchObject({ pause: false, turn: false, rate: '' });
+    expect(dock(el).status).toContain('Joining the game');
+    // The orders desk takes words but neither signs nor holds them yet.
+    desk.activeView.set('orders');
+    await tick();
+    expect(el.querySelector('#order-sign')).toBeNull();
+    expect(el.querySelector('#order-joining')?.textContent).toContain(
+      "Reading the game's settings",
+    );
+    desk.activeView.set('table');
+    // A real-time game's settings bring the pause panel and the rate.
+    g.fake.apply((s) => withTurnSettings(s, { dial: 'standard', persona: 'dry' }));
+    await tick();
+    expect(dock(el)).toMatchObject({ pause: true, turn: false, rate: '4:1' });
+  });
+
+  it('dresses a finished turn game, reloaded with no turnState, as a turn game', async () => {
+    vi.stubGlobal('fetch', async () => new Response('{}', { status: 500 }));
+    const { el, g, desk, tick } = mount(withModePending({ ...initialState, clock }), 'g1');
+    g.fake.set({ gameOver: over, view: fixtureView });
+    g.fake.apply((s) => withTurnSettings(s, turns));
+    await tick();
+    expect(dock(el)).toMatchObject({ pause: false, turn: true, rate: '20-min turns' });
+    expect(dock(el).status).toContain('Game over');
+    desk.activeView.set('orders');
+    await tick();
+    const labels = [...el.querySelectorAll('button')].map((b) => b.textContent?.trim());
+    expect(labels).not.toContain('Sign and send');
+    expect(el.querySelector('#orders-closed')).not.toBeNull();
+  });
+});
+
+describe('the paper and the dock (#455)', () => {
+  it("measures the dock into --dock-h, so a paper ends above it, and follows the dock's changes", async () => {
+    let fire: () => void = () => undefined;
+    const observed: Element[] = [];
+    const disconnect = vi.fn();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(cb: () => void) {
+          fire = cb;
+        }
+        observe(el: Element): void {
+          observed.push(el);
+        }
+        disconnect = disconnect;
+      },
+    );
+    let height = 276.4;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      () => ({ height }) as DOMRect,
+    );
+    const { f, el, tick } = mount({ view: fixtureView });
+    await tick();
+    expect(observed).toEqual([el.querySelector('.dock')]);
+    expect(el.style.getPropertyValue('--dock-h')).toBe('277px');
+    height = 120;
+    fire();
+    expect(el.style.getPropertyValue('--dock-h')).toBe('120px');
+    f.destroy();
+    expect(disconnect).toHaveBeenCalled();
+  });
+
+  it('leaves the paper its default room where there is no ResizeObserver', async () => {
+    vi.stubGlobal('ResizeObserver', undefined);
+    const { el, tick } = mount();
+    await tick();
+    expect(el.style.getPropertyValue('--dock-h')).toBe('');
   });
 });
 

@@ -69,6 +69,26 @@ describe('TurnPanelComponent', () => {
     expect(t.el.querySelector('#turn-send')).not.toBeNull();
   });
 
+  it('offers Send only to a seat that can sign (#428)', async () => {
+    const label = async (role: 'chiefOfStaff' | 'intelligence', held: number) => {
+      TestBed.resetTestingModule();
+      const orders = Array.from({ length: held }, (_, i) => ({
+        orderId: `o${i}`,
+        to: 'b1',
+        text: 'Hold',
+      }));
+      const t = await mount(turn({ held: orders }));
+      t.g.fake.set({ view: { ...fixtureView, role } });
+      await t.tick();
+      const go = t.el.querySelector<HTMLButtonElement>('#turn-open-orders')!;
+      return { text: go.textContent!.trim(), primary: go.classList.contains('ks-primary') };
+    };
+    expect(await label('chiefOfStaff', 2)).toEqual({ text: 'Orders (2 held)', primary: false });
+    expect(await label('chiefOfStaff', 0)).toEqual({ text: 'Write orders', primary: false });
+    expect(await label('intelligence', 0)).toEqual({ text: 'See the orders', primary: false });
+    expect(await label('intelligence', 1)).toEqual({ text: 'Orders (1 held)', primary: false });
+  });
+
   it('shows the umpire at work while the turn is decided', async () => {
     const t = await mount(turn({ sent: ['blue', 'red'], resolving: true }));
     expect(t.el.querySelector('[data-testid="turn-resolving"]')!.textContent).toContain(
@@ -125,5 +145,23 @@ describe('TurnPanelComponent', () => {
     t.g.fake.set({ gameOver: { winner: 'blue', reason: 'eliminated', atGame: 0 } });
     await t.tick();
     expect(t.panel()).toBeNull();
+  });
+
+  it('explains how turns work, and a short last turn (#439)', async () => {
+    const t = await mount(turn({ turn: 3, startsAt: 40 * MIN, endsAt: 50 * MIN }));
+    t.g.fake.set({ turnMinutes: 20, battleMinutes: 50 });
+    await t.tick();
+    const how = t.panel()!.querySelector<HTMLDetailsElement>('[data-testid=turn-how]')!;
+    expect(how.open).toBe(false);
+    expect(how.querySelector('summary')!.textContent).toBe('How turns work');
+    expect(how.textContent).toContain('send them once for your whole side');
+    expect(t.panel()!.querySelector('[data-testid=turn-last]')!.textContent).toContain(
+      'it is 10 minutes, not 20',
+    );
+    expect(t.el.querySelector('#clock')!.textContent).toContain('Turn 3 of 3: 00:40 to 00:50');
+    // Over a desk view the dock stays short; the orders desk explains turns itself.
+    t.desk.activeView.set('orders');
+    await t.tick();
+    expect(t.panel()!.querySelector('[data-testid=turn-how]')).toBeNull();
   });
 });

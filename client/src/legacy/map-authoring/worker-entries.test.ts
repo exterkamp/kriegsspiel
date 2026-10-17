@@ -15,7 +15,7 @@ vi.mock('@kriegsspiel/maps', async (importOriginal) => ({
   generateBattlefield: core.generate,
   validateBattlefield: core.validate,
   exportBattlefield: core.export,
-  supportsReplay: core.support,
+  supportsValidation: core.support,
 }));
 async function settle() {
   for (let i = 0; i < 8; i++) await Promise.resolve();

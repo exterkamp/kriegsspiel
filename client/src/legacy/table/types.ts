@@ -117,7 +117,8 @@ export interface SceneMark {
  */
 export interface OrderRoute {
   id: string;
-  kind: 'order' | 'route';
+  /** `held`: a turn-mode order held or sent for the open turn, drawn as the courier's ride from HQ to its unit (#439). */
+  kind: 'order' | 'route' | 'held';
   /** Start first; an `order` arrow runs from the first to the last point. */
   points: Coord[];
 }
@@ -146,6 +147,11 @@ export interface Engagement {
   id: string;
   /** Midway between the two, in metres. */
   position: { x: number; y: number };
+  /**
+   * Set for fighting the last turn's papers reported (turn mode, #439): its label, `Fought 00:12`, in place of
+   * "Fighting", and drawn fainter, since it is over or moved on.
+   */
+  past?: { label: string };
 }
 
 export interface SceneState {

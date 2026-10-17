@@ -11,6 +11,91 @@
       at
       {{ formatGameTime(tl.outcome.time) }}
     </p>
+    @if (turns().length > 0) {
+      <section class="turns" aria-label="Turns">
+        <h3>Turns</h3>
+        <div class="turn-steps">
+          <button type="button" aria-label="Previous turn" (click)="stepTurn(-1)">◀ turn</button>
+          <span>{{ turns().length }} turns played</span>
+          <button type="button" aria-label="Next turn" (click)="stepTurn(1)">turn ▶</button>
+        </div>
+        <ol class="turn-list">
+          @for (t of turns(); track t.n) {
+            <li [class.current]="shownTurn()?.n === t.n">
+              <button type="button" class="jump" (click)="load(t.endMs)">Turn {{ t.n }}</button>
+              {{ formatGameTime(t.startMs) }}–{{ formatGameTime(t.endMs) }}
+              @if (t.fellBack) {
+                <span class="why">(the tables)</span>
+              }
+            </li>
+          }
+        </ol>
+        @if (shownTurn(); as t) {
+          <article class="turn" aria-live="polite">
+            <h4>Turn {{ t.n }}</h4>
+            <p class="why">{{ decidedBy(t) }}</p>
+            @if (t.summary) {
+              <p class="summary">{{ t.summary }}</p>
+            }
+            <p class="losses">{{ lossesText(t) }}</p>
+            @if (t.units.length > 0) {
+              <ul class="changed">
+                @for (u of t.units; track u.id) {
+                  <li>{{ u.name }} ({{ u.side }}): {{ unitChange(u) }}</li>
+                }
+              </ul>
+            }
+            @if (t.corrections > 0) {
+              <p class="why corrections">
+                The engine corrected {{ t.corrections }}
+                {{ t.corrections === 1 ? 'outcome' : 'outcomes' }} of the umpire's against the hard
+                limits.
+              </p>
+            }
+            @if (t.rolls.length > 0) {
+              <ul class="rolls">
+                @for (r of t.rolls; track $index) {
+                  <li>
+                    Dice: {{ r.why }} ({{ Math.round(r.chance * 100) }}%):
+                    {{ r.success ? 'yes' : 'no' }}
+                  </li>
+                }
+              </ul>
+            }
+          </article>
+        }
+        <label class="log-toggle"
+          ><input
+            type="checkbox"
+            [checked]="showLog()"
+            (change)="showLog.set($any($event.target).checked)"
+          />
+          Show the umpire's log</label
+        >
+        @if (showLog()) {
+          @if (shownTurn()?.journal; as j) {
+            <div class="journal" aria-label="The umpire's log">
+              <h4>The umpire's notes</h4>
+              <ol>
+                @for (n of j.notes; track n.turn) {
+                  <li>Turn {{ n.turn }}: {{ n.note }}</li>
+                }
+              </ol>
+              @if (j.precedents.length > 0) {
+                <h4>Standing rulings</h4>
+                <ol>
+                  @for (p of j.precedents; track $index) {
+                    <li>Turn {{ p.turn }}: {{ p.ruling }}</li>
+                  }
+                </ol>
+              }
+            </div>
+          } @else {
+            <p class="why">The umpire had kept no log by this turn.</p>
+          }
+        }
+      </section>
+    }
     <section class="rulings" aria-label="Rulings">
       <h3>Rulings</h3>
       @if (rulings().length === 0) {
