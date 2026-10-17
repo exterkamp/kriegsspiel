@@ -3,6 +3,9 @@
  *
  *   --model <tag> --url <ollama url>      run every case against an Ollama model
  *   --provider anthropic --model <id>     run against the Anthropic API (needs ANTHROPIC_API_KEY)
+ *   --provider claude-bridge --model sonnet --label claude-code-sonnet
+ *                                         run against the host's Claude Code bridge (CLAUDE_BRIDGE_URL,
+ *                                         CLAUDE_BRIDGE_SECRET); `UMPIRE_PROVIDER` sets the default provider
  *   --provider test                       the canned adjudicator (projection as proposal), no model
  *   --export <dir>                        write each case as a self-contained prompt for Claude Code
  *   --import <dir> --model <label>        score a Claude Code pane's answers in <dir>
@@ -18,6 +21,7 @@ import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { join } from 'node:path';
 import { AnthropicProvider } from '../providers/anthropic.js';
+import { CLAUDE_BRIDGE_DEFAULT_URL, ClaudeBridgeProvider } from '../providers/claudeBridge.js';
 import { OllamaProvider } from '../providers/ollama.js';
 import type { LlmProvider } from '../provider.js';
 import type { FetchFn } from '../providers/http.js';
@@ -148,7 +152,7 @@ if (has('export')) {
   writeFileSync(join(out, 'results.md'), table + '\n');
   console.log(table);
 } else {
-  const providerId = arg('provider') ?? 'ollama';
+  const providerId = arg('provider') ?? process.env.UMPIRE_PROVIDER ?? 'ollama';
   const url = arg('url') ?? 'http://localhost:11434';
   let provider: LlmProvider | undefined;
   if (providerId === 'ollama') {
@@ -159,13 +163,25 @@ if (has('export')) {
     });
   } else if (providerId === 'anthropic') {
     provider = new AnthropicProvider();
+  } else if (providerId === 'claude-bridge') {
+    // The host-side Claude Code bridge (#457); the secret is read from the env, never an argument.
+    const secret = process.env.CLAUDE_BRIDGE_SECRET;
+    provider = new ClaudeBridgeProvider({
+      baseUrl: arg('url') ?? process.env.CLAUDE_BRIDGE_URL ?? CLAUDE_BRIDGE_DEFAULT_URL,
+      ...(secret ? { secret } : {}),
+      fetch: patientFetch,
+    });
   } else if (providerId !== 'test') {
     throw new Error(`unknown provider ${providerId}`);
   }
   const model = providerId === 'test' ? 'test' : arg('model');
   if (!model) throw new Error('--model <tag> is required');
+  // A row's name: the model, or `--label` (e.g. `claude-code-sonnet` for the bridge's `sonnet`).
+  const label = providerId === 'test' ? 'test' : (arg('label') ?? model);
   for (const c of cases) {
-    const r = provider ? await runCase(provider, model, c) : runCanned(c);
+    const r = provider
+      ? { ...(await runCase(provider, model, c)), model: label }
+      : await runCanned(c);
     saveRun(out, r);
     console.log(line(r));
   }
@@ -175,5 +191,5 @@ if (has('export')) {
     meta[model] = { ...meta[model], ...(await ollamaMeta(url, model)) };
     writeFileSync(metaFile, JSON.stringify(meta, null, 2) + '\n');
   }
-  console.log(`saved to ${join(out, slug(model))}`);
+  console.log(`saved to ${join(out, slug(label))}`);
 }

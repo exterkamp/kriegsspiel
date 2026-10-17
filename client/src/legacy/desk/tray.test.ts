@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import type { Dispatch } from '@kriegsspiel/protocol';
-import { emptyMarks, loadMarks, saveMarks, sortTray } from './tray.js';
+import { byTurn, emptyMarks, loadMarks, saveMarks, sortTray } from './tray.js';
 
 const disp = (id: string, extra: Partial<Dispatch> = {}): Dispatch => ({
   id,
@@ -75,5 +75,69 @@ describe('persistence', () => {
     expect(loadMarks('g', s).read.size).toBe(0);
     expect(loadMarks('g', undefined).read.size).toBe(0);
     expect(() => saveMarks('g', emptyMarks(), undefined)).not.toThrow();
+  });
+});
+
+describe('papers by turn (#439)', () => {
+  const MIN = 60_000;
+  const TURN = 20 * MIN;
+  const at = (id: string, written: number, received: number, extra: Partial<Dispatch> = {}) =>
+    disp(id, { writtenAtGame: written * MIN, receivedAtGame: received * MIN, ...extra });
+
+  it('groups under the turn, newest turn first, each in written order with its summary first', () => {
+    const groups = byTurn(
+      [
+        at('late', 18, 20),
+        at('early', 3, 20),
+        at('open', 0, 0),
+        at('turn-summary-1', 20, 20, { from: 'Chief of staff' }),
+        at('t2', 25, 40),
+      ],
+      TURN,
+    );
+    expect(groups.map((g) => [g.turn, g.rows.map((r) => r.d.id)])).toEqual([
+      [2, ['t2']],
+      [1, ['turn-summary-1', 'open', 'early', 'late']],
+    ]);
+  });
+
+  it('puts an umpire turn’s papers (all handed in at its end) in that turn, the ruling and notice last', () => {
+    const groups = byTurn(
+      [
+        at('a-notice', 20, 20, { kind: 'notice' }),
+        at('b-turn', 20, 20, { kind: 'turn' }),
+        at('c-battle', 20, 20, { kind: 'battle' }),
+        at('turn-summary-1', 20, 20),
+      ],
+      TURN,
+    );
+    expect(groups.map((g) => [g.turn, g.rows.map((r) => r.d.id)])).toEqual([
+      [1, ['turn-summary-1', 'b-turn', 'a-notice', 'c-battle']],
+    ]);
+  });
+
+  it('merges repeated sightings into one row that opens on the newest', () => {
+    const seen = {
+      kind: 'contact' as const,
+      sizeEstimate: 'about a battalion',
+      place: 'near the bridge',
+    };
+    const groups = byTurn(
+      [
+        at('c1', 5, 20, seen),
+        at('x', 8, 20),
+        at('c2', 12, 20, seen),
+        at('c3', 18, 20, seen),
+        at('c4', 25, 40, seen),
+      ],
+      TURN,
+    );
+    const [two, one] = groups;
+    expect(one!.rows.map((r) => [r.d.id, r.papers.map((d) => d.id)])).toEqual([
+      ['c3', ['c1', 'c2', 'c3']],
+      ['x', ['x']],
+    ]);
+    // The next turn's sighting of the same battalion is that turn's news.
+    expect(two!.rows.map((r) => r.d.id)).toEqual(['c4']);
   });
 });

@@ -195,4 +195,68 @@ describe('DeskStore', () => {
     expect(ids).toEqual(expect.arrayContaining(['turn:1', 'turn:2']));
     expect(d.journal().some((e) => e.kind === 'pause')).toBe(false);
   });
+
+  it("files the staff's summary of a turn once it is decided, and keeps it (#439)", () => {
+    const d = TestBed.inject(DeskStore);
+    const game = TestBed.inject(GameService) as unknown as {
+      _state: { update(f: (s: ClientState) => ClientState): void };
+    };
+    const MIN = 60_000;
+    const unit = (y: number, strength: number) => ({
+      id: 'b1',
+      name: '1st Battalion',
+      position: { x: 1000, y },
+      facing: 0,
+      formation: 'line' as const,
+      footprint: { frontage: 200, depth: 40 },
+      strength,
+      morale: 0.9,
+      place: 'at the bridge',
+    });
+    const at = (turn: number, y: number, strength: number) =>
+      game._state.update((s) => ({
+        ...s,
+        turnMode: true,
+        turnMinutes: 20,
+        view: {
+          side: 'blue',
+          atGame: (turn - 1) * 20 * MIN,
+          ownUnits: [unit(y, strength)],
+          visibleEnemies: [],
+          lastKnownContacts: [],
+          dispatches: [],
+          clock: { gameMsAtAnchor: 0, wallMsAtAnchor: 0, rate: 1, status: 'paused' },
+        },
+        turn: {
+          turn,
+          startsAt: (turn - 1) * 20 * MIN,
+          endsAt: turn * 20 * MIN,
+          sent: [],
+          resolving: false,
+          held: [],
+        },
+      }));
+    d.persistTurns('g');
+    at(1, 3000, 600);
+    TestBed.tick();
+    expect(d.turnRecord().starts[1]).toHaveLength(1);
+    expect(d.papers()).toHaveLength(0);
+    at(2, 2000, 540);
+    TestBed.tick();
+    const [summary] = d.papers();
+    expect(summary).toMatchObject({
+      id: 'turn-summary-1',
+      from: 'Chief of staff',
+      receivedAtGame: 20 * MIN,
+    });
+    expect(summary!.text).toContain('Moved: 1st Battalion about 1000 m north, now at the bridge.');
+    expect(summary!.text).toContain('Losses: 1st Battalion moderate, about 60 men.');
+    TestBed.tick();
+    expect(JSON.parse(storage.getItem('kriegsspiel.turns.g')!).summaries).toHaveLength(1);
+    // A reload keeps the paper as it was filed.
+    TestBed.resetTestingModule();
+    const again = TestBed.inject(DeskStore);
+    again.persistTurns('g');
+    expect(again.papers().map((x) => x.id)).toEqual(['turn-summary-1']);
+  });
 });

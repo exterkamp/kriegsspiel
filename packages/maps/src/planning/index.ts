@@ -30,6 +30,9 @@ export function generatePlanning(input: PlanningInput): GenerationResult<Regiona
 export * from './types.js';
 export { certifyFootprint, certifyRoadSegment, directionalGrade } from './certificates.js';
 export { certifyBridge } from './bridges.js';
+export { certifyFord } from './fords.js';
 export { validatePlanning, validateRoadPath } from './validation.js';
 export { reconcileLocalJoins } from './reconcile.js';
 export { createPlanningCertificates, type PlanningCertificates } from './session.js';
+export { ROUTE_COSTS } from './router.js';
+export { SITE_PREFERENCES } from './sites.js';
