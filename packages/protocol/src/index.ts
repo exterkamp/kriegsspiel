@@ -14,3 +14,10 @@ export * from './turn.js';
 export * from './turns.js';
 export * from './battlefield.js';
 export * from './battlefield-catalog.js';
+export {
+  LibraryNameSchema,
+  LibraryMapSummarySchema,
+  decodeLibraryMapSummary,
+  decodeLibraryPage,
+  type LibraryMapDescriptor,
+} from './map-library.js';
