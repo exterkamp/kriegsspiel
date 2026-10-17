@@ -22,6 +22,7 @@ import { ADMIN_OPEN_WARNING, adminFromEnv } from './admin/adminApi.js';
 import { SqliteNotifyStore, pushFromEnv } from './notify/index.js';
 import { allowedOriginsFromEnv } from './auth/origin.js';
 import { SqliteCreationStore } from './lobby/creation-store.js';
+import { MapLibraryService } from './map-library/service.js';
 
 import {
   aiCommanderBudgetWarning,
@@ -58,6 +59,10 @@ const store = process.env.DB_PATH ? new SqliteGameStore(process.env.DB_PATH) : u
 
 const creations = new SqliteCreationStore(process.env.DB_PATH ?? ':memory:');
 const authStore = creations.auth;
+// No durable owner means no library capability or browser storage fallback.
+const mapLibrary = creations.durable
+  ? await MapLibraryService.open(creations, new URL('../../data/maps/', import.meta.url))
+  : undefined;
 
 const notifyStore = process.env.DB_PATH ? new SqliteNotifyStore(process.env.DB_PATH) : undefined;
 const lobby = creations.lobby;
@@ -126,6 +131,7 @@ const { server } = await buildApp({
   store,
   lobby,
   creations,
+  mapLibrary,
   staticDir: process.env.STATIC_DIR,
   spaFallback: !/^(0|false|off)$/i.test(process.env.SPA_FALLBACK ?? ''),
   logger: true,
