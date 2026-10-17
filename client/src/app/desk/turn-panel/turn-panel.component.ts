@@ -11,10 +11,14 @@ import {
 import {
   RESOLVING_TEXT,
   deadlineText,
+  howTurnsWork,
+  lastTurnText,
+  ordersButtonText,
   pursuitText,
   resolvedText,
   sidesSent,
   turnPhase,
+  turnRights,
 } from '@legacy/desk/turn';
 import { GameService } from '../../game/game.service';
 import { DeskStore } from '../desk.store';
@@ -49,8 +53,26 @@ export class TurnPanelComponent {
     return t ? sidesSent(t, this.game.state().view?.side, this.game.sides()) : [];
   });
   protected readonly heldCount = computed(() => this.turn()?.held.length ?? 0);
+  /** Only a seat that signs is offered Send (#428). */
+  private readonly rights = computed(() => turnRights(this.game.state().view?.role));
+  protected readonly ordersText = computed(() => ordersButtonText(this.heldCount(), this.rights()));
+  protected readonly primary = computed(() => this.heldCount() > 0 && this.rights() === 'send');
   protected readonly deadline = computed(() => deadlineText(this.turn()?.deadline, this.now()));
   protected readonly resolvingText = RESOLVING_TEXT;
+  /** What a turn is, for a first-time player, and a word on the last turn when it is short (#439). */
+  protected readonly howItWorks = computed(() => {
+    // Over a desk view the dock stays short (the orders desk explains it itself); the table has room.
+    if (this.desk.activeView() !== 'table') return undefined;
+    const s = this.game.state();
+    const t = this.turn();
+    const minutes = s.turnMinutes ?? (t ? Math.round((t.endsAt - t.startsAt) / 60_000) : undefined);
+    return minutes ? howTurnsWork(minutes, s.battleMinutes) : undefined;
+  });
+  protected readonly lastTurn = computed(() => {
+    const t = this.turn();
+    const s = this.game.state();
+    return t && !t.pursuitUntil ? lastTurnText(t, s.turnMinutes, s.battleMinutes) : undefined;
+  });
   /** After the umpire's ruling: the turn is the pursuit, and while writing, it may go with no orders (#438). */
   protected readonly pursuit = computed(() => pursuitText(this.turn(), this.phase() === 'writing'));
 
@@ -59,9 +81,10 @@ export class TurnPanelComponent {
   protected readonly decidedText = computed(() => {
     const d = this.decided();
     if (!d) return undefined;
-    const fresh = this.game
-      .state()
-      .dispatches.filter((x) => x.receivedAtGame > d.from && x.receivedAtGame <= d.to).length;
+    // The staff's summary of the turn is one of its papers (#439).
+    const fresh = this.desk
+      .papers()
+      .filter((x) => x.receivedAtGame > d.from && x.receivedAtGame <= d.to).length;
     return resolvedText(d.turn, fresh);
   });
 

@@ -21,8 +21,11 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-async function open(dispatches: Dispatch[]) {
-  const { provide, useValue } = fakeGame({ dispatches });
+async function open(dispatches: Dispatch[], turns = false) {
+  const { provide, useValue } = fakeGame({
+    dispatches,
+    ...(turns ? { turnMode: true as const, turnMinutes: 20 } : {}),
+  });
   TestBed.configureTestingModule({
     providers: [provideZonelessChangeDetection(), { provide, useValue }],
   });
@@ -228,5 +231,77 @@ describe('InTrayComponent', () => {
     await t.click(t.pileBtn('Scouts'));
     await t.click(t.rows()[0]);
     expect(t.rows()).toHaveLength(200);
+  });
+});
+
+describe('InTrayComponent in a turn-mode game (#439)', () => {
+  const MIN = 60_000;
+  const seen = {
+    kind: 'contact' as const,
+    sizeEstimate: 'about a battalion',
+    place: 'near the bridge',
+  };
+  const papers = [
+    disp('open', {
+      from: 'Chief of staff',
+      writtenAtGame: 0,
+      receivedAtGame: 0,
+      category: 'staff',
+    }),
+    disp('c1', {
+      ...seen,
+      from: '1st Battalion',
+      writtenAtGame: 5 * MIN,
+      receivedAtGame: 20 * MIN,
+    }),
+    disp('c2', {
+      ...seen,
+      from: '1st Battalion',
+      writtenAtGame: 12 * MIN,
+      receivedAtGame: 20 * MIN,
+    }),
+    disp('e', {
+      from: '2nd Battalion',
+      kind: 'engaged',
+      category: 'subordinates',
+      writtenAtGame: 8 * MIN,
+      receivedAtGame: 20 * MIN,
+    }),
+    disp('t2', { from: '2nd Battalion', writtenAtGame: 25 * MIN, receivedAtGame: 40 * MIN }),
+  ];
+
+  it('opens on All, with the papers under their turns in written order and clock times', async () => {
+    const t = await open(papers, true);
+    expect(t.pileBtn('All').getAttribute('aria-pressed')).toBe('true');
+    const headings = [...t.el.querySelectorAll('h3.turn')].map((h) => h.textContent!.trim());
+    expect(headings).toEqual(['Turn 2: 00:20 to 00:40', 'Turn 1: 00:00 to 00:20']);
+    const rows = [...t.rows()].map((r) => [
+      r.querySelector('b')!.textContent!.trim(),
+      r.querySelector('small')!.textContent!.trim(),
+    ]);
+    expect(rows).toEqual([
+      ['● 2nd Battalion', 'written 00:25'],
+      ['● Chief of staff', 'written 00:00'],
+      ['● 1st Battalion', 'seen 2 times, 00:05 to 00:12'],
+      ['● 2nd Battalion', 'written 00:08'],
+    ]);
+  });
+
+  it('opens a merged sighting on its newest paper, lists the earlier ones, and reads them all', async () => {
+    const t = await open(papers, true);
+    await t.click(t.rows()[2]);
+    expect(t.el.querySelector('.viewer .text')!.textContent).toBe('text of c2');
+    expect(t.el.querySelector('.also')!.textContent).toContain('00:05, 1st Battalion');
+    expect([...t.game.state().read].sort()).toEqual(['c1', 'c2']);
+    await t.click(t.action('File'));
+    expect([...t.desk.trayFiled()].sort()).toEqual(['c1', 'c2']);
+  });
+
+  it('keeps the piles of a real-time game as they were', async () => {
+    const t = await open(papers);
+    expect(t.el.querySelector('h3.turn')).toBeNull();
+    expect(
+      [...t.el.querySelectorAll('.pile')].map((b) => b.textContent!.trim().split(' ')[0]),
+    ).not.toContain('All');
   });
 });

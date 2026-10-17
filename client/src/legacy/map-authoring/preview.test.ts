@@ -3,15 +3,24 @@ import { createReferenceAsset } from '@kriegsspiel/maps';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MapPreview } from './preview.js';
 import type { PreviewAsset } from './asset.js';
+import { PERIOD_MAP_STYLE } from './map-style.js';
 
 // This tests viewport selection against parsed assets, not Canvas2D/browser rendering.
+const rendered = vi.hoisted(() => ({ incompleteFrames: 0, styles: [] as unknown[] }));
 vi.mock('./renderer.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('./renderer.js')>();
   return {
     ...original,
     MapRenderer: class {
-      constructor(readonly asset: PreviewAsset) {}
-      render() {}
+      constructor(
+        readonly asset: PreviewAsset,
+        style?: unknown,
+      ) {
+        rendered.styles.push(style);
+      }
+      render() {
+        return rendered.incompleteFrames-- > 0;
+      }
     },
   };
 });
@@ -95,6 +104,24 @@ describe('stable site detail selection', () => {
     expect(input).toEqual(before);
     preview.fit();
     expect(preview.center()).toEqual([75, 75]);
+  });
+
+  it('draws in the period style and keeps drawing while base tiles are still being made', () => {
+    const callbacks: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    });
+    rendered.styles.length = 0;
+    expect(preview.loadAsset(multiSiteAsset()).ok).toBe(true);
+    expect(rendered.styles).toEqual([PERIOD_MAP_STYLE]);
+    expect(callbacks).toHaveLength(1);
+    rendered.incompleteFrames = 2;
+    callbacks[0]!(16);
+    callbacks[1]!(32);
+    callbacks[2]!(48);
+    // Two incomplete frames each asked for one more; the complete third asked for none.
+    expect(callbacks).toHaveLength(3);
   });
 
   it('returns false before loading or for missing IDs and preserves the view for recovery', () => {

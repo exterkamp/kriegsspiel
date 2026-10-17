@@ -165,9 +165,17 @@ describe('saved-only independent certification and immutable full identity', () 
         moveTo() {}
         lineTo() {}
         closePath() {}
+        addPath() {}
       },
     );
+    // Enough Canvas2D for the period staff map the raster draws (#498).
     const context = {
+      moveTo() {},
+      lineTo() {},
+      closePath() {},
+      setLineDash() {},
+      strokeText() {},
+      getImageData: () => ({ data: new Uint8ClampedArray(4) }),
       save() {},
       restore() {},
       setTransform() {},

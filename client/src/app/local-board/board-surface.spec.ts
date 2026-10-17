@@ -588,6 +588,8 @@ describe('actual raster/scene/OrbitControls with a WebGLRenderer double', () => 
           moveTo() {}
           lineTo() {}
           closePath() {}
+          // The period raster merges each base layer into one path (#498).
+          addPath() {}
         },
       );
       vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => canvasContext());

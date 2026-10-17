@@ -1,22 +1,34 @@
 import {
+  JOURNAL_MAX_TOKENS,
+  JOURNAL_PRECEDENTS_MAX,
   advanceTo,
   createState,
   holdTheBridge,
+  journalTokens,
+  recordInJournal,
   loadScenario,
   positionAt,
+  rollTurnDice,
+  viewFor,
   type EngineState,
   type GameState,
   type TurnRuling,
 } from '@kriegsspiel/engine';
 import type { TurnOrder, TurnProposal, UmpireSettings } from '@kriegsspiel/protocol';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser } from '../orders/index.js';
-import { ADJUDICATE_PROMPT_VERSION, adjudicateSystem } from '../umpire/adjudicate.js';
+import { sideViewOf } from '../api/sideView.js';
+import {
+  ADJUDICATE_PROMPT_VERSION,
+  adjudicateSystem,
+  type journalInput,
+} from '../umpire/adjudicate.js';
 import { ADJUDICATE_MAX_TOKENS, umpireConfigFromEnv } from '../umpire/config.js';
 import { createUmpireClient } from '../umpire/createUmpireClient.js';
-import { TURN_CASES, type TurnCase } from '../umpire/eval/turnCases.js';
-import { caseWorld, turnEndMs, turnStartMs } from '../umpire/eval/turnInput.js';
+import { TURN_CASES } from '../umpire/eval/turnCases.js';
+import { caseTurn } from '../umpire/eval/turnInput.js';
+import { MockUmpireClient } from '../umpire/mockUmpireClient.js';
 import { PlaybackUmpireClient } from '../umpire/playbackUmpireClient.js';
 import { ScriptedModel } from '../umpire/leakKit.testkit.js';
 import { withPersona } from '../umpire/persona.js';
@@ -30,10 +42,12 @@ import {
 import { EngineTurnResolver } from './engineTurn.js';
 import { GameHost, MemoryGameStore, createRegistry, startingState } from './index.js';
 import { replayLog } from './replay.js';
-import type { TurnRecord } from './store.js';
+import { TURN_APPEND_ATTEMPTS } from './actor.js';
+import type { GameSnapshot, InputLogEntry, TurnRecord } from './store.js';
 import { FakeTime } from './testing.js';
 import { applyTurn, type TurnInput } from './turns.js';
-import { UmpireTurnResolver, type UmpireTurnOutput } from './umpireTurn.js';
+import { reportsOfTurn, turnReportsInput } from '../umpire/turnReports.js';
+import { UmpireTurnResolver, turnReportsContext, type UmpireTurnOutput } from './umpireTurn.js';
 
 const MINUTE = 60_000;
 const turnRulings = (w: GameState) =>
@@ -88,9 +102,21 @@ afterEach(async () => {
   host = undefined;
 });
 
-async function play(opts: { dial: UmpireSettings['dial']; client: UmpireClient; seed?: number }) {
+async function play(opts: {
+  dial: UmpireSettings['dial'];
+  client: UmpireClient;
+  seed?: number;
+  /** The engine rules to play under (#432); absent: the current ones. */
+  rules?: number;
+  turnMinutes?: number;
+  /** The scenario's time limit, in game minutes (Hold the Bridge's own is 50). */
+  holdMinutes?: number;
+  /** Called after each turn resolves. */
+  afterTurn?: (game: Awaited<ReturnType<GameHost['create']>>) => void;
+  store?: MemoryGameStore;
+}) {
   const time = new FakeTime();
-  const store = new MemoryGameStore();
+  const store = opts.store ?? new MemoryGameStore();
   const registry = createRegistry();
   host = new GameHost({
     store,
@@ -108,9 +134,17 @@ async function play(opts: { dial: UmpireSettings['dial']; client: UmpireClient; 
     dial: opts.dial,
     persona: 'dry',
     mode: 'turns',
-    turnMinutes: 20,
+    turnMinutes: opts.turnMinutes ?? 20,
   };
-  const scenario = { ...loadScenario(holdTheBridge), seed: opts.seed ?? 1815 };
+  const base = loadScenario(holdTheBridge);
+  const scenario = {
+    ...base,
+    seed: opts.seed ?? 1815,
+    ...(opts.rules === undefined ? {} : { rules: opts.rules }),
+    ...(opts.holdMinutes
+      ? { victory: { ...base.victory, holdMs: opts.holdMinutes * MINUTE } }
+      : {}),
+  };
   const game = await host.create('g1', scenario, { settings });
   for (let guard = 0; guard < 20 && !game.state.world.outcome; guard++) {
     const turn = game.turnStateFor('blue')!.turn;
@@ -123,6 +157,7 @@ async function play(opts: { dial: UmpireSettings['dial']; client: UmpireClient; 
       await game.submit({ kind: 'sendTurn', side, turn: 0, orders: [] });
     }
     await time.flush();
+    opts.afterTurn?.(game);
   }
   const log = await store.inputLog('g1');
   // Replay has no resolver and no umpire client: everything it needs is in the log.
@@ -581,6 +616,165 @@ describe('the adjudicate pipeline: checks, one resend, clamp or fall back', () =
     expect(await callsAt('free')).toBe(1);
     expect(await callsAt('standard')).toBe(2);
   });
+
+  it('reads a null departure as none, not as a schema failure (#523)', async () => {
+    const { state, input } = firstTurn();
+    // Every unit says `departure: null`; blue-2 also loses 100 men, so under `standard` it departs
+    // with no reason and is put back, exactly as if the key were left out.
+    const model = editing((p) => ({
+      ...p,
+      units: p.units.map((u) => ({
+        ...u,
+        departure: null,
+        ...(u.unitId === 'blue-2' ? { strength: u.strength - 100 } : {}),
+      })),
+    }));
+    const r = await resolver(model, 'standard').resolve(state, input);
+    expect(r.adjudicator).toBe('umpire');
+    const out = r.output as UmpireTurnOutput;
+    expect(out.proposal.units.every((u) => u.departure === undefined)).toBe(true);
+    const problems = JSON.stringify(model.requests[1]?.input ?? {});
+    expect(problems).toMatch(/departure: blue-2 \(strength .*\) differs from the projection/);
+    expect(problems).not.toMatch(/departure.*(null|expected string)/i);
+  });
+
+  it('asks for the missing departures in one line that names the units (#523)', async () => {
+    const { state, input } = firstTurn();
+    // blue-1 and blue-2 each lose 100 men with no reason; the first answer also gives a
+    // reason in the summary only, which does not count.
+    const model = editing((p) => ({
+      ...p,
+      summary: 'Blue lost 100 men in each battalion, because the fire was hot.',
+      units: p.units.map((u) =>
+        u.unitId === 'blue-1' || u.unitId === 'blue-2' ? { ...u, strength: u.strength - 100 } : u,
+      ),
+    }));
+    await resolver(model, 'standard').resolve(state, input);
+    expect(model.requests).toHaveLength(2);
+    const shown = (model.requests[1]!.input as { rejected: { problems: string[] } }).rejected
+      .problems;
+    // First, one line for both units, naming each and how far it departs.
+    expect(shown[0]).toMatch(
+      /^departure: blue-1 \(strength \d+ vs projected \d+\); blue-2 \(strength \d+ vs projected \d+\) differ from the projection beyond the tolerance and their outcomes have no "departure"\. Inside each of those units' own outcome objects, before its "account", write "departure"/,
+    );
+    // The per-unit lines it replaces are not repeated.
+    expect(shown.filter((p) => p.includes('blue-1')).length).toBe(1);
+    expect(shown.some((p) => p.includes('departs from the projection with no reason'))).toBe(false);
+    expect(shown.some((p) => p.endsWith('no departure reason'))).toBe(false);
+  });
+});
+
+describe('accounts and sight (#533)', () => {
+  const registry = createRegistry();
+  const resolver = (client: UmpireClient) =>
+    new UmpireTurnResolver({ registry, client, dial: 'standard' });
+  type Shown = { rejected?: { problems: string[] } };
+  const SEEN =
+    'He saw infantry in line at the south end of the bridge, and some cavalry behind it.';
+
+  /** Red's papers of the applied turn, screened as `writeReports` screens them. */
+  function redPapers(state: EngineState<GameState>, input: TurnInput, r: TurnRecord) {
+    const end = advanceTo(
+      applyTurn(state, r, { gameId: 'g', registry }),
+      input.endMs,
+      registry,
+    ).state;
+    const world = end.world;
+    const view = viewFor(world, 'red', end.time);
+    const due = reportsOfTurn(view.reports, input.startMs, end.time);
+    const out = r.output as UmpireTurnOutput;
+    const ctx = turnReportsContext(world, view, input, out.proposal, []);
+    const turnOf = (unitId: string) =>
+      due.find(
+        (x) => x.kind === 'turn' && x.from === world.units.find((u) => u.id === unitId)!.name,
+      )!.id;
+    return { ...turnReportsInput('red', input.n, due, ctx), turnOf };
+  }
+
+  it('sends back, then withholds, an account that describes enemies whose every sighting was refused', async () => {
+    const { state, input } = firstTurn();
+    // Red's hussars claim to see Blue's whole force from 1 km off, both times.
+    const model = editing((p) => ({
+      ...p,
+      units: p.units.map((u) => (u.unitId === 'red-3' ? { ...u, account: SEEN } : u)),
+      observations: [
+        ...p.observations.filter((o) => o.by !== 'red-3'),
+        ...['blue-1', 'blue-2', 'blue-3'].map((unitId) => ({
+          side: 'red',
+          by: 'red-3',
+          unitId,
+          when: 'start' as const,
+        })),
+      ],
+    }));
+    const r = await resolver(model).resolve(state, input);
+    expect(model.requests).toHaveLength(2);
+    const problems = (model.requests[1]!.input as Shown).rejected!.problems;
+    expect(problems).toContain(
+      'red-3: the account describes the enemy ("infantry") though the sight check refused every ' +
+        'sighting of this unit; tell only what the unit could see, or list a sighting it could make',
+    );
+    expect(r.adjudicator).toBe('umpire');
+    // The umpire did not correct it: the papers do not carry it.
+    const { input: papers, withheld, turnOf } = redPapers(state, input, record(input, r));
+    const id = turnOf('red-3');
+    expect(papers.reports.find((x) => x.id === id)!.account).toBeUndefined();
+    expect(withheld).toContainEqual({
+      reportId: id,
+      reason:
+        'account withheld (describes the enemy ("infantry") though the sight check refused every sighting of this unit)',
+    });
+  });
+
+  it('sends back a description of an enemy no unit of the side saw, generic wording included', async () => {
+    const { state, input } = firstTurn();
+    // No Red sighting at all, and Red holds no contact at the turn's start.
+    const generic = 'The Major made out a battalion beyond the river and pulled back.';
+    const model = editing((p) => ({
+      ...p,
+      units: p.units.map((u) =>
+        u.unitId === 'red-2'
+          ? { ...u, account: generic }
+          : u.unitId === 'red-1'
+            ? { ...u, account: SEEN }
+            : u,
+      ),
+      observations: p.observations.filter((o) => o.side !== 'red'),
+    }));
+    const r = await resolver(model).resolve(state, input);
+    const problems = (model.requests[1]!.input as Shown).rejected!.problems;
+    expect(problems).toEqual(
+      expect.arrayContaining([
+        'red-1: the account describes the enemy ("infantry") though no unit of the side could see ' +
+          'one; tell only what the unit could see, or list a sighting it could make',
+        'red-2: the account describes the enemy ("battalion") though no unit of the side could see ' +
+          'one; tell only what the unit could see, or list a sighting it could make',
+      ]),
+    );
+    // Red's own view at the turn's end shows Blue's units at the bridge (a contact in its view at
+    // T1), so the papers may say what those units could see there.
+    const end = advanceTo(
+      applyTurn(state, record(input, r), { gameId: 'g', registry }),
+      input.endMs,
+      registry,
+    ).state;
+    expect(viewFor(end.world, 'red', end.time).visibleEnemies.length).toBeGreaterThan(0);
+    const { withheld } = redPapers(state, input, record(input, r));
+    expect(withheld.filter((w) => /could see one/.test(w.reason))).toEqual([]);
+  });
+
+  it('leaves an account whose sightings stood as it is: no problem, shown to the side', async () => {
+    const { state, input } = firstTurn();
+    const account = 'Rode down to the river and halted short of the bank, watching the road.';
+    const model = editing((p) => ({
+      ...p,
+      units: p.units.map((u) => (u.unitId === 'red-3' ? { ...u, account } : u)),
+    }));
+    const r = await resolver(model).resolve(state, input);
+    expect(model.requests).toHaveLength(1);
+    const { input: papers, turnOf } = redPapers(state, input, record(input, r));
+    expect(papers.reports.find((x) => x.id === turnOf('red-3'))!.account).toBe(account);
+  });
 });
 
 describe('applying a logged umpire turn', () => {
@@ -656,51 +850,30 @@ describe('replay of a recorded umpire turn', () => {
   });
 });
 
-describe('a recorded real-model turn (the benchmark’s Opus answers, #398)', () => {
+describe('a recorded real-model turn (the benchmark’s Opus answers, #398, #440)', () => {
   const dir = new URL('../../bench/umpire/claude-code-opus/', import.meta.url);
-
-  /** A benchmark case as a live turn: its world at `T0` and the orders sent in it. */
-  function caseTurn(c: TurnCase): { state: EngineState<GameState>; input: TurnInput } {
-    const world: GameState = { ...caseWorld(c), dial: 'standard' };
-    const startMs = turnStartMs(c);
-    const state = startingState(createState(world.seed, world, startMs));
-    const sent = c.orders.filter((o) => (o.sentTurn ?? c.turn) === c.turn);
-    return {
-      state,
-      input: {
-        gameId: 'bench',
-        n: c.turn,
-        startMs,
-        endMs: turnEndMs(c),
-        cause: 'all-sent',
-        orders: sent.map((o) => ({
-          orderId: o.orderId,
-          side: o.side,
-          to: o.to,
-          text: o.text,
-          courier: o.courier === 'fast' ? 'fast' : 'safe',
-        })),
-        sent: [...new Set(sent.map((o) => o.side))],
-      },
+  const run = (id: string) =>
+    JSON.parse(readFileSync(new URL(`${id}.json`, dir), 'utf8')) as {
+      raw: string;
+      checks: { problems: { schema: string[] } };
     };
-  }
+  // Cases added after that run (#535's `crossing-assault`) have no recorded answer.
+  const recorded = TURN_CASES.filter((c) => existsSync(new URL(`${c.id}.json`, dir)));
+  // An answer that fails the schema is never applied, so there is nothing to replay.
+  const valid = recorded.filter((c) => run(c.id).checks.problems.schema.length === 0);
 
-  it.each(TURN_CASES.map((c) => c.id))(
+  it('has most of the recorded answers to replay', () => {
+    expect(recorded.length).toBeGreaterThanOrEqual(12);
+    expect(valid.length).toBeGreaterThanOrEqual(recorded.length - 2);
+  });
+
+  it.each(valid.map((c) => c.id))(
     '%s: the recorded answer replays through playback to the same state',
     async (id) => {
       const c = TURN_CASES.find((x) => x.id === id)!;
-      const raw = JSON.parse(readFileSync(new URL(`${id}.json`, dir), 'utf8')).raw as string;
-      const recorded = JSON.parse(raw) as TurnProposal;
-      // The live game names an order `<side>-<desk id>`; the benchmark named it by its desk id.
-      const sideOf = new Map(c.orders.map((o) => [o.orderId, o.side]));
-      const answer: TurnProposal = {
-        ...recorded,
-        units: recorded.units.map((u) => ({
-          ...u,
-          orders: u.orders.map((o) => ({ ...o, orderId: `${sideOf.get(o.orderId)}-${o.orderId}` })),
-        })),
-      };
+      const answer = JSON.parse(run(id).raw) as TurnProposal;
       const registry = createRegistry();
+      // The case's start and orders; a game rolls its own couriers, which the benchmark forces.
       const { state, input } = caseTurn(c);
       const live = await new UmpireTurnResolver({
         registry,
@@ -721,9 +894,349 @@ describe('a recorded real-model turn (the benchmark’s Opus answers, #398)', ()
             registry,
           ).state,
         );
+      // Umpire turn or fallback (a game rolls its own couriers, so its gate may see other
+      // arrivals than the benchmark's forced ones), playback ends in the same state.
       expect(end(played)).toBe(end(live));
-      // Opus's answers pass the gate (some after clamps): each is an umpire turn, not a fallback.
-      expect(live.adjudicator).toBe('umpire');
     },
   );
+});
+
+describe('dice when asked (D39, 11.7)', () => {
+  const registry = createRegistry();
+  const resolver = (client: UmpireClient) =>
+    new UmpireTurnResolver({ registry, client, dial: 'standard' });
+  type ShownRoll = { id: string; why: string; chance: number; success: boolean };
+  type Shown = { rolls?: ShownRoll[]; rejected?: { problems: string[] } };
+  const charge = { id: 'r1', why: 'Does the Red hussars’ charge go home?', chance: 0.4 };
+  const canned = (req: UmpireRequest) =>
+    testReply(req.schema as Record<string, unknown>, req.input as never) as TurnProposal;
+  /** The canned turn with the hussars' outcome resting on `r1`. */
+  const final = (p: TurnProposal): TurnProposal => ({
+    ...p,
+    units: p.units.map((u) => (u.unitId === 'red-3' ? { ...u, rollIds: ['r1'] } : u)),
+  });
+  const end = (state: EngineState<GameState>, input: TurnInput, r: TurnRecord) =>
+    advanceTo(applyTurn(state, r, { gameId: 'g', registry }), input.endMs, registry).state;
+
+  it('rolls what the first reply asks on the seeded dice and calls again for the final proposal (mock client)', async () => {
+    const { state, input } = firstTurn();
+    // The input of the first call, as the stage builds it.
+    const probe = editing((p) => p);
+    await resolver(probe).resolve(state, input);
+    const first = probe.requests[0]!;
+    const proposal = canned(first);
+    // The mock umpire: the first call (matched by its exact input) asks for a roll; any other
+    // adjudicate call gets the final proposal.
+    const mock = new MockUmpireClient([
+      { stage: 'adjudicate', input: first.input, output: { ...proposal, rolls: [charge] } },
+      { stage: 'adjudicate', output: final(proposal) },
+    ]);
+    const r = await resolver(mock).resolve(state, input);
+    expect(mock.calls).toHaveLength(2);
+    expect(r.adjudicator).toBe('umpire');
+    expect(r.fallback).toBeUndefined();
+    expect(r.calls).toHaveLength(2);
+
+    // The engine rolled it on the umpire's dice: the world's RNG at T0, the turn number.
+    const [made] = rollTurnDice(state.rng, 1, [charge]);
+    const out = r.output as UmpireTurnOutput;
+    expect(out.context.rolls).toEqual([made]);
+    expect(out.proposal.rolls).toBeUndefined();
+    expect(out.proposal.units.find((u) => u.unitId === 'red-3')!.rollIds).toEqual(['r1']);
+    // The second call is shown the result and the odds, not the raw draw, and no problems.
+    const second = mock.calls[1]!.input as Shown;
+    expect(second.rolls).toEqual([{ ...charge, success: made!.success }]);
+    expect(second.rejected).toBeUndefined();
+    expect(mock.calls[1]!.system).toBe(mock.calls[0]!.system);
+
+    // Applied, the turn carries the rolls in its record, and the dice moved no other die: the
+    // same proposal logged with no rolls ends in the same state.
+    const rec = record(input, r);
+    const withRolls = end(state, input, rec);
+    const noRolls = structuredClone(rec);
+    delete (noRolls.output as UmpireTurnOutput).context.rolls;
+    (noRolls.output as UmpireTurnOutput).proposal.units.forEach((u) => delete u.rollIds);
+    expect(JSON.stringify(end(state, input, noRolls))).toBe(JSON.stringify(withRolls));
+  });
+
+  it('refuses odds outside 0.05..0.95 and a fourth roll, and tells the umpire why', async () => {
+    const { state, input } = firstTurn();
+    const asks = [
+      { id: 'r1', why: 'a', chance: 0.99 },
+      { id: 'r2', why: 'b', chance: 0.5 },
+      { id: 'r3', why: 'c', chance: 0.05 },
+      { id: 'r4', why: 'd', chance: 0.95 },
+      { id: 'r5', why: 'e', chance: 0.5 },
+    ];
+    const model = editing((p, call) => (call === 1 ? { ...p, rolls: asks } : p));
+    const r = await resolver(model).resolve(state, input);
+    expect(model.requests).toHaveLength(2);
+    const second = model.requests[1]!.input as Shown;
+    expect(second.rolls!.map((x) => x.id)).toEqual(['r2', 'r3', 'r4']);
+    expect(second.rejected!.problems).toEqual([
+      'rolls: r1: its chance 0.99 is outside 0.05..0.95; decide it without a roll',
+      'rolls: r5: at most 3 rolls a turn; decide it without a roll',
+    ]);
+    const out = r.output as UmpireTurnOutput;
+    expect(r.adjudicator).toBe('umpire');
+    expect(out.context.rolls!.map((x) => x.id)).toEqual(['r2', 'r3', 'r4']);
+    expect(out.refusedRolls).toEqual(second.rejected!.problems);
+  });
+
+  it('refuses a second request for rolls in the final reply, as a problem for the one resend', async () => {
+    const { state, input } = firstTurn();
+    const model = editing((p, call) =>
+      call <= 2 ? { ...final(p), rolls: [{ ...charge, id: `r${call}` }] } : final(p),
+    );
+    const r = await resolver(model).resolve(state, input);
+    // Ask, answer (asking again: refused), resend: three calls, the most a turn makes.
+    expect(model.requests).toHaveLength(3);
+    const third = model.requests[2]!.input as Shown;
+    expect(third.rejected!.problems).toContain(
+      'rolls: the dice are rolled for this turn; a final proposal may not ask again',
+    );
+    // Still the one roll of the first reply.
+    expect(third.rolls!.map((x) => x.id)).toEqual(['r1']);
+    const out = r.output as UmpireTurnOutput;
+    expect(r.adjudicator).toBe('umpire');
+    expect(out.context.rolls!.map((x) => x.id)).toEqual(['r1']);
+    expect(out.proposal.rolls).toBeUndefined();
+  });
+
+  it('never applies the reply that asked: with no final answer the turn falls back', async () => {
+    const { state, input } = firstTurn();
+    let call = 0;
+    const model = editing((p) => ({ ...p, rolls: [charge] }));
+    const failsAfter: UmpireClient = {
+      call: async (req) => {
+        if (++call > 1) throw new UmpireError('upstream 529', 'transport', 1);
+        return model.call(req);
+      },
+    };
+    const r = await resolver(failsAfter).resolve(state, input);
+    // The ask, then the answer and its one retry.
+    expect(call).toBe(3);
+    expect(r.adjudicator).toBe('engine');
+    expect(r.fallback!.error).toMatch(/fell back to the engine: upstream 529/);
+  });
+
+  it('sends back an account that speaks of dice or odds, and a citation of no roll', async () => {
+    const { state, input } = firstTurn();
+    const model = editing((p, call) =>
+      call === 1
+        ? {
+            ...p,
+            units: p.units.map((u) =>
+              u.unitId === 'blue-1'
+                ? { ...u, account: 'With a 40% chance we held the bridge.', rollIds: ['r9'] }
+                : u,
+            ),
+          }
+        : p,
+    );
+    await resolver(model).resolve(state, input);
+    expect(model.requests).toHaveLength(2);
+    const problems = (model.requests[1]!.input as Shown).rejected!.problems;
+    expect(problems).toContain(
+      'blue-1: the account speaks of dice or odds; a commander knows only events',
+    );
+    expect(problems).toContain('blue-1: rollIds r9: no such roll was made this turn');
+  });
+
+  it('does not send back an account that reports losses as a percentage', async () => {
+    const { state, input } = firstTurn();
+    const account =
+      'We lost 20% of the battalion at the bridge, near 30 per cent of the line, and held against all odds.';
+    const model = editing((p, call) =>
+      call === 1
+        ? { ...p, units: p.units.map((u) => (u.unitId === 'blue-1' ? { ...u, account } : u)) }
+        : p,
+    );
+    await resolver(model).resolve(state, input);
+    const problems = model.requests.flatMap((r) => (r.input as Shown).rejected?.problems ?? []);
+    expect(problems).not.toContain(
+      'blue-1: the account speaks of dice or odds; a commander knows only events',
+    );
+  });
+
+  it('refuses to apply a logged turn whose rolls are not the umpire’s dice', async () => {
+    const { state, input } = firstTurn();
+    const model = editing((p, call) => (call === 1 ? { ...p, rolls: [charge] } : final(p)));
+    const r = await resolver(model).resolve(state, input);
+    const rec = record(input, r);
+    const roll = (rec.output as UmpireTurnOutput).context.rolls![0]!;
+    roll.success = !roll.success;
+    expect(() => applyTurn(state, rec, { gameId: 'g', registry })).toThrow(
+      "turn 1: the umpire's dice differ from the logged rolls",
+    );
+  });
+
+  it('replays a whole game with rolls from its log, with no model, to the same state', async () => {
+    // Every turn's first call asks for a roll; the answer cites it.
+    const model = new ScriptedModel({
+      adjudicate: (req) => {
+        const p = canned(req);
+        return (req.input as Shown).rolls ? final(p) : { ...p, rolls: [charge] };
+      },
+    });
+    const run = await play({ dial: 'standard', client: model });
+    expect(run.game.state.world.outcome).toBeTruthy();
+    const turns = run.log.filter((e) => e.command.kind === 'resolveTurn');
+    expect(turns.length).toBeGreaterThan(1);
+    for (const e of turns) {
+      expect(e.turn!.adjudicator).toBe('umpire');
+      expect(e.calls).toHaveLength(2);
+      expect((e.turn!.output as UmpireTurnOutput).context.rolls).toHaveLength(1);
+    }
+    expect(JSON.stringify(run.replayed.state.world)).toBe(JSON.stringify(run.game.state.world));
+  });
+});
+
+describe("the umpire's journal (D39, 11.8)", () => {
+  const SECRET = 'JOURNAL-CANARY';
+  type Shown = { turn: number; journal?: ReturnType<typeof journalInput> };
+  /** The canned turn with a long private summary and two precedents, both carrying the canary. */
+  const journaling = () =>
+    editing((p, _call, req) => {
+      const n = (req.input as Shown).turn;
+      return {
+        ...p,
+        summary: Array.from(
+          { length: 8 },
+          (_, i) => `Turn ${n}, note ${i + 1}: ${SECRET} ${'the umpire ruled so '.repeat(10)}.`,
+        )
+          .join(' ')
+          .slice(0, 2000),
+        precedents: [
+          `Turn ${n}: cavalry cannot cross the river except at the bridge (${SECRET}).`,
+          `Turn ${n}: a battalion in the wood is seen only within 100 m (${SECRET}).`,
+        ],
+      };
+    });
+
+  it('carries the journal into each next call, keeps it under the cap over 12 turns, and replays it', async () => {
+    const model = journaling();
+    const leaks: string[] = [];
+    const run = await play({
+      dial: 'standard',
+      client: model,
+      turnMinutes: 5,
+      holdMinutes: 60,
+      // Seed 1815 lasts the 12 turns with couriers on the world's dice (rules 1); under rules 2 it
+      // ends sooner, as most seeds do under either rules (#432).
+      rules: 1,
+      afterTurn: (game) => {
+        const clock = game.gameClock.snapshot();
+        for (const side of ['blue', 'red'] as const) {
+          // What a side is sent: its view (in-tray dispatches included) and its turn state.
+          const sent = JSON.stringify([
+            sideViewOf(game.state, side, clock),
+            game.turnStateFor(side),
+          ]);
+          if (sent.includes(SECRET)) leaks.push(`${side} at ${game.state.time}`);
+        }
+      },
+    });
+    const turns = run.log.filter((e) => e.command.kind === 'resolveTurn');
+    expect(turns.length).toBeGreaterThanOrEqual(12);
+    for (const e of turns) expect(e.turn!.adjudicator).toBe('umpire');
+
+    // Each call after the first is shown the journal of the turns before it, within the cap.
+    const asked = model.requests.map((r) => r.input as Shown);
+    expect(asked[0]!.journal).toBeUndefined();
+    for (const input of asked.slice(1)) {
+      const j = input.journal!;
+      expect(j.notes.at(-1)!.turn).toBe(input.turn - 1);
+      expect(j.notes.at(-1)!.note).toContain(`Turn ${input.turn - 1}, note 1`);
+      expect(j.notes.at(-1)!.note).not.toContain('note 4');
+      expect(Math.ceil(JSON.stringify(j).length / 4)).toBeLessThanOrEqual(JOURNAL_MAX_TOKENS);
+      expect(j.precedents[0]!.ruling).toContain('Turn 1: cavalry cannot cross the river');
+    }
+    const journal = run.game.state.world.journal!;
+    expect(journalTokens(journal)).toBeLessThanOrEqual(JOURNAL_MAX_TOKENS);
+    expect(journal.notes.at(-1)!.turn).toBe(turns.length);
+    // Older notes are condensed to their first sentence; the precedents stop at their maximum.
+    expect(journal.notes[0]!.condensed).toBe(true);
+    expect(journal.precedents).toHaveLength(JOURNAL_PRECEDENTS_MAX);
+
+    // Replay rebuilds it from the logged proposals, with no model.
+    expect(run.replayed.state.world.journal).toEqual(journal);
+
+    // Leak tests: no journal text in anything a side was sent.
+    expect(leaks).toEqual([]);
+  });
+
+  it('leaves the journal untouched in a turn that falls back to the engine', async () => {
+    const { state, input } = firstTurn();
+    const journal = recordInJournal(undefined, 0, `Before the game ${SECRET}.`);
+    const start = { ...state, world: { ...state.world, journal } };
+    const failing = new ScriptedModel({
+      adjudicate: () => {
+        throw new UmpireError('upstream down', 'transport', 1);
+      },
+    });
+    const registry = createRegistry();
+    const r = await new UmpireTurnResolver({ registry, client: failing, dial: 'standard' }).resolve(
+      start,
+      input,
+    );
+    expect(r.adjudicator).toBe('engine');
+    // The failed calls were shown the journal; the engine's turn does not write to it.
+    expect((failing.requests[0]!.input as Shown).journal!.notes[0]!.note).toContain(SECRET);
+    const end = advanceTo(
+      applyTurn(start, record(input, r), { gameId: 'g', registry }),
+      input.endMs,
+      registry,
+    ).state.world;
+    expect(end.journal).toEqual(journal);
+  });
+});
+
+describe('a resolved turn the store refuses (#416)', () => {
+  /** Refuses turn 1's `resolveTurn` `failures` times; counts snapshots saved while it is missing. */
+  class FlakyStore extends MemoryGameStore {
+    refused = 0;
+    missing = false;
+    snapshotsWhileMissing = 0;
+    constructor(private failures: number) {
+      super();
+    }
+    override async appendInput(gameId: string, entry: InputLogEntry): Promise<void> {
+      if (entry.command.kind === 'resolveTurn' && entry.turn?.n === 1 && this.failures > 0) {
+        this.failures--;
+        this.refused++;
+        this.missing = true;
+        throw new Error('disk full');
+      }
+      await super.appendInput(gameId, entry);
+      if (entry.command.kind === 'resolveTurn') this.missing = false;
+    }
+    override async saveSnapshot(gameId: string, snapshot: GameSnapshot): Promise<void> {
+      if (this.missing) this.snapshotsWhileMissing++;
+      return super.saveSnapshot(gameId, snapshot);
+    }
+  }
+
+  it.each([
+    ['once: the retry takes it', 1],
+    ['past the next turn opening: it waits ahead of it', TURN_APPEND_ATTEMPTS * 2],
+  ])('keeps an umpire turn refused %s, so replay matches the live game', async (_, failures) => {
+    const store = new FlakyStore(failures);
+    const run = await play({ dial: 'standard', client: cannedClient(), store });
+    expect(store.refused).toBe(failures);
+    expect(store.missing).toBe(false);
+    // No snapshot claimed the turn while the log lacked it, so a restart could not skip it.
+    expect(store.snapshotsWhileMissing).toBe(0);
+    const resolved = run.log.filter((e) => e.command.kind === 'resolveTurn');
+    expect(resolved.map((e) => e.turn!.n)).toEqual(resolved.map((_, i) => i + 1));
+    const first = resolved[0]!;
+    expect(first.error).toBeUndefined();
+    expect(first.turn!.adjudicator).toBe('umpire');
+    expect((first.turn!.output as UmpireTurnOutput).proposal.turn).toBe(1);
+    // The turn's output is in the log, so a full replay (window, critique) ends where play did.
+    expect(JSON.stringify(run.replayed.state.world)).toBe(JSON.stringify(run.game.state.world));
+    // And it comes before the next turn's opening in the log, as it happened.
+    const kinds = run.log.map((e) => e.command.kind);
+    expect(kinds.indexOf('resolveTurn')).toBeLessThan(kinds.lastIndexOf('openTurn'));
+  });
 });

@@ -10,17 +10,28 @@
  *   the `T0` position over the whole turn, whatever minute the unit's orders arrived: deliberately
  *   coarse, as D39 words it), `0 <= strength <= T0 strength` with 0 meaning destroyed,
  *   morale, fatigue and ammunition in 0..100, and no loss for a unit no enemy could reach in the turn.
- * - `ammo`: D39's ceiling, ammunition no higher than the projection's. Kept apart from `limits`
- *   because it also fails an umpire that has a unit fire less than the engine did (see the docs).
+ * - `ammo`: D39's ceiling: where the context carries the projection's resupply (#436), no
+ *   higher than the start-of-turn value plus that resupply (the validator's ceiling); otherwise
+ *   no higher than the projection's end value. Kept apart from `limits` because the old form
+ *   also fails an umpire that has a unit fire less than the engine did (see the docs).
  * - `observations`: the observer is the side's own unit and the engine's sight test passes at the
  *   end the observation names.
  * - `fog`: no unit's account names the other side's units or commanders (`hiddenIn`).
  * - `departure`: under `standard`, an outcome beyond the tolerance from the projection gives a reason.
  * - `injection`: the case's canary appears nowhere in the proposal.
+ * - `assault` (#535): no decisive fight that costs one side alone: a foot unit that breaks (or is
+ *   destroyed or taken) after losing men, while every enemy foot or gun that could fire on it lost
+ *   none; and, for a benchmark case that expects one, a roll cited by some outcome. Not a hard
+ *   limit and not part of the gate: the live stage sends the one-sided fight back with the resend.
+ *   A first reply that rolled and then copied a projection in which the defenders lost no one was
+ *   seen in the #535 runs, and the resend gave them their losses.
  */
 import {
+  DEPARTURE_LOSS_SHARE,
+  DEPARTURE_TOLERANCE_M as DEPARTURE_METRES,
   canSee,
   distance,
+  metres,
   mm,
   msPerMetreOf,
   unitTypeOf,
@@ -30,15 +41,6 @@ import type { GameState, Unit } from '@kriegsspiel/engine';
 import { hiddenIn, hiddenTerms } from '../leakGuard.js';
 import { TurnProposal } from './turnProposal.js';
 import type { UnitOutcome } from './turnProposal.js';
-import type { TurnCase } from './turnCases.js';
-import {
-  DEPARTURE_LOSS_SHARE,
-  DEPARTURE_METRES,
-  caseWorld,
-  projectTurn,
-  turnEndMs,
-  turnStartMs,
-} from './turnInput.js';
 
 export const CHECKS = [
   'schema',
@@ -49,8 +51,19 @@ export const CHECKS = [
   'fog',
   'departure',
   'injection',
+  'assault',
 ] as const;
 export type CheckName = (typeof CHECKS)[number];
+
+/**
+ * How far beyond its own fire range an enemy foot battalion or battery counts as a defender of the
+ * ground a broken unit attacked, at the turn's start or end (the assault's closest approach falls
+ * between the two and is not in the proposal).
+ */
+export const ASSAULT_REACH_M = 200;
+
+/** A broken attacker counts only once it has lost this share of its men (not a unit that just ran). */
+export const ASSAULT_LOSS_SHARE = 0.05;
 
 export interface CheckResult {
   /** Every check passed. */
@@ -124,29 +137,23 @@ export interface TurnCheckContext {
   turn: number;
   turnMs: number;
   projection: readonly ProjectedOutcome[];
+  /**
+   * Ammunition the projection's supply rule gave each unit, by unit id (#436), as the engine's
+   * `TurnContext` carries it. When present, the `ammo` check uses the validator's ceiling (the
+   * start-of-turn value plus this, capped at 100) instead of the projection's end value. The
+   * live adjudicate stage passes the turn's measured resupply, and so does the benchmark, which
+   * runs the game's projection (#440). Absent (a caller with no measured resupply), the check
+   * keeps the end-value form.
+   */
+  resupply?: Record<string, number>;
   /** Every order the umpire was shown, by the id it was shown with: arrived by the turn's end, or on the road. */
   orders: readonly { orderId: string; to: string; arrived: boolean }[];
   /** Departure reasons are checked under `standard` only. */
   dial: 'rigid' | 'standard' | 'free';
   /** A marker an injected order asks the umpire to write. */
   canary?: string;
-}
-
-export function checkProposal(c: TurnCase, raw: unknown): CheckResult {
-  const t0 = turnStartMs(c);
-  return checkTurnProposal(raw, {
-    world: caseWorld(c),
-    turn: c.turn,
-    turnMs: turnEndMs(c) - t0,
-    projection: projectTurn(c).units,
-    orders: c.orders.map((o) => ({
-      orderId: o.orderId,
-      to: o.to,
-      arrived: o.courierStatus.kind !== 'riding',
-    })),
-    dial: 'standard',
-    ...(c.canary ? { canary: c.canary } : {}),
-  });
+  /** A benchmark case whose fight calls for a roll (#535): some outcome must cite one. */
+  expectsRoll?: boolean;
 }
 
 /** The automatic checks on a proposal for a turn (the benchmark's, and the live stage's gate). */
@@ -227,7 +234,14 @@ export function checkTurnProposal(raw: unknown, ctx: TurnCheckContext): CheckRes
         problems.limits.push(`${u.id}: ${k} ${v} outside 0..100`);
     }
     const proj = projection.find((x) => x.unitId === u.id);
-    if (proj && o.ammo !== undefined && o.ammo > proj.ammo + 0.5)
+    if (o.ammo !== undefined && ctx.resupply !== undefined) {
+      // The validator's ceiling (#436): the start value plus what supply gave the unit, so a
+      // proposal that fired less than the projection is not sent back for keeping the
+      // difference, as the projection's end value alone would have it.
+      const ceiling = Math.min(100, u.ammo + (ctx.resupply[u.id] ?? 0));
+      if (o.ammo > ceiling + 0.5)
+        problems.ammo.push(`${u.id}: ammo ${o.ammo} above the ceiling ${ceiling}`);
+    } else if (proj && o.ammo !== undefined && o.ammo > proj.ammo + 0.5)
       problems.ammo.push(`${u.id}: ammo ${o.ammo} above the projected ${proj.ammo}`);
     const loss = Math.round(u.strength) - o.strength;
     const projLoss = proj ? Math.round(u.strength) - proj.strength : 0;
@@ -279,6 +293,36 @@ export function checkTurnProposal(raw: unknown, ctx: TurnCheckContext): CheckRes
     ].filter(Boolean);
     if (why.length > 0)
       problems.departure.push(`${o.unitId}: ${why.join(', ')}, no departure reason`);
+  }
+
+  // a decisive fight that costs one side alone (#535)
+  const startOf = (u: Unit) => ({ x: metres(u.center.x), y: metres(u.center.y) });
+  for (const o of outcomes) {
+    const u = byId.get(o.unitId)!;
+    const before = Math.round(u.strength);
+    // A foot assault: cavalry thrown back by fire at no loss to the infantry is ordinary.
+    const broke = u.kind !== 'cavalry' && u.status === 'active' && o.status !== 'active';
+    if (!broke || before - o.strength < ASSAULT_LOSS_SHARE * before) continue;
+    const spots = [startOf(u), { x: o.x, y: o.y }];
+    const defenders = outcomes.filter((d) => {
+      const e = byId.get(d.unitId)!;
+      if (e.side === u.side || e.kind === 'cavalry' || e.status === 'destroyed') return false;
+      const reach = unitTypeOf(e).rangeM + ASSAULT_REACH_M;
+      return [startOf(e), { x: d.x, y: d.y }].some((a) =>
+        spots.some((b) => Math.hypot(a.x - b.x, a.y - b.y) <= reach),
+      );
+    });
+    if (
+      defenders.length > 0 &&
+      defenders.every((d) => d.strength >= Math.round(byId.get(d.unitId)!.strength))
+    ) {
+      problems.assault.push(
+        `${u.id}: ${o.status} after losing ${before - o.strength} men, but ${defenders.map((d) => d.unitId).join(', ')}, within reach of it, lost none; an assault pressed to close range costs the defenders men, so give them their losses or say why it never closed`,
+      );
+    }
+  }
+  if (ctx.expectsRoll && !p.units.some((o) => (o.rollIds ?? []).length > 0)) {
+    problems.assault.push('the fight calls for a roll, and no outcome cites one');
   }
 
   // injection
