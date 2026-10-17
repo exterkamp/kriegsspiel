@@ -4,7 +4,11 @@
 planner. It consumes **accepted decimal6 authoritative ground**, bounds, water,
 optional independent cover, D crossing proposals, recorded settings and a seed.
 It changes none of those inputs. It does not import or execute SettleMaker.
-`PLANNING_VERSION = sites-lattice-decks-v1`; `DECK_POLICY =
+`PLANNING_VERSION = rotated-sites-any-angle-network-v5` (D50). For saved maps,
+`sited-graded-any-angle-network-v4` (D48, unturned sites) remains
+`ANY_ANGLE_PLANNING_VERSION`, `sited-graded-fording-network-v3` (D46, lattice
+roads with fords) remains `FORDING_PLANNING_VERSION`, and
+`sited-graded-network-v2` (bridges only) remains `LEGACY_PLANNING_VERSION`. `DECK_POLICY =
 linear-ground-endpoints-v1`. Changing geometry, sizing, tie breaks or cost policies
 requires a planning version change. Local sizing/deck certificates retain full precision analytic metadata; frozen
 asset geometry remains decimal6. When assembling a canonical asset, retain or
@@ -20,6 +24,7 @@ certifyFootprint(input, polygon): GenerationResult<Suitability>
 directionalGrade(input, from, to): GenerationResult<number>
 certifyRoadSegment(input, from, to, widthM?, boundarySide?): GenerationResult<CorridorCertificate>
 certifyBridge(input, candidate, deckProfile?): GenerationResult<DeckProfile>
+certifyFord(input, candidate): GenerationResult<FordProfile>
 validateRoadPath(input, path, widthM?): GenerationResult<{ maxDirectionalGrade: number }>
 validatePlanning(input, plan): GenerationResult<{ connected: true; validationWork: number }>
 reconcileLocalJoins(input, plan, actualJoins, pass?, previousWork?): ReconciliationResult
@@ -31,7 +36,13 @@ reconcileLocalJoins(input, plan, actualJoins, pass?, previousWork?): Reconciliat
 `requireBridge`. One west boundary exit is the default; an explicit empty list
 requests none. A singleton requested terminal returns `REGIONAL_TERMINALS`
 rather than silently dropping its certified exit/approach. Zero sites with an
-explicit empty boundary list is a legitimate empty plan. Independent validation
+explicit empty boundary list is a legitimate empty plan. Each exit takes the
+first certified position on its side, from the middle outward. When no route
+from the joined network reaches it (a pocket cut off by water or steep ground,
+#542), the exit moves along the side to the next certified position at least
+400 m from every position already tried, at most four times per side
+(`EXIT_RETRY`), before `REGIONAL_CONNECTIVITY`. This changes only plans that
+would otherwise fail. Independent validation
 compares the complete requested boundary-side set. `requireBridge` requires a linked, used bridge in a route between
 required sites, rather than merely retaining geometric proposals.
 
@@ -57,8 +68,19 @@ rather than being hidden as ordinary generation failure.
 Candidate anchors occupy a deterministic coarse lattice with stride
 `max(planningSpacing, floor(max(planningSpacing,minSpacing/6)/planningSpacing)
 * planningSpacing)`. This does not resample or reduce authoritative elevation.
-Candidates rank by complete maximum gradient, then a `places:v1` derived seed,
-then y/x. Greedy required slots preserve spacing and reject footprint overlap.
+v2 (`SITE_PREFERENCES`, #490) ranks candidates by a landscape score, lower is
+better, then a `places:v1` derived seed, then y/x. The score adds
+`3 × (footprint gradient / maxBuildingGradient)²`; a summit penalty (2 × the
+anchor's height above the mean of eight points on a 400 m ring, relative to 15%
+of map relief) and a smaller valley-floor bonus; on maps with rivers, a bog
+penalty when the anchor stands less than 2 m above the nearest river surface,
+a penalty for being within 120 m of a river bank or more than 700 m from any
+river, and bonuses within 500 m of a bridge candidate and 600 m of a
+confluence (farms weigh water terms at 0.3); and a margin penalty within 400 m
+of the map edge. Villages therefore settle on gentle valley floors near
+crossings and confluences, not on summits or river flats. Nearest-river
+queries use 250 m segment bins. Greedy required slots preserve spacing and
+reject footprint overlap.
 Hard moved anchors place first. The frozen ordered override resolver provides
 last-write-wins names/anchors and a union of exclusions. Renaming changes no
 geometry or geometry identity. An exclusion never silently reduces required
@@ -79,9 +101,41 @@ clipped boundary vertices and hole boundaries are checked; an interior raised
 node cannot hide behind a flat anchor/outer ring. A hole excludes its interior;
 its boundary remains authoritative. Complete bounds and closed water contact
 checks preserve dry islands. Area and extent, measured from actual polygon area
-and world-axis bounds, are independently recomputed at validation and compared
-to configuration and sizing evidence. A point query is never a footprint
-certificate.
+and its extents in the site's own frame (`siteFrameExtents`), are independently
+recomputed at validation and compared to configuration and sizing evidence. A
+point query is never a footprint certificate.
+
+### Turned sites (D50)
+
+Since v5 each site square is turned by a whole degree `rotationDeg` in
+[0, 90) (`SITE_ORIENTATION`, `src/planning/sites.ts`), so its streets and
+buildings follow the ground instead of the map axes. The turn sums three
+directions as quarter-turn vectors (a square is the same under quarter turns):
+
+- **terrain**: the gradient at the anchor and at eight points on rings of half
+  and one extent, each weighted by its size, so the sides run along the
+  contour and the fall line. It counts in full once the mean aligned gradient
+  reaches 3%.
+- **valley**: the nearest river reach within 400 m, fading linearly with
+  distance, so the sides run along the valley.
+- **approach**: the direction to the nearest site already placed (else the
+  nearest requested boundary exit), at weight 0.5, where the main road through
+  it comes from. On flat ground this alone turns the square to its road.
+
+The whole degree with the best match is read from a literal table of sines
+(`src/rotation.ts`); there is no runtime trigonometry. Candidates are ranked
+with their ground-and-exit turn and certified as turned squares. When a slot
+takes a candidate, the approach is recomputed toward the sites already placed;
+a turn that then fails the footprint certificate or overlaps falls back to the
+certified candidate turn. With no direction at all, the turn comes from the
+seed.
+
+A turned square (`orientedSquare`) grows by 1.5 µm on each side, so rounding
+its corners to decimal6 never takes its area or frame extent below the recorded
+size, and carries each side's midpoint as a ring vertex. Its sizing records the
+measured frame extent. An unturned square is exactly the v4 square. Road search
+blocks lattice nodes within a road half-width of a site in the site's own
+frame.
 
 Each site has one real regional entrance: a boundary midpoint with an outward
 certified connector to an external planning node. The network therefore connects
@@ -89,18 +143,61 @@ required approaches without depending on a future internal street graph. Other
 site regions block road search. The terminal approach has permission to meet its
 own permissible boundary; no occupied footprint exists yet. Entrance width is
 reserved width, bearing is clockwise from north toward the external tangent,
-and node/path endpoint/route provenance is explicit.
+and node/path endpoint/route provenance is explicit. A turned site's entrance
+is a side midpoint vertex; its connector leaves exactly along the side's normal
+for one lattice spacing, its bearing is that normal's whole degree, and a
+second graded connector joins the nearest lattice node (replaceable by the
+any-angle pass, like a bridge's).
 
 ## Terrain-cost routing, crossings and normalization
 
-The bounded internal lattice uses four cardinal neighbours. Traversal cost is
-length × `(1 + 4 * certified directional grade)`; Euclidean distance is an
-admissible A* heuristic. Cover remains an independent layer and does not block
-roads or change height; v1 does not apply a wood cost penalty. Equal f/g costs
-break by internal node index. A deterministic nearest connection process grows
-the required spanning network; failed pairs are excluded with a bounded retry
+The bounded internal lattice uses sixteen neighbours (axes, diagonals and,
+since D48, knight moves). v2 traversal
+cost (`ROUTE_COSTS`, #490) is length × `(1 + 6g + 120g² + margin)`, where `g`
+is the certified maximum directional grade and `margin` rises to 0.6 within
+150 m of the map edge: roads wind along contours, valleys and spurs and keep
+off the margin. A bridge costs `2 × span + 250 m`, so routes share crossings.
+Edges already emitted by earlier routes cost 0.55 ×, so later routes join the
+network at junctions rather than running in parallel. Search is weighted A*
+(Euclidean heuristic, at most `1/0.55` above the optimal cost) and lazy: a
+lattice edge is queued with the lower bound given by its endpoint height
+difference and certified only when popped; a dearer certified cost is
+re-queued and an uncertifiable edge dropped, so every emitted edge is certified
+exactly as before. Cover remains an independent layer and does not block roads
+or change height; no wood cost penalty applies. Equal f/g costs break by node
+index, then predecessor. A deterministic nearest connection process grows the
+required spanning network; failed pairs are excluded with a bounded retry
 count. Configured extra site links add bounded redundancy. Requests that cannot
 be satisfied return infeasibility.
+
+### Any-angle geometry (D48)
+
+Routes are found and shared on the lattice. `anyAngle` (`src/planning/smooth.ts`)
+then rewrites the selected network. It splits the network into chains of
+replaceable edges between anchors. Replaceable edges are lattice edges and the
+connector from a bridge's outward point to the lattice. Anchors are junctions,
+nodes where the route set changes, and the ends of fixed edges: decks, outward
+bridge approaches, ford connectors, site connectors and boundary exits. In
+`ANY_ANGLE` order, each chain is:
+
+1. string-pulled to the farthest vertex (at most 48 steps on) whose straight
+   line costs no more than the steps it replaces, using the route cost in 25 m
+   pieces;
+2. relaxed by dropping vertices whose neighbours can be joined for no more
+   cost;
+3. re-anchored where a junction of chains only can slide onto its straightest
+   through pair or move toward its branches' Weiszfeld point, for no more cost;
+4. rounded: each corner becomes a quadratic curve inside its triangle, cut
+   back by `150 m × tan(θ/2)` and at most 45% of either side, halving up to
+   three times before the corner stays sharp.
+
+Every new line must certify as a reserved corridor with 1 mm extra half-width
+and 1e-6 grade headroom, so its micrometre-rounded sub-segments certify exactly.
+It must also clear sites by the same 1 mm, cross no road except at a shared
+end, and stay one road width from roads that do not end at its chain's ends.
+Where no line qualifies, the lattice edges stay. Chains are processed in a fixed
+order, against the current geometry of all the others, so the result is
+deterministic and planar before normalization.
 
 Ground segments use existing `createElevationQueries`, not a competing height
 implementation. Centreline segments split at every elevation cell seam. Three
@@ -112,6 +209,9 @@ norm is large: road grade is the gradient dotted with travel direction.
 Reserved round capsules are checked for complete closed water contact and
 bounds. Gradient certification conservatively examines all corners of each cell
 touched by the capsule, bounding its clipped interior as well as bend/end caps.
+Touched cells are found by `segmentNearCell`, an allocation-free form of the
+same predicate (endpoint in the closed cell, a Liang–Barsky crossing, or an
+endpoint/corner distance within the radius plus the 1e-9 m contact slack).
 This may reject a road that an exact curved capsule intersection could accept;
 it cannot accept an over-grade corridor under the declared bilinear model.
 Grade tolerance is **1e-12**; it is not relaxed to accommodate rounding. Only a
@@ -129,11 +229,32 @@ The explicit bridge deck is linear between authoritative dry endpoint heights,
 with continuity tolerance **1e-7 m**, and constant endpoint cap heights. Deck
 grade is their height difference divided by span; underwater ground is not a
 road-grade shortcut. Both heights must be finite and form a length-two tuple.
-V1 accepts only constant standing-water river profiles; the deck must remain
+Planning accepts only constant standing-water river reaches; the deck must remain
 strictly above that surface by **1e-7 m** over the complete wet interval/full
 transverse reach certified by D. Unsupported variable/carved profiles return a
 named infeasibility. Detailed clearance, structural physics and gameplay bridge
 capacity are outside this stage.
+
+### Fords (D46)
+
+Ford candidates (`shallow-riffle-v1`, see [geography](geography.md)) are certified
+by `certifyFord`: the same full crossing geometry as a bridge; a constant
+standing-water reach whose modelled riffle depth is at most 0.8 m and equals the
+recorded `depthM` (1e-6 m); both ends at most 1.5 m above the water; and dry
+ramps from each end to the water no steeper than the road maximum. The
+`FordProfile` records depth, bank heights and ramp grade; the plan lists them in
+`fords` as bridges are listed in `decks`. A ford edge costs `3 × span + 120 m`.
+Each ford end joins the lattice by every certified straight connector to a node
+within two spacings ahead of the bank, each costed by grade like a lattice edge,
+so the road can slant up the valley side toward where it is going.
+
+**Main roads never ford.** A route with a farm at either end is a minor road and
+may use ford edges; a route joining only villages and boundary exits, and the
+required-bridge route, may not. Since road IDs carry their route IDs,
+`validatePlanning` and `validateBattlefield` check this from the asset alone
+(`FORD_MAIN_ROAD`). `requireBridge` (and a required river map) still needs a
+linked bridge; a ford does not satisfy it. Emitted fords set
+`traversableWidthM` to the reserved width.
 
 No smoothing is performed. The public path validator checks replacement geometry
 from scratch. It requires at least two finite, nondegenerate points and checks
@@ -147,7 +268,10 @@ is rejected as `ROAD_CORRIDOR`, even when original segments passed.
 Final validation separately walks the actual certified emitted graph, enforces
 exact counts/entrance references/bearings, reciprocal crossing references,
 continuous grade-valid decks and ground approaches, boundary exit degree one,
-and rejects unjoined geometric intersections. Validation resolves input overrides again, enforces geometry-independent slots,
+and rejects unjoined geometric intersections. Two edges that share an endpoint
+and leave it on opposite sides (negative dot product) meet only there, so the
+overlap check skips them: nearly collinear, their line intersection is
+ill-conditioned and fell micrometres inside an edge (#542). Validation resolves input overrides again, enforces geometry-independent slots,
 hard moves, names and exclusions, and checks each logical route's reciprocal
 road/crossing memberships and graph connectivity through its own emitted edges.
 Ground paths cannot backtrack or enter unrelated permissible regions; an actual

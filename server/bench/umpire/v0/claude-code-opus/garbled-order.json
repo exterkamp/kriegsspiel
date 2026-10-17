@@ -1,0 +1,21 @@
+{
+  "caseId": "garbled-order",
+  "model": "claude-code-opus",
+  "provider": "claude-code",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 18495,
+  "raw": "{\"turn\":1,\"units\":[\n{\"unitId\":\"blue-1\",\"x\":1960,\"y\":1680,\"facingDeg\":0,\"formation\":\"line\",\"strength\":600,\"morale\":80,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"Col. Aubry had no orders and held his line covering the bridge. The 2nd Battalion marched past his rear to take post on his left.\"},\n{\"unitId\":\"blue-2\",\"x\":1740,\"y\":1660,\"facingDeg\":0,\"formation\":\"line\",\"strength\":550,\"morale\":75,\"fatigue\":6,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[{\"orderId\":\"b2-12\",\"result\":\"misread\"}],\"account\":\"Col. Delacroix's order came at minute 6, and the aide's message was confused: he took it as 'extend the line 300 paces west along the bank and watch for a crossing upstream'. He carefully broke into column and marched behind the 1st Battalion. He re-formed line on its left about 300 paces along the bank and posted pickets to watch the river upstream.\",\"departure\":\"The order was garbled. The colonel took 'east' for 'west' and 'downstream' for 'upstream', so the battalion extended the line on the 1st Battalion's left at (1740,1660), not 300 paces east at (2400,1680). The bridge's east flank is now uncovered.\"},\n{\"unitId\":\"blue-3\",\"x\":2050,\"y\":1850,\"facingDeg\":0,\"formation\":\"line\",\"strength\":200,\"morale\":85,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"Maj. Verneuil had no orders and held his squadron behind the infantry, astride the road.\"},\n{\"unitId\":\"red-1\",\"x\":1950,\"y\":300,\"facingDeg\":180,\"formation\":\"line\",\"strength\":650,\"morale\":80,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[{\"orderId\":\"r1-12\",\"result\":\"carried-out\"}],\"account\":\"Col. Brandt received the order to stand fast and obeyed, though with ill grace, holding his line by the road.\"},\n{\"unitId\":\"red-2\",\"x\":2250,\"y\":150,\"facingDeg\":180,\"formation\":\"line\",\"strength\":650,\"morale\":70,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"Col. Hartmann had no orders, so he held his line and waited for instructions.\"},\n{\"unitId\":\"red-3\",\"x\":1550,\"y\":400,\"facingDeg\":180,\"formation\":\"line\",\"strength\":220,\"morale\":85,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"Maj. von Reiter had no orders and held his squadron in place.\"}\n],\n\"observations\":[],\n\"summary\":\"Turn 1 (0-20). A quiet turn: no enemy came within anyone's sight, and nothing was fought. Blue's order for the 2nd Battalion to extend 300 paces east along the river and watch downstream reached it at minute 6 but was garbled in delivery. Its cautious colonel understood west and upstream instead. He marched the battalion behind the 1st and formed line on its left at about (1740,1660), watching the river upstream. As a result, the ground east of the bridge is now open, the opposite of what Blue intended. Red's Vanguard Battalion received 'Stand fast' at minute 2 and held. Every other unit held without orders.\"}\n",
+  "checks": {
+    "pass": true,
+    "problems": {
+      "schema": [],
+      "ids": [],
+      "limits": [],
+      "ammo": [],
+      "observations": [],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

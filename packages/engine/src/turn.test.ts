@@ -15,6 +15,7 @@ import {
   issueOrder,
   issuePlacement,
   issueTurn,
+  issueTurnNotice,
   metres,
   overlapsBeyondTolerance,
   positionAt,
@@ -27,6 +28,7 @@ import {
   startGame,
   startVisibility,
   validateProposal,
+  viewFor,
   type EngineState,
   type AppliedOutcome,
   type GameState,
@@ -306,12 +308,62 @@ describe('validateProposal', () => {
     expect(v.outcomes.find((o) => o.unitId === 'b')!.morale).toBe(0);
     const projected = w.units.map((u) => (u.id === 'a' ? { ...u, ammo: 90 } : u));
     const lowAmmo = { ...w, units: w.units.map((u) => (u.id === 'a' ? { ...u, ammo: 50 } : u)) };
+    // The projection took `a` from 50 to 90 by resupply alone, so the ceiling is 50 + 40 and a
+    // proposal of 95 is still corrected, to 90 (#436).
     const resupplied = validateProposal(
       lowAmmo,
       proposal(lowAmmo, { a: { ammo: 95 } }),
-      ctx({ projection: projected }),
+      ctx({ projection: projected, resupply: { a: 40 } }),
     );
     expect(resupplied.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(90);
+  });
+
+  it('does not correct ammunition for a unit that fired less than the projection (#436)', () => {
+    // At T0 `a` has 50. The projection resupplied it 25 (one wagon tick) and fired 50 away, so
+    // it ends at 25. The umpire's `a` fired less and ends at 70: more than the projection, but
+    // no more than it started with plus the resupply, so nothing is corrected.
+    const w = world();
+    const lowAmmo = { ...w, units: w.units.map((u) => (u.id === 'a' ? { ...u, ammo: 50 } : u)) };
+    const projected = lowAmmo.units.map((u) => (u.id === 'a' ? { ...u, ammo: 25 } : u));
+    const c = ctx({ projection: projected, resupply: { a: 25 } });
+    const kept = validateProposal(lowAmmo, proposal(lowAmmo, { a: { ammo: 70 } }), c);
+    expect(kept.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(70);
+    expect(kept.corrections.filter((x) => x.field === 'ammo')).toEqual([]);
+    // Past the start plus the resupply (75), the ceiling still bites.
+    const over = validateProposal(lowAmmo, proposal(lowAmmo, { a: { ammo: 80 } }), c);
+    expect(over.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(75);
+    expect(over.corrections).toMatchObject([
+      { unitId: 'a', field: 'ammo', proposed: 80, applied: 75 },
+    ]);
+    expect(over.corrections[0]!.reason).toMatch(/rises only by supply, to 75/);
+  });
+
+  it('keeps the old ceiling for a context logged before #436: projection, no resupply', () => {
+    // A turn logged before #436 carries the projection (its end value has the resupply
+    // baked in) but no `resupply` field. Replay runs the same validator on that logged
+    // context, so its ceiling must stay the old one, the projection's end value: at T0
+    // `a` has 50 and the projection took it to 90 by resupply alone.
+    const w = world();
+    const lowAmmo = { ...w, units: w.units.map((u) => (u.id === 'a' ? { ...u, ammo: 50 } : u)) };
+    const projected = lowAmmo.units.map((u) => (u.id === 'a' ? { ...u, ammo: 90 } : u));
+    const c = ctx({ projection: projected });
+    // A proposal between the start value and the projection's end value stands, as it
+    // did when the turn was applied live.
+    const kept = validateProposal(lowAmmo, proposal(lowAmmo, { a: { ammo: 70 } }), c);
+    expect(kept.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(70);
+    expect(kept.corrections.filter((x) => x.field === 'ammo')).toEqual([]);
+    // An outcome that omits ammunition falls back to the projection's value, which the
+    // old ceiling lets stand; the start value as ceiling would clamp it and file a
+    // ruling that never happened live.
+    const omitted = validateProposal(lowAmmo, proposal(lowAmmo), c);
+    expect(omitted.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(90);
+    expect(omitted.corrections.filter((x) => x.field === 'ammo')).toEqual([]);
+    // Past the projection's end value, the old ceiling still bites.
+    const over = validateProposal(lowAmmo, proposal(lowAmmo, { a: { ammo: 95 } }), c);
+    expect(over.outcomes.find((o) => o.unitId === 'a')!.ammo).toBe(90);
+    expect(over.corrections).toMatchObject([
+      { unitId: 'a', field: 'ammo', proposed: 95, applied: 90 },
+    ]);
   });
 
   it('refuses to bring back a destroyed unit', () => {
@@ -379,6 +431,27 @@ describe('validateProposal', () => {
       status: 'active',
       rallied: true,
     });
+    expect(ok.corrections).toEqual([]);
+    // A failed roll cited is no rally (#494).
+    const lost = { ...roll, id: 'r2', roll: 0.8, success: false };
+    const failed = validateProposal(
+      broken,
+      proposal(broken, { a: { status: 'active', rollIds: ['r2'] } }),
+      ctx({ rolls: [roll, lost] }),
+    );
+    expect(failed.outcomes.find((o) => o.unitId === 'a')).toMatchObject({
+      status: 'withdrawn',
+      rallied: false,
+    });
+    expect(failed.corrections).toMatchObject([{ unitId: 'a', field: 'status', clamp: true }]);
+    expect(failed.corrections[0]!.reason).toMatch(/no rally: the roll it rests on failed/);
+    // One success among the cited rolls is enough.
+    const mixed = validateProposal(
+      broken,
+      proposal(broken, { a: { status: 'active', rollIds: ['r2', 'r1'] } }),
+      ctx({ rolls: [roll, lost] }),
+    );
+    expect(mixed.outcomes.find((o) => o.unitId === 'a')!.status).toBe('active');
     // Too late: past the give-up time.
     const late = {
       ...broken,
@@ -1017,5 +1090,132 @@ describe('umpire.turn', () => {
       }),
       { numRuns: 60 },
     );
+  });
+});
+
+describe("umpire.turn and the umpire's journal (11.8)", () => {
+  const SECRET = 'JOURNAL-CANARY';
+  it('records the turn’s note and precedents from the proposal, and no side sees them', () => {
+    const w = world();
+    const p = proposal(
+      w,
+      {},
+      {
+        summary: `Blue’s line held ${SECRET} the river. Red waits for its guns.`,
+        precedents: [`Cavalry cannot cross the river except at the bridge ${SECRET}.`],
+      },
+    );
+    const { state, emitted } = play(w, p);
+    expect(state.world.journal).toEqual({
+      notes: [{ turn: 1, note: `Blue’s line held ${SECRET} the river. Red waits for its guns.` }],
+      precedents: [
+        { turn: 1, ruling: `Cavalry cannot cross the river except at the bridge ${SECRET}.` },
+      ],
+    });
+    // Master state only: not in the emitted events (the window shows those after the game), nor
+    // in any side's view.
+    expect(JSON.stringify(emitted)).not.toContain(SECRET);
+    for (const side of state.world.sides) {
+      expect(JSON.stringify(viewFor(state.world, side.id, T1))).not.toContain(SECRET);
+    }
+  });
+});
+
+describe('umpire.turn and the turn reports (11.9)', () => {
+  const SECRET = 'REPORT-CANARY';
+  const turnReports = (w: GameState, side: 'blue' | 'red') =>
+    viewFor(w, side, T1).reports.filter((r) => r.observedAt === T1);
+
+  it('files one paper per own unit at the turn end, handed in at once, from the applied outcome', () => {
+    const w = world();
+    const a = unit(w, 'a');
+    const p = proposal(
+      w,
+      {
+        a: {
+          x: metres(a.center.x) + 400,
+          strength: a.strength - 37,
+          account: `I went forward ${SECRET}.`,
+        },
+      },
+      { summary: `The umpire's own record ${SECRET}.` },
+    );
+    const end = play(w, p).state.world;
+    const blue = turnReports(end, 'blue');
+    expect(blue.map((r) => [r.kind, r.from])).toEqual([
+      ['turn', unit(w, 'a').name],
+      ['turn', unit(w, 'b').name],
+    ]);
+    for (const r of blue) {
+      expect(r.deliveredAt).toBe(T1);
+      expect(r.text).toMatch(/^Sir, /);
+    }
+    expect(blue[0]!.turn).toMatchObject({ n: 1, lost: 37, movedM: 400, orders: [] });
+    expect(blue[0]!.text).toContain('We lost about 40 men.');
+    expect(blue[1]!.turn).toMatchObject({ n: 1, lost: 0, movedM: 0 });
+    // Red's own paper; the umpire's words (account, summary) are in no side's papers or view.
+    expect(turnReports(end, 'red').map((r) => r.from)).toEqual([unit(w, 'c').name]);
+    for (const side of ['blue', 'red'] as const) {
+      expect(JSON.stringify(viewFor(end, side, T1))).not.toContain(SECRET);
+    }
+  });
+
+  it('says how the unit took its orders, by the desk id of each', () => {
+    const w = world();
+    let s: EngineState<GameState> = startGame(startVisibility(createState(w.seed, w, 0)));
+    s = issueOrder(s, {
+      id: 'blue-o7',
+      side: 'blue',
+      to: 'a',
+      issuedAt: 0,
+      text: 'Take the bridge',
+      intents: [],
+      ref: 'o7',
+    });
+    const c = ctx({ orders: [{ orderId: 'blue-o7', unitId: 'a', deliveredAt: 0 }] });
+    s = beginTurn(s, { ...c.turn, adjudicator: 'umpire' });
+    const p = proposal(s.world, { a: { orders: [{ orderId: 'blue-o7', result: 'misread' }] } });
+    s = issueTurn(s, { proposal: p, context: c });
+    const end = advanceTo(s, T1, registry()).state.world;
+    const paper = turnReports(end, 'blue').find((r) => r.from === unit(w, 'a').name)!;
+    expect(paper.turn!.orders).toEqual([{ ref: 'o7', result: 'misread' }]);
+    expect(paper.text).toMatch(/as I understood them|took my orders to mean/);
+  });
+
+  it('reports a unit lost from headquarters, and an enemy newly in sight', () => {
+    const w = miniWorld({
+      units: [
+        { id: 'a', x: 500, y: 500 },
+        { id: 'b', x: 800, y: 500 },
+        { id: 'c', side: 'red', x: 1000, y: 500 },
+      ],
+    });
+    const p = proposal(
+      w,
+      { b: { strength: 0, status: 'destroyed' } },
+      { observations: [{ side: 'blue', unitId: 'c', by: 'a', when: 'end' }] },
+    );
+    const end = play(w, p).state.world;
+    const kinds = turnReports(end, 'blue').map((r) => [r.kind, r.from]);
+    expect(kinds).toContainEqual(['unitLost', unit(w, 'b').name]);
+    expect(kinds).toContainEqual(['turn', unit(w, 'a').name]);
+    expect(kinds).toContainEqual(['contact', unit(w, 'a').name]);
+    expect(kinds.filter(([k]) => k === 'turn')).toHaveLength(1);
+  });
+
+  it('files a notice to every side from the umpire’s staff', () => {
+    const w = world();
+    let s: EngineState<GameState> = startGame(startVisibility(createState(w.seed, w, 0)));
+    s = issueTurnNotice(s, T1, 'Sir, the turn was worked out by the book.');
+    const end = advanceTo(s, T1, registry()).state.world;
+    for (const side of ['blue', 'red'] as const) {
+      const notice = viewFor(end, side, T1).reports.filter((r) => r.kind === 'notice');
+      expect(notice).toHaveLength(1);
+      expect(notice[0]).toMatchObject({
+        from: "The umpire's staff",
+        deliveredAt: T1,
+        text: 'Sir, the turn was worked out by the book.',
+      });
+    }
   });
 });

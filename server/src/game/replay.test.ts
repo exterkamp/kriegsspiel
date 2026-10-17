@@ -1,7 +1,13 @@
 import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createState, loadScenario, holdTheBridge, type EmittedEvent } from '@kriegsspiel/engine';
+import {
+  RULES_VERSION,
+  createState,
+  loadScenario,
+  holdTheBridge,
+  type EmittedEvent,
+} from '@kriegsspiel/engine';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser, ParseResult } from '../orders/index.js';
 import { GameHost, FileGameStore, MemoryGameStore, parseInputLog, replayLog } from './index.js';
@@ -266,7 +272,12 @@ describe('FileGameStore', () => {
       .trim()
       .split('\n')
       .map((l) => JSON.parse(l));
-    expect(lines[0]).toEqual({ gameId: 'g1', scenarioId: 'hold-the-bridge', seed: 1815 });
+    expect(lines[0]).toEqual({
+      gameId: 'g1',
+      scenarioId: 'hold-the-bridge',
+      seed: 1815,
+      rules: RULES_VERSION,
+    });
     expect(lines.slice(1).map((l) => l.command.kind)).toEqual(['order', 'pause']);
 
     // A fresh store over the same directory (a new process) replays from the file alone.

@@ -8,6 +8,7 @@ import {
   advanceTo,
   createState,
   deserialize,
+  RULES_VERSION,
   type EmittedEvent,
   type EngineState,
   type EventRegistry,
@@ -32,7 +33,12 @@ import type {
 import { turnSettingsOf } from '@kriegsspiel/protocol';
 import type { GameStore, InputLogEntry } from './store.js';
 import { EngineTurnResolver } from './engineTurn.js';
-import { openTurnFromLog, sentTurnIdsFromLog, type TurnResolver } from './turns.js';
+import {
+  openTurnFromLog,
+  sentTurnIdsFromLog,
+  turnNarrationsFromLog,
+  type TurnResolver,
+} from './turns.js';
 import { assertPinnedWorld, detachedInputHeader } from './pinned-header.js';
 import {
   decodeNativeScenarioPin,
@@ -209,19 +215,31 @@ export class GameHost {
     clock: GameCreationOptions,
   ): Promise<GameActor> {
     const pin = clock.pin !== undefined ? decodeNativeScenarioPin(clock.pin) : undefined;
+    // A new game is played under the current rules, kept in the world and the log header (#432).
+    // A world that names its rules keeps them (a test pinned to a seed's story under rules 1).
+    const { rules: pinnedRules, ...given } = scenario;
+    let base: GameState = given;
     if (pin) {
-      assertBattlefieldBudget(scenario, 1024 * 1024);
-      if (nativeCanonicalJson(scenario) !== nativeCanonicalJson(pin.initialWorld))
+      assertBattlefieldBudget(base, 1024 * 1024);
+      // Each game its own seed (#534): the creating caller re-seeds the authored world, and
+      // everything else must be exactly the pinned time-zero world.
+      if (
+        nativeCanonicalJson({ ...base, seed: pin.initialWorld.seed }) !==
+        nativeCanonicalJson(pin.initialWorld)
+      )
         throw new Error('Creation world contradicts native pin');
-      scenario = structuredClone(pin.initialWorld);
+      base = { ...structuredClone(pin.initialWorld), seed: base.seed };
     }
+    const rules = pinnedRules ?? RULES_VERSION;
+    // The dial is part of the world (it sets the judgment cap); the persona is only prose.
     const settings = clock.settings ? structuredClone(clock.settings) : undefined;
     const rate = clock.rate;
     const header = detachedInputHeader({
       gameId: id,
-      scenarioId: scenario.scenarioId,
-      seed: scenario.seed,
+      scenarioId: base.scenarioId,
+      seed: base.seed,
       ...(settings ? { settings } : {}),
+      rules,
       ...(pin ? { battlefieldFormat: 1 as const, battlefieldPin: pin } : {}),
       ...(clock.creationReceiptId !== undefined
         ? { creationReceiptId: clock.creationReceiptId }
@@ -239,8 +257,13 @@ export class GameHost {
       )
         throw new Error('Existing input header conflicts with native allocation');
     } else await this.options.store.saveLogHeader(header);
-    // Dial/settings are runtime choices applied after the retained initial pin.
-    const world: GameState = settings ? { ...scenario, dial: settings.dial } : scenario;
+    // Dial/settings are runtime choices applied after the retained initial pin. The keys are in
+    // the order replay sets them (the dial, then the rules), so the two compare equal.
+    const world: GameState = {
+      ...base,
+      ...(settings ? { dial: settings.dial } : {}),
+      rules,
+    };
     const state0 = createState(world.seed, world, 0);
     const state = this.options.init?.(state0) ?? state0;
     // Turn mode (D39): the clock is manual for the game's whole life, there is no pause vote, and
@@ -349,6 +372,8 @@ export class GameHost {
       .reverse()
       .find((e) => e.command.kind === 'narrate' && e.narrateBreaker)?.narrateBreaker;
     const open = turnOptions ? openTurnFromLog(log) : undefined;
+    // The turns' narrated papers (11.9) as they were written: no model is asked again.
+    const narrations = turnOptions ? turnNarrationsFromLog(log) : undefined;
     const turns = turnOptions && {
       ...turnOptions,
       ...(open ? { open } : {}),
@@ -369,6 +394,7 @@ export class GameHost {
       restart: { downMs },
       persona: settings?.persona,
       ...(narrateBreaker ? { narrateBreaker } : {}),
+      ...(narrations && narrations.size > 0 ? { narrations } : {}),
       // The log is in insertion order, which is not always seq order (see D14b).
       seq: tail.reduce((max, e) => Math.max(max, e.seq), snap.seq),
     });

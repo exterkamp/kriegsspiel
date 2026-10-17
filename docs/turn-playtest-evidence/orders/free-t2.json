@@ -1,0 +1,12 @@
+{
+  "blue": [
+    { "orderId": "f2-1", "to": "blue-1", "text": "Hold where you stand at the bridge-end. Fire on any column that comes onto the bridge; do not waste powder on the far bank." },
+    { "orderId": "f2-2", "to": "blue-2", "text": "Hold where you stand. When the enemy comes onto the bridge, wheel your left company to fire into his flank. Do not leave the bank." },
+    { "orderId": "f2-3", "to": "blue-3", "courier": "fast", "text": "Come up to 150 paces behind the bridge-end. If enemy infantry gets over the bridge, charge it before it can form, then rally behind the infantry." }
+  ],
+  "red": [
+    { "orderId": "g2-1", "to": "red-1", "text": "Advance to the river bank and open fire on the enemy battalion west of the road for ten minutes. Then form column on the road and storm the bridge at the bayonet, with the Line Battalion close behind you. Take the south end and hold it." },
+    { "orderId": "g2-2", "to": "red-2", "text": "Advance to the river bank and fire on the enemy battalion east of the road while the Vanguard prepares. When the Vanguard storms the bridge, follow it across in column and deploy on its left on the far bank." },
+    { "orderId": "g2-3", "to": "red-3", "courier": "fast", "text": "Return at once to the bridge by the north bank and wait behind our infantry. Once our infantry holds the south end, cross and pursue any enemy who falls back." }
+  ]
+}

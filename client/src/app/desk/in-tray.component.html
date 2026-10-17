@@ -4,6 +4,22 @@
     <p class="ks-muted overloaded" role="status">{{ notice }}</p>
   }
   <div class="piles" role="group" aria-label="Piles">
+    @if (turnMs()) {
+      <button
+        type="button"
+        class="pile"
+        [attr.aria-pressed]="!showFiled() && pile() === 'all'"
+        (click)="pick('all')"
+      >
+        All <span class="n">{{ all().items.length }}</span>
+        @if (all().unread > 0) {
+          <span class="unread-dot"
+            ><span aria-hidden="true">●{{ all().unread }}</span
+            ><span class="ks-sr-only">{{ all().unread }} unread</span></span
+          >
+        }
+      </button>
+    }
     @for (p of sorted().piles; track p.id) {
       <button
         type="button"
@@ -26,24 +42,51 @@
   </div>
 
   <div class="cols">
-    <ul class="list" [attr.aria-label]="listLabel()">
-      @for (d of list(); track d.id) {
-        <li>
-          <button
-            type="button"
-            class="row"
-            [class.unread]="!read().has(d.id)"
-            [attr.aria-current]="openId() === d.id"
-            (click)="openDispatch(d.id)"
-          >
-            <b>{{ read().has(d.id) ? '' : '● ' }}{{ d.from }}</b>
-            <small>received {{ formatGameTime(d.receivedAtGame) }}</small>
-          </button>
-        </li>
-      } @empty {
-        <li class="empty">Nothing here.</li>
-      }
-    </ul>
+    @if (groups(); as gs) {
+      <div class="list" role="region" [attr.aria-label]="listLabel()">
+        @for (g of gs; track g.turn) {
+          <h3 class="turn" [id]="'tray-turn-' + g.turn">{{ g.heading }}</h3>
+          <ul [attr.aria-labelledby]="'tray-turn-' + g.turn">
+            @for (r of g.rows; track r.d.id) {
+              <li>
+                <button
+                  type="button"
+                  class="row"
+                  [class.unread]="unread(r)"
+                  [class.summary]="isSummary(r.d)"
+                  [attr.aria-current]="open() === r.d"
+                  (click)="openDispatch(r.d.id)"
+                >
+                  <b>{{ unread(r) ? '● ' : '' }}{{ r.d.from }}</b>
+                  <small>{{ rowNote(r) }}</small>
+                </button>
+              </li>
+            }
+          </ul>
+        } @empty {
+          <p class="empty">Nothing here.</p>
+        }
+      </div>
+    } @else {
+      <ul class="list" [attr.aria-label]="listLabel()">
+        @for (d of list(); track d.id) {
+          <li>
+            <button
+              type="button"
+              class="row"
+              [class.unread]="!read().has(d.id)"
+              [attr.aria-current]="openId() === d.id"
+              (click)="openDispatch(d.id)"
+            >
+              <b>{{ read().has(d.id) ? '' : '● ' }}{{ d.from }}</b>
+              <small>received {{ formatGameTime(d.receivedAtGame) }}</small>
+            </button>
+          </li>
+        } @empty {
+          <li class="empty">Nothing here.</li>
+        }
+      </ul>
+    }
 
     <article class="viewer" aria-live="polite" tabindex="-1" #viewer>
       @if (open(); as o) {
@@ -55,6 +98,16 @@
           <dd>{{ formatGameTime(o.receivedAtGame) }}</dd>
         </dl>
         <p class="text">{{ o.text }}</p>
+        @if (alsoSeen().length > 0) {
+          <aside class="also" aria-label="The same sighting, reported earlier">
+            <b>The same sighting, reported earlier</b>
+            <ul>
+              @for (d of alsoSeen(); track d.id) {
+                <li>{{ timeOfDay(d.writtenAtGame) }}, {{ d.from }}</li>
+              }
+            </ul>
+          </aside>
+        }
         @if (o.location || o.unit || o.sizeEstimate) {
           <aside class="sketch" aria-label="Attached sketch">
             <b>Sketch</b>

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
 import { assertBattlefieldBudget } from '@kriegsspiel/protocol';
@@ -39,6 +39,11 @@ export interface CreationReceipt {
   intent: CreationIntent;
   fingerprint: string;
   pin: NativeScenarioPinV1;
+  /**
+   * The game's own dice (#534): the request's seed, or one drawn once when the receipt is
+   * accepted, so a retry or later activation plays the same game. Server-only, like the pin.
+   */
+  seed: number;
   activationError?: string;
   retiredOwnerId?: string;
   retiredOwnerGuest?: boolean;
@@ -71,6 +76,11 @@ const envelope = z
     intent: z.unknown(),
     fingerprint: z.string().regex(/^game-creation-intent-v1:sha256:[a-f0-9]{64}$/),
     pin: z.unknown(),
+    seed: z
+      .number()
+      .int()
+      .min(0)
+      .max(2 ** 32 - 1),
     activationError: z.string().min(1).max(128).optional(),
     retiredOwnerId: ownerId.optional(),
     retiredOwnerGuest: z.boolean().optional(),
@@ -99,6 +109,7 @@ function decodeReceipt(value: unknown): CreationReceipt {
     pin.publicScenarioId !== intent.scenario ||
     pin.battlefield.pairing.id !== intent.pairing.pairingId ||
     pin.battlefield.pairing.revision !== intent.pairing.revision ||
+    (intent.seed !== undefined && intent.seed !== row.seed) ||
     nativeCanonicalJson(defaults.sides) !==
       nativeCanonicalJson(
         pin.initialWorld.sides.map((side) => ({ id: side.id, controller: side.controller })),
@@ -145,6 +156,7 @@ export function creationLobby(receipt: CreationReceipt): PinnedCreationLobby {
             ...(intent.pause.maxPauseMs === null ? {} : { maxPauseMs: intent.pause.maxPauseMs }),
           },
         }),
+    seed: receipt.seed,
     creationFormat: 1,
     creationReceiptId: receipt.receiptId,
     battlefieldPin: receipt.pin,
@@ -196,6 +208,8 @@ export class SqliteCreationStore {
     database: string | DatabaseSync,
     private readonly clock: () => number = Date.now,
     private readonly newId: () => string = randomUUID,
+    /** Each game its own seed (#534) when the request names none; as `AppOptions.newSeed`. */
+    private readonly newSeed: () => number = () => randomInt(0, 2 ** 32),
   ) {
     this.ownsDatabase = typeof database === 'string';
     this.database = typeof database === 'string' ? new DatabaseSync(database) : database;
@@ -360,6 +374,8 @@ export class SqliteCreationStore {
       defaultPin: NativeScenarioPinV1;
       selectedPin: NativeScenarioPinV1;
       aiAvailable: boolean;
+      /** The caller's draw of the game's seed (#534), used when the request names none. */
+      seed?: number;
     },
     checkNewLimit: () => void = () => undefined,
   ): CreationReceipt {
@@ -408,6 +424,7 @@ export class SqliteCreationStore {
         intent,
         fingerprint: creationIntentFingerprint(intent),
         pin,
+        seed: intent.seed ?? proposal.seed ?? this.newSeed(),
       });
       if (this.lobby.get(receipt.gameId) || this.auth.seatsOf(receipt.gameId).length)
         throw new CreationStoreError('game_id_conflict');
