@@ -96,6 +96,9 @@ describe('immutable room battlefield summary', () => {
     const summary = p.element.querySelector<HTMLElement>('[aria-label="Battlefield map"]')!;
     expect(summary.textContent).toContain('Open bridge approaches');
     expect(summary.textContent).toContain('4 × 3 km');
+    expect(summary.textContent).toContain('Scenario: hold-the-bridge');
+    expect(summary.textContent).toContain('Escape fits the map when zoomed.');
+    expect(summary.textContent).not.toContain('before closing');
     expect(
       summary.compareDocumentPosition(p.element.querySelector('#room-sides')!) &
         Node.DOCUMENT_POSITION_FOLLOWING,
