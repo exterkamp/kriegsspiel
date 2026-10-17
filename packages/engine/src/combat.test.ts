@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BREAK_MORALE,
   CHARGE_M,
+  RULES_VERSION,
   LONG_RANGE_FACTOR,
   MELEE_FACTOR,
   inMelee,
@@ -680,15 +681,18 @@ describe('Hold the Bridge', () => {
   it('plays out to a result, the same way every time', () => {
     const play = () => {
       const g = loadScenario(holdTheBridge);
-      let s = startGame(createState(g.seed, g, 0));
+      let s = startGame(createState(g.seed, { ...g, rules: RULES_VERSION }, 0));
       const goal = polygonCentroid(g.victory.objective);
       for (const id of ['red-1', 'red-2']) s = issueMove(s, id, goal);
       for (const id of ['blue-1', 'blue-2', 'blue-3']) s = issueMove(s, id, goal);
       return run(s, 200);
     };
     const a = play();
-    expect(a.state.world.outcome).toMatchObject({ winner: 'blue', reason: 'attack-broken' });
-    expect(a.state.world.rulings).toHaveLength(1);
+    // Since the contact line (#446) both sides halt at musket range and fight there
+    // instead of stacking on the bridge point at point-blank, so the attack stalls:
+    // blue holds the objective to the deadline and no force breaks for a ruling.
+    expect(a.state.world.outcome).toMatchObject({ winner: 'blue', reason: 'objective-held' });
+    expect(a.state.world.rulings).toHaveLength(0);
     expect(ofType(a.emitted, 'game.end')).toHaveLength(1);
     expect(ofType(a.emitted, 'combat.fire').length).toBeGreaterThan(0);
     expect(a.emitted).toEqual(play().emitted);
@@ -973,12 +977,14 @@ describe('a contested objective (rules 3, #528)', () => {
   /** Red marches onto the bridge while Blue's battalion fights it from the south end. */
   const southEnd = (rules: number) => {
     // Blue's 2nd battalion stands far off, so Blue's force is not broken when the 1st breaks.
+    // Blue's 1st stands 150 m south of the bridge: in reach of a holder and contesting it,
+    // but beyond the contact distance (#446), so Red's march is not halted short of the square.
     let s = field([
       { id: 'blue-1', side: 'blue', x: 9, y: 4 },
       { id: 'blue-2', side: 'blue', x: 0, y: 4 },
       { id: 'red-1', side: 'red', x: 3, y: 2 },
     ]);
-    s = place(s, 'blue-1', 550, 360);
+    s = place(s, 'blue-1', 550, 400);
     s = { ...s, world: { ...s.world, rules } };
     return issueMove(s, 'red-1', T(5, 2));
   };

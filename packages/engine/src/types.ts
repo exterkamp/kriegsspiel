@@ -23,8 +23,11 @@ export const MS_PER_MINUTE = 60 * MS_PER_SECOND;
  * - 4 (#531): an enemy takes a courier only if it could reach it: by a straight ride over passable
  *   ground, or by its cheapest route within its arm's reach, never over a crossing the courier's
  *   side holds (`CROSSING_HOLD_M`; D11).
+ * - 5 (#446): a plain march halts at the contact line (`contactM` in the unit data) instead of
+ *   marching into an enemy; a type with a charge distance closes to melee on an attack order;
+ *   an umpire turn's settle covers opposing pairs as well as friendly ones (D55).
  */
-export const RULES_VERSION = 4;
+export const RULES_VERSION = 5;
 
 /** True when couriers roll on their own stream (rules 2, #432). */
 export const courierStreams = (world: { rules?: number }): boolean => (world.rules ?? 1) >= 2;
@@ -34,6 +37,9 @@ export const contestedHolds = (world: { rules?: number }): boolean => (world.rul
 
 /** True when an enemy must be able to reach a courier to take it (rules 4, #531). */
 export const interceptReach = (world: { rules?: number }): boolean => (world.rules ?? 1) >= 4;
+
+/** True when marches halt at the contact line and charges close to melee (rules 5, #446). */
+export const contactLine = (world: { rules?: number }): boolean => (world.rules ?? 1) >= 5;
 
 export type SideId = 'blue' | 'red';
 

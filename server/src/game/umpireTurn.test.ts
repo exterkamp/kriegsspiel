@@ -184,8 +184,11 @@ describe('the umpire adjudicator (D39, 11.6) with the canned umpire', () => {
         expect(e.error).toBeUndefined();
         expect(e.turn!.fallback).toBeUndefined();
         expect(e.turn!.adjudicator).toBe('umpire');
-        // One canned call per turn, logged for the record.
-        expect(e.calls).toHaveLength(1);
+        // One canned call per turn, logged for the record. Turn 2 takes a resend:
+        // Red's two battalions halt at the same contact line in the projection (#446),
+        // the validator refuses their stacked end positions, and the canned reply's
+        // clamped version is applied after the one resend.
+        expect(e.calls).toHaveLength(e.turn!.n === 2 ? 2 : 1);
         expect(e.calls![0]).toMatchObject({
           stage: 'adjudicate',
           promptVersion: ADJUDICATE_PROMPT_VERSION,
@@ -1085,7 +1088,9 @@ describe('dice when asked (D39, 11.7)', () => {
     expect(turns.length).toBeGreaterThan(1);
     for (const e of turns) {
       expect(e.turn!.adjudicator).toBe('umpire');
-      expect(e.calls).toHaveLength(2);
+      // Two calls a turn (the ask, then the final proposal); turn 2 takes one more,
+      // the resend over Red's stacked battalions (see the canned-umpire test above).
+      expect(e.calls).toHaveLength(e.turn!.n === 2 ? 3 : 2);
       expect((e.turn!.output as UmpireTurnOutput).context.rolls).toHaveLength(1);
     }
     expect(JSON.stringify(run.replayed.state.world)).toBe(JSON.stringify(run.game.state.world));

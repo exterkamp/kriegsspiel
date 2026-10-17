@@ -162,11 +162,12 @@ const CASES = [1, 2, 3, 4, 5, 6, 7, 8, 42, 1815].flatMap((seed) =>
  * Blue's cavalry where it stood at the turn's start (D39: interception against `T0` positions), south
  * of the bridge Red holds, so out of reach and the order is delivered; in real time the cavalry has
  * crossed by minute 21 and takes it. Under rules 3 both took it, as reach ignored the river.
+ * Under rules 5 (#446) the 1815 cases no longer part: the cavalry's ride at the bridge is halted
+ * at Red's contact line in real time too, so it is still south of the bridge, out of reach, in
+ * both modes, and the fields agree at every turn end. The table stands empty until another
+ * case parts.
  */
-const T0_REACH = new Map<string, number>([
-  ['1815/10', 21 * MIN],
-  ['1815/20', 21 * MIN],
-]);
+const T0_REACH = new Map<string, number>([]);
 
 describe('rigid turns against real time (#430)', () => {
   it.each(CASES)(

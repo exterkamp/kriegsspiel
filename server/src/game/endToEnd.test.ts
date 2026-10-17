@@ -66,6 +66,8 @@ async function play(
   untilMs: number | 'end',
   script: readonly { atMs: number; text: string }[] = SCRIPT,
   seed?: number,
+  /** The engine rules to play under; absent: the current ones. */
+  rules?: number,
 ): Promise<Run> {
   const time = new FakeTime();
   const store = new MemoryGameStore();
@@ -81,11 +83,13 @@ async function play(
     onEmitted: (_id, e) => events.push(...e),
   });
   const fast = rate === 'fast-forward';
-  const game = await host.create(
-    'g1',
-    loadScenario(seed === undefined ? holdTheBridge : { ...holdTheBridge, seed }),
-    { rate: fast ? 1 : rate },
-  );
+  const loaded = loadScenario({
+    ...holdTheBridge,
+    ...(seed === undefined ? {} : { seed }),
+  });
+  const game = await host.create('g1', rules === undefined ? loaded : { ...loaded, rules }, {
+    rate: fast ? 1 : rate,
+  });
   if (fast) await game.submit({ kind: 'setMode', mode: 'fast-forward' });
   const horizon = untilMs === 'end' ? Infinity : untilMs;
   let at = 0;
@@ -243,12 +247,15 @@ describe('pacing of a first game (#178)', () => {
 describe('a battle is decided (#315)', () => {
   // A seed whose battle is ruled and then closed after its pursuit. Under rules 1 the scenario's
   // own seed (1815) did; under rules 2 (#432) its battle closes at the ruling, Red having nobody
-  // left, so seed 6 stands in.
+  // left, so seed 6 stands in. Played under rules 4: under rules 5 (#446) this script is not
+  // decided inside the hold limit (the battalions halt at the contact line and the fight runs
+  // long, Red breaking Blue only after it), and the ruling machinery followed here is
+  // rules-independent; current-rules games are covered by the pacing tests above and turnParity.
   const BATTLE_SEED = 6;
   it.each([1, 4, 12] as const)(
     'with both battalions at the bridge the game ends with a declared result at rate %i',
     async (rate) => {
-      const run = await play(rate, HORIZON_MS, SCRIPT, BATTLE_SEED);
+      const run = await play(rate, HORIZON_MS, SCRIPT, BATTLE_SEED, 4);
       const w = run.state.world;
       const end = w.outcome!;
       expect(end).toMatchObject({ winner: 'blue', reason: 'attack-broken' });
@@ -366,6 +373,10 @@ describe('a decided battle against the time limit (#417)', () => {
     { atMs: 0, text: 'blue-2 hold the bridge' },
   ];
   const RATES = [1, 4, 12, 'fast-forward'] as const;
+  // Both games are played under rules 4: under rules 5 (#446) no hold-the-bridge defence is
+  // ruled broken inside the 50-minute limit (the fight at the contact line runs long), so there
+  // is no pre-limit ruling for the limit to stand on. What #417 proves, that a ruling stands at
+  // the limit, is rules-independent.
 
   it('a defence ruled broken after minute 30 wins for Red at the time limit, not objective-held, at every rate and in replay', async () => {
     // Seed 128: Blue's defence is ruled broken at about game minute 35, so the pursuit would
@@ -373,7 +384,7 @@ describe('a decided battle against the time limit (#417)', () => {
     // showed it under rules 1; courier dice on their own stream, #432, changed the fight.)
     const runs = [];
     for (const rate of RATES) {
-      const run = await play(rate, HORIZON_MS, HOLD_BOTH, 128);
+      const run = await play(rate, HORIZON_MS, HOLD_BOTH, 128, 4);
       const { battle, outcome } = run.state.world;
       expect(battle, `rate ${rate}`).toMatchObject({ winner: 'red', reason: 'defence-broken' });
       expect(battle!.declaredAt).toBeGreaterThan(30 * MIN);
@@ -400,7 +411,7 @@ describe('a decided battle against the time limit (#417)', () => {
     // Seed 27: Red's attack is ruled broken, then Blue's last unit breaks in the pursuit. Before
     // #417 that gave Red the game with "attack-broken".
     for (const rate of RATES) {
-      const run = await play(rate, HORIZON_MS, HOLD_BOTH, 27);
+      const run = await play(rate, HORIZON_MS, HOLD_BOTH, 27, 4);
       expect(run.state.world.battle, `rate ${rate}`).toMatchObject({
         winner: 'blue',
         reason: 'attack-broken',

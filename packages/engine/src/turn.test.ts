@@ -5,6 +5,7 @@ import {
   EventRegistry,
   MS_PER_MINUTE,
   RALLY_RULES,
+  RULES_VERSION,
   STANDING_EVENT,
   TURN_EVENT,
   advanceTo,
@@ -189,7 +190,7 @@ describe('validateProposal', () => {
     expect(v.corrections[0]!.reason).toMatch(/refused: .*impassable/);
   });
 
-  it('counts overlap with a friendly end position only, not with the enemy', () => {
+  it('counts overlap with a friendly end position, and with the enemy alike', () => {
     const w = world();
     // `a` onto where `b` stays: friendly overlap.
     const onFriend = validateProposal(w, proposal(w, { a: { x: 1300, y: 600 } }), ctx());
@@ -201,15 +202,23 @@ describe('validateProposal', () => {
       ctx(),
     );
     expect(swapped.corrections).toEqual([]);
-    // Red `c` met in melee by `b`: opposing units may overlap.
-    const near = miniWorld({
-      units: [
-        { id: 'a', x: 500, y: 500 },
-        { id: 'c', side: 'red', x: 900, y: 500 },
-      ],
-    });
+    // Red `c` met head-on by `a`: under the current rules a turn may not end with
+    // opposing footprints overlapping either (#446), so the mover is put back.
+    const near = {
+      ...miniWorld({
+        units: [
+          { id: 'a', x: 500, y: 500 },
+          { id: 'c', side: 'red', x: 900, y: 500 },
+        ],
+      }),
+      rules: RULES_VERSION,
+    };
     const melee = validateProposal(near, proposal(near, { a: { x: 890, y: 500 } }), ctx());
-    expect(melee.corrections).toEqual([]);
+    expect(melee.outcomes.find((o) => o.unitId === 'a')!.center).toEqual({
+      x: 500_000,
+      y: 500_000,
+    });
+    expect(melee.corrections[0]!.reason).toMatch(/put back .* overlaps c/);
   });
 
   it('puts back a friend whose end position overlaps a unit that could not move', () => {

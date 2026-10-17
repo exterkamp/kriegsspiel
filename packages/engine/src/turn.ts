@@ -21,6 +21,7 @@ import { FORMATION_RULES, unitTypeOf } from './unitTypes.js';
 import { canSee, coarseFacing, contactReport, fileReport, sizeEstimate } from './visibility.js';
 import { FORCED_PACE_FACTOR } from './fatigue.js';
 import { recordInJournal } from './journal.js';
+import { contactLine } from './types.js';
 import type {
   Contact,
   Formation,
@@ -373,7 +374,6 @@ export function validateProposal(
     ends.set(u.id, 'wanted' in a ? a.wanted : { ...u, center: startAt.get(u.id)! });
   }
   const placed = new Map<string, Unit>();
-  const atStart = new Set<string>();
   const startArrangement = (u: Unit): Unit => ({ ...u, center: startAt.get(u.id)! });
   for (const u of live) {
     const w = wants.get(u.id)!;
@@ -401,7 +401,6 @@ export function validateProposal(
     const proposed = { x: m(w.center.x), y: m(w.center.y) };
     if (verdict.verdict === 'reject') {
       placed.set(u.id, startArrangement(u));
-      atStart.add(u.id);
       const s = startAt.get(u.id)!;
       note(
         u.id,
@@ -426,27 +425,36 @@ export function validateProposal(
       );
     }
   }
-  // No two friends may end overlapping, and the march checks above saw each friend at its
-  // proposed end, not at its clamped one. So once status is settled (below), every pair that still
-  // overlaps is settled: the one that moved goes back where it started (the later in unit-id order
-  // if both moved), until stable. `stays` says which units stand on the ground at the end.
+  // No two units may end a turn overlapping: friends because the march checks above only
+  // counted friendly overlap, and (under rules 5, #446) enemies because a turn may not end
+  // with opposing footprints on top of each other; mere contact, footprints touching, stands.
+  // Games logged before rules 5 replay with the friendly pairs only, as they were played.
+  // The march checks saw each unit at its proposed end, not at its clamped one, so once status
+  // is settled (below), every pair that still overlaps is settled: the one that moved goes back
+  // where it started (the later in unit-id order if both moved), until stable. `stays` says
+  // which units stand on the ground at the end.
   const settle = (stays: (id: string) => boolean): Set<string> => {
     const moved = new Set<string>();
+    // Off its start ground, by where the turn has placed it: the mover is who goes back.
+    const offStart = (u: Unit): boolean => {
+      const p = placed.get(u.id)!.center;
+      const s = startAt.get(u.id)!;
+      return p.x !== s.x || p.y !== s.y;
+    };
     let changed: boolean;
     do {
       changed = false;
       for (const [i, a] of live.entries()) {
         for (const b of live.slice(i + 1)) {
-          if (a.side !== b.side || !stays(a.id) || !stays(b.id)) continue;
+          if ((a.side !== b.side && !contactLine(world)) || !stays(a.id) || !stays(b.id)) continue;
           const pa = placed.get(a.id)!;
           const pb = placed.get(b.id)!;
           if (!overlapsBeyondTolerance(pa, pb)) continue;
-          const v = !atStart.has(b.id) ? b : !atStart.has(a.id) ? a : undefined;
+          const v = offStart(b) ? b : offStart(a) ? a : undefined;
           if (!v) continue; // both where they started: the turn's start allowed it
           const keep = v === b ? a : b;
           const there = placed.get(v.id)!;
           placed.set(v.id, startArrangement(v));
-          atStart.add(v.id);
           moved.add(v.id);
           const s = startAt.get(v.id)!;
           note(
@@ -462,10 +470,6 @@ export function validateProposal(
     } while (changed);
     return moved;
   };
-  // Units the proposal marks gone are already at the start; the out-of-reach rule may bring one
-  // back, so they count in the settle once their status is known.
-  for (const u of live) if (gone(wants.get(u.id)!)) atStart.add(u.id);
-
   // Who could have been hit: some enemy within its reach plus its march, at either end.
   const reachable = (u: Unit) =>
     live.some((e) => {

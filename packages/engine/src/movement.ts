@@ -1,11 +1,20 @@
 import { heldTurn } from './held.js';
-import { ATTACK_INTENT_EVENT, COMBAT_CHECK_EVENT, canReach, pursuable } from './contact.js';
+import {
+  ATTACK_INTENT_EVENT,
+  COMBAT_CHECK_EVENT,
+  bearingTo,
+  canReach,
+  closesToMelee,
+  crossingPoint,
+  hasClosed,
+  pursuable,
+} from './contact.js';
 import type { EngineState, EventRegistry, HandlerResult, Json, NewEvent } from './events.js';
-import { distance } from './geometry.js';
+import { distance, mm } from './geometry.js';
 import { FATIGUE_PER_MARCH_MINUTE, type Pace } from './fatigue.js';
 import { schedule } from './queue.js';
 import { noteWear } from './supply.js';
-import { MS_PER_MINUTE } from './types.js';
+import { MS_PER_MINUTE, contactLine } from './types.js';
 import { defaultFootprint } from './formation.js';
 import { findPath, legCost } from './navigation.js';
 import { profileAlong } from './terrain.js';
@@ -171,6 +180,11 @@ interface StepPayload {
   to: [number, number];
   /** Flat x,y pairs (mm): the point just left, then the waypoints still to reach, nearest first. */
   path: number[];
+  /**
+   * The contact line cut this march short (#446): the point, already in `path` as a
+   * waypoint, where the march stops in contact unless the enemy has gone by then.
+   */
+  halt?: [number, number];
 }
 
 /** Apply `patch` to a unit; a patched field set to undefined is removed (snapshots stay lean). */
@@ -201,6 +215,149 @@ function nextLeg(
   return {
     event: { time: arriveAt, type: MOVE_STEP_EVENT, payload: p as unknown as Json },
     leg: { from, to, startedAt: now, arriveAt, msPerMetre: msPerMetreOf(mover) },
+  };
+}
+
+interface ContactStop {
+  /** Where the march stops: a point on the step, or the step's start when stopping at once. */
+  at: Point;
+  /** The enemy whose line stops the march. */
+  foe: Unit;
+  /** The unit is already inside the line and the step closes further: it stops where it stands. */
+  immediate: boolean;
+}
+
+/**
+ * The contact line of a plain march (#446): the first point along `from` → `to` where the
+ * marching `unit` would come closer than its type's contact distance to an active enemy,
+ * or undefined when the step stays clear of every enemy. A unit already inside an enemy's
+ * line is only stopped when the step closes further: marching away is always allowed.
+ * Withdrawing, routing and attacking units do not use this; their handlers exempt them.
+ */
+function contactStop(
+  world: GameState,
+  unit: Unit,
+  from: Point,
+  to: Point,
+  time: number,
+): ContactStop | undefined {
+  if (!contactLine(world)) return undefined; // games logged before rules 5 replay as played
+  if (unit.status !== 'active') return undefined; // a routing unit rides home unhindered
+  const radius = mm(unitTypeOf(unit).contactM);
+  let best: (ContactStop & { t: number }) | undefined;
+  for (const foe of world.units) {
+    if (foe.id === unit.id || foe.side === unit.side || foe.status !== 'active') continue;
+    const c = positionAt(world.map, foe, time);
+    const d0 = distance(from, c);
+    if (d0 <= radius) {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const len2 = dx * dx + dy * dy;
+      if (len2 === 0) continue;
+      const along = Math.min(1, Math.max(0, ((c.x - from.x) * dx + (c.y - from.y) * dy) / len2));
+      if (along <= 0) continue;
+      const closest = { x: from.x + dx * along, y: from.y + dy * along };
+      if (distance(closest, c) < d0 - 1 && (!best || best.t > 0)) {
+        best = { at: from, foe, immediate: true, t: 0 };
+      }
+      continue;
+    }
+    const at = crossingPoint(from, to, c, radius);
+    if (!at) continue;
+    const t = distance(from, at) / Math.max(1, distance(from, to));
+    if (!best || t < best.t) best = { at, foe, immediate: false, t };
+  }
+  return best && { at: best.at, foe: best.foe, immediate: best.immediate };
+}
+
+/** The nearest active enemy within the contact distance of `at`, if any. */
+function foeInContact(world: GameState, unit: Unit, at: Point, time: number): Unit | undefined {
+  const limit = mm(unitTypeOf(unit).contactM) + 1000; // 1 m slack for the rounded halt point
+  let best: Unit | undefined;
+  let bestD = Infinity;
+  for (const foe of world.units) {
+    if (foe.id === unit.id || foe.side === unit.side || foe.status !== 'active') continue;
+    const d = distance(at, positionAt(world.map, foe, time));
+    if (d <= limit && d < bestD) {
+      best = foe;
+      bestD = d;
+    }
+  }
+  return best;
+}
+
+/**
+ * End a march at the contact line (#446): the unit stands at `at`, turns to face the enemy
+ * it met, and is in contact. A march that was to end in a hold holds there instead.
+ */
+function stopAtContact(
+  world: GameState,
+  unit: Unit,
+  at: Point,
+  foe: Unit,
+  time: number,
+  thenHold: boolean,
+): HandlerResult<GameState> {
+  const intent: Intent = thenHold ? { kind: 'hold', at } : { kind: 'idle' };
+  return {
+    world: updateUnit(
+      world,
+      unit.id,
+      {
+        center: at,
+        intent,
+        leg: undefined,
+        pace: unit.pace,
+        facing: bearingTo(at, positionAt(world.map, foe, time)),
+      },
+      time,
+    ),
+    schedule: [{ time, type: COMBAT_CHECK_EVENT }],
+  };
+}
+
+/**
+ * What the contact line does to one step of a plain march (#446): when a step ends at a
+ * planned halt point, or the next leg would cross an enemy's line, contact decides the
+ * step and this returns its whole result; otherwise undefined and the march goes on.
+ * `unit` is the marching unit as updated for the step, standing at `center`.
+ */
+function contactStep(
+  world: GameState,
+  unit: Unit,
+  intent: Intent,
+  center: Point,
+  rest: number[],
+  p: StepPayload,
+  time: number,
+  check: NewEvent,
+): HandlerResult<GameState> | undefined {
+  const thenHold = intent.kind === 'move' && intent.thenHold === true;
+  if (p.halt && p.halt[0] === center.x && p.halt[1] === center.y) {
+    const foe = foeInContact(world, unit, center, time);
+    if (foe) return stopAtContact(world, unit, center, foe, time, thenHold);
+    // The enemy has gone: march on, with the spent halt point dropped from the payload.
+    const clean: StepPayload = { unitId: p.unitId, startedAt: p.startedAt, to: p.to, path: rest };
+    const { event, leg } = nextLeg(world.map, unit, time, clean);
+    return {
+      world: updateUnit(world, p.unitId, { center, leg }, time),
+      schedule: [check, event],
+    };
+  }
+  if (rest.length < 4) return undefined;
+  const next = { x: rest[2]!, y: rest[3]! };
+  const stop = contactStop(world, unit, center, next, time);
+  if (!stop) return undefined;
+  if (stop.immediate) return stopAtContact(world, unit, center, stop.foe, time, thenHold);
+  const payload: StepPayload = {
+    ...p,
+    path: [center.x, center.y, stop.at.x, stop.at.y, ...rest.slice(2)],
+    halt: [stop.at.x, stop.at.y],
+  };
+  const { event, leg } = nextLeg(world.map, unit, time, payload);
+  return {
+    world: updateUnit(world, p.unitId, { center, leg }, time),
+    schedule: [check, event],
   };
 }
 
@@ -283,6 +440,18 @@ export function beginMarch(
     to,
     path: stepped(path.waypoints).flatMap((t) => [t.x, t.y]),
   };
+  if (how === 'move' || how === 'hold') {
+    // A plain march stops at the contact line (#446), starting with its first leg: an
+    // enemy already closing gets faced where the unit stands, a line ahead cuts the
+    // first leg short at the crossing point.
+    const first = { x: step.path[2]!, y: step.path[3]! };
+    const stop = contactStop(world, unit, here, first, time);
+    if (stop?.immediate) return stopAtContact(world, unit, here, stop.foe, time, how === 'hold');
+    if (stop) {
+      step.halt = [stop.at.x, stop.at.y];
+      step.path = [here.x, here.y, stop.at.x, stop.at.y, ...step.path.slice(2)];
+    }
+  }
   const { event, leg } = nextLeg(world.map, unit, time, step);
   return {
     world: updateUnit(world, unit.id, { intent, center: here, leg, pace }, time),
@@ -428,6 +597,11 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
     world = noteWear(world, unit, tired, ev.time);
     // Every step may start or end a contact, or put a unit on the objective.
     const check: NewEvent = { time: ev.time, type: COMBAT_CHECK_EVENT };
+    if (i.kind === 'move') {
+      // A plain march halts at the contact line instead of marching into the enemy (#446).
+      const contact = contactStep(world, tired, i, center, rest, p, ev.time, check);
+      if (contact) return contact;
+    }
     if (i.kind === 'attack') {
       const foe = world.units.find((u) => u.id === i.target);
       if (!foe || !pursuable(foe, ev.time)) {
@@ -442,9 +616,20 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
         };
       }
       const arrived = rest.length === 2;
-      if (canReach({ ...unit, center }, foe)) {
-        // In reach: stop here. `to` becomes the stopping point, so the unit counts as
-        // stopped and `combat.check` re-plans it if the foe later walks out of reach.
+      // Under rules 5 a charge closes to melee before it counts as closed (#446); the
+      // melee line within a rounding step (whole-mm points) counts too, or the shortened
+      // leg below would shrink to no length at all. Before rules 5, reach was enough.
+      const closed = contactLine(world)
+        ? hasClosed({ ...unit, center }, foe) ||
+          (closesToMelee(unit) &&
+            distance(center, positionAt(world.map, foe, ev.time)) <=
+              mm(unitTypeOf(unit).chargeM!) + 1)
+        : canReach({ ...unit, center }, foe);
+      if (closed) {
+        // Closed far enough: stop here. A type with a charge distance closes to melee
+        // first (#446); any other attacker stops once its target is in reach. `to`
+        // becomes the stopping point, so the unit counts as stopped and `combat.check`
+        // re-plans it if the foe later moves out of closing distance.
         return {
           world: updateUnit(
             world,
@@ -454,6 +639,28 @@ export function registerMovement(registry: EventRegistry<GameState>): void {
           ),
           schedule: [check],
         };
+      }
+      if (contactLine(world) && closesToMelee(unit) && rest.length >= 4) {
+        // A charge does not ride through its target: the next leg ends on the melee
+        // line, where the stop above takes over (#446).
+        const next = { x: rest[2]!, y: rest[3]! };
+        const chargeAt = crossingPoint(
+          center,
+          next,
+          positionAt(world.map, foe, ev.time),
+          mm(unitTypeOf(unit).chargeM!),
+        );
+        if (chargeAt && (chargeAt.x !== center.x || chargeAt.y !== center.y)) {
+          const shortened: StepPayload = {
+            ...p,
+            path: [center.x, center.y, chargeAt.x, chargeAt.y, ...rest.slice(2)],
+          };
+          const { event, leg } = nextLeg(world.map, tired, ev.time, shortened);
+          return {
+            world: updateUnit(world, p.unitId, { center, leg }, ev.time),
+            schedule: [check, event],
+          };
+        }
       }
       if (arrived) {
         // The foe moved on; plan a fresh march toward where it is now.

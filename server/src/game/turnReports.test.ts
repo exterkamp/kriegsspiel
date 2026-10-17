@@ -35,7 +35,13 @@ interface Played {
 }
 
 /** A rigid turn game; with `orders`, Blue writes to its three units in turn 2. */
-async function play(seed: number, turnMinutes: number, orders: boolean): Promise<Played> {
+async function play(
+  seed: number,
+  turnMinutes: number,
+  orders: boolean,
+  /** The engine rules to play under; absent: the current ones. */
+  rules?: number,
+): Promise<Played> {
   await host?.shutdown();
   const time = new FakeTime();
   const emitted: EmittedEvent[] = [];
@@ -50,7 +56,11 @@ async function play(seed: number, turnMinutes: number, orders: boolean): Promise
     onEmitted: (_id, events) => emitted.push(...events),
   });
   const settings: UmpireSettings = { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes };
-  const game = await host.create('g1', { ...loadScenario(holdTheBridge), seed }, { settings });
+  const game = await host.create(
+    'g1',
+    { ...loadScenario(holdTheBridge), seed, ...(rules === undefined ? {} : { rules }) },
+    { settings },
+  );
   const trays: Played['trays'] = [];
   const turns: Played['turns'] = [];
   for (let n = 1; n <= 20 && game.turnStateFor('blue'); n++) {
@@ -168,9 +178,12 @@ describe('turn mode: the turn reports (#438)', () => {
   });
 
   it('tells the players that a turn after the ruling is the pursuit, and until when (D13, D39)', async () => {
+    // Played under rules 4: under rules 5 (#446) none of the CASES games is decided by a ruling
+    // inside the scenario's limits (the fight at the contact line runs long), so there is no
+    // pursuit turn to report. The pursuit papers themselves are rules-independent.
     let pursuits = 0;
     for (const { turnMinutes, seed, orders } of CASES) {
-      const { game, turns } = await play(seed, turnMinutes, orders);
+      const { game, turns } = await play(seed, turnMinutes, orders, 4);
       const battle = game.state.world.battle;
       for (const t of turns) {
         if (battle && battle.declaredAt < t.startsAt) {

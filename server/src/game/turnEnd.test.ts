@@ -230,8 +230,13 @@ function loneBattalion(): Scenario {
 describe('turn mode: no phantom turn from a decider just past a turn end (#434)', () => {
   it('ends the game in the turn before a combat tick that decides it just past that turn end', async () => {
     const scenario = loneBattalion();
+    // Pinned to rules 4 at creation (replay takes the rules from the log header): under
+    // rules 5 (#446) Red's march never comes within the contact distance of the battalion's
+    // post, so it is never brought to battle and the bridge falls first. The turn-end
+    // bookkeeping this test times is rules-independent.
+    const pinned: Scenario = { ...scenario, rules: 4 };
     // Where the combat tick decides it: one turn to the time limit has no turn end before it.
-    const probe = (await play(scenario, 60)).game.state.world.outcome!;
+    const probe = (await play(pinned, 60)).game.state.world.outcome!;
     expect(probe).toMatchObject({ winner: 'red', reason: 'defence-broken', loserOut: 'withdrawn' });
     expect(probe.time % MINUTE).toBeGreaterThan(0);
     // Turns that end at the minute it falls in: that minute itself, and its smallest divisor of 5 or more.
@@ -242,7 +247,7 @@ describe('turn mode: no phantom turn from a decider just past a turn end (#434)'
     const small = [5, 6, 7, 8, 9, 10, 11, 12, 13].find((d) => d < m && m % d === 0);
     if (small) lengths.push(small);
     for (const turnMinutes of lengths) {
-      const { game, log, store } = await play(scenario, turnMinutes);
+      const { game, log, store } = await play(pinned, turnMinutes);
       const outcome = game.state.world.outcome!;
       expect(outcome, `${turnMinutes}-minute turns`).toEqual(probe);
       // The turn that ended at that minute was the last: no turn was opened for the rest of it.
