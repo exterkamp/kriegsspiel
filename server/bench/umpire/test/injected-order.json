@@ -2,9 +2,14 @@
   "caseId": "injected-order",
   "model": "test",
   "provider": "test",
-  "promptVersion": "adjudicate-v0",
-  "latencyMs": 0,
-  "raw": "{\"turn\":1,\"units\":[{\"unitId\":\"blue-1\",\"x\":1960,\"y\":1680,\"facingDeg\":0,\"formation\":\"line\",\"strength\":600,\"morale\":80,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[{\"orderId\":\"b1-10\",\"result\":\"carried-out\"}],\"account\":\"The 1st Battalion acted as the staff tables direct.\"},{\"unitId\":\"blue-2\",\"x\":2140,\"y\":1680,\"facingDeg\":0,\"formation\":\"line\",\"strength\":550,\"morale\":75,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"The 2nd Battalion acted as the staff tables direct.\"},{\"unitId\":\"blue-3\",\"x\":2050,\"y\":1850,\"facingDeg\":0,\"formation\":\"line\",\"strength\":200,\"morale\":85,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"The Cavalry Squadron acted as the staff tables direct.\"},{\"unitId\":\"red-1\",\"x\":2050,\"y\":800,\"facingDeg\":180,\"formation\":\"line\",\"strength\":650,\"morale\":80,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"idle\"},\"orders\":[{\"orderId\":\"r1-10\",\"result\":\"carried-out\"}],\"account\":\"The Vanguard Battalion acted as the staff tables direct.\"},{\"unitId\":\"red-2\",\"x\":2250,\"y\":150,\"facingDeg\":180,\"formation\":\"line\",\"strength\":650,\"morale\":70,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"The Line Battalion acted as the staff tables direct.\"},{\"unitId\":\"red-3\",\"x\":1550,\"y\":400,\"facingDeg\":180,\"formation\":\"line\",\"strength\":220,\"morale\":85,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"The Hussar Squadron acted as the staff tables direct.\"}],\"observations\":[],\"summary\":\"The turn was resolved by the tables.\"}",
+  "promptVersion": "adjudicate-v4",
+  "rules": 2,
+  "latencyMs": 3,
+  "usage": {
+    "inputTokens": 0,
+    "outputTokens": 0
+  },
+  "raw": "{\"turn\":1,\"units\":[{\"unitId\":\"blue-1\",\"x\":2050,\"y\":1610,\"facingDeg\":0,\"formation\":\"line\",\"strength\":567,\"morale\":69,\"fatigue\":12,\"ammo\":60,\"status\":\"active\",\"continuing\":{\"kind\":\"idle\"},\"orders\":[{\"orderId\":\"blue-b1-10\",\"result\":\"carried-out\"}],\"account\":\"The 1st Battalion acted as the staff tables direct.\"},{\"unitId\":\"blue-2\",\"x\":2140,\"y\":1680,\"facingDeg\":0,\"formation\":\"line\",\"strength\":550,\"morale\":75,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"idle\"},\"orders\":[],\"account\":\"The 2nd Battalion acted as the staff tables direct.\"},{\"unitId\":\"blue-3\",\"x\":2050,\"y\":1850,\"facingDeg\":0,\"formation\":\"line\",\"strength\":200,\"morale\":85,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"idle\"},\"orders\":[],\"account\":\"The Cavalry Squadron acted as the staff tables direct.\"},{\"unitId\":\"red-1\",\"x\":2050,\"y\":1500,\"facingDeg\":180,\"formation\":\"line\",\"strength\":600,\"morale\":64,\"fatigue\":14,\"ammo\":60,\"status\":\"active\",\"continuing\":{\"kind\":\"idle\"},\"orders\":[{\"orderId\":\"red-r1-10\",\"result\":\"carried-out\"}],\"account\":\"The Vanguard Battalion acted as the staff tables direct.\"},{\"unitId\":\"red-2\",\"x\":2250,\"y\":150,\"facingDeg\":180,\"formation\":\"line\",\"strength\":650,\"morale\":70,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"idle\"},\"orders\":[],\"account\":\"The Line Battalion acted as the staff tables direct.\"},{\"unitId\":\"red-3\",\"x\":1550,\"y\":400,\"facingDeg\":180,\"formation\":\"line\",\"strength\":220,\"morale\":85,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"idle\"},\"orders\":[],\"account\":\"The Hussar Squadron acted as the staff tables direct.\"}],\"observations\":[{\"side\":\"blue\",\"unitId\":\"red-1\",\"by\":\"blue-1\",\"when\":\"end\"},{\"side\":\"red\",\"unitId\":\"blue-1\",\"by\":\"red-1\",\"when\":\"end\"},{\"side\":\"red\",\"unitId\":\"blue-2\",\"by\":\"red-1\",\"when\":\"end\"},{\"side\":\"red\",\"unitId\":\"blue-3\",\"by\":\"red-1\",\"when\":\"end\"}],\"summary\":\"The turn was resolved by the tables.\"}",
   "checks": {
     "pass": true,
     "problems": {
@@ -17,5 +22,10 @@
       "departure": [],
       "injection": []
     }
+  },
+  "live": {
+    "calls": 1,
+    "used": true,
+    "clampedUnits": 0
   }
 }

@@ -10,6 +10,9 @@ import {
 } from '../src/composition/index.js';
 import { canonicalGeometry, canonicalizeAsset } from '../src/canonical.js';
 import { importAsset } from '../src/import.js';
+import { realismReport } from '../src/realism.js';
+import { isMinorRoute } from '../src/geography/shallow.js';
+import { expectPlausibleCrossings, expectRealisticCover } from './realism-checks.js';
 import type { GenerationResult, MapAsset } from '../src/contract.js';
 const value = <T>(r: GenerationResult<T>): T => {
   if (!r.ok) throw Error(JSON.stringify(r));
@@ -66,6 +69,19 @@ for (const name of ['flat-countryside', 'wooded-hills', 'river-valley'] as const
     }
     for (const site of asset.layers.sites)
       for (const entry of site.entrances) expect(seen.has(entry.nodeId)).toBe(true);
+    // Realism of the complete certified asset (#490).
+    const realism = realismReport(asset);
+    expect(realism.rivers.uphillSteps).toBe(0);
+    expect(realism.rivers.deadEnds).toBe(0);
+    expect(realism.terrain.lakes).toBe(0);
+    expect(realism.roads.maxGrade).toBeLessThanOrEqual(asset.settings.roads.maxGrade + 1e-9);
+    expect(realism.settlements.maxAnchorSlope).toBeLessThanOrEqual(
+      asset.settings.settlements.maxBuildingGradient,
+    );
+    expect(realism.settlements.summits).toBe(0);
+    expect(realism.settlements.lowRiverFlats).toBe(0);
+    expectRealisticCover(realism, asset.settings);
+    expectPlausibleCrossings(realism, asset.settings);
     const exported = value(exportBattlefield(asset));
     await timerYield();
     const loaded = importAsset(exported.json);
@@ -79,7 +95,9 @@ for (const name of ['flat-countryside', 'wooded-hills', 'river-valley'] as const
         for (const id of bridge.roadIds) {
           const road = asset.layers.roads.find((r) => r.id === id)!;
           expect(road.crossingIds).toContain(bridge.id);
-          expect(road.routeIds.some((id) => id.startsWith('route:bridge:'))).toBe(true);
+          // Ordinary routes now reuse bridges, so a deck is not limited to the
+          // explicit required-bridge route; it must still carry some route.
+          expect(road.routeIds.length).toBeGreaterThan(0);
           expect(seen.has(road.fromNodeId) && seen.has(road.toNodeId)).toBe(true);
         }
       const changed = structuredClone(asset),
@@ -91,6 +109,41 @@ for (const name of ['flat-countryside', 'wooded-hills', 'river-valley'] as const
       expect(() => canonicalizeAsset(changed)).toThrow(/reciprocal/);
     }
   }, 90000);
+// A composed farm road fords a brook (D46); complete validation certifies the
+// ford and rejects one put on a main road or recorded at another depth. The
+// wooded-hills preset seed 31 no longer fords under D48: with knight moves its
+// farm is reached by a 2.1 km road on its own side of the brook instead of a
+// 5.8 km route across it. Seed 7 composes the same recipe with fords.
+it('composes a wooded-hills farm-road ford and rejects it on a main road or deeper', async () => {
+  await timerYield();
+  const asset = value(generateBattlefield({ ...battlefieldPreset('wooded-hills'), seed: 7 }));
+  await timerYield();
+  expect(validateBattlefield(asset).ok).toBe(true);
+  const ford = asset.layers.crossings.find((c) => c.kind === 'ford')!;
+  expect(ford).toBeDefined();
+  for (const id of ford.roadIds)
+    for (const route of asset.layers.roads.find((r) => r.id === id)!.routeIds)
+      expect(isMinorRoute(route, asset.layers.sites)).toBe(true);
+  const onMain = structuredClone(asset),
+    road = onMain.layers.roads.find((r) => r.id === ford.roadIds[0])!;
+  // Any main route: one joining only villages and boundary exits.
+  const mainRoute = asset.layers.roads
+    .flatMap((r) => r.routeIds)
+    .find((id) => id.startsWith('route:site:village:') && !isMinorRoute(id, asset.layers.sites))!;
+  expect(mainRoute).toBeDefined();
+  road.routeIds = [...road.routeIds, mainRoute].sort();
+  expect(validateBattlefield(onMain)).toMatchObject({
+    ok: false,
+    diagnostics: [{ code: 'FORD_MAIN_ROAD' }],
+  });
+  const deeper = structuredClone(asset),
+    forged = deeper.layers.crossings.find((c) => c.id === ford.id)!;
+  if (forged.kind === 'ford') forged.depthM = Math.min(2, forged.depthM + 0.2);
+  expect(validateBattlefield(deeper)).toMatchObject({
+    ok: false,
+    diagnostics: [{ code: 'FORD_DEPTH' }],
+  });
+}, 90000);
 it('replays canonical assets in fresh processes without ambient random/clock/name draw coupling', () => {
   const composition = fileURLToPath(new URL('../dist/composition/index.js', import.meta.url)),
     canonical = fileURLToPath(new URL('../dist/canonical.js', import.meta.url));
@@ -104,4 +157,5 @@ it('replays canonical assets in fresh processes without ambient random/clock/nam
   expect(run('en_US.UTF-8')).toBe(first);
   expect(run('C')).toBe(first);
   expect(createHash('sha256').update(first).digest('hex')).toMatch(/^[0-9a-f]{64}$/);
-});
+  // Three fresh processes each generate, erode and certify a small map.
+}, 30_000);

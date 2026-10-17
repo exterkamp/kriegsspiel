@@ -1,5 +1,10 @@
 import type { MapAsset } from '@kriegsspiel/maps';
-import { createAuthoringPanel, type AuthoringPanel, type PanelOptions } from './controls/index.js';
+import {
+  createAuthoringPanel,
+  statusClass,
+  type AuthoringPanel,
+  type PanelOptions,
+} from './controls/index.js';
 import type { ReadonlyData } from './generation/index.js';
 import type { createAuthoringRuntime } from './runtime/index.js';
 import { MapPreview, type PreviewState } from './preview.js';
@@ -65,7 +70,7 @@ export function mountAuthoringApp(
   detail.disabled = true;
   for (const id of ['fit', 'zoom-in', 'zoom-out']) element<HTMLButtonElement>(id).disabled = true;
   const empty = document.createElement('section');
-  empty.className = 'map-empty-state';
+  empty.className = 'map-empty-state ks-paper';
   empty.setAttribute('aria-label', 'Start a battlefield map');
   const outline = document.createElement('div');
   outline.className = 'empty-map-outline';
@@ -81,11 +86,15 @@ export function mountAuthoringApp(
   emptyGenerate.type = 'button';
   emptyGenerate.textContent = 'Generate map';
   emptyGenerate.dataset.action = 'empty-generate';
+  emptyGenerate.className = 'ks-primary';
   const emptyLoad = document.createElement('button');
   emptyLoad.type = 'button';
   emptyLoad.textContent = 'Load saved map';
   emptyLoad.dataset.action = 'empty-load';
-  empty.append(outline, emptyHeading, emptyCopy, emptyGenerate, emptyLoad, emptyMessage);
+  const emptyActions = document.createElement('div');
+  emptyActions.className = 'ks-cluster';
+  emptyActions.append(emptyGenerate, emptyLoad);
+  empty.append(outline, emptyHeading, emptyCopy, emptyActions, emptyMessage);
   element('map').parentElement!.append(empty);
   detail.before(select);
   function updateSites(asset: ReadonlyData<MapAsset>): void {
@@ -115,6 +124,7 @@ export function mountAuthoringApp(
     for (const issue of state.issues) {
       const line = document.createElement('li');
       line.dataset.severity = 'error';
+      line.className = statusClass('error');
       line.textContent = `${issue.code} · ${issue.path}: ${issue.message}`;
       diagnostics.append(line);
     }
@@ -128,6 +138,7 @@ export function mountAuthoringApp(
     input.type = 'checkbox';
     input.checked = DEFAULT_LAYERS[layer];
     input.addEventListener('change', () => preview.setLayer(layer, input.checked), { signal });
+    label.className = 'ks-choice';
     label.append(input, document.createTextNode(LAYER_NAMES[layer]));
     layerControls.append(label);
   }
@@ -205,6 +216,7 @@ export function mountAuthoringApp(
       for (const diagnostic of asset.diagnostics) {
         const line = document.createElement('li');
         line.dataset.severity = diagnostic.severity;
+        line.className = statusClass(diagnostic.severity);
         line.textContent = `${diagnostic.stage} / ${diagnostic.code}: ${diagnostic.message}${diagnostic.featureId ? ` [${diagnostic.featureId}]` : ''}${diagnostic.remediation ? ` ${diagnostic.remediation}` : ''}`;
         diagnostics.append(line);
       }
@@ -233,7 +245,10 @@ export function mountAuthoringApp(
     { signal },
   );
   emptyLoad.addEventListener('click', () => panel.openSavedFile(), { signal });
-  panel.element.append(svgButton);
+  // Beside the JSON export, so both exports sit with the other actions.
+  const exportJsonButton = panel.element.querySelector('[data-action="export"]');
+  if (exportJsonButton) exportJsonButton.after(svgButton);
+  else panel.element.append(svgButton);
   element('summary').parentElement!.before(panel.element);
   svgButton.addEventListener(
     'click',

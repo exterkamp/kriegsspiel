@@ -50,6 +50,33 @@ describe('receipt/seat/lobby SQLite unit of work', () => {
     expect(store.durable).toBe(false);
   });
 
+  it('gives each reserved game its own seed, kept across retries and named seeds honoured (#534)', () => {
+    let next = 7000;
+    const store = new SqliteCreationStore(
+      ':memory:',
+      () => 123,
+      randomUUID,
+      () => next++,
+    );
+    stores.push(store);
+    const owner = store.auth.createGuest(0).id;
+    const request = { requestId: randomUUID() };
+    const first = store.reserve(owner, request, plan);
+    expect(first.seed).toBe(7000);
+    expect(first.seed).not.toBe(first.pin.initialWorld.seed);
+    expect(store.lobby.get(first.gameId)!.seed).toBe(7000);
+    // A retry is the same game, with the same dice.
+    expect(store.reserve(owner, request, plan).seed).toBe(7000);
+    const second = store.reserve(owner, { requestId: randomUUID() }, plan);
+    expect(second.seed).toBe(7001);
+    const named = store.reserve(owner, { requestId: randomUUID(), seed: 42 }, plan);
+    expect(named.seed).toBe(42);
+    expect(store.lobby.get(named.gameId)!.seed).toBe(42);
+    expect(() => store.reserve(owner, { requestId: named.requestId, seed: 43 }, plan)).toThrow(
+      'request_conflict',
+    );
+  });
+
   it('returns one game across identical retries before latest catalog/default/limit callbacks', () => {
     const store = open();
     const owner = store.auth.createGuest(0).id;
