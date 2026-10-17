@@ -322,6 +322,61 @@ describe('FileGameStore', () => {
     expect(await reopened.inputLog('g')).toEqual([first, second]);
   });
 
+  it('retries an append after a partial write without corrupting the log (#508)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kriegsspiel-log-'));
+    dirs.push(dir);
+    const header = { gameId: 'g', scenarioId: 'hold-the-bridge', seed: 1815 };
+    const first: InputLogEntry = {
+      seq: 1,
+      wallMs: 0,
+      gameMs: 0,
+      command: { kind: 'pause' },
+      endGameMs: 0,
+    };
+    const second: InputLogEntry = { ...first, seq: 2 };
+    const store = new FileGameStore(dir);
+    await store.saveLogHeader(header);
+    await store.appendInput('g', first);
+
+    // The append of the second entry died mid-write, leaving a torn prefix of its line in
+    // the file, and the entry was turned down. The actor offers the same entry again (#416):
+    // the retry must land exactly once and the log must stay parseable, where a store that
+    // only repairs the tail when a new process opens it would glue the retry onto the tear.
+    await appendFile(join(dir, 'g.jsonl'), '{"seq":2,"wal');
+    await store.appendInput('g', second);
+
+    const text = await readFile(join(dir, 'g.jsonl'), 'utf8');
+    expect(parseInputLog(text).entries).toEqual([first, second]);
+    expect(await store.inputLog('g')).toEqual([first, second]);
+  });
+
+  it('does not duplicate an entry whose write landed except for its newline (#508)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kriegsspiel-log-'));
+    dirs.push(dir);
+    const header = { gameId: 'g', scenarioId: 'hold-the-bridge', seed: 1815 };
+    const first: InputLogEntry = {
+      seq: 1,
+      wallMs: 0,
+      gameMs: 0,
+      command: { kind: 'pause' },
+      endGameMs: 0,
+    };
+    const second: InputLogEntry = { ...first, seq: 2 };
+    const store = new FileGameStore(dir);
+    await store.saveLogHeader(header);
+    await store.appendInput('g', first);
+
+    // The second entry's line landed in full but its newline did not, and the append still
+    // reported failure. Offered again, the entry must appear exactly once: the store
+    // completes the line it finds instead of writing the entry a second time.
+    await appendFile(join(dir, 'g.jsonl'), JSON.stringify(second));
+    await store.appendInput('g', second);
+
+    const text = await readFile(join(dir, 'g.jsonl'), 'utf8');
+    expect(parseInputLog(text).entries).toEqual([first, second]);
+    expect(await store.inputLog('g')).toEqual([first, second]);
+  });
+
   it('ignores a line cut short by a crash and rejects unsafe ids', async () => {
     const header = '{"gameId":"g","scenarioId":"hold-the-bridge","seed":1815}\n';
     const entry = '{"seq":1,"wallMs":0,"gameMs":0,"command":{"kind":"pause"},"endGameMs":0}\n';
