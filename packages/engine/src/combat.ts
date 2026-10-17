@@ -9,6 +9,7 @@ import {
   aspectOf,
   bearingTo,
   canReach,
+  hasClosed,
   isRouted,
   pursuable,
   distanceMm,
@@ -39,6 +40,7 @@ import { FORMATION_RULES, unitTypeOf } from './unitTypes.js';
 import {
   DEFAULT_TAKE_MS,
   MS_PER_MINUTE,
+  contactLine,
   contestedHolds,
   type BattleRuling,
   type GameTime,
@@ -648,7 +650,7 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
       return rejectOrder(world, unitId, 'target not active');
     }
     const check: NewEvent = { time: ev.time, type: COMBAT_CHECK_EVENT };
-    if (canReach(unit, target)) {
+    if (contactLine(world) ? hasClosed(unit, target) : canReach(unit, target)) {
       return {
         world: {
           ...world,
@@ -697,14 +699,18 @@ export function registerCombat(registry: EventRegistry<GameState>): void {
     if (outcome) return conclude(world, outcome);
     const declared = declareBattle(world, ev.time);
     if (declared) world = declared.world;
-    // An attacker that stopped in reach (its `to` is where it stands) and whose target
-    // has since moved out of reach gives chase again.
+    // An attacker that stopped where it closed (its `to` is where it stands) and whose
+    // target has since moved out of closing distance gives chase again.
     const chase: NewEvent[] = [];
     for (const u of activeUnits(world)) {
       if (u.intent.kind !== 'attack') continue;
       if (u.intent.to.x !== u.center.x || u.intent.to.y !== u.center.y) continue;
       const foe = world.units.find((x) => x.id === (u.intent as { target: string }).target);
-      if (foe && pursuable(foe, ev.time) && !canReach(u, foe)) {
+      if (
+        foe &&
+        pursuable(foe, ev.time) &&
+        !(contactLine(world) ? hasClosed(u, foe) : canReach(u, foe))
+      ) {
         chase.push({
           time: ev.time,
           type: ATTACK_INTENT_EVENT,

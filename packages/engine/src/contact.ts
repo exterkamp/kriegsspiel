@@ -76,6 +76,46 @@ export function inMelee(shooter: Unit, target: Unit): boolean {
   return charge !== undefined && distance(shooter.center, target.center) <= mm(charge);
 }
 
+/** A unit type that closes to melee on an attack order rather than halting at range: cavalry. */
+export function closesToMelee(u: Pick<Unit, 'type' | 'kind'>): boolean {
+  return unitTypeOf(u).chargeM !== undefined;
+}
+
+/**
+ * Whether an attacker has closed far enough to stop marching (#446): a type with a charge
+ * distance closes until it is in melee; any other attacker stops once its target is in range.
+ */
+export function hasClosed(u: Unit, foe: Unit): boolean {
+  return closesToMelee(u) ? inMelee(u, foe) : canReach(u, foe);
+}
+
+/**
+ * Where the straight run from `from` to `to` first comes within `radius` of `center`, or
+ * undefined when it never does (or starts inside: callers handle that case themselves).
+ * Pure geometry on whole-mm points, shared by the contact halt and the charge.
+ */
+export function crossingPoint(
+  from: Point,
+  to: Point,
+  center: Point,
+  radius: number,
+): Point | undefined {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const fx = from.x - center.x;
+  const fy = from.y - center.y;
+  const a = dx * dx + dy * dy;
+  if (a === 0) return undefined;
+  const b = 2 * (fx * dx + fy * dy);
+  const c = fx * fx + fy * fy - radius * radius;
+  if (c <= 0) return undefined;
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return undefined;
+  const t = (-b - Math.sqrt(disc)) / (2 * a);
+  if (t <= 0 || t > 1) return undefined;
+  return { x: Math.round(from.x + dx * t), y: Math.round(from.y + dy * t) };
+}
+
 /** Where `shooter` is relative to `target`'s facing. A square has no flanks. */
 export type Aspect = 'front' | 'flank' | 'rear';
 

@@ -44,6 +44,12 @@ export interface UnitType {
   rangeM: number;
   /** Cavalry only: how far from a target it closes to melee, in metres. */
   chargeM?: number;
+  /**
+   * How close to an enemy ahead of it a marching unit halts, in metres between centres
+   * (#446): a march that is not a charge, a withdrawal or a rout stops at this line, faces
+   * the enemy and is in contact, instead of marching through it.
+   */
+  contactM: number;
   /** How far it sees in clear weather, in metres. */
   sightRangeM: number;
   /** 0..1: how well drilled the unit is. Well-trained units understand orders (fewer garbled). */
@@ -128,6 +134,7 @@ export const UNIT_DATA: UnitData = {
       marchMetresPerMinute: 100,
       fireRate: 0.03,
       rangeM: 200,
+      contactM: 140,
       sightRangeM: 600,
       training: 0.5,
       breakMorale: 25,
@@ -143,6 +150,7 @@ export const UNIT_DATA: UnitData = {
       marchMetresPerMinute: 125,
       fireRate: 0.02,
       rangeM: 250,
+      contactM: 150,
       sightRangeM: 700,
       training: 0.6,
       breakMorale: 35,
@@ -159,6 +167,7 @@ export const UNIT_DATA: UnitData = {
       fireRate: 0.06,
       rangeM: 100,
       chargeM: 60,
+      contactM: 100,
       sightRangeM: 800,
       training: 0.6,
       breakMorale: 25,
@@ -174,6 +183,7 @@ export const UNIT_DATA: UnitData = {
       marchMetresPerMinute: (100 * 2) / 3,
       fireRate: 0.04,
       rangeM: 400,
+      contactM: 140,
       sightRangeM: 600,
       training: 0.7,
       breakMorale: 25,
@@ -271,6 +281,7 @@ export function parseUnitData(raw: unknown): UnitData {
       fireRate: pos(r.fireRate, `${p}.fireRate`),
       rangeM: pos(r.rangeM, `${p}.rangeM`),
       ...(r.chargeM === undefined ? {} : { chargeM: pos(r.chargeM, `${p}.chargeM`) }),
+      contactM: pos(r.contactM, `${p}.contactM`),
       sightRangeM: pos(r.sightRangeM, `${p}.sightRangeM`),
       training,
       breakMorale,

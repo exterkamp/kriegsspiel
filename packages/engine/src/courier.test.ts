@@ -319,8 +319,8 @@ describe('interception needs reach (rules 4, #531)', () => {
   const away: Record<string, [number, number]> = { 'red-1': [1000, 200], 'red-2': [3000, 200] };
   const south = { ...away, 'blue-3': [1450, 1700] as [number, number] };
 
-  it('is rules 4 for a new game', () => {
-    expect(RULES_VERSION).toBe(4);
+  it('is rules 5 for a new game', () => {
+    expect(RULES_VERSION).toBe(5);
   });
 
   it('cavalry south of the river cannot take a courier on the north bank with no crossing in reach', () => {
