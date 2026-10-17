@@ -1135,7 +1135,7 @@ Generation of the 40 maps took 460 s against main's 423 s, run interleaved on tw
 
 **See.** [Lobby map selection design](lobby-map-selection-ux-design.md), [execution log](lobby-map-selection-execution-log.md), [map-to-gameplay boundary](map-gameplay-handoff.md).
 
-## D44: Native lobby pairings retain exact private initial worlds
+## D52: Native lobby pairings retain exact private initial worlds
 
 **Decision.** The approved lobby map work introduces a versioned native public catalog alongside the unchanged legacy default descriptor. Modern pairing identity binds the public scenario, resolved engine scenario, complete initial-world revision, terrain identity, logical IDs and native assembly semantics. Public geometry remains an explicit allowlist. Shared transport decoders enforce parent-scenario binding, exact millimetre geometry and structural/byte limits before expensive processing.
 
