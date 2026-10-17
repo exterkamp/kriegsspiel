@@ -13,7 +13,10 @@ import {
 } from '@kriegsspiel/engine';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { OrderParser, ParseResult } from '../orders/index.js';
+import { APPEND_ATTEMPTS } from './actor.js';
 import { GameHost, MemoryGameStore, type GameActor } from './index.js';
+import { replayLog } from './replay.js';
+import type { GameSnapshot, InputLogEntry } from './store.js';
 import { FakeTime } from './testing.js';
 
 // The bridge, which is the scenario's objective (metres in the scenario, mm in state).
@@ -600,4 +603,105 @@ describe('many games, restore and shutdown', () => {
     expect(blue1(reopened).intent.kind).toBe('move');
     expect((await store.inputLog('g1')).map((e) => e.seq)).toEqual([1, 2, 3]);
   });
+});
+
+describe('an applied command the store refuses to log (#507)', () => {
+  /** Refuses `order` appends `failures` times; counts snapshots saved while an order is missing. */
+  class FlakyStore extends MemoryGameStore {
+    refused = 0;
+    missing = false;
+    snapshotsWhileMissing = 0;
+    constructor(private failures: number) {
+      super();
+    }
+    override async appendInput(gameId: string, entry: InputLogEntry): Promise<void> {
+      if (entry.command.kind === 'order' && this.failures > 0) {
+        this.failures--;
+        this.refused++;
+        this.missing = true;
+        throw new Error('disk full');
+      }
+      await super.appendInput(gameId, entry);
+      if (entry.command.kind === 'order') this.missing = false;
+    }
+    override async saveSnapshot(gameId: string, snapshot: GameSnapshot): Promise<void> {
+      if (this.missing) this.snapshotsWhileMissing++;
+      return super.saveSnapshot(gameId, snapshot);
+    }
+  }
+
+  it.each([
+    ['once: the retry takes it', 1],
+    ['past every retry: it waits ahead of what is logged next', APPEND_ATTEMPTS],
+  ])(
+    'keeps a real-time order the store refuses %s, so replay and restart match the live game',
+    async (_, failures) => {
+      const time = new FakeTime();
+      const store = new FlakyStore(failures);
+      const h = new GameHost({
+        store,
+        parser: new FixedParser(),
+        registry: registry(),
+        wallNow: time.now,
+        timers: time,
+      });
+      host = h;
+      const game = await h.create('g1', loadScenario(holdTheBridgeFarStart), { rate: 1 });
+
+      const signed = await game.submit(order);
+      if (failures === 1) {
+        expect(signed).toEqual({ ok: true, orderId: 'g1-o1' });
+      } else {
+        // The caller is told the log refused it, but the order was already applied and stands.
+        expect(signed).toMatchObject({ ok: false, kind: 'rejection', reason: 'disk full' });
+      }
+      expect(store.refused).toBe(failures);
+
+      // The order stands live: the courier rides and blue-1 takes up the move.
+      await time.advance(DELIVERY_MS + 60_000);
+      expect(blue1(game).intent.kind).toBe('move');
+      await game.submit({ kind: 'pause' });
+
+      // The refused entry reached the log exactly once, ahead of everything logged after it,
+      // and no snapshot claimed the game while the log lacked it.
+      expect(store.missing).toBe(false);
+      expect(store.snapshotsWhileMissing).toBe(0);
+      const log = await store.inputLog('g1');
+      const orders = log.filter((e) => e.command.kind === 'order');
+      expect(orders).toHaveLength(1);
+      expect(log.indexOf(orders[0]!)).toBeLessThan(
+        log.findIndex((e) => e.command.kind === 'pause'),
+      );
+      const seqs = log.map((e) => e.seq);
+      expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
+      expect(new Set(seqs).size).toBe(seqs.length);
+
+      // A full-log replay ends where the live game stands.
+      const replayed = replayLog(
+        (await store.logHeader('g1'))!,
+        loadScenario(holdTheBridgeFarStart),
+        log,
+        registry(),
+        game.state.time,
+      );
+      expect(JSON.stringify(replayed.state.world)).toBe(JSON.stringify(game.state.world));
+
+      // And a restart recovers the same game: the order was applied once, not lost, not doubled.
+      const liveUnits = JSON.stringify(game.state.world.units);
+      const liveTime = game.state.time;
+      await h.close('g1');
+      const s2 = new GameHost({
+        store,
+        parser: new FixedParser(),
+        registry: registry(),
+        wallNow: time.now,
+        timers: time,
+      });
+      host = s2;
+      const back = await s2.open('g1');
+      expect(back.state.time).toBe(liveTime);
+      expect(JSON.stringify(back.state.world.units)).toBe(liveUnits);
+      expect(blue1(back).intent.kind).toBe('move');
+    },
+  );
 });

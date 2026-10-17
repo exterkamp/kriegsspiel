@@ -42,7 +42,7 @@ import {
 import { EngineTurnResolver } from './engineTurn.js';
 import { GameHost, MemoryGameStore, createRegistry, startingState } from './index.js';
 import { replayLog } from './replay.js';
-import { TURN_APPEND_ATTEMPTS } from './actor.js';
+import { APPEND_ATTEMPTS } from './actor.js';
 import type { GameSnapshot, InputLogEntry, TurnRecord } from './store.js';
 import { FakeTime } from './testing.js';
 import { applyTurn, type TurnInput } from './turns.js';
@@ -1219,7 +1219,7 @@ describe('a resolved turn the store refuses (#416)', () => {
 
   it.each([
     ['once: the retry takes it', 1],
-    ['past the next turn opening: it waits ahead of it', TURN_APPEND_ATTEMPTS * 2],
+    ['past the next turn opening: it waits ahead of it', APPEND_ATTEMPTS * 2],
   ])('keeps an umpire turn refused %s, so replay matches the live game', async (_, failures) => {
     const store = new FlakyStore(failures);
     const run = await play({ dial: 'standard', client: cannedClient(), store });
