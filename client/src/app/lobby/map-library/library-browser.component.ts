@@ -13,7 +13,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { assetIdentity, canonicalizeAsset, importAsset, parseAsset } from '@kriegsspiel/maps';
+import type { MapAsset } from '@kriegsspiel/maps';
 import type {
   BoardPreparation,
   CertifiedBoard,
@@ -24,6 +24,7 @@ import type {
   MapLibraryPort,
 } from '../../../shared/lobby-map-library/contracts';
 import { MAP_LIBRARY_PREVIEW_FACTORY, type LibraryPreview } from './map-library.component';
+import { MAP_LIBRARY_ASSET_VERIFIER } from './asset-verifier';
 
 type Source = 'included' | 'owned';
 type Load = { abort: AbortController; preparation?: BoardPreparation; disposed: boolean };
@@ -113,6 +114,7 @@ export class LibraryBrowserComponent implements OnChanges {
   >(undefined);
   private readonly canvas = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
   private readonly factory = inject(MAP_LIBRARY_PREVIEW_FACTORY);
+  private readonly verifier = inject(MAP_LIBRARY_ASSET_VERIFIER);
   private mount: Mount | undefined;
 
   constructor() {
@@ -300,16 +302,15 @@ export class LibraryBrowserComponent implements OnChanges {
         new TextEncoder().encode(readback.canonicalJson).byteLength > 64 * 1024 * 1024
       )
         throw new Error('Invalid readback');
-      const asset = importAsset(readback.canonicalJson);
-      if (
-        canonicalizeAsset(asset) !== readback.canonicalJson ||
-        asset.bounds.minX !== 0 ||
-        asset.bounds.minY !== 0 ||
-        asset.bounds.maxX !== item.widthM ||
-        asset.bounds.maxY !== item.heightM ||
-        (await assetIdentity(asset, 'asset')) !== item.assetIdentity
-      )
-        throw new Error('Readback mismatch');
+      await this.verifier(
+        {
+          canonicalJson: readback.canonicalJson,
+          assetIdentity: item.assetIdentity,
+          widthM: item.widthM,
+          heightM: item.heightM,
+        },
+        load.abort.signal,
+      );
       if (!current()) return;
       const preparation = this.preparationFactory()();
       if (!current()) {
@@ -331,12 +332,9 @@ export class LibraryBrowserComponent implements OnChanges {
       );
       if (!current()) return;
       const board = structuredClone(receivedBoard);
-      const checkedAsset = parseAsset(board.asset);
       if (
         board.canonicalJson !== readback.canonicalJson ||
-        canonicalizeAsset(checkedAsset) !== readback.canonicalJson ||
         board.assetIdentity !== item.assetIdentity ||
-        (await assetIdentity(checkedAsset, 'asset')) !== item.assetIdentity ||
         board.bounds.minX !== 0 ||
         board.bounds.minY !== 0 ||
         board.bounds.maxX !== item.widthM ||
@@ -347,6 +345,17 @@ export class LibraryBrowserComponent implements OnChanges {
         board.summary.ref.id !== adapted.ref.id
       )
         throw new Error('Certification mismatch');
+      const checkedAsset = await this.verifier(
+        {
+          canonicalJson: readback.canonicalJson,
+          assetIdentity: item.assetIdentity,
+          widthM: item.widthM,
+          heightM: item.heightM,
+          // The cloned readonly port view has no shared aliases; verification still owns validity.
+          candidate: board.asset as MapAsset,
+        },
+        load.abort.signal,
+      );
       if (!current()) return;
       this.board.set({ ...board, asset: checkedAsset });
     } catch {

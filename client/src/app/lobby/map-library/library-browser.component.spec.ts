@@ -15,6 +15,8 @@ import type {
 } from '../../../shared/lobby-map-library/contracts';
 import { MAP_LIBRARY_PREVIEW_FACTORY, type LibraryPreview } from './map-library.component';
 import { LibraryBrowserComponent } from './library-browser.component';
+import { MAP_LIBRARY_ASSET_VERIFIER, type LibraryAssetVerifier } from './asset-verifier';
+import { checkLibraryAssetForTest } from './asset-verifier.testing';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -33,6 +35,7 @@ let preparations: BoardPreparation[];
 let previews: LibraryPreview[];
 let prepFactory: ReturnType<typeof vi.fn<() => BoardPreparation>>;
 let previewFactory: ReturnType<typeof vi.fn<(canvas: HTMLCanvasElement) => LibraryPreview>>;
+let verifier: ReturnType<typeof vi.fn<LibraryAssetVerifier>>;
 beforeEach(async () => {
   vi.stubGlobal('crypto', webcrypto);
   const asset = createReferenceAsset();
@@ -80,10 +83,12 @@ beforeEach(async () => {
     previews.push(preview);
     return preview;
   });
+  verifier = vi.fn(checkLibraryAssetForTest);
   TestBed.configureTestingModule({
     providers: [
       provideZonelessChangeDetection(),
       { provide: MAP_LIBRARY_PREVIEW_FACTORY, useValue: previewFactory },
+      { provide: MAP_LIBRARY_ASSET_VERIFIER, useValue: verifier },
     ],
   });
 });
@@ -115,6 +120,143 @@ async function inspect() {
 }
 
 describe('read-only paginated geography library', () => {
+  it('verifies raw geography before preparation, then the loaded candidate before preview publication', async () => {
+    const raw = deferred<MapAsset>();
+    const candidate = deferred<MapAsset>();
+    verifier.mockReturnValueOnce(raw.promise).mockReturnValueOnce(candidate.promise);
+    await render();
+    const operation = component.inspect(item);
+    await vi.waitFor(() => expect(verifier).toHaveBeenCalledOnce());
+    expect(prepFactory).not.toHaveBeenCalled();
+    expect(component.board()).toBeUndefined();
+    expect(previewFactory).not.toHaveBeenCalled();
+    const [rawJob, signal] = verifier.mock.calls[0]!;
+    expect(rawJob).toEqual({
+      canonicalJson: board.canonicalJson,
+      assetIdentity: item.assetIdentity,
+      widthM: item.widthM,
+      heightM: item.heightM,
+    });
+    expect(signal).toBe(vi.mocked(port.read).mock.calls[0]![1]);
+    raw.resolve(await checkLibraryAssetForTest(rawJob, signal));
+    await vi.waitFor(() => expect(verifier).toHaveBeenCalledTimes(2));
+    expect(prepFactory).toHaveBeenCalledOnce();
+    expect(preparations[0]!.load).toHaveBeenCalledExactlyOnceWith(
+      board.canonicalJson,
+      {
+        ref: { kind: 'generated', id: item.ref.id },
+        name: item.name,
+        widthM: item.widthM,
+        heightM: item.heightM,
+      },
+      signal,
+    );
+    expect(component.board()).toBeUndefined();
+    expect(previewFactory).not.toHaveBeenCalled();
+    const [candidateJob, candidateSignal] = verifier.mock.calls[1]!;
+    expect(candidateSignal).toBe(signal);
+    expect(candidateJob).toEqual({ ...rawJob, candidate: board.asset });
+    candidate.resolve(await checkLibraryAssetForTest(candidateJob, signal));
+    await operation;
+    await fixture.whenStable();
+    expect(component.board()).toEqual(board);
+    expect(previews[0]!.loadAsset).toHaveBeenCalledWith(board.asset);
+  });
+
+  it.each(['source', 'owner', 'retirement', 'destruction'])(
+    'cannot create a preparation from late raw verification after %s replacement',
+    async (exit) => {
+      const pending = deferred<MapAsset>();
+      verifier.mockReturnValueOnce(pending.promise);
+      await render();
+      const operation = component.inspect(item);
+      await vi.waitFor(() => expect(verifier).toHaveBeenCalledOnce());
+      const signal = verifier.mock.calls[0]![1];
+      if (exit === 'source') fixture.componentRef.setInput('source', 'included');
+      else if (exit === 'owner') fixture.componentRef.setInput('library', { ...port });
+      else if (exit === 'retirement') component.retire();
+      else fixture.destroy();
+      if (exit === 'source' || exit === 'owner') await fixture.whenStable();
+      expect(signal.aborted).toBe(true);
+      pending.resolve(board.asset as MapAsset);
+      await operation;
+      expect(prepFactory).not.toHaveBeenCalled();
+      expect(previewFactory).not.toHaveBeenCalled();
+      expect(component.board()).toBeUndefined();
+    },
+  );
+
+  it.each(['source', 'retirement', 'destruction'])(
+    'disposes preparation and suppresses late candidate verification after %s',
+    async (exit) => {
+      const pending = deferred<MapAsset>();
+      verifier
+        .mockImplementationOnce(checkLibraryAssetForTest)
+        .mockReturnValueOnce(pending.promise);
+      await render();
+      const operation = component.inspect(item);
+      await vi.waitFor(() => expect(verifier).toHaveBeenCalledTimes(2));
+      const signal = verifier.mock.calls[1]![1];
+      expect(preparations).toHaveLength(1);
+      if (exit === 'source') {
+        fixture.componentRef.setInput('source', 'included');
+        await fixture.whenStable();
+      } else if (exit === 'retirement') component.retire();
+      else fixture.destroy();
+      expect(signal.aborted).toBe(true);
+      expect(preparations[0]!.dispose).toHaveBeenCalledOnce();
+      pending.resolve(board.asset as MapAsset);
+      await operation;
+      expect(component.board()).toBeUndefined();
+      expect(previewFactory).not.toHaveBeenCalled();
+      expect(preparations[0]!.dispose).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('cannot overwrite or retire a newer inspection of the same row when old candidate verification resolves', async () => {
+    const pending = deferred<MapAsset>();
+    verifier.mockImplementationOnce(checkLibraryAssetForTest).mockReturnValueOnce(pending.promise);
+    await render();
+    const old = component.inspect(item);
+    await vi.waitFor(() => expect(verifier).toHaveBeenCalledTimes(2));
+    const signal = verifier.mock.calls[1]![1];
+    await component.inspect(item);
+    await fixture.whenStable();
+    expect(signal.aborted).toBe(true);
+    expect(preparations).toHaveLength(2);
+    const current = component.board();
+    expect(current).toEqual(board);
+    expect(preparations[0]!.dispose).toHaveBeenCalledOnce();
+    expect(preparations[1]!.dispose).not.toHaveBeenCalled();
+    const shown = vi.mocked(previews[0]!.loadAsset).mock.calls.length;
+    pending.resolve(board.asset as MapAsset);
+    await old;
+    await fixture.whenStable();
+    expect(component.board()).toBe(current);
+    expect(preparations[1]!.dispose).not.toHaveBeenCalled();
+    expect(previews[0]!.loadAsset).toHaveBeenCalledTimes(shown);
+    expect(component.readError()).toBe('');
+  });
+
+  it.each(['raw', 'candidate'])(
+    'makes %s verifier failure retryable without displaying unchecked geography',
+    async (phase) => {
+      if (phase === 'candidate') verifier.mockImplementationOnce(checkLibraryAssetForTest);
+      verifier.mockRejectedValueOnce(new Error('Verification unavailable'));
+      await render();
+      await inspect();
+      expect(component.board()).toBeUndefined();
+      expect(component.readError()).toContain('could not be checked');
+      expect(previewFactory).not.toHaveBeenCalled();
+      if (phase === 'raw') expect(prepFactory).not.toHaveBeenCalled();
+      else expect(preparations[0]!.dispose).toHaveBeenCalledOnce();
+      await component.inspect(item);
+      await fixture.whenStable();
+      expect(component.board()).toEqual(board);
+      expect(component.readError()).toBe('');
+    },
+  );
+
   it('loads only one page, keeps row metadata detached, and uses explicit next/previous cursor reads without aggregation', async () => {
     const page = Array.from({ length: 20 }, (_, i) => ({
       ...item,

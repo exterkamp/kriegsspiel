@@ -22,6 +22,8 @@ import {
   MapLibraryComponent,
   type LibraryPreview,
 } from './map-library.component';
+import { MAP_LIBRARY_ASSET_VERIFIER, type LibraryAssetVerifier } from './asset-verifier';
+import { checkLibraryAssetForTest } from './asset-verifier.testing';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -45,6 +47,7 @@ let factory: ReturnType<typeof vi.fn<(canvas: HTMLCanvasElement) => LibraryPrevi
 let saved: ReturnType<typeof vi.fn<(item: LibraryMapSummary) => void>>;
 let cancelled: ReturnType<typeof vi.fn<() => void>>;
 let dirty: ReturnType<typeof vi.fn<(value: boolean) => void>>;
+let verifier: ReturnType<typeof vi.fn<LibraryAssetVerifier>>;
 
 beforeEach(async () => {
   vi.stubGlobal('crypto', webcrypto);
@@ -92,10 +95,12 @@ beforeEach(async () => {
   saved = vi.fn();
   cancelled = vi.fn();
   dirty = vi.fn();
+  verifier = vi.fn(checkLibraryAssetForTest);
   TestBed.configureTestingModule({
     providers: [
       provideZonelessChangeDetection(),
       { provide: MAP_LIBRARY_PREVIEW_FACTORY, useValue: factory },
+      { provide: MAP_LIBRARY_ASSET_VERIFIER, useValue: verifier },
     ],
   });
 });
@@ -145,6 +150,81 @@ async function save() {
 // These public reference assets exercise exact bytes/hash/metadata boundaries. The preparation doubles
 // stand for current complete certification; they are not claims of real generation/composition evidence.
 describe('portable Add geography content', () => {
+  it('does not emit a saved map or clear pending state before injected readback verification', async () => {
+    await render();
+    await named();
+    const pending = deferred<MapAsset>();
+    verifier.mockReturnValueOnce(pending.promise);
+    const operation = component.state.save();
+    await vi.waitFor(() => expect(verifier).toHaveBeenCalledTimes(2));
+    await fixture.whenStable();
+    expect(saved).not.toHaveBeenCalled();
+    expect(component.state.pending()).toBe(true);
+    expect(component.state.completed()).toBeUndefined();
+    expect(button('Save map').disabled).toBe(true);
+    const [job, signal] = verifier.mock.calls[1]!;
+    expect(job).toEqual({
+      canonicalJson: board.canonicalJson,
+      assetIdentity: board.assetIdentity,
+      widthM: summary.widthM,
+      heightM: summary.heightM,
+    });
+    expect(signal).toBe(vi.mocked(library.read).mock.calls[0]![1]);
+    pending.resolve(await checkLibraryAssetForTest(job, signal));
+    await operation;
+    await fixture.whenStable();
+    expect(saved).toHaveBeenCalledExactlyOnceWith(summary);
+    expect(root.textContent).toContain('Saved · Needs a scenario');
+  });
+
+  it('aborts candidate verification and never creates a preview after the Add component is destroyed', async () => {
+    const pending = deferred<MapAsset>();
+    verifier.mockReturnValueOnce(pending.promise);
+    await render();
+    const operation = component.state.generate();
+    await vi.waitFor(() => expect(verifier).toHaveBeenCalledOnce());
+    const signal = verifier.mock.calls[0]![1];
+    fixture.destroy();
+    expect(signal.aborted).toBe(true);
+    expect(prep.dispose).toHaveBeenCalledOnce();
+    pending.resolve(board.asset as MapAsset);
+    await operation;
+    expect(component.state.board()).toBeUndefined();
+    expect(factory).not.toHaveBeenCalled();
+    expect(saved).not.toHaveBeenCalled();
+    expect(prep.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('waits for injected candidate verification before mounting any generated preview', async () => {
+    const pending = deferred<MapAsset>();
+    verifier.mockReturnValueOnce(pending.promise);
+    await render();
+    const operation = component.state.generate();
+    await vi.waitFor(() => expect(verifier).toHaveBeenCalledOnce());
+    await fixture.whenStable();
+    expect(component.state.busy()).toBe(true);
+    expect(component.state.board()).toBeUndefined();
+    expect(root.querySelector('canvas')).toBeNull();
+    expect(factory).not.toHaveBeenCalled();
+    expect(verifier).toHaveBeenCalledExactlyOnceWith(
+      {
+        canonicalJson: board.canonicalJson,
+        assetIdentity: board.assetIdentity,
+        widthM: board.summary.widthM,
+        heightM: board.summary.heightM,
+        candidate: board.asset,
+      },
+      vi.mocked(prep.generate).mock.calls[0]![1],
+    );
+    const [job, signal] = verifier.mock.calls[0]!;
+    pending.resolve(await checkLibraryAssetForTest(job, signal));
+    await operation;
+    await fixture.whenStable();
+    expect(component.state.phase()).toBe('Unsaved');
+    expect(factory).toHaveBeenCalledOnce();
+    expect(previews[0]!.loadAsset).toHaveBeenCalledWith(board.asset);
+  });
+
   it('defaults to Countryside 5km, generates only on explicit click and owns no dialog/history or library browsing', async () => {
     await render(null);
     expect(field('landscape').value).toBe('flat-countryside');
