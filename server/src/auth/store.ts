@@ -216,13 +216,22 @@ interface Row {
   [column: string]: string | number;
 }
 
+/** Synchronous participants use the same connection and roll back with account changes. */
+export interface AuthOwnershipParticipant {
+  adoptGuest?(guestId: string, userId: string): void;
+  deleteUser?(userId: string): void;
+}
+
 /** Account tables in the same SQLite file as the games (own `auth_` tables, created if missing). */
 export class SqliteAuthStore implements AuthStore {
   private readonly db: DatabaseSync;
   private readonly ownsDatabase: boolean;
 
   /** A borrowed handle allows a caller-owned transaction across account and lobby tables. */
-  constructor(database: string | DatabaseSync) {
+  constructor(
+    database: string | DatabaseSync,
+    private readonly ownership?: AuthOwnershipParticipant,
+  ) {
     this.ownsDatabase = typeof database === 'string';
     this.db = typeof database === 'string' ? new DatabaseSync(database) : database;
     if (this.ownsDatabase) this.db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
@@ -245,26 +254,35 @@ export class SqliteAuthStore implements AuthStore {
     return { id, email: guestEmail(id), createdAtMs: nowMs, guest: true };
   }
 
-  adoptGuest(guestId: string, userId: string): string[] {
-    const seats = this.db
-      .prepare('SELECT game_id, side FROM auth_seats WHERE user_id = ?')
-      .all(guestId) as Row[];
-    const moved: string[] = [];
+  /** A borrowed connection may already be in its caller's account-ownership unit of work. */
+  private transaction<T>(run: () => T): T {
+    if (this.db.isTransaction) return run();
     this.db.exec('BEGIN');
     try {
+      const result = run();
+      this.db.exec('COMMIT');
+      return result;
+    } catch (error) {
+      if (this.db.isTransaction) this.db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  adoptGuest(guestId: string, userId: string): string[] {
+    return this.transaction(() => {
+      const seats = this.db
+        .prepare('SELECT game_id, side FROM auth_seats WHERE user_id = ?')
+        .all(guestId) as Row[];
+      const moved: string[] = [];
       this.db.prepare('DELETE FROM auth_seats WHERE user_id = ?').run(guestId);
       for (const r of seats) {
-        if (this.claimSeat(String(r.game_id), String(r.side) as SideId, userId)) {
+        if (this.claimSeat(String(r.game_id), String(r.side) as SideId, userId))
           moved.push(String(r.game_id));
-        }
       }
-      this.db.exec('COMMIT');
-    } catch (e) {
-      this.db.exec('ROLLBACK');
-      throw e;
-    }
-    this.deleteUser(guestId);
-    return moved;
+      this.ownership?.adoptGuest?.(guestId, userId);
+      this.deleteUser(guestId);
+      return moved;
+    });
   }
 
   idleGuests(nowMs: number): string[] {
@@ -292,22 +310,18 @@ export class SqliteAuthStore implements AuthStore {
   }
 
   deleteUser(id: string): string[] {
-    const user = this.getUser(id);
-    const games = (
-      this.db.prepare('SELECT game_id FROM auth_seats WHERE user_id = ?').all(id) as Row[]
-    ).map((r) => String(r.game_id));
-    this.db.exec('BEGIN');
-    try {
+    return this.transaction(() => {
+      const user = this.getUser(id);
+      const games = (
+        this.db.prepare('SELECT game_id FROM auth_seats WHERE user_id = ?').all(id) as Row[]
+      ).map((r) => String(r.game_id));
       this.db.prepare('DELETE FROM auth_seats WHERE user_id = ?').run(id);
       this.db.prepare('DELETE FROM auth_sessions WHERE user_id = ?').run(id);
       if (user) this.db.prepare('DELETE FROM auth_login_tokens WHERE email = ?').run(user.email);
+      this.ownership?.deleteUser?.(id);
       this.db.prepare('DELETE FROM auth_users WHERE id = ?').run(id);
-      this.db.exec('COMMIT');
-    } catch (e) {
-      this.db.exec('ROLLBACK');
-      throw e;
-    }
-    return games;
+      return games;
+    });
   }
 
   putLoginToken(hash: string, email: string, expiresAtMs: number, guestId?: string): void {
