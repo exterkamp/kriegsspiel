@@ -16,6 +16,12 @@ export const TURN_ACCOUNT_MAX = 600;
 export const TURN_SUMMARY_MAX = 2000;
 /** The most rolls one proposal may ask for. */
 export const TURN_ROLLS_MAX = 8;
+/**
+ * The most precedents one proposal may list (11.8). The engine keeps the first three, each cut
+ * to 200 characters, in the umpire's journal; the schema is looser so a long list or ruling does
+ * not waste the whole reply.
+ */
+export const TURN_PRECEDENTS_MAX = 8;
 
 export const TURN_STATUSES = ['active', 'broken', 'destroyed', 'captured'] as const;
 export const TURN_ORDER_RESULTS = [
@@ -60,8 +66,16 @@ export const UnitOutcome = z
     ),
     /** What its commander did and why, in character. Master state; 11.9 filters it. */
     account: z.string().max(TURN_ACCOUNT_MAX),
-    /** Why it differs from the projection; required under `standard` beyond the tolerance. */
-    departure: z.string().max(TURN_ACCOUNT_MAX).optional(),
+    /**
+     * Why it differs from the projection; required under `standard` beyond the tolerance. A `null`
+     * is read as no reason, as models write it for "none" (#523).
+     */
+    departure: z
+      .string()
+      .max(TURN_ACCOUNT_MAX)
+      .nullish()
+      .transform((v) => v ?? undefined)
+      .optional(),
     /** The rolls this outcome rests on. */
     rollIds: z.array(z.string().min(1)).optional(),
   })
@@ -107,6 +121,8 @@ export const TurnProposal = z
     rolls: z.array(RollRequest).max(TURN_ROLLS_MAX).optional(),
     /** The umpire's account for the record; never sent to a side. */
     summary: z.string().max(TURN_SUMMARY_MAX),
+    /** Rulings set as precedent for the rest of the game (11.8): the umpire's journal; never sent to a side. */
+    precedents: z.array(z.string().max(TURN_ACCOUNT_MAX)).max(TURN_PRECEDENTS_MAX).optional(),
   })
   .strict();
 export type TurnProposal = z.infer<typeof TurnProposal>;

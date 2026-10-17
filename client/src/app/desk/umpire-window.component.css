@@ -94,6 +94,52 @@ ul {
   font-size: 0.85em;
 }
 
+/* Turn mode (11.11): each turn's outcome and, on request, the umpire's log. */
+.turns {
+  margin-bottom: 0.75rem;
+}
+.turns h3,
+.turns h4 {
+  margin: 0.25rem 0;
+}
+.turn-steps {
+  display: flex;
+  gap: var(--ks-space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+.turns ol {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.turn-list li.current {
+  font-weight: bold;
+}
+.turns .jump {
+  padding: 0 4px;
+  font-size: 0.85em;
+}
+.turns .why {
+  opacity: 0.85;
+  font-size: 0.85em;
+}
+.turn {
+  margin: var(--ks-space-2) 0;
+  padding-left: var(--ks-space-2);
+  border-left: 2px solid var(--ks-rule);
+}
+.turn p {
+  margin: 0.25rem 0;
+}
+.log-toggle {
+  display: block;
+  margin: var(--ks-space-1) 0;
+}
+.journal {
+  padding-left: var(--ks-space-2);
+  border-left: 2px solid var(--ks-rule-soft);
+}
+
 /* The HUD wraps to two rows on a phone, so the window starts lower than on a desktop. */
 @media (max-width: 600px) {
   .window {

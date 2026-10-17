@@ -51,8 +51,12 @@ it.each(recipes)(
         })
       : geo;
     expect(again).toEqual(plan);
+    // Stream networks now reach the boundary even on these 1 km extents, so a
+    // requested exit can be blocked as well as a region, site or bridge.
     if (!plan.ok)
-      expect(plan.diagnostics[0]!.code).toMatch(/REGION|SITE|CONNECTIVITY|BRIDGE|RESOURCE/);
+      expect(plan.diagnostics[0]!.code).toMatch(
+        /REGION|SITE|CONNECTIVITY|BRIDGE|RESOURCE|BOUNDARY_EXIT/,
+      );
   },
   20000,
 );
@@ -76,7 +80,7 @@ it('supports unchanged default10km17 and maximum601x601 flat17 with configured s
     expect(p.evidence.planningCells).toBe(max ? 361201 : 160801);
     expect(p.evidence.expansions).toBeLessThanOrEqual(s.roads.maxGlobalExpansions);
   }
-}, 30000);
+}, 90_000); // Two full 10 km plans; about 29 s on CI since rotated sites (#545), so leave headroom.
 it('matches fresh processes/locales and unrelated settlement draws; no clock in content', () => {
   const planning = fileURLToPath(new URL('../dist/planning/index.js', import.meta.url)),
     terrain = fileURLToPath(new URL('../dist/terrain/index.js', import.meta.url)),

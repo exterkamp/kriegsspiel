@@ -26,6 +26,8 @@ interface AtResult {
 }
 
 const JUMPS: { kind: MarkKind; label: string }[] = [
+  // Turn mode (11.11): each turn's start and end, so a game can be scrubbed turn by turn.
+  { kind: 'turn', label: 'turn' },
   { kind: 'contact', label: 'contact' },
   { kind: 'order', label: 'order delivery' },
   { kind: 'llm', label: 'LLM call' },

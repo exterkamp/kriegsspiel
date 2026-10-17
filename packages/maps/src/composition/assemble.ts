@@ -11,6 +11,8 @@ import type {
 import { HARD_LIMITS } from '../contract.js';
 import { preflightAsset } from '../resources.js';
 import { distance, orientation, pointSegmentDistance } from '../geometry.js';
+import { decimal6 } from '../terrain/precision.js';
+import { degreeUnit } from '../rotation.js';
 import { settlementFrame } from './frame.js';
 import { CompositionFailure, Meter } from './budget.js';
 import type { LocalLayout } from './settlements.js';
@@ -22,6 +24,32 @@ export const accessId = (id: string) => `road:${id.slice('building:'.length)}:ac
 export const isLocalRoad = (r: Road) =>
   !!r.siteId && r.id.startsWith(`road:${localScope(r.siteId)}:`);
 const key = (p: Point) => `${p[0]},${p[1]}`;
+/**
+ * The projection of p onto the line through a along d, rounded to the decimal6
+ * point (of the nine around it) nearest that line. Given the segment's other
+ * end b (d = b − a), the projection stays on the segment, at an end exactly.
+ */
+function onLine(p: Point, a: Point, d: Point, b?: Point): Point {
+  const l = d[0] * d[0] + d[1] * d[1];
+  if (!(l > 0)) return a;
+  const t = ((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / l;
+  if (b && t <= 0) return a;
+  if (b && t >= 1) return b;
+  const x = decimal6(a[0] + t * d[0]),
+    y = decimal6(a[1] + t * d[1]);
+  let best: Point = [x, y],
+    offset = Infinity;
+  for (const dy of [0, -1, 1])
+    for (const dx of [0, -1, 1]) {
+      const q: Point = [decimal6(x + dx * 1e-6), decimal6(y + dy * 1e-6)],
+        e = Math.abs((q[0] - a[0]) * d[1] - (q[1] - a[1]) * d[0]);
+      if (e < offset) {
+        offset = e;
+        best = q;
+      }
+    }
+  return best;
+}
 const compare = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 /** Internal linear index; unmatched accesses never cause a street-by-access scan. */
 export function indexStreetAccesses<T extends { streetId: string }>(
@@ -131,14 +159,48 @@ export function assembleLayouts(
     meter.take(source.nodes.length * 2 + source.streets.length * 4 + accessCount * 20);
     const f = settlementFrame(site),
       metadata = model.constraints!,
-      scope = localScope(site.id);
+      scope = localScope(site.id),
+      // A turned frame rounds local points to world points independently (#545).
+      turned = site.rotationDeg % 90 !== 0;
     const existing = new Map<string, string>(),
-      points = new Map<string, Point>();
-    meter.take(site.entrances.length * 3 + 1);
+      points = new Map<string, Point>(),
+      entrances = new Map<string, Point>();
+    meter.take(site.entrances.length * 5 + 1);
     for (const e of site.entrances) {
       existing.set(key(e.endpoint), e.nodeId);
       points.set(e.nodeId, e.endpoint);
+      const local = f.local(e.endpoint);
+      entrances.set(`${local.x},${local.y}`, e.endpoint);
     }
+    // An exact supplied entrance maps back to its own world point, not a rounded
+    // copy. In a turned frame every vertex of its lead (exactly on the local
+    // axis through it, split wherever accesses join) goes back onto the line of
+    // the entrance bearing, within rounding.
+    const leads = new Map<string, Point>();
+    if (turned) {
+      const vertices = metadata.streets.flatMap((street) => street.path);
+      meter.take(vertices.length * site.entrances.length + site.entrances.length * 4);
+      for (const e of site.entrances) {
+        // Whole-degree bearings read the literal table; local ones are quarter turns.
+        const unit = degreeUnit(e.bearingDeg),
+          localUnit = degreeUnit(f.localBearing(e.bearingDeg));
+        if (!unit || !localUnit) continue;
+        const local = f.local(e.endpoint),
+          inward: Point = [0 - unit[1], unit[0]],
+          lx = 0 - localUnit[1],
+          ly = localUnit[0],
+          reach = e.widthM + 10;
+        for (const p of vertices) {
+          const dx = p.x - local.x,
+            dy = p.y - local.y,
+            along = dx * lx + dy * ly;
+          if (dx * ly - dy * lx !== 0 || !(along > 0) || along > reach) continue;
+          leads.set(`${p.x},${p.y}`, onLine(f.world(p), e.endpoint, inward));
+        }
+      }
+    }
+    const world = (p: { x: number; y: number }): Point =>
+      entrances.get(`${p.x},${p.y}`) ?? leads.get(`${p.x},${p.y}`) ?? f.world(p);
     let ordinal = 0;
     const node = (p: Point): string => {
       const k = key(p),
@@ -156,7 +218,7 @@ export function assembleLayouts(
       meter.take(rows.length * (Math.ceil(Math.log2(rows.length + 1)) + 2) + 1);
       return [...rows].sort(compare);
     };
-    for (const n of sorted(metadata.nodes)) node(f.world(n.point));
+    for (const n of sorted(metadata.nodes)) node(world(n.point));
     meter.take(model.buildings.length * 2 + 1);
     const account = new Map(model.buildings.map((b) => [b.id, b]));
     const meta = sorted(metadata.buildings),
@@ -188,20 +250,38 @@ export function assembleLayouts(
       const access = {
         id,
         streetId: b.access.streetId,
-        path: [f.world(b.access.path[0]), f.world(b.access.path[1])] as [Point, Point],
+        path: [world(b.access.path[0]), world(b.access.path[1])] as [Point, Point],
         width: b.access.widthM,
       };
+      if (turned) {
+        // The doorway goes back onto the nearest world footprint edge.
+        meter.take(polygon.outer.length);
+        let door = access.path[0],
+          best = Infinity;
+        for (let i = 1; i < polygon.outer.length; i++) {
+          const a = polygon.outer[i - 1]!,
+            z = polygon.outer[i]!,
+            d = pointSegmentDistance(access.path[0], a, z);
+          if (d < best) {
+            best = d;
+            door = onLine(access.path[0], a, [z[0] - a[0], z[1] - a[1]], z);
+          }
+        }
+        access.path[0] = door;
+      }
       accesses.push(access);
     }
     const accessesByStreet = indexStreetAccesses(accesses, meter);
     let streetOrdinal = 0;
     for (const street of sorted(metadata.streets)) {
       meter.take(3);
-      const a = f.world(street.path[0]!),
-        b = f.world(street.path.at(-1)!);
+      const a = world(street.path[0]!),
+        b = world(street.path.at(-1)!);
       const cuts: Point[] = [a, b];
       for (const access of accessesByStreet.get(street.id) ?? []) {
         meter.take();
+        // The join goes back onto the world street it splits.
+        if (turned) access.path[1] = onLine(access.path[1], a, [b[0] - a[0], b[1] - a[1]], b);
         if (pointSegmentDistance(access.path[1], a, b) > 1e-6)
           throw new CompositionFailure(
             'BUILDING_ACCESS',

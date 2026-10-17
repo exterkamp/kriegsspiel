@@ -28,7 +28,7 @@ afterEach(async () => {
   for (const owner of owners.splice(0)) owner.close();
   for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true });
 });
-async function open(path?: string) {
+async function open(path?: string, newSeed?: () => number) {
   const time = new FakeTime();
   const creations = new SqliteCreationStore(path ?? ':memory:', time.now);
   owners.push(creations);
@@ -44,6 +44,7 @@ async function open(path?: string) {
     wallNow: time.now,
     timers: time,
     limits: { sweepEveryMs: 0 },
+    ...(newSeed ? { newSeed } : {}),
   });
   apps.push(app);
   const user = creations.auth.upsertUser('player@example.test', time.now());
@@ -107,6 +108,42 @@ describe('native battlefield allocation API', () => {
     );
     const replay = await loadReplayInput(store, id);
     expect(replayAt(replay!, 0).engine.world.map).toEqual(actor.state.world.map);
+  });
+  it('gives a game made on a pinned battlefield its own seed, logged for replay (#534)', async () => {
+    let next = 31_337;
+    const { app, headers, request, store, creations } = await open(undefined, () => next++);
+    const payload = request();
+    const made = await app.server.inject({ method: 'POST', url: '/games', headers, payload });
+    expect(made.statusCode).toBe(201);
+    expect(made.json()).not.toHaveProperty('seed');
+    const id = made.json().id;
+    const header = (await store.logHeader(id))!;
+    // Not the scenario's authored 1815: the game rolls its own dice, kept in the header.
+    expect(headerPin(header)!.initialWorld.seed).toBe(1815);
+    expect(header.seed).toBe(31_337);
+    expect(app.host.get(id)!.state.world.seed).toBe(31_337);
+    expect(creations.forGame(id)!.seed).toBe(31_337);
+    expect(creations.lobby.get(id)!.seed).toBe(31_337);
+    const replay = (await loadReplayInput(store, id))!;
+    expect(replayAt(replay, 0).engine.world.seed).toBe(31_337);
+    // A retry is the same game; the next game draws again.
+    const retry = await app.server.inject({ method: 'POST', url: '/games', headers, payload });
+    expect(retry.json().id).toBe(id);
+    const other = await app.server.inject({
+      method: 'POST',
+      url: '/games',
+      headers,
+      payload: request(),
+    });
+    expect((await store.logHeader(other.json().id))!.seed).toBe(31_338);
+    // A request may name its dice, as on the unpinned path.
+    const named = await app.server.inject({
+      method: 'POST',
+      url: '/games',
+      headers,
+      payload: request({ seed: 99 }),
+    });
+    expect((await store.logHeader(named.json().id))!.seed).toBe(99);
   });
   it('retries one game before latest availability and limits, and rejects changed intent', async () => {
     const { app, creations, headers, request, battlefields } = await open();

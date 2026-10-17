@@ -12,6 +12,9 @@ import type { JsonSchema } from '../umpireClient.js';
 export { TurnProposal } from '@kriegsspiel/protocol';
 export type { UnitOutcome } from '@kriegsspiel/protocol';
 
+/** Radians (0 north, clockwise) to whole compass degrees in [0, 360). */
+export const deg = (radians: number) => ((Math.round((radians * 180) / Math.PI) % 360) + 360) % 360;
+
 const num = { type: 'number' };
 const str = { type: 'string' };
 const obj = (properties: Record<string, unknown>, required: string[]) => ({
@@ -81,6 +84,7 @@ export const TURN_PROPOSAL_JSON_SCHEMA: JsonSchema = obj(
       items: obj({ id: str, why: str, chance: num }, ['id', 'why', 'chance']),
     },
     summary: str,
+    precedents: { type: 'array', items: str },
   },
   ['turn', 'units', 'observations', 'summary'],
 );

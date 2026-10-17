@@ -491,6 +491,48 @@ ks-admin {
     flex: 1 1 260px;
     min-width: 0;
   }
+  /* Turn panel (D39, 11.11): one turn at a time, master state throughout. */
+  .legend {
+    margin: 0 0 var(--ks-space-1);
+    color: var(--dim);
+  }
+  .turn-picker {
+    margin: var(--ks-space-1) 0 var(--ks-space-2);
+  }
+  .turn-picker button[aria-pressed='true'] {
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: bold;
+  }
+  .turn-picker button[data-adjudicator='fallback'] {
+    border-style: dashed;
+  }
+  .turn-detail ol {
+    margin: 0;
+    padding-left: 28px;
+  }
+  .turn-detail li {
+    overflow-wrap: anywhere;
+  }
+  .turn-fallback[data-state='fell-back'] {
+    border-left: 3px solid var(--ks-wax);
+    padding-left: var(--ks-space-2);
+  }
+  .turn-call {
+    margin: var(--ks-space-1) 0;
+  }
+  .turn-call pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 50vh;
+  }
+  .turn-table {
+    overflow-x: auto;
+  }
+  .turn-rulings td:last-child {
+    white-space: normal;
+    min-width: 24ch;
+  }
   @media (max-width: 800px) {
     .or-top {
       grid-template-columns: 1fr;
