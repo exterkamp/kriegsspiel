@@ -37,17 +37,19 @@ export function mountBenchmark(root: HTMLElement): { dispose(): void } {
   const parentWindow = document.defaultView;
   if (!parentWindow) throw new Error('Benchmark requires a browser window');
   const win = parentWindow;
-  const heading = document.createElement('h1');
-  heading.textContent = 'Real battlefield preview benchmark';
+  // The page title is the host's (ks-tool-header); the layout is the shared design system's classes (#308).
   const note = document.createElement('p');
+  note.className = 'ks-muted';
   note.textContent =
     'Diagnostic run only. Real generation, validation and export run in workers. Keep this page visible and record the machine/browser. No fixture fallback. Canvas is fixed at 1440 × 900 CSS pixels; browser viewport is reported separately.';
   const form = document.createElement('form');
-  form.style.cssText = 'display:flex;flex-wrap:wrap;gap:16px;align-items:end;margin-bottom:16px';
+  form.className = 'benchmark-form';
   function field(label: string, input: HTMLElement) {
     const wrapper = document.createElement('label');
-    wrapper.style.cssText = 'display:flex;flex-direction:column;gap:4px';
-    wrapper.append(document.createTextNode(label), input);
+    const checkbox = input.tagName === 'INPUT' && (input as HTMLInputElement).type === 'checkbox';
+    wrapper.className = checkbox ? 'ks-choice' : 'ks-field';
+    if (checkbox) wrapper.append(input, document.createTextNode(label));
+    else wrapper.append(document.createTextNode(label), input);
     form.append(wrapper);
   }
   const preset = document.createElement('select');
@@ -89,26 +91,31 @@ export function mountBenchmark(root: HTMLElement): { dispose(): void } {
   run.type = 'submit';
   run.id = 'benchmark-run';
   run.textContent = 'Run real benchmark';
+  run.className = 'ks-primary';
   const cancel = document.createElement('button');
   cancel.type = 'button';
   cancel.id = 'benchmark-cancel';
   cancel.textContent = 'Cancel run';
   cancel.disabled = true;
-  form.append(run, cancel);
   const status = document.createElement('p');
   status.id = 'benchmark-status';
+  status.className = 'ks-status';
   status.setAttribute('role', 'status');
   status.textContent = 'Not run · G public implementations and real successful assets required';
   const output = document.createElement('pre');
   output.id = 'benchmark-result';
-  output.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere';
+  output.className = 'benchmark-result ks-mono';
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'overflow:auto;max-width:100%;border:1px solid #aaa';
+  wrap.className = 'benchmark-canvas';
   const canvas = document.createElement('canvas');
   canvas.id = 'benchmark-canvas';
   canvas.style.cssText = `display:block;width:${WIDTH}px;height:${HEIGHT}px;pointer-events:none`;
   wrap.append(canvas);
-  root.replaceChildren(heading, note, form, status, output, wrap);
+  const actions = document.createElement('div');
+  actions.className = 'ks-cluster benchmark-actions';
+  actions.append(run, cancel);
+  form.append(actions);
+  root.replaceChildren(note, form, status, output, wrap);
   const runtime = createAuthoringRuntime({
     generationWorkerFactory: () =>
       new Worker(new URL('./generate.worker.ts', import.meta.url), { type: 'module' }),
@@ -256,6 +263,7 @@ export function mountBenchmark(root: HTMLElement): { dispose(): void } {
     });
     cancel.disabled = false;
     output.textContent = '';
+    status.classList.remove('ks-ok', 'ks-error');
     const start = performance.now();
     const metadata = {
       operator,
@@ -447,9 +455,11 @@ export function mountBenchmark(root: HTMLElement): { dispose(): void } {
       assertEnvironment();
       output.textContent = resultText;
       status.textContent = `Completed diagnostic · ${measured} frames · p95 interval ${result.timings.frameInterval.p95Ms.toFixed(2)} ms · p95 draw ${result.timings.draw.p95Ms.toFixed(2)} ms · no gate acceptance`;
+      status.classList.add('ks-ok');
     } catch (error) {
       if (runtime.controller.state.status !== 'disposed') runtime.controller.cancel();
       status.textContent = `Run failed · ${error instanceof Error ? error.message : String(error)}`;
+      status.classList.add('ks-error');
       output.textContent = JSON.stringify(
         {
           status: 'failed',

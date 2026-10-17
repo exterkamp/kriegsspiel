@@ -1,6 +1,6 @@
 # Case garbled-order: A garbled order
 
-**What this case tests.** Blue-2's order to extend the line east was garbled on the ride (the umpire is told `garbled: true` and the true text). D39: the umpire must have it misread: the battalion goes somewhere plausibly wrong (the wrong side of the road, the wrong distance), with result "misread" and an account that shows the misunderstanding.
+**What this case tests.** Blue-2's order to march east to the Southern wood was garbled on the ride (the umpire is told `garbled: true` and the true text). D39: the umpire must have it misread: the battalion goes somewhere plausibly wrong (the wrong side of the road, the wrong distance), with result "misread" and an account that shows the misunderstanding.
 
 ## The umpire's input
 
@@ -374,23 +374,23 @@
  ],
  "orders": [
   {
-   "orderId": "b2-12",
+   "orderId": "blue-b2-12",
    "side": "blue",
    "to": "blue-2",
-   "text": "Extend the line 300 paces east along the river bank and watch for a crossing downstream.",
+   "text": "March east to the Southern wood and hold it.",
    "courier": "fast",
-   "sentTurn": 1,
+   "sentAtMinute": 0,
    "status": "arrived",
    "arrivedAtMinuteOfTurn": 6,
    "garbled": true
   },
   {
-   "orderId": "r1-12",
+   "orderId": "red-r1-12",
    "side": "red",
    "to": "red-1",
    "text": "Stand fast.",
    "courier": "safe",
-   "sentTurn": 1,
+   "sentAtMinute": 0,
    "status": "arrived",
    "arrivedAtMinuteOfTurn": 2
   }
@@ -410,12 +410,13 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the bridge, west of the High road"
    },
    {
     "unitId": "blue-2",
-    "x": 2400,
-    "y": 1680,
+    "x": 1750,
+    "y": 1720,
     "facingDeg": 0,
     "formation": "line",
     "strength": 550,
@@ -425,7 +426,18 @@
     "status": "active",
     "continuing": {
      "kind": "idle"
-    }
+    },
+    "at": "near the bridge, south of the river",
+    "path": [
+     [
+      2140,
+      1680
+     ],
+     [
+      1750,
+      1720
+     ]
+    ]
    },
    {
     "unitId": "blue-3",
@@ -440,7 +452,8 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the bridge, on the High road"
    },
    {
     "unitId": "red-1",
@@ -455,7 +468,8 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "west of the High road"
    },
    {
     "unitId": "red-2",
@@ -470,7 +484,8 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "east of the High road"
    },
    {
     "unitId": "red-3",
@@ -485,12 +500,16 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the Northern wood"
    }
   ],
+  "observations": [],
   "events": [
-   "minute 2: unit.arrived {\"unitId\":\"red-1\",\"at\":[1950,300]}",
-   "minute 9: unit.arrived {\"unitId\":\"blue-2\",\"at\":[2400,1680]}"
+   "2: order_delivered red-1, orderId red-r1-12",
+   "6: order_delivered blue-2, orderId blue-b2-12",
+   "6: order_garbled blue-2, orderId blue-b2-12",
+   "10: unit.arrived blue-2"
   ]
  }
 }
@@ -499,274 +518,258 @@
 ## Proposal A
 
 ```json
-(no answer)
+{
+ "turn": 1,
+ "units": [
+  {
+   "unitId": "blue-1",
+   "x": 1960,
+   "y": 1680,
+   "facingDeg": 0,
+   "formation": "line",
+   "strength": 600,
+   "morale": 80,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Colonel Aubry kept his battalion in line west of the High road, facing north. No orders came and nothing was in sight."
+  },
+  {
+   "unitId": "blue-2",
+   "x": 1750,
+   "y": 1720,
+   "facingDeg": 0,
+   "formation": "line",
+   "strength": 550,
+   "morale": 75,
+   "fatigue": 2,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "idle"
+   },
+   "orders": [
+    {
+     "orderId": "blue-b2-12",
+     "result": "misread"
+    }
+   ],
+   "account": "The order reached Colonel Delacroix at the sixth minute, badly garbled. He could not make out the direction or the place and moved off cautiously west of the road, away from the wood. He halted and waited for clarification, without having reached the Southern wood."
+  },
+  {
+   "unitId": "blue-3",
+   "x": 2050,
+   "y": 1850,
+   "facingDeg": 0,
+   "formation": "line",
+   "strength": 200,
+   "morale": 85,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Major Verneuil held the squadron on the High road and saw no enemy. He is impatient, but he had no orders and no target."
+  },
+  {
+   "unitId": "red-1",
+   "x": 1950,
+   "y": 300,
+   "facingDeg": 180,
+   "formation": "line",
+   "strength": 650,
+   "morale": 80,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [
+    {
+     "orderId": "red-r1-12",
+     "result": "carried-out"
+    }
+   ],
+   "account": "Colonel Brandt received 'Stand fast' at the second minute. He chafed at it but obeyed and held his ground."
+  },
+  {
+   "unitId": "red-2",
+   "x": 2250,
+   "y": 150,
+   "facingDeg": 180,
+   "formation": "line",
+   "strength": 650,
+   "morale": 70,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Colonel Hartmann had no orders and held his position east of the road, as the book requires."
+  },
+  {
+   "unitId": "red-3",
+   "x": 1550,
+   "y": 400,
+   "facingDeg": 180,
+   "formation": "line",
+   "strength": 220,
+   "morale": 85,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Major von Reiter held near the Northern wood and saw nothing of the enemy at this range."
+  }
+ ],
+ "observations": [],
+ "summary": "Quiet turn; the projection stands. Blue-2's order to march east to the Southern wood arrived garbled at minute 6. I ruled it misread: Delacroix, cautious, drifted west of the road to about (1750,1720) and halted without reaching the wood. Blue-2 is out of position and awaits a clear order. All other units held. The armies are about 1400 m apart across the river, with no contact and no sightings. Red-1 obeyed 'Stand fast'.",
+ "precedents": [
+  "A garbled order is misread by a cautious commander as a short, hesitant move in the wrong direction, followed by a halt to await clarification."
+ ]
+}
 ```
 
 ## Proposal B
 
 ```json
-(no answer)
+{
+ "turn": 1,
+ "units": [
+  {
+   "unitId": "blue-1",
+   "x": 1960,
+   "y": 1680,
+   "facingDeg": 0,
+   "formation": "line",
+   "strength": 600,
+   "morale": 80,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Col. Aubry had no new order and held his line south of the bridge, west of the high road, facing the river. Nothing to report."
+  },
+  {
+   "unitId": "blue-2",
+   "x": 1750,
+   "y": 1720,
+   "facingDeg": 0,
+   "formation": "line",
+   "strength": 550,
+   "morale": 75,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "idle"
+   },
+   "orders": [
+    {
+     "orderId": "blue-b2-12",
+     "result": "misread"
+    }
+   ],
+   "account": "The order reached Col. Delacroix at the sixth minute, but the bearing was garbled in the telling. He took it to mean the ground west along the river bank and marched some 400 m that way. He halted by the tenth minute, formed line facing the river and awaits clarification. No wood lies there, and he has noted the fact."
+  },
+  {
+   "unitId": "blue-3",
+   "x": 2050,
+   "y": 1850,
+   "facingDeg": 0,
+   "formation": "line",
+   "strength": 200,
+   "morale": 85,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Maj. Verneuil had no orders and kept his squadron on the high road behind the infantry. He was impatient but stayed in hand."
+  },
+  {
+   "unitId": "red-1",
+   "x": 1950,
+   "y": 300,
+   "facingDeg": 180,
+   "formation": "line",
+   "strength": 650,
+   "morale": 80,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [
+    {
+     "orderId": "red-r1-12",
+     "result": "carried-out"
+    }
+   ],
+   "account": "Col. Brandt was told to stand fast and did so, though he did not care for it. His battalion is in line west of the high road, facing south."
+  },
+  {
+   "unitId": "red-2",
+   "x": 2250,
+   "y": 150,
+   "facingDeg": 180,
+   "formation": "line",
+   "strength": 650,
+   "morale": 70,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Col. Hartmann had no orders and held his position east of the high road, as regulations require."
+  },
+  {
+   "unitId": "red-3",
+   "x": 1550,
+   "y": 400,
+   "facingDeg": 180,
+   "formation": "line",
+   "strength": 220,
+   "morale": 85,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Maj. von Reiter had no orders and held his hussars by the eastern edge of the northern wood."
+  }
+ ],
+ "observations": [],
+ "summary": "Turn 1 was quiet, and every unit ends where the projection put it. Blue-2's order to march east to the Southern wood arrived garbled at minute 6. Col. Delacroix read it as west along the bank, marched to about 1750,1720 and halted there in line. He now stands idle, west of blue-1 and no nearer the wood. Red-1 obeyed 'stand fast'. All other units held for want of orders. No contact was made: the two sides remain some 1,300 m or more apart, across the river and beyond sight. The bridge is held only by Blue's presence south of it.",
+ "precedents": [
+  "A garbled order to march to a named place may be read with its bearing reversed; the unit halts when it finds no such place and awaits clarification."
+ ]
+}
 ```
 
 ## Proposal C
-
-```json
-(no answer)
-```
-
-## Proposal D
-
-```json
-{
- "turn": 1,
- "units": [
-  {
-   "unitId": "blue-1",
-   "x": 1960,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 600,
-   "morale": 80,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Aubry had no orders and held his line covering the bridge. The 2nd Battalion marched past his rear to take post on his left."
-  },
-  {
-   "unitId": "blue-2",
-   "x": 1740,
-   "y": 1660,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 550,
-   "morale": 75,
-   "fatigue": 6,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "b2-12",
-     "result": "misread"
-    }
-   ],
-   "account": "Col. Delacroix's order came at minute 6, and the aide's message was confused: he took it as 'extend the line 300 paces west along the bank and watch for a crossing upstream'. He carefully broke into column and marched behind the 1st Battalion. He re-formed line on its left about 300 paces along the bank and posted pickets to watch the river upstream.",
-   "departure": "The order was garbled. The colonel took 'east' for 'west' and 'downstream' for 'upstream', so the battalion extended the line on the 1st Battalion's left at (1740,1660), not 300 paces east at (2400,1680). The bridge's east flank is now uncovered."
-  },
-  {
-   "unitId": "blue-3",
-   "x": 2050,
-   "y": 1850,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 200,
-   "morale": 85,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. Verneuil had no orders and held his squadron behind the infantry, astride the road."
-  },
-  {
-   "unitId": "red-1",
-   "x": 1950,
-   "y": 300,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 650,
-   "morale": 80,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r1-12",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Brandt received the order to stand fast and obeyed, though with ill grace, holding his line by the road."
-  },
-  {
-   "unitId": "red-2",
-   "x": 2250,
-   "y": 150,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 650,
-   "morale": 70,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Hartmann had no orders, so he held his line and waited for instructions."
-  },
-  {
-   "unitId": "red-3",
-   "x": 1550,
-   "y": 400,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. von Reiter had no orders and held his squadron in place."
-  }
- ],
- "observations": [],
- "summary": "Turn 1 (0-20). A quiet turn: no enemy came within anyone's sight, and nothing was fought. Blue's order for the 2nd Battalion to extend 300 paces east along the river and watch downstream reached it at minute 6 but was garbled in delivery. Its cautious colonel understood west and upstream instead. He marched the battalion behind the 1st and formed line on its left at about (1740,1660), watching the river upstream. As a result, the ground east of the bridge is now open, the opposite of what Blue intended. Red's Vanguard Battalion received 'Stand fast' at minute 2 and held. Every other unit held without orders."
-}
-```
-
-## Proposal E
-
-```json
-{
- "turn": 1,
- "units": [
-  {
-   "unitId": "blue-1",
-   "x": 1960,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 600,
-   "morale": 80,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Aubry has no order and holds his line facing the bridge. He sees the 2nd Battalion march off along the river bank to the east and supposes it has its reasons. Nothing of the enemy is in sight."
-  },
-  {
-   "unitId": "blue-2",
-   "x": 3540,
-   "y": 1680,
-   "facingDeg": 90,
-   "formation": "column",
-   "strength": 550,
-   "morale": 75,
-   "fatigue": 12,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "move",
-    "x": 3950,
-    "y": 1680
-   },
-   "orders": [
-    {
-     "orderId": "b2-12",
-     "result": "misread"
-    }
-   ],
-   "account": "Col. Delacroix gets his order at about the sixth minute. The written figure is blotted, and he reads it as 3,000 paces rather than 300. Cautious, he reads it twice, but the order says extend the line east and watch for a crossing downstream, so he forms column and marches east along the south bank to carry it out, and is still marching at the end of the turn, over a kilometre from the 1st Battalion.",
-   "departure": "The projection takes the order as written: 300 paces east, to (2400,1680), where the battalion halts. The courier's order is garbled, and the colonel reads 3,000 paces instead of 300, so he marches the 1,400 m that the rest of the turn allows, ending at (3540,1680) and still moving, more than a kilometre from the projected position."
-  },
-  {
-   "unitId": "blue-3",
-   "x": 2050,
-   "y": 1850,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 200,
-   "morale": 85,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. Verneuil has no order and holds behind the infantry. He sees the 2nd Battalion march away to the east and is puzzled, but does not stir without orders."
-  },
-  {
-   "unitId": "red-1",
-   "x": 1950,
-   "y": 300,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 650,
-   "morale": 80,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r1-12",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Brandt is told to stand fast and does, in line facing south, chafing."
-  },
-  {
-   "unitId": "red-2",
-   "x": 2250,
-   "y": 150,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 650,
-   "morale": 70,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Hartmann has no order and holds his position, by the book."
-  },
-  {
-   "unitId": "red-3",
-   "x": 1550,
-   "y": 400,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. von Reiter has no order and holds his position."
-  }
- ],
- "observations": [],
- "summary": "Blue-2 got the order to extend the line east along the river bank and watch for a crossing downstream, but it came in garbled. Col. Delacroix read '300 paces' as '3,000' and marched east in column from about minute 6, covering about 1,400 m to (3540,1680) and still marching, so the Blue line at the bridge is now held by the 1st Battalion with the cavalry behind. Red-1 stood fast; all the other units held. No contact: Red is still 1,400 m or more from Blue's infantry, and nobody saw anybody."
-}
-```
-
-## Proposal F
 
 ```json
 {
@@ -791,8 +794,8 @@
   },
   {
    "unitId": "blue-2",
-   "x": 2400,
-   "y": 1680,
+   "x": 1750,
+   "y": 1720,
    "facingDeg": 0,
    "formation": "line",
    "strength": 550,
@@ -805,7 +808,7 @@
    },
    "orders": [
     {
-     "orderId": "b2-12",
+     "orderId": "blue-b2-12",
      "result": "carried-out"
     }
    ],
@@ -844,7 +847,7 @@
    },
    "orders": [
     {
-     "orderId": "r1-12",
+     "orderId": "red-r1-12",
      "result": "carried-out"
     }
    ],

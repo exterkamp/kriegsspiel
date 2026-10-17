@@ -119,4 +119,31 @@ describe('StatePanel', () => {
     expect(root.querySelector<HTMLElement>('.unit[data-side="blue"]')!.hidden).toBe(true);
     expect(root.querySelector<HTMLElement>('.unit[data-side="red"]')!.hidden).toBe(false);
   });
+
+  it("shows the umpire's journal of a turn game as master only, and nothing when there is none", () => {
+    const panel = mount();
+    panel.update(state());
+    const root = document.querySelector('section')!;
+    expect(root.querySelector('.journal')).toBeNull();
+    const next = state();
+    next.engine.world.journal = {
+      notes: [
+        { turn: 1, note: 'Blue held the bridge.', condensed: true },
+        { turn: 2, note: 'Red’s hussars were checked at the ford. The guns came up.' },
+      ],
+      dropped: 3,
+      precedents: [{ turn: 1, ruling: 'Cavalry cannot cross the river except at the bridge.' }],
+    };
+    panel.update(next);
+    const block = root.querySelector('.journal')!;
+    expect(block.textContent).toContain('master only');
+    expect(block.textContent).toContain('3 older notes dropped');
+    expect([...block.querySelectorAll('.journal-notes li')].map((li) => li.textContent)).toEqual([
+      'Turn 1 (condensed): Blue held the bridge.',
+      'Turn 2: Red’s hussars were checked at the ford. The guns came up.',
+    ]);
+    expect(block.querySelector('.journal-precedents li')!.textContent).toBe(
+      'Turn 1: Cavalry cannot cross the river except at the bridge.',
+    );
+  });
 });

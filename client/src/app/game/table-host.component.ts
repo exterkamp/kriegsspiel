@@ -13,7 +13,7 @@ import {
   viewChild,
 } from '@angular/core';
 import * as THREE from 'three';
-import { buildSceneState } from '@legacy/table/sceneState';
+import { buildSceneState, withTurnOverlays } from '@legacy/table/sceneState';
 import { GLIDE_MS } from '@legacy/table/glide';
 import type { BaseMap, SceneState } from '@legacy/table/types';
 import type { TableScene } from '@legacy/table/TableScene';
@@ -189,7 +189,11 @@ export class TableHostComponent implements OnDestroy {
     const frame = this.desk.windowFrame();
     if (frame) return buildWindowScene(frame, this.desk.windowBelief(), map);
     const view = this.game.view();
-    return view ? buildSceneState(view, map) : { side: '', map, own: [], ghosts: [] };
+    if (!view) return { side: '', map, own: [], ghosts: [] };
+    // Turn mode: the turn's orders and the last turn's fighting on the table too (#439).
+    const turn = this.desk.turnTable();
+    const built = buildSceneState(view, map);
+    return turn ? withTurnOverlays(built, view, turn) : built;
   }
 
   private disposeScene(): void {

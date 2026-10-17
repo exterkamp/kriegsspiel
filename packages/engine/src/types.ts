@@ -4,12 +4,36 @@ import type { Order, OrderIntent } from './orders.js';
 import type { Trait } from './personality.js';
 import type { PlacementProposal, PlacementVerdict } from './placement.js';
 import type { Dial } from './judgment.js';
+import type { UmpireJournal } from './journal.js';
 
 /** Game time in integer milliseconds since the scenario start. Never derived from the wall clock. */
 export type GameTime = number;
 
 export const MS_PER_SECOND = 1000;
 export const MS_PER_MINUTE = 60 * MS_PER_SECOND;
+
+/**
+ * The engine's rules version, for rules that change what a seed draws, so a game logged under an
+ * older version replays as it was played (`GameState.rules`). A new game is made at this version.
+ * - 1 (absent): every die on the world's RNG.
+ * - 2 (#432): each courier rolls its loss, garbling and interceptions on a stream of its own
+ *   (`Courier.dice`), seeded by one draw from the world's RNG as it sets out.
+ * - 3 (#528): the objective's hold counts only while it is uncontested: no standing enemy in
+ *   contact with a holder or within `CONTEST_RADIUS_M` of the objective (D13).
+ * - 4 (#531): an enemy takes a courier only if it could reach it: by a straight ride over passable
+ *   ground, or by its cheapest route within its arm's reach, never over a crossing the courier's
+ *   side holds (`CROSSING_HOLD_M`; D11).
+ */
+export const RULES_VERSION = 4;
+
+/** True when couriers roll on their own stream (rules 2, #432). */
+export const courierStreams = (world: { rules?: number }): boolean => (world.rules ?? 1) >= 2;
+
+/** True when an enemy contesting the objective stops the attacker's hold (rules 3, #528). */
+export const contestedHolds = (world: { rules?: number }): boolean => (world.rules ?? 1) >= 3;
+
+/** True when an enemy must be able to reach a courier to take it (rules 4, #531). */
+export const interceptReach = (world: { rules?: number }): boolean => (world.rules ?? 1) >= 4;
 
 export type SideId = 'blue' | 'red';
 
@@ -279,7 +303,9 @@ export interface Report {
     | 'engaged'
     | 'heavyLosses'
     | 'broke'
-    | 'battle';
+    | 'battle'
+    | 'turn'
+    | 'notice';
   /** Game time of the thing reported. */
   observedAt: GameTime;
   /** Game time the report reaches HQ (observedAt plus courier delay). */
@@ -307,6 +333,34 @@ export interface Report {
   routed?: true;
   /** The unit's first report of the fight since it rallied from a break: it says so. */
   rallied?: true;
+  /** For `turn`: what the unit did in an umpire turn, as the engine applied it (D39, 11.9). */
+  turn?: TurnReportFacts;
+}
+
+/**
+ * A unit's own account of an umpire turn, as the engine applied it (D39, 11.9, #405): only what the
+ * unit knows of itself. The commander's words come from the umpire's `account`, which the server
+ * adds when it writes the side's reports; the engine's note is built from these facts alone.
+ */
+export interface TurnReportFacts {
+  /** The turn's number. */
+  n: number;
+  /** Men lost in the turn. */
+  lost: number;
+  /** Whole metres between where it stood at the turn's start and where it stands at its end. */
+  movedM: number;
+  /** It broke in the turn and is falling back. */
+  broke?: true;
+  /** It rallied from a break in the turn. */
+  rallied?: true;
+  /**
+   * What became of each order it had in the turn, as the umpire ruled and the engine applied it.
+   * `ref` is the desk's id of the order when the side's own desk sent it.
+   */
+  orders: {
+    ref?: string;
+    result: 'carried-out' | 'partly' | 'misread' | 'refused' | 'not-arrived';
+  }[];
 }
 
 /**
@@ -335,6 +389,12 @@ export interface Courier {
    * the pass had it taken. Absent in real-time play.
    */
   forced?: ForcedRide;
+  /**
+   * Under rules 2 (#432): the state of the courier's own dice, from which its loss, garbling and
+   * interception checks are drawn, so a ride never moves the world's RNG past its one seeding draw.
+   * Absent under rules 1.
+   */
+  dice?: number;
 }
 
 /** A ride's outcome in a turn, fixed by the turn's courier pass (see `courierPass`). */
@@ -398,7 +458,7 @@ export interface GameState {
   combatActive: boolean;
   /** Set once, when the game ends. Nothing happens in combat or victory handlers after that. */
   outcome: Outcome | null;
-  /** Since when the attacker alone has held the objective, or null (D13). Absent counts as null. */
+  /** Since when the attacker alone has held the objective (uncontested under rules 3, #528), or null (D13). Absent counts as null. */
   heldSince?: GameTime | null;
   intel: Record<SideId, SideIntel>;
   /** Couriers riding now, both sides. Master state only: never sent to a client. */
@@ -409,6 +469,8 @@ export interface GameState {
   rulings: Array<Ruling | BattleRuling | JudgmentRuling | TurnRuling>;
   /** The rigid-to-free dial chosen for this game; absent counts as 'standard'. Sets the judgment cap only. */
   dial?: Dial;
+  /** The rules version the game is played under (`RULES_VERSION`); absent counts as 1. */
+  rules?: number;
   /** Men each unit started with, the yardstick for a broken force (D13). Absent: no unit counts as broken. */
   startStrength?: Record<string, number>;
   /** Set once, when the umpire has declared one side's force broken; the game closes soon after (D13). */
@@ -420,6 +482,12 @@ export interface GameState {
    * moves the world up to `endMs`. Absent in real time.
    */
   turn?: TurnFlag;
+  /**
+   * The umpire's journal in a turn-mode game (D39, 11.8): condensed notes of its earlier turns and
+   * the precedents it set, written by `umpire.turn` from the logged proposal. Master state only:
+   * never sent to a client. Absent until the first umpire turn.
+   */
+  journal?: UmpireJournal;
 }
 
 /**

@@ -14,6 +14,8 @@ The inspector is a standalone Angular page: template bindings and signals show l
 
 The paper uses a whole-map raster, up to 4096 pixels on its longest side and limited by the browser's GPU. At 5 km that is about 1.22 metres per pixel; at 15 km it is about 3.66 metres per pixel. Very narrow tracks and small footprints can be indistinct, especially in an oblique view. Zoom enlarges the available raster; it does not add geometry detail. Use the authoring view for closer vector inspection.
 
+The paper is drawn in the authoring preview's period staff-map style (D43, #498), without the preview's neat line. It is drawn once per loaded map; with the app in high contrast (or the OS asking for more contrast) when the map loads, it uses the style's high-contrast palette. Switching contrast afterwards applies to the next map loaded. A live game's table (`/?game=`) draws its scenario map in the same style (`legacy/table/periodMap.ts`); there a change of contrast redraws the paper at the table's next update.
+
 ## Local development
 
 Follow `AGENTS.md` and use `devrun` to start the client. Obtain its allocated URL with `devrun url`; append `/map-authoring` or `/map-table`. Preserve other running previews and checkouts.

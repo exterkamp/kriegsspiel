@@ -7,6 +7,8 @@
  *   GET /admin/api/games/:id/entries           trace entries: ?kind= &correlationId= &after= &limit=
  *   GET /admin/api/games/:id/replay            timeline of the input log: end time and marks to jump to
  *   GET /admin/api/games/:id/replay/at?at=ms   master state, both side views and events at a game time
+ *   GET /admin/api/games/:id/turns             turn mode (11.11): each turn's orders, projection, model
+ *                                              calls, proposal, rolls, clamps, fallback and journal
  *   GET /admin/api/games/:id/stream            server-sent events of new entries; ?after= replays first
  *   …/games/:id/orders, …/orders/playground    order interpretation history and the dry-run playground
  *                                              (`orderDebug.ts`, #395; its one POST never touches a game)
@@ -31,6 +33,7 @@ import { sideViewOf } from '../api/sideView.js';
 import type { TraceEntry, TraceStore } from '../debug/trace.js';
 import type { GameStore } from '../game/store.js';
 import { loadReplayInput, replayAt, replayTimeline } from './replayView.js';
+import { adminTurns } from './turnView.js';
 import { OrderPlayground, orderDebugRoutes } from './orderDebug.js';
 
 export const ADMIN_PREFIX = '/admin/api';
@@ -293,6 +296,18 @@ export async function adminApi(server: FastifyInstance, options: AdminOptions): 
       return replayAt(input, Math.min(q.data.at, end));
     },
   );
+
+  // The Turn panel (D39, 11.11): master state from the log, behind the same gate as every route here.
+  server.get<{ Params: { id: string } }>(`${ADMIN_PREFIX}/games/:id/turns`, async (req, reply) => {
+    const input = await replayInput(req.params.id).catch(() => null);
+    if (input === null) return reply.code(422).send({ error: 'cannot_replay' });
+    if (!input) return reply.code(404).send({ error: 'no_such_game' });
+    try {
+      return adminTurns(input);
+    } catch {
+      return reply.code(422).send({ error: 'cannot_replay' });
+    }
+  });
 
   server.get<{ Params: { id: string }; Querystring: Record<string, string> }>(
     `${ADMIN_PREFIX}/games/:id/stream`,
