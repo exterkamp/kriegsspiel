@@ -37,6 +37,8 @@ import {
 } from '@kriegsspiel/protocol';
 import { decodePendingCreation } from '@legacy/shell/pendingCreation';
 import { CreationPendingError } from '@legacy/shell/newGameApi';
+import { createHttpMapLibrary } from '../../shared/lobby-map-library/http';
+import { createBoardPreparation } from '../../shared/game-setup/preparation';
 import { GameListComponent } from '../lobby/game-list.component';
 import { PageFrameComponent } from '../ui/page-frame.component';
 import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-map.component';
@@ -92,6 +94,8 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
               [scenarioId]="scenario()!.battlefields ? scenario()!.id : undefined"
               [catalog]="scenario()!.battlefields"
               [selection]="mapSelection()"
+              [library]="library()"
+              [preparationFactory]="library() ? prepareLibraryMap : undefined"
               (selectionChange)="selectMap($event)"
               [canOpen]="canInspectMap"
               (activeChange)="mapDialogOpen.set($event)"
@@ -382,7 +386,17 @@ export class NewGameComponent implements OnInit, OnChanges, OnDestroy {
     }
   });
   protected readonly mapInvalid = computed(() => this.checkedChoice() === null);
-  protected readonly canInspectMap = () => !this.starting() && !this.creationPending();
+  private loadedOwner: string | undefined;
+  protected readonly library = computed(() =>
+    this.ownerId() && this.options()?.mapLibrary === true ? createHttpMapLibrary() : undefined,
+  );
+  protected readonly prepareLibraryMap = () => createBoardPreparation();
+  protected readonly canInspectMap = () =>
+    !!this.options() &&
+    this.loadedOwner === this.ownerId() &&
+    !this.starting() &&
+    !this.creationPending() &&
+    !this.recoveryBlocked();
   protected readonly scenario = computed(() =>
     this.options()?.scenarios.find((s) => s.id === this.form()?.scenario),
   );
@@ -457,6 +471,7 @@ export class NewGameComponent implements OnInit, OnChanges, OnDestroy {
   ngOnInit(): void {
     const epoch = ++this.epoch;
     const ownerId = this.ownerId();
+    this.loadedOwner = ownerId;
     const current = () => !this.destroyed && this.epoch === epoch && this.ownerId() === ownerId;
     // Recovery is independent of the latest catalog and begins before its request.
     if (ownerId) {
@@ -548,7 +563,11 @@ export class NewGameComponent implements OnInit, OnChanges, OnDestroy {
     e.preventDefault();
     const epoch = this.epoch;
     const ownerId = this.ownerId();
-    const current = () => !this.destroyed && this.epoch === epoch && this.ownerId() === ownerId;
+    const current = () =>
+      !this.destroyed &&
+      this.epoch === epoch &&
+      this.ownerId() === ownerId &&
+      this.loadedOwner === ownerId;
     if (!current()) return;
     const options = this.options();
     const form = this.form();
