@@ -2,11 +2,12 @@ import { Component, input, output, provideZonelessChangeDetection } from '@angul
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import type { ScenarioBattlefield } from '@kriegsspiel/protocol';
-import type { ScenarioOptions } from '@legacy/shell/newGame';
+import type { ScenarioOptions, CreateRequest } from '@legacy/shell/newGame';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-map.component';
 import { SHELL_API } from './shell-api';
 import { NewGameComponent } from './new-game.component';
+import { CreationPendingError } from '@legacy/shell/newGameApi';
 
 /** Parent contract test: actual dialog/geometry/focus behavior belongs to the component's own tests/browser. */
 @Component({
@@ -17,6 +18,10 @@ import { NewGameComponent } from './new-game.component';
 class MapFixture {
   readonly battlefield = input.required<ScenarioBattlefield>();
   readonly scenarioName = input.required<string>();
+  readonly scenarioId = input<string>();
+  readonly catalog = input<import('@kriegsspiel/protocol').BattlefieldCatalog>();
+  readonly selection = input<{ pairingId: string; revision: string }>();
+  readonly selectionChange = output<import('@kriegsspiel/protocol').ApprovedBattlefield>();
   readonly canOpen = input<() => boolean>(() => true);
   readonly activeChange = output<boolean>();
 }
@@ -63,11 +68,18 @@ const options: ScenarioOptions = {
 let fixture: ComponentFixture<NewGameComponent> | undefined;
 afterEach(() => {
   fixture?.destroy();
+  sessionStorage.clear();
   fixture = undefined;
   TestBed.resetTestingModule();
 });
 
-async function open(loaded = options, realMap = false, create = vi.fn(async () => 'game-1')) {
+async function open(
+  loaded = options,
+  realMap = false,
+  create: (req: CreateRequest) => Promise<string> = vi.fn(async () => 'game-1'),
+  ownerId?: string,
+  loadOverride?: () => Promise<ScenarioOptions>,
+) {
   TestBed.configureTestingModule({
     providers: [
       provideZonelessChangeDetection(),
@@ -87,8 +99,9 @@ async function open(loaded = options, realMap = false, create = vi.fn(async () =
       add: { imports: [MapFixture] },
     });
   fixture = TestBed.createComponent(NewGameComponent);
-  fixture.componentRef.setInput('load', async () => loaded);
+  fixture.componentRef.setInput('load', loadOverride ?? (async () => loaded));
   fixture.componentRef.setInput('create', create);
+  if (ownerId) fixture.componentRef.setInput('ownerId', ownerId);
   fixture.detectChanges();
   await fixture.whenStable();
   fixture.detectChanges();
@@ -197,4 +210,224 @@ describe('new-game battlefield integration', () => {
     expect(element.querySelector('[role=alert]')?.textContent).toContain('server refused');
     push.mockRestore();
   });
+});
+
+function modernOptions(): ScenarioOptions {
+  const entry = (isDefault: boolean) => ({
+    map: {
+      ...structuredClone(battlefield.map),
+      preview: [],
+      id: isDefault ? 'bridge:default' : 'bridge:open-v1',
+      source: isDefault ? ('scenario-default' as const) : ('included' as const),
+      name: isDefault ? 'The bridge battlefield' : 'Open bridge approaches',
+    },
+    pairing: {
+      ...structuredClone(battlefield.pairing),
+      id: isDefault ? 'bridge:default' : 'bridge:open-v1',
+      revision: 'engine-pairing-v1:sha256:' + (isDefault ? 'c' : 'd').repeat(64),
+      resolvedScenarioId: isDefault ? 'bridge' : 'bridge-open-v1',
+      assemblyVersion: 'engine-native-v1' as const,
+    },
+    isDefault,
+  });
+  return {
+    ...options,
+    scenarios: [
+      {
+        ...structuredClone(options.scenarios[0]!),
+        battlefields: {
+          schemaVersion: 1,
+          scenarioId: 'bridge',
+          entries: [entry(true), entry(false)],
+        },
+      },
+    ],
+  };
+}
+describe('committed native pairing and recoverable creation', () => {
+  it('commits only a checked child choice and sends its exact identity with one request key', async () => {
+    const loaded = modernOptions();
+    const create = vi.fn<(req: CreateRequest) => Promise<string>>(async () => 'native-game');
+    const { fixture, element } = await open(loaded, false, create, 'owner');
+    const child = fixture.debugElement.query(By.directive(MapFixture))
+      .componentInstance as MapFixture;
+    const selected = loaded.scenarios[0]!.battlefields!.entries[1]!;
+    child.selectionChange.emit(selected);
+    await fixture.whenStable();
+    expect(child.selection()).toEqual({
+      pairingId: selected.pairing.id,
+      revision: selected.pairing.revision,
+    });
+    click(element, 'Start game');
+    await fixture.whenStable();
+    expect(create).toHaveBeenCalledOnce();
+    expect(create.mock.calls[0]![0]).toMatchObject({
+      pairing: { pairingId: selected.pairing.id, revision: selected.pairing.revision },
+      battlefieldVersion: 1,
+      requestId: expect.any(String),
+      rate: 12,
+    });
+    expect(sessionStorage.getItem('ks:lobby-creation:owner')).toBeNull();
+  });
+  it('blocks malformed modern metadata rather than creating a legacy default game', async () => {
+    const loaded = modernOptions();
+    loaded.scenarios[0]!.battlefields!.scenarioId = 'foreign';
+    const { fixture, element, create } = await open(loaded);
+    click(element, 'Start game');
+    await fixture.whenStable();
+    expect(create).not.toHaveBeenCalled();
+    expect(element.textContent).toContain('Choose an available battlefield');
+  });
+  it('retains exact accepted choices and key through ambiguous retry and changed current defaults', async () => {
+    const loaded = modernOptions();
+    const create = vi
+      .fn<(req: CreateRequest) => Promise<string>>()
+      .mockImplementationOnce(async (req) => {
+        throw new CreationPendingError(req.requestId!);
+      })
+      .mockResolvedValue('same-game');
+    let page = await open(loaded, false, create, 'owner');
+    page.element.querySelector<HTMLInputElement>('input[name=rate][value="4"]')!.click();
+    click(page.element, 'Start game');
+    await page.fixture.whenStable();
+    const first = structuredClone(create.mock.calls[0]![0]);
+    expect(page.element.textContent).toContain('Retry creation');
+    expect(page.element.querySelector('input[name=rate]')!.matches(':disabled')).toBe(true);
+    expect(JSON.parse(sessionStorage.getItem('ks:lobby-creation:owner')!).request).toEqual(first);
+    page.fixture.destroy();
+    TestBed.resetTestingModule();
+    const changed = modernOptions();
+    changed.opponent = undefined;
+    changed.scenarios[0]!.defaults.rate = 1;
+    changed.scenarios[0]!.battlefields!.entries[0]!.pairing.revision =
+      'engine-pairing-v1:sha256:' + 'e'.repeat(64);
+    page = await open(changed, false, create, 'owner');
+    expect(page.element.textContent).toContain('Retry creation');
+    click(page.element, 'Retry creation');
+    await page.fixture.whenStable();
+    expect(create.mock.calls[1]![0]).toEqual(first);
+    expect(sessionStorage.getItem('ks:lobby-creation:owner')).toBeNull();
+  });
+});
+
+describe('creation owner lifetime', () => {
+  it('never opens an old owner game or reuses its pending request after owner replacement', async () => {
+    let finish!: (id: string) => void;
+    const create = vi.fn<(request: CreateRequest) => Promise<string>>(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const page = await open(modernOptions(), false, create, 'owner-a');
+    const started = vi.fn();
+    page.fixture.componentInstance.started.subscribe(started);
+    click(page.element, 'Start game');
+    await Promise.resolve();
+    const retained = sessionStorage.getItem('ks:lobby-creation:owner-a');
+    expect(retained).not.toBeNull();
+    page.fixture.componentRef.setInput('ownerId', 'owner-b');
+    await page.fixture.whenStable();
+    finish('old-owner-game');
+    await Promise.resolve();
+    await page.fixture.whenStable();
+    expect(started).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('ks:lobby-creation:owner-a')).toBe(retained);
+    expect(sessionStorage.getItem('ks:lobby-creation:owner-b')).toBeNull();
+    expect(page.element.textContent).not.toContain('Retry creation');
+  });
+});
+
+describe('pending creation recovery boundaries', () => {
+  it('retains the identical ambiguous intent when a retry storage write fails', async () => {
+    const create = vi
+      .fn<(request: CreateRequest) => Promise<string>>()
+      .mockImplementationOnce(async (request) => {
+        throw new CreationPendingError(request.requestId!);
+      })
+      .mockResolvedValue('same-game');
+    const page = await open(modernOptions(), false, create, 'recovery-owner');
+    click(page.element, 'Start game');
+    await page.fixture.whenStable();
+    const first = structuredClone(create.mock.calls[0]![0]);
+    const retained = sessionStorage.getItem('ks:lobby-creation:recovery-owner');
+    const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage full');
+    });
+    click(page.element, 'Retry creation');
+    await page.fixture.whenStable();
+    expect(create).toHaveBeenCalledOnce();
+    expect(page.element.querySelector('input[name=rate]')!.matches(':disabled')).toBe(true);
+    expect(sessionStorage.getItem('ks:lobby-creation:recovery-owner')).toBe(retained);
+    storage.mockRestore();
+    click(page.element, 'Retry creation');
+    await page.fixture.whenStable();
+    expect(create.mock.calls[1]![0]).toEqual(first);
+  });
+  it.each(['', ' ', '{'])('blocks every present malformed retained record %j', async (text) => {
+    sessionStorage.setItem('ks:lobby-creation:malformed-owner', text);
+    const page = await open(
+      modernOptions(),
+      false,
+      vi.fn(async () => 'must-not-create'),
+      'malformed-owner',
+    );
+    const button = [...page.element.querySelectorAll('button')].find(
+      (b) => b.textContent?.trim() === 'Start game',
+    );
+    button?.click();
+    await page.fixture.whenStable();
+    expect(page.create).not.toHaveBeenCalled();
+    expect(page.element.textContent).toContain('could not be recovered');
+    expect(sessionStorage.getItem('ks:lobby-creation:malformed-owner')).toBe(text);
+  });
+  it.each(['empty', 'removed'])(
+    'recovers one retained key when the latest catalog is %s',
+    async (kind) => {
+      const create = vi
+        .fn<(request: CreateRequest) => Promise<string>>()
+        .mockImplementationOnce(async (request) => {
+          throw new CreationPendingError(request.requestId!);
+        })
+        .mockResolvedValue('retained-game');
+      let page = await open(modernOptions(), false, create, 'retained-owner');
+      click(page.element, 'Start game');
+      await page.fixture.whenStable();
+      const first = structuredClone(create.mock.calls[0]![0]);
+      page.fixture.destroy();
+      TestBed.resetTestingModule();
+      const latest = modernOptions();
+      latest.scenarios =
+        kind === 'empty' ? [] : [{ ...latest.scenarios[0]!, id: 'other-scenario' }];
+      page = await open(latest, false, create, 'retained-owner');
+      expect(page.element.textContent).toContain('Retry creation');
+      click(page.element, 'Retry creation');
+      await page.fixture.whenStable();
+      expect(create.mock.calls[1]![0]).toEqual(first);
+      expect(create).toHaveBeenCalledTimes(2);
+    },
+  );
+});
+
+it('recovers a retained intent even when the current scenario request fails', async () => {
+  const create = vi
+    .fn<(request: CreateRequest) => Promise<string>>()
+    .mockImplementationOnce(async (request) => {
+      throw new CreationPendingError(request.requestId!);
+    })
+    .mockResolvedValue('recovered-during-outage');
+  let page = await open(modernOptions(), false, create, 'offline-catalog-owner');
+  click(page.element, 'Start game');
+  await page.fixture.whenStable();
+  const first = structuredClone(create.mock.calls[0]![0]);
+  page.fixture.destroy();
+  TestBed.resetTestingModule();
+  page = await open(modernOptions(), false, create, 'offline-catalog-owner', async () => {
+    throw new Error('Catalog unavailable');
+  });
+  expect(page.element.textContent).toContain('Retry creation');
+  click(page.element, 'Retry creation');
+  await page.fixture.whenStable();
+  expect(create.mock.calls[1]![0]).toEqual(first);
+  expect(create).toHaveBeenCalledTimes(2);
 });

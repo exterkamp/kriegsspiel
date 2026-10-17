@@ -2,6 +2,9 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  OnChanges,
+  OnDestroy,
+  type SimpleChanges,
   computed,
   input,
   output,
@@ -27,6 +30,13 @@ import {
   type Form,
   type ScenarioOptions,
 } from '@legacy/shell/newGame';
+import {
+  decodeBattlefieldCatalog,
+  decodeApprovedBattlefield,
+  type ApprovedBattlefield,
+} from '@kriegsspiel/protocol';
+import { decodePendingCreation } from '@legacy/shell/pendingCreation';
+import { CreationPendingError } from '@legacy/shell/newGameApi';
 import { GameListComponent } from '../lobby/game-list.component';
 import { PageFrameComponent } from '../ui/page-frame.component';
 import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-map.component';
@@ -38,13 +48,26 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <ks-page-frame heading="New game" [back]="true" (backClick)="goBack()">
-      @if (loadError()) {
+      @if (creationPending() && (!scenario() || loadError())) {
+        <section aria-label="Recover previous game">
+          <p>Your previous choices are retained. Retry creation to recover the same game.</p>
+          @if (error()) {
+            <p role="alert" class="ks-status ks-error">{{ error() }}</p>
+          }
+          <button type="button" class="ks-primary" [disabled]="starting()" (click)="start($event)">
+            {{ starting() ? 'Recovering game…' : 'Retry creation' }}
+          </button>
+        </section>
+      } @else if (recoveryBlocked()) {
+        <p role="alert" class="ks-status ks-error">{{ error() }}</p>
+        <button type="button" (click)="goBack()">Back</button>
+      } @else if (loadError()) {
         <p role="alert" class="ks-status ks-error">{{ loadError() }}</p>
       } @else if (!options() || !form() || !scenario()) {
         <p role="status" class="ks-muted">Loading scenarios…</p>
       } @else {
         <form (submit)="start($event)" aria-label="New game">
-          <fieldset [disabled]="starting()">
+          <fieldset [disabled]="starting() || creationPending()">
             <legend>Scenario</legend>
             @for (s of options()!.scenarios; track s.id) {
               <label class="ks-choice">
@@ -66,18 +89,22 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
             <ks-battlefield-map
               [battlefield]="battlefield"
               [scenarioName]="scenario()!.name"
+              [scenarioId]="scenario()!.battlefields ? scenario()!.id : undefined"
+              [catalog]="scenario()!.battlefields"
+              [selection]="mapSelection()"
+              (selectionChange)="selectMap($event)"
               [canOpen]="canInspectMap"
               (activeChange)="mapDialogOpen.set($event)"
             />
           } @else {
-            <fieldset [disabled]="starting()">
+            <fieldset [disabled]="starting() || creationPending()">
               <legend>Battlefield map</legend>
               <p>The scenario's default battlefield will be used.</p>
               <p class="ks-muted">Map previews are not available on this server.</p>
             </fieldset>
           }
 
-          <fieldset [disabled]="starting()">
+          <fieldset [disabled]="starting() || creationPending()">
             <legend>Your side</legend>
             @if (sides().length === 1) {
               <p class="side-only">{{ sides()[0]!.name }}</p>
@@ -100,7 +127,7 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
             }
           </fieldset>
 
-          <fieldset [disabled]="starting()">
+          <fieldset [disabled]="starting() || creationPending()">
             <legend>How the game is played</legend>
             @for (m of modes; track m.id) {
               <label class="ks-choice">
@@ -118,7 +145,7 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
           </fieldset>
 
           @if (form()!.mode === 'turns') {
-            <fieldset [disabled]="starting()">
+            <fieldset [disabled]="starting() || creationPending()">
               <legend>Turns</legend>
               <label class="ks-field">
                 Game minutes per turn
@@ -152,7 +179,7 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
               </p>
             </fieldset>
           } @else {
-            <fieldset [disabled]="starting()">
+            <fieldset [disabled]="starting() || creationPending()">
               <legend>Clock rate</legend>
               @for (r of presets; track r) {
                 <label class="ks-choice">
@@ -192,7 +219,7 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
             </fieldset>
           }
 
-          <fieldset [disabled]="starting()">
+          <fieldset [disabled]="starting() || creationPending()">
             <legend>
               {{
                 form()!.mode === 'turns'
@@ -215,7 +242,7 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
             <p class="ks-muted" role="status">{{ dialLine() }}</p>
           </fieldset>
 
-          <fieldset [disabled]="starting()">
+          <fieldset [disabled]="starting() || creationPending()">
             <legend>Umpire's manner</legend>
             @for (p of personas; track p.id) {
               <label class="ks-choice">
@@ -235,6 +262,14 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
             </p>
           </fieldset>
 
+          @if (mapInvalid() && !creationPending()) {
+            <p role="alert" class="ks-status ks-error">
+              Choose an available battlefield map before starting.
+            </p>
+          }
+          @if (creationPending()) {
+            <p role="status">Your choices are retained while this game is recovered.</p>
+          }
           @if (error()) {
             <p role="alert" class="ks-status ks-error">{{ error() }}</p>
           }
@@ -246,17 +281,38 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
             <button
               type="submit"
               class="ks-primary"
-              [attr.aria-disabled]="starting() || mapDialogOpen()"
+              [attr.aria-disabled]="
+                starting() ||
+                recoveryBlocked() ||
+                mapDialogOpen() ||
+                (mapInvalid() && !creationPending())
+              "
             >
-              {{ starting() ? 'Starting game…' : 'Start game' }}
+              {{
+                starting() ? 'Starting game…' : creationPending() ? 'Retry creation' : 'Start game'
+              }}
             </button>
-            <button type="button" (click)="goBack()">Back</button>
+            <button
+              type="button"
+              [attr.aria-disabled]="starting() || creationPending()"
+              (click)="goBack()"
+            >
+              Back
+            </button>
           </div>
         </form>
       }
       <ks-game-list class="ks-panel games" />
-      @if (loadError()) {
-        <div class="ks-actions"><button type="button" (click)="goBack()">Back</button></div>
+      @if (loadError() && !creationPending() && !recoveryBlocked()) {
+        <div class="ks-actions">
+          <button
+            type="button"
+            [attr.aria-disabled]="starting() || creationPending()"
+            (click)="goBack()"
+          >
+            Back
+          </button>
+        </div>
       }
     </ks-page-frame>
   `,
@@ -284,10 +340,11 @@ import { BattlefieldMapComponent } from '../lobby/battlefield-map/battlefield-ma
     }
   `,
 })
-export class NewGameComponent implements OnInit {
+export class NewGameComponent implements OnInit, OnChanges, OnDestroy {
   readonly load = input.required<() => Promise<ScenarioOptions>>();
   /** Makes the game; resolves to its id, or throws an Error whose message is shown. */
   readonly create = input.required<(req: CreateRequest) => Promise<string>>();
+  readonly ownerId = input<string>();
   readonly started = output<string>();
   readonly back = output();
   protected readonly presets = ['1', '4', '12'];
@@ -300,7 +357,32 @@ export class NewGameComponent implements OnInit {
   protected readonly error = signal<string | undefined>(undefined);
   protected readonly starting = signal(false);
   protected readonly mapDialogOpen = signal(false);
-  protected readonly canInspectMap = () => !this.starting();
+  protected readonly creationPending = signal(false);
+  protected readonly recoveryBlocked = signal(false);
+  private pendingRequest: CreateRequest | undefined;
+  protected readonly mapSelection = signal<{ pairingId: string; revision: string } | undefined>(
+    undefined,
+  );
+  protected readonly checkedChoice = computed(() => {
+    const scenario = this.scenario();
+    if (!scenario || !Object.hasOwn(scenario, 'battlefields')) return undefined;
+    try {
+      const catalog = decodeBattlefieldCatalog(scenario.battlefields, scenario.id);
+      const selected = this.mapSelection();
+      return (
+        catalog.entries.find((entry) =>
+          selected
+            ? entry.pairing.id === selected.pairingId &&
+              entry.pairing.revision === selected.revision
+            : entry.isDefault,
+        ) ?? null
+      );
+    } catch {
+      return null;
+    }
+  });
+  protected readonly mapInvalid = computed(() => this.checkedChoice() === null);
+  protected readonly canInspectMap = () => !this.starting() && !this.creationPending();
   protected readonly scenario = computed(() =>
     this.options()?.scenarios.find((s) => s.id === this.form()?.scenario),
   );
@@ -347,23 +429,86 @@ export class NewGameComponent implements OnInit {
     () => PERSONA_CHOICES.find((p) => p.id === this.form()?.persona)?.description ?? '',
   );
   private busy = false;
+  private epoch = 0;
+  private destroyed = false;
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['ownerId'] && !changes['ownerId'].firstChange) {
+      this.options.set(undefined);
+      this.form.set(undefined);
+      this.mapSelection.set(undefined);
+      this.pendingRequest = undefined;
+      this.creationPending.set(false);
+      this.recoveryBlocked.set(false);
+      this.starting.set(false);
+      this.mapDialogOpen.set(false);
+      this.busy = false;
+      this.error.set(undefined);
+      this.loadError.set(undefined);
+      this.ngOnInit();
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    this.epoch++;
+  }
 
   ngOnInit(): void {
-    this.load()().then(
+    const epoch = ++this.epoch;
+    const ownerId = this.ownerId();
+    const current = () => !this.destroyed && this.epoch === epoch && this.ownerId() === ownerId;
+    // Recovery is independent of the latest catalog and begins before its request.
+    if (ownerId) {
+      try {
+        const saved = sessionStorage.getItem(`ks:lobby-creation:${ownerId}`);
+        if (saved !== null) {
+          const pending = decodePendingCreation(saved);
+          this.pendingRequest = pending.request;
+          this.form.set(pending.form);
+          this.mapSelection.set(pending.selection);
+          this.creationPending.set(true);
+          this.busy = true;
+          this.error.set(
+            'A previous creation may still be pending. Retry creation to recover the same game.',
+          );
+        }
+      } catch {
+        this.recoveryBlocked.set(true);
+        this.error.set(
+          'A previous game could not be recovered. Check Your games before creating another.',
+        );
+      }
+    }
+    if (!current()) return;
+    let loaded: Promise<ScenarioOptions>;
+    try {
+      loaded = this.load()();
+    } catch (e) {
+      if (current()) this.loadError.set(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    void loaded.then(
       (o) => {
+        if (!current() || !o) return;
         this.options.set(o);
         const f = initialForm(o);
-        this.form.set(f);
-        if (!f) this.loadError.set('This server has no scenarios.');
+        if (!this.creationPending() && !this.recoveryBlocked()) this.form.set(f);
+        if (!f && !this.creationPending()) this.loadError.set('This server has no scenarios.');
       },
-      (e: unknown) => this.loadError.set(e instanceof Error ? e.message : String(e)),
+      (e: unknown) => {
+        if (current()) this.loadError.set(e instanceof Error ? e.message : String(e));
+      },
     );
   }
 
   protected pick(id: string): void {
     if (this.mapDialogOpen() || this.busy) return;
     const next = chooseScenario(this.options()!, id, this.form());
-    if (next) this.form.set(next);
+    if (next) {
+      this.form.set(next);
+      this.mapSelection.set(undefined);
+    }
   }
 
   protected patch(p: Partial<Form>): void {
@@ -375,25 +520,119 @@ export class NewGameComponent implements OnInit {
     if (!this.mapDialogOpen() && !this.busy) this.back.emit();
   }
 
+  protected selectMap(value: ApprovedBattlefield): void {
+    if (this.busy) return;
+    const scenario = this.scenario();
+    if (!scenario?.battlefields) return;
+    try {
+      const approved = decodeApprovedBattlefield(value, scenario.id);
+      const catalog = decodeBattlefieldCatalog(scenario.battlefields, scenario.id);
+      if (
+        !catalog.entries.some(
+          (entry) =>
+            entry.pairing.id === approved.pairing.id &&
+            entry.pairing.revision === approved.pairing.revision,
+        )
+      )
+        return;
+      this.mapSelection.set({
+        pairingId: approved.pairing.id,
+        revision: approved.pairing.revision,
+      });
+    } catch {
+      this.error.set('This battlefield is unavailable. Choose another map.');
+    }
+  }
+
   protected async start(e: Event): Promise<void> {
     e.preventDefault();
+    const epoch = this.epoch;
+    const ownerId = this.ownerId();
+    const current = () => !this.destroyed && this.epoch === epoch && this.ownerId() === ownerId;
+    if (!current()) return;
     const options = this.options();
     const form = this.form();
-    if (this.busy || this.mapDialogOpen() || !options || !form) return;
-    const problem = validate(form, options);
-    if (problem) {
-      this.error.set(problem);
+    if (
+      (this.busy && !this.creationPending()) ||
+      this.starting() ||
+      this.recoveryBlocked() ||
+      this.mapDialogOpen() ||
+      !form ||
+      (!this.pendingRequest && !options)
+    )
       return;
+    let request = this.pendingRequest;
+    if (!request) {
+      if (!options) return;
+      const problem = validate(form, options);
+      if (problem || this.mapInvalid()) {
+        this.error.set(problem ?? 'Choose an available battlefield map before starting.');
+        return;
+      }
+      const choice = this.checkedChoice();
+      request = {
+        ...toRequest(form, options),
+        ...(choice
+          ? {
+              pairing: { pairingId: choice.pairing.id, revision: choice.pairing.revision },
+              requestId: crypto.randomUUID(),
+              battlefieldVersion: 1 as const,
+            }
+          : {}),
+      };
     }
+    if (request.pairing) this.mapSelection.set({ ...request.pairing });
+    const wasPending = this.creationPending();
     this.busy = true;
     this.starting.set(true);
     this.error.set(undefined);
+    this.pendingRequest = request;
+    const storageKey = this.ownerId() ? `ks:lobby-creation:${this.ownerId()}` : undefined;
+    if (storageKey && request.requestId) {
+      try {
+        sessionStorage.setItem(
+          storageKey,
+          JSON.stringify({ request, form, selection: request.pairing }),
+        );
+      } catch {
+        this.error.set(
+          'This browser could not retain the creation request. Try again after enabling session storage.',
+        );
+        this.busy = wasPending;
+        this.starting.set(false);
+        if (!wasPending) this.pendingRequest = undefined;
+        return;
+      }
+    }
     try {
-      this.started.emit(await this.create()(toRequest(form, options)));
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : String(err));
-      this.busy = false;
+      const id = await this.create()(request);
+      if (!current()) return;
+      if (storageKey) {
+        try {
+          sessionStorage.removeItem(storageKey);
+        } catch {
+          /* The known server result remains authoritative. */
+        }
+      }
+      this.pendingRequest = undefined;
+      this.creationPending.set(false);
+      this.started.emit(id);
+    } catch (error) {
+      if (!current()) return;
+      this.error.set(error instanceof Error ? error.message : String(error));
+      this.creationPending.set(wasPending || error instanceof CreationPendingError);
+      this.busy = this.creationPending();
       this.starting.set(false);
+      if (!this.creationPending()) {
+        this.pendingRequest = undefined;
+        if (storageKey) {
+          try {
+            sessionStorage.removeItem(storageKey);
+          } catch {
+            /* The known server result remains authoritative. */
+          }
+        }
+      }
     }
   }
 }
