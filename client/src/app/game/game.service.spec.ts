@@ -104,8 +104,70 @@ describe('GameService', () => {
       info('t1', { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 30 }),
     );
     svc.connect(loc('?game=t1'));
+    // Until the settings are read the mode is unknown, and the desk wears neither dress (#427).
+    expect(svc.state().modePending).toBe(true);
     await vi.waitFor(() => expect(svc.sides()).toEqual(['blue', 'red']));
     expect(svc.state()).toMatchObject({ turnMode: true, turnMinutes: 30 });
+    expect(svc.state().modePending).toBeUndefined();
+  });
+
+  it('seeds turn mode from the settings before any turnState, and a turnState keeps it (#427)', async () => {
+    let answer: (v: GameInfo) => void = () => undefined;
+    loadInfo.mockImplementationOnce(() => new Promise((r) => (answer = r)));
+    const svc = TestBed.inject(GameService);
+    svc.connect(loc('?game=t3'));
+    expect(svc.state()).toMatchObject({ modePending: true });
+    expect(svc.state().turnMode).toBeUndefined();
+    answer(info('t3', { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 20 }));
+    await vi.waitFor(() => expect(svc.state().turnMode).toBe(true));
+    expect(svc.state().modePending).toBeUndefined();
+  });
+
+  it('offers Retry, not a guessed dress, when its settings cannot be read (#427)', async () => {
+    loadInfo.mockRejectedValueOnce(new Error('could not read the game'));
+    const svc = TestBed.inject(GameService);
+    svc.connect(loc('?game=f1'));
+    // The terrain gate needs the game's own record, so no socket opens on a guess.
+    await vi.waitFor(() => expect(svc.mapError()).not.toBe(''));
+    expect(svc.state().modePending).toBeUndefined();
+    expect(svc.state().turnMode).toBeUndefined();
+    expect(FakeSocket.all).toHaveLength(0);
+  });
+
+  it('forgets the turn mode of a game opened earlier when joining another (#427)', async () => {
+    loadInfo.mockResolvedValueOnce(
+      info('t4', { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 20 }),
+    );
+    const svc = TestBed.inject(GameService);
+    svc.connect(loc('?game=t4'));
+    await vi.waitFor(() => expect(svc.state().turnMode).toBe(true));
+    loadInfo.mockImplementationOnce(() => new Promise(() => undefined));
+    svc.connect(loc('?game=r4'));
+    expect(svc.state().turnMode).toBeUndefined();
+    expect(svc.state().turnMinutes).toBeUndefined();
+    expect(svc.state().modePending).toBe(true);
+  });
+
+  it("reads the battle's length from the scenario list, so the desk can count the turns (#439)", async () => {
+    const svc = TestBed.inject(GameService);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          scenarios: [
+            { id: 'other', lengthMinutes: 90 },
+            { id: 'hold-the-bridge', lengthMinutes: 50 },
+          ],
+        }),
+      })),
+    );
+    loadInfo.mockResolvedValueOnce(
+      info('t2', { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 20 }),
+    );
+    svc.connect(loc('?game=t2'));
+    await vi.waitFor(() => expect(svc.state().battleMinutes).toBe(50));
   });
 
   it('leaves a real-time game in real-time dress when its settings arrive', async () => {
