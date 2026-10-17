@@ -13,6 +13,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { DraftSnapshot, Mark, UmpireSettings } from '@kriegsspiel/protocol';
 import type { ClockChange } from '../clock.js';
+import { detachedInputHeader } from './pinned-header.js';
 import type {
   GameSnapshot,
   GameStore,
@@ -89,6 +90,10 @@ export const MIGRATIONS: readonly string[] = [
   `ALTER TABLE games ADD COLUMN settings TEXT;`,
   // The engine rules version the game is played under (#432); null for a game made before it: 1.
   `ALTER TABLE games ADD COLUMN rules INTEGER;`,
+  // Private versioned initial scenario pin; old rows keep both columns NULL.
+  `ALTER TABLE games ADD COLUMN battlefield_format INTEGER;
+   ALTER TABLE games ADD COLUMN battlefield_pin TEXT;
+   ALTER TABLE games ADD COLUMN creation_receipt_id TEXT;`,
 ];
 
 /** Older snapshots kept besides the newest (not yet used as a fallback: recovery reads the newest). */
@@ -147,10 +152,11 @@ export class SqliteGameStore implements GameStore {
   }
 
   async saveLogHeader(header: InputLogHeader): Promise<void> {
+    header = detachedInputHeader(header);
     // Plain INSERT: never overwrite the record of an existing game.
     this.db
       .prepare(
-        'INSERT INTO games (game_id, scenario_id, seed, summarized, settings, rules) VALUES (?, ?, ?, 1, ?, ?)',
+        'INSERT INTO games (game_id, scenario_id, seed, summarized, settings, rules, battlefield_format, battlefield_pin, creation_receipt_id) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)',
       )
       .run(
         header.gameId,
@@ -158,24 +164,56 @@ export class SqliteGameStore implements GameStore {
         header.seed,
         header.settings ? JSON.stringify(header.settings) : null,
         header.rules ?? null,
+        header.battlefieldFormat ?? null,
+        header.battlefieldPin ? JSON.stringify(header.battlefieldPin) : null,
+        header.creationReceiptId ?? null,
       );
   }
 
   async logHeader(gameId: string): Promise<InputLogHeader | undefined> {
     const r = this.db
-      .prepare('SELECT scenario_id, seed, settings, rules FROM games WHERE game_id = ?')
+      .prepare(
+        `SELECT scenario_id, seed, rules, battlefield_format, creation_receipt_id,
+      length(CAST(battlefield_pin AS BLOB)) AS pin_bytes,
+      CASE WHEN length(CAST(battlefield_pin AS BLOB)) <= 1048576 THEN battlefield_pin ELSE NULL END AS battlefield_pin,
+      length(CAST(settings AS BLOB)) AS settings_bytes,
+      CASE WHEN length(CAST(settings AS BLOB)) <= 16384 THEN settings ELSE NULL END AS settings
+      FROM games WHERE game_id = ?`,
+      )
       .get(gameId) as
-      | { scenario_id: string; seed: number; settings: string | null; rules: number | null }
+      | {
+          scenario_id: string;
+          seed: number;
+          rules: number | null;
+          settings: string | null;
+          settings_bytes: number | null;
+          battlefield_format: number | null;
+          battlefield_pin: string | null;
+          pin_bytes: number | null;
+          creation_receipt_id: string | null;
+        }
       | undefined;
-    return (
-      r && {
-        gameId,
-        scenarioId: r.scenario_id,
-        seed: r.seed,
-        ...(r.settings ? { settings: JSON.parse(r.settings) as UmpireSettings } : {}),
-        ...(r.rules === null ? {} : { rules: r.rules }),
-      }
-    );
+    if (!r) return undefined;
+    if ((r.pin_bytes ?? 0) > 1048576 || (r.settings_bytes ?? 0) > 16384)
+      throw new Error('Stored input header exceeds byte limit');
+    const modern =
+      r.battlefield_format !== null || r.battlefield_pin !== null || r.creation_receipt_id !== null;
+    return detachedInputHeader({
+      gameId,
+      scenarioId: r.scenario_id,
+      seed: r.seed,
+      ...((modern ? r.settings !== null : !!r.settings)
+        ? { settings: JSON.parse(r.settings!) as UmpireSettings }
+        : {}),
+      ...(r.rules === null ? {} : { rules: r.rules }),
+      ...(modern
+        ? {
+            battlefieldFormat: r.battlefield_format as 1,
+            battlefieldPin: r.battlefield_pin === null ? undefined : JSON.parse(r.battlefield_pin),
+            ...(r.creation_receipt_id === null ? {} : { creationReceiptId: r.creation_receipt_id }),
+          }
+        : {}),
+    });
   }
 
   async appendInput(gameId: string, entry: InputLogEntry): Promise<void> {

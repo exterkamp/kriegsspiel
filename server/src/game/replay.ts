@@ -20,6 +20,9 @@ import {
 import type { ParseResult } from '../orders/index.js';
 import type { InputLogEntry, InputLogHeader } from './store.js';
 import { advanceUntilOver } from './advance.js';
+import { headerPin } from './pinned-header.js';
+import { nativeCanonicalJson } from './native-scenario-pin.js';
+import { assertBattlefieldBudget } from '@kriegsspiel/protocol';
 import { applyTurn } from './turns.js';
 
 export { advanceUntilOver };
@@ -92,6 +95,10 @@ export function replayLog(
   if (world.scenarioId !== header.scenarioId) {
     throw new Error(`log is for scenario ${header.scenarioId}, got ${world.scenarioId}`);
   }
+  const pin = headerPin(header);
+  if (pin) assertBattlefieldBudget(world, 1024 * 1024);
+  if (pin && nativeCanonicalJson(world) !== nativeCanonicalJson(pin.initialWorld))
+    throw new Error('Replay initial world contradicts pinned scenario');
   // The dial chosen at creation is part of the starting world, as the host built it.
   const start = structuredClone(world);
   if (header.settings) start.dial = header.settings.dial;

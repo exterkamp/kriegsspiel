@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { createRegistry, loadScenarioById, startingState } from './registry.js';
+import { createRegistry, startingState } from './registry.js';
 import { replayLog } from './replay.js';
+import { initialWorldFromHeader } from './pinned-header.js';
 import { parseInputLog } from './store.js';
 
 /**
@@ -30,7 +31,7 @@ async function main(): Promise<number> {
   );
   const { state, emitted } = replayLog(
     header,
-    loadScenarioById(header.scenarioId),
+    initialWorldFromHeader(header),
     entries,
     createRegistry(),
     until,
