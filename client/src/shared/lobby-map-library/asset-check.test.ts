@@ -1,4 +1,5 @@
 import { webcrypto } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import * as maps from '@kriegsspiel/maps';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -493,6 +494,34 @@ describe('pure actual worker message verification', () => {
       code: 'MAP_UNAVAILABLE',
     });
   });
+
+  it.each(['d44', 'd45', 'd46', 'd48'])(
+    'certifies a map saved by a legacy generator (%s, LEGACY_GENERATORS)',
+    async (name) => {
+      const saved = maps.importAsset(
+        readFileSync(
+          new URL(
+            `../../../../packages/maps/tests/fixtures/${name}-saved-map.json`,
+            import.meta.url,
+          ),
+          'utf8',
+        ),
+      );
+      expect(maps.supportsReplay(saved)).toBe(false);
+      const canonicalJson = maps.canonicalizeAsset(saved);
+      const input = request({
+        canonicalJson,
+        assetIdentity: await maps.assetIdentity(maps.importAsset(canonicalJson), 'asset'),
+        widthM: saved.bounds.maxX,
+        heightM: saved.bounds.maxY,
+      });
+      expect(await verifyLibraryAssetMessage(input)).toMatchObject({
+        type: 'verified',
+        requestId: input.requestId,
+      });
+    },
+    30000,
+  );
 
   it('rejects schema-only reference geography as unsupported rather than substituting a playable map', async () => {
     const reference = maps.createReferenceAsset();
