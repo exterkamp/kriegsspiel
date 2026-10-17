@@ -3,6 +3,7 @@ import { canonicalizeAsset, createReferenceAsset } from '@kriegsspiel/maps';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GenerationWorker } from './generation/index.js';
 import { mountAuthoringApp } from './authoring-app.js';
+import { statusClass } from './controls/index.js';
 import { createAuthoringRuntime, type ValidationRequest } from './runtime/index.js';
 
 vi.mock('@kriegsspiel/maps', async (importOriginal) => {
@@ -311,4 +312,40 @@ it('keeps the empty preview during generation and initial cancellation with reco
     document.querySelector<HTMLButtonElement>('[data-action="empty-generate"]')!.disabled,
   ).toBe(false);
   expect(worker.terminate).toHaveBeenCalledOnce();
+});
+describe('shared design-system markup (#308)', () => {
+  it('builds the empty card, layer toggles, exports and diagnostics from the shared classes', async () => {
+    const r = setup();
+    const empty = document.querySelector<HTMLElement>('.map-empty-state')!;
+    expect(empty.classList).toContain('ks-paper');
+    const emptyActions = empty.querySelector('.ks-cluster')!;
+    expect(
+      [...emptyActions.querySelectorAll('button')].map((b) => [b.dataset.action, b.className]),
+    ).toEqual([
+      ['empty-generate', 'ks-primary'],
+      ['empty-load', ''],
+    ]);
+    const layers = [...document.querySelectorAll<HTMLLabelElement>('#layers label')];
+    expect(layers.length).toBeGreaterThan(0);
+    for (const label of layers) {
+      expect(label.className).toBe('ks-choice');
+      expect(label.firstElementChild).toBeInstanceOf(HTMLInputElement);
+      expect(label.textContent!.trim()).not.toBe('');
+    }
+    // Both exports sit together among the panel's actions.
+    const svg = [...r.app.panel.element.querySelectorAll('button')].find(
+      (b) => b.textContent === 'Export SVG',
+    )!;
+    expect(svg.previousElementSibling).toBe(
+      r.app.panel.element.querySelector('[data-action="export"]'),
+    );
+    expect(svg.parentElement!.classList).toContain('authoring-actions');
+    r.app.panel.loadText(canonicalizeAsset(createReferenceAsset()));
+    r.workers[0]!.accept();
+    await settle();
+    expect(empty.hidden).toBe(true);
+    const lines = [...document.querySelectorAll<HTMLLIElement>('#diagnostics li')];
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) expect(line.className).toBe(statusClass(line.dataset.severity!));
+  });
 });

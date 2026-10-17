@@ -7,24 +7,32 @@ import {
 } from '../contract.js';
 import { preflightAsset } from '../resources.js';
 import { parseSettings } from '../validation.js';
-import { deriveSeed } from '../overrides.js';
+import { deriveSeed, placeId, resolveOverrides } from '../overrides.js';
 import { canonicalizeAsset } from '../canonical.js';
 import { importAsset } from '../import.js';
 import { generateElevation, extractContours } from '../terrain/index.js';
-import { generateGeography } from '../geography/index.js';
+import { generateCover, generateGeography } from '../geography/index.js';
 import {
   createPlanningCertificates,
   generatePlanning,
   reconcileLocalJoins,
   type PlanningInput,
 } from '../planning/index.js';
-import { bounded, compositionLimits, configurationData, Meter, requireValue } from './budget.js';
+import {
+  bounded,
+  compositionLimits,
+  configurationData,
+  guarded,
+  Meter,
+  requireValue,
+} from './budget.js';
 import { assembleLayouts } from './assemble.js';
 import { compactLocalStreets } from './compact.js';
 import { createLocalLayouts, type CallbackState } from './settlements.js';
 import { settlementFrame } from './frame.js';
 import { CURRENT_GENERATOR, CONSUMED_FORK } from './identity.js';
 import { validateBattlefield } from './validate.js';
+import type { Diagnostic } from '../contract.js';
 import type { BattlefieldInput, BattlefieldResult } from './types.js';
 
 export function generateBattlefield(raw: BattlefieldInput): BattlefieldResult {
@@ -50,100 +58,176 @@ export function generateBattlefield(raw: BattlefieldInput): BattlefieldResult {
         maxX: settings.widthM,
         maxY: settings.heightM,
       };
-    const source = requireValue(generateElevation(settings, seed)),
-      geo = requireValue(generateGeography(source, bounds, settings, seed));
-    const contours = requireValue(extractContours(geo.elevation, bounds, settings));
-    const size = settings.settlements.farmSite;
-    const preferredFarm = Math.max(
-      size.minExtentM,
-      Math.sqrt(size.minAreaM2),
-      Math.min(50, size.maxExtentM, Math.sqrt(size.maxAreaM2)),
-    );
-    const input: PlanningInput = {
-      settings,
-      seed,
-      bounds,
-      elevation: geo.elevation,
-      water: geo.water,
-      cover: geo.cover,
-      crossingCandidates: geo.crossingCandidates,
-      overrides,
-      requireBridge: settings.hydrology.requireRiver,
-      preferredSiteExtentM: { farm: preferredFarm },
-    };
-    let plan = requireValue(generatePlanning(input));
-    const certificates = requireValue(
-      createPlanningCertificates(input, (n) => {
-        state.active?.take(n, 'world certificate');
-        meter.take(n);
-        state.charged += n;
-      }),
-    );
-    const layouts = createLocalLayouts(plan, geo.water, settings, seed, certificates, meter, state);
-    const joins = layouts.flatMap((l) =>
-      l.model.constraints!.entrances.map((e) => ({
-        siteId: l.site.id,
-        entranceId: e.id,
-        endpoint: settlementFrame(l.site).world(e.endpoint),
-        bearingDeg: (e.bearingDeg + l.site.rotationDeg) % 360,
-        widthM: e.widthM,
-      })),
-    );
-    const changed = joins.some((j) => {
-      const e = plan.sites
-        .find((s) => s.id === j.siteId)!
-        .entrances.find((e) => e.id === j.entranceId)!;
-      return (
-        e.endpoint[0] !== j.endpoint[0] ||
-        e.endpoint[1] !== j.endpoint[1] ||
-        e.bearingDeg !== j.bearingDeg ||
-        e.widthM !== j.widthM
-      );
-    });
-    if (changed) {
-      const r = reconcileLocalJoins(input, plan, joins);
-      meter.take(r.work);
-      if (!r.ok) return r;
-      plan = r.value.plan;
-      for (const l of layouts) l.site = plan.sites.find((s) => s.id === l.site.id)!;
-    }
-    const asset: MapAsset = {
-      schema: 'kriegsspiel/local-map',
-      schemaVersion: SCHEMA_VERSION,
-      precisionPolicy: PRECISION_POLICY,
-      coordinates: { ...COORDINATES },
-      name: `Battlefield ${seed}`,
-      provenance: {
-        seed,
-        generator: structuredClone(CURRENT_GENERATOR),
-        fork: { ...CONSUMED_FORK },
+    // Overrides name stable place slots, so they are checked before generation
+    // (planning resolves them again against the same slots).
+    const { villageCount, farmCount } = settings.settlements;
+    resolveOverrides(overrides, [
+      ...Array.from({ length: villageCount }, (_, i) => placeId('village', i)),
+      ...Array.from({ length: farmCount }, (_, i) => placeId('farm', i)),
+    ]);
+    // Input is validated above and may throw; generation from it never does.
+    let stage: Diagnostic['stage'] = 'terrain';
+    return guarded(
+      () => stage,
+      (): BattlefieldResult => {
+        const source = requireValue(generateElevation(settings, seed));
+        stage = 'hydrology';
+        const geo = requireValue(
+          generateGeography(source, bounds, settings, seed, {}, { cover: false }),
+        );
+        stage = 'contours';
+        const contours = requireValue(extractContours(geo.elevation, bounds, settings));
+        const size = settings.settlements.farmSite;
+        const preferredFarm = Math.max(
+          size.minExtentM,
+          Math.sqrt(size.minAreaM2),
+          Math.min(50, size.maxExtentM, Math.sqrt(size.maxAreaM2)),
+        );
+        const input: PlanningInput = {
+          settings,
+          seed,
+          bounds,
+          elevation: geo.elevation,
+          water: geo.water,
+          cover: geo.cover,
+          crossingCandidates: geo.crossingCandidates,
+          overrides,
+          requireBridge: settings.hydrology.requireRiver,
+          preferredSiteExtentM: { farm: preferredFarm },
+        };
+        stage = 'roads';
+        let plan = requireValue(generatePlanning(input));
+        const certificates = requireValue(
+          createPlanningCertificates(input, (n) => {
+            state.active?.take(n, 'world certificate');
+            meter.take(n);
+            state.charged += n;
+          }),
+        );
+        stage = 'settlements';
+        const layouts = createLocalLayouts(
+          plan,
+          geo.water,
+          settings,
+          seed,
+          certificates,
+          meter,
+          state,
+        );
+        const joins = layouts.flatMap((l) => {
+          const f = settlementFrame(l.site);
+          return l.model.constraints!.entrances.map((e) => {
+            // An entrance the fork kept exactly as supplied is the planned one: a
+            // turned frame's round trip through local coordinates is not exact (#545).
+            const planned = l.site.entrances.find((p) => p.id === e.id),
+              local = planned && f.local(planned.endpoint);
+            if (
+              planned &&
+              local!.x === e.endpoint.x &&
+              local!.y === e.endpoint.y &&
+              f.localBearing(planned.bearingDeg) === e.bearingDeg &&
+              planned.widthM === e.widthM
+            )
+              return {
+                siteId: l.site.id,
+                entranceId: e.id,
+                endpoint: planned.endpoint,
+                bearingDeg: planned.bearingDeg,
+                widthM: e.widthM,
+              };
+            return {
+              siteId: l.site.id,
+              entranceId: e.id,
+              endpoint: f.world(e.endpoint),
+              bearingDeg: (e.bearingDeg + l.site.rotationDeg) % 360,
+              widthM: e.widthM,
+            };
+          });
+        });
+        const changed = joins.some((j) => {
+          const e = plan.sites
+            .find((s) => s.id === j.siteId)!
+            .entrances.find((e) => e.id === j.entranceId)!;
+          return (
+            e.endpoint[0] !== j.endpoint[0] ||
+            e.endpoint[1] !== j.endpoint[1] ||
+            e.bearingDeg !== j.bearingDeg ||
+            e.widthM !== j.widthM
+          );
+        });
+        if (changed) {
+          const r = reconcileLocalJoins(input, plan, joins);
+          meter.take(r.work);
+          if (!r.ok) return r;
+          plan = r.value.plan;
+          for (const l of layouts) l.site = plan.sites.find((s) => s.id === l.site.id)!;
+        }
+        const asset: MapAsset = {
+          schema: 'kriegsspiel/local-map',
+          schemaVersion: SCHEMA_VERSION,
+          precisionPolicy: PRECISION_POLICY,
+          coordinates: { ...COORDINATES },
+          name: `Battlefield ${seed}`,
+          provenance: {
+            seed,
+            generator: structuredClone(CURRENT_GENERATOR),
+            fork: { ...CONSUMED_FORK },
+          },
+          settings,
+          overrides,
+          bounds,
+          elevation: geo.elevation,
+          drainage: geo.drainage,
+          layers: {
+            cover: geo.cover,
+            water: geo.water,
+            roadNodes: plan.roadNodes,
+            roads: plan.roads,
+            crossings: plan.crossings,
+            sites: plan.sites,
+            buildings: [],
+            landmarks: [],
+            contours,
+          },
+          diagnostics: [],
+        };
+        assembleLayouts(asset.layers, layouts, settings, meter);
+        compactLocalStreets(asset.layers, meter);
+        // Cover is laid out last, around the final roads and settlements (D45),
+        // within the feature/coordinate capacity the other layers leave.
+        const usage = preflightAsset(
+          { layers: asset.layers },
+          {
+            ...HARD_LIMITS,
+            maxFeatures: settings.limits.maxFeatures,
+            maxVertices: settings.limits.maxVertices,
+          },
+        );
+        stage = 'cover';
+        const coverSettings = structuredClone(settings);
+        coverSettings.limits.maxFeatures = Math.max(
+          1,
+          settings.limits.maxFeatures - usage.features,
+        );
+        coverSettings.limits.maxVertices = Math.max(
+          1,
+          settings.limits.maxVertices - usage.vertices,
+        );
+        asset.layers.cover = requireValue(
+          generateCover(geo.elevation, bounds, geo.water, coverSettings, seed, {
+            roads: asset.layers.roads,
+            sites: asset.layers.sites,
+          }),
+        );
+        stage = 'validation';
+        // Canonical geometry, rather than an unrounded trial, is the acceptance surface.
+        const normalized = importAsset(canonicalizeAsset(asset));
+        const validation = validateBattlefield(normalized, {
+          maxValidationWork: limits.maxValidationWork,
+        });
+        if (!validation.ok) return validation;
+        return { ok: true, value: normalized, diagnostics: normalized.diagnostics };
       },
-      settings,
-      overrides,
-      bounds,
-      elevation: geo.elevation,
-      drainage: geo.drainage,
-      layers: {
-        cover: geo.cover,
-        water: geo.water,
-        roadNodes: plan.roadNodes,
-        roads: plan.roads,
-        crossings: plan.crossings,
-        sites: plan.sites,
-        buildings: [],
-        landmarks: [],
-        contours,
-      },
-      diagnostics: [],
-    };
-    assembleLayouts(asset.layers, layouts, settings, meter);
-    compactLocalStreets(asset.layers, meter);
-    // Canonical geometry, rather than an unrounded trial, is the acceptance surface.
-    const normalized = importAsset(canonicalizeAsset(asset));
-    const validation = validateBattlefield(normalized, {
-      maxValidationWork: limits.maxValidationWork,
-    });
-    if (!validation.ok) return validation;
-    return { ok: true, value: normalized, diagnostics: normalized.diagnostics };
+    );
   });
 }
