@@ -1,0 +1,20 @@
+{
+  "result": [
+    {
+      "id": "5b05b386-4f40-4321-9cc2-15e4e2f93a5d",
+      "name": "Lobby countryside review",
+      "widthM": 5000,
+      "heightM": 5000,
+      "identity": "6305b91faa19915eeea48e0bb473d900415ff00584fce318866d4e79e883926a",
+      "bytes": 1598509,
+      "hashMatches": true,
+      "exactDeterministicGeneratedBytes": true
+    }
+  ],
+  "counts": {
+    "games": 0,
+    "creation_receipts": 0,
+    "library_assets": 1,
+    "library_operations": 1
+  }
+}

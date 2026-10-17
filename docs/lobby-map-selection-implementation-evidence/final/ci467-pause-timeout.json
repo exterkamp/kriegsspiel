@@ -1,0 +1,18 @@
+{
+  "pr": 467,
+  "head": "e0644f57",
+  "test": "emergency hold: stops the clock, shows tallies only, and refuses with fixed wording when spent",
+  "failure": "Timed out waiting8s for pauseResult after pause_proposed; not reproduced or cleared.",
+  "unchangedVersusMain": [
+    "server/src/api/app.test.ts",
+    "server/src/api/app.ts",
+    "server/src/game/host.ts",
+    "server/src/pause.ts"
+  ],
+  "currentIntegrationFocusedResult": {
+    "passed": 1,
+    "filterExcluded": 81,
+    "sourceSkipAdded": false
+  },
+  "limits": "The focused current-source pass does not establish the cause of the older CI timeout. No timeout/assertion change or CI rerun."
+}

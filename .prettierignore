@@ -25,3 +25,6 @@ packages/maps/tests/fixtures/*.json
 # Playtest input logs (#408), exported from the server as played.
 server/src/game/playtest408/*.json
 docs/turn-playtest-evidence/orders/*.json
+
+# Preserve the independently inspected browser source-binding evidence bytes.
+docs/lobby-map-selection-implementation-evidence/final/source-binding.json

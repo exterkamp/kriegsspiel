@@ -1,0 +1,17 @@
+{
+  "seed": -1470786920,
+  "path": "94:12:5:2:2:3:4:2:2:3:4:4:3:3:27:5",
+  "counterexample": {
+    "name": "hold-the-bridge",
+    "cmds": [
+      {
+        "kind": "attack",
+        "at": 10704029,
+        "unit": "blue-1",
+        "target": "red-2"
+      }
+    ],
+    "stops": [10799978, 10800000]
+  },
+  "observed": ["t=10800000: blue-1: teleported 589mm in 11ms"]
+}

@@ -1,0 +1,373 @@
+{
+  "mapLibrary": {
+    "schemaVersion": 1,
+    "available": true
+  },
+  "scenarios": [
+    {
+      "id": "hold-the-bridge",
+      "name": "Hold the Bridge",
+      "briefing": "Blue holds a river crossing on the high road against a Red advance from the north. Blue wins by keeping the objective for 50 minutes; Red wins by taking it, or by breaking the defence.",
+      "lengthMinutes": 50,
+      "sides": [
+        {
+          "id": "blue",
+          "name": "Blue",
+          "controller": "human"
+        },
+        {
+          "id": "red",
+          "name": "Red",
+          "controller": "scripted"
+        }
+      ],
+      "defaults": {
+        "side": "blue",
+        "rate": 12
+      },
+      "battlefield": {
+        "map": {
+          "id": "hold-the-bridge:default",
+          "name": "The bridge battlefield",
+          "source": "scenario-default",
+          "terrainIdentity": "engine-terrain-v1:sha256:488cdff4d4dd66f8fa99525654c08d28e23b94351d66ea7595ccc553329ba891",
+          "widthM": 4000,
+          "heightM": 3000,
+          "preview": [
+            {
+              "id": "north-wood",
+              "kind": "wood",
+              "name": "Northern wood",
+              "layer": 1,
+              "geometry": {
+                "shape": "polygon",
+                "points": [
+                  {
+                    "x": 600,
+                    "y": 300
+                  },
+                  {
+                    "x": 1300,
+                    "y": 350
+                  },
+                  {
+                    "x": 1250,
+                    "y": 900
+                  },
+                  {
+                    "x": 650,
+                    "y": 850
+                  }
+                ]
+              }
+            },
+            {
+              "id": "south-wood",
+              "kind": "wood",
+              "name": "Southern wood",
+              "layer": 1,
+              "geometry": {
+                "shape": "polygon",
+                "points": [
+                  {
+                    "x": 2700,
+                    "y": 1900
+                  },
+                  {
+                    "x": 3400,
+                    "y": 1950
+                  },
+                  {
+                    "x": 3350,
+                    "y": 2500
+                  },
+                  {
+                    "x": 2750,
+                    "y": 2450
+                  }
+                ]
+              }
+            },
+            {
+              "id": "river",
+              "kind": "river",
+              "name": "The river",
+              "layer": 3,
+              "geometry": {
+                "shape": "polyline",
+                "points": [
+                  {
+                    "x": 0,
+                    "y": 1500
+                  },
+                  {
+                    "x": 4000,
+                    "y": 1500
+                  }
+                ],
+                "widthM": 200
+              }
+            },
+            {
+              "id": "high-road",
+              "kind": "road",
+              "name": "High road",
+              "layer": 2,
+              "geometry": {
+                "shape": "polyline",
+                "points": [
+                  {
+                    "x": 2050,
+                    "y": 0
+                  },
+                  {
+                    "x": 2050,
+                    "y": 3000
+                  }
+                ],
+                "widthM": 20
+              }
+            },
+            {
+              "id": "bridge",
+              "kind": "bridge",
+              "name": "The bridge",
+              "layer": 4,
+              "geometry": {
+                "shape": "point",
+                "at": {
+                  "x": 2050,
+                  "y": 1500
+                },
+                "radiusM": 110
+              }
+            }
+          ]
+        },
+        "pairing": {
+          "id": "hold-the-bridge:default",
+          "revision": "engine-scenario-v1:sha256:d1be38a65dc3866553ba9714a9be2ea277c23193bea0d0f37ebc7e74daa3a775",
+          "scenarioId": "hold-the-bridge",
+          "scenarioRevision": "engine-scenario-v1:sha256:d1be38a65dc3866553ba9714a9be2ea277c23193bea0d0f37ebc7e74daa3a775",
+          "terrainIdentity": "engine-terrain-v1:sha256:488cdff4d4dd66f8fa99525654c08d28e23b94351d66ea7595ccc553329ba891"
+        },
+        "capabilities": {
+          "addMaps": false
+        }
+      },
+      "battlefields": {
+        "schemaVersion": 1,
+        "scenarioId": "hold-the-bridge",
+        "entries": [
+          {
+            "map": {
+              "id": "hold-the-bridge:default",
+              "name": "The bridge battlefield",
+              "source": "scenario-default",
+              "terrainIdentity": "engine-terrain-v1:sha256:488cdff4d4dd66f8fa99525654c08d28e23b94351d66ea7595ccc553329ba891",
+              "widthM": 4000,
+              "heightM": 3000,
+              "preview": [
+                {
+                  "id": "north-wood",
+                  "name": "Northern wood",
+                  "kind": "wood",
+                  "layer": 1,
+                  "geometry": {
+                    "shape": "polygon",
+                    "points": [
+                      {
+                        "x": 600,
+                        "y": 300
+                      },
+                      {
+                        "x": 1300,
+                        "y": 350
+                      },
+                      {
+                        "x": 1250,
+                        "y": 900
+                      },
+                      {
+                        "x": 650,
+                        "y": 850
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "south-wood",
+                  "name": "Southern wood",
+                  "kind": "wood",
+                  "layer": 1,
+                  "geometry": {
+                    "shape": "polygon",
+                    "points": [
+                      {
+                        "x": 2700,
+                        "y": 1900
+                      },
+                      {
+                        "x": 3400,
+                        "y": 1950
+                      },
+                      {
+                        "x": 3350,
+                        "y": 2500
+                      },
+                      {
+                        "x": 2750,
+                        "y": 2450
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "river",
+                  "name": "The river",
+                  "kind": "river",
+                  "layer": 3,
+                  "geometry": {
+                    "shape": "polyline",
+                    "points": [
+                      {
+                        "x": 0,
+                        "y": 1500
+                      },
+                      {
+                        "x": 4000,
+                        "y": 1500
+                      }
+                    ],
+                    "widthM": 200
+                  }
+                },
+                {
+                  "id": "high-road",
+                  "name": "High road",
+                  "kind": "road",
+                  "layer": 2,
+                  "geometry": {
+                    "shape": "polyline",
+                    "points": [
+                      {
+                        "x": 2050,
+                        "y": 0
+                      },
+                      {
+                        "x": 2050,
+                        "y": 3000
+                      }
+                    ],
+                    "widthM": 20
+                  }
+                },
+                {
+                  "id": "bridge",
+                  "name": "The bridge",
+                  "kind": "bridge",
+                  "layer": 4,
+                  "geometry": {
+                    "shape": "point",
+                    "at": {
+                      "x": 2050,
+                      "y": 1500
+                    },
+                    "radiusM": 110
+                  }
+                }
+              ]
+            },
+            "pairing": {
+              "id": "hold-the-bridge:default",
+              "revision": "engine-pairing-v1:sha256:33ed66c739254355bdadd444e115061f14ecb2151ee7d7aec43d4a83b67eefd5",
+              "scenarioId": "hold-the-bridge",
+              "resolvedScenarioId": "hold-the-bridge",
+              "scenarioRevision": "engine-scenario-v1:sha256:d1be38a65dc3866553ba9714a9be2ea277c23193bea0d0f37ebc7e74daa3a775",
+              "terrainIdentity": "engine-terrain-v1:sha256:488cdff4d4dd66f8fa99525654c08d28e23b94351d66ea7595ccc553329ba891",
+              "assemblyVersion": "engine-native-v1"
+            },
+            "isDefault": true
+          },
+          {
+            "map": {
+              "id": "hold-the-bridge:open-v1",
+              "name": "Open bridge approaches",
+              "source": "included",
+              "terrainIdentity": "engine-terrain-v1:sha256:6c2b8cd6b9ac724de091342f0194138ca8580fd691c01709c0a2f97260db9971",
+              "widthM": 4000,
+              "heightM": 3000,
+              "preview": [
+                {
+                  "id": "river",
+                  "name": "The river",
+                  "kind": "river",
+                  "layer": 3,
+                  "geometry": {
+                    "shape": "polyline",
+                    "points": [
+                      {
+                        "x": 0,
+                        "y": 1500
+                      },
+                      {
+                        "x": 4000,
+                        "y": 1500
+                      }
+                    ],
+                    "widthM": 200
+                  }
+                },
+                {
+                  "id": "high-road",
+                  "name": "High road",
+                  "kind": "road",
+                  "layer": 2,
+                  "geometry": {
+                    "shape": "polyline",
+                    "points": [
+                      {
+                        "x": 2050,
+                        "y": 0
+                      },
+                      {
+                        "x": 2050,
+                        "y": 3000
+                      }
+                    ],
+                    "widthM": 20
+                  }
+                },
+                {
+                  "id": "bridge",
+                  "name": "The bridge",
+                  "kind": "bridge",
+                  "layer": 4,
+                  "geometry": {
+                    "shape": "point",
+                    "at": {
+                      "x": 2050,
+                      "y": 1500
+                    },
+                    "radiusM": 110
+                  }
+                }
+              ]
+            },
+            "pairing": {
+              "id": "hold-the-bridge:open-v1",
+              "revision": "engine-pairing-v1:sha256:f34ca9c241885dd5ce84003ca4bb275b3ddb022341356cdcd1fdc61f13620310",
+              "scenarioId": "hold-the-bridge",
+              "resolvedScenarioId": "hold-the-bridge-open-v1",
+              "scenarioRevision": "engine-scenario-v1:sha256:3f5f490ff3e7d7dfebac6e40f7f4b7516dd579022d210d67638c78443ea6f157",
+              "terrainIdentity": "engine-terrain-v1:sha256:6c2b8cd6b9ac724de091342f0194138ca8580fd691c01709c0a2f97260db9971",
+              "assemblyVersion": "engine-native-v1"
+            },
+            "isDefault": false
+          }
+        ]
+      }
+    }
+  ],
+  "opponent": "scripted"
+}

@@ -1,5 +1,7 @@
 # Local game initialization in Angular
 
+The live lobby now has a separate reviewed map-selection implementation: see [lobby delivery and boundaries](lobby-map-selection-delivery.md). It selects approved native scenario pairings and can generate/save owned geography when the durable library is available. Saved geography still needs a scenario; the local sandbox described here does not become a live game. Default development preparation and sidecar behavior below remain separate. The lobby alone opts into the trusted worker-verification path; it does not change this default preparation contract.
+
 The Angular development build includes the native local board at `/dev/local-board`. It opens the pinned certified default; Settings → New game selects or generates/saves a replacement. Personal marks and a notebook belong to each fresh session. The native saved-map inspector is at `/map-table`. `/` retains the menu, authentication, guest, scenario and live-game flows; `?mode=fixture` remains retired.
 
 ## Certified preparation

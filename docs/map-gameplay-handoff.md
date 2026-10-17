@@ -1,5 +1,7 @@
 # Standalone map-to-gameplay handoff
 
+For the implemented lobby boundary, see [lobby map delivery](lobby-map-selection-delivery.md) and D52–D54. The server retains exact authored native scenario–map pins for creation/reopen/rendering and keeps canonical owned geography unpaired. This delivery does not convert arbitrary generated terrain into armies, HQs or objectives; the conversion/assembly policies below remain requirements for that separate follow-up.
+
 M3c exports a public static `MapAsset`; it does not implement a playable generated scenario. Keep battlefield generation, scenario assembly, simulation, visibility and player rendering as separate boundaries. The asset/query APIs below are available; a scenario conversion API is not currently exported. This document defines downstream adapter responsibilities; current standalone acceptance evidence is in the [verification report](map-verification-report.md).
 
 ## Existing asset and query boundary

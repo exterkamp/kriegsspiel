@@ -1,0 +1,30 @@
+{
+  "result": [
+    {
+      "id": "5b05b386-4f40-4321-9cc2-15e4e2f93a5d",
+      "name": "Lobby countryside review",
+      "identity": "6305b91faa19915eeea48e0bb473d900415ff00584fce318866d4e79e883926a",
+      "widthM": 5000,
+      "heightM": 5000,
+      "bytes": 1598509,
+      "hashMatches": true,
+      "exactDeterministicGeneratedBytes": true
+    },
+    {
+      "id": "bbf3c416-c1bb-46f1-bb34-f801e4c1dc1c",
+      "name": "Lobby large countryside review",
+      "identity": "24dd102e722d5755303faaf257a033aa48c5413a1fe032c5e89dfe422b6da89b",
+      "widthM": 15000,
+      "heightM": 15000,
+      "bytes": 8678100,
+      "hashMatches": true,
+      "exactDeterministicGeneratedBytes": true
+    }
+  ],
+  "counts": {
+    "games": 0,
+    "creation_receipts": 0,
+    "library_assets": 2,
+    "library_operations": 2
+  }
+}
