@@ -16,6 +16,7 @@ import {
   saveDraft,
   splitOptions,
   withAnnex,
+  orderProgress,
 } from './orders.js';
 
 const arrow = (id: string, madeAtGame = 0): Mark => ({
@@ -218,5 +219,69 @@ describe('word of an order (#438)', () => {
       expect(outcomes.get('o-a')).toEqual({ lost: lostA });
       expect(outcomes.get('o-b')).toEqual({ arrived: ackB });
     });
+  });
+});
+
+describe('where a sent order stands (#439)', () => {
+  const p = { orderId: 't-1', text: 'Hold', sentAtGame: 0, toName: '1st Battalion' };
+  const d = (id: string, extra: Partial<Dispatch>): Dispatch => ({
+    id,
+    from: '1st Battalion',
+    writtenAtGame: 4 * 60_000,
+    receivedAtGame: 20 * 60_000,
+    category: 'subordinates',
+    text: '',
+    ...extra,
+  });
+
+  it('is delivered at the time the unit had it, not when the paper came in', () => {
+    const ack = d('a', { kind: 'orderDelivered', orderId: 't-1' });
+    expect(orderProgress(p, [ack])).toEqual({
+      state: 'delivered',
+      atGame: 4 * 60_000,
+      label: 'Delivered at Day 1 00:04',
+    });
+  });
+
+  it('is acted on once the unit has written since, and lost when its courier was given up', () => {
+    const ack = d('a', { kind: 'orderDelivered', orderId: 't-1' });
+    const later = d('b', { kind: 'engaged', writtenAtGame: 12 * 60_000 });
+    expect(orderProgress(p, [later, ack], (ms) => `${ms / 60_000}`)?.label).toBe(
+      'Delivered at 4; acted on',
+    );
+    const lost = d('c', { kind: 'courierLost', from: 'Chief of staff', orderId: 't-1' });
+    expect(orderProgress(p, [lost])?.state).toBe('lost');
+    expect(orderProgress(p, [])).toBeUndefined();
+  });
+
+  it('takes what became of it from the unit’s paper on an umpire turn (11.9)', () => {
+    const clock = (ms: number) => `${ms / 60_000}`;
+    const turn = (id: string, result: NonNullable<Dispatch['turn']>['orders'][number]['result']) =>
+      d(id, {
+        kind: 'turn',
+        writtenAtGame: 20 * 60_000,
+        turn: { n: 1, lost: 0, movedM: 0, orders: [{ ref: 't-1', result }] },
+      });
+    expect(orderProgress(p, [turn('t', 'not-arrived')], clock)).toEqual({
+      state: 'riding',
+      atGame: 20 * 60_000,
+      label: 'Not arrived by 20; with the courier',
+    });
+    expect(orderProgress(p, [turn('t', 'carried-out')], clock)?.label).toBe(
+      'Delivered by 20; carried out',
+    );
+    expect(orderProgress(p, [turn('t', 'misread')], clock)?.label).toBe(
+      'Delivered by 20; acted on as he read it',
+    );
+    const ack = d('a', { kind: 'orderDelivered', orderId: 't-1' });
+    expect(orderProgress(p, [ack, turn('t', 'refused')], clock)?.label).toBe(
+      'Delivered at 4; not acted on',
+    );
+    // A paper about another order says nothing of this one.
+    const other = d('o', {
+      kind: 'turn',
+      turn: { n: 1, lost: 0, movedM: 0, orders: [{ ref: 't-2', result: 'carried-out' }] },
+    });
+    expect(orderProgress(p, [other])).toBeUndefined();
   });
 });

@@ -1,5 +1,5 @@
 /** Turn mode on the desk (D39, story 11.10): pure rules for the clock line, the send panel and the diary. */
-import type { TurnOrder } from '@kriegsspiel/protocol';
+import type { Role, TurnOrder } from '@kriegsspiel/protocol';
 import { formatGameTime, type ClientState, type TurnInfo } from '../net/state.js';
 import type { JournalEntry } from './journal.js';
 
@@ -9,9 +9,67 @@ export type TurnPhase = 'writing' | 'sent' | 'resolving' | 'over';
 /** `08:20`: the time of day of a game instant, without the day. */
 export const timeOfDay = (ms: number): string => formatGameTime(ms).replace(/^Day \d+ /, '');
 
-/** `Turn 3: 08:20 to 08:40`. */
-export const turnLine = (t: Pick<TurnInfo, 'turn' | 'startsAt' | 'endsAt'>): string =>
-  `Turn ${t.turn}: ${timeOfDay(t.startsAt)} to ${timeOfDay(t.endsAt)}`;
+/**
+ * About how many turns the battle lasts: its time limit in turns, the last one short when they do not divide
+ * (D39). Undefined when either length is unknown. "About", since a victory may end the game sooner.
+ */
+export function turnsInBattle(
+  battleMinutes: number | undefined,
+  turnMinutes: number | undefined,
+): number | undefined {
+  if (!battleMinutes || !turnMinutes || battleMinutes <= 0 || turnMinutes <= 0) return undefined;
+  return Math.ceil(battleMinutes / turnMinutes);
+}
+
+/**
+ * `Turn 3: 08:20 to 08:40`, or with the battle's length in turns `Turn 2 of about 3: 00:20 to 00:40`; the
+ * last turn by the time limit is `Turn 3 of 3` (#439).
+ */
+export function turnLine(
+  t: Pick<TurnInfo, 'turn' | 'startsAt' | 'endsAt'>,
+  total?: number,
+): string {
+  const of = total === undefined ? '' : t.turn >= total ? ` of ${t.turn}` : ` of about ${total}`;
+  return `Turn ${t.turn}${of}: ${timeOfDay(t.startsAt)} to ${timeOfDay(t.endsAt)}`;
+}
+
+/**
+ * What a turn is, for a first-time player (#439): its length against the battle's, and that each side sends
+ * once per turn and the umpire then decides.
+ */
+export function howTurnsWork(turnMinutes: number, battleMinutes?: number): string {
+  const total = turnsInBattle(battleMinutes, turnMinutes);
+  const battle =
+    total === undefined
+      ? ''
+      : ` The battle lasts about ${battleMinutes} minutes, so about ${total} ${total === 1 ? 'turn' : 'turns'}; it ends sooner if a side wins.`;
+  return (
+    `Each turn is ${turnMinutes} minutes of the battle. Write your orders and hold them, then send them once ` +
+    `for your whole side. When every side has sent, the umpire decides what happened in those ` +
+    `${turnMinutes} minutes, the pieces move, and the turn's papers come into the in-tray.${battle}`
+  );
+}
+
+/**
+ * The note on the last turn (#439): one cut short by the battle's time limit says how long it is and why; the
+ * last full turn says it is the last. Undefined for any other turn.
+ */
+export function lastTurnText(
+  t: Pick<TurnInfo, 'turn' | 'startsAt' | 'endsAt'>,
+  turnMinutes: number | undefined,
+  battleMinutes: number | undefined,
+): string | undefined {
+  if (!turnMinutes) return undefined;
+  const mins = Math.round((t.endsAt - t.startsAt) / 60_000);
+  const end = timeOfDay(t.endsAt);
+  if (mins < turnMinutes) {
+    return `This is the last turn, and it is ${mins} minutes, not ${turnMinutes}: the battle's time limit is at ${end}.`;
+  }
+  const total = turnsInBattle(battleMinutes, turnMinutes);
+  return total !== undefined && t.turn >= total
+    ? `This is the last turn: the battle's time limit is at ${end}.`
+    : undefined;
+}
 
 export function turnPhase(state: Pick<ClientState, 'turn' | 'gameOver' | 'view'>): TurnPhase {
   const t = state.turn;
@@ -60,6 +118,35 @@ export function deadlineText(deadline: number | undefined, nowWall: number): str
   if (h < 48) return `Orders due in ${h} h${min % 60 ? ` ${min % 60} min` : ''}.`;
   // Whole days left, rounded down: a deadline must never seem further off than it is.
   return `Orders due in ${Math.floor(h / 24)} days.`;
+}
+
+/**
+ * What a seat may do with the turn's orders, as the hub allows it (D39, #428): a commander or subordinate holds
+ * and sends; the chief of staff and quartermaster hold for the commander to send; the intelligence officer does
+ * neither. Shared-HQ play has no role, and everyone there may send.
+ */
+export type TurnRights = 'send' | 'hold' | 'none';
+
+export function turnRights(role: Role | undefined): TurnRights {
+  if (role === undefined || role === 'commander' || role === 'subordinate') return 'send';
+  return role === 'intelligence' ? 'none' : 'hold';
+}
+
+/** Said in place of the Send button to a seat that cannot send. */
+export function turnSenderText(rights: TurnRights): string | undefined {
+  if (rights === 'hold') {
+    return "Your commander sends the turn's orders. Orders you hold here go with them.";
+  }
+  if (rights === 'none') {
+    return "The intelligence officer writes no orders. Your commander holds and sends the turn's orders.";
+  }
+  return undefined;
+}
+
+/** The turn panel's way to the orders desk: it offers to send only to a seat that can (#428). */
+export function ordersButtonText(held: number, rights: TurnRights): string {
+  if (held === 0) return rights === 'none' ? 'See the orders' : 'Write orders';
+  return rights === 'send' ? `Send orders (${held} held)` : `Orders (${held} held)`;
 }
 
 /** One line of the held list: `To 1st Battalion, by steady courier`. */

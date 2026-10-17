@@ -40,13 +40,18 @@ const NativeHeader = z
     scenarioId: id,
     seed: z.number().int().min(0).max(0xffff_ffff),
     settings: settings.optional(),
+    rules: z.number().int().min(1).max(1024).optional(),
     battlefieldFormat: z.literal(1),
     battlefieldPin: z.unknown(),
     creationReceiptId: z.uuid().optional(),
   })
   .strict();
 
-/** Presence of either field forbids the historical scenario-only fallback. */
+/**
+ * Presence of either field forbids the historical scenario-only fallback. The header's seed is the
+ * game's own (#534) and need not be the pinned scenario's authored seed: the pin retains the
+ * authored time-zero world and replay re-seeds it from the header, as it does an unpinned game.
+ */
 export function headerPin(
   header: InputLogHeader,
   expectedGameId?: string,
@@ -61,8 +66,7 @@ export function headerPin(
   const pin = decodeNativeScenarioPin(parsed.battlefieldPin);
   if (
     parsed.gameId !== (expectedGameId ?? parsed.gameId) ||
-    parsed.scenarioId !== pin.initialWorld.scenarioId ||
-    parsed.seed !== pin.initialWorld.seed
+    parsed.scenarioId !== pin.initialWorld.scenarioId
   )
     throw new Error('Pinned input header identity mismatch');
   return pin;

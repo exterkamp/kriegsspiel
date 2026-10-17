@@ -5,16 +5,8 @@ import { describe, expect, it } from 'vitest';
 const SRC = join(__dirname, '..');
 const tokens = readFileSync(join(__dirname, 'tokens.css'), 'utf8');
 
-/** Skipped on purpose: the map tools are restyled in #308, the Three.js table and in-canvas labels keep their own look. */
-const EXEMPT = [
-  'app/map-authoring',
-  'app/benchmarks',
-  'app/map-table',
-  'app/local-board',
-  'legacy',
-  'shared',
-  'styles',
-];
+/** Skipped on purpose: the Three.js table and in-canvas labels keep their own look. The map tools joined in #308. */
+const EXEMPT = ['app/map-table', 'app/local-board', 'legacy', 'shared', 'styles'];
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -32,12 +24,15 @@ describe('component styles use the design tokens (#327)', () => {
     expect(files.length).toBeGreaterThan(30);
   });
 
-  it('covers the admin view, the new-game screen and the desk', () => {
+  it('covers the admin view, the new-game screen, the desk and the map tools', () => {
     const rel = files.map((f) => f.slice(SRC.length + 1));
     for (const name of [
       'app/admin/admin.component.css',
       'app/shell/new-game.component.ts',
       'app/desk/desk.component.css',
+      'app/map-authoring/map-authoring.component.css',
+      'app/benchmarks/map-benchmark.component.ts',
+      'app/benchmarks/table-benchmark.component.ts',
     ])
       expect(rel).toContain(name);
   });

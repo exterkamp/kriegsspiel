@@ -374,22 +374,22 @@
  ],
  "orders": [
   {
-   "orderId": "r1-1",
+   "orderId": "red-r1-1",
    "side": "red",
    "to": "red-1",
    "text": "March south down the high road in column and halt 400 paces short of the river.",
    "courier": "safe",
-   "sentTurn": 1,
+   "sentAtMinute": 0,
    "status": "arrived",
    "arrivedAtMinuteOfTurn": 2
   },
   {
-   "orderId": "r2-1",
+   "orderId": "red-r2-1",
    "side": "red",
    "to": "red-2",
    "text": "Follow the Vanguard down the road at three hundred paces.",
    "courier": "safe",
-   "sentTurn": 1,
+   "sentAtMinute": 0,
    "status": "arrived",
    "arrivedAtMinuteOfTurn": 3
   }
@@ -408,8 +408,9 @@
     "ammo": 100,
     "status": "active",
     "continuing": {
-     "kind": "hold"
-    }
+     "kind": "idle"
+    },
+    "at": "near the bridge, west of the High road"
    },
    {
     "unitId": "blue-2",
@@ -423,8 +424,9 @@
     "ammo": 100,
     "status": "active",
     "continuing": {
-     "kind": "hold"
-    }
+     "kind": "idle"
+    },
+    "at": "near the bridge, east of the High road"
    },
    {
     "unitId": "blue-3",
@@ -438,13 +440,14 @@
     "ammo": 100,
     "status": "active",
     "continuing": {
-     "kind": "hold"
-    }
+     "kind": "idle"
+    },
+    "at": "near the bridge, on the High road"
    },
    {
     "unitId": "red-1",
     "x": 2050,
-    "y": 1100,
+    "y": 1500,
     "facingDeg": 180,
     "formation": "column",
     "strength": 650,
@@ -454,12 +457,27 @@
     "status": "active",
     "continuing": {
      "kind": "idle"
-    }
+    },
+    "at": "at the bridge, on the High road",
+    "path": [
+     [
+      2050,
+      300
+     ],
+     [
+      2050,
+      1050
+     ],
+     [
+      2050,
+      1500
+     ]
+    ]
    },
    {
     "unitId": "red-2",
     "x": 2050,
-    "y": 850,
+    "y": 120,
     "facingDeg": 180,
     "formation": "column",
     "strength": 650,
@@ -469,7 +487,8 @@
     "status": "active",
     "continuing": {
      "kind": "idle"
-    }
+    },
+    "at": "on the High road"
    },
    {
     "unitId": "red-3",
@@ -483,14 +502,48 @@
     "ammo": 100,
     "status": "active",
     "continuing": {
-     "kind": "hold"
-    }
+     "kind": "idle"
+    },
+    "at": "near the Northern wood"
+   }
+  ],
+  "observations": [
+   {
+    "side": "blue",
+    "unitId": "red-1",
+    "by": "blue-1",
+    "when": "end"
+   },
+   {
+    "side": "red",
+    "unitId": "blue-1",
+    "by": "red-1",
+    "when": "end"
+   },
+   {
+    "side": "red",
+    "unitId": "blue-2",
+    "by": "red-1",
+    "when": "end"
+   },
+   {
+    "side": "red",
+    "unitId": "blue-3",
+    "by": "red-1",
+    "when": "end"
    }
   ],
   "events": [
-   "minute 5: unit.arrived {\"unitId\":\"red-1\",\"at\":[2050,1100]}",
-   "minute 6: unit.arrived {\"unitId\":\"red-2\",\"at\":[2050,850]}"
-  ]
+   "2: order_delivered red-1, orderId red-r1-1",
+   "3: order_delivered red-2, orderId red-r2-1",
+   "7: unit.arrived red-1",
+   "17: game.end reason objective-taken, winner red"
+  ],
+  "outcome": {
+   "winner": "red",
+   "reason": "objective-taken",
+   "atMin": 17
+  }
  }
 }
 ```
@@ -509,17 +562,14 @@
    "formation": "line",
    "strength": 600,
    "morale": 80,
+   "fatigue": 0,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
-   "orders": [
-    {
-     "orderId": "b1-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Aubry holds his position, maintaining the line as ordered."
+   "orders": [],
+   "account": "No orders. Col. Aubry kept his line in place south of the river and watched the road. Towards the end of the turn a column came into view on the high road to the north."
   },
   {
    "unitId": "blue-2",
@@ -529,17 +579,14 @@
    "formation": "line",
    "strength": 550,
    "morale": 75,
+   "fatigue": 0,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
-   "orders": [
-    {
-     "orderId": "b2-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Delacroix is cautious and holds his position as instructed."
+   "orders": [],
+   "account": "No orders. Col. Delacroix held his ground east of the road and kept his reserve back. He saw the enemy column come down to the far bank and made no move."
   },
   {
    "unitId": "blue-3",
@@ -549,57 +596,60 @@
    "formation": "line",
    "strength": 200,
    "morale": 85,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "No orders. Maj. Verneuil stayed in place behind the infantry on the road. He chafed but had no authority to advance. He saw the enemy column in the distance."
+  },
+  {
+   "unitId": "red-1",
+   "x": 2050,
+   "y": 1200,
+   "facingDeg": 180,
+   "formation": "column",
+   "strength": 650,
+   "morale": 80,
+   "fatigue": 8,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
    "orders": [
     {
-     "orderId": "b3-1",
+     "orderId": "red-r1-1",
      "result": "carried-out"
     }
    ],
-   "account": "Maj. Verneuil, bold and impatient, holds his position as ordered."
-  },
-  {
-   "unitId": "red-1",
-   "x": 2050,
-   "y": 1100,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 80,
-   "status": "active",
-   "continuing": {
-    "kind": "idle"
-   },
-   "orders": [
-    {
-     "orderId": "r1-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Brandt marches his Vanguard down the high road and halts as ordered."
+   "account": "The order reached Col. Brandt at minute 2. He marched south down the road in column and halted about 400 paces (300 m) short of the river, as written. He found enemy infantry in line beyond the river and held his halt.",
+   "departure": "The engine ran red-1 on to the bridge. The order says halt 400 paces short of the river, so it ends near y=1200, about 300 m off the projection. There is no contact with the objective and the game does not end."
   },
   {
    "unitId": "red-2",
    "x": 2050,
-   "y": 850,
+   "y": 975,
    "facingDeg": 180,
    "formation": "column",
    "strength": 650,
    "morale": 70,
+   "fatigue": 8,
+   "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "idle"
+    "kind": "hold"
    },
    "orders": [
     {
-     "orderId": "r2-1",
+     "orderId": "red-r2-1",
      "result": "carried-out"
     }
    ],
-   "account": "Col. Hartmann follows the Vanguard as ordered."
+   "account": "The order reached Col. Hartmann at minute 3. He followed the Vanguard down the road at about 300 paces and closed up behind it. He halted when it halted and waits for further orders.",
+   "departure": "The projection left red-2 at its start point. It had an order to follow the Vanguard, so it marches about 855 m down the road and ends about 855 m from the projection."
   },
   {
    "unitId": "red-3",
@@ -609,58 +659,52 @@
    "formation": "line",
    "strength": 220,
    "morale": 85,
+   "fatigue": 0,
+   "ammo": 100,
    "status": "active",
    "continuing": {
     "kind": "hold"
    },
-   "orders": [
-    {
-     "orderId": "r3-1",
-     "result": "not-arrived"
-    }
-   ],
-   "account": "Maj. von Reiter, dashing scout, is still on the road and has not arrived at his position."
+   "orders": [],
+   "account": "No orders. Maj. von Reiter kept his hussars near the northern wood and watched his front."
   }
  ],
  "observations": [
   {
    "side": "blue",
-   "unitId": "blue-1",
+   "unitId": "red-1",
    "by": "blue-1",
    "when": "end"
   },
   {
    "side": "blue",
-   "unitId": "blue-2",
+   "unitId": "red-1",
    "by": "blue-2",
    "when": "end"
   },
   {
    "side": "blue",
-   "unitId": "blue-3",
+   "unitId": "red-1",
    "by": "blue-3",
    "when": "end"
   },
   {
    "side": "red",
-   "unitId": "red-1",
+   "unitId": "blue-1",
    "by": "red-1",
    "when": "end"
   },
   {
    "side": "red",
-   "unitId": "red-2",
-   "by": "red-2",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "unitId": "red-3",
-   "by": "red-3",
+   "unitId": "blue-2",
+   "by": "red-1",
    "when": "end"
   }
  ],
- "summary": "In the first turn, the red vanguard marched down the high road and halted 400 paces short of the river, while the red line battalion followed. The blue line infantry held their positions. The hussar squadron, however, was still on the road and had not arrived at its position. The projected positions and statuses of the units were largely accurate, with minor discrepancies noted."
+ "summary": "Red-1 marched down the high road and halted about 300 m (400 paces) short of the river at y=1200, as ordered. The engine had carried it onto the bridge and ended the game, and I overrode that. Red-2 followed at about 225 m, ending at y=975. Red-3 and all Blue units held without orders. No fighting, and the objective is untaken. Blue-1, blue-2 and blue-3 see red-1 at about 500-650 m; red-1 sees blue-1 and blue-2. Next turn: Red decides whether to force the bridge; Blue is still unordered.",
+ "precedents": [
+  "A halt order such as '400 paces short of the river' is obeyed literally; the unit does not run on to the objective."
+ ]
 }
 ```
 
@@ -678,329 +722,6 @@
    "formation": "line",
    "strength": 600,
    "morale": 80,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Colonel Aubry held his line steady, awaiting further orders.",
-   "departure": ""
-  },
-  {
-   "unitId": "blue-2",
-   "x": 2140,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 550,
-   "morale": 75,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Colonel Delacroix remained cautious, waiting for the enemy to make the first move.",
-   "departure": ""
-  },
-  {
-   "unitId": "blue-3",
-   "x": 2050,
-   "y": 1850,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 200,
-   "morale": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Major Verneuil held his cavalry in reserve, awaiting an opportunity to strike.",
-   "departure": ""
-  },
-  {
-   "unitId": "red-1",
-   "x": 2050,
-   "y": 1400,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 80,
-   "status": "active",
-   "continuing": {
-    "kind": "idle"
-   },
-   "orders": [
-    {
-     "orderId": "r1-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Colonel Brandt marched his battalion down the high road, halting 400 paces short of the river.",
-   "departure": ""
-  },
-  {
-   "unitId": "red-2",
-   "x": 2050,
-   "y": 900,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 70,
-   "status": "active",
-   "continuing": {
-    "kind": "idle"
-   },
-   "orders": [
-    {
-     "orderId": "r2-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Colonel Hartmann followed the Vanguard down the road, keeping a safe distance.",
-   "departure": ""
-  },
-  {
-   "unitId": "red-3",
-   "x": 1550,
-   "y": 400,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Major von Reiter held his cavalry in reserve, awaiting an opportunity to strike.",
-   "departure": ""
-  }
- ],
- "observations": [
-  {
-   "side": "blue",
-   "unitId": "blue-1",
-   "by": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "blue-2",
-   "by": "blue-2",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "blue-3",
-   "by": "blue-3",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "unitId": "red-1",
-   "by": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "unitId": "red-2",
-   "by": "red-2",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "unitId": "red-3",
-   "by": "red-3",
-   "when": "end"
-  }
- ],
- "summary": "The Blue forces held their positions, awaiting further orders. The Red forces marched down the high road, with the Vanguard Battalion halting 400 paces short of the river. The Hussar Squadron remained in reserve, awaiting an opportunity to strike."
-}
-```
-
-## Proposal C
-
-```json
-{
- "turn": 1,
- "units": [
-  {
-   "unitId": "blue-1",
-   "x": 1960,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 580,
-   "morale": 80,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Aubry maintained the defensive line, holding his position steadfastly. The arrival of the enemy cavalry squadron forced a skirmish, but the battalion held firm against the charge, sustaining minor casualties.",
-   "departure": "Minor losses sustained due to engagement with Red-3."
-  },
-  {
-   "unitId": "blue-2",
-   "x": 2140,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 550,
-   "morale": 75,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Delacroix maintained his defensive posture, remaining cautious and refusing to commit his reserve forces despite the enemy's advance.",
-   "departure": ""
-  },
-  {
-   "unitId": "blue-3",
-   "x": 2050,
-   "y": 1850,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 200,
-   "morale": 85,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. Verneuil held his position, maintaining observation of the enemy's movements along the high road, awaiting a suitable opportunity to engage.",
-   "departure": ""
-  },
-  {
-   "unitId": "red-1",
-   "x": 2050,
-   "y": 1900,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 80,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r1-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Brandt, being aggressive, executed the order immediately. He marched his vanguard down the high road until he halted 400 paces short of the river, establishing a forward position.",
-   "departure": ""
-  },
-  {
-   "unitId": "red-2",
-   "x": 2050,
-   "y": 2200,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 70,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r2-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Hartmann, adhering strictly to orders, followed the Vanguard, maintaining the specified distance down the high road. He established a strong position further south.",
-   "departure": ""
-  },
-  {
-   "unitId": "red-3",
-   "x": 2050,
-   "y": 1500,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 130,
-   "morale": 75,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. von Reiter, driven by his aggressive nature and desire to strike early, moved rapidly towards the center of the enemy line. Upon reaching the vicinity of the objective, he initiated a charge against the nearest infantry battalion, suffering heavy losses in the engagement.",
-   "departure": "Significant losses sustained during the charge against Blue-1."
-  }
- ],
- "observations": [
-  {
-   "side": "red",
-   "unitId": "red-3",
-   "by": "red-3",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "unitId": "red-1",
-   "by": "red-3",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "unitId": "red-2",
-   "by": "red-3",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "blue-1",
-   "by": "blue-3",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "blue-2",
-   "by": "blue-3",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "red-1",
-   "by": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "red-2",
-   "by": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "unitId": "red-3",
-   "by": "blue-1",
-   "when": "end"
-  }
- ],
- "summary": "The Red forces initiated a rapid advance along the high road. Red-1 (Vanguard) and Red-2 (Line) successfully marched south, establishing strong positions near the objective area. Red-3 (Hussars), driven by aggressive initiative, moved quickly towards the Blue defensive line. Upon arrival, Red-3 engaged Blue-1, initiating a cavalry charge against the infantry. Although the charge inflicted casualties on the Blue battalion, the disciplined defense held the line. The Blue units maintained their defensive positions, observing the Red advance. The Red forces have successfully positioned themselves to threaten the objective, but the Blue line remains intact.",
- "rolls": []
-}
-```
-
-## Proposal D
-
-```json
-{
- "turn": 1,
- "units": [
-  {
-   "unitId": "blue-1",
-   "x": 1960,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 600,
-   "morale": 80,
    "fatigue": 0,
    "ammo": 100,
    "status": "active",
@@ -1008,7 +729,7 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Col. Aubry had no orders and held his line south of the bridge. Late in the turn he saw an enemy column halt on the high road beyond the river."
+   "account": "Col. Aubry had no new orders and held his line south of the bridge, west of the road. Late in the period his front reported an enemy column coming down the high road beyond the river. It halted some distance short of the far bank. He kept his men in line and his muskets ready for the bridge."
   },
   {
    "unitId": "blue-2",
@@ -1025,7 +746,7 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Col. Delacroix had no orders and held his line, watching an enemy column come down the road on the far bank and halt."
+   "account": "Col. Delacroix held his ground east of the road as before. He watched the enemy column come down to within musket-and-a-half of the far bank and halt. He saw no cause to stir and kept his battalion in line, facing the bridge."
   },
   {
    "unitId": "blue-3",
@@ -1042,7 +763,7 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Maj. Verneuil had no orders and held his squadron behind the infantry, watching the enemy column on the far side of the river."
+   "account": "Maj. Verneuil kept his squadron on the road behind the infantry. He saw an enemy column halt beyond the river, but the bridge and his own foot lay between them. Impatient as he was, he found nothing to charge and stayed where he had been posted."
   },
   {
    "unitId": "red-1",
@@ -1060,11 +781,11 @@
    },
    "orders": [
     {
-     "orderId": "r1-1",
+     "orderId": "red-r1-1",
      "result": "carried-out"
     }
    ],
-   "account": "Col. Brandt marched his column down the high road the moment the order came. He halted it as ordered 400 paces (about 300 m) short of the river bank. From there he could see enemy infantry in line beyond the bridge."
+   "account": "Col. Brandt received his order at minute 2 and marched the battalion down the high road in column. He halted it some 300 m short of the river as ordered. From there he could make out two enemy battalions in line covering the far end of the bridge. He holds, ready to go on when told."
   },
   {
    "unitId": "red-2",
@@ -1082,11 +803,11 @@
    },
    "orders": [
     {
-     "orderId": "r2-1",
+     "orderId": "red-r2-1",
      "result": "carried-out"
     }
    ],
-   "account": "Col. Hartmann followed the Vanguard down the road in column, keeping his interval of 300 paces, and halted when it halted."
+   "account": "Col. Hartmann had his order at minute 3. He followed the Vanguard down the high road at the prescribed three hundred paces and halted when it halted, keeping the interval exactly."
   },
   {
    "unitId": "red-3",
@@ -1103,7 +824,7 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Maj. von Reiter had no orders and held his squadron west of the road."
+   "account": "Maj. von Reiter had no orders and kept his hussars where they stood, east of the northern wood, watching the road column go by."
   }
  ],
  "observations": [
@@ -1138,11 +859,15 @@
    "when": "end"
   }
  ],
- "summary": "Turn 1 (0-20). An uncontested march. Red's Vanguard Battalion received its order at minute 2 and marched about 800 m down the high road in column. It halted 400 paces (about 300 m) short of the river at (2050,1100). Red's Line Battalion received its order at minute 3 and followed at 300 paces, halting at (2050,875). At the end of the turn the Vanguard and the two Blue battalions south of the bridge can see each other at under 600 m, and the Blue cavalry also has it in view. Nobody was in range to fire. All other units held without orders. There were no losses."
+ "summary": "Turn 1: the objective was NOT taken. The engine marched red-1 onto the bridge, but its order said to halt 400 paces (about 300 m) short of the river. I halted it at y=1100 on the high road, holding. Red-2 follows at 300 paces (about 225 m), halted at y=875 holding; the engine had wrongly left it idle. All blue units hold in place south of the bridge. Red-3 is idle near the northern wood. No fire was exchanged. Blue's infantry and cavalry have sight of red-1, and red-1 has seen both blue battalions in line at y=1680.",
+ "precedents": [
+  "A pace is reckoned at about 0.75 m; a unit ordered to halt short of a point halts there, whatever path the engine projects.",
+  "A unit ordered to follow another keeps the stated interval and halts when the leading unit halts."
+ ]
 }
 ```
 
-## Proposal E
+## Proposal C
 
 ```json
 {
@@ -1160,162 +885,7 @@
    "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Aubry has no order and holds his line south of the river, facing the bridge. Towards the end of the turn he sights an enemy column halted on the road some 590 m to the north and keeps his men quiet."
-  },
-  {
-   "unitId": "blue-2",
-   "x": 2140,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 550,
-   "morale": 75,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Delacroix has no order and keeps his line beside the 1st Battalion. He sights an enemy column on the road to the north, halted, and waits to see what it does."
-  },
-  {
-   "unitId": "blue-3",
-   "x": 2050,
-   "y": 1850,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 200,
-   "morale": 85,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. Verneuil has no order and stays behind the infantry. He sights an enemy column on the road, a kilometre away at most, and reports it, but does not move without orders."
-  },
-  {
-   "unitId": "red-1",
-   "x": 2050,
-   "y": 1100,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 80,
-   "fatigue": 5,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r1-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Brandt gets his order at about the second minute and marches his battalion south down the high road in column. He halts at about the fifth minute, 400 paces (about 300 m) short of the river, as he was told. He sees the enemy line beyond the river at about 590 m and holds there, eager to go on."
-  },
-  {
-   "unitId": "red-2",
-   "x": 2050,
-   "y": 860,
-   "facingDeg": 180,
-   "formation": "column",
-   "strength": 650,
-   "morale": 70,
-   "fatigue": 5,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r2-1",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Hartmann gets his order at about the third minute and follows the Vanguard down the road, by the book, keeping 300 paces (about 225 m) behind it. When the Vanguard halts he halts behind it, and waits for orders."
-  },
-  {
-   "unitId": "red-3",
-   "x": 1550,
-   "y": 400,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. von Reiter has no order and holds his position at the edge of the northern wood."
-  }
- ],
- "observations": [
-  {
-   "side": "blue",
-   "by": "blue-1",
-   "unitId": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-2",
-   "unitId": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "blue",
-   "by": "blue-3",
-   "unitId": "red-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-1",
-   "when": "end"
-  },
-  {
-   "side": "red",
-   "by": "red-1",
-   "unitId": "blue-2",
-   "when": "end"
-  }
- ],
- "summary": "A quiet turn. Red-1 marched down the high road in column and halted 400 paces (about 300 m) short of the river at about (2050,1100), as ordered, and Red-2 followed 300 paces behind and halted at about (2050,860). No contact: the Blue infantry in line south of the river were about 590 m from the Red head of column, which is out of musket range, and no shots were fired. By the end of the turn the Blue infantry and cavalry had sighted the Red column on the road, and Red-1 had sighted the Blue infantry. Blue and Red-3 held. This matches the projection."
-}
-```
-
-## Proposal F
-
-```json
-{
- "turn": 1,
- "units": [
-  {
-   "unitId": "blue-1",
-   "x": 1960,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 600,
-   "morale": 80,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
+    "kind": "idle"
    },
    "orders": [],
    "account": "The 1st Battalion acted as the staff tables direct."
@@ -1332,7 +902,7 @@
    "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "hold"
+    "kind": "idle"
    },
    "orders": [],
    "account": "The 2nd Battalion acted as the staff tables direct."
@@ -1349,7 +919,7 @@
    "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "hold"
+    "kind": "idle"
    },
    "orders": [],
    "account": "The Cavalry Squadron acted as the staff tables direct."
@@ -1357,7 +927,7 @@
   {
    "unitId": "red-1",
    "x": 2050,
-   "y": 1100,
+   "y": 1500,
    "facingDeg": 180,
    "formation": "column",
    "strength": 650,
@@ -1370,7 +940,7 @@
    },
    "orders": [
     {
-     "orderId": "r1-1",
+     "orderId": "red-r1-1",
      "result": "carried-out"
     }
    ],
@@ -1379,7 +949,7 @@
   {
    "unitId": "red-2",
    "x": 2050,
-   "y": 850,
+   "y": 120,
    "facingDeg": 180,
    "formation": "column",
    "strength": 650,
@@ -1392,7 +962,7 @@
    },
    "orders": [
     {
-     "orderId": "r2-1",
+     "orderId": "red-r2-1",
      "result": "carried-out"
     }
    ],
@@ -1410,13 +980,38 @@
    "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "hold"
+    "kind": "idle"
    },
    "orders": [],
    "account": "The Hussar Squadron acted as the staff tables direct."
   }
  ],
- "observations": [],
+ "observations": [
+  {
+   "side": "blue",
+   "unitId": "red-1",
+   "by": "blue-1",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-1",
+   "by": "red-1",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-2",
+   "by": "red-1",
+   "when": "end"
+  },
+  {
+   "side": "red",
+   "unitId": "blue-3",
+   "by": "red-1",
+   "when": "end"
+  }
+ ],
  "summary": "The turn was resolved by the tables."
 }
 ```
