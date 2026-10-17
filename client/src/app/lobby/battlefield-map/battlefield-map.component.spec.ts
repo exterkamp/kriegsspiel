@@ -1,4 +1,23 @@
+import { webcrypto } from 'node:crypto';
 import { Component, provideZonelessChangeDetection, signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { parseReplayParameters } from '../../../legacy/map-authoring/generation/protocol';
+import {
+  assetIdentity,
+  canonicalizeAsset,
+  createReferenceAsset,
+  importAsset,
+} from '@kriegsspiel/maps';
+import type { BoardPreparation, CertifiedBoard } from '../../../shared/game-setup/contracts';
+import type {
+  LibraryMapSummary,
+  MapLibraryPort,
+} from '../../../shared/lobby-map-library/contracts';
+import {
+  MAP_LIBRARY_PREVIEW_FACTORY,
+  MapLibraryComponent,
+} from '../map-library/map-library.component';
+import { LibraryBrowserComponent } from '../map-library/library-browser.component';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import {
   decodeApprovedBattlefield,
@@ -159,6 +178,8 @@ function selection(entry: ApprovedBattlefield) {
         [catalog]="maps()"
         [selection]="selected()"
         [canOpen]="allowMapEntry"
+        [library]="library()"
+        [preparationFactory]="preparationFactory()"
         (activeChange)="gate($event)"
         (selectionChange)="select($event)"
       />
@@ -174,6 +195,8 @@ class Host {
   readonly selected = signal<{ pairingId: string; revision: string } | undefined>(undefined);
   readonly selections: ApprovedBattlefield[] = [];
   onSelection: ((entry: ApprovedBattlefield) => void) | undefined;
+  readonly library = signal<MapLibraryPort | undefined>(undefined);
+  readonly preparationFactory = signal<(() => BoardPreparation) | undefined>(undefined);
   readonly pending = signal(false);
   readonly allowMapEntry = () => !this.pending();
   readonly transitions: boolean[] = [];
@@ -293,7 +316,13 @@ beforeEach(() => {
   window.history.replaceState({ parent: 'retained' }, '', '/?lobby=1');
   TestBed.configureTestingModule({
     imports: [Host],
-    providers: [provideZonelessChangeDetection()],
+    providers: [
+      provideZonelessChangeDetection(),
+      {
+        provide: MAP_LIBRARY_PREVIEW_FACTORY,
+        useValue: () => ({ loadAsset: () => ({ ok: true }), dispose: vi.fn() }),
+      },
+    ],
   });
   fixture = TestBed.createComponent(Host);
   host = fixture.componentInstance;
@@ -308,6 +337,7 @@ afterEach(async () => {
   fixture?.destroy();
   if (pop) await pop;
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   if (nativeShowModal)
     Object.defineProperty(HTMLDialogElement.prototype, 'showModal', nativeShowModal);
   else Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
@@ -1416,4 +1446,443 @@ describe('modern approval and replacement boundaries', () => {
     expect(root.querySelector('fieldset')?.textContent).toContain('Open bridge approaches');
     expect(host.selections).toHaveLength(1);
   });
+});
+
+function deferredLibrary<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((yes) => {
+    resolve = yes;
+  });
+  return { promise, resolve };
+}
+function addBody(): MapLibraryComponent {
+  const found = fixture.debugElement.query(By.directive(MapLibraryComponent));
+  if (!found) throw new Error('Missing actual Add child');
+  return found.componentInstance as MapLibraryComponent;
+}
+function browserBody(): LibraryBrowserComponent {
+  const found = fixture.debugElement.query(By.directive(LibraryBrowserComponent));
+  if (!found) throw new Error('Missing actual library browser');
+  return found.componentInstance as LibraryBrowserComponent;
+}
+
+describe('attached geography library with real Add content and outer history ownership', () => {
+  let library: MapLibraryPort;
+  let preparations: BoardPreparation[];
+  let factory: ReturnType<typeof vi.fn<() => BoardPreparation>>;
+  let savedSummary: LibraryMapSummary;
+  let canonicalJson: string;
+  beforeEach(() => {
+    vi.stubGlobal('crypto', webcrypto);
+    preparations = [];
+    // Preparation doubles certify public reference geography expanded to the requested
+    // recipe/grid. These tests exercise presentation ownership, not real generation.
+    factory = vi.fn(() => {
+      const preparation: BoardPreparation = {
+        generate: vi.fn<BoardPreparation['generate']>(async (recipe) => {
+          const asset = createReferenceAsset();
+          asset.settings = structuredClone(recipe.settings);
+          asset.provenance.seed = recipe.seed;
+          asset.overrides = structuredClone(recipe.overrides);
+          asset.bounds.maxX = recipe.settings.widthM;
+          asset.bounds.maxY = recipe.settings.heightM;
+          const spacingM = recipe.settings.sampleSpacingM;
+          const columns = Math.ceil(recipe.settings.widthM / spacingM) + 1;
+          const rows = Math.ceil(recipe.settings.heightM / spacingM) + 1;
+          if (asset.elevation.columns !== columns || asset.elevation.rows !== rows)
+            asset.elevation = { columns, rows, spacingM, samples: Array(columns * rows).fill(100) };
+          canonicalJson = canonicalizeAsset(asset);
+          const identity = await assetIdentity(asset, 'asset');
+          savedSummary = {
+            ref: { kind: 'owned', id: '7da01aae-638e-4700-9a8d-5f39646c78d1' },
+            name: 'Saved geography',
+            widthM: asset.bounds.maxX,
+            heightM: asset.bounds.maxY,
+            assetIdentity: identity,
+            status: 'needs-scenario',
+          };
+          return {
+            asset,
+            canonicalJson,
+            assetIdentity: identity,
+            bounds: { minX: 0, minY: 0, maxX: asset.bounds.maxX, maxY: asset.bounds.maxY },
+            summary: {
+              ref: null,
+              name: asset.name,
+              widthM: asset.bounds.maxX,
+              heightM: asset.bounds.maxY,
+            },
+          };
+        }),
+        load: vi.fn<BoardPreparation['load']>(async (json, summary) => {
+          const asset = importAsset(json);
+          return {
+            asset,
+            canonicalJson: json,
+            assetIdentity: await assetIdentity(asset, 'asset'),
+            bounds: { minX: 0, minY: 0, maxX: asset.bounds.maxX, maxY: asset.bounds.maxY },
+            summary,
+          };
+        }),
+        dispose: vi.fn(),
+      };
+      preparations.push(preparation);
+      return preparation;
+    });
+    library = {
+      list: vi.fn().mockResolvedValue({ items: [] }),
+      read: vi.fn(async () => ({ item: savedSummary, canonicalJson })),
+      save: vi.fn(async (intent) => ({ ...savedSummary, name: intent.name })),
+    };
+    host.library.set(library);
+    host.preparationFactory.set(factory);
+    fixture.detectChanges();
+  });
+
+  function dirtyAdd() {
+    const child = addBody();
+    child.state.setSeed('17');
+    fixture.detectChanges();
+    return child;
+  }
+
+  it('keeps native candidates distinct from My maps and unpaired included browsing, with Use disabled', async () => {
+    const choices = modern();
+    click('Choose map');
+    pick(choices.entries[1]!.pairing.id);
+    click('My maps', true);
+    await fixture.whenStable();
+    expect(library.list).toHaveBeenCalledWith('owned', expect.any(AbortSignal), undefined);
+    expect(modal.textContent).toContain('Needs a scenario');
+    expect(modal.textContent).not.toContain('Ready for');
+    expect(button('Use map', true).disabled).toBe(true);
+    button('Use map', true).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(host.selections).toEqual([]);
+    click('Back to scenario maps', true);
+    expect(radios().find((radio) => radio.checked)?.value).toBe(choices.entries[1]!.pairing.id);
+    click('Browse included maps', true);
+    await fixture.whenStable();
+    expect(library.list).toHaveBeenCalledWith('included', expect.any(AbortSignal), undefined);
+    expect(button('Use map', true).disabled).toBe(true);
+    expect(modal.textContent).toContain('Other included maps');
+    click('Back to scenario maps', true);
+    await close('Use map');
+    expect(host.selections).toEqual([choices.entries[1]]);
+    expect(host.starts).toBe(0);
+  });
+
+  it.each(['Escape', 'native cancel', 'native close', 'Cancel', 'Back to maps'])(
+    'routes dirty %s through the child and keeps the exact draft through Keep editing',
+    async (action) => {
+      modern();
+      click('Choose map');
+      click('Add map', true);
+      const child = dirtyAdd();
+      if (action === 'Escape') key(modal.querySelector('input')!, 'Escape');
+      else if (action === 'native cancel') {
+        const event = new Event('cancel', { cancelable: true });
+        modal.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(true);
+        fixture.detectChanges();
+      } else if (action === 'native close') {
+        modal.close();
+        fixture.detectChanges();
+      } else click(action, true);
+      await fixture.whenStable();
+      expect(child.state.confirming()).toBe(true);
+      expect(addBody()).toBe(child);
+      expect(preparations[0]!.dispose).not.toHaveBeenCalled();
+      expect(modal.open).toBe(true);
+      expect(host.transitions).toEqual([true]);
+      expect(document.activeElement?.textContent).toBe('Discard this map?');
+      click('Keep editing', true);
+      await fixture.whenStable();
+      expect(child.state.seed()).toBe('17');
+      expect(child.state.confirming()).toBe(false);
+      // A fresh Escape is a close intent, even after keeping an earlier Back-to-maps draft.
+      key(modal.querySelector('input')!, 'Escape');
+      await fixture.whenStable();
+      const pop = nextPop();
+      click('Discard map', true);
+      expect(host.active).toBe(true);
+      await pop;
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(host.transitions).toEqual([true, false]);
+      expect(window.history.state).toEqual({ parent: 'retained' });
+      expect(preparations[0]!.dispose).toHaveBeenCalledTimes(1);
+      expect(document.activeElement).toBe(button('Choose map'));
+      expect(host.selections).toEqual([]);
+      expect(host.starts).toBe(0);
+    },
+  );
+
+  it.each([false, true])(
+    're-owns browser Back during dirty Add (nested=%s), retains Keep editing, and acknowledges final discard',
+    async (nested) => {
+      modern();
+      const opener = nested ? 'Choose map' : 'Add map';
+      click(opener);
+      if (nested) click('Add map', true);
+      const child = dirtyAdd();
+      const draft = root.querySelector<HTMLInputElement>('[aria-label="Parent draft"]')!;
+      draft.value = 'preserved turn fields';
+      await back();
+      expect(modal.open).toBe(true);
+      expect(addBody()).toBe(child);
+      expect(child.state.confirming()).toBe(true);
+      expect(window.history.state.__ksBattlefield.view).toBe('add');
+      expect(window.history.state.__ksBattlefield.depth).toBe(nested ? 2 : 1);
+      expect(host.transitions).toEqual([true]);
+      expect(preparations[0]!.dispose).not.toHaveBeenCalled();
+      click('Keep editing', true);
+      await fixture.whenStable();
+      expect(child.state.seed()).toBe('17');
+      await back();
+      expect(child.state.confirming()).toBe(true);
+      // Repeated Back while confirmation is pending must retain this same child.
+      await back();
+      expect(addBody()).toBe(child);
+      expect(window.history.state.__ksBattlefield.view).toBe('add');
+      const pop = nextPop();
+      click('Discard map', true);
+      await pop;
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(preparations[0]!.dispose).toHaveBeenCalledTimes(1);
+      expect(draft.value).toBe('preserved turn fields');
+      expect(host.selections).toEqual([]);
+      if (nested) {
+        expect(modal.open).toBe(true);
+        expect(modal.querySelector('h2')?.textContent).toBe('Choose battlefield map');
+        await close();
+      } else expect(modal.open).toBe(false);
+      expect(document.activeElement).toBe(button(opener));
+      expect(window.history.state).toEqual({ parent: 'retained' });
+      expect(host.starts).toBe(0);
+    },
+  );
+
+  it('preserves the native candidate when Back to maps discards a dirty Add child', async () => {
+    const value = modern();
+    click('Choose map');
+    pick(value.entries[1]!.pairing.id);
+    click('Add map', true);
+    dirtyAdd();
+    click('Back to maps', true);
+    const pop = nextPop();
+    click('Discard map', true);
+    await pop;
+    fixture.detectChanges();
+    expect(radios().find((radio) => radio.checked)?.value).toBe(value.entries[1]!.pairing.id);
+    expect(host.selections).toEqual([]);
+    await close();
+  });
+
+  it.each([false, true])(
+    'returns a verified Save to My maps inspection without committing or enabling native Use (nested=%s)',
+    async (nested) => {
+      const value = modern();
+      const nativeCandidate = value.entries[nested ? 1 : 0]!;
+      if (nested) {
+        click('Choose map');
+        pick(nativeCandidate.pairing.id);
+        click('Add map', true);
+      } else click('Add map');
+      const child = addBody();
+      // Use the frozen child's recorded-recipe seam: the public reference fixture
+      // has one village, unlike the default generator preset's ten settlements.
+      const reference = createReferenceAsset();
+      child.state.configure(
+        preparations[0]!,
+        library,
+        parseReplayParameters({
+          seed: reference.provenance.seed,
+          settings: reference.settings,
+          overrides: reference.overrides,
+        }),
+      );
+      await child.state.generate();
+      await fixture.whenStable();
+      expect(child.state.board()).toBeDefined();
+      child.state.setName('Saved geography');
+      fixture.detectChanges();
+      const pop = nested ? nextPop() : undefined;
+      await child.state.save();
+      if (pop) await pop;
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(modal.open).toBe(true);
+      expect(host.transitions).toEqual([true]);
+      expect(host.selections).toEqual([]);
+      expect(host.starts).toBe(0);
+      expect(button('Use map', true).disabled).toBe(true);
+      expect(modal.textContent).toContain('My maps');
+      expect(modal.textContent).toContain('Saved geography');
+      await vi.waitFor(() => expect(browserBody().board()).toBeDefined());
+      await fixture.whenStable();
+      expect(modal.querySelector('canvas')).not.toBeNull();
+      const inspectionHeading = modal.querySelector<HTMLElement>(
+        'section[aria-label="Geography inspection"] h3',
+      )!;
+      expect(inspectionHeading.textContent).toBe('Saved geography');
+      expect(document.activeElement).toBe(inspectionHeading);
+      expect(modal.textContent).not.toContain('Ready for');
+      expect(root.querySelector('fieldset')?.textContent).toContain('The bridge battlefield');
+      expect(preparations[0]!.dispose).toHaveBeenCalledTimes(1);
+      expect(preparations[1]!.load).toHaveBeenCalledWith(
+        canonicalJson,
+        {
+          ref: { kind: 'generated', id: savedSummary.ref.id },
+          name: savedSummary.name,
+          widthM: 150,
+          heightM: 150,
+        },
+        expect.any(AbortSignal),
+      );
+      click('Back to scenario maps', true);
+      expect(radios().find((radio) => radio.checked)?.value).toBe(nativeCandidate.pairing.id);
+      expect(preparations[1]!.dispose).toHaveBeenCalledTimes(1);
+      await close();
+      expect(host.selections).toEqual([]);
+    },
+  );
+
+  it('allocates a fresh preparation for each Add visit and retires a browser read immediately on outer Cancel', async () => {
+    modern();
+    click('Choose map');
+    click('Add map', true);
+    let pop = nextPop();
+    click('Back to maps', true);
+    await pop;
+    fixture.detectChanges();
+    click('Add map', true);
+    expect(factory).toHaveBeenCalledTimes(2);
+    expect(preparations[0]).not.toBe(preparations[1]);
+    expect(preparations[0]!.dispose).toHaveBeenCalledTimes(1);
+    pop = nextPop();
+    click('Back to maps', true);
+    await pop;
+    fixture.detectChanges();
+    click('My maps', true);
+    await fixture.whenStable();
+    const asset = createReferenceAsset();
+    const item: LibraryMapSummary = {
+      ref: { kind: 'owned', id: '7da01aae-638e-4700-9a8d-5f39646c78d1' },
+      name: 'Late inspection',
+      widthM: 150,
+      heightM: 150,
+      assetIdentity: await assetIdentity(asset, 'asset'),
+      status: 'needs-scenario',
+    };
+    const delayed = deferredLibrary<Awaited<ReturnType<MapLibraryPort['read']>>>();
+    vi.mocked(library.read).mockReturnValueOnce(delayed.promise);
+    const browser = browserBody();
+    const operation = browser.inspect(item);
+    const signal = vi.mocked(library.read).mock.calls[0]![1];
+    pop = nextPop();
+    button('Cancel', true).click();
+    expect(signal.aborted).toBe(true);
+    delayed.resolve({ item, canonicalJson: canonicalizeAsset(asset) });
+    await operation;
+    expect(browser.board()).toBeUndefined();
+    await pop;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(factory).toHaveBeenCalledTimes(2);
+    expect(host.selections).toEqual([]);
+    expect(window.history.state).toEqual({ parent: 'retained' });
+  });
+
+  it('retries a failed preparation factory without creating a dialog/history owner', async () => {
+    factory.mockImplementationOnce(() => {
+      throw new Error('private failure');
+    });
+    click('Add map');
+    expect(modal.textContent).toContain('Add map could not be opened');
+    expect(modal.textContent).not.toContain('private failure');
+    const state = window.history.state;
+    click('Retry Add map', true);
+    expect(addBody()).toBeDefined();
+    expect(window.history.state).toEqual(state);
+    await close();
+    expect(preparations[0]!.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('revokes dirty generation on capability replacement without accepting late save or stealing a newer focus owner', async () => {
+    modern();
+    click('Add map');
+    const child = addBody();
+    const delayed = deferredLibrary<CertifiedBoard>();
+    vi.mocked(preparations[0]!.generate).mockReturnValueOnce(delayed.promise);
+    const operation = child.state.generate();
+    const signal = vi.mocked(preparations[0]!.generate).mock.calls[0]![1];
+    const pop = nextPop();
+    host.library.set(undefined);
+    fixture.detectChanges();
+    expect(signal.aborted).toBe(true);
+    expect(preparations[0]!.dispose).toHaveBeenCalledTimes(1);
+    await pop;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    delayed.resolve({} as CertifiedBoard);
+    await operation;
+    expect(host.selections).toEqual([]);
+    expect(library.save).not.toHaveBeenCalled();
+    expect(modal.open).toBe(false);
+    click('Add map');
+    expect(modal.textContent).toContain('Adding maps to live games is not available yet.');
+    expect(modal.querySelector('ks-map-library')).toBeNull();
+    await close();
+  });
+
+  it('unwinds reinserted dirty history on destruction and never publishes the old child afterward', async () => {
+    click('Choose map');
+    click('Add map', true);
+    const child = dirtyAdd();
+    await back();
+    expect(child.state.confirming()).toBe(true);
+    const pop = nextPop();
+    fixture.destroy();
+    expect(modal.open).toBe(false);
+    await pop;
+    expect(window.history.state).toEqual({ parent: 'retained' });
+    expect(preparations[0]!.dispose).toHaveBeenCalledTimes(1);
+    expect(host.transitions).toEqual([true, false]);
+    child.requestCancel();
+    expect(host.transitions).toEqual([true, false]);
+    expect(host.selections).toEqual([]);
+  });
+  it('disposes a preparation handed back after its factory destroys the owner, without focusing or reopening it', async () => {
+    const orphan: BoardPreparation = { generate: vi.fn(), load: vi.fn(), dispose: vi.fn() };
+    factory.mockImplementationOnce(() => {
+      fixture.destroy();
+      return orphan;
+    });
+    const pop = nextPop();
+    click('Add map');
+    await pop;
+    expect(orphan.dispose).toHaveBeenCalledTimes(1);
+    expect(orphan.generate).not.toHaveBeenCalled();
+    expect(modal.open).toBe(false);
+    expect(host.transitions).toEqual([true, false]);
+    expect(window.history.state).toEqual({ parent: 'retained' });
+  });
+  it.each(['library only', 'factory only'])(
+    'keeps Add truthfully unavailable with partial capability: %s',
+    async (capability) => {
+      if (capability === 'library only') host.preparationFactory.set(undefined);
+      else host.library.set(undefined);
+      fixture.detectChanges();
+      click('Add map');
+      expect(modal.textContent).toContain('Adding maps to live games is not available yet.');
+      expect(modal.querySelector('ks-map-library, input, select')).toBeNull();
+      expect(factory).not.toHaveBeenCalled();
+      expect(library.list).not.toHaveBeenCalled();
+      await close();
+      click('Choose map');
+      expect(modal.querySelector('nav[aria-label="Map sources"]')).toBeNull();
+      await close();
+    },
+  );
 });

@@ -9,7 +9,10 @@ import {
   OnDestroy,
   SimpleChanges,
   computed,
+  effect,
   afterNextRender,
+  afterRenderEffect,
+  untracked,
   input,
   inject,
   output,
@@ -23,6 +26,13 @@ import {
   type BattlefieldCatalog,
   type ScenarioBattlefield,
 } from '@kriegsspiel/protocol';
+import type { BoardPreparation } from '../../../shared/game-setup/contracts';
+import type {
+  LibraryMapSummary,
+  MapLibraryPort,
+} from '../../../shared/lobby-map-library/contracts';
+import { MapLibraryComponent } from '../map-library/map-library.component';
+import { LibraryBrowserComponent } from '../map-library/library-browser.component';
 import { BattlefieldPreviewComponent } from './battlefield-preview.component';
 
 const KINDS = new Set([
@@ -150,11 +160,11 @@ function checked(value: unknown, name: unknown): ScenarioBattlefield | null {
   return value as ScenarioBattlefield;
 }
 
-/** Checked public map choices only. No requests, game mutations, library or master state. */
+/** Native playable choices and separate, read-only geography library inspection. */
 @Component({
   selector: 'ks-battlefield-map',
   standalone: true,
-  imports: [BattlefieldPreviewComponent],
+  imports: [BattlefieldPreviewComponent, MapLibraryComponent, LibraryBrowserComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './battlefield-map.component.html',
   styleUrl: './battlefield-map.component.css',
@@ -166,9 +176,23 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
   readonly scenarioId = input<string>();
   readonly catalog = input<BattlefieldCatalog>();
   readonly selection = input<Selection>();
+  readonly library = input<MapLibraryPort>();
+  readonly preparationFactory = input<() => BoardPreparation>();
   readonly canOpen = input<() => boolean>(() => true);
   readonly activeChange = output<boolean>();
   readonly selectionChange = output<ApprovedBattlefield>();
+  protected readonly libraryEnabled = computed(
+    () => !!this.library() && !!this.preparationFactory(),
+  );
+  protected readonly librarySource = signal<'scenario' | 'owned' | 'included'>('scenario');
+  protected readonly inspected = signal<LibraryMapSummary | undefined>(undefined);
+  protected readonly addPreparation = signal<BoardPreparation | undefined>(undefined);
+  private readonly libraryChild = viewChild<LibraryBrowserComponent>('libraryBody');
+  private readonly addChild = viewChild<MapLibraryComponent>('addBody');
+  private addExit: 'close' | 'maps' = 'close';
+  private addReturnSource: 'scenario' | 'owned' | 'included' = 'scenario';
+  private savedItem: LibraryMapSummary | undefined;
+  private focusedInspection: LibraryMapSummary | undefined;
   protected readonly entryEnabled = computed(() => this.canOpen()());
   protected readonly modern = computed(
     () =>
@@ -276,6 +300,19 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
     }
     this.waiting.set(false);
     if (!this.active()) return;
+    if (!this.closing && this.view() === 'add' && this.addChild()) {
+      if (window.location.href !== this.openedUrl) {
+        this.retireAdd();
+        this.finish(false);
+        return;
+      }
+      // Back has already traversed. Re-own exactly one Add entry before asking
+      // the child, so Keep editing and repeated Back cannot strand a dirty draft.
+      this.depth = (entry?.depth ?? 0) + 1;
+      this.push('add', this.depth);
+      this.requestAddExit(entry ? 'maps' : 'close');
+      return;
+    }
     if (!entry) {
       this.finish(false);
       return;
@@ -291,6 +328,35 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
 
   constructor() {
     window.addEventListener('popstate', this.onPop);
+    effect(() => {
+      const child = this.addChild();
+      if (child && !child.state.confirming()) this.addExit = 'close';
+    });
+    afterRenderEffect(() => {
+      const browser = this.libraryChild();
+      const saved = this.inspected();
+      const selected = browser?.selected();
+      if (!saved) this.focusedInspection = undefined;
+      if (
+        this.destroyed ||
+        !this.active() ||
+        this.closing ||
+        this.waiting() ||
+        !this.entryEnabled() ||
+        this.view() !== 'choose' ||
+        this.librarySource() !== 'owned' ||
+        !browser ||
+        !saved ||
+        this.focusedInspection === saved ||
+        selected?.ref.kind !== saved.ref.kind ||
+        selected.ref.id !== saved.ref.id
+      )
+        return;
+      // Run after the ordinary chooser/history heading focus. The browser binds
+      // its own deferred target to the exact current inspection, not just its ID.
+      if (untracked(() => browser.requestInspectionFocus(saved.ref)))
+        this.focusedInspection = saved;
+    });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -307,7 +373,10 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
     this.committed.set(undefined);
     this.lastUse = undefined;
     // A replacement invalidates the entire picker lifetime, even if IDs are reused.
-    if (this.active()) this.finish(true);
+    if (this.active()) {
+      this.retireAdd();
+      this.finish(true);
+    }
     this.pendingAnnouncement = '';
     this.announcement.set('');
   }
@@ -316,6 +385,7 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
     this.destroyed = true;
     this.focusRequest?.destroy();
     this.focusReturn = undefined;
+    this.retireAdd();
     if (this.active()) this.finish(true);
     if (!this.waiting()) window.removeEventListener('popstate', this.onPop);
   }
@@ -345,6 +415,9 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
     this.candidateSelection.set(
       initial ? { pairingId: initial.pairing.id, revision: initial.pairing.revision } : undefined,
     );
+    this.librarySource.set('scenario');
+    this.inspected.set(undefined);
+    this.addReturnSource = 'scenario';
     this.view.set(view);
     this.announcement.set('');
     this.pendingAnnouncement = '';
@@ -355,6 +428,7 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
     try {
       this.push(view, 1);
       this.dialog().nativeElement.showModal();
+      if (view === 'add') this.prepareAdd();
       this.focusTitle();
     } catch {
       this.modalError.set('The map could not be opened. Please try again.');
@@ -362,21 +436,142 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
     }
   }
 
+  protected browse(source: 'scenario' | 'owned' | 'included'): void {
+    if (
+      !this.active() ||
+      this.waiting() ||
+      this.closing ||
+      !this.entryEnabled() ||
+      this.view() !== 'choose' ||
+      !this.libraryEnabled()
+    )
+      return;
+    this.libraryChild()?.retire();
+    this.librarySource.set(source);
+    this.inspected.set(undefined);
+    this.focusTitle();
+  }
+
   protected add(): void {
-    if (!this.active() || this.waiting() || this.view() !== 'choose') return;
+    if (
+      !this.active() ||
+      this.waiting() ||
+      this.closing ||
+      !this.entryEnabled() ||
+      this.view() !== 'choose'
+    )
+      return;
+    this.libraryChild()?.retire();
+    this.addReturnSource = this.librarySource();
     this.push('add', this.depth + 1);
     this.depth++;
     this.view.set('add');
+    this.prepareAdd();
     this.focusTitle();
+  }
+
+  protected prepareAdd(): void {
+    if (
+      this.destroyed ||
+      !this.active() ||
+      this.waiting() ||
+      !this.entryEnabled() ||
+      this.view() !== 'add' ||
+      !this.libraryEnabled() ||
+      this.addPreparation()
+    )
+      return;
+    const visit = this.visit;
+    this.addExit = 'close';
+    this.savedItem = undefined;
+    try {
+      const preparation = this.preparationFactory()!();
+      if (this.destroyed || !this.active() || this.visit !== visit || this.view() !== 'add') {
+        preparation.dispose();
+        return;
+      }
+      this.addPreparation.set(preparation);
+      this.modalError.set('');
+    } catch {
+      this.modalError.set('Add map could not be opened. Please try again.');
+    }
+  }
+
+  private retireAdd(): void {
+    const preparation = this.addPreparation();
+    this.addPreparation.set(undefined);
+    const child = this.addChild();
+    // Before the first render the picker owns the factory result. Once mounted,
+    // the frozen child owns disposal, including replacement and destruction.
+    if (child && child.preparation() === preparation) child.state.dispose();
+    else if (preparation) {
+      try {
+        preparation.dispose();
+      } catch {
+        /* Retire once. */
+      }
+    }
+    this.savedItem = undefined;
+  }
+
+  private requestAddExit(exit: 'close' | 'maps'): void {
+    const child = this.addChild();
+    if (!child || !this.addPreparation()) return;
+    if (!child.state.confirming()) this.addExit = exit;
+    child.requestCancel();
+  }
+
+  protected savedMap(item: LibraryMapSummary, child: MapLibraryComponent): void {
+    if (
+      this.destroyed ||
+      !this.active() ||
+      this.closing ||
+      this.view() !== 'add' ||
+      child !== this.addChild() ||
+      child.preparation() !== this.addPreparation()
+    )
+      return;
+    this.savedItem = structuredClone(item);
+    this.addExit = 'maps';
+    child.requestCancel();
+  }
+
+  protected addCancelled(child: MapLibraryComponent): void {
+    if (
+      this.destroyed ||
+      !this.active() ||
+      this.closing ||
+      this.view() !== 'add' ||
+      child !== this.addChild() ||
+      child.preparation() !== this.addPreparation()
+    )
+      return;
+    const saved = this.savedItem;
+    const exit = this.addExit;
+    this.addPreparation.set(undefined); // Child has already disposed its preparation.
+    this.savedItem = undefined;
+    this.view.set('choose');
+    this.librarySource.set(saved ? 'owned' : this.addReturnSource);
+    this.inspected.set(saved);
+    if (exit === 'close') this.finish(true);
+    else this.returnToMaps();
   }
 
   protected backToMaps(): void {
     if (!this.active() || this.waiting() || this.view() !== 'add') return;
+    if (this.addChild()) {
+      this.requestAddExit('maps');
+      return;
+    }
+    this.returnToMaps();
+  }
+
+  private returnToMaps(): void {
+    this.view.set('choose');
     if (this.depth > 1) {
       this.waiting.set(true);
       window.history.back();
     } else {
-      this.view.set('choose');
       this.replace('choose');
       this.focusTitle();
     }
@@ -390,6 +585,7 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
       this.closing ||
       !this.entryEnabled() ||
       this.view() !== 'choose' ||
+      this.librarySource() !== 'scenario' ||
       !candidate
     )
       return;
@@ -409,7 +605,8 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
       this.waiting() ||
       this.closing ||
       !this.entryEnabled() ||
-      this.view() !== 'choose'
+      this.view() !== 'choose' ||
+      this.librarySource() !== 'scenario'
     )
       return;
     this.candidateSelection.set({ pairingId: entry.pairing.id, revision: entry.pairing.revision });
@@ -418,7 +615,10 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
   protected cancel(event?: Event): void {
     event?.preventDefault();
     event?.stopPropagation();
-    if (this.active() && !this.waiting()) this.finish(true);
+    if (this.active() && !this.waiting()) {
+      if (this.view() === 'add' && this.addChild()) this.requestAddExit('close');
+      else this.finish(true);
+    }
   }
 
   protected nativeClose(): void {
@@ -430,7 +630,15 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
     )
       return;
     this.awaitingNativeClose = false;
-    if (this.active()) this.finish(true);
+    if (this.active() && this.view() === 'add' && this.addChild() && !this.closing) {
+      try {
+        this.dialog().nativeElement.showModal();
+        this.requestAddExit('close');
+      } catch {
+        this.retireAdd();
+        this.finish(true);
+      }
+    } else if (this.active()) this.finish(true);
     else this.restoreFocusAfterRender();
   }
 
@@ -470,7 +678,9 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
   }
 
   private focusTitle(): void {
+    if (this.destroyed || !this.active() || this.closing) return;
     this.changeDetector.detectChanges();
+    if (this.destroyed || !this.active() || this.closing) return;
     this.title().nativeElement.focus({ preventScroll: true });
   }
 
@@ -503,6 +713,8 @@ export class BattlefieldMapComponent implements OnChanges, OnDestroy {
 
   private finish(unwind: boolean): void {
     if (!this.active()) return;
+    this.libraryChild()?.retire();
+    this.retireAdd();
     if (unwind && this.ownEntry(window.history.state)) {
       this.closing = true;
       if (!this.waiting()) {
