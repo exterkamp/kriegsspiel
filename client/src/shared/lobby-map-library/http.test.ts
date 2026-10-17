@@ -1,8 +1,15 @@
 import { webcrypto } from 'node:crypto';
-import { assetIdentity, canonicalizeAsset, createReferenceAsset } from '@kriegsspiel/maps';
+import * as maps from '@kriegsspiel/maps';
+import {
+  assetIdentity,
+  canonicalizeAsset,
+  createReferenceAsset,
+  importAsset,
+} from '@kriegsspiel/maps';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LibraryMapSummary } from './contracts';
 import { createHttpMapLibrary, MapLibraryHttpError } from './http';
+import type { AssetCheckRequest, AssetCheckResponse, LibraryAssetInput } from './asset-check';
 
 const key = '7da01aae-638e-4700-9a8d-5f39646c78d1';
 const id = '7da01aae-638e-4700-9a8d-5f39646c78d2';
@@ -58,6 +65,25 @@ function stream(
   return { response, body, cancel };
 }
 const bytes = (value: string) => new TextEncoder().encode(value);
+// Trusted Node-only seam for the original transport cases: preserve their exact
+// import/canonical/full-hash/dimension assertions on the reference fixture. This
+// is not complete certification; default-worker wiring is tested separately below,
+// and asset-check.test.ts tests the actual complete worker handler.
+async function checkReferenceAsset(value: LibraryAssetInput, signal: AbortSignal) {
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+  const asset = importAsset(value.canonicalJson);
+  if (
+    canonicalizeAsset(asset) !== value.canonicalJson ||
+    asset.bounds.minX !== 0 ||
+    asset.bounds.minY !== 0 ||
+    asset.bounds.maxX !== value.widthM ||
+    asset.bounds.maxY !== value.heightM ||
+    (await assetIdentity(asset, 'asset')) !== value.assetIdentity
+  )
+    throw new Error('Map mismatch');
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+  return asset;
+}
 beforeEach(async () => {
   vi.stubGlobal('crypto', webcrypto);
   const asset = createReferenceAsset();
@@ -85,7 +111,7 @@ describe('library list and exact raw geography reads', () => {
   it('requests one explicit source-bound page with credentials and a bounded cursor, returning only detached allowlisted fields', async () => {
     const input = { schemaVersion: 1, items: [item], nextCursor: 'next_2.x-3' };
     f.mockResolvedValue(json(input));
-    const port = createHttpMapLibrary(f);
+    const port = createHttpMapLibrary(f, checkReferenceAsset);
     const caller = signal();
     const page = await port.list('owned', caller, 'page_1');
     expect(f).toHaveBeenCalledExactlyOnceWith('/map-library/maps?source=owned&cursor=page_1', {
@@ -129,7 +155,9 @@ describe('library list and exact raw geography reads', () => {
     if (invalid === 'empty continuation')
       input = { schemaVersion: 1, items: [], nextCursor: 'next' };
     f.mockResolvedValue(json(input));
-    await expect(createHttpMapLibrary(f).list('owned', signal())).rejects.toMatchObject({
+    await expect(
+      createHttpMapLibrary(f, checkReferenceAsset).list('owned', signal()),
+    ).rejects.toMatchObject({
       kind: 'unavailable',
     });
   });
@@ -149,7 +177,7 @@ describe('library list and exact raw geography reads', () => {
         length > 32768,
       );
       f.mockResolvedValue(source.response);
-      const result = createHttpMapLibrary(f).list('owned', signal());
+      const result = createHttpMapLibrary(f, checkReferenceAsset).list('owned', signal());
       if (length === 32768) expect(await result).toEqual({ items: [item] });
       else {
         await expect(result).rejects.toBeInstanceOf(MapLibraryHttpError);
@@ -164,12 +192,14 @@ describe('library list and exact raw geography reads', () => {
   it('handles split multibyte UTF-8 and rejects malformed UTF-8/JSON without exposing payloads', async () => {
     const encoded = bytes(JSON.stringify({ schemaVersion: 1, items: [item] }));
     f.mockResolvedValueOnce(stream(Array.from(encoded, (n) => new Uint8Array([n]))).response);
-    expect((await createHttpMapLibrary(f).list('owned', signal())).items[0]!.name).toBe(item.name);
+    expect(
+      (await createHttpMapLibrary(f, checkReferenceAsset).list('owned', signal())).items[0]!.name,
+    ).toBe(item.name);
     for (const data of [new Uint8Array([0xc3, 0x28]), bytes('{secret-owner:')]) {
       f.mockResolvedValueOnce(stream([data]).response);
-      await expect(createHttpMapLibrary(f).list('owned', signal())).rejects.toThrow(
-        'The map library is unavailable. Please try again.',
-      );
+      await expect(
+        createHttpMapLibrary(f, checkReferenceAsset).list('owned', signal()),
+      ).rejects.toThrow('The map library is unavailable. Please try again.');
     }
   });
 
@@ -192,7 +222,7 @@ describe('library list and exact raw geography reads', () => {
       );
       f.mockResolvedValue(source.response);
       const original = structuredClone(item);
-      const result = await createHttpMapLibrary(f).read(item.ref, signal());
+      const result = await createHttpMapLibrary(f, checkReferenceAsset).read(item.ref, signal());
       expect(f.mock.calls[0]![0]).toBe(
         `/map-library/maps/${kind}/${encodeURIComponent(item.ref.id)}`,
       );
@@ -237,9 +267,9 @@ describe('library list and exact raw geography reads', () => {
     f.mockResolvedValue(source.response);
     const ref =
       invalid === 'included timestamp' ? { kind: 'included' as const, id: 'reference' } : item.ref;
-    await expect(createHttpMapLibrary(f).read(ref, signal())).rejects.toBeInstanceOf(
-      MapLibraryHttpError,
-    );
+    await expect(
+      createHttpMapLibrary(f, checkReferenceAsset).read(ref, signal()),
+    ).rejects.toBeInstanceOf(MapLibraryHttpError);
     expect(source.cancel).toHaveBeenCalledOnce();
     expect(source.body.locked).toBe(false);
   });
@@ -260,7 +290,9 @@ describe('library list and exact raw geography reads', () => {
         body = canonicalizeAsset(asset);
       }
       f.mockResolvedValue(stream([bytes(body)], headers).response);
-      await expect(createHttpMapLibrary(f).read(item.ref, signal())).rejects.toMatchObject({
+      await expect(
+        createHttpMapLibrary(f, checkReferenceAsset).read(item.ref, signal()),
+      ).rejects.toMatchObject({
         kind: 'unavailable',
       });
     },
@@ -277,9 +309,9 @@ describe('library list and exact raw geography reads', () => {
       true,
     );
     f.mockResolvedValue(source.response);
-    await expect(createHttpMapLibrary(f).read(item.ref, signal())).rejects.toBeInstanceOf(
-      MapLibraryHttpError,
-    );
+    await expect(
+      createHttpMapLibrary(f, checkReferenceAsset).read(item.ref, signal()),
+    ).rejects.toBeInstanceOf(MapLibraryHttpError);
     expect(source.cancel).toHaveBeenCalledOnce();
     expect(source.body.locked).toBe(false);
   });
@@ -287,9 +319,9 @@ describe('library list and exact raw geography reads', () => {
   it('admits exactly 64MiB of bytes, then rejects the invalid asset rather than claiming it was truncated', async () => {
     const source = stream([new Uint8Array(assetLimit)], readHeaders());
     f.mockResolvedValue(source.response);
-    await expect(createHttpMapLibrary(f).read(item.ref, signal())).rejects.toBeInstanceOf(
-      MapLibraryHttpError,
-    );
+    await expect(
+      createHttpMapLibrary(f, checkReferenceAsset).read(item.ref, signal()),
+    ).rejects.toBeInstanceOf(MapLibraryHttpError);
     expect(source.cancel).not.toHaveBeenCalled();
     expect(source.body.locked).toBe(false);
   }, 15000);
@@ -300,7 +332,7 @@ describe('exact keyed saves and ambiguity reconciliation', () => {
     f.mockResolvedValue(json(item, 201));
     const uuid = vi.spyOn(crypto, 'randomUUID');
     const value = intent();
-    const result = await createHttpMapLibrary(f).save(value, signal());
+    const result = await createHttpMapLibrary(f, checkReferenceAsset).save(value, signal());
     expect(result).toEqual(item);
     expect(uuid).not.toHaveBeenCalled();
     expect(f).toHaveBeenCalledExactlyOnceWith(`/map-library/saves/${key}`, {
@@ -350,7 +382,9 @@ describe('exact keyed saves and ambiguity reconciliation', () => {
         f.mockResolvedValueOnce(json({ ...item, ownerId: 'secret' }));
       if (lost === 'pending 202') f.mockResolvedValueOnce(json(item, 202));
       f.mockResolvedValueOnce(json(item));
-      expect(await createHttpMapLibrary(f).save(intent(), signal())).toEqual(item);
+      expect(await createHttpMapLibrary(f, checkReferenceAsset).save(intent(), signal())).toEqual(
+        item,
+      );
       expect(f.mock.calls.map((call) => [call[0], call[1]!.method])).toEqual([
         [`/map-library/saves/${key}`, 'PUT'],
         [`/map-library/saves/${key}`, 'GET'],
@@ -364,7 +398,9 @@ describe('exact keyed saves and ambiguity reconciliation', () => {
       f.mockRejectedValueOnce(new Error('lost')).mockResolvedValueOnce(
         json({ message: 'private error' }, status),
       );
-      await expect(createHttpMapLibrary(f).save(intent(), signal())).rejects.toMatchObject({
+      await expect(
+        createHttpMapLibrary(f, checkReferenceAsset).save(intent(), signal()),
+      ).rejects.toMatchObject({
         kind: 'pending',
       });
       expect(f).toHaveBeenCalledTimes(2);
@@ -376,7 +412,9 @@ describe('exact keyed saves and ambiguity reconciliation', () => {
       f.mockReset()
         .mockResolvedValueOnce(new Response(body, { status: 409 }))
         .mockResolvedValueOnce(json(item));
-      await expect(createHttpMapLibrary(f).save(intent(), signal())).rejects.toMatchObject({
+      await expect(
+        createHttpMapLibrary(f, checkReferenceAsset).save(intent(), signal()),
+      ).rejects.toMatchObject({
         kind: 'conflict',
       });
       expect(f).toHaveBeenCalledOnce();
@@ -395,7 +433,9 @@ describe('exact keyed saves and ambiguity reconciliation', () => {
       if (invalid === 'foreign name') Object.assign(wrong, { name: 'Other map' });
       if (invalid === 'foreign identity') Object.assign(wrong, { assetIdentity: 'f'.repeat(64) });
       f.mockResolvedValueOnce(json(wrong)).mockResolvedValueOnce(json(item));
-      await expect(createHttpMapLibrary(f).save(intent(), signal())).rejects.toMatchObject({
+      await expect(
+        createHttpMapLibrary(f, checkReferenceAsset).save(intent(), signal()),
+      ).rejects.toMatchObject({
         kind: 'conflict',
       });
       expect(f).toHaveBeenCalledOnce();
@@ -409,7 +449,7 @@ describe('exact keyed saves and ambiguity reconciliation', () => {
     f.mockReturnValueOnce(delayed.promise)
       .mockResolvedValueOnce(json({ message: 'not found' }, 404))
       .mockResolvedValueOnce(json(item));
-    const port = createHttpMapLibrary(f);
+    const port = createHttpMapLibrary(f, checkReferenceAsset);
     const operation = port.save(value, signal());
     value.requestId = id;
     value.name = 'Changed';
@@ -432,7 +472,7 @@ describe('exact keyed saves and ambiguity reconciliation', () => {
     const first = stream([data], undefined, 200, length > 4096);
     const second = stream([data], undefined, 200, length > 4096);
     f.mockResolvedValueOnce(first.response).mockResolvedValueOnce(second.response);
-    const result = createHttpMapLibrary(f).save(intent(), signal());
+    const result = createHttpMapLibrary(f, checkReferenceAsset).save(intent(), signal());
     if (length === 4096) {
       expect(await result).toEqual(item);
       expect(f).toHaveBeenCalledOnce();
@@ -448,9 +488,9 @@ describe('exact keyed saves and ambiguity reconciliation', () => {
     f.mockRejectedValueOnce(new Error('lost')).mockResolvedValueOnce(
       json({ ...item, owner: 'secret' }),
     );
-    await expect(createHttpMapLibrary(f).save(intent(), signal())).rejects.toThrow(
-      'This map may already be saved. Retry Save map to recover the same map.',
-    );
+    await expect(
+      createHttpMapLibrary(f, checkReferenceAsset).save(intent(), signal()),
+    ).rejects.toThrow('This map may already be saved. Retry Save map to recover the same map.');
   });
 });
 
@@ -466,7 +506,7 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
     'broken Unicode',
     'extra intent',
   ])('rejects invalid %s before any fetch', async (invalid) => {
-    const port = createHttpMapLibrary(f);
+    const port = createHttpMapLibrary(f, checkReferenceAsset);
     const value = intent();
     let operation: Promise<unknown>;
     if (invalid === 'source') operation = port.list('private' as 'owned', signal());
@@ -491,11 +531,15 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
     value.canonicalJson = ' '.repeat(assetLimit);
     f.mockResolvedValueOnce(json(item));
     // Transport admission only; the fake server response does not claim this is a valid asset.
-    await expect(createHttpMapLibrary(f).save(value, signal())).resolves.toEqual(item);
+    await expect(
+      createHttpMapLibrary(f, checkReferenceAsset).save(value, signal()),
+    ).resolves.toEqual(item);
     expect((f.mock.calls[0]![1]!.body as string).length).toBe(assetLimit);
     value.canonicalJson = 'é'.repeat(assetLimit / 2 + 1);
     f.mockClear();
-    await expect(createHttpMapLibrary(f).save(value, signal())).rejects.toMatchObject({
+    await expect(
+      createHttpMapLibrary(f, checkReferenceAsset).save(value, signal()),
+    ).rejects.toMatchObject({
       kind: 'invalid',
     });
     expect(f).not.toHaveBeenCalled();
@@ -516,7 +560,9 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
       true,
     );
     f.mockResolvedValue(source.response);
-    await expect(createHttpMapLibrary(f).list('owned', signal())).rejects.toMatchObject({ kind });
+    await expect(
+      createHttpMapLibrary(f, checkReferenceAsset).list('owned', signal()),
+    ).rejects.toMatchObject({ kind });
     expect(source.cancel).toHaveBeenCalledOnce();
   });
 
@@ -534,9 +580,9 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
       f.mockResolvedValueOnce(
         new Response(body, { headers: { 'Content-Type': 'application/json' } }),
       );
-      await expect(createHttpMapLibrary(f).list('owned', signal())).rejects.toBeInstanceOf(
-        MapLibraryHttpError,
-      );
+      await expect(
+        createHttpMapLibrary(f, checkReferenceAsset).list('owned', signal()),
+      ).rejects.toBeInstanceOf(MapLibraryHttpError);
       expect(cancel).toHaveBeenCalledOnce();
       expect(body.locked).toBe(false);
     }
@@ -547,7 +593,7 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
     async (method) => {
       const controller = new AbortController();
       controller.abort();
-      const port = createHttpMapLibrary(f);
+      const port = createHttpMapLibrary(f, checkReferenceAsset);
       const operation =
         method === 'list'
           ? port.list('owned', controller.signal)
@@ -567,7 +613,7 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
     );
     const controller = new AbortController();
     const remove = vi.spyOn(controller.signal, 'removeEventListener');
-    const operation = createHttpMapLibrary(f).list('owned', controller.signal);
+    const operation = createHttpMapLibrary(f, checkReferenceAsset).list('owned', controller.signal);
     const rejection = expect(operation).rejects.toMatchObject({ name: 'AbortError' });
     await vi.waitFor(() => expect(body.locked).toBe(true));
     controller.abort();
@@ -582,7 +628,10 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
     const pending = deferred<Response>();
     f.mockReturnValueOnce(pending.promise);
     const controller = new AbortController();
-    const operation = createHttpMapLibrary(f).save(intent(), controller.signal);
+    const operation = createHttpMapLibrary(f, checkReferenceAsset).save(
+      intent(),
+      controller.signal,
+    );
     const rejection = expect(operation).rejects.toMatchObject({ name: 'AbortError' });
     controller.abort();
     await rejection;
@@ -605,7 +654,7 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
           new Response(body, { headers: { 'Content-Type': 'application/json' } }),
         );
       }
-      const operation = createHttpMapLibrary(f).list('owned', signal());
+      const operation = createHttpMapLibrary(f, checkReferenceAsset).list('owned', signal());
       const rejection = expect(operation).rejects.toMatchObject({ kind: 'timeout' });
       await vi.advanceTimersByTimeAsync(30_000);
       await rejection;
@@ -621,7 +670,7 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
   it('bounds PUT and same-key receipt as separate30s phases without a second PUT', async () => {
     vi.useFakeTimers();
     f.mockImplementation(() => new Promise<Response>(() => {}));
-    const operation = createHttpMapLibrary(f).save(intent(), signal());
+    const operation = createHttpMapLibrary(f, checkReferenceAsset).save(intent(), signal());
     const rejection = expect(operation).rejects.toMatchObject({ kind: 'pending' });
     await vi.advanceTimersByTimeAsync(30_000);
     expect(f.mock.calls.map((call) => call[1]!.method)).toEqual(['PUT', 'GET']);
@@ -635,7 +684,7 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
     const cancel = vi.fn(() => new Promise<void>(() => {}));
     const body = new ReadableStream<Uint8Array>({ cancel });
     f.mockResolvedValueOnce(new Response(body, { status: 409 })).mockResolvedValueOnce(json(item));
-    const operation = createHttpMapLibrary(f).save(intent(), signal());
+    const operation = createHttpMapLibrary(f, checkReferenceAsset).save(intent(), signal());
     const rejection = expect(operation).rejects.toMatchObject({ status: 409 });
     await vi.advanceTimersByTimeAsync(30_000);
     await rejection;
@@ -659,7 +708,9 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
       },
     });
     f.mockResolvedValue(new Response(body, { headers: { 'Content-Type': 'application/json' } }));
-    await expect(createHttpMapLibrary(f).list('owned', controller.signal)).rejects.toMatchObject({
+    await expect(
+      createHttpMapLibrary(f, checkReferenceAsset).list('owned', controller.signal),
+    ).rejects.toMatchObject({
       name: 'AbortError',
     });
     expect(body.locked).toBe(false);
@@ -669,7 +720,10 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
     const digest = vi.spyOn(crypto.subtle, 'digest').mockReturnValueOnce(pending.promise);
     f.mockResolvedValueOnce(stream([bytes(canonicalJson)], readHeaders()).response);
     const controller = new AbortController();
-    const operation = createHttpMapLibrary(f).read(item.ref, controller.signal);
+    const operation = createHttpMapLibrary(f, checkReferenceAsset).read(
+      item.ref,
+      controller.signal,
+    );
     const rejection = expect(operation).rejects.toMatchObject({ name: 'AbortError' });
     await vi.waitFor(() => expect(digest).toHaveBeenCalledOnce());
     controller.abort();
@@ -685,7 +739,10 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
     const pending = deferred<Response>();
     f.mockRejectedValueOnce(new Error('lost PUT')).mockReturnValueOnce(pending.promise);
     const controller = new AbortController();
-    const operation = createHttpMapLibrary(f).save(intent(), controller.signal);
+    const operation = createHttpMapLibrary(f, checkReferenceAsset).save(
+      intent(),
+      controller.signal,
+    );
     const rejection = expect(operation).rejects.toMatchObject({ name: 'AbortError' });
     await vi.waitFor(() => expect(f).toHaveBeenCalledTimes(2));
     controller.abort();
@@ -694,5 +751,317 @@ describe('bounded inputs, errors and lifetime cleanup', () => {
     pending.resolve(source.response);
     await vi.waitFor(() => expect(source.cancel).toHaveBeenCalledOnce());
     expect(f.mock.calls.map((call) => call[1]!.method)).toEqual(['PUT', 'GET']);
+  });
+});
+
+// Default verification uses the real accepted helper with a simulated browser
+// Worker, not the trusted Node seam. No worker thread or HTTP server is started.
+class TransportWorker extends EventTarget {
+  readonly sent: AssetCheckRequest[] = [];
+  readonly postMessage = vi.fn((value: AssetCheckRequest) => {
+    this.sent.push(structuredClone(value));
+  });
+  readonly terminate = vi.fn();
+  readonly added = vi.spyOn(this as EventTarget, 'addEventListener');
+  readonly removed = vi.spyOn(this as EventTarget, 'removeEventListener');
+  emit(value: unknown) {
+    this.dispatchEvent(new MessageEvent('message', { data: value }));
+  }
+}
+function defaultWorkers() {
+  const workers: TransportWorker[] = [];
+  const constructors: unknown[][] = [];
+  class BrowserWorker extends TransportWorker {
+    constructor(...args: unknown[]) {
+      super();
+      constructors.push(args);
+      workers.push(this);
+    }
+  }
+  vi.stubGlobal('Worker', BrowserWorker);
+  return { workers, constructors };
+}
+function verified(worker: TransportWorker): Extract<AssetCheckResponse, { type: 'verified' }> {
+  const request = worker.sent[0]!;
+  return {
+    v: 1,
+    type: 'verified',
+    requestId: request.requestId,
+    inputDigest: request.input.assetIdentity,
+    byteLength: request.byteLength,
+    widthM: request.input.widthM,
+    heightM: request.input.heightM,
+    asset: createReferenceAsset(),
+  };
+}
+function rawRead() {
+  return stream([bytes(canonicalJson)], readHeaders());
+}
+function releasedWorker(worker: TransportWorker) {
+  expect(worker.terminate).toHaveBeenCalledOnce();
+  expect(worker.removed.mock.calls.map(([type]) => type)).toEqual([
+    'message',
+    'error',
+    'messageerror',
+  ]);
+}
+
+describe('HTTP read worker-verification boundary', () => {
+  it('uses a fresh default module worker per read, binds exact bytes/metadata, and runs no heavy validation on main', async () => {
+    vi.useFakeTimers();
+    const { workers, constructors } = defaultWorkers();
+    const heavy = [
+      vi.spyOn(maps, 'importAsset'),
+      vi.spyOn(maps, 'canonicalizeAsset'),
+      vi.spyOn(maps, 'assetIdentity'),
+      vi.spyOn(maps, 'parseAsset'),
+      vi.spyOn(maps, 'validateBattlefield'),
+    ];
+    f.mockImplementation(async () => rawRead().response);
+    const published = vi.fn();
+    const port = createHttpMapLibrary(f);
+    const first = port.read(item.ref, signal()).then(published);
+    const second = port.read(item.ref, signal()).then(published);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(workers).toHaveLength(2);
+    expect(published).not.toHaveBeenCalled();
+    for (const [url, options] of constructors) {
+      expect(url).toBeInstanceOf(URL);
+      expect(String(url)).toMatch(/\/asset-check\.worker\.ts$/);
+      expect(options).toEqual({ type: 'module' });
+    }
+    for (const worker of workers) {
+      expect(worker.sent).toEqual([
+        {
+          v: 1,
+          type: 'verify-library-asset',
+          requestId: expect.any(String),
+          byteLength: bytes(canonicalJson).byteLength,
+          input: {
+            canonicalJson,
+            assetIdentity: item.assetIdentity,
+            widthM: item.widthM,
+            heightM: item.heightM,
+          },
+        },
+      ]);
+    }
+    expect(workers[0]!.sent[0]!.requestId).not.toBe(workers[1]!.sent[0]!.requestId);
+    workers[1]!.emit(verified(workers[1]!));
+    await second;
+    expect(published).toHaveBeenCalledExactlyOnceWith({ item, canonicalJson });
+    expect(workers[0]!.terminate).not.toHaveBeenCalled();
+    workers[0]!.emit(verified(workers[0]!));
+    await first;
+    expect(published).toHaveBeenCalledTimes(2);
+    workers.forEach(releasedWorker);
+    for (const spy of heavy) expect(spy).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(['requestId', 'inputDigest', 'widthM'] as const)(
+    'rejects a mismatched default worker %s without publishing raw bytes',
+    async (field) => {
+      vi.useFakeTimers();
+      const { workers } = defaultWorkers();
+      f.mockResolvedValueOnce(rawRead().response);
+      const operation = createHttpMapLibrary(f).read(item.ref, signal());
+      const rejection = expect(operation).rejects.toThrow(
+        'The map library is unavailable. Please try again.',
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(workers).toHaveLength(1);
+      const reply = verified(workers[0]!);
+      if (field === 'requestId') reply.requestId = key;
+      if (field === 'inputDigest') reply.inputDigest = '0'.repeat(64);
+      if (field === 'widthM') reply.widthM += 1;
+      workers[0]!.emit(reply);
+      await rejection;
+      releasedWorker(workers[0]!);
+      expect(f).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it('does not allocate a default worker before ref/header/fatal UTF-8 checks finish', async () => {
+    const { workers } = defaultWorkers();
+    const port = createHttpMapLibrary(f);
+    await expect(port.read({ kind: 'owned', id: '../foreign' }, signal())).rejects.toMatchObject({
+      kind: 'invalid',
+    });
+    expect(f).not.toHaveBeenCalled();
+    f.mockResolvedValueOnce(
+      stream([bytes(canonicalJson)], { ...readHeaders(), 'X-Map-Id': key }).response,
+    );
+    await expect(port.read(item.ref, signal())).rejects.toMatchObject({ kind: 'unavailable' });
+    f.mockResolvedValueOnce(stream([new Uint8Array([0xc3, 0x28])], readHeaders()).response);
+    await expect(port.read(item.ref, signal())).rejects.toMatchObject({ kind: 'unavailable' });
+    expect(workers).toHaveLength(0);
+  });
+
+  it('does not run any verifier for list or save', async () => {
+    const { workers } = defaultWorkers();
+    const port = createHttpMapLibrary(f);
+    f.mockResolvedValueOnce(json({ schemaVersion: 1, items: [item] })).mockResolvedValueOnce(
+      json(item),
+    );
+    expect(await port.list('owned', signal())).toEqual({ items: [item] });
+    expect(await port.save(intent(), signal())).toEqual(item);
+    expect(workers).toHaveLength(0);
+  });
+
+  it('passes the exact four-field job and derived phase signal to the trusted verifier only after EOF', async () => {
+    const entered = deferred<void>();
+    const pending = deferred<maps.MapAsset>();
+    const verifier = vi.fn<typeof checkReferenceAsset>(() => {
+      entered.resolve();
+      return pending.promise;
+    });
+    const source = rawRead();
+    f.mockResolvedValueOnce(source.response);
+    const caller = signal();
+    const operation = createHttpMapLibrary(f, verifier).read(item.ref, caller);
+    await entered.promise;
+    const phaseSignal = f.mock.calls[0]![1]!.signal!;
+    expect(phaseSignal).not.toBe(caller);
+    expect(verifier).toHaveBeenCalledExactlyOnceWith(
+      {
+        canonicalJson,
+        assetIdentity: item.assetIdentity,
+        widthM: item.widthM,
+        heightM: item.heightM,
+      },
+      phaseSignal,
+    );
+    expect(source.cancel).not.toHaveBeenCalled();
+    pending.resolve(createReferenceAsset());
+    const result = await operation;
+    expect(result).toEqual({ item, canonicalJson });
+    expect(Object.keys(result)).toEqual(['item', 'canonicalJson']);
+    expect(source.body.locked).toBe(false);
+  });
+
+  it.each(['throw', 'reject'])(
+    'sanitizes trusted verifier %s without retry or fallback',
+    async (mode) => {
+      const verifier = vi.fn(() => {
+        if (mode === 'throw') throw new Error('Private diagnostic and canonical bytes');
+        return Promise.reject(new Error('Private diagnostic and canonical bytes'));
+      });
+      f.mockResolvedValueOnce(rawRead().response);
+      await expect(createHttpMapLibrary(f, verifier).read(item.ref, signal())).rejects.toThrow(
+        'The map library is unavailable. Please try again.',
+      );
+      expect(verifier).toHaveBeenCalledOnce();
+      expect(f).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('aborts the real verifier promptly and ignores retained old callbacks during a newer read', async () => {
+    vi.useFakeTimers();
+    const { workers } = defaultWorkers();
+    f.mockImplementation(async () => rawRead().response);
+    const port = createHttpMapLibrary(f);
+    const controller = new AbortController();
+    const remove = vi.spyOn(controller.signal, 'removeEventListener');
+    const first = port.read(item.ref, controller.signal);
+    const rejection = expect(first).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.advanceTimersByTimeAsync(0);
+    const old = workers[0]!;
+    const retained = old.added.mock.calls.find(([type]) => type === 'message')![1] as EventListener;
+    const reply = verified(old);
+    controller.abort();
+    await rejection;
+    releasedWorker(old);
+    expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+    expect(f.mock.calls[0]![1]!.signal!.aborted).toBe(true);
+    const published = vi.fn();
+    const second = port.read(item.ref, signal()).then(published);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(workers).toHaveLength(2);
+    retained(new MessageEvent('message', { data: reply }));
+    expect(published).not.toHaveBeenCalled();
+    expect(workers[1]!.terminate).not.toHaveBeenCalled();
+    workers[1]!.emit(verified(workers[1]!));
+    await second;
+    expect(published).toHaveBeenCalledExactlyOnceWith({ item, canonicalJson });
+    releasedWorker(old);
+    releasedWorker(workers[1]!);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('rejects caller abort promptly even when a trusted verifier never acknowledges, then ignores late success', async () => {
+    vi.useFakeTimers();
+    const pending = deferred<maps.MapAsset>();
+    const verifier = vi.fn(() => pending.promise);
+    const source = rawRead();
+    f.mockResolvedValueOnce(source.response);
+    const controller = new AbortController();
+    const operation = createHttpMapLibrary(f, verifier).read(item.ref, controller.signal);
+    const rejection = expect(operation).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(verifier).toHaveBeenCalledOnce();
+    controller.abort();
+    await rejection;
+    expect(source.body.locked).toBe(false);
+    expect(f.mock.calls[0]![1]!.signal!.aborted).toBe(true);
+    pending.resolve(createReferenceAsset());
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(operation).rejects.toMatchObject({ name: 'AbortError' });
+    expect(f).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('rejects an abort during verifier return instead of publishing a successful handoff', async () => {
+    const controller = new AbortController();
+    const verifier = vi.fn(async () => {
+      controller.abort();
+      return createReferenceAsset();
+    });
+    f.mockResolvedValueOnce(rawRead().response);
+    await expect(
+      createHttpMapLibrary(f, verifier).read(item.ref, controller.signal),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(verifier).toHaveBeenCalledOnce();
+    expect(f.mock.calls[0]![1]!.signal!.aborted).toBe(true);
+  });
+
+  it('uses the original fetch/body deadline to abort and retire default verification, not a new 30s HTTP phase', async () => {
+    vi.useFakeTimers();
+    const pending = deferred<Response>();
+    const { workers } = defaultWorkers();
+    f.mockReturnValueOnce(pending.promise);
+    const caller = signal();
+    const remove = vi.spyOn(caller, 'removeEventListener');
+    const operation = createHttpMapLibrary(f).read(item.ref, caller);
+    const rejection = expect(operation).rejects.toMatchObject({ kind: 'timeout' });
+    await vi.advanceTimersByTimeAsync(20_000);
+    pending.resolve(rawRead().response);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(workers).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(9999);
+    expect(workers[0]!.terminate).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await rejection;
+    releasedWorker(workers[0]!);
+    expect(f.mock.calls[0]![1]!.signal!.aborted).toBe(true);
+    expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('checks the original deadline after a late verifier resolution even before the timer callback runs', async () => {
+    vi.useFakeTimers();
+    const pending = deferred<maps.MapAsset>();
+    const verifier = vi.fn(() => pending.promise);
+    f.mockResolvedValueOnce(rawRead().response);
+    const operation = createHttpMapLibrary(f, verifier).read(item.ref, signal());
+    const rejection = expect(operation).rejects.toMatchObject({ kind: 'timeout' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(verifier).toHaveBeenCalledOnce();
+    vi.setSystemTime(Date.now() + 30_001);
+    pending.resolve(createReferenceAsset());
+    await rejection;
+    expect(f.mock.calls[0]![1]!.signal!.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
