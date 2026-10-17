@@ -1,0 +1,990 @@
+{
+ "main": [
+  {
+   "map": "flat-countryside-17",
+   "terrain": {
+    "reliefM": 0,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 0,
+    "systems": 0,
+    "confluences": 0,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 0
+   },
+   "roads": {
+    "lengthM": 15254.646455628199,
+    "meanGrade": 0,
+    "maxGrade": 0,
+    "marginShare": 0.006555379719279238,
+    "junctions": 8,
+    "bridges": 0
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 0
+   },
+   "cover": {
+    "features": 575,
+    "woodShare": 0.146,
+    "fieldShare": 0.5935,
+    "openShare": 0.2605,
+    "woodMeanSlope": 0,
+    "fieldMeanSlope": 0,
+    "fieldMaxSlope": 0,
+    "woodMeanSettlementDistanceM": 1244.6502164110657,
+    "fieldMeanSettlementDistanceM": 596.2389909249357,
+    "riverFlatPoints": 0,
+    "riverFlatOpenShare": 0,
+    "riverFlatWoodShare": 0,
+    "boundaryLengthM": 243837.09746157605,
+    "axisAlignedShare": 0.0016404394744037344,
+    "sharedAxisAlignedShare": 0.0016404394744037344,
+    "meanVertices": 9.636521739130435
+   },
+   "crossings": {
+    "bridges": 0,
+    "fords": 0,
+    "fordMaxDepthM": 0,
+    "fordsOnMainRoads": 0,
+    "fordMaxBankM": 0,
+    "fordMaxRampGrade": 0,
+    "fordMaxApproachGrade": 0,
+    "mainRoadCrossings": 0,
+    "bridgeMinDepthM": null
+   },
+   "grain": {
+    "anisotropy": 1,
+    "grainAxis": [
+     0,
+     1
+    ],
+    "aspectLatticeShare": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "riverBankLengthM": 0,
+    "riverGrainAlignment": 0,
+    "riverNearGrainShare": 0,
+    "riverGridShare": [
+     0,
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "map": "river-valley-13-10km",
+   "terrain": {
+    "reliefM": 66.727059,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 49,
+    "systems": 5,
+    "confluences": 1,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 24.425082000000003
+   },
+   "roads": {
+    "lengthM": 22217.3858862227,
+    "meanGrade": 0.016478209241912175,
+    "maxGrade": 0.09313080000000014,
+    "marginShare": 0.005433162962412651,
+    "junctions": 6,
+    "bridges": 4
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.0020000000000004545,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 1
+   },
+   "cover": {
+    "features": 1602,
+    "woodShare": 0.29789447512366196,
+    "fieldShare": 0.3931796173676359,
+    "openShare": 0.30892590750870214,
+    "woodMeanSlope": 0.06078628437769683,
+    "fieldMeanSlope": 0.015066812325048945,
+    "fieldMaxSlope": 0.07925314271904707,
+    "woodMeanSettlementDistanceM": 1734.3625021244466,
+    "fieldMeanSettlementDistanceM": 1655.4471479988129,
+    "riverFlatPoints": 2575,
+    "riverFlatOpenShare": 0.9941747572815534,
+    "riverFlatWoodShare": 0.005825242718446602,
+    "boundaryLengthM": 845289.994686071,
+    "axisAlignedShare": 0.07794169308778838,
+    "sharedAxisAlignedShare": 0.0026058910540211143,
+    "meanVertices": 11.295880149812733
+   },
+   "crossings": {
+    "bridges": 4,
+    "fords": 0,
+    "fordMaxDepthM": 0,
+    "fordsOnMainRoads": 0,
+    "fordMaxBankM": 0,
+    "fordMaxRampGrade": 0,
+    "fordMaxApproachGrade": 0,
+    "mainRoadCrossings": 0,
+    "bridgeMinDepthM": 0.81424
+   },
+   "grain": {
+    "anisotropy": 2.370461079310824,
+    "grainAxis": [
+     -0.4536729600607194,
+     -0.8911682474761681
+    ],
+    "aspectLatticeShare": [
+     0.12272781721177728,
+     0.04979545485656652,
+     0.049884903169280514,
+     0.15117241120708072
+    ],
+    "riverBankLengthM": 80965.02256860092,
+    "riverGrainAlignment": 0.7907746283647645,
+    "riverNearGrainShare": 0.24399914567250075,
+    "riverGridShare": [
+     0.036827521352737196,
+     0.10824387150390412,
+     0.09113952543995256,
+     0.05659193376158814
+    ]
+   }
+  },
+  {
+   "map": "river-valley-3",
+   "terrain": {
+    "reliefM": 60.67210499999999,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 32,
+    "systems": 3,
+    "confluences": 2,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 18.664040999999997
+   },
+   "roads": {
+    "lengthM": 17497.52350636927,
+    "meanGrade": 0.015431059628443973,
+    "maxGrade": 0.09165371999999991,
+    "marginShare": 0.007490546712526079,
+    "junctions": 11,
+    "bridges": 3
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.014101237705960282,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 1
+   },
+   "cover": {
+    "features": 439,
+    "woodShare": 0.29620552924330873,
+    "fieldShare": 0.3929948232184161,
+    "openShare": 0.31079964753827516,
+    "woodMeanSlope": 0.0550082380915381,
+    "fieldMeanSlope": 0.025661363877506643,
+    "fieldMaxSlope": 0.07563564280002401,
+    "woodMeanSettlementDistanceM": 1102.3669708033437,
+    "fieldMeanSettlementDistanceM": 638.2144227192027,
+    "riverFlatPoints": 1168,
+    "riverFlatOpenShare": 0.997431506849315,
+    "riverFlatWoodShare": 0,
+    "boundaryLengthM": 231231.40875480574,
+    "axisAlignedShare": 0.1427141761480712,
+    "sharedAxisAlignedShare": 0.0029239129325000796,
+    "meanVertices": 12.066059225512529
+   },
+   "crossings": {
+    "bridges": 3,
+    "fords": 1,
+    "fordMaxDepthM": 0.5936151151954353,
+    "fordsOnMainRoads": 0,
+    "fordMaxBankM": 0,
+    "fordMaxRampGrade": 0.04765616787551806,
+    "fordMaxApproachGrade": 0.03252620939698579,
+    "mainRoadCrossings": 2,
+    "bridgeMinDepthM": 1.150815
+   },
+   "grain": {
+    "anisotropy": 2.9232389778307093,
+    "grainAxis": [
+     -0.8400827731080658,
+     -0.5424582327949884
+    ],
+    "aspectLatticeShare": [
+     0.054051523657483266,
+     0.036147576776245714,
+     0.12652032783176637,
+     0.22590510250527135
+    ],
+    "riverBankLengthM": 42469.82909493002,
+    "riverGrainAlignment": 0.8434714734104836,
+    "riverNearGrainShare": 0.3983132481726855,
+    "riverGridShare": [
+     0.08251439235504017,
+     0.1698737964236507,
+     0.05177391248880488,
+     0.043040857374390146
+    ]
+   }
+  },
+  {
+   "map": "river-valley-97",
+   "terrain": {
+    "reliefM": 70.98707999999999,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 28,
+    "systems": 2,
+    "confluences": 2,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 26.818527000000003
+   },
+   "roads": {
+    "lengthM": 16382.86481081199,
+    "meanGrade": 0.012216936508645745,
+    "maxGrade": 0.09774151999999958,
+    "marginShare": 0.00736810560989253,
+    "junctions": 12,
+    "bridges": 3
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.023889361976745578,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 0.75
+   },
+   "cover": {
+    "features": 450,
+    "woodShare": 0.2958683473389356,
+    "fieldShare": 0.3947963800904977,
+    "openShare": 0.3093352725705667,
+    "woodMeanSlope": 0.07507384109088198,
+    "fieldMeanSlope": 0.02481525016465167,
+    "fieldMaxSlope": 0.07908056782062725,
+    "woodMeanSettlementDistanceM": 1071.3014481434627,
+    "fieldMeanSettlementDistanceM": 719.177184831059,
+    "riverFlatPoints": 913,
+    "riverFlatOpenShare": 0.9813800657174151,
+    "riverFlatWoodShare": 0.018619934282584884,
+    "boundaryLengthM": 220786.16477201442,
+    "axisAlignedShare": 0.12251673481412229,
+    "sharedAxisAlignedShare": 0.006672025226858756,
+    "meanVertices": 11.248888888888889
+   },
+   "crossings": {
+    "bridges": 3,
+    "fords": 0,
+    "fordMaxDepthM": 0,
+    "fordsOnMainRoads": 0,
+    "fordMaxBankM": 0,
+    "fordMaxRampGrade": 0,
+    "fordMaxApproachGrade": 0,
+    "mainRoadCrossings": 2,
+    "bridgeMinDepthM": 0.973367
+   },
+   "grain": {
+    "anisotropy": 3.034519197607752,
+    "grainAxis": [
+     -0.502774512963902,
+     0.8644176011129755
+    ],
+    "aspectLatticeShare": [
+     0.13851895642360212,
+     0.18975094999548084,
+     0.05517731070860795,
+     0.03734612765584984
+    ],
+    "riverBankLengthM": 33685.36442285738,
+    "riverGrainAlignment": 0.8162323781944035,
+    "riverNearGrainShare": 0.38248985356806997,
+    "riverGridShare": [
+     0.07899897771304243,
+     0.06317832585120535,
+     0.14878499433524553,
+     0.16423551870196176
+    ]
+   }
+  },
+  {
+   "map": "wooded-hills-31",
+   "terrain": {
+    "reliefM": 111.68337,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 33,
+    "systems": 2,
+    "confluences": 2,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 34.66225000000001
+   },
+   "roads": {
+    "lengthM": 20184.132649461248,
+    "meanGrade": 0.023962633412801596,
+    "maxGrade": 0.09734269537692589,
+    "marginShare": 0.008457667271781993,
+    "junctions": 8,
+    "bridges": 1
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.032206710109540876,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 0.5
+   },
+   "cover": {
+    "features": 232,
+    "woodShare": 0.6487325128852425,
+    "fieldShare": 0.09519301567266225,
+    "openShare": 0.2560744714420953,
+    "woodMeanSlope": 0.09519383373356374,
+    "fieldMeanSlope": 0.019236924603231093,
+    "fieldMaxSlope": 0.07308752146879822,
+    "woodMeanSettlementDistanceM": 1057.0205586288541,
+    "fieldMeanSettlementDistanceM": 265.86529396030085,
+    "riverFlatPoints": 551,
+    "riverFlatOpenShare": 0.8275862068965517,
+    "riverFlatWoodShare": 0.1724137931034483,
+    "boundaryLengthM": 151747.00325838648,
+    "axisAlignedShare": 0.1581458172530581,
+    "sharedAxisAlignedShare": 0.008963175064394369,
+    "meanVertices": 13.616379310344827
+   },
+   "crossings": {
+    "bridges": 1,
+    "fords": 1,
+    "fordMaxDepthM": 0.38340117842688104,
+    "fordsOnMainRoads": 0,
+    "fordMaxBankM": 0,
+    "fordMaxRampGrade": 0.04008040000000763,
+    "fordMaxApproachGrade": 0.08390522056548474,
+    "mainRoadCrossings": 0,
+    "bridgeMinDepthM": 0.999306
+   },
+   "grain": {
+    "anisotropy": 2.030432467710484,
+    "grainAxis": [
+     -0.9292521838012943,
+     -0.3694460432871429
+    ],
+    "aspectLatticeShare": [
+     0.05018562754256829,
+     0.062162076304184244,
+     0.15213353363844312,
+     0.13576853313006507
+    ],
+    "riverBankLengthM": 29492.397187959636,
+    "riverGrainAlignment": 0.7692766415597212,
+    "riverNearGrainShare": 0.1946285019535596,
+    "riverGridShare": [
+     0.1343102211421295,
+     0.17549269016898147,
+     0.051818074413769837,
+     0.04903474776100608
+    ]
+   }
+  },
+  {
+   "map": "wooded-hills-7",
+   "terrain": {
+    "reliefM": 82.087221,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 28,
+    "systems": 4,
+    "confluences": 3,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 16.72569399999999
+   },
+   "roads": {
+    "lengthM": 16902.327214822202,
+    "meanGrade": 0.016350416164129,
+    "maxGrade": 0.08952200000000061,
+    "marginShare": 0.006529002643053388,
+    "junctions": 9,
+    "bridges": 1
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.003054920000000152,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 1
+   },
+   "cover": {
+    "features": 229,
+    "woodShare": 0.6499204665959704,
+    "fieldShare": 0.09573170731707317,
+    "openShare": 0.2543478260869565,
+    "woodMeanSlope": 0.0806037633321537,
+    "fieldMeanSlope": 0.008413751449660684,
+    "fieldMaxSlope": 0.07422437347649105,
+    "woodMeanSettlementDistanceM": 1214.507205778876,
+    "fieldMeanSettlementDistanceM": 320.94025089359184,
+    "riverFlatPoints": 978,
+    "riverFlatOpenShare": 0.901840490797546,
+    "riverFlatWoodShare": 0.09815950920245399,
+    "boundaryLengthM": 157539.53908977867,
+    "axisAlignedShare": 0.18679331870604207,
+    "sharedAxisAlignedShare": 0.0076052623346805175,
+    "meanVertices": 14.615720524017467
+   },
+   "crossings": {
+    "bridges": 1,
+    "fords": 3,
+    "fordMaxDepthM": 0.671515251838443,
+    "fordsOnMainRoads": 0,
+    "fordMaxBankM": 0.02150892121049708,
+    "fordMaxRampGrade": 0.06662859394486365,
+    "fordMaxApproachGrade": 0.05090728868507811,
+    "mainRoadCrossings": 0,
+    "bridgeMinDepthM": 0.942352
+   },
+   "grain": {
+    "anisotropy": 2.607638230607302,
+    "grainAxis": [
+     -0.25488906060476046,
+     -0.9669703029483494
+    ],
+    "aspectLatticeShare": [
+     0.18953062849608412,
+     0.04458953172723241,
+     0.04500053712066479,
+     0.1214986801081637
+    ],
+    "riverBankLengthM": 33889.60013364716,
+    "riverGrainAlignment": 0.7962613532414097,
+    "riverNearGrainShare": 0.33329935823940215,
+    "riverGridShare": [
+     0.041909930209229874,
+     0.08932095031523271,
+     0.10498687288888416,
+     0.03915479650061003
+    ]
+   }
+  }
+ ],
+ "branch": [
+  {
+   "map": "flat-countryside-17",
+   "terrain": {
+    "reliefM": 0,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 0,
+    "systems": 0,
+    "confluences": 0,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 0
+   },
+   "roads": {
+    "lengthM": 15254.646455628199,
+    "meanGrade": 0,
+    "maxGrade": 0,
+    "marginShare": 0.006555379719279238,
+    "junctions": 8,
+    "bridges": 0
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 0
+   },
+   "cover": {
+    "features": 575,
+    "woodShare": 0.146,
+    "fieldShare": 0.5935,
+    "openShare": 0.2605,
+    "woodMeanSlope": 0,
+    "fieldMeanSlope": 0,
+    "fieldMaxSlope": 0,
+    "woodMeanSettlementDistanceM": 1244.6502164110657,
+    "fieldMeanSettlementDistanceM": 596.2389909249357,
+    "riverFlatPoints": 0,
+    "riverFlatOpenShare": 0,
+    "riverFlatWoodShare": 0,
+    "boundaryLengthM": 243837.09746157605,
+    "axisAlignedShare": 0.0016404394744037344,
+    "sharedAxisAlignedShare": 0.0016404394744037344,
+    "meanVertices": 9.636521739130435
+   },
+   "crossings": {
+    "bridges": 0,
+    "fords": 0,
+    "fordMaxDepthM": 0,
+    "fordsOnMainRoads": 0,
+    "fordMaxBankM": 0,
+    "fordMaxRampGrade": 0,
+    "fordMaxApproachGrade": 0,
+    "mainRoadCrossings": 0,
+    "bridgeMinDepthM": null
+   },
+   "grain": {
+    "anisotropy": 1,
+    "grainAxis": [
+     0,
+     1
+    ],
+    "aspectLatticeShare": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "riverBankLengthM": 0,
+    "riverGrainAlignment": 0,
+    "riverNearGrainShare": 0,
+    "riverGridShare": [
+     0,
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "map": "river-valley-13-10km",
+   "terrain": {
+    "reliefM": 56.586839999999995,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 47,
+    "systems": 5,
+    "confluences": 3,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 19.380606
+   },
+   "roads": {
+    "lengthM": 24885.62292692281,
+    "meanGrade": 0.010958408070123554,
+    "maxGrade": 0.08977373953829151,
+    "marginShare": 0.005266736443080426,
+    "junctions": 9,
+    "bridges": 3
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.0020055581682911537,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 1
+   },
+   "cover": {
+    "features": 1688,
+    "woodShare": 0.29685269305645684,
+    "fieldShare": 0.3914016872160934,
+    "openShare": 0.3117456197274497,
+    "woodMeanSlope": 0.06284934663237988,
+    "fieldMeanSlope": 0.010623837609806116,
+    "fieldMaxSlope": 0.07842867655180241,
+    "woodMeanSettlementDistanceM": 2022.9309679558817,
+    "fieldMeanSettlementDistanceM": 1849.493699507227,
+    "riverFlatPoints": 3937,
+    "riverFlatOpenShare": 0.9946659893319787,
+    "riverFlatWoodShare": 0.004826009652019304,
+    "boundaryLengthM": 877398.8823075,
+    "axisAlignedShare": 0.06631267470387413,
+    "sharedAxisAlignedShare": 0.0042533128537837195,
+    "meanVertices": 11.486374407582938
+   },
+   "crossings": {
+    "bridges": 3,
+    "fords": 1,
+    "fordMaxDepthM": 0.7701643304258013,
+    "fordsOnMainRoads": 0,
+    "fordMaxBankM": 0,
+    "fordMaxRampGrade": 0.02312121472884409,
+    "fordMaxApproachGrade": 0.019672545790450677,
+    "mainRoadCrossings": 1,
+    "bridgeMinDepthM": 0.78871
+   },
+   "grain": {
+    "anisotropy": 1.157686390485533,
+    "grainAxis": [
+     -0.5278291551566108,
+     -0.8493505654125736
+    ],
+    "aspectLatticeShare": [
+     0.0929585814796784,
+     0.07864480757306208,
+     0.08531361752182452,
+     0.0954539802420612
+    ],
+    "riverBankLengthM": 69273.41342867765,
+    "riverGrainAlignment": 0.7095067749476114,
+    "riverNearGrainShare": 0.2001506891424192,
+    "riverGridShare": [
+     0.02057875018332519,
+     0.04122750982497101,
+     0.03855255003177812,
+     0.01895739482100179
+    ]
+   }
+  },
+  {
+   "map": "river-valley-3",
+   "terrain": {
+    "reliefM": 54.131462,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 31,
+    "systems": 6,
+    "confluences": 2,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 14.833207000000002
+   },
+   "roads": {
+    "lengthM": 15425.156483379244,
+    "meanGrade": 0.012724865395194917,
+    "maxGrade": 0.09093584000000021,
+    "marginShare": 0.019563930882763116,
+    "junctions": 16,
+    "bridges": 4
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.004111689202262147,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 1
+   },
+   "cover": {
+    "features": 487,
+    "woodShare": 0.29935680802354736,
+    "fieldShare": 0.39341000763109124,
+    "openShare": 0.3072331843453614,
+    "woodMeanSlope": 0.06200596846891775,
+    "fieldMeanSlope": 0.014278120190529337,
+    "fieldMaxSlope": 0.07830805311569934,
+    "woodMeanSettlementDistanceM": 1027.7050080332124,
+    "fieldMeanSettlementDistanceM": 676.7984835553391,
+    "riverFlatPoints": 2348,
+    "riverFlatOpenShare": 0.9838160136286201,
+    "riverFlatWoodShare": 0.014480408858603067,
+    "boundaryLengthM": 233606.24239814398,
+    "axisAlignedShare": 0.13088263261342933,
+    "sharedAxisAlignedShare": 0.009021819966224927,
+    "meanVertices": 11.412731006160165
+   },
+   "crossings": {
+    "bridges": 4,
+    "fords": 0,
+    "fordMaxDepthM": 0,
+    "fordsOnMainRoads": 0,
+    "fordMaxBankM": 0,
+    "fordMaxRampGrade": 0,
+    "fordMaxApproachGrade": 0,
+    "mainRoadCrossings": 1,
+    "bridgeMinDepthM": 0.65208
+   },
+   "grain": {
+    "anisotropy": 1.3441236456607433,
+    "grainAxis": [
+     -0.39075362597758045,
+     -0.9204953035107638
+    ],
+    "aspectLatticeShare": [
+     0.10869889553709865,
+     0.08384985263552555,
+     0.061083649433985,
+     0.12858885261776667
+    ],
+    "riverBankLengthM": 37896.96475796333,
+    "riverGrainAlignment": 0.7164303386199512,
+    "riverNearGrainShare": 0.14520967494442574,
+    "riverGridShare": [
+     0.021988578359125842,
+     0.05698149321053107,
+     0.046366228520810765,
+     0.021203180310665013
+    ]
+   }
+  },
+  {
+   "map": "river-valley-97",
+   "terrain": {
+    "reliefM": 51.80264699999999,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 25,
+    "systems": 5,
+    "confluences": 3,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 9.534252999999993
+   },
+   "roads": {
+    "lengthM": 17301.09429630753,
+    "meanGrade": 0.012960039543849236,
+    "maxGrade": 0.0900881757817479,
+    "marginShare": 0.005779981213173459,
+    "junctions": 9,
+    "bridges": 1
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.002018663542049284,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 1
+   },
+   "cover": {
+    "features": 467,
+    "woodShare": 0.29570755726825093,
+    "fieldShare": 0.3938396488974524,
+    "openShare": 0.31045279383429675,
+    "woodMeanSlope": 0.056049054260066004,
+    "fieldMeanSlope": 0.02149730529689972,
+    "fieldMaxSlope": 0.07725054842451255,
+    "woodMeanSettlementDistanceM": 1065.349974846756,
+    "fieldMeanSettlementDistanceM": 596.880667027662,
+    "riverFlatPoints": 1841,
+    "riverFlatOpenShare": 0.9956545355784899,
+    "riverFlatWoodShare": 0.0027159152634437804,
+    "boundaryLengthM": 226782.5237203256,
+    "axisAlignedShare": 0.11154408895808932,
+    "sharedAxisAlignedShare": 0.006616099743836513,
+    "meanVertices": 11.449678800856532
+   },
+   "crossings": {
+    "bridges": 1,
+    "fords": 0,
+    "fordMaxDepthM": 0,
+    "fordsOnMainRoads": 0,
+    "fordMaxBankM": 0,
+    "fordMaxRampGrade": 0,
+    "fordMaxApproachGrade": 0,
+    "mainRoadCrossings": 1,
+    "bridgeMinDepthM": 1.556294
+   },
+   "grain": {
+    "anisotropy": 1.222001541033395,
+    "grainAxis": [
+     -0.6997177799983024,
+     0.7144193644871667
+    ],
+    "aspectLatticeShare": [
+     0.07508931537364276,
+     0.11019214168994314,
+     0.09300761909385419,
+     0.07389096262135199
+    ],
+    "riverBankLengthM": 31895.87376570812,
+    "riverGrainAlignment": 0.6547600431046794,
+    "riverNearGrainShare": 0.212275831122983,
+    "riverGridShare": [
+     0.02325123847032369,
+     0.024316180770272547,
+     0.020225324810534396,
+     0.018241102107518538
+    ]
+   }
+  },
+  {
+   "map": "wooded-hills-31",
+   "terrain": {
+    "reliefM": 98.99154899999999,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 36,
+    "systems": 3,
+    "confluences": 2,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 51.625892
+   },
+   "roads": {
+    "lengthM": 20283.400240423794,
+    "meanGrade": 0.019855613657660597,
+    "maxGrade": 0.09713228000000015,
+    "marginShare": 0.004930139858932776,
+    "junctions": 14,
+    "bridges": 0
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.002016475616911922,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 1
+   },
+   "cover": {
+    "features": 250,
+    "woodShare": 0.6451069208890762,
+    "fieldShare": 0.09454334772990625,
+    "openShare": 0.2603497313810176,
+    "woodMeanSlope": 0.12520467419770567,
+    "fieldMeanSlope": 0.009841008596460761,
+    "fieldMaxSlope": 0.07718125329895577,
+    "woodMeanSettlementDistanceM": 1102.8391574160362,
+    "fieldMeanSettlementDistanceM": 308.78446902329364,
+    "riverFlatPoints": 1584,
+    "riverFlatOpenShare": 0.9236111111111112,
+    "riverFlatWoodShare": 0.0763888888888889,
+    "boundaryLengthM": 163014.43378252126,
+    "axisAlignedShare": 0.15356329345901204,
+    "sharedAxisAlignedShare": 0.006381378401145154,
+    "meanVertices": 14.58
+   },
+   "crossings": {
+    "bridges": 0,
+    "fords": 1,
+    "fordMaxDepthM": 0.14340564520925736,
+    "fordsOnMainRoads": 0,
+    "fordMaxBankM": 0,
+    "fordMaxRampGrade": 0.012920880000001024,
+    "fordMaxApproachGrade": 0.03909571613411744,
+    "mainRoadCrossings": 0,
+    "bridgeMinDepthM": null
+   },
+   "grain": {
+    "anisotropy": 1.2946722785042872,
+    "grainAxis": [
+     -0.7032535703175612,
+     0.7109391083880554
+    ],
+    "aspectLatticeShare": [
+     0.07043551318013269,
+     0.10860268545654243,
+     0.08027208706345798,
+     0.08608622959821452
+    ],
+    "riverBankLengthM": 29756.07006156596,
+    "riverGrainAlignment": 0.6823196091684691,
+    "riverNearGrainShare": 0.2541302211117522,
+    "riverGridShare": [
+     0.03237038839791239,
+     0.03140860609393379,
+     0.040208616571442056,
+     0.0513237718656395
+    ]
+   }
+  },
+  {
+   "map": "wooded-hills-7",
+   "terrain": {
+    "reliefM": 70.832439,
+    "lakes": 0,
+    "boundaryDrainedShare": 1
+   },
+   "rivers": {
+    "features": 25,
+    "systems": 3,
+    "confluences": 2,
+    "uphillSteps": 0,
+    "deadEnds": 0,
+    "maxFallM": 14.655974
+   },
+   "roads": {
+    "lengthM": 16398.97492910391,
+    "meanGrade": 0.019063357948012904,
+    "maxGrade": 0.09309820000000002,
+    "marginShare": 0.00799232987089785,
+    "junctions": 6,
+    "bridges": 3
+   },
+   "settlements": {
+    "sites": 10,
+    "maxAnchorSlope": 0.0020407668997705557,
+    "summits": 0,
+    "lowRiverFlats": 0,
+    "villagesNearRiver": 1
+   },
+   "cover": {
+    "features": 231,
+    "woodShare": 0.6493066498581784,
+    "fieldShare": 0.09410127114192668,
+    "openShare": 0.25659207899989495,
+    "woodMeanSlope": 0.09451465741846617,
+    "fieldMeanSlope": 0.009332722633268845,
+    "fieldMaxSlope": 0.071923048711272,
+    "woodMeanSettlementDistanceM": 905.4610872762553,
+    "fieldMeanSettlementDistanceM": 333.46368898493887,
+    "riverFlatPoints": 1822,
+    "riverFlatOpenShare": 0.9571899012074643,
+    "riverFlatWoodShare": 0.042810098792535674,
+    "boundaryLengthM": 159835.28028735972,
+    "axisAlignedShare": 0.16135444745135885,
+    "sharedAxisAlignedShare": 0.004633872740483081,
+    "meanVertices": 15.220779220779221
+   },
+   "crossings": {
+    "bridges": 3,
+    "fords": 2,
+    "fordMaxDepthM": 0.7736053680803722,
+    "fordsOnMainRoads": 0,
+    "fordMaxBankM": 0,
+    "fordMaxRampGrade": 0.05136631740378513,
+    "fordMaxApproachGrade": 0.0435760499288018,
+    "mainRoadCrossings": 1,
+    "bridgeMinDepthM": 0.773605
+   },
+   "grain": {
+    "anisotropy": 1.760011536736286,
+    "grainAxis": [
+     -0.9454529266094159,
+     0.3257587505588917
+    ],
+    "aspectLatticeShare": [
+     0.05558273299489459,
+     0.0977353423179877,
+     0.13944260032175307,
+     0.06000725443204779
+    ],
+    "riverBankLengthM": 29335.231807406646,
+    "riverGrainAlignment": 0.8392407861160461,
+    "riverNearGrainShare": 0.2929431513235138,
+    "riverGridShare": [
+     0.06059999822262736,
+     0.006724814581746259,
+     0.001516990881805041,
+     0.0669387727619654
+    ]
+   }
+  }
+ ]
+}

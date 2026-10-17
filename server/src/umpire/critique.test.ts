@@ -72,7 +72,7 @@ async function playedGame(): Promise<ReplayInput> {
 const record = (output: unknown): UmpireCallRecord => ({
   stage: 'critique',
   model: 'scripted',
-  promptVersion: 'critique-v1',
+  promptVersion: 'critique-v2',
   system: '',
   input: {},
   rawOutput: JSON.stringify(output),
@@ -183,6 +183,22 @@ describe('critique facts', () => {
       [9, 'The players voted to change the clock ratio to 4.'],
     ]);
     expect(JSON.stringify(pauses)).not.toContain('user-secret');
+  });
+
+  it('gives a real-time game no turn facts (#506)', async () => {
+    const input = await playedGame();
+    const digest = critiqueFacts(input);
+    const turnKinds = ['turn', 'fallback', 'clamp', 'roll', 'precedent'];
+    expect(digest.facts.filter((f) => turnKinds.includes(f.kind))).toEqual([]);
+    expect(input.header.settings?.mode).not.toBe('turns');
+    const realtime = {
+      ...input,
+      header: {
+        ...input.header,
+        settings: { ...input.header.settings!, mode: 'realtime' as const },
+      },
+    };
+    expect(critiqueFacts(realtime)).toEqual(digest);
   });
 
   it('refuses a game that has no outcome', async () => {

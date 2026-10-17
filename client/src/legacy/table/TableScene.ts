@@ -203,7 +203,7 @@ export class TableScene {
       if (u) u.visible = this.overlays.lastKnown;
     }
     const routes = (this.state?.orderRoutes ?? []).filter((r) =>
-      r.kind === 'order' ? this.overlays.orders : this.overlays.routes,
+      r.kind === 'route' ? this.overlays.routes : this.overlays.orders,
     );
     const couriers = this.overlays.orders ? (this.state?.couriers ?? []) : [];
     const fights = this.state?.engagements ?? [];
@@ -261,7 +261,10 @@ export class TableScene {
     return g;
   }
 
-  /** A red ring and the word "Fighting" where a fight is going on, drawn above the pieces. */
+  /**
+   * A red ring and the word "Fighting" where a fight is going on, drawn above the pieces; fainter, with its times
+   * ("Fought 00:12"), where the last turn's papers reported fighting (#439).
+   */
   private engagementObject(f: Engagement, labelAt: Coord): THREE.Group {
     const map = this.state!.map;
     const g = new THREE.Group();
@@ -271,7 +274,7 @@ export class TableScene {
       new THREE.MeshBasicMaterial({
         color: 0xc0392b,
         transparent: true,
-        opacity: 0.85,
+        opacity: f.past ? 0.45 : 0.85,
         depthWrite: false,
         side: THREE.DoubleSide,
       }),
@@ -280,7 +283,7 @@ export class TableScene {
     ring.position.copy(mapToWorld(map, f.position, this.span * 0.004));
     g.add(ring);
     const labelW = this.span * 0.07;
-    const tag = labelSprite('Fighting', false, labelW);
+    const tag = labelSprite(f.past?.label ?? 'Fighting', false, labelW);
     // Placed clear of the unit tags and the other fight labels (placeFightLabels).
     tag.position.copy(mapToWorld(map, labelAt, this.span * 0.03));
     g.add(tag);
@@ -291,9 +294,14 @@ export class TableScene {
   private routeObject(r: OrderRoute): THREE.Group {
     const map = this.state!.map;
     const g = new THREE.Group();
-    const colour = r.kind === 'order' ? 0x1f1a12 : 0x8a3b12;
+    const colour = r.kind === 'order' ? 0x1f1a12 : r.kind === 'held' ? 0xb8892b : 0x8a3b12;
     const pts = r.points;
-    if (r.kind === 'order') {
+    if (r.kind === 'held') {
+      // A turn's order waiting to ride: the courier's road from HQ to the unit, in the courier's brass (#439).
+      for (const d of dashPolyline(pts, this.span / 90, this.span / 140)) {
+        g.add(this.ribbon(d, this.span / 500, colour, 0.9, 0.0015));
+      }
+    } else if (r.kind === 'order') {
       g.add(this.ribbon(pts, this.span / 450, colour, 0.8, 0.0015));
     } else {
       // A planned route is dotted, so it reads apart from the order arrow drawn over the same ground (#343).
@@ -301,7 +309,7 @@ export class TableScene {
         g.add(this.ribbon(d, this.span / 380, colour, 0.9, 0.0015));
       }
     }
-    if (r.kind === 'order' && pts.length >= 2) {
+    if (r.kind !== 'route' && pts.length >= 2) {
       const a = pts[pts.length - 2]!;
       const b = pts[pts.length - 1]!;
       g.add(this.arrowHead(map, a, b, colour, 0.8));

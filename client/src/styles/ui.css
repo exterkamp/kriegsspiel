@@ -1,6 +1,6 @@
 /*
- * Shared controls (#327). Everything is scoped under `.ks-theme`, which the shell and the admin view put on their
- * host, so the map tools (#308) and the benchmarks are untouched until they opt in by adding the class.
+ * Shared controls (#327). Everything is scoped under `.ks-theme`, which the shell, the admin view and the map tools
+ * (#308: map editor and benchmarks) put on their host; a page that does not add the class is untouched.
  * Variants are classes: `.ks-primary`, `.ks-quiet`, `.ks-danger`; a pressed or selected button is `aria-pressed`
  * or `aria-selected`. Layout helpers: `.ks-panel`, `.ks-paper`, `.ks-overlay`, `.ks-field`, `.ks-row`, `.ks-badge`,
  * `.ks-status`, `.ks-tabs`, `.ks-stack`, `.ks-cluster`, `.ks-actions`, `.ks-choice`, `.ks-link`, `.ks-dense`. Radios,

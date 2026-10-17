@@ -1,4 +1,4 @@
-import type { WindowAt, WindowEvent, WindowMark } from '@kriegsspiel/protocol';
+import type { WindowAt, WindowEvent, WindowMark, WindowTurn } from '@kriegsspiel/protocol';
 import { formatAge, buildSceneState } from '../table/sceneState.js';
 import type { BaseMap, SceneState } from '../table/types.js';
 
@@ -93,4 +93,43 @@ export function stepMark(marks: readonly WindowMark[], ms: number, dir: 1 | -1):
   if (dir > 0) return marks.findIndex((m) => m.ms > ms);
   for (let i = marks.length - 1; i >= 0; i--) if (marks[i]!.ms < ms) return i;
   return -1;
+}
+
+/**
+ * The turn shown at `ms` (turn mode, 11.11): the one under way, or the one that ended there, so a
+ * stop at a turn's end shows how that turn came out.
+ */
+export function turnAt(turns: readonly WindowTurn[], ms: number): WindowTurn | undefined {
+  return turns.find((t) => t.startMs < ms && ms <= t.endMs) ?? (ms <= 0 ? turns[0] : undefined);
+}
+
+/** Who decided a turn, in the window's words. */
+export function decidedBy(t: WindowTurn): string {
+  if (t.fellBack) return 'Decided by the tables: the umpire could not rule this turn.';
+  return t.adjudicator === 'umpire' ? 'Decided by the umpire.' : 'Decided by the tables.';
+}
+
+/** What a turn cost each side, in men, e.g. "Blue lost 40 men, Red none." */
+export function lossesText(t: WindowTurn): string {
+  const parts = Object.entries(t.losses).map(([side, men]) => {
+    const name = side.charAt(0).toUpperCase() + side.slice(1);
+    return men > 0 ? `${name} lost ${men} men` : `${name} none`;
+  });
+  return parts.length ? `${parts.join(', ')}.` : '';
+}
+
+/** What a turn did to one unit, e.g. "lost 172 men, active → withdrawn". */
+export function unitChange(u: WindowTurn['units'][number]): string {
+  const parts = [
+    ...(u.lost > 0 ? [`lost ${u.lost} men`] : []),
+    ...(u.from !== u.to ? [`${u.from} → ${u.to}`] : []),
+  ];
+  return parts.join(', ');
+}
+
+/** The index of the next (or previous) turn mark from `ms`, or -1: the scrubber's turn steps. */
+export function stepTurn(marks: readonly WindowMark[], ms: number, dir: 1 | -1): number {
+  const turns = marks.filter((m) => m.kind === 'turn');
+  const i = stepMark(turns, ms, dir);
+  return i < 0 ? -1 : marks.indexOf(turns[i]!);
 }

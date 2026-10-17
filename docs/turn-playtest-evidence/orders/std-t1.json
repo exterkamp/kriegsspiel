@@ -1,0 +1,12 @@
+{
+  "blue": [
+    { "orderId": "b1-1", "to": "blue-1", "text": "Advance to the south end of the bridge and hold it in line, facing north, astride the High road. Fire on any enemy that tries to cross. Do not cross the river." },
+    { "orderId": "b1-2", "to": "blue-2", "text": "Move up to the river bank about 150 paces east of the bridge and form line facing north so that your fire sweeps the bridge. Support the 1st Battalion; if it is pressed hard, close on the bridge and help hold it." },
+    { "orderId": "b1-3", "to": "blue-3", "courier": "fast", "text": "Cross the bridge and scout north along the High road to find the enemy. Do not engage. Report what you see, and be back south of the bridge before the enemy reaches it." }
+  ],
+  "red": [
+    { "orderId": "r1-3", "to": "red-3", "courier": "fast", "text": "Ride ahead down the High road to the river and find out whether the bridge is held. Report what you see. Do not get caught by infantry; fall back on the Vanguard if fired on." },
+    { "orderId": "r1-1", "to": "red-1", "text": "Advance down the High road to the bridge, deploy in line on the north bank and take the bridge. Press the attack across it if it is weakly held." },
+    { "orderId": "r1-2", "to": "red-2", "text": "Follow the Vanguard down the east side of the High road and form line on the north bank east of the bridge, to support its attack with fire." }
+  ]
+}

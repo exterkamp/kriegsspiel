@@ -85,6 +85,7 @@ describe('AdminPage', () => {
       'Requests',
       'LLM',
       'Replay',
+      'Turns',
       'Orders',
     ]);
     expect(secs.filter((s) => !s.hidden)).toHaveLength(1);

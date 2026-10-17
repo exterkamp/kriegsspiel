@@ -54,6 +54,45 @@ describe('FlatBoardComponent (#343)', () => {
     expect(el.textContent).toContain(fixtureView.ownUnits[0]!.name);
   });
 
+  it("in turn mode draws the turn's held orders from HQ and labels where the last turn was fought (#439)", async () => {
+    const unit = fixtureView.ownUnits[0]!;
+    stubGame({
+      ...initialState,
+      view: { ...view, hq: { x: 100, y: 100 } },
+      turnMode: true,
+      turnMinutes: 20,
+      turn: {
+        turn: 2,
+        startsAt: 1_200_000,
+        endsAt: 2_400_000,
+        sent: [],
+        resolving: false,
+        held: [{ orderId: 't-1', to: unit.id, text: 'Hold' }],
+      },
+      dispatches: [
+        {
+          id: 'e',
+          from: unit.name,
+          kind: 'engaged',
+          writtenAtGame: 720_000,
+          receivedAtGame: 1_200_000,
+          category: 'subordinates',
+          location: { x: 4000, y: 4000 },
+          text: 'Sir, we are engaged.',
+        },
+      ],
+    });
+    const f = TestBed.createComponent(FlatBoardComponent);
+    await f.whenStable();
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector('polyline.held[data-held="held-t-1"]')).not.toBeNull();
+    expect(el.querySelector('text.fought')!.textContent!.trim()).toBe('Fought 00:12');
+    expect(el.querySelector('circle.fight.past')).not.toBeNull();
+    TestBed.inject(MarksService).overlays.update((o) => ({ ...o, orders: false }));
+    await f.whenStable();
+    expect(el.querySelector('polyline.held')).toBeNull();
+  });
+
   it('hides the order arrows and the planned routes with their own toggles', async () => {
     const { f, el, marks } = await open();
     marks.overlays.update((o) => ({ ...o, routes: false }));

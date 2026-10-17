@@ -79,4 +79,17 @@ export class EventRegistry<W = Json> {
     if (!h) throw new Error(`no handler registered for event type: ${type}`);
     return h;
   }
+
+  /**
+   * A copy of this registry with one event type's handler replaced; this registry is unchanged
+   * and the copy shares the other handlers. For a single run that must observe a handler's work
+   * (the turn projection measuring what the supply rule gave) without touching the live registry.
+   */
+  replaced(type: string, handler: Handler<W>): EventRegistry<W> {
+    if (!this.handlers.has(type)) throw new Error(`no handler registered for event type: ${type}`);
+    const r = new EventRegistry<W>();
+    for (const [t, h] of this.handlers) r.handlers.set(t, h);
+    r.handlers.set(type, handler);
+    return r;
+  }
 }

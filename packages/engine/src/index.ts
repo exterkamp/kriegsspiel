@@ -105,6 +105,8 @@ export type { Dial, JudgmentProposal, JudgmentRequest } from './judgment.js';
 export {
   BREAK_MORALE,
   COMBAT_TICK_MS,
+  CONTEST_RADIUS_M,
+  contesters,
   coverFactor,
   FIRE_RATE,
   issueAttack,
@@ -117,6 +119,7 @@ export {
   FLANK_FACTOR,
   LONG_RANGE_FACTOR,
   MELEE_FACTOR,
+  RALLY_EVENT,
   RANGE_M,
   REAR_FACTOR,
   aspectOf,
@@ -131,6 +134,7 @@ export {
   COURIER_LOST_EVENT,
   COURIER_MS_PER_METRE,
   COURIER_STEP_EVENT,
+  ORDER_DELIVER_EVENT,
   choiceRisk,
   issueForcedOrder,
   issueOrder,
@@ -146,6 +150,8 @@ export {
   INTERCEPT_CHECK_MS,
   MAX_GARBLE,
   MAX_LOSS,
+  CROSSING_HOLD_M,
+  canReachCourier,
   courierPosition,
   interceptChance,
   rideRisk,
@@ -186,7 +192,7 @@ export type {
   ViewUnit,
 } from './visibility.js';
 export * from './fatigue.js';
-export { fieldNote, temperOf } from './fieldNotes.js';
+export { TURN_MOVED_M, clockTime, fieldNote, temperOf } from './fieldNotes.js';
 export type { NoteSender, Temper } from './fieldNotes.js';
 export {
   AMMO_PER_FIRE_TICK,
@@ -237,6 +243,9 @@ export {
   DEPARTURE_LOSS_SHARE,
   DEPARTURE_TOLERANCE_M,
   TURN_EVENT,
+  TURN_NOTICE_EVENT,
+  TURN_NOTICE_FROM,
+  issueTurnNotice,
   beginTurn,
   issueTurn,
   registerTurn,
@@ -256,4 +265,24 @@ export type {
   TurnUnitOutcome,
   TurnValidation,
 } from './turn.js';
+export {
+  TURN_ROLLS_PER_TURN,
+  TURN_ROLL_CHANCE,
+  rollTurnDice,
+  screenRollRequests,
+  turnDice,
+} from './turnDice.js';
+export type { ScreenedRolls } from './turnDice.js';
 export { turnVictory } from './combat.js';
+export {
+  JOURNAL_FULL_TURNS,
+  JOURNAL_MAX_TOKENS,
+  JOURNAL_PRECEDENTS_MAX,
+  JOURNAL_PRECEDENTS_PER_TURN,
+  JOURNAL_PRECEDENT_MAX,
+  JOURNAL_SENTENCES_PER_TURN,
+  JOURNAL_SENTENCE_MAX,
+  journalTokens,
+  recordInJournal,
+} from './journal.js';
+export type { JournalNote, JournalPrecedent, UmpireJournal } from './journal.js';
