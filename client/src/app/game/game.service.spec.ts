@@ -65,8 +65,95 @@ describe('GameService', () => {
       vi.fn(async () => info({ dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 30 })),
     );
     svc.connect(loc('?game=t1'));
+    // Until the settings are read the mode is unknown, and the desk wears neither dress (#427).
+    expect(svc.state().modePending).toBe(true);
     await vi.waitFor(() => expect(svc.sides()).toEqual(['blue', 'red']));
     expect(svc.state()).toMatchObject({ turnMode: true, turnMinutes: 30 });
+    expect(svc.state().modePending).toBeUndefined();
+  });
+
+  it('seeds turn mode from the settings before any turnState, and a turnState keeps it (#427)', async () => {
+    let answer: (v: unknown) => void = () => undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise((r) => (answer = r))),
+    );
+    const svc = TestBed.inject(GameService);
+    svc.connect(loc('?game=t3'));
+    expect(svc.state()).toMatchObject({ modePending: true });
+    expect(svc.state().turnMode).toBeUndefined();
+    answer({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        sides: [{ side: 'blue' }],
+        umpire: { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 20 },
+      }),
+    });
+    await vi.waitFor(() => expect(svc.state().turnMode).toBe(true));
+    expect(svc.state().modePending).toBeUndefined();
+  });
+
+  it('plays the game as the socket says when its settings cannot be read (#427)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) })),
+    );
+    const svc = TestBed.inject(GameService);
+    svc.connect(loc('?game=f1'));
+    await vi.waitFor(() => expect(svc.state().modePending).toBeUndefined());
+    expect(svc.state().turnMode).toBeUndefined();
+  });
+
+  it('forgets the turn mode of a game opened earlier when joining another (#427)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          sides: [{ side: 'blue' }],
+          umpire: { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 20 },
+        }),
+      })),
+    );
+    const svc = TestBed.inject(GameService);
+    svc.connect(loc('?game=t4'));
+    await vi.waitFor(() => expect(svc.state().turnMode).toBe(true));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise(() => undefined)),
+    );
+    svc.connect(loc('?game=r4'));
+    expect(svc.state().turnMode).toBeUndefined();
+    expect(svc.state().turnMinutes).toBeUndefined();
+    expect(svc.state().modePending).toBe(true);
+  });
+
+  it("reads the battle's length from the scenario list, so the desk can count the turns (#439)", async () => {
+    const svc = TestBed.inject(GameService);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => ({
+        ok: true,
+        status: 200,
+        json: async () =>
+          url === '/scenarios'
+            ? {
+                scenarios: [
+                  { id: 'other', lengthMinutes: 90 },
+                  { id: 'bridge', lengthMinutes: 50 },
+                ],
+              }
+            : {
+                scenario: 'bridge',
+                sides: [{ side: 'blue' }],
+                umpire: { dial: 'rigid', persona: 'dry', mode: 'turns', turnMinutes: 20 },
+              },
+      })),
+    );
+    svc.connect(loc('?game=t2'));
+    await vi.waitFor(() => expect(svc.state().battleMinutes).toBe(50));
   });
 
   it('leaves a real-time game in real-time dress when its settings arrive', async () => {

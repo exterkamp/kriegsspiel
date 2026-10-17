@@ -374,32 +374,32 @@
  ],
  "orders": [
   {
-   "orderId": "r2-4",
+   "orderId": "red-r2-4",
    "side": "red",
    "to": "red-2",
    "text": "March through the northern wood, keep inside the trees, and halt at its southern edge unseen. Do not show yourselves to the enemy across the river.",
    "courier": "safe",
-   "sentTurn": 1,
+   "sentAtMinute": 0,
    "status": "arrived",
    "arrivedAtMinuteOfTurn": 2
   },
   {
-   "orderId": "r1-4",
+   "orderId": "red-r1-4",
    "side": "red",
    "to": "red-1",
    "text": "Stand where you are and show yourselves on the road to hold the enemy's eye.",
    "courier": "safe",
-   "sentTurn": 1,
+   "sentAtMinute": 0,
    "status": "arrived",
    "arrivedAtMinuteOfTurn": 2
   },
   {
-   "orderId": "b3-4",
+   "orderId": "blue-b3-4",
    "side": "blue",
    "to": "blue-3",
    "text": "Watch the northern wood from this bank and report any movement on the far side.",
    "courier": "fast",
-   "sentTurn": 1,
+   "sentAtMinute": 0,
    "status": "arrived",
    "arrivedAtMinuteOfTurn": 5
   }
@@ -419,7 +419,8 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the bridge, west of the High road"
    },
    {
     "unitId": "blue-2",
@@ -434,7 +435,8 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the bridge, east of the High road"
    },
    {
     "unitId": "blue-3",
@@ -449,7 +451,8 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "south of the river"
    },
    {
     "unitId": "red-1",
@@ -464,12 +467,13 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "west of the High road"
    },
    {
     "unitId": "red-2",
-    "x": 950,
-    "y": 820,
+    "x": 951,
+    "y": 593,
     "facingDeg": 225,
     "formation": "column",
     "strength": 650,
@@ -479,7 +483,26 @@
     "status": "active",
     "continuing": {
      "kind": "idle"
-    }
+    },
+    "at": "in the Northern wood",
+    "path": [
+     [
+      1500,
+      250
+     ],
+     [
+      1259,
+      400
+     ],
+     [
+      1082,
+      511
+     ],
+     [
+      951,
+      593
+     ]
+    ]
    },
    {
     "unitId": "red-3",
@@ -494,13 +517,16 @@
     "status": "active",
     "continuing": {
      "kind": "hold"
-    }
+    },
+    "at": "near the Northern wood"
    }
   ],
+  "observations": [],
   "events": [
-   "minute 2: unit.arrived {\"unitId\":\"red-1\",\"at\":[1950,300]}",
-   "minute 5: unit.arrived {\"unitId\":\"blue-3\",\"at\":[1100,1650]}",
-   "minute 15: unit.arrived {\"unitId\":\"red-2\",\"at\":[950,820]}"
+   "2: order_delivered red-2, orderId red-r2-4",
+   "2: order_delivered red-1, orderId red-r1-4",
+   "5: order_delivered blue-3, orderId blue-b3-4",
+   "14: unit.arrived red-2"
   ]
  }
 }
@@ -509,24 +535,6 @@
 ## Proposal A
 
 ```json
-(no answer)
-```
-
-## Proposal B
-
-```json
-(no answer)
-```
-
-## Proposal C
-
-```json
-(no answer)
-```
-
-## Proposal D
-
-```json
 {
  "turn": 1,
  "units": [
@@ -545,7 +553,7 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Col. Aubry had no orders and held his line south of the bridge. Nothing of the enemy was in sight."
+   "account": "No new orders. Col. Aubry holds his ground west of the road, facing the river, and keeps his line steady."
   },
   {
    "unitId": "blue-2",
@@ -562,136 +570,7 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Col. Delacroix had no orders and held his line. Nothing of the enemy was in sight."
-  },
-  {
-   "unitId": "blue-3",
-   "x": 1100,
-   "y": 1620,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 200,
-   "morale": 85,
-   "fatigue": 2,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "b3-4",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Maj. Verneuil edged his squadron up to the river bank and posted vedettes to watch the northern wood across the water. The wood lies more than 700 m off and its edge shows nothing: no movement could be made out among the trees. He has nothing to report but an empty treeline."
-  },
-  {
-   "unitId": "red-1",
-   "x": 1950,
-   "y": 300,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 650,
-   "morale": 80,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r1-4",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Brandt, though he would rather advance, stood his battalion in line by the road with colours uncased, in plain view for any enemy who came near enough to look."
-  },
-  {
-   "unitId": "red-2",
-   "x": 950,
-   "y": 820,
-   "facingDeg": 200,
-   "formation": "column",
-   "strength": 650,
-   "morale": 70,
-   "fatigue": 14,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [
-    {
-     "orderId": "r2-4",
-     "result": "carried-out"
-    }
-   ],
-   "account": "Col. Hartmann marched as ordered. He crossed the open ground behind the wood out of the enemy's sight, entered the trees at their eastern side and worked his column slowly south-west through the undergrowth. He halted a little inside the southern edge without showing a man in the open."
-  },
-  {
-   "unitId": "red-3",
-   "x": 1550,
-   "y": 400,
-   "facingDeg": 180,
-   "formation": "line",
-   "strength": 220,
-   "morale": 85,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Maj. von Reiter had no orders and held his squadron between the road and the wood."
-  }
- ],
- "observations": [],
- "summary": "Turn 1 (0-20). Red's Line Battalion received its order at minute 2. It crossed the open ground north-east of the northern wood, out of any enemy's sight, entered the trees and worked its column south-west through them. It ends hidden just inside the wood's southern edge at about (950,820), tired from the going. Red's Vanguard Battalion stood in line by the high road at (1950,300) to draw the eye, but it is about 1.4 km from the nearest Blue troops, well beyond their sight. Blue's cavalry squadron received its order at minute 5, moved up to the river bank at (1100,1620) and watched the northern wood. The wood's edge is about 750 m off and the battalion inside it is concealed by the trees and beyond the squadron's 800 m sight in any case, so nothing was seen. No unit on either side saw an enemy this turn, and there was no fighting."
-}
-```
-
-## Proposal E
-
-```json
-{
- "turn": 1,
- "units": [
-  {
-   "unitId": "blue-1",
-   "x": 1960,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 600,
-   "morale": 80,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Aubry has no order and holds his line south of the river, facing the bridge. Nothing is in sight."
-  },
-  {
-   "unitId": "blue-2",
-   "x": 2140,
-   "y": 1680,
-   "facingDeg": 0,
-   "formation": "line",
-   "strength": 550,
-   "morale": 75,
-   "fatigue": 0,
-   "ammo": 100,
-   "status": "active",
-   "continuing": {
-    "kind": "hold"
-   },
-   "orders": [],
-   "account": "Col. Delacroix has no order and keeps his line beside the 1st Battalion. Nothing is in sight."
+   "account": "No new orders. Col. Delacroix stays in place east of the road and keeps the battalion in hand as the reserve."
   },
   {
    "unitId": "blue-3",
@@ -709,11 +588,11 @@
    },
    "orders": [
     {
-     "orderId": "b3-4",
+     "orderId": "blue-b3-4",
      "result": "carried-out"
     }
    ],
-   "account": "Maj. Verneuil is already on the south bank opposite the northern wood when his order comes, and stays there watching its southern edge across the river. He sees nothing move in the open, and cannot see into the trees from 800 m. There is no news to send back."
+   "account": "The order reached Maj. Verneuil at the fifth minute. He keeps the squadron on the south bank and watches the northern wood. He sees no movement on the far side."
   },
   {
    "unitId": "red-1",
@@ -731,33 +610,35 @@
    },
    "orders": [
     {
-     "orderId": "r1-4",
+     "orderId": "red-r1-4",
      "result": "carried-out"
     }
    ],
-   "account": "Col. Brandt is told to stand where he is and show himself on the road to hold the enemy's eye. He steps his line a few paces east so that it sits across the high road in plain view, and stands there, though he would rather be advancing."
+   "account": "Col. Brandt would rather advance, but the order says stand. He shifts the battalion a hundred paces onto the High road, faces south and shows himself there to hold the enemy's eye."
   },
   {
    "unitId": "red-2",
-   "x": 950,
-   "y": 825,
-   "facingDeg": 190,
+   "x": 951,
+   "y": 593,
+   "facingDeg": 225,
    "formation": "column",
    "strength": 650,
    "morale": 70,
-   "fatigue": 22,
+   "fatigue": 10,
    "ammo": 100,
    "status": "active",
    "continuing": {
-    "kind": "hold"
+    "kind": "move",
+    "x": 950,
+    "y": 840
    },
    "orders": [
     {
-     "orderId": "r2-4",
+     "orderId": "red-r2-4",
      "result": "carried-out"
     }
    ],
-   "account": "Col. Hartmann gets his order at about the second minute and marches his column across the open ground to the north-east corner of the northern wood. He then goes through the trees by the shortest line towards the southern edge, slowly because of the undergrowth, and halts just inside the trees at their southern edge at about the fifteenth minute, unseen from the river, as he was ordered. He stays in column under cover."
+   "account": "Col. Hartmann entered the northern wood in column and kept inside the trees. The going was slow and he has not yet reached the southern edge. He continues south under cover, to halt unseen at the edge."
   },
   {
    "unitId": "red-3",
@@ -774,15 +655,151 @@
     "kind": "hold"
    },
    "orders": [],
-   "account": "Maj. von Reiter has no order and holds his position, watching the open ground to the south."
+   "account": "No new orders. Maj. von Reiter holds near the northern wood and watches the ground to the south.",
+   "departure": "Red-1 moves 90 m onto the road, which is within tolerance. Red-2 fatigue is set at 10 for the wood march."
   }
  ],
  "observations": [],
- "summary": "Red-2 marched through the northern wood as ordered, entering at its north-east corner and halting just inside its southern edge at about (950,825), unseen. The slow going in the wood used up most of the turn. Red-1 stood on the high road in view of the enemy to hold their attention, but at 1400 m from the Blue infantry no one could see it. Blue-3 watched the wood from the south bank, but at about 840 m from the Red column, and with the column hidden by the trees, it saw nothing. No other units moved and no one saw anyone; no fire or melee. The result matches the projection."
+ "summary": "Opening turn, quiet. I followed the projection. Red-2 is in the northern wood at (951,593) and still moving south to halt at the edge unseen. Red-1 shifted onto the High road to show itself, as ordered. Blue-3 holds on the south bank watching the wood. Blue-1 and blue-2 hold at the bridge. No sightings: the nearest units are beyond sight range and the wood hides red-2. Under way: red-2 completing its march to the wood's southern edge.",
+ "precedents": []
 }
 ```
 
-## Proposal F
+## Proposal B
+
+```json
+{
+ "turn": 1,
+ "units": [
+  {
+   "unitId": "blue-1",
+   "x": 1960,
+   "y": 1680,
+   "facingDeg": 0,
+   "formation": "line",
+   "strength": 600,
+   "morale": 80,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Col. Aubry had no new orders and held his line south of the bridge, west of the road, facing north. Nothing in sight across the river.",
+   "departure": ""
+  },
+  {
+   "unitId": "blue-2",
+   "x": 2140,
+   "y": 1680,
+   "facingDeg": 0,
+   "formation": "line",
+   "strength": 550,
+   "morale": 75,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Col. Delacroix had no new orders and kept his battalion in line east of the road, covering the bridge. Nothing seen across the water."
+  },
+  {
+   "unitId": "blue-3",
+   "x": 1100,
+   "y": 1650,
+   "facingDeg": 0,
+   "formation": "line",
+   "strength": 200,
+   "morale": 85,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [
+    {
+     "orderId": "blue-b3-4",
+     "result": "carried-out"
+    }
+   ],
+   "account": "Maj. Verneuil got his order at minute 5. He posted vedettes on the south bank opposite the northern wood and watched. At this distance, with the wood dense, he saw no movement on the far side and had nothing to report."
+  },
+  {
+   "unitId": "red-1",
+   "x": 2040,
+   "y": 300,
+   "facingDeg": 180,
+   "formation": "line",
+   "strength": 650,
+   "morale": 80,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [
+    {
+     "orderId": "red-r1-4",
+     "result": "carried-out"
+    }
+   ],
+   "account": "Col. Brandt got his order at minute 2. He sidestepped his line onto the high road so it stood plain to anyone looking north, then halted there facing the bridge. No enemy in sight yet."
+  },
+  {
+   "unitId": "red-2",
+   "x": 1000,
+   "y": 800,
+   "facingDeg": 200,
+   "formation": "column",
+   "strength": 650,
+   "morale": 70,
+   "fatigue": 10,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [
+    {
+     "orderId": "red-r2-4",
+     "result": "carried-out"
+    }
+   ],
+   "account": "Col. Hartmann got his order at minute 2. He marched his column south-west into the northern wood and pushed through the trees to its southern edge. He halted some eighty paces inside the treeline, out of view from the far bank. The march through the wood tired the men somewhat.",
+   "departure": "The order sets the southern edge of the wood as the halt. The engine stopped the column mid-wood at its own waypoint. At the wood rate the column had time to reach the edge (about 660 m in the trees after entry), so it is placed just inside the edge."
+  },
+  {
+   "unitId": "red-3",
+   "x": 1550,
+   "y": 400,
+   "facingDeg": 180,
+   "formation": "line",
+   "strength": 220,
+   "morale": 85,
+   "fatigue": 0,
+   "ammo": 100,
+   "status": "active",
+   "continuing": {
+    "kind": "hold"
+   },
+   "orders": [],
+   "account": "Maj. von Reiter had no orders and held his squadron east of the northern wood, facing south."
+  }
+ ],
+ "observations": [],
+ "summary": "Turn 1 (0-20): No contact; no unit within sight of the enemy at start or end. Red-2 marched through the northern wood and halts concealed just inside its southern edge at (1000,800), holding. Red-1 moved onto the high road at (2040,300) as a display; Blue holds the bridge with blue-1 and blue-2 in line at y=1680, and blue-3 watches the wood from the south bank at (1100,1650) but saw nothing at about 850 m. Red-3 holds near the wood. No losses.",
+ "precedents": [
+  "A unit ordered to halt at a wood's edge unseen stops just inside the treeline, where it is concealed beyond close range."
+ ]
+}
+```
+
+## Proposal C
 
 ```json
 {
@@ -838,7 +855,7 @@
    },
    "orders": [
     {
-     "orderId": "b3-4",
+     "orderId": "blue-b3-4",
      "result": "carried-out"
     }
    ],
@@ -860,7 +877,7 @@
    },
    "orders": [
     {
-     "orderId": "r1-4",
+     "orderId": "red-r1-4",
      "result": "carried-out"
     }
    ],
@@ -868,8 +885,8 @@
   },
   {
    "unitId": "red-2",
-   "x": 950,
-   "y": 820,
+   "x": 951,
+   "y": 593,
    "facingDeg": 225,
    "formation": "column",
    "strength": 650,
@@ -882,7 +899,7 @@
    },
    "orders": [
     {
-     "orderId": "r2-4",
+     "orderId": "red-r2-4",
      "result": "carried-out"
     }
    ],

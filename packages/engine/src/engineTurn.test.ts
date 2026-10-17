@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   EventRegistry,
   MS_PER_MINUTE,
+  RULES_VERSION,
+  Rng,
   advanceTo,
   courierPass,
   createState,
   engineTurnStart,
+  issueOrder,
   loadScenario,
   pointMm,
   registerCombat,
@@ -208,6 +211,26 @@ describe('the courier pass and forced rides (D39, 11.4)', () => {
     expect(rides(run.emitted).get('o1')).toEqual({ outcome: 'delivered', atMs: 0 });
   });
 
+  it('times a forced ride to `arriveAt` when one is given (the umpire benchmark, #440)', () => {
+    const s0 = start(3);
+    const turn = { n: 1, startMs: 0, endMs: 30 * MS_PER_MINUTE };
+    const real = courierPass(s0, [ORDER], turn, reg);
+    expect(real.forced.o1?.arriveAt).toBeUndefined(); // the pass never sets it
+    for (const arriveAt of [7 * MS_PER_MINUTE, 45 * MS_PER_MINUTE]) {
+      const pass = { ...real, forced: { o1: { untilMs: turn.endMs, arriveAt } } };
+      const run = advanceTo(engineTurnStart(s0, [ORDER], pass, turn), turn.endMs, reg);
+      if (arriveAt <= turn.endMs) {
+        expect(rides(run.emitted).get('o1')).toEqual({ outcome: 'delivered', atMs: arriveAt });
+      } else {
+        // still riding at the turn's end, due when forced
+        expect(rides(run.emitted).get('o1')).toBeUndefined();
+        const c = run.state.world.couriers.find((x) => x.order.id === 'o1')!;
+        expect(c.legs.at(-1)!.arriveAt).toBe(arriveAt);
+        expect(c.legs[0]!.startedAt).toBe(0);
+      }
+    }
+  });
+
   it('continues a ride still on the road at the turn end into the next turn', () => {
     let checked = 0;
     const outcomes = new Set<string>();
@@ -271,5 +294,109 @@ describe('the courier pass and forced rides (D39, 11.4)', () => {
       outcome: 'failed',
       reason: 'order has no intents',
     });
+  });
+});
+
+describe('courier dice on their own stream (#432)', () => {
+  /** The same start under rules 2: each courier rolls on dice of its own. */
+  const own = (s: EngineState<GameState>): EngineState<GameState> => ({
+    ...s,
+    world: { ...s.world, rules: RULES_VERSION },
+  });
+  /** The world's RNG after `n` draws from `s`. */
+  const drawn = (s: EngineState<GameState>, n: number) => {
+    const r = new Rng(s.rng);
+    for (let i = 0; i < n; i++) r.next();
+    return r.getState();
+  };
+
+  it("moves the world's RNG by one draw per ride, however the ride goes, in real time and in the pass", () => {
+    const outcomes = new Set<string>();
+    for (let seed = 1; seed <= 40; seed++) {
+      const s0 = own(start(seed));
+      const turn = { n: 1, startMs: 0, endMs: 30 * MS_PER_MINUTE };
+      // Real time: the order sets out and rides; nothing else on this quiet field draws.
+      const rt = advanceTo(issueOrder(s0, ORDER, 0), turn.endMs, reg);
+      expect(rt.emitted.some((e) => e.type.startsWith('combat'))).toBe(false);
+      expect(rt.state.rng).toBe(drawn(s0, 1));
+      // The pass leaves the world's RNG where real time has it, so the turn draws on in step.
+      const pass = courierPass(s0, [ORDER], turn, reg);
+      expect(pass.rng).toBe(drawn(s0, 1));
+      const c = pass.couriers[0]!;
+      outcomes.add(c.outcome);
+      // Units held or not, this ride's dice are the same: the pass and real time agree on it here.
+      const got = rides(rt.emitted).get('o1');
+      if (c.outcome === 'riding') expect(got).toBeUndefined();
+      else
+        expect({ outcome: c.outcome, atMs: c.atMs, by: c.by }).toEqual({ by: undefined, ...got });
+      // The engine's turn rides it to the pass's outcome and ends in real time's state.
+      const run = advanceTo(engineTurnStart(s0, [ORDER], pass, turn), turn.endMs, reg);
+      expect(rides(run.emitted).get('o1')).toEqual(got);
+      expect(run.state.rng).toBe(rt.state.rng);
+      expect(run.state.world.couriers.map((x) => x.dice)).toEqual(
+        rt.state.world.couriers.map((x) => x.dice),
+      );
+    }
+    expect(outcomes.has('intercepted')).toBe(true);
+    expect(outcomes.has('delivered')).toBe(true);
+  });
+
+  it('loses and garbles rides on their own dice, and the engine turn replays them', () => {
+    const fast: Order = { ...ORDER, courier: 'fast' };
+    const turn = { n: 1, startMs: 0, endMs: 60 * MS_PER_MINUTE };
+    let lost = 0;
+    let garbled = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const s0 = own(foggy(seed));
+      const pass = courierPass(s0, [fast], turn, reg);
+      const run = advanceTo(engineTurnStart(s0, [fast], pass, turn), turn.endMs, reg);
+      const c = pass.couriers[0]!;
+      const got = rides(run.emitted).get('o1');
+      if (c.outcome === 'riding') expect(got).toBeUndefined();
+      else
+        expect({ outcome: c.outcome, atMs: c.atMs, by: c.by }).toEqual({ by: undefined, ...got });
+      if (c.outcome === 'lost') lost++;
+      if (c.outcome === 'delivered' && c.garbled) {
+        garbled++;
+        expect(garbledIds(run.emitted)).toEqual(['o1']);
+      }
+    }
+    expect(lost).toBeGreaterThan(0);
+    expect(garbled).toBeGreaterThan(0);
+  });
+
+  it('carries a ride on the road at the turn end, with its dice, into the next turn', () => {
+    const outcomes = new Set<string>();
+    for (let seed = 1; seed <= 20; seed++) {
+      let s = own(start(seed));
+      const t1 = { n: 1, startMs: 0, endMs: 30_000 };
+      const p1 = courierPass(s, [ORDER], t1, reg);
+      if (p1.couriers[0]!.outcome !== 'riding') continue;
+      s = advanceTo(engineTurnStart(s, [ORDER], p1, t1), t1.endMs, reg).state;
+      // The turn ends with the courier's dice where the pass left them.
+      expect(s.world.couriers.map((c) => c.dice)).toEqual([p1.forced.o1!.dice]);
+      expect(p1.forced.o1!.dice).toBeTypeOf('number');
+
+      const t2 = { n: 2, startMs: t1.endMs, endMs: 40 * MS_PER_MINUTE };
+      const p2 = courierPass(s, [], t2, reg);
+      // A ride already on the road draws nothing from the world's RNG.
+      expect(p2.rng).toBe(s.rng);
+      const run = advanceTo(engineTurnStart(s, [], p2, t2), t2.endMs, reg);
+      const c = p2.couriers[0]!;
+      const got = rides(run.emitted).get('o1');
+      expect({ outcome: c.outcome, atMs: c.atMs, by: c.by }).toEqual({ by: undefined, ...got });
+      outcomes.add(c.outcome);
+    }
+    expect(outcomes.has('delivered')).toBe(true);
+    expect(outcomes.has('intercepted')).toBe(true);
+  });
+
+  it("leaves rules 1 as it was: every courier die on the world's RNG, and no dice on the courier", () => {
+    const s0 = start(7);
+    expect(s0.world.rules).toBeUndefined();
+    const rt = advanceTo(issueOrder(s0, ORDER, 0), 30_000, reg);
+    expect(rt.state.world.couriers.map((c) => c.dice)).toEqual([undefined]);
+    // The loss and garble checks alone are two draws.
+    expect(rt.state.rng).not.toBe(drawn(s0, 1));
   });
 });

@@ -1,16 +1,18 @@
 import type { ConstraintPolygon } from '@kriegsspiel/settlemaker';
 import type { Point, Polygon, Site } from '../contract.js';
 import { decimal6 } from '../terrain/precision.js';
+import { degreeUnit } from '../rotation.js';
 
 export function settlementFrame(site: Pick<Site, 'anchor' | 'rotationDeg'>) {
   const rotation = site.rotationDeg,
     x = site.anchor[0],
     y = site.anchor[1];
+  // Whole degrees (every generated site, #545) read the literal table; any
+  // other recorded rotation keeps the snapped runtime value.
   const angle = (rotation * Math.PI) / 180;
   const snap = (n: number) =>
     Math.abs(n) < 1e-14 ? 0 : Math.abs(n - 1) < 1e-14 ? 1 : Math.abs(n + 1) < 1e-14 ? -1 : n;
-  const c = snap(Math.cos(angle)),
-    s = snap(Math.sin(angle));
+  const [c, s] = degreeUnit(rotation) ?? [snap(Math.cos(angle)), snap(Math.sin(angle))];
   const world = (p: { x: number; y: number }): Point => [
     decimal6(x + c * p.x - s * p.y),
     decimal6(y + s * p.x + c * p.y),

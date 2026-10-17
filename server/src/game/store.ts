@@ -85,6 +85,12 @@ export type GameCommand =
    */
   | { kind: 'narrate'; side: string; windowEndMs: number }
   /**
+   * One side's papers of an umpire turn were written (D39, 11.9). Journal only: the notes are display
+   * text and never change the engine; the model calls are on the entry (`calls`) and the notes that
+   * replaced template text are in `narrated`, so a reopened game and replay show them with no model.
+   */
+  | { kind: 'turnReports'; side: string; turn: number }
+  /**
    * A staff officer answered a player's question on the `staff` stage. Journal only: the answer is
    * advice text and never changes the engine; the model calls are on the entry (`calls`).
    */
@@ -190,6 +196,11 @@ export interface InputLogHeader {
   seed: number;
   /** Umpire settings chosen at creation (3.11). Absent on older games: the defaults. Replay applies the dial. */
   settings?: UmpireSettings;
+  /**
+   * The engine rules version the game was made under (`RULES_VERSION`, #432). Absent on a game
+   * made before it, which replays under rules 1 (couriers on the world's RNG), as it was played.
+   */
+  rules?: number;
 }
 
 export interface InputLogEntry {
@@ -225,6 +236,8 @@ export interface InputLogEntry {
   narrateBreaker?: NarrateBreakerState;
   /** For `resolveTurn` commands: the turn as resolved, so replay needs no resolver call (D39). */
   turn?: TurnRecord;
+  /** For `turnReports` commands: each report's note that replaced its template text (11.9). */
+  narrated?: Array<{ reportId: string; text: string }>;
   /** The command was refused or failed; the reason. */
   error?: string;
 }
