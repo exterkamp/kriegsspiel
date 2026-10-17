@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   OnInit,
   inject,
@@ -8,6 +9,8 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { decodeApprovedBattlefield } from '@kriegsspiel/protocol';
+import { BattlefieldPreviewComponent } from './battlefield-map/battlefield-preview.component';
 import type { GameInfo, KickTarget } from '@legacy/lobby/api';
 import { SESSION_LABELS, inviteLink, paceLabel, startBlocker } from '@legacy/lobby/model';
 import { SHELL_API, SHELL_WINDOW } from '../shell/shell-api';
@@ -23,7 +26,7 @@ const MISSES_BEFORE_WARNING = 3;
 
 @Component({
   selector: 'ks-room',
-  imports: [PageFrameComponent, ModalComponent],
+  imports: [PageFrameComponent, ModalComponent, BattlefieldPreviewComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <ks-page-frame
@@ -31,6 +34,30 @@ const MISSES_BEFORE_WARNING = 3;
       [back]="true"
       (backClick)="leave()"
     >
+      <section class="ks-panel ks-stack" aria-label="Battlefield map">
+        <h2>Battlefield map</h2>
+        @if (battlefield(); as selected) {
+          <p>
+            <strong>{{ selected.map.name }}</strong> · {{ selected.map.widthM / 1000 }} ×
+            {{ selected.map.heightM / 1000 }} km
+          </p>
+          <p>
+            The scenario and this battlefield are fixed for this game. Its scenario supplies the
+            armies and objectives.
+          </p>
+          <details>
+            <summary>View map</summary>
+            <ks-battlefield-preview [map]="selected.map" [interactive]="true" />
+          </details>
+        } @else if (mapProblem()) {
+          <p role="alert" class="ks-error">
+            The battlefield details could not be checked. Reload them before starting.
+          </p>
+          <button type="button" (click)="poll()">Retry map details</button>
+        } @else {
+          <p>Battlefield details are not available on this server.</p>
+        }
+      </section>
       <ul id="room-sides" class="ks-stack">
         @for (s of info().sides; track s.side) {
           <li class="ks-row">
@@ -101,6 +128,16 @@ const MISSES_BEFORE_WARNING = 3;
       }
     </ks-page-frame>
   `,
+  styles: `
+    summary {
+      min-height: 44px;
+      padding: var(--ks-space-2);
+      cursor: pointer;
+    }
+    details {
+      min-width: 0;
+    }
+  `,
 })
 export class RoomComponent implements OnInit {
   /** The game as last read; the room keeps it fresh by polling. */
@@ -116,7 +153,22 @@ export class RoomComponent implements OnInit {
   protected readonly hot = () => this.info().sessionType === 'hot_seat';
   protected readonly rate = () => paceLabel(this.info());
   protected readonly invite = () => inviteLink(this.win.location.origin, this.info().id);
-  protected readonly blocker = () => startBlocker(this.info());
+  protected readonly battlefield = computed(() => {
+    const info = this.info();
+    if (!info || !Object.hasOwn(info, 'battlefield')) return undefined;
+    try {
+      return decodeApprovedBattlefield(info.battlefield, info.scenario);
+    } catch {
+      return undefined;
+    }
+  });
+  protected readonly mapProblem = computed(
+    () => !!this.info() && Object.hasOwn(this.info(), 'battlefield') && !this.battlefield(),
+  );
+  protected readonly blocker = () =>
+    this.mapProblem()
+      ? 'Reload the battlefield details before starting.'
+      : startBlocker(this.info());
   /** The status line: an error, else what stops the host starting, else the guest's wait. Empty shows no bar. */
   protected readonly message = (): string =>
     this.error() ??
@@ -192,6 +244,7 @@ export class RoomComponent implements OnInit {
     this.act(this.api.setReady(this.info().id, !this.info().ready));
   }
   protected start(): void {
+    if (this.mapProblem()) return;
     this.act(this.api.startGame(this.info().id));
   }
 }
