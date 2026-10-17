@@ -1,5 +1,5 @@
 /** Pure rules for the Angular new-game form: defaults, validation and the creation request. */
-import type { ScenarioBattlefield } from '@kriegsspiel/protocol';
+import type { ScenarioBattlefield, BattlefieldCatalog } from '@kriegsspiel/protocol';
 import {
   DEFAULT_TURN_MINUTES,
   DEFAULT_UMPIRE_DIAL,
@@ -27,6 +27,7 @@ export interface ScenarioInfo {
   defaults: { side: string; rate: number };
   /** Additive server metadata; older servers can still create their scenario's default game. */
   battlefield?: ScenarioBattlefield;
+  battlefields?: BattlefieldCatalog;
 }
 
 /** Who plays a side nobody sits at; undefined when the server has no computer opponent. */
@@ -56,6 +57,9 @@ export interface Form {
 }
 
 export interface CreateRequest {
+  pairing?: { pairingId: string; revision: string };
+  requestId?: string;
+  battlefieldVersion?: 1;
   scenario: string;
   side: string;
   rate: number;
