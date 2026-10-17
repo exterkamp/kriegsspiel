@@ -260,9 +260,10 @@ describe('period staff-map style (recorded Canvas2D)', () => {
     const setup = canvases.length;
     const calls: Call[] = [];
     renderer.renderOnce(proxyContext(calls), view, DEFAULT_LAYERS, false);
-    // Only the two symbol tiles (tree marks, building hatching); no base tile, which starts with paper.
+    // The hillshade (made on first use) and the two symbol tiles (tree marks, building hatching); no
+    // base tile, which starts with paper.
     const made = canvases.slice(setup);
-    expect(made).toHaveLength(2);
+    expect(made).toHaveLength(3);
     expect(made.some((c) => c.some((call) => call.name === 'fillRect'))).toBe(false);
     // The base lands straight on the target: the hillshade, sepia hachures and lined water.
     expect(calls.filter((c) => c.name === 'drawImage')).toHaveLength(1);
@@ -291,6 +292,18 @@ describe('period staff-map style (recorded Canvas2D)', () => {
     expect(JSON.stringify(asset)).toBe(before);
   });
 
+  it('reads the ground only when relief is drawn: the hillshade is made on first use (#498)', () => {
+    const renderer = new MapRenderer(reference(), PERIOD_MAP_STYLE);
+    expect(canvases).toHaveLength(0);
+    const view = { width: 150, height: 150, scale: 1, offset: [0, 0] as [number, number] };
+    const flat = { ...DEFAULT_LAYERS, hillshade: false, hachures: false };
+    renderer.renderOnce(proxyContext([]), view, flat, false);
+    expect(canvases.some((c) => c.some((call) => call.name === 'putImageData'))).toBe(false);
+    renderer.renderOnce(proxyContext([]), view, DEFAULT_LAYERS, false);
+    renderer.renderOnce(proxyContext([]), view, DEFAULT_LAYERS, false);
+    expect(canvases.filter((c) => c.some((call) => call.name === 'putImageData'))).toHaveLength(1);
+  });
+
   it('puts its helper rasters on CPU-backed canvases only when asked', () => {
     const options: unknown[][] = [];
     vi.stubGlobal('document', {
@@ -303,9 +316,29 @@ describe('period staff-map style (recorded Canvas2D)', () => {
         },
       }),
     });
-    new MapRenderer(reference(), PERIOD_MAP_STYLE);
-    new MapRenderer(reference(), PERIOD_MAP_STYLE, { software: true });
-    expect(options).toEqual([['2d'], ['2d', { willReadFrequently: true }]]);
+    const view = { width: 150, height: 150, scale: 1, offset: [0, 0] as [number, number] };
+    // Helpers are made on first use (the hillshade lazily since #498), so each renderer draws once.
+    new MapRenderer(reference(), PERIOD_MAP_STYLE).renderOnce(
+      proxyContext([]),
+      view,
+      DEFAULT_LAYERS,
+      false,
+    );
+    const gpu = options.splice(0);
+    new MapRenderer(reference(), PERIOD_MAP_STYLE, { software: true }).renderOnce(
+      proxyContext([]),
+      view,
+      DEFAULT_LAYERS,
+      false,
+    );
+    expect(gpu.length).toBeGreaterThan(0);
+    expect(gpu.every((args) => JSON.stringify(args) === JSON.stringify(['2d']))).toBe(true);
+    expect(options).toHaveLength(gpu.length);
+    expect(
+      options.every(
+        (args) => JSON.stringify(args) === JSON.stringify(['2d', { willReadFrequently: true }]),
+      ),
+    ).toBe(true);
   });
 
   it('hachures sloping ground in sepia on the base tile, heavier strokes wider', () => {

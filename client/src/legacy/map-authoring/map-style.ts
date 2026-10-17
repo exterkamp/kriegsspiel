@@ -2,8 +2,9 @@
  * Cartographic style definitions for `MapRenderer` (#491).
  *
  * Every colour, stroke width, dash, symbol size and label font the renderer uses lives here, so another
- * surface can adopt a style by passing it to `new MapRenderer(asset, style)`. The authoring preview and the
- * table raster (`shared/map-table/raster.ts`, #498) both draw the period style.
+ * surface can adopt a style by passing it to `new MapRenderer(asset, style)`. The authoring preview draws the
+ * period style; the table raster (`shared/map-table/raster.ts`) and the live game's table
+ * (`legacy/table/periodMap.ts`) draw it as `TABLE_MAP_STYLE` (#498).
  * Pixel sizes are CSS pixels at the current zoom; metre sizes come from the map asset itself.
  *
  * - `PERIOD_MAP_STYLE`: a 19th-century staff map (Prussian Generalstab / Ordnance Survey sheets of the
@@ -272,6 +273,13 @@ export const PERIOD_MAP_STYLE: MapStyle = Object.freeze({
   scaleBar: { mode: 'segmented', font: `12px ${SERIF}` },
   neatLine: { innerPx: 1, outerPx: 2.5, gapPx: 5 },
 } satisfies MapStyle);
+
+/**
+ * The table's paper: the period style without the neat line (#498). A table raster is exactly the map
+ * sheet, so the frame the preview draws round the sheet would be cut in half at the edge of the paper, and
+ * the table's board frames the sheet instead. The saved-map raster and the live game's table both draw it.
+ */
+export const TABLE_MAP_STYLE: MapStyle = Object.freeze({ ...PERIOD_MAP_STYLE, neatLine: null });
 
 /** The earlier flat style, unchanged; `MapRenderer`'s default, which the table raster drew until #498. */
 export const CLASSIC_MAP_STYLE: MapStyle = Object.freeze({
