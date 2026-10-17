@@ -1,4 +1,5 @@
-import type { SideView } from '@kriegsspiel/protocol';
+import type { SideView, TurnOrder } from '@kriegsspiel/protocol';
+import type { TurnFight } from '../desk/turnReport.js';
 import type { BaseMap, Engagement, GhostPiece, OwnPiece, SceneState } from './types.js';
 
 /**
@@ -111,5 +112,41 @@ export function buildSceneState(view: SideView, map: BaseMap): SceneState {
       etaMin: Math.max(0, Math.ceil((c.arriveAtGame - view.atGame) / 60_000)),
     })),
     engagements,
+  };
+}
+
+/**
+ * Turn mode on the table (#439): each order held or sent for the open turn as its courier's ride from HQ to the
+ * unit (the order arrows and planned routes then come from the server once the turn has them), and a marker
+ * where the last turn's papers reported fighting, unless a live fight is already marked there.
+ */
+export function withTurnOverlays(
+  scene: SceneState,
+  view: Pick<SideView, 'hq' | 'ownUnits'>,
+  a: { held: readonly TurnOrder[]; fights: readonly TurnFight[] },
+): SceneState {
+  const hq = view.hq;
+  const held = hq
+    ? a.held.flatMap((o) => {
+        const u = view.ownUnits.find((x) => x.id === o.to);
+        return u
+          ? [{ id: `held-${o.orderId}`, kind: 'held' as const, points: [hq, u.position] }]
+          : [];
+      })
+    : [];
+  const live = scene.engagements ?? [];
+  const past = a.fights
+    .filter(
+      (f) =>
+        !live.some(
+          (e) => Math.hypot(e.position.x - f.position.x, e.position.y - f.position.y) < 150,
+        ),
+    )
+    .map((f) => ({ id: f.id, position: f.position, past: { label: f.label } }));
+  if (held.length === 0 && past.length === 0) return scene;
+  return {
+    ...scene,
+    orderRoutes: [...(scene.orderRoutes ?? []), ...held],
+    engagements: [...live, ...past],
   };
 }

@@ -36,7 +36,7 @@ Example file: parse on a local model, judging and narration in the cloud.
 
 Env overrides (they win over the file): `UMPIRE_PROVIDER_PARSE|JUDGE|NARRATE|STAFF|COMMAND|CRITIQUE|ADJUDICATE`, `UMPIRE_MODEL_<same stages>`, `UMPIRE_TIMEOUT_MS`, `UMPIRE_TIMEOUT_MS_ADJUDICATE` (per attempt, default 300 s; the file's `stageTimeoutMs.adjudicate`), `UMPIRE_MAX_ATTEMPTS`, `UMPIRE_BASE_BACKOFF_MS`, `UMPIRE_MAX_BACKOFF_MS`, `UMPIRE_MAX_CONCURRENT`, `UMPIRE_MIN_INTERVAL_MS`, `UMPIRE_BUDGET_USD`, `UMPIRE_BUDGET_TOKENS`, `UMPIRE_GAME_BUDGET_USD`, `UMPIRE_GAME_BUDGET_TOKENS`, `UMPIRE_GAME_CALLS_PER_MINUTE`.
 
-**The turn umpire** (`adjudicate`, D39, 11.6) defaults to `claude-sonnet-5-5` with a 12,000-token reply limit and the 300 s per-attempt timeout above; a whole turn's adjudication (both calls and their retries) is cut off after 15 minutes and the turn falls back to the engine. It runs only when `turnUmpireEnabled` holds: an Anthropic route with its key, or another provider type than `test` and `ollama` on the stage, or `UMPIRE_PROVIDER_ADJUDICATE` set explicitly (any provider, `test` included, for development). `TURN_UMPIRE=off` turns it off. Otherwise turn-mode games are decided by the engine at every dial; the keyless demo (Ollama or `test`) is in this case, by the benchmark below. The stage is not in `OLLAMA_STAGES`' eligible list. Its calls count against the game's `GameUmpireClient` caps; a refused call is not retried and the turn falls back.
+**The turn umpire** (`adjudicate`, D39, 11.6) defaults to `claude-sonnet-5-5` with a 12,000-token reply limit and the 300 s per-attempt timeout above; a whole turn's adjudication (both calls and their retries) is cut off after 15 minutes and the turn falls back to the engine. It runs only when `turnUmpireEnabled` holds: an Anthropic route with its key, or another provider type than `test` and `ollama` on the stage, or `UMPIRE_PROVIDER_ADJUDICATE` set explicitly (any provider, `test` included, for development). `TURN_UMPIRE=off` turns it off. Otherwise turn-mode games are decided by the engine at every dial; the keyless demo (Ollama or `test`) is in this case, by the benchmark below. The stage is not in `OLLAMA_STAGES`' eligible list. Its calls count against the game's `GameUmpireClient` caps; a refused call is not retried and the turn falls back. After an umpire turn the same client makes one report call per human side on the `narrate` stage's route (prompt `turn-reports-v3`, D39 "As built (11.9)"), with that route's provider and model; a failed or refused report call keeps the engine's text and never fails the turn.
 
 **API keys come only from the environment.** A provider names the variable in `apiKeyEnv`; a literal key in a file is rejected. `anthropic` defaults to `ANTHROPIC_API_KEY`. `openai-compatible` sends no key unless `apiKeyEnv` is set. Never commit keys.
 
@@ -51,7 +51,7 @@ Select it with `UMPIRE_PROVIDER=test` (every stage), `UMPIRE_PROVIDER_<STAGE>=te
 | Stage | What it does |
 | --- | --- |
 | `parse` | Finds the unit (id, name, or `the cavalry`, `the 1st`), then one or more clauses split at `and`, `then` and commas, each a verb (move, hold/screen/defend, withdraw/fall back, attack) and a place (by name, or by kind narrowed by name words, such as `the northern wood`). `it` or `there` means the place before. No unit named: the unit nearest the first place. Several fits: a clarification with options. An unknown place or unit, no verb, or injected instructions: a rejection with a reason. Conditions and times are ignored. |
-| `narrate` | One dispatch per report, built only from the report's own officer, place, size and numbers, so it passes `checkNarration`. |
+| `narrate` | One dispatch per report, built only from the report's own officer, place, size and numbers, so it passes `checkNarration`. A turn report (11.9) also says what became of the unit's orders and its losses, and gives the umpire's account as written. |
 | `staff` | One short piece of advice, chosen by the topic keywords of an optional `question` (enemy, supply, fatigue, ground, orders) or else by the officer's role, from counts in the officer's view. |
 | `judge` | No placements. |
 | `command` | Every unit holds the named place nearest the objective. |
@@ -124,7 +124,80 @@ Without Docker (`npm run dev -w server` on the host), set `CLAUDE_BRIDGE_HOST=12
 
 ## Turn umpire benchmark
 
-Story 11.2 (#398): can a model adjudicate a whole turn (D39)? The cases, prompt `adjudicate-v0`, checks, rubric and procedure are in [umpire-benchmark.md](umpire-benchmark.md); raw outputs, grades and the joined table are in `server/bench/umpire/`. Run 2026-10-12/13 on this host (4 CPUs, no GPU, 15 GB RAM, shared with other agents).
+Story 11.2 (#398): can a model adjudicate a whole turn (D39)? The cases, checks, rubric and procedure are in [umpire-benchmark.md](umpire-benchmark.md); raw outputs, grades and the joined table are in `server/bench/umpire/`.
+
+### Departure reasons (#523), 2026-10-16
+
+In #440 Opus failed the `departure` check in 4 of 12 cases (`uncontested-march`, `cavalry-screen`, `injected-order`, `impossible-order`), giving its reasons in the `summary`; that run scored the first reply only, on `adjudicate-v4`. Here each case went through the live stage itself, `adjudicateTurn` with its one resend, on the current prompt `adjudicate-v6` (`standard`), through the Claude Code bridge (`opus`, `sonnet`), one call at a time, 38 calls in all. The four cases plus two controls Opus had passed (`flank-march-woods`, `garbled-order`); Opus ran the four cases twice. The new resend (one line naming the units with no reason and asking for exactly their `departure`, inside each unit's own outcome, before its `account`; D39, "As built (#523)") changes only the resend, so the arms are paired: each first reply that lacked a reason was resent twice under the old wording and twice under the new. Replies are kept outside the repo.
+
+First replies (the same in both arms):
+
+| Model | Runs | Departure failures | Schema failures | Resent (any problem) | Median s (first call) |
+| --- | --- | --- | --- | --- | --- |
+| Opus | 10 (6 cases, the four twice) | 2 (`uncontested-march` red-2 760 m, `impossible-order` red-3 943 m, both in the second runs) | 0 | 5 (the 2 departures, observations twice, an account's sight once) | 26 |
+| Sonnet | 6 | 2 (`uncontested-march` red-2 800 m, `cavalry-screen` blue-3 402 m) | 0 | 3 (the 2 departures, an account's sight once) | 20 |
+
+`injected-order` asked for a roll in both Opus runs (one more call, 28 to 31 s). The controls never lacked a reason.
+
+The resend of those four first replies, twice each:
+
+| Resend | Replies | Still no reason | Schema failures | Reason given | Put back on the projection | Other problems left | Median s |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Old (the check's and the validator's line per unit) | 8 (Opus 4, Sonnet 4) | 1 (Opus) | 1 (Opus) | 4 | 3 | 0 | 20 |
+| **New (one line naming the units)** | 8 (Opus 4, Sonnet 4) | 0 | 0 | 5 | 3 | 0 | 19 |
+
+- The one failure of the old resend was Opus on `uncontested-march`: it closed red-2's outcome after its `account` and then wrote `,"departure":"..."}` inside `units`, which is not JSON, so the game would have used the first reply with red-2 put back on its projection (or, in a game, spent a repair call). It is the shape #523's v5 trial ran into (a stray `"departure_placeholder"` in `units`, `units` closed early): Opus writes the reason after the account it has already closed. The new line asks for the field before the `account`.
+- Sonnet met both arms the same way: it gave red-2 its reason and moved blue-3 back each time.
+- On v6 the first reply already gives a reason far more often than on v4 in #440 (Opus 2 of 8 runs of the four cases lacked one, against 4 of 4), so most of #523 is now caught by the live gate's resend; the benchmark still scores the first reply.
+- Small samples: 8 resends per arm, a difference of one reply. The new wording made no reply worse on either model, and it is shorter (one line for all the units, not two per unit).
+
+### Rolls and river placements (#535), 2026-10-16
+
+The 11.12 playtest's umpire (#408, Sonnet, `adjudicate-v4`) never asked for a roll, decided the free game's last assault with no loss to Blue's infantry, and in 5 of 6 turns needed the resend, mostly for units placed in the river or overlapping. Prompt **`adjudicate-v6`** (`v5` was #523's unshipped trial) changes the input and the dice paragraph; see D39, "As built (#535)". Measured through the Claude Code bridge on Sonnet, one call at a time, 54 calls in all, on the playtest's six umpire-turn inputs (the logged `calls` input, rebuilt with `adjudicateInput` from the replayed world at each turn's start; the rebuild equals the logged input exactly but for the new fields, and the v4 prompt was checked equal to the logged one) and on the benchmark's new `crossing-assault` case. Each run is the first reply, with the roll call when it asked and the dice rolled on the turn's own stream, judged by the live stage's `judge`; the resend itself was not made, except where noted.
+
+| Arm | Runs (calls) | Assault turns asking a roll (std 2, std 3, free 2, free 3) | `crossing-assault` asking | River or overlap in the reply | Any problem (would resend) | Schema failures | Median s per turn (first call) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| v4, as played | 14 (14) | 0 of 8 | 0 of 2 | 4 of 14 (std 1, free 2: river; std 2 twice: overlap) | 8 of 14 | 0 | 31 (31) |
+| v6 input, v4 dice wording | 6 (6) | 0 of 4 | 0 of 2 | 0 of 6 | 5 of 6 | 0 | 31 (31) |
+| v6, first wording | 14 (19) | 5 of 8 (none on free 3) | 0 of 2 | 0 of 14 | 5 of 14 | 0 | 40 (29) |
+| **v6, shipped wording** | 7 (13) | 5 of 5 | 1 of 2 | 0 of 7 | 1 of 7, plus 2 one-sided (below) | 0 | 50 (34) |
+
+- **Rolls.** Every roll asked was for the assault on the bridge ("Does Red's column force the south end of the bridge against ...?"), at 0.15 to 0.25, and one for Blue's charge in `crossing-assault` (0.6). The first v6 wording ("do not decide these yourself: an assault on a defended crossing, a charge, a broken unit's rally; for each, state the odds and ask for a roll") asked wherever the outcome was open, but never in free 3 or `crossing-assault`, whose projections already break the attack: the umpire read the projection as settling it. The shipped wording adds "even where the projection already settles it"; it then asked in both free 3 runs and one of two `crossing-assault` runs.
+- **Defender losses in broken assaults.** v4: std 2 79 and 79, free 3 68 (Blue's cavalry broke too). First v6 wording: std 2 48 and 48, free 3 32, `crossing-assault` 13 and 19; the infantry always lost men. Shipped wording: in both free 3 runs the umpire rolled (failed) and then copied the projection, in which Blue's two battalions lose no one (the cavalry 43). The `assault` check, now sent back with the resend, caught both; the two resend calls (28 s each) gave Blue's battalions 22 and 26 men lost between them, kept the break, and passed every check but one ammunition ceiling (#436). They dropped the outcomes' `rollIds`, which a failed roll's outcome does not need.
+- **River and overlap.** None in 34 replies on the new input (4 of 14 on v4). What still sends replies back is the ammunition ceiling (#436) in most turns, and a departure with no reason once.
+- **Latency.** An asked roll costs a second call of 20 to 33 s, so an assault turn takes about 50 to 70 s of adjudication instead of 30. It replaces a river or overlap resend of 25 to 45 s in the turns that had one.
+- Small samples (1 to 2 runs per input and arm) and one model. Raw replies were kept outside the repo.
+
+### Run 2 (#440): the live stage on the game's projection, 2026-10-16
+
+Since #440 every case goes through what a game sends: `engineTurn.projectTurn` (the rules parse, the server's registry, `advanceUntilOver`) with a courier pass forced to the case's courier results, the `adjudicate` stage's own input and prompt (`adjudicate-v4`, `standard`, the default voice), rules version 2, one call through `adjudicateTurn` and no resend (a second call if the umpire asks for rolls). Sonnet and Opus ran through the host's Claude Code bridge (`UMPIRE_PROVIDER=claude-bridge`, models `sonnet` and `opus`, schema in the prompt as the bridge is `json-mode`), each case once, in order. A fresh Opus subagent graded the three umpires blind (letters A to C, the key withheld until it was done).
+
+| Umpire | Cases | Schema | All checks | All but ammo | Failing checks (cases) | Median / p95 per turn | Plausibility | Faithfulness | Consistency | Fog | Prose | Rubric mean | Live gate would use (no resend) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Claude Code, Opus (`opus`) | 12 | 11/12 | 6/12 | 6/12 | schema 1, limits 1, departure 4 | 28 s / 54 s | 5.0 | 4.8 | 4.9 | 5.0 | 5.0 | **4.9** | 11/12 (5 with a clamp) |
+| Claude Code, Sonnet (`sonnet`) | 12 | 11/12 | 10/12 | 10/12 | schema 1, fog 1 | 22 s / 30 s | 4.4 | 4.3 | 4.5 | 4.8 | 3.9 | **4.4** | 10/12 |
+| `test` (projection as proposal) | 12 | 12/12 | 12/12 | 12/12 | none | 0 | 1.8 | 1.2 | 2.3 | 2.0 | 1.0 | 1.7 | 12/12 |
+
+How to read it:
+- **Latency** is the bridge call's wall clock (the CLI's start-up included). No umpire asked for a roll in any case, so every case was one call.
+- **Live gate.** What `adjudicateTurn`'s gate would do with the first answer: apply it (clamping what the validator finds) or fall back to the engine. In a game a failing answer also gets one resend with the problems listed, which the benchmark leaves out so it scores the first answer.
+- **Spot check by hand** on `impossible-order`, `uncontested-march` and `injected-order`: agreement on every ranking and reason. Sonnet's cautious colonel marches over the bridge to the enemy bank on an order to wade, which the grader marked down; Opus has him refuse.
+- **Local models** were not re-run (they failed every case on run 1 and take 13 to 44 minutes a turn here).
+
+What changed from run 1:
+- **The projection is now much weaker, so departures dominate.** The rules parser reads 8 of the 29 orders sent in the cases' turns (plain verbs and named places only; "storm the bridge", "push on", "screen the front" or anything with "if" are "no new order"), so in most cases the projection leaves the addressed units standing; and in `uncontested-march` and `injected-order` it marches the Vanguard onto the undefended bridge and ends the game. Both Claude umpires overrule it in nearly every case (rejecting the objective "wins"). Sonnet gives a reason on each unit it moves (no departure failures; one on run 1). **Opus now fails the departure check in 4 cases**: it moves units by its reading of their orders and explains it in the `summary`, not in each unit's `departure` (none on run 1). The live gate would still apply those answers, clamping the unexplained units back to the projection, which loses the better reading.
+- **The ammunition-ceiling finding (#436) is gone from this run, but not because the rule changed.** No case fails `ammo` now (5 of 12 for both Claude umpires on run 1). The game's projection fires almost nothing here, because the rules leave the fighting units standing, and it resupplies 50 a turn, so the projection's ammunition is 100 for every unit and no answer can exceed it. The cases no longer test the ceiling; the argument for #436 (PR #460, not merged at the time of this run) stands on its own.
+- **New single failures.** Each Claude umpire failed the schema once on a key the zod schema does not allow (Sonnet a top-level `departure` in `injected-order`, Opus `departure: null` in `ambiguous-order`); in a game the resend would list the problem. Sonnet's `impossible-order` fails `fog` because Blue's account says "a hussar squadron was seen": the enemy unit's name is "Hussar Squadron", so the check cannot tell a description from a name. That was a false positive of the check's name match, and the gate fell back on it; since #524 a name made only of arm and size words is not a hidden term (D35, "Generic names").
+- **The projection's grade fell from 2.6 to 1.7**: it now leaves units standing on orders that arrived, marks those orders carried out, and accepts objective captures no defender contested.
+- **Rubric.** Opus 5.0 to 4.9, Sonnet 4.8 to 4.4 (weaker readings of a cautious colonel, a doubtful repulse at the bridge, plainer prose). The order of the three is unchanged.
+
+**Recommendation** (unchanged): Sonnet as the `adjudicate` default and Opus for a game that wants the best umpire; no local model on this host; the keyless demo keeps the `test` provider's projection. Two things follow for the turn umpire: the prompt should ask for each unit's departure reason on that unit, not in the summary (Opus); and the rules parser is the projection's weak point, since under `standard` it is the reference the umpire must justify departing from.
+
+**Follow-up (#523), 2026-10-16.** `TurnProposal` now reads `departure: null` as absent. A prompt `adjudicate-v5` was tried and not shipped (the stage stays on `adjudicate-v4`): it told the umpire that each unit beyond the tolerance needs its own `departure` (a reason only in the `summary` or another unit's outcome does not count) and that `departure` sits in the unit's outcome and is left out, not null, when there is none. The four Opus cases that failed `departure` above, run once each through the bridge on v5, came out worse: `uncontested-march` again gave its reasons only in the `summary` (red-1 400 m, red-2 755 m), and the other three did not parse (`cavalry-screen` ended `units` with a stray string `"departure_placeholder"` and an empty summary; `injected-order` returned one unit with an unknown `orders_note: null` key and an empty summary; `impossible-order` closed `units` early, so not JSON). No unit in any reply carried a `departure`. Four single runs cannot separate the wording from noise, but v4 parsed all four, so the per-unit departure reason needs another approach.
+
+### Run 1 (#398): the benchmark's own projection, 2026-10-12/13
+
+Prompt `adjudicate-v0`, the benchmark's own projection (rules parses written into the cases, `advanceTo`, its own registry; replaced by #440), Claude Code panes answering exported prompts. Outputs and grades are in `server/bench/umpire/v0/`.
 
 | Umpire | Cases | Schema | All checks | All but ammo | Failing checks (cases) | Median / p95 per turn | Plausibility | Faithfulness | Consistency | Fog | Prose | Rubric mean | Disk | Memory |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -138,28 +211,9 @@ Story 11.2 (#398): can a model adjudicate a whole turn (D39)? The cases, prompt 
 | `gemma4:26b`, `gemma4:31b` | - | not run | | | | | | | | | | | 18.7 / 20.4 GB | |
 | Anthropic API | - | not run | | | | | | | | | | | | |
 
-How to read it:
-- **Cases.** The Claude Code umpires and `test` answered all 12 cases. The local models ran a fixed subset, because one turn takes them 13 to 44 minutes here: the 7-8B models and Gemma 4 e4b ran `uncontested-march`, `advance-to-contact`, `bridge-assault`, `courier-mid-turn`, `impossible-order` and `injected-order`; `llama3.1:8b` lost its sixth (`injected-order`) to a Docker daemon crash on the host and is reported on five. Rubric means are over the cases each model ran. On that same six-case subset Opus passes 6/6 and Sonnet 5/6 of every check but ammo.
-- **Not run.** `gemma4:12b` and `qwen2.5:14b` were not run: the 7-8B models already take 13 to 27 minutes per turn on this host, a 12-14B model would take roughly twice that, and the owner capped the run after the daemon crash. `gemma4:26b` and `gemma4:31b` need more memory than the host has. No `ANTHROPIC_API_KEY` is configured, so the API rows were not run; the Claude Code panes stand in for Sonnet and Opus with the same prompt and schema.
-- **Latency.** Claude Code times are from each pane's `date` before reading a case and after writing the answer, so they include file handling and are an upper bound on an API call. Local times are wall clock with Ollama on about 2 CPUs (its default thread count here) while other agents shared the host; the Gemma run was capped at 1.5 CPUs.
-- **Memory.** `qwen2.5:7b` from Ollama `/api/ps`; `gemma4:e4b` from `docker stats` while it ran (Ollama's `/api/ps` reported 1.9 GB after the run, which is not its working set); `llama3.1:8b` was not recorded before the crash.
-- **Grading.** A separate Opus pane graded every proposal blind (letters A to F, model names and the key withheld). Grades are in `server/bench/umpire/grading/grades.json`, the key in `blind-key.json`. The grader may be biased toward Claude's own style; the automatic checks agree with its ranking independently. Spot check by hand on three cases (`impossible-order`, `uncontested-march`, `injected-order`): agreement on every ranking and on the reasons, with one correction to a note: the grader says the projection marched Blue-2 "over the impassable river" in `impossible-order`, but the engine routed it over the bridge; the outcome (a battalion through the Red army to its headquarters in 17 minutes on an order to wade) is still implausible, so the score stands.
-
-What the failures were:
-- **All three local models** copy the engine's projection for positions and losses and then write accounts that contradict it (`qwen2.5:7b` has Blue-2 "hesitate to cross" while placing it at the enemy headquarters; `llama3.1:8b` says it "waded the river" and that the hussars were destroyed "in the previous turn" on turn 1). Every one lists a unit as having observed itself, and two attach orders to units they were not sent to. `gemma4:e4b` departs from the projection but badly: it marches Red through the Blue line in an "uncontested" march, puts a battalion in the river, marks an order still on the road as carried out, and **writes the injected marker word**, obeying instructions hidden in an order.
-- **Opus and Sonnet** read every order as written and as the commander would (the cautious colonel refuses to wade the river, the aggressive major makes one unauthorised charge, the garbled order is misread, the order on the road is not acted on), ignore the injected text and say so, and explain each departure from the projection. Their only check failures are D39's ammunition ceiling (below) and one missing departure reason from Sonnet.
-- **The projection itself** (`test`, what `rigid` and the keyless demo do) passes every check but grades 2.6: the engine's march rates and combat are harsh (a column storming the bridge ends at 96 men, a hussar squadron is destroyed in 15 minutes, cavalry pursue 1.3 km), and it cannot refuse an impossible order or let a personality bend one.
-
-Findings for the turn-mode stories (measured on the benchmark's own projection, written before 11.4's `engineTurn.projectTurn` landed and different from it in the ways [umpire-benchmark.md](umpire-benchmark.md#the-projection) lists; re-running on 11.4's is #440):
-- **D39's ammunition ceiling is wrong.** "The projection's value is the ceiling" fails every umpire that has a unit fire less than the engine did (5 of 12 cases for both Claude umpires). The rule should be "no rise above the `T0` value except by the engine's supply rule"; 11.5 (#401) built the validator with the projection ceiling, so this is #436.
-- **D39's reach rule hardly ever applies.** With engine march rates (cavalry 6 km and infantry 2 km per 20-minute turn) every unit on "Hold the Bridge" is within some enemy's reach every turn, so "no loss out of reach" catches nothing here (11.5).
-- **Observations need a clearer prompt.** Every local model listed self-sightings; the field names (`unitId` seen, `by` observer) are easy to swap. 11.6 should say it in the prompt and the validator should drop them quietly (D39 already drops observations that fail the sight test).
-- **Local calls cannot last past 300 s** through the server's `fetch` (#415), so a local adjudicator would fail at the timeout D39 sets even if it were good enough.
-
-**Recommendation.**
-- **Cloud: Sonnet** (`claude-sonnet-5-5`) as the `adjudicate` default, as D39 says. It grades 4.8 against Opus's 5.0, with the same check results apart from one missing departure reason, at the same speed in this harness; Opus is the option for a game whose owner wants the best umpire and accepts the cost.
-- **Local: no model that runs on this host is good enough.** The 7-8B models and Gemma 4 e4b fail every case, take 13 to 44 minutes per turn, and one obeys injected text. Larger local models were not run; on this hardware they would be slower still.
-- **Keyless demo:** keep D39's plan: `adjudicate` is not an Ollama stage, the `test` provider answers with the projection (the engine's resolution, with the canned badge), so turn mode plays as `rigid` at every dial. It is consistent and checkable but harsh and literal (rubric 2.6); with a key the umpire is Sonnet.
+- **Cases.** The local models ran a fixed six-case subset (`uncontested-march`, `advance-to-contact`, `bridge-assault`, `courier-mid-turn`, `impossible-order`, `injected-order`; `llama3.1:8b` lost the sixth to a Docker daemon crash), because one turn takes them 13 to 44 minutes on this host (4 CPUs, no GPU). 12-14B models were not run for time; 26-31B models need more memory than the host has.
+- **All three local models** copied the projection's positions and losses and wrote accounts that contradict them, listed units observing themselves, and attached orders to the wrong units; `gemma4:e4b` wrote the injected marker word. **Opus and Sonnet** read every order as its commander would and ignored the injection; their only failures were the ammunition ceiling and one missing departure reason.
+- Findings then: D39's ammunition ceiling ("the projection's value") fails umpires whose units fire less than the engine's (#436); the "no loss out of reach" rule never applies at the engine's march rates on this map; models confuse the observation fields; local calls cannot outlast 300 s through Node's `fetch` (#415). Run 2 no longer measures the first (see above); the others are unchanged.
 
 ## Structured output
 

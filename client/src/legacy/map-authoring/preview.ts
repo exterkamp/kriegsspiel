@@ -1,6 +1,7 @@
 import type { Point } from '@kriegsspiel/maps';
 import { loadPreviewAsset, type AssetLoadResult, type PreviewAsset } from './asset.js';
 import { DEFAULT_LAYERS, MapRenderer, type Layer, type Layers } from './renderer.js';
+import { PERIOD_MAP_STYLE } from './map-style.js';
 import { observeDisplayLifecycle } from './display-lifecycle.js';
 import { geometryBounds } from './geometry.js';
 import {
@@ -146,7 +147,7 @@ export class MapPreview {
   loadAsset(input: unknown, source: PreviewState['source'] = 'asset'): AssetLoadResult {
     const result = loadPreviewAsset(input);
     if (result.ok) {
-      const renderer = new MapRenderer(result.asset);
+      const renderer = new MapRenderer(result.asset, PERIOD_MAP_STYLE);
       this.renderer = renderer;
       this.source = source;
       this.issues = [];
@@ -225,9 +226,17 @@ export class MapPreview {
       if (this.canvas.width !== width) this.canvas.width = width;
       if (this.canvas.height !== height) this.canvas.height = height;
       const drawStarted = this.onFrame ? performance.now() : 0;
-      this.renderer.render(this.context, view, this.layers, this.highContrast, dpr);
+      const incomplete = this.renderer.render(
+        this.context,
+        view,
+        this.layers,
+        this.highContrast,
+        dpr,
+      );
       const drawEnded = this.onFrame ? performance.now() : 0;
       this.publish();
+      // Hachure tiles are made a few per frame; keep drawing until the view is complete.
+      if (incomplete) this.schedule();
       if (this.onFrame) {
         const ended = performance.now();
         this.onFrame(

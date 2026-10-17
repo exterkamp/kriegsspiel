@@ -1,0 +1,43 @@
+wooded-hills  1: anisotropy 1.13  aspect 8.1% 9.1% 8.9% 8.9%  rivers align 0.58 grid 11.2%
+wooded-hills  2: anisotropy 1.04  aspect 9.8% 7.9% 8.4% 9.1%  rivers align 0.65 grid 12.3%
+wooded-hills  3: anisotropy 1.12  aspect 7.4% 8.8% 9.1% 9.9%  rivers align 0.68 grid 7.7%
+wooded-hills  4: anisotropy 1.12  aspect 7.7% 7.6% 10.2% 8.9%  rivers align 0.72 grid 16.5%
+wooded-hills  5: anisotropy 1.22  aspect 8.1% 7.6% 9.9% 11.0%  rivers align 0.75 grid 12.4%
+wooded-hills  6: anisotropy 1.09  aspect 9.0% 9.5% 9.0% 8.9%  rivers align 0.64 grid 10.2%
+wooded-hills  7: anisotropy 1.76  aspect 5.6% 9.8% 13.9% 6.0%  rivers align 0.84 grid 13.6%
+wooded-hills  8: anisotropy 1.05  aspect 7.8% 8.3% 8.8% 8.0%  rivers align 0.61 grid 15.3%
+wooded-hills  9: anisotropy 1.11  aspect 9.4% 8.4% 7.7% 8.3%  rivers align 0.76 grid 13.8%
+wooded-hills 10: anisotropy 1.16  aspect 9.1% 7.9% 8.2% 10.0%  rivers align 0.67 grid 12.2%
+wooded-hills 11: anisotropy 1.08  aspect 8.4% 8.6% 9.0% 10.1%  rivers align 0.64 grid 11.1%
+wooded-hills 12: anisotropy 1.50  aspect 9.3% 10.1% 6.0% 8.8%  rivers align 0.66 grid 13.1%
+wooded-hills 13: anisotropy 1.08  aspect 9.1% 8.6% 9.1% 9.8%  rivers align 0.72 grid 16.2%
+wooded-hills 14: anisotropy 1.18  aspect 7.4% 9.3% 9.4% 8.0%  rivers align 0.67 grid 16.0%
+wooded-hills 15: anisotropy 1.11  aspect 9.4% 7.8% 7.7% 9.4%  rivers align 0.00 grid 0.0%
+wooded-hills 16: anisotropy 1.07  aspect 8.2% 9.0% 7.9% 8.5%  rivers align 0.68 grid 6.1%
+wooded-hills 17: anisotropy 1.34  aspect 7.7% 7.0% 9.5% 10.8%  rivers align 0.66 grid 9.7%
+wooded-hills 18: anisotropy 1.50  aspect 7.1% 7.6% 9.3% 11.1%  rivers align 0.70 grid 13.2%
+wooded-hills 19: anisotropy 1.35  aspect 6.9% 7.5% 11.3% 8.9%  rivers align 0.67 grid 15.0%
+wooded-hills 20: anisotropy 1.11  aspect 8.7% 7.1% 9.8% 9.0%  rivers align 0.69 grid 11.6%
+== wooded-hills (20 maps): anisotropy mean 1.207 max 1.76; aspect 0/45/90/135 8.2% / 8.4% / 9.2% / 9.2% (uniform 8.3%); river alignment 0.686 (uniform 0.64), near grain 20.1% (uniform 16.7%), grid 3.4% / 3.8% / 2.5% / 3.0% = 12.6% (uniform 11.1%)
+river-valley  1: anisotropy 1.04  aspect 9.0% 8.3% 8.5% 8.4%  rivers align 0.62 grid 12.0%
+river-valley  2: anisotropy 1.42  aspect 10.9% 7.1% 8.2% 9.9%  rivers align 0.77 grid 11.3%
+river-valley  3: anisotropy 1.34  aspect 10.9% 8.4% 6.1% 12.9%  rivers align 0.72 grid 14.7%
+river-valley  4: anisotropy 1.70  aspect 9.2% 14.1% 9.1% 5.9%  rivers align 0.85 grid 10.7%
+river-valley  5: anisotropy 1.16  aspect 7.4% 9.8% 9.7% 8.9%  rivers align 0.64 grid 10.6%
+river-valley  6: anisotropy 1.33  aspect 7.3% 8.1% 10.1% 10.6%  rivers align 0.67 grid 13.7%
+river-valley  7: anisotropy 1.27  aspect 9.2% 9.1% 10.8% 6.9%  rivers align 0.72 grid 13.6%
+river-valley  8: anisotropy 1.12  aspect 8.2% 10.5% 9.4% 10.7%  rivers align 0.71 grid 10.7%
+river-valley  9: anisotropy 1.25  aspect 10.6% 8.3% 8.6% 8.2%  rivers align 0.66 grid 11.4%
+river-valley 10: anisotropy 1.08  aspect 9.3% 9.8% 9.1% 8.3%  rivers align 0.62 grid 13.0%
+river-valley 11: anisotropy 1.34  aspect 10.8% 11.0% 6.3% 8.2%  rivers align 0.73 grid 12.9%
+river-valley 12: anisotropy 1.38  aspect 6.4% 9.6% 9.3% 11.2%  rivers align 0.70 grid 23.5%
+river-valley 13: anisotropy 1.19  aspect 8.8% 8.5% 8.8% 10.6%  rivers align 0.67 grid 10.0%
+river-valley 14: anisotropy 1.08  aspect 9.3% 7.2% 9.0% 9.5%  rivers align 0.68 grid 10.5%
+river-valley 15: anisotropy 1.57  aspect 5.5% 8.4% 11.6% 9.3%  rivers align 0.76 grid 9.6%
+river-valley 16: anisotropy 1.17  aspect 8.5% 10.5% 8.6% 7.6%  rivers align 0.74 grid 10.0%
+river-valley 17: anisotropy 1.16  aspect 7.1% 8.3% 10.1% 10.4%  rivers align 0.70 grid 8.7%
+river-valley 18: anisotropy 1.29  aspect 11.0% 8.5% 7.2% 8.9%  rivers align 0.76 grid 15.2%
+river-valley 19: anisotropy 1.26  aspect 9.0% 10.7% 7.3% 8.4%  rivers align 0.68 grid 5.2%
+river-valley 20: anisotropy 1.03  aspect 8.5% 7.8% 8.4% 9.5%  rivers align 0.66 grid 9.4%
+== river-valley (20 maps): anisotropy mean 1.259 max 1.70; aspect 0/45/90/135 8.9% / 9.2% / 8.8% / 9.2% (uniform 8.3%); river alignment 0.707 (uniform 0.64), near grain 23.2% (uniform 16.7%), grid 2.7% / 2.8% / 2.9% / 3.3% = 11.7% (uniform 11.1%)
+== all (40 maps): anisotropy mean 1.233 max 1.76; aspect 0/45/90/135 8.5% / 8.8% / 9.0% / 9.2% (uniform 8.3%); river alignment 0.698 (uniform 0.64), near grain 21.9% (uniform 16.7%), grid 3.0% / 3.2% / 2.7% / 3.2% = 12.1% (uniform 11.1%)

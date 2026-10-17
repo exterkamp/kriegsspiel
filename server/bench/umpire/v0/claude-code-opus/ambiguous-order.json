@@ -1,0 +1,21 @@
+{
+  "caseId": "ambiguous-order",
+  "model": "claude-code-opus",
+  "provider": "claude-code",
+  "promptVersion": "adjudicate-v0",
+  "latencyMs": 28873,
+  "raw": "{\"turn\":1,\"units\":[\n{\"unitId\":\"blue-1\",\"x\":2000,\"y\":1650,\"facingDeg\":0,\"formation\":\"line\",\"strength\":600,\"morale\":80,\"fatigue\":3,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[{\"orderId\":\"b1-8\",\"result\":\"carried-out\"}],\"account\":\"Col. Aubry read the order as written: a good position near the river. He moved his line about 50 m forward and towards the road, so his right covers the south end of the bridge at musket range. He halted there to receive whatever comes over it. No enemy was in sight.\"},\n{\"unitId\":\"blue-2\",\"x\":2140,\"y\":1680,\"facingDeg\":0,\"formation\":\"line\",\"strength\":550,\"morale\":75,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"Col. Delacroix had no new orders, so he held his line east of the road and watched the far bank.\"},\n{\"unitId\":\"blue-3\",\"x\":2050,\"y\":1850,\"facingDeg\":0,\"formation\":\"line\",\"strength\":200,\"morale\":85,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"Maj. Verneuil had no orders, so he held his squadron behind the infantry, watching the road across the river for enemy movement.\"},\n{\"unitId\":\"red-1\",\"x\":1950,\"y\":300,\"facingDeg\":180,\"formation\":\"line\",\"strength\":650,\"morale\":80,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"Col. Brandt had no orders this turn, so he held his line and waited impatiently.\"},\n{\"unitId\":\"red-2\",\"x\":2100,\"y\":1100,\"facingDeg\":180,\"formation\":\"column\",\"strength\":650,\"morale\":70,\"fatigue\":12,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"move\",\"x\":2050,\"y\":1380},\"orders\":[{\"orderId\":\"r2-8\",\"result\":\"carried-out\"}],\"account\":\"Col. Hartmann read 'Push on' as an order to advance along the line of march towards the bridge, the army's objective. He formed column of march, gained the high road and went south about 950 m. By the end he could see enemy lines across the river, and he keeps marching on the bridge.\",\"departure\":\"The engine left the battalion holding. The order arrived at minute 3 and plainly asks for an advance, so it marched about 960 m south in column towards the bridge.\"},\n{\"unitId\":\"red-3\",\"x\":1550,\"y\":400,\"facingDeg\":180,\"formation\":\"line\",\"strength\":220,\"morale\":85,\"fatigue\":0,\"ammo\":100,\"status\":\"active\",\"continuing\":{\"kind\":\"hold\"},\"orders\":[],\"account\":\"Maj. von Reiter had no orders, so he held his squadron west of the road.\"}\n],\n\"observations\":[\n{\"side\":\"blue\",\"by\":\"blue-1\",\"unitId\":\"red-2\",\"when\":\"end\"},\n{\"side\":\"blue\",\"by\":\"blue-2\",\"unitId\":\"red-2\",\"when\":\"end\"},\n{\"side\":\"blue\",\"by\":\"blue-3\",\"unitId\":\"red-2\",\"when\":\"end\"},\n{\"side\":\"red\",\"by\":\"red-2\",\"unitId\":\"blue-1\",\"when\":\"end\"},\n{\"side\":\"red\",\"by\":\"red-2\",\"unitId\":\"blue-2\",\"when\":\"end\"}\n],\n\"summary\":\"Turn 1 (0-20). Two loose orders were issued. Blue's 1st Battalion was told to take a good position near the river. Its literal colonel shifted the line a short way forward and towards the road, so it covers the bridge's south exit at musket range, then halted. Red's Line Battalion was told only 'Push on'. Its by-the-book colonel took that as an advance on the bridge, formed column, took the high road and marched about 950 m south, ending at about (2100,1100), ahead of the rest of its side. At the end it and the Blue infantry and cavalry south of the river can see each other at 550-750 m. No shots were fired. Every other unit held its ground without orders.\"}\n",
+  "checks": {
+    "pass": true,
+    "problems": {
+      "schema": [],
+      "ids": [],
+      "limits": [],
+      "ammo": [],
+      "observations": [],
+      "fog": [],
+      "departure": [],
+      "injection": []
+    }
+  }
+}

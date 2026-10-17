@@ -141,12 +141,26 @@ export function runThrough(start: EngineState<GameState>, stops: number[]): Run 
  */
 const MAX_MM_PER_MS = 1000 / (MS_PER_MINUTE / 400 / 8);
 
-/** Violations of the rules that must hold at every instant of every game, as readable strings. */
+/**
+ * Violations of the rules that must hold at every instant of every game, as readable strings.
+ *
+ * `sampleAt` gives the two instants the positions are read at; `dt` must be their difference.
+ * Callers that advance the engine (runChecked) must pass the engine stop times, not the worlds'
+ * own `time`: a world's `time` is only stamped by event handlers as they fire (see
+ * visibility.ts: "world.time only moves when an event..."), so between events it lags the engine
+ * clock, and an event inside a short advance can stamp it forward by a whole inter-event gap.
+ * Reading positions at the world times while dividing by the engine interval then reports a
+ * marching unit's accumulated movement as a teleport (#409). Positions read at the engine stop
+ * times are the model's true positions at those instants (movement.ts: positionAt), and a leg is
+ * continuous there: a march starts where the unit stands and combat places a unit at its
+ * positionAt, so anything faster than MAX_MM_PER_MS at those samples is a real jump.
+ */
 export function violations(
   prev: GameState,
   cur: GameState,
   dt: number,
   startUnits: ReadonlySet<string>,
+  sampleAt?: { from: number; to: number },
 ): string[] {
   const bad: string[] = [];
   if (cur.units.length !== startUnits.size) bad.push('unit count changed');
@@ -179,8 +193,8 @@ export function violations(
     ) {
       bad.push(`${u.id}: off the map at ${u.center.x},${u.center.y}`);
     }
-    const a = positionAt(prev.map, p, prev.time);
-    const b = positionAt(cur.map, u, cur.time);
+    const a = positionAt(prev.map, p, sampleAt ? sampleAt.from : prev.time);
+    const b = positionAt(cur.map, u, sampleAt ? sampleAt.to : cur.time);
     const moved = Math.hypot(b.x - a.x, b.y - a.y);
     if (moved > dt * MAX_MM_PER_MS + 2) {
       bad.push(`${u.id}: teleported ${Math.round(moved)}mm in ${dt}ms`);
@@ -209,7 +223,10 @@ export function runChecked(start: EngineState<GameState>, stops: number[]) {
     const r = advanceTo(state, t, reg);
     state = r.state;
     emitted.push(...r.emitted);
-    for (const v of violations(prev.world, state.world, t - prev.time, ids)) {
+    for (const v of violations(prev.world, state.world, t - prev.time, ids, {
+      from: prev.time,
+      to: state.time,
+    })) {
       found.push(`t=${t}: ${v}`);
     }
     for (let i = 1; i < state.queue.length; i++) {

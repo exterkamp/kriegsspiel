@@ -19,6 +19,7 @@ import {
   deserialize,
   heldTurn,
   mayDraft,
+  MS_PER_MINUTE,
   maySign,
   pursuitEndsAt,
   serialize,
@@ -91,6 +92,7 @@ import {
   type OpenTurn,
   type TurnAgent,
   type TurnInput,
+  type TurnReports,
   type TurnResolution,
   type TurnResolver,
 } from './turns.js';
@@ -108,6 +110,9 @@ const realTimers: Timers = {
 
 /** Longest single sleep; Node timers overflow beyond 2^31-1 ms. */
 const MAX_SLEEP_MS = 2 ** 30;
+
+/** Times a resolved turn's log entry is offered to the store in a row before the caller is told (#416). */
+export const TURN_APPEND_ATTEMPTS = 3;
 
 /** The umpire's state as the client shows it ("staff at work"). */
 export interface StaffAtWork {
@@ -207,6 +212,8 @@ export interface GameActorOptions {
   persona?: UmpirePersona;
   /** The narration circuit breaker of a reopened game, from its input log (#419). Default closed. */
   narrateBreaker?: NarrateBreakerState;
+  /** Narrated text by side and report id of a reopened game (its turn reports, 11.9). */
+  narrations?: ReadonlyMap<string, ReadonlyMap<string, string | null>>;
   /** Server-side agents that play scripted sides (see `opponent/`). */
   agents?: SideAgent[];
   /** Pause voting: who votes and the host's rules. Unset: the vote commands are refused. */
@@ -313,6 +320,12 @@ export class GameActor {
   private readonly deputyAccounts = new Map<string, DeputyAccount[]>();
   /** Agent orders issued since the last flush, to be appended to the input log in order. */
   private agentLog: InputLogEntry[] = [];
+  /**
+   * Entries the store has not taken yet that must reach it before anything logged after them: a
+   * resolved turn whose append failed, and everything logged since (#416). While any is here no
+   * snapshot is saved, so a restart never resumes past a turn the log lacks.
+   */
+  private unlogged: InputLogEntry[] = [];
   private readonly snapshotEvery: number;
   /** Seq covered by the newest stored snapshot. */
   private snapshotSeq: number;
@@ -390,6 +403,7 @@ export class GameActor {
     this.umpire = options.umpire;
     this.persona = options.persona;
     this.narrateBreaker = options.narrateBreaker ?? closedBreaker();
+    for (const [side, text] of options.narrations ?? []) this.narrations.set(side, new Map(text));
     for (const [side, list] of options.staffHistory ?? []) {
       this.staffHistory.set(side, [...list]);
       // Asked before a stop and not yet answered: answered when due, as if the game had not stopped.
@@ -638,6 +652,9 @@ export class GameActor {
       }
     }
     await this.tail.catch(() => undefined);
+    // One last try for a resolved turn the store refused (#416); if it still fails, no snapshot
+    // covers it, so a reopened game resolves the turn again from the log.
+    if (this.unlogged.length > 0) await this.flushUnlogged().catch(() => undefined);
     // A clean stop: the next start measures downtime from here, not from the last tick.
     await this.store.saveHeartbeat(this.id, this.wallNow()).catch(() => undefined);
   }
@@ -1436,9 +1453,40 @@ export class GameActor {
 
   /** Append the agent orders issued so far, before anything logged after them. */
   private async flushAgentLog(): Promise<void> {
+    await this.append();
+  }
+
+  /**
+   * Append the agent orders issued so far, then `entry`. A resolved turn may not be lost from the
+   * log (#416): its append is retried, and if the store still refuses it, it and everything logged
+   * after it wait in `unlogged`, in order, and go first on the next append. Other entries are
+   * appended once, as before.
+   */
+  private async append(entry?: InputLogEntry): Promise<void> {
+    if (this.unlogged.length > 0 || entry?.command.kind === 'resolveTurn') {
+      this.unlogged.push(...this.agentLog.splice(0), ...(entry ? [entry] : []));
+      return this.flushUnlogged();
+    }
     while (this.agentLog.length > 0) {
-      const entry = this.agentLog.shift()!;
-      await this.store.appendInput(this.id, entry);
+      const next = this.agentLog.shift()!;
+      await this.store.appendInput(this.id, next);
+    }
+    if (entry) await this.store.appendInput(this.id, entry);
+  }
+
+  /** Hand the store every waiting entry in order; throws, keeping the rest, if it refuses one. */
+  private async flushUnlogged(): Promise<void> {
+    while (this.unlogged.length > 0) {
+      const entry = this.unlogged[0]!;
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await this.store.appendInput(this.id, entry);
+          break;
+        } catch (e) {
+          if (attempt >= TURN_APPEND_ATTEMPTS) throw e;
+        }
+      }
+      this.unlogged.shift();
     }
   }
 
@@ -1532,6 +1580,10 @@ export class GameActor {
       this.enqueue(async () => {
         if (this.pauseVoting?.isDue(this.wallNow())) await this.apply({ kind: 'pauseExpire' });
         if (this.ratioVoting?.isDue(this.wallNow())) await this.apply({ kind: 'rateExpire' });
+        // A timer can wake a millisecond before the wall clock reaches the deadline (Node times it
+        // on the monotonic clock, `wallNow` is Date.now), and a long sleep is capped: then nothing
+        // was due and nothing re-armed it, so sleep again or the vote never lapses (#503).
+        if (!this.pauseTimerSet) this.reschedulePause();
       }).catch((e) => {
         if (this.trace.enabled) this.trace.record(this.id, 'error', { source: 'pause', error: e });
         this.onError?.(e);
@@ -1620,8 +1672,7 @@ export class GameActor {
   private async commit(entry: InputLogEntry): Promise<void> {
     // A failing store must not leave the scheduler unarmed after the clock already changed.
     try {
-      await this.flushAgentLog();
-      await this.store.appendInput(this.id, entry);
+      await this.append(entry);
       this.sync();
       await this.persistProgress();
       // Not while an order is mid-parse: its seq is taken at signing but it is logged when the
@@ -1828,6 +1879,8 @@ export class GameActor {
         throw new Error('orders go through submitOrder');
       case 'narrate':
         throw new Error('narration is logged by the scheduler');
+      case 'turnReports':
+        throw new Error('turn reports are logged with their turn');
       case 'staffAnswer':
         throw new Error('staff answers are logged by answerStaff');
       case 'critique':
@@ -1946,6 +1999,8 @@ export class GameActor {
       try {
         return await turns.resolver.resolve(state, input, {
           agents: () => this.turnAgents(t.n),
+          // Nobody reads a scripted side's papers (#419), so none are written for it (11.9).
+          reportSides: turns.humans,
         });
       } catch (e) {
         // A resolver must always answer; one that throws leaves the units on their last orders.
@@ -1998,18 +2053,99 @@ export class GameActor {
       }
       if (this.clock.status !== 'stopped') this.clock.skipTo(t.endMs);
       this.sync();
+      this.settleTurnMinute(t.endMs);
       entry.endGameMs = this.engine.time;
     } finally {
       this.openTurn = undefined;
       this.onStaffAtWork?.({ working: false });
     }
+    // Each side's papers of the turn (11.9), only if the turn was applied as resolved. Shown before
+    // the turn's entry is committed, so a side is first sent its papers in their narrated words.
+    const reports = entry.error ? [] : this.showTurnReports(res.reports ?? []);
     if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
     try {
       await this.commit(entry);
+      await this.logTurnReports(reports);
     } finally {
       // The turn is resolved in memory whether or not the store took it; a failed commit must not
-      // leave the live game with no turn open (a restart would re-resolve it from the log).
+      // leave the live game with no turn open. The entry is not lost (#416): `append` retried it
+      // and keeps it, ahead of the next turn's `openTurn`, until the store takes it, and no
+      // snapshot is saved meanwhile, so a restart before then resolves the turn again from the log.
       await this.openNextTurn(t.n);
+    }
+  }
+
+  /**
+   * The general guard against a phantom turn (#434): a turn that ends at `endMs` settles the rest
+   * of that game minute before the next turn opens. If the game is decided in it (a combat tick or a
+   * rout that runs on a cadence from first contact, say 0.3 s past the turn's end), it ends there
+   * and no turn opens; otherwise nothing moves and the next turn opens at `endMs`. The look ahead
+   * is on a copy and stops short of the next scripted decision, so only the ordinary handlers run
+   * in it, as they would in real time with no new order; when it finds an outcome the live world is
+   * advanced to it (the turn's `endGameMs`, which replay settles to). #431 already counts the hold
+   * and a battle's close from the minute; this covers every other decider.
+   */
+  private settleTurnMinute(endMs: number): void {
+    if (this.engine.world.outcome || this.engine.time !== endMs) return;
+    let until = Math.floor(endMs / MS_PER_MINUTE) * MS_PER_MINUTE + MS_PER_MINUTE - 1;
+    for (const a of this.agents) if (!a.retired) until = Math.min(until, a.nextAt - 1);
+    if (until <= endMs) return;
+    const outcome = advanceUntilOver(this.engine, until, this.registry).state.world.outcome;
+    if (!outcome) return;
+    if (this.clock.status !== 'stopped') this.clock.skipTo(outcome.time);
+    this.sync();
+  }
+
+  /**
+   * Put each side's narrated papers of a turn in place of their template text (11.9). A note is kept
+   * only for a report the applied turn really filed for that side, so it can never land on another.
+   */
+  private showTurnReports(reports: readonly TurnReports[]): TurnReports[] {
+    return reports.map((r) => {
+      const filed = new Set(
+        (this.engine.world.intel[r.side as SideId]?.reports ?? []).map((x) => x.id),
+      );
+      const narrated = r.narrated.filter((n) => filed.has(n.reportId));
+      const text = this.narrations.get(r.side) ?? new Map<string, string | null>();
+      for (const n of narrated) text.set(n.reportId, n.text);
+      this.narrations.set(r.side, text);
+      return { ...r, narrated };
+    });
+  }
+
+  /**
+   * Journal each side's papers of a turn (11.9) as a `turnReports` entry per side, with its calls
+   * and the notes that replaced template text. Display text only: nothing in the engine changes,
+   * and a reopened game takes the notes from these entries.
+   */
+  private async logTurnReports(reports: readonly TurnReports[]): Promise<void> {
+    for (const r of reports) {
+      if (this.trace.enabled) {
+        // One admin LLM row per side whose papers kept any template text, with the reasons.
+        if (r.error) {
+          this.trace.record(this.id, 'llm', {
+            mode: 'fallback',
+            stage: 'narrate',
+            provider: 'turn report checks',
+            ok: false,
+            errorKind: 'template text used',
+            error: `${r.side}: ${r.error}`,
+            fallbackFor: { reason: r.error },
+          });
+        }
+      }
+      const entry: InputLogEntry = {
+        seq: ++this.seq,
+        wallMs: this.wallNow(),
+        gameMs: this.engine.time,
+        endGameMs: this.engine.time,
+        command: { kind: 'turnReports', side: r.side, turn: r.turn },
+        calls: r.calls,
+        narrated: r.narrated,
+        ...(r.error ? { error: r.error } : {}),
+      };
+      if (this.trace.enabled) this.trace.record(this.id, 'command', entry);
+      await this.commit(entry);
     }
   }
 

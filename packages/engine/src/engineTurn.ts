@@ -151,6 +151,9 @@ export function courierPass(
 
   const couriers: TurnCourier[] = [];
   const forced: Record<string, ForcedIssue> = {};
+  const endDice = new Map<string, RngState>();
+  for (const c of end.state.world.couriers)
+    if (c.dice !== undefined) endDice.set(c.order.id, c.dice);
   const fresh = new Set(orders.map((o) => o.id));
   const describe = (order: Order, c: Courier | undefined) => {
     const f = fate.get(order.id);
@@ -175,6 +178,10 @@ export function courierPass(
       if (lost !== undefined) ride.lostAt = lost;
       if (c.garbled) ride.garbled = c.garbled;
     }
+    // A courier on its own dice (#432) leaves the turn with them as the pass left them, so the
+    // turn's courier state at `T1` is the pass's and the next turn's pass rolls on from there.
+    const dice = endDice.get(order.id) ?? c.dice;
+    if (dice !== undefined) ride.dice = dice;
     forced[order.id] = ride;
   };
   for (const c of riding) describe(c.order, c);
@@ -218,7 +225,7 @@ export function engineTurnStart(
     const ride: ForcedRide = { untilMs: f.untilMs };
     if (f.takenAt !== undefined) ride.takenAt = f.takenAt;
     if (f.takenBy !== undefined) ride.takenBy = f.takenBy;
-    return { ...bare, forced: ride };
+    return { ...bare, forced: ride, ...(f.dice === undefined ? {} : { dice: f.dice }) };
   });
   s = { ...s, world: { ...s.world, couriers } };
   for (const o of orders) {

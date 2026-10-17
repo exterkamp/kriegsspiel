@@ -1,4 +1,5 @@
 import { infeasible, type Diagnostic, type GenerationResult } from '../../contract.js';
+import { TopologyBudget } from '../../errors.js';
 
 export class CoverLimit extends Error {
   constructor(
@@ -43,5 +44,14 @@ export function boundedCover<T>(operation: () => GenerationResult<T>): Generatio
     return infeasible([
       { ...coverDiagnostic('COVER_LIMIT', error.message, 'error'), constraint: error.constraint },
     ]);
+  }
+}
+/** Frozen geometry queries metered against the cover work reservation. */
+export class MeteredTopology extends TopologyBudget {
+  constructor(private readonly work: CoverWork) {
+    super(Number.MAX_SAFE_INTEGER);
+  }
+  override consume(_path: string, count = 1): void {
+    this.work.reserve(count, 'cover geometry queries');
   }
 }

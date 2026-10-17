@@ -893,6 +893,25 @@ describe('places in reports', () => {
     expect(r!.text).not.toMatch(/\d+, \d+/);
   });
 
+  it('in a turn-mode game names clock times, and says where each own unit stands (#439)', () => {
+    const w = miniWorld({
+      features: [mill, road],
+      units: [
+        { id: 'b', x: 1000, y: 1000 },
+        { id: 'r', side: 'red', x: 1500, y: 1050 },
+      ],
+    });
+    let s = startVisibility(createState(1, w, 0));
+    s = advanceTo(s, COURIER_DELAY_MS, registry()).state;
+    const turn = { n: 1, startMs: 0, endMs: COURIER_DELAY_MS, adjudicator: 'engine' as const };
+    const view = viewFor({ ...s.world, turn }, 'blue', s.time);
+    const r = view.reports.find((x) => x.kind === 'contact');
+    expect(r!.text).toMatch(/— Unit b, at 00:00\.$/);
+    expect(view.ownUnits[0]!.place).toBe('near the mill');
+    // Real time keeps the age.
+    expect(viewFor(s.world, 'blue', s.time).reports[0]!.text).not.toContain('at 00:00.');
+  });
+
   it('words every report kind the same way: "Sir," first, minutes spelled out (#323)', () => {
     const base = {
       id: 'r',

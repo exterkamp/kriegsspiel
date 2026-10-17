@@ -11,7 +11,7 @@ import {
   viewChild,
 } from '@angular/core';
 import * as THREE from 'three';
-import { buildSceneState } from '@legacy/table/sceneState';
+import { buildSceneState, withTurnOverlays } from '@legacy/table/sceneState';
 import { GLIDE_MS } from '@legacy/table/glide';
 import { fixtureMap } from '@legacy/table/fixture';
 import { buildWindowScene } from '@legacy/window/model';
@@ -90,7 +90,12 @@ export class TableHostComponent implements OnDestroy {
       shownFrame = !!frame;
       scene.setGlide(glide ? GLIDE_MS : 0);
       if (frame) scene.apply(buildWindowScene(frame, this.desk.windowBelief(), fixtureMap));
-      else if (view) scene.apply(buildSceneState(view, fixtureMap));
+      else if (view) {
+        // Turn mode: the turn's orders and the last turn's fighting on the table too (#439).
+        const turn = this.desk.turnTable();
+        const built = buildSceneState(view, fixtureMap);
+        scene.apply(turn ? withTurnOverlays(built, view, turn) : built);
+      }
     });
     // Leaving the table dollies the camera to the desk and back.
     effect(() => {
