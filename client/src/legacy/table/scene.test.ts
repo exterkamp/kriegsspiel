@@ -356,6 +356,36 @@ describe('TableScene marks and overlays', () => {
     expect(t.scene.getObjectByName('courier:o1')).toBeFalsy();
   });
 
+  it("draws a turn's held order as a dashed ride with the order arrows, and the last turn's fights fainter (#439)", () => {
+    const t = make();
+    t.apply({
+      ...state,
+      orderRoutes: [
+        {
+          id: 'held-t-1',
+          kind: 'held' as const,
+          points: [
+            { x: 0, y: 0 },
+            { x: 900, y: 900 },
+          ],
+        },
+      ],
+      engagements: [
+        { id: 'now', position: { x: 200, y: 200 } },
+        { id: 'fought-1-0', position: { x: 800, y: 200 }, past: { label: 'Fought 00:12' } },
+      ],
+    });
+    // Dashes and a head.
+    expect(t.scene.getObjectByName('overlay:held-t-1')!.children.length).toBeGreaterThan(2);
+    const ring = (id: string) =>
+      (t.scene.getObjectByName(`engagement:${id}`)!.children[0] as THREE.Mesh)
+        .material as THREE.MeshBasicMaterial;
+    expect(ring('fought-1-0').opacity).toBeLessThan(ring('now').opacity);
+    t.setOverlays({ orders: false, routes: true, lastKnown: true });
+    expect(t.scene.getObjectByName('overlay:held-t-1')).toBeFalsy();
+    expect(t.scene.getObjectByName('engagement:fought-1-0')).toBeTruthy();
+  });
+
   it('shows order arrows, routes and last-known shading only while their overlay is on', () => {
     const t = make();
     const withRoutes = {

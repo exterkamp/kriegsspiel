@@ -1,0 +1,12 @@
+{
+  "blue": [
+    { "orderId": "b2-1", "to": "blue-1", "text": "Hold the south end of the bridge at all costs. Keep up your fire on any enemy on the bridge or the far bank. Spare your powder: fire by volleys at close range only." },
+    { "orderId": "b2-2", "to": "blue-2", "text": "Close in to the river bank about 80 paces east of the bridge and open fire on the enemy battalion at the north end of the bridge. If the enemy storms the bridge, take his column in the flank with your fire." },
+    { "orderId": "b2-3", "to": "blue-3", "courier": "fast", "text": "Stay behind the 1st Battalion out of the enemy's fire. If any enemy gets across the bridge, charge him at once while he is still in disorder, then return behind the infantry." }
+  ],
+  "red": [
+    { "orderId": "r2-1", "to": "red-1", "text": "Storm the bridge now. Form column on the road, give one volley, then cross at the bayonet and drive the enemy battalion off the south end. Once across, hold the south end of the bridge." },
+    { "orderId": "r2-2", "to": "red-2", "text": "Form line on the north bank just east of the bridge and fire on the enemy battalion at the south end to cover the Vanguard's assault. When the Vanguard is across, follow it over the bridge and form on its left." },
+    { "orderId": "r2-3", "to": "red-3", "courier": "fast", "text": "Wait at the north end of the bridge behind the Vanguard. When the Vanguard has cleared the south end, cross and fall on any enemy who breaks. Do not charge formed infantry." }
+  ]
+}
