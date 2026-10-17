@@ -3,7 +3,7 @@ import type { TurnOrder, UmpireSettings } from '@kriegsspiel/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SideAgent } from '../opponent/index.js';
 import type { OrderParser } from '../orders/index.js';
-import { TURN_MODE_REFUSAL } from './actor.js';
+import { TURN_APPEND_ATTEMPTS, TURN_MODE_REFUSAL } from './actor.js';
 import { GameHost, MemoryGameStore, createRegistry, startingState } from './index.js';
 import { replayLog } from './replay.js';
 import type { InputLogEntry } from './store.js';
@@ -419,10 +419,13 @@ describe('turn mode: the turn clock (D39, 11.3)', () => {
   });
 
   it('opens the next turn even when the store fails to take the resolved one', async () => {
+    // Fails every offer of the resolved turn until `failures` run out (#416: it is retried).
     class FlakyStore extends MemoryGameStore {
+      failures = TURN_APPEND_ATTEMPTS;
       failed = false;
       override async appendInput(gameId: string, entry: InputLogEntry): Promise<void> {
-        if (entry.command.kind === 'resolveTurn' && !this.failed) {
+        if (entry.command.kind === 'resolveTurn' && this.failures > 0) {
+          this.failures--;
           this.failed = true;
           throw new Error('disk full');
         }
@@ -454,6 +457,13 @@ describe('turn mode: the turn clock (D39, 11.3)', () => {
     expect(
       await game.submit({ kind: 'turnOrder', side: 'blue', turn: 0, order: order('b1', 'blue-1') }),
     ).toMatchObject({ ok: true });
+    // The store took the turn on the next append, ahead of everything logged after it (#416).
+    const kinds = (await store.inputLog('g1')).map((e) => e.command.kind);
+    expect(kinds.slice(kinds.indexOf('resolveTurn'))).toEqual([
+      'resolveTurn',
+      'openTurn',
+      'turnOrder',
+    ]);
   });
 
   it('lets a seat hold or withdraw only orders to units it may draft for (D6a)', async () => {

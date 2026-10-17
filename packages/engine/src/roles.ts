@@ -28,7 +28,7 @@ export interface Seat {
  */
 export type ViewUnitOutline = Pick<
   ViewUnit,
-  'id' | 'name' | 'kind' | 'position' | 'facing' | 'formation' | 'footprint'
+  'id' | 'name' | 'kind' | 'position' | 'place' | 'facing' | 'formation' | 'footprint'
 >;
 
 /** What one role may see: the side view cut down. Never has anything the side view lacks. */
@@ -48,6 +48,7 @@ const outline = (u: ViewUnit): ViewUnitOutline => ({
   name: u.name,
   kind: u.kind,
   position: u.position,
+  place: u.place,
   facing: u.facing,
   formation: u.formation,
   footprint: {

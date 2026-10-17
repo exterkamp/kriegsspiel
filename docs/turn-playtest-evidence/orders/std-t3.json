@@ -1,0 +1,12 @@
+{
+  "blue": [
+    { "orderId": "b3-1", "to": "blue-1", "text": "Hold the south end of the bridge as before. Fire only at close range. You will be relieved after dark." },
+    { "orderId": "b3-2", "to": "blue-2", "text": "Stay where you are on the bank east of the bridge and take any column on the bridge in the flank with your fire. If the 1st Battalion gives way, close on the bridge-end and hold it." },
+    { "orderId": "b3-3", "to": "blue-3", "courier": "fast", "text": "Stay behind the 1st Battalion. If the enemy gets a footing on our bank, charge him before he can form." }
+  ],
+  "red": [
+    { "orderId": "r3-2", "to": "red-2", "text": "Form column on the road and storm the bridge at once with the bayonet. Drive the enemy off the south end and hold it. This is our last chance before nightfall." },
+    { "orderId": "r3-1", "to": "red-1", "text": "Rally your men on the north bank and support the Line Battalion's assault with whatever fire you can give. Do not attack again." },
+    { "orderId": "r3-3", "to": "red-3", "courier": "fast", "text": "Follow the Line Battalion over the bridge as soon as it has a footing on the far bank, and charge any enemy who wavers." }
+  ]
+}

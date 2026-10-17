@@ -53,6 +53,33 @@ describe('native pinned actor activation and recovery', () => {
     expect(initialWorldFromHeader(header)).toEqual(native.initialWorld);
   });
 
+  it('plays a pinned game under its own seed and reopens it (#534)', async () => {
+    const store = new MemoryGameStore();
+    const host = createHost(store);
+    const native = pin();
+    expect(native.initialWorld.seed).toBe(1815);
+    const actor = await host.create(
+      'own-seed',
+      { ...native.initialWorld, seed: 97_531 },
+      { pin: native, settings: { dial: 'standard', persona: 'dry' } },
+    );
+    const header = (await store.logHeader('own-seed'))!;
+    expect(header.seed).toBe(97_531);
+    expect(headerPin(header)!.initialWorld.seed).toBe(1815);
+    expect(actor.state.world.seed).toBe(97_531);
+    await host.shutdown();
+    const reopened = await createHost(store).open('own-seed');
+    expect(reopened.state.world.seed).toBe(97_531);
+    // Only the seed may differ from the pinned world.
+    await expect(
+      createHost(new MemoryGameStore()).create(
+        'other',
+        { ...native.initialWorld, seed: 5, victory: [] as never },
+        { pin: native },
+      ),
+    ).rejects.toThrow(/contradicts native pin/);
+  });
+
   it('does not expose an actor or duplicate open before persistence/startup settles', async () => {
     const store = new MemoryGameStore();
     const time = new FakeTime();
