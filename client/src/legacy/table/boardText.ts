@@ -22,7 +22,12 @@ export function boardLines(scene: SceneState | undefined, map: BaseMap): string[
       (g) =>
         `Enemy ${g.id}${g.ageTag ? `, ${g.ageTag}` : ''}${g.sizeEstimate ? `, about ${g.sizeEstimate}` : ''}: ${whereText(map, g.position)}.`,
     ),
-    ...(scene.engagements ?? []).map((f) => `Fighting: ${whereText(map, f.position)}.`),
+    ...(scene.engagements ?? []).map(
+      (f) => `${f.past ? f.past.label : 'Fighting'}: ${whereText(map, f.position)}.`,
+    ),
+    ...(scene.orderRoutes ?? [])
+      .filter((r) => r.kind === 'held')
+      .map((r) => `Order for this turn, to the unit at ${whereText(map, r.points.at(-1)!)}.`),
     ...(scene.couriers ?? []).map(
       (c) =>
         `Courier${c.etaMin > 0 ? `, ${c.etaMin} min away` : ''}: ${whereText(map, c.position)}.`,

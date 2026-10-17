@@ -7,7 +7,14 @@ import { bounded, withCallerErrorIdentity, Work } from './budget.js';
 import { Context } from './context.js';
 import { footprint, corridor, segmentGrade } from './certificates.js';
 import { bridge } from './bridges.js';
-import type { CorridorCertificate, DeckProfile, PlanningInput, Suitability } from './types.js';
+import { ford } from './fords.js';
+import type {
+  CorridorCertificate,
+  DeckProfile,
+  FordProfile,
+  PlanningInput,
+  Suitability,
+} from './types.js';
 import { fail } from '../errors.js';
 
 function configurationValue(object: unknown, key: string, path: string): unknown {
@@ -37,6 +44,7 @@ export interface PlanningCertificates {
   ): GenerationResult<CorridorCertificate>;
   directionalGrade(a: Point, b: Point): GenerationResult<number>;
   bridge(candidate: CrossingCandidate, profile?: DeckProfile): GenerationResult<DeckProfile>;
+  ford(candidate: CrossingCandidate): GenerationResult<FordProfile>;
   heightAt(x: number, y: number): number;
   gradientAt(x: number, y: number): ReturnType<ElevationQueries['gradientAt']>;
 }
@@ -98,6 +106,7 @@ export function createPlanningCertificates(
         }),
       bridge: (candidate: CrossingCandidate, profile?: DeckProfile) =>
         bounded(() => bridge(c, candidate, profile)),
+      ford: (candidate: CrossingCandidate) => bounded(() => ford(c, candidate)),
       heightAt: (x: number, y: number) =>
         withCallerErrorIdentity(() => {
           c.validation.take();

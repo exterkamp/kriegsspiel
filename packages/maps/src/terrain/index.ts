@@ -2,7 +2,13 @@ import { type GenerationResult, type MapSettings, type TerrainOutput } from '../
 import { extractContours } from './contours.js';
 import { generateElevation } from './elevation.js';
 
-export { generateElevation, TERRAIN_VERSION } from './elevation.js';
+export {
+  generateElevation,
+  reliefShape,
+  RELIEF_SHAPE,
+  TERRAIN_VERSION,
+  type ReliefShape,
+} from './elevation.js';
 export { extractContours, CONTOUR_VERSION } from './contours.js';
 export { validateContourHeights, type ContourHeightEvidence } from './validation.js';
 

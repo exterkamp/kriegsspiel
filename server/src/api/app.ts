@@ -17,7 +17,7 @@
  *                                  (no `role`: the side's seat holder; a subordinate is named by one of their `unit`s)
  *   POST /games/:id/ready          signed in, seated or holding a role: body `{ "ready": boolean }`
  *   POST /games/:id/start          the creator: start a lobby game once every side is taken and every player is ready
- *   GET  /games/:id/window         seated, game over: the umpire's window timeline (403 `game_not_over` before the end)
+ *   GET  /games/:id/window         seated, game over: the umpire's window timeline, with a turn game's turns (403 `game_not_over` before the end)
  *   GET  /games/:id/window/dissents seated, game over: dissents on signed orders, for the critique (D6e)
  *   GET  /games/:id/window/at?at=  seated, game over: true positions, beliefs, dice and rulings at a game time
  *   GET  /games/:id/critique       seated, game over: the umpire's critique, each point citing logged events (403 `game_not_over` before the end)
@@ -32,7 +32,7 @@
  * before the WebSocket upgrade.
  */
 import { Buffer } from 'node:buffer';
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
@@ -93,7 +93,7 @@ import {
 } from '../notify/index.js';
 import { Hub, type Socket } from './hub.js';
 import { CritiqueService } from './critiqueService.js';
-import { windowAt, windowTimeline } from './umpireWindow.js';
+import { windowAt, windowTimeline, withTurns } from './umpireWindow.js';
 import { dissentNotes } from '../critique.js';
 import { seatKey } from './sideView.js';
 
@@ -143,6 +143,16 @@ const CreateGame = z
       .optional(),
     hierarchy: z.enum(['shared', 'chain']).optional(),
     lobby: z.boolean().optional(),
+    /**
+     * The game's dice (#534): absent, each game draws its own; given, the game rolls those dice
+     * (a test, or the same game again). Never sent back to a player.
+     */
+    seed: z
+      .number()
+      .int()
+      .min(0)
+      .max(2 ** 32 - 1)
+      .optional(),
   })
   .strict();
 
@@ -192,6 +202,11 @@ export interface AppOptions {
   lobby?: LobbyStore;
   wallNow?: WallClock;
   timers?: Timers;
+  /**
+   * The seed a new game gets when its request names none (#534): by default a random 32-bit value,
+   * drawn once when the game is made, kept on its lobby record and logged in its header.
+   */
+  newSeed?: () => number;
   /** Log lines from Fastify; off by default so tests stay quiet. */
   logger?: boolean;
   /** Play sides the scenario marks `scripted` with the built-in opponent. Off unless set; `main.ts` sets it from the environment. */
@@ -455,6 +470,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
         client,
         dial: settings.dial,
         persona: settings.persona,
+        // Each side's papers of an umpire turn, on the same capped client (11.9).
+        reporter: client,
         onFallback: (turn, reason) => {
           server.log.warn({ gameId: id, turn, reason }, 'turn umpire fallback');
           if (trace?.enabled) trace.record(id, 'error', { source: 'adjudicate', turn, reason });
@@ -479,6 +496,7 @@ export async function buildApp(options: AppOptions): Promise<App> {
   const mailer = options.auth?.mailer ?? new LogMailer((line) => server.log.info(line));
   const publicUrl = options.auth?.publicUrl ?? 'http://localhost:3000';
   const wallNow = options.wallNow ?? Date.now;
+  const newSeed = options.newSeed ?? (() => randomInt(0, 2 ** 32));
   const notifier = new Notifier({
     auth: authStore,
     store: notifyStore,
@@ -673,6 +691,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
           : {}),
       },
       ...(body.data.hierarchy ? { hierarchy: body.data.hierarchy } : {}),
+      // Drawn once, here, so a game started later from the lobby rolls the dice it was made with.
+      seed: body.data.seed ?? newSeed(),
       creator: user.id,
       status: 'lobby',
       ready: [],
@@ -714,10 +734,15 @@ export async function buildApp(options: AppOptions): Promise<App> {
   /** Create the game's actor and mark the record started. Returns an error code on failure. */
   const startGame = async (rec: LobbyGame): Promise<string | undefined> => {
     try {
-      await host.create(rec.id, loadScenarioById(rec.scenario), {
-        rate: rec.rate,
-        settings: rec.umpire,
-      });
+      // Each game its own dice (#534); a lobby record made before them draws its seed now.
+      await host.create(
+        rec.id,
+        { ...loadScenarioById(rec.scenario), seed: rec.seed ?? newSeed() },
+        {
+          rate: rec.rate,
+          settings: rec.umpire,
+        },
+      );
     } catch (e) {
       server.log.error({ err: e, gameId: rec.id }, 'could not start game');
       return 'start_failed';
@@ -1137,7 +1162,8 @@ export async function buildApp(options: AppOptions): Promise<App> {
     return tracedHttp(req.params.id, req, reply, async () => {
       const w = await windowFor(req.params.id, user.id, undefined);
       if ('error' in w) return reply.code(w.status).send({ error: w.error });
-      return w.timeline;
+      // A turn-mode game's turns (D39, 11.11), behind the same game-over gate.
+      return withTurns(w.input, w.timeline);
     });
   });
 

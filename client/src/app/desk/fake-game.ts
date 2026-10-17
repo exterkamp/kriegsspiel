@@ -27,6 +27,8 @@ export function fakeGame(state: Partial<ClientState> = {}, gameId?: string) {
     mergeDraft: vi.fn(() => true),
     draftPresence: vi.fn(() => true),
     set: (p: Partial<ClientState>) => s.update((x) => ({ ...x, ...p })),
+    /** Run a reducer over the state, as the service does (it may drop fields, which `set` cannot). */
+    apply: (f: (x: ClientState) => ClientState) => s.update(f),
   };
   return { provide: GameService, useValue: fake, fake };
 }
