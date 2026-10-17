@@ -1,0 +1,140 @@
+@if (!state.closed()) {
+  <section aria-label="Add geography map">
+    <p>
+      A geography map has no armies or objectives and cannot start a game. A saved map needs a
+      scenario before it can be played.
+    </p>
+    <div class="scroller">
+      <div class="layout">
+        <div>
+          <fieldset [disabled]="state.locked()">
+            <legend>Generate geography</legend>
+            <label
+              >Landscape
+              <select
+                #landscape
+                name="landscape"
+                [value]="state.landscape()"
+                (change)="state.setLandscape(landscape.value)"
+              >
+                <option value="" disabled>Custom / recorded settings</option>
+                @for (item of landscapes; track item.id) {
+                  <option [value]="item.id">{{ item.name }}</option>
+                }
+              </select>
+            </label>
+            <label
+              >Map size
+              <select
+                #size
+                name="map-size"
+                [value]="state.size()"
+                (change)="state.setSize(size.value)"
+              >
+                <option value="" disabled>Custom / recorded size</option>
+                <option value="5000">5 km × 5 km</option>
+                <option value="10000">10 km × 10 km</option>
+                <option value="15000">15 km × 15 km</option>
+              </select>
+            </label>
+            <details>
+              <summary>Repeat this map</summary>
+              <label
+                >Map number
+                <input
+                  #seed
+                  name="map-number"
+                  inputmode="numeric"
+                  [value]="state.seed()"
+                  (input)="state.setSeed(seed.value)"
+                  [attr.aria-invalid]="state.draft() ? null : 'true'"
+                  [attr.aria-describedby]="id + '-recipe'"
+                />
+              </label>
+              <p [id]="id + '-recipe'">
+                Keep the map number and recorded settings to repeat this geography.
+              </p>
+              @if (!state.draft()) {
+                <p class="ks-error" role="alert">
+                  Enter a whole map number between 0 and 9,007,199,254,740,991.
+                </p>
+              }
+            </details>
+          </fieldset>
+          <button type="button" [disabled]="!state.canGenerate()" (click)="state.generate()">
+            Generate map
+          </button>
+          @if (state.board()) {
+            <label
+              >Map name
+              <input
+                #name
+                name="map-name"
+                maxlength="160"
+                [value]="state.name()"
+                [disabled]="state.locked()"
+                (input)="state.setName(name.value)"
+              />
+            </label>
+            <p>The name labels your saved map. It does not change its geography.</p>
+          }
+          <p role="status" aria-live="polite">{{ state.phase() }}</p>
+          @if (state.board(); as board) {
+            <p>
+              {{ board.bounds.maxX / 1000 }} × {{ board.bounds.maxY / 1000 }} km ·
+              {{ state.completed() ? 'Needs a scenario' : 'Unsaved' }}
+            </p>
+          }
+          @if (state.pending()) {
+            <p>
+              The map may already be saved. Retry Save map to recover the same map before making
+              changes.
+            </p>
+          }
+          @if (state.error()) {
+            <p class="ks-error" role="alert">{{ state.error() }}</p>
+          }
+        </div>
+        @if (state.board()) {
+          <div class="preview">
+            <canvas
+              #canvas
+              tabindex="0"
+              aria-label="Geography preview. Drag or use arrow keys to pan, scroll or use plus and minus to zoom, F to fit."
+            ></canvas>
+            <p>Drag or arrow keys to pan · scroll or + / − to zoom · F to fit</p>
+            @if (previewError()) {
+              <p class="ks-error" role="alert">{{ previewError() }}</p>
+              <button type="button" (click)="retryPreview()">Retry preview</button>
+            }
+          </div>
+        }
+      </div>
+      @if (state.confirming()) {
+        <section class="discard" [attr.aria-labelledby]="id + '-discard'">
+          <h3 #confirmHeading tabindex="-1" [id]="id + '-discard'">Discard this map?</h3>
+          @if (state.pending()) {
+            <p>
+              The map may already be saved. Discarding stops recovery; it does not delete a saved
+              map.
+            </p>
+          } @else {
+            <p>Your unsaved map and changes will be lost.</p>
+          }
+          <div class="actions">
+            <button type="button" (click)="keepEditing()">Keep editing</button
+            ><button type="button" (click)="discard()">Discard map</button>
+          </div>
+        </section>
+      }
+    </div>
+    <footer>
+      <button type="button" (click)="requestCancel()" [disabled]="state.confirming()">
+        {{ state.completed() ? 'Back to maps' : 'Cancel' }}
+      </button>
+      <button type="button" class="ks-primary" [disabled]="!state.canSave()" (click)="state.save()">
+        Save map
+      </button>
+    </footer>
+  </section>
+}
