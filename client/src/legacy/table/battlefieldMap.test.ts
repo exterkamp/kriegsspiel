@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApprovedBattlefield } from '@kriegsspiel/protocol';
 import { battlefieldMap, battlefieldPoints } from './battlefieldMap.js';
-import { drawMap, FEATURE_COLOURS } from './mapTexture.js';
+import { TABLE_MAP_STYLE } from '../map-authoring/map-style.js';
+import { RecordedPath, recordCanvas, type PathOp } from './canvasRecorder.testing.js';
+import { drawPeriodMap } from './periodMap.js';
 import type { BaseFeature } from './types.js';
 
 const parentId = 'hold-the-bridge';
@@ -92,82 +94,6 @@ function descriptor(): ApprovedBattlefield {
     },
     isDefault: true,
   };
-}
-
-type Command =
-  ['move' | 'line', number, number] | ['arc', number, number, number, number, number] | ['close'];
-type Paint = {
-  op: 'fill' | 'stroke';
-  colour: CanvasRenderingContext2D['fillStyle'];
-  width: number;
-  cap: CanvasLineCap;
-  path: Command[];
-};
-
-/** Record the actual drawMap API calls, including widths at stroke time. */
-function recording() {
-  const paints: Paint[] = [];
-  const backgrounds: number[][] = [];
-  let path: Command[] = [];
-  const context: Pick<
-    CanvasRenderingContext2D,
-    | 'fillStyle'
-    | 'strokeStyle'
-    | 'lineWidth'
-    | 'lineCap'
-    | 'lineJoin'
-    | 'fillRect'
-    | 'beginPath'
-    | 'moveTo'
-    | 'lineTo'
-    | 'closePath'
-    | 'stroke'
-    | 'fill'
-    | 'arc'
-  > = {
-    fillStyle: '',
-    strokeStyle: '',
-    lineWidth: 1,
-    lineCap: 'butt',
-    lineJoin: 'miter',
-    fillRect(x, y, width, height) {
-      backgrounds.push([x, y, width, height]);
-    },
-    beginPath() {
-      path = [];
-    },
-    moveTo(x, y) {
-      path.push(['move', x, y]);
-    },
-    lineTo(x, y) {
-      path.push(['line', x, y]);
-    },
-    closePath() {
-      path.push(['close']);
-    },
-    arc(x, y, radius, start, end) {
-      path.push(['arc', x, y, radius, start, end]);
-    },
-    stroke() {
-      paints.push({
-        op: 'stroke',
-        colour: context.strokeStyle,
-        width: context.lineWidth,
-        cap: context.lineCap,
-        path: [...path],
-      });
-    },
-    fill() {
-      paints.push({
-        op: 'fill',
-        colour: context.fillStyle,
-        width: context.lineWidth,
-        cap: context.lineCap,
-        path: [...path],
-      });
-    },
-  };
-  return { context: context as CanvasRenderingContext2D, paints, backgrounds };
 }
 
 describe('public battlefield render adapter', () => {
@@ -362,12 +288,29 @@ describe('public battlefield render adapter', () => {
   });
 });
 
-describe('native geometry through actual canvas drawing', () => {
+describe('native geometry through the period paper (#498)', () => {
+  // The table paper is drawn by `drawPeriodMap` (D43); these replace the flat `drawMap` checks of #467
+  // with the same guarantees: paint order, exact native widths and radii, and legacy legibility floors.
+  const regular = TABLE_MAP_STYLE.palette.regular;
+  beforeEach(() => {
+    vi.stubGlobal('Path2D', RecordedPath);
+    vi.stubGlobal('document', {
+      createElement: () => ({ width: 0, height: 0, getContext: () => recordCanvas().ctx }),
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const extent = (path: readonly PathOp[]) => {
+    const pts = path.filter((op): op is ['M' | 'L', number, number] => op.length === 3);
+    const xs = pts.map((op) => op[1]);
+    const ys = pts.map((op) => op[2]);
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  };
+
   it.each([
     [-7, 12],
     [5, 5],
   ])(
-    'paints explicit layer/ID order through drawMap for bridge=%s and wood=%s',
+    'paints explicit layer/ID order through the period paper for bridge=%s and wood=%s',
     (bridgeLayer, woodLayer) => {
       const input = descriptor();
       input.map.preview = [
@@ -393,43 +336,37 @@ describe('native geometry through actual canvas drawing', () => {
       ];
       const map = battlefieldMap(input, parentId);
       expect(map.features.map((f) => f.id)).toEqual(['z', 'a']);
-      const trace = recording();
-      drawMap(trace.context, map, 1);
-      expect(trace.paints.filter((p) => p.op === 'fill').map((p) => p.path[0])).toEqual([
-        ['arc', 2050, 1500, 110, 0, Math.PI * 2],
-        ['move', 600, 300],
-      ]);
-      expect(trace.paints.filter((p) => p.op === 'fill').map((p) => p.colour)).toEqual([
-        FEATURE_COLOURS.bridge,
-        FEATURE_COLOURS.wood,
-      ]);
+      const r = recordCanvas();
+      drawPeriodMap(r.ctx, map, 1, false);
+      const bridge = r.paints.findIndex((p) => p.op === 'fill' && p.style === regular.bridge);
+      const wood = r.paints.findIndex((p) => p.op === 'fill' && p.style === regular.wood);
+      expect(bridge).toBeGreaterThanOrEqual(0);
+      // The wood paints over the bridge although the renderer would put crossings over cover.
+      expect(bridge).toBeLessThan(wood);
+      expect(extent(r.paints[wood]!.path)).toEqual([600, 300, 1300, 900]);
+      expect(extent(r.paints[bridge]!.path)).toEqual([1995, 1390, 2105, 1610]);
     },
   );
 
-  it('uses full scaled native widths and radii below two pixels without flipping coordinates', () => {
+  it('uses full scaled native widths and radii below the legibility floors without flipping coordinates', () => {
     const map = battlefieldMap(descriptor(), parentId);
-    const trace = recording();
-    drawMap(trace.context, map, 0.01);
-    expect(trace.backgrounds).toEqual([[0, 0, 40, 30]]);
-    const road = trace.paints.find((p) => p.op === 'stroke' && p.colour === FEATURE_COLOURS.road)!;
-    expect(road.path).toEqual([
-      ['move', 20.5, 0],
-      ['line', 20.5, 30],
+    const r = recordCanvas();
+    // 0.01 px/m: the style's 4.2 px road floor would be 420 m wide.
+    drawPeriodMap(r.ctx, map, 0.01, false);
+    expect(r.calls).toContain('scale');
+    const casing = r.painted('stroke', regular.roadCasing.regional)[0]!;
+    expect(casing.width).toBe(20);
+    expect(casing.path).toEqual([
+      ['M', 2050, 0],
+      ['L', 2050, 3000],
     ]);
-    expect(road.width).toBe(0.2);
-    expect(road.cap).toBe('round');
-    const river = trace.paints.find(
-      (p) => p.op === 'stroke' && p.colour === FEATURE_COLOURS.river,
-    )!;
-    expect(river.path).toEqual([
-      ['move', 0, 15],
-      ['line', 40, 15],
-    ]);
-    expect(river.width).toBe(2);
-    const bridge = trace.paints.find(
-      (p) => p.op === 'fill' && p.colour === FEATURE_COLOURS.bridge,
-    )!;
-    expect(bridge.path).toEqual([['arc', 20.5, 15, 1.1, 0, Math.PI * 2]]);
+    const water = r.painted('fill', regular.water)[0]!;
+    expect(extent(water.path)).toEqual([0, 1400, 4000, 1600]);
+    // No centreline floor for a native river.
+    expect(r.painted('stroke', regular.waterLine).every((p) => p.width !== 1.6 / 0.01)).toBe(true);
+    // The bridge spans its 110 m radius each way, as wide as the 20 m road it carries.
+    const deck = r.painted('fill', regular.bridge)[0]!;
+    expect(extent(deck.path)).toEqual([2040, 1390, 2060, 1610]);
   });
 
   it('does not treat explicit layer zero or 0.001 metre native dimensions as legacy', () => {
@@ -455,41 +392,30 @@ describe('native geometry through actual canvas drawing', () => {
         geometry: { shape: 'point', at: { x: 1.001, y: 0.001 }, radiusM: 0.001 },
       },
     ];
-    const trace = recording();
-    drawMap(trace.context, battlefieldMap(input, parentId), 0.5);
-    const line = trace.paints.find((p) => p.op === 'stroke' && p.colour === FEATURE_COLOURS.road)!;
-    expect(line.width).toBe(0.0005);
+    const r = recordCanvas();
+    drawPeriodMap(r.ctx, battlefieldMap(input, parentId), 0.5, false);
+    const line = r.painted('stroke', regular.roadCasing.track)[0]!;
+    expect(line.width).toBe(0.001);
     expect(line.path).toEqual([
-      ['move', 0.0005, 0.5005],
-      ['line', 0.5005, 1.0005],
+      ['M', 0.001, 1.001],
+      ['L', 1.001, 2.001],
     ]);
-    expect(trace.paints.find((p) => p.op === 'fill')?.path).toEqual([
-      ['arc', 0.5005, 0.0005, 0.0005, 0, Math.PI * 2],
+    const ford = r.painted('fill', regular.ford)[0]!;
+    expect(extent(ford.path).map((v) => Math.round(v * 1e6) / 1e6)).toEqual([
+      1.0005, 0, 1.0015, 0.002,
     ]);
   });
 
-  it('retains the legacy visibility clamp, line caps and existing colours/outlines when layer is absent', () => {
+  it('keeps the legibility floors for legacy features with no layer', () => {
     const native = battlefieldMap(descriptor(), parentId);
     const features: BaseFeature[] = native.features.map((f) => ({
       id: f.id,
       kind: f.kind,
       geometry: f.geometry,
     }));
-    const trace = recording();
-    drawMap(trace.context, { ...native, features }, 0.01);
-    const road = trace.paints.find((p) => p.op === 'stroke' && p.colour === FEATURE_COLOURS.road)!;
-    expect(road.width).toBe(2);
-    expect(road.cap).toBe('butt');
-    expect(
-      trace.paints.find((p) => p.op === 'fill' && p.colour === FEATURE_COLOURS.bridge)?.path,
-    ).toEqual([['arc', 20.5, 15, 2, 0, Math.PI * 2]]);
-    expect(
-      trace.paints
-        .filter((p) => p.op === 'stroke' && p.colour === 'rgba(60,45,20,0.45)')
-        .map((p) => p.width),
-    ).toEqual([1.5, 1.5]);
-    expect(
-      trace.paints.find((p) => p.op === 'stroke' && p.colour === 'rgba(60,45,20,0.6)')?.width,
-    ).toBe(1.5);
+    const r = recordCanvas();
+    drawPeriodMap(r.ctx, { ...native, features }, 0.01, false);
+    const casing = r.painted('stroke', regular.roadCasing.regional)[0]!;
+    expect(casing.width).toBeCloseTo(TABLE_MAP_STYLE.roads.stroke.regional.minWidthPx / 0.01);
   });
 });

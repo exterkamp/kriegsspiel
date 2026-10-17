@@ -9,12 +9,13 @@ import {
   withMarkPut,
   withPendingOrder,
   withRead,
+  withModePending,
   withTurnSettings,
   type ClientState,
   type PendingOrder,
 } from '@legacy/net/state';
 import type { Mark, TurnOrder } from '@kriegsspiel/protocol';
-import { fetchGame } from '@legacy/lobby/api';
+import { fetchGame, fetchScenarios } from '@legacy/lobby/api';
 import { fetchGameBattlefield, GameBattlefieldError } from '@legacy/lobby/battlefield';
 import { fixtureView, fixtureMap } from '@legacy/table/fixture';
 import type { BaseMap } from '@legacy/table/types';
@@ -76,7 +77,8 @@ export class GameService {
     this._map.set(undefined);
     this._gameId.set(params.game);
     this._sides.set([]);
-    this._state.set(initialState);
+    // Neither dress until the game's settings (or its first turn) say how it is played (#427).
+    this._state.set(withModePending(initialState));
     this._mapLoading.set(true);
     this._mapError.set('');
     const request = new AbortController();
@@ -99,7 +101,20 @@ export class GameService {
           throw new Error('Game metadata mismatch');
         this._map.set(terrain.map);
         this._sides.set(info.sides.map((x) => x.side));
+        // The mode comes with the game, so a finished turn game reloads in turn dress (#429, #427).
         this._state.update((state) => withTurnSettings(state, info.umpire));
+        // The battle's length, so the turn desk can count its turns (#439).
+        fetchScenarios().then(
+          (list) => {
+            // An odd answer only costs the count.
+            const minutes = Array.isArray(list)
+              ? list.find((x) => x.id === info.scenario)?.lengthMinutes
+              : undefined;
+            if (!current() || minutes === undefined) return;
+            this._state.update((state) => ({ ...state, battleMinutes: minutes }));
+          },
+          () => undefined,
+        );
         const url = wsUrl(loc, params.game, params.side);
         this.conn = new GameConnection({
           url: url + (url.includes('?') ? '&' : '?') + 'battlefieldVersion=1',

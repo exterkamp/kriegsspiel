@@ -67,5 +67,8 @@ The checked-in recording is a hand-authored seed (`model: hand-authored-seed`, z
 ## Evaluating another parser
 Construct it in `cli.ts` in place of `StubOrderParser` and give it its own baseline file. Stored outputs for an LLM run should come from the recorded LLM outputs, so the regression check needs no model calls.
 
+## The rules parser
+The test provider's `parse` stage (`server/src/umpire/providers/testParse.ts`) is the rules parser the keyless demo uses in real time and turn mode uses for every order (D39). `server/src/game/rulesParse.test.ts` scores it on this corpus through `LlmOrderParser` with `UMPIRE_PROVIDER=test` and pins the result per category (40/50 since #522, from 29/50; zero unsafe). Its conditional and timed scores stay low by design: in real time it ignores a condition and carries out the plain order, and in turn mode the engine treats such a sentence as no new order before the parser sees it. The same file holds the reading of every umpire-benchmark order as an engine order.
+
 ## The staff check
 `server/src/orders/staffCheck.test.ts` reuses this corpus for the LLM staff check (D6d, `server/src/orders/staffCheck.ts`). With the offline test provider it requires no findings on the clear orders (except clear-10, which the test parser cannot read), and a finding of the expected kind on each known ambiguity: a missing place or an ambiguous name (vague), a contradiction, an unknown reference (impossible), a condition, and a stated time. It is not scored against the parser's expectations: the check warns where a subordinate would have to guess, and need not agree with the parse. A live-model run with a recorded baseline, as for the parser, is not built.
